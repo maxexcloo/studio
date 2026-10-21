@@ -4,7 +4,7 @@ import { loadSharp } from "./sharp-loader.js";
 /**
  * Inpainting: change only the part of a reference image the user painted.
  *
- * The model never sees the whole picture. HEISS crops the painted area with a
+ * The model never sees the whole picture. Studio crops the painted area with a
  * band of context around it, the graph regenerates that crop with a latent
  * noise mask (so only the painted part is repainted), and ImageCompositeMasked
  * lays the result back onto the original pixels as ComfyUI loaded them. The

@@ -10,9 +10,9 @@ import { isInside, pathKey, samePath } from "./paths.js";
  *
  * People keep models in a shared folder, in another ComfyUI install, in
  * Stability Matrix or A1111, or on an external drive, and then ComfyUI (so
- * HEISS) simply never lists them. This finds such folders on the machine
+ * Studio) simply never lists them. This finds such folders on the machine
  * ComfyUI runs on, says what is in them, and adds them to ComfyUI's
- * extra_model_paths.yaml as a marked section HEISS can take out again.
+ * extra_model_paths.yaml as a marked section Studio can take out again.
  *
  * Only folder and file names are read, never file contents.
  */
@@ -33,7 +33,7 @@ function derivedKinds() {
   return { unet_gguf: "diffusion_models", clip_gguf: "text_encoders" };
 }
 
-/** Rewrites derived kinds in HEISS's own sections to their core kind; other text is left alone. */
+/** Rewrites derived kinds in Studio's own sections to their core kind; other text is left alone. */
 export function migrateDerivedKinds(text = "") {
   let changed = [];
   const next = text.replace(/# >>> Added by Studio: ([^\r\n]*)([\s\S]*?)# <<< Studio/g, (block, dir, body) => {
@@ -184,7 +184,7 @@ export async function comfyModelSetup() {
 }
 
 /**
- * Whether HEISS can write the file and its backup next to it. On Windows
+ * Whether Studio can write the file and its backup next to it. On Windows
  * accessSync(W_OK) passes for every folder (it only reads the read-only flag),
  * so the folder is tested by making and removing a file in it.
  */
@@ -347,8 +347,8 @@ export async function findModelFolders(knownKinds, { home = os.homedir(), drives
 const startMark = "# >>> Added by Studio:";
 const endMark = "# <<< Studio";
 
-/** Sections HEISS added before, by the folder they point at. */
-export function heissSections(text = "") {
+/** Sections Studio added before, by the folder they point at. */
+export function studioModelSections(text = "") {
   const sections = [];
   // \r?: Notepad and other Windows editors save CRLF.
   const pattern = /^# >>> Added by Studio: (.+?)\r?\n([\s\S]*?)^# <<< Studio\s*$/gm;
@@ -356,7 +356,7 @@ export function heissSections(text = "") {
   return sections;
 }
 
-/** The folders a HEISS section adds (base_path joined with each kind's names), as written by sectionFor. */
+/** The folders a Studio section adds (base_path joined with each kind's names), as written by sectionFor. */
 export function sectionDirs(section) {
   const dirs = [];
   let multi = false;
@@ -405,7 +405,7 @@ let lastReport = null;
 
 /**
  * What a setup panel needs: every models folder with files ComfyUI is not
- * reading, what they hold, and the folders HEISS already added.
+ * reading, what they hold, and the folders Studio already added.
  */
 export async function modelFolderReport({ local = true, scan = {} } = {}) {
   const setup = await comfyModelSetup();
@@ -418,11 +418,11 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
   const read = new Set(Object.values(setup.kinds).flat().map((dir) => pathKey(dir)));
   let configText = "";
   try { configText = fs.readFileSync(setup.configPath, "utf8"); } catch { /* not made yet */ }
-  // `read`: ComfyUI has picked the folder up, which only happens once it restarted after HEISS added it.
+  // `read`: ComfyUI has picked the folder up, which only happens once it restarted after Studio added it.
   const readDirs = Object.values(setup.kinds).flat();
   // Read only when ComfyUI reads every folder the section adds, not just any folder
   // inside it: a ComfyUI's own models folder has read subfolders from the start.
-  const linked = heissSections(configText).map((section) => {
+  const linked = studioModelSections(configText).map((section) => {
     const dirs = sectionDirs(section).map(realpath);
     const allRead = dirs.length ? dirs.every((dir) => read.has(pathKey(dir))) : readDirs.some((dir) => isInside(realpath(section.path), dir, { orSame: true }));
     return { path: section.path, label: tildePath(section.path), read: allRead };
@@ -489,7 +489,7 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   try { text = fs.readFileSync(file, "utf8"); } catch { /* a new file */ }
   // Keep the file's own line endings (a Windows editor saves CRLF).
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
-  const already = new Set(heissSections(text).map((section) => pathKey(section.path)));
+  const already = new Set(studioModelSections(text).map((section) => pathKey(section.path)));
   const backup = text ? `${file}.heiss-backup` : "";
   // Sections an older HEISS wrote under a derived kind never took; fix them in place.
   const migrated = migrateDerivedKinds(text);
@@ -513,12 +513,12 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   return { ok: true, added, configPath: file, backup };
 }
 
-/** Takes a folder HEISS added back out of ComfyUI's model paths. */
+/** Takes a folder Studio added back out of ComfyUI's model paths. */
 export async function unlinkModelFolder(dir) {
   const setup = await comfyModelSetup();
   if (!setup?.configPath) throw new Error("Can’t reach ComfyUI.");
   const text = fs.readFileSync(setup.configPath, "utf8");
-  const section = heissSections(text).find((item) => item.path === String(dir)) || heissSections(text).find((item) => samePath(item.path, String(dir)) || samePath(item.path, realpath(String(dir))));
+  const section = studioModelSections(text).find((item) => item.path === String(dir)) || studioModelSections(text).find((item) => samePath(item.path, String(dir)) || samePath(item.path, realpath(String(dir))));
   if (!section) throw new Error("Only folders added here can be removed here.");
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   // The blank line that went in before the section goes out with it.

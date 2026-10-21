@@ -264,7 +264,7 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
   };
 }
 
-/** When HEISS's own queue should be clear (now, when empty), or null when a job in it has no known length. */
+/** When Studio's own queue should be clear (now, when empty), or null when a job in it has no known length. */
 export function queueClearsAt(now = Date.now(), backend = defaultWorkerId()) {
   return refreshQueueEstimates(now, { apply: false, backend });
 }
@@ -492,7 +492,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", heiss_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}) } } })
+      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", studio_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}) } } })
     });
     if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
       // It may already have started on an idle ComfyUI; this stops it either way, and only it.
@@ -513,7 +513,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
      * saved; they are kept at their generated size and the toast says so.
      */
     const deliver = async (results, missed = null) => {
-      // ComfyUI as a worker: the pictures move into HEISS media before anything shows them.
+      // ComfyUI as a worker: the pictures move into Studio media before anything shows them.
       let comfyCopies = [];
       if (mediaStorageEnabled) {
         const moved = await ingestRunResults(results, body.ownerId || "");
@@ -544,7 +544,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       markWorkflowUsed(body.profileId || body.model || body.workflow || "", completed[0]?.url || "");
       setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
       if (body.temporaryInputNames?.length) await forgetComfyRun({ inputNames: body.temporaryInputNames });
-      // The gallery has HEISS's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
+      // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
       if (mediaStorageEnabled) {
         await flushGallery();

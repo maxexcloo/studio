@@ -9,7 +9,7 @@ import { registerComparisonRoutes } from './comparisons.js';
 test('comparisons enforce ownership and fixed seeds, persist votes and redact removed images', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'studio-compare-'));
   let items = ['a', 'b', 'c'].map(jobId => ({ id: jobId, jobId, ownerId: jobId === 'c' ? 'other' : 'owner', type: 'image', status: 'done', settings: { seed: '42' }, prompt: 'private' }));
-  const app = express(); app.use(express.json()); app.use((req, res, next) => { req.heissAccount = { userId: req.headers['x-test-owner'] || 'owner', authenticated: true, role: 'administrator' }; next(); });
+  const app = express(); app.use(express.json()); app.use((req, res, next) => { req.studioAccount = { userId: req.headers['x-test-owner'] || 'owner', authenticated: true, role: 'administrator' }; next(); });
   registerComparisonRoutes(app, { dataDir: dir, gallery: () => items });
   const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
   t.after(() => { server.closeAllConnections(); server.close(); fs.rmSync(dir, { recursive: true, force: true }); });

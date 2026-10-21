@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 /**
  * Two facts about the device in front of the studio, shared app-wide:
  *
- *   thisComputer  the page may look after the computer HEISS UI runs on
+ *   thisComputer  the page may look after the computer Studio runs on
  *                 (folders, downloads, installs, restarts, updates): it is
  *                 open on that computer, or on a signed-in device its owner
  *                 trusts with that (Settings › Workers). Elsewhere the

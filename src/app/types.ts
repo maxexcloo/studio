@@ -170,7 +170,7 @@ export type EncoderSlot = { slot: string; label: string; options: string[]; defa
 export type PartDownload = { id: string; file: string; url: string; folder: string; label: string; bytes?: number; /** Already in a ComfyUI model folder, waiting for ComfyUI to list it. */ onDisk?: boolean; /** Who publishes it on Hugging Face (the repo owner), and the repo. */ source?: string; repo?: string };
 /** A ComfyUI custom node pack (server/node-packs.js). */
 export type NodePackInfo = { id?: string; name: string; repository: string; folder?: string; search?: string; note?: string; /** Where the pack sits inside its repository, when it isn't the whole repository. */ subdir?: string; /** The reviewed commit a one-click install takes, and what it is (a release tag, or a branch and date). */ commit?: string; ref?: string };
-/** Which one-click routes HEISS has for a pack: Manager (the pack is in its list) and/or a local clone + pip. */
+/** Which one-click routes Studio has for a pack: Manager (the pack is in its list) and/or a local clone + pip. */
 export type PackAutoInstall = { manager: boolean; local: boolean };
 export type PackInstallState = { id: string; name: string; route: "manager" | "local"; status: "running" | "done" | "error" | "blocked"; step: string; log: string; error: string; startedAt: number; finishedAt: number; /** Blocked by ComfyUI-Manager's security level: whether ComfyUI's own Python could do it instead, if the person agrees. */ canOverride?: boolean };
 /** One command per shell: Terminal on macOS and Linux; PowerShell and Command Prompt on Windows. */
@@ -178,7 +178,7 @@ export type ShellPlan = { commands: Array<{ shell: "sh" | "powershell" | "cmd"; 
 export type NodeInstallPlan = ShellPlan & { exact: boolean; customNodesDir: string; python: string; cloned: boolean; needsGit: boolean };
 /**
  * Something a model still needs. A missing node pack carries `nodePack` and its
- * terminal `install`; a part fetched outside HEISS carries a `command`.
+ * terminal `install`; a part fetched outside Studio carries a `command`.
  */
 export type MissingPart = {
   part: "encoder" | "vae" | "model" | "vision" | "comfy"; slot?: string; label: string; kind?: string; detail?: string; downloads: PartDownload[];
@@ -190,7 +190,7 @@ export type MissingPart = {
 export type ModelDownload = { id: string; file: string; folder?: string; label: string; status: "queued" | "downloading" | "done" | "error" | "canceled" | "paused"; receivedBytes: number; totalBytes: number; bytesPerSecond?: number; already?: boolean; error?: string; finishedAt?: number; /** false when trying again cannot help (full disk, gated file). */ retryable?: boolean; /** Gated: only the browser, logged in to Hugging Face, can fetch it. */ needsBrowser?: boolean; /** Which automatic reconnect this is, while the connection is down. */ reconnecting?: number; /** Gone or gated, and the next build of the same part the server tried instead. */ unavailable?: boolean; fellBackTo?: string; fallbackFrom?: string ; /** All there, being checked against its published SHA-256. */ verifying?: boolean };
 export type DownloadState = { local?: boolean; active: ModelDownload | null; queued: ModelDownload[]; recent: ModelDownload[]; paused?: ModelDownload[]; /** Free bytes where each models folder lands, and which disk that is. */ space?: Record<string, { free: number; disk: string }> };
 export type ModelSource = "unet" | "checkpoint";
-/** A model file and what HEISS took it for: via says how (your choice, its weights, metadata, filename). */
+/** A model file and what Studio took it for: via says how (your choice, its weights, metadata, filename). */
 export type ModelFile = { name: string; source: ModelSource; family: string; choice: string; via: "choice" | "file" | "metadata" | "name" | "default" | ""; label: string; supported: boolean; reason?: string; missing?: string[]; /** A quantized format ComfyUI cannot load natively (svdq, nf4). */ quant?: string };
 export type Models = {
   imageModels: SelectOption[];
@@ -215,15 +215,15 @@ export type Paths = { outputDir?: string; galleryDir?: string; workflowsDir?: st
 export type OutputFolderState = "empty" | "missing" | "not-folder" | "ok" | "match" | "mismatch";
 export type OutputFolderReport = { path: string; state: OutputFolderState; media?: number; capped?: boolean; checked?: number; found?: number; looksLikeComfy?: boolean; source?: "comfy" | "common" };
 export type Health = { ok: boolean; comfyUrl?: string; /** Off: stay on comfyUrl instead of looking on the usual ports (STUDIO_COMFY_SEARCH=0). */ comfySearch?: boolean; error?: string; /** Admin allowed: on the computer Studio runs on, or a signed-in device trusted with admin. */ thisComputer?: boolean; /** Open on the computer Studio runs on itself. */ atComputer?: boolean; /** The last run stopped without anyone meaning it to (server/exit-record.js); this computer only. */ previousExit?: PreviousExit };
-/** Why the last run of HEISS UI stopped, written down by whoever saw it. */
+/** Why the last run of Studio stopped, written down by whoever saw it. */
 export type PreviousExit = { at: number; who: "server" | "vite" | "launcher" | "unknown"; reason: string; code: number | null; signal: string | null; detail?: string; lastSeen?: number };
 /** How a ComfyUI restart ended, as the server saw it: how long it took, and which node packs it brought in or failed to load. */
 export type RestartResult = { startedAt: number; endedAt: number; outcome: 'back' | 'failed'; durationMs?: number | null; newPacks?: string[]; failedPacks?: string[] };
 /** One worker in the status poll (server/workers.js): who it is, what it runs and whether it answers. */
 export type WorkerState = { id: string; name: string; capabilities: string[]; default?: boolean; connected: boolean; busy?: boolean; restarting?: boolean; device?: string; version?: string; url?: string; error?: string };
-export type ComfyStatus = { connected: boolean; label?: string; busy?: boolean; backends?: Record<string, { connected: boolean; busy?: boolean; device: string; version?: string; url?: string; error?: string }>; /** Every worker, in list order. */ workers?: WorkerState[]; /** No worker is set up, or none runs what the selected profile needs. */ noWorkers?: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart HEISS asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer Studio tries by itself. */ nearby?: string[] };
+export type ComfyStatus = { connected: boolean; label?: string; busy?: boolean; backends?: Record<string, { connected: boolean; busy?: boolean; device: string; version?: string; url?: string; error?: string }>; /** Every worker, in list order. */ workers?: WorkerState[]; /** No worker is set up, or none runs what the selected profile needs. */ noWorkers?: boolean; url?: string; latencyMs?: number; version?: string; device?: string; error?: string; checking?: boolean; checked?: boolean; /** A restart Studio asked for is under way: not answering is expected. */ restarting?: boolean; restartStartedAt?: number; restartElapsedMs?: number; /** How long restarts usually take here, once they agree. */ restartTypicalMs?: number; /** The restart that ended in the last two minutes. */ lastRestart?: RestartResult; /** ComfyUI turned up at this other usual address, which is now saved. */ found?: string; /** Other addresses on this computer Studio tries by itself. */ nearby?: string[] };
 export type AspectPreset = { label: string; value: string; w: number; h: number };
-export type WorkflowValidation = { ok: boolean; unverified?: boolean; issues: string[]; warnings?: string[]; missingNodes?: string[]; missingFiles?: string[]; missingPacks?: string[]; /** ComfyUI itself is too old for this model. */ outdatedComfy?: boolean; /** An imported workflow's missing files, with downloads where HEISS's catalog has them. */ missingParts?: MissingPart[] };
+export type WorkflowValidation = { ok: boolean; unverified?: boolean; issues: string[]; warnings?: string[]; missingNodes?: string[]; missingFiles?: string[]; missingPacks?: string[]; /** ComfyUI itself is too old for this model. */ outdatedComfy?: boolean; /** An imported workflow's missing files, with downloads where Studio's catalog has them. */ missingParts?: MissingPart[] };
 export type WorkflowSummary = {
   id: string;
   profileId: string;
@@ -251,7 +251,7 @@ export type WorkflowPreferences = { favorites: string[]; lastUsed: Record<string
 export type WorkflowImportPreview = {
   filename?: string;
   format?: string;
-  hasHeissUi: boolean;
+  hasStudioBlock: boolean;
   detected: {
     id: string;
     name: string;

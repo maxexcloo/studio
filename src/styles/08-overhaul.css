@@ -1,4 +1,4 @@
-/* HEISS UI 2026 visual system: quiet canvas, tactile floating surfaces, clear primary actions. */
+/* Studio 2026 visual system: quiet canvas, tactile floating surfaces, clear primary actions. */
 :root {
   /* One brand ladder: canvas -> surface -> raised -> selected -> action. */
   --brand-canvas: #0a0a0a;

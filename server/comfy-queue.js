@@ -1,7 +1,7 @@
 import { comfy } from './comfy.js';
 
 /**
- * HEISS's side of ComfyUI's queue: stopping only its own runs, and following a
+ * Studio's side of ComfyUI's queue: stopping only its own runs, and following a
  * run through a flaky connection. ComfyUI's queue is shared with its own UI,
  * other apps and other devices, so nothing here clears the whole queue or
  * interrupts whatever happens to be running.
@@ -25,7 +25,7 @@ export function queuePlace(queue, promptId) {
 }
 
 /**
- * Stops one of HEISS's own prompts and nothing else. A current ComfyUI does it
+ * Stops one of Studio's own prompts and nothing else. A current ComfyUI does it
  * in one atomic call (/api/jobs/{id}/cancel: dequeue if pending, interrupt if
  * running). An older one gets the same by hand: delete it from the pending
  * list, and interrupt only when it is the prompt running right now. Older
@@ -56,7 +56,7 @@ export async function cancelPrompt(promptId, request = comfy) {
   return "running";
 }
 
-/** Stops several of HEISS's prompts; one that fails to stop does not keep the rest running. */
+/** Stops several of Studio's prompts; one that fails to stop does not keep the rest running. */
 export async function cancelPrompts(promptIds = [], request = comfy) {
   const ids = [...new Set(promptIds.filter(Boolean))];
   const results = await Promise.allSettled(ids.map((id) => cancelPrompt(id, request)));

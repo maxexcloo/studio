@@ -8,7 +8,7 @@ import { packInstallRoutes } from './pack-installer.js';
  * What the viewer can offer as a button for a failure describeFailure
  * classified: the node pack that has a missing node, the catalog download that
  * replaces a damaged file, and whether a retry may decode in tiles. Only what
- * HEISS can actually do is attached; everything else stays a hint.
+ * Studio can actually do is attached; everything else stays a hint.
  */
 
 // Which models folder a loader reads, so a damaged file is looked up where it lives.
@@ -25,7 +25,7 @@ export function packForNode(classType = "") {
   return id ? nodePack(id) : null;
 }
 
-/** The catalog download for a damaged file a loader could not read, or null when HEISS cannot fetch it. */
+/** The catalog download for a damaged file a loader could not read, or null when Studio cannot fetch it. */
 export function redownloadFor(file = "", nodeType = "") {
   if (!file) return null;
   const folder = loaderFolders.find(([test]) => test.test(nodeType))?.[1];
@@ -46,7 +46,7 @@ export function canDecodeTiled(body = {}) {
   return Boolean(family && family.sampling !== "sana" && String(body.workflow || "").startsWith("family:"));
 }
 
-/** The failure with the fixes HEISS can offer for it. */
+/** The failure with the fixes Studio can offer for it. */
 export function withFixes(failure, body = {}) {
   if (!failure) return failure;
   const next = { ...failure };

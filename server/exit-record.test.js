@@ -42,7 +42,7 @@ test("no word after a run started: ended from outside, unless the computer has b
   assert.equal(told.lastSeen, 1000);
   reset();
   startSession({ now: 1000, bootedAt: 0 });
-  assert.equal(startSession({ now: 5000, bootedAt: 3000 }), null, "shut down or restarted with HEISS running");
+  assert.equal(startSession({ now: 5000, bootedAt: 3000 }), null, "shut down or restarted with Studio running");
 });
 
 test("the tail keeps the last lines, without colour codes", () => {

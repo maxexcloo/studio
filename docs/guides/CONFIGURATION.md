@@ -214,3 +214,34 @@ The same goes for the names browsers and scripts see. Studio writes only the new
 | Browser storage (preferences, drafts, LoRA favourites and the rest) | `heiss-ui-*`, `heiss-ui:*`, `heiss.*`, `heiss-grid-autoplay` | `studio-*`, `studio:*`, `studio.*`, `studio-grid-autoplay` | Moved to the new names when the page starts |
 
 Accounts already use `studio_account`, so account sessions are unaffected.
+
+## On-Disk Names
+
+Some names on disk still come from HEISS UI. Gallery records, account media and ComfyUI's output folder hold these paths, so Studio keeps writing them and never moves or renames files by itself. It already recognises the Studio name beside each one (`server/data-names.js`), so files a migration has moved keep working.
+
+| Kept name | Where | Studio name it also reads |
+| --- | --- | --- |
+| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`) | `studio/` |
+| `.heiss-trash/` | Beside trashed files in the output and media folders | `.studio-trash/` (skipped by snapshots) |
+| `heiss_generation` | Run records in ComfyUI's queue and history | `studio_generation` (written now) |
+| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, `studio-profiles`) | Not renamed: it is the profile file format |
+| `heiss_*` sections, `.heiss-backup` | ComfyUI's `extra_model_paths.yaml` (single-user mode) | Not renamed |
+| `heiss` text chunk | Metadata in PNGs Studio wrote | Not renamed |
+| `heiss-ui-reference-*`, `heiss-ui-upscale-*` | File names in ComfyUI's input folder | Not renamed |
+
+Logs are now `studio-YYYY-MM-DD.log`; older `heiss-*.log` files are still pruned after a week.
+
+### Moving to Studio Names Later
+
+A later release adds an explicit migration command. It is never run automatically. Until then, nothing needs to change.
+
+1. **Back up.** Stop Studio (scale it to zero), then snapshot the data volume (`/data`, on kimbap's `truenas-nvme/studio` dataset) and, with ComfyUI's output folder, that folder too. Keep the snapshots until the migrated studio has run for a while.
+2. **Dry run (default).** The command lists every mapping it would apply and changes nothing:
+   - folders: `<media>/heiss-ui` → `<media>/studio`, `<output>/heiss-ui` → `<output>/studio`, and each `.heiss-trash` → `.studio-trash`
+   - records: each gallery, history, trash and comparison record whose `subfolder` or `/media`, `/comfy/view` and thumbnail URL starts with `heiss-ui/` (counted per account)
+   - refusals: a target folder that already exists and differs, a record that points at a missing file, or a running Studio.
+3. **Apply (`--apply`).** It writes a mapping manifest first (every old → new path and record ID), renames the folders (a rename on the same file system, so no copy), rewrites the records, verifies the record and file counts against the dry run, and writes a marker so a second run does nothing.
+4. **Switch.** The release that ships the command changes `outputFolderName` and `trashFolderName` in `server/data-names.js` to the Studio names; the old names stay readable for one more release.
+5. **Recovery.** `--undo <manifest>` renames the folders back and restores the records from the backups the apply step made. If anything else is wrong, restore the snapshots from step 1 and redeploy the previous image.
+
+The `heissUi` profile block is a file format shared with `studio-profiles`; renaming it needs a reader for both names first and its own decision.

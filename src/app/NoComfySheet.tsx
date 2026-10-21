@@ -5,7 +5,7 @@ import { formatGB, useHardware, type Hardware } from './hardware';
 
 /**
  * "No ComfyUI yet?": which ComfyUI to install on this kind of computer, that
- * HEISS UI then finds it by itself, and what memory makes a good start. Only
+ * Studio then finds it by itself, and what memory makes a good start. Only
  * official pages are linked. The README's "No ComfyUI yet?" says the same.
  */
 
@@ -44,7 +44,7 @@ function thisSystem(hardware: Hardware | null): System {
   return /Mac/i.test(agent) ? 'mac' : /Win/i.test(agent) ? 'windows' : 'linux';
 }
 
-/** What this computer has, when HEISS UI can tell without ComfyUI. */
+/** What this computer has, when Studio can tell without ComfyUI. */
 function thisComputerLine(hardware: Hardware | null) {
   if (!hardware?.known) return '';
   if (hardware.unified) return `This Mac has ${formatGB(hardware.ramGB)} of memory.`;

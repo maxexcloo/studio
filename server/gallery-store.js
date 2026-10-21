@@ -1,3 +1,4 @@
+import { generationRecord } from "./generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from './gallery-filters.js';
 import { mediaFile, mediaParams, mediaPath } from './media-paths.js';
 import crypto from "node:crypto";
@@ -419,7 +420,7 @@ export function importedImageFile(item) {
 }
 
 export function outputFileCandidates(item, baseDir = comfyOutputDir) {
-  // HEISS-owned media has exactly one place, whatever folder ComfyUI uses.
+  // Studio-owned media has exactly one place, whatever folder ComfyUI uses.
   const media = mediaParams(item?.url);
   if (media) {
     const file = mediaPath(media.filename, media.subfolder);
@@ -801,7 +802,7 @@ export function recordsFromComfyHistory(history) {
   const records = [];
   for (const [promptId, item] of Object.entries(history || {})) {
     const graph = item?.prompt?.[2] || {};
-    const saved = item?.prompt?.[3]?.heiss_generation || {};
+    const saved = generationRecord(item?.prompt?.[3]);
     const textNodes = Object.values(graph).filter((node) => node?.class_type === "CLIPTextEncode");
     const prompt = textNodes[0]?.inputs?.text || "";
     const negative = textNodes[1]?.inputs?.text || "";
@@ -829,7 +830,7 @@ export function recordsFromComfyHistory(history) {
     const rawCreatedAt = Number(item?.prompt?.[3]?.create_time || Date.now());
     const createdAtMs = rawCreatedAt > 0 && rawCreatedAt < 1e12 ? rawCreatedAt * 1000 : rawCreatedAt;
     // Smart upscale's copy belongs to its picture; recovered on its own it would be a second tile.
-    const own = Object.fromEntries(Object.entries(item?.outputs || {}).filter(([id]) => !graph[id]?._meta?.heissUpscale));
+    const own = Object.fromEntries(Object.entries(item?.outputs || {}).filter(([id]) => !(graph[id]?._meta?.studioUpscale || graph[id]?._meta?.heissUpscale)));
     for (const output of outputsFrom({ outputs: own })) {
       const record = {
         ...output,

@@ -617,7 +617,7 @@ test("Ideogram 4 pairs with its unconditional model, and offers the matching one
   assert.deepEqual([ideogram[0].ready, ideogram[0].pairModel, ideogram[0].capabilities.negativePrompt, ideogram[0].defaults.cfg], [true, partner, false, 7]);
   assert.equal(models.modelFiles.find((file) => file.name === partner).reason, "Ideogram 4 runs this next to its main model.");
 
-  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: ideogram[0].workflow, profileId: ideogram[0].id, prompt: "a poster that says HEISS", steps: 12 }, info));
+  const graph = familyGraph(sanitizeGenerateBody({ kind: "image", workflow: ideogram[0].workflow, profileId: ideogram[0].id, prompt: "a poster that says Studio", steps: 12 }, info));
   const guider = byType(graph, "DualModelGuider")[0].inputs;
   const [cfgOverride] = Object.entries(graph).find(([, item]) => item.class_type === "CFGOverride");
   assert.deepEqual(guider.model, [cfgOverride, 0]);

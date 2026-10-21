@@ -13,17 +13,17 @@ import { mediaUrl } from './mediaUrl';
 function PlayerControls({ desktop = false }: { desktop?: boolean }) {
   return (
     <Controls.Root visibility="always">
-      <Controls.Content className={`heiss-video-controls${desktop ? ' heiss-video-desktop-controls' : ''}`}>
-        <PlayButton className="heiss-video-button" render={(props, state) => <button {...props}>{state.paused ? <Play size={20} /> : <Pause size={20} />}</button>} />
-        <div className="heiss-video-timeline">
-          <TimeSlider.Root className="heiss-video-slider">
-            <TimeSlider.Track className="heiss-video-track"><TimeSlider.Buffer className="heiss-video-buffer" /><TimeSlider.Fill className="heiss-video-fill" /></TimeSlider.Track>
-            <TimeSlider.Thumb className="heiss-video-thumb" />
+      <Controls.Content className={`studio-video-controls${desktop ? ' studio-video-desktop-controls' : ''}`}>
+        <PlayButton className="studio-video-button" render={(props, state) => <button {...props}>{state.paused ? <Play size={20} /> : <Pause size={20} />}</button>} />
+        <div className="studio-video-timeline">
+          <TimeSlider.Root className="studio-video-slider">
+            <TimeSlider.Track className="studio-video-track"><TimeSlider.Buffer className="studio-video-buffer" /><TimeSlider.Fill className="studio-video-fill" /></TimeSlider.Track>
+            <TimeSlider.Thumb className="studio-video-thumb" />
           </TimeSlider.Root>
-          {!desktop ? <Time.Group className="heiss-video-time"><Time.Value type="current" /><Time.Separator /><Time.Value type="duration" /></Time.Group> : null}
+          {!desktop ? <Time.Group className="studio-video-time"><Time.Value type="current" /><Time.Separator /><Time.Value type="duration" /></Time.Group> : null}
         </div>
-        <MuteButton className="heiss-video-button" render={(props, state) => <button {...props}>{state.muted ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>} />
-        {desktop ? <FullscreenButton className="heiss-video-button" render={(props, state) => <button {...props}>{state.fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}</button>} /> : null}
+        <MuteButton className="studio-video-button" render={(props, state) => <button {...props}>{state.muted ? <VolumeX size={19} /> : <Volume2 size={19} />}</button>} />
+        {desktop ? <FullscreenButton className="studio-video-button" render={(props, state) => <button {...props}>{state.fullscreen ? <Minimize size={19} /> : <Maximize size={19} />}</button>} /> : null}
       </Controls.Content>
     </Controls.Root>
   );
@@ -72,11 +72,11 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
     const v = event.currentTarget; if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
   }} onError={() => setError('This video couldn’t be played. Try again, or save the original using the viewer actions.')} />;
   return (
-    <div ref={host} className="heiss-video-viewer" data-video-viewer
+    <div ref={host} className="studio-video-viewer" data-video-viewer
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(event) => {
         // Only the fitted player owns clicks; its surrounding space is viewer backdrop.
-        if ((event.target as Element).closest('.heiss-phone-video, .heiss-desktop-video, .heiss-video-error')) event.stopPropagation();
+        if ((event.target as Element).closest('.studio-phone-video, .studio-desktop-video, .studio-video-error')) event.stopPropagation();
       }} onDoubleClick={(e) => e.stopPropagation()}
       onKeyDownCapture={(e) => {
         // Left and right step through the gallery, as they do for pictures, rather
@@ -88,9 +88,9 @@ export default function VideoViewer({ item }: { item: Output & { width?: number;
       }}
       onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation(); }}>
       <VideoPlayer key={`${item.url}:${attempt}`} title={titleFromPrompt(item.prompt || item.filename)}>
-        {phone ? <Container className="heiss-phone-video" style={frame}>{media}<PlayerControls /></Container> : <VideoSkin className="heiss-desktop-video" style={frame}>{media}<PlayerControls desktop /></VideoSkin>}
+        {phone ? <Container className="studio-phone-video" style={frame}>{media}<PlayerControls /></Container> : <VideoSkin className="studio-desktop-video" style={frame}>{media}<PlayerControls desktop /></VideoSkin>}
       </VideoPlayer>
-      {error ? <div className="heiss-video-error" role="alert"><p>{error}</p><button type="button" onClick={() => { setError(''); setAttempt((n) => n + 1); }}><RotateCcw size={16} />Try Again</button></div> : null}
+      {error ? <div className="studio-video-error" role="alert"><p>{error}</p><button type="button" onClick={() => { setError(''); setAttempt((n) => n + 1); }}><RotateCcw size={16} />Try Again</button></div> : null}
     </div>
   );
 }

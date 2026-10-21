@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Crash-safe JSON files for everything HEISS UI remembers.
+ * Crash-safe JSON files for everything Studio remembers.
  *
  * A plain writeFileSync truncates the file first, so a crash, a full disk or a
  * killed process mid-write leaves half a file. Every loader here treats an

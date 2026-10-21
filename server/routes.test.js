@@ -54,7 +54,7 @@ const api = async (pathname, options = {}) => {
 
 test("the server says who it is, and an unknown API route fails as JSON", async () => {
   const ping = await api("/api/ping");
-  assert.equal(ping.body.app, "heiss-ui");
+  assert.equal(ping.body.app, "studio");
   const unknown = await api("/api/no-such-thing");
   assert.equal(unknown.status, 404);
   assert.match(unknown.body.error, /Unknown API route/);

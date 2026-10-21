@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { isInside } from "./paths.js";
 
 /**
- * HEISS-owned media storage. With it, ComfyUI is a worker: each finished output
+ * Studio-owned media storage. With it, ComfyUI is a worker: each finished output
  * is fetched over its HTTP API into this folder and ComfyUI's copy is removed
  * (media-store.js). Gallery URLs keep ComfyUI's shape with `type=media`:
  * `/comfy/view?filename=…&subfolder=…&type=media`, so owner subfolders, caches

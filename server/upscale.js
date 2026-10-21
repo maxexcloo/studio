@@ -10,6 +10,7 @@ import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
 import { nodePacks } from "./node-packs.js";
 import { renameWithRetry } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
+import { outputFolderName } from "./data-names.js";
 
 export { freeBytesAt };
 
@@ -19,7 +20,7 @@ export { freeBytesAt };
 export const upscaleQualities = ["fast", "balanced", "high"];
 
 /**
- * Every file HEISS UI may download, with the exact size and SHA-256 Hugging Face
+ * Every file Studio may download, with the exact size and SHA-256 Hugging Face
  * publishes for it (the same hashes the SeedVR2 node's own registry checks).
  * Knowing them up front means the download dialog never guesses a size and a
  * finished download is verified before anything tries to load it.
@@ -97,7 +98,7 @@ function downloadUrl(file) {
 
 /**
  * SeedVR2 keeps its weights in ComfyUI/models/SEEDVR2. The output folder is the
- * only Comfy path HEISS UI already knows, so derive the sibling models folder from
+ * only Comfy path Studio already knows, so derive the sibling models folder from
  * it unless an explicit override is set.
  */
 export function seedvr2ModelDir() {
@@ -715,9 +716,9 @@ export function upscaleGraph(body, info = {}) {
   });
   if (video) {
     graph["7"] = { class_type: "CreateVideo", inputs: { images: ["5", 0], audio: ["6", 1], fps: ["6", 2], codec: "none" } };
-    graph["9"] = { class_type: "SaveVideo", inputs: { video: ["7", 0], filename_prefix: "heiss-ui/upscale", format: "mp4", "format.codec": "h264" } };
+    graph["9"] = { class_type: "SaveVideo", inputs: { video: ["7", 0], filename_prefix: `${outputFolderName}/upscale`, format: "mp4", "format.codec": "h264" } };
   } else {
-    graph["9"] = { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: "heiss-ui/upscale" } };
+    graph["9"] = { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: `${outputFolderName}/upscale` } };
   }
   // The weight it runs on, which is what its timing is learned by (upscale-timing.js).
   return { graph, plan: { ...plan, model: dit.file } };
@@ -747,13 +748,13 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
   const pairs = [];
   let plan = null;
   saves.forEach(([saveId, save], index) => {
-    const prefix = `heiss_up${index}_`;
+    const prefix = `studio_up${index}_`;
     const built = upscaleGraph({ ...body, imageName: "" }, info);
     plan = built.plan;
     for (const [id, node] of Object.entries(built.graph)) {
       if (id === "1") continue;
       const inputs = Object.fromEntries(Object.entries(node.inputs || {}).map(([key, value]) => [key, relink(value, prefix, save.inputs.images)]));
-      next[`${prefix}${id}`] = { ...node, inputs, _meta: { title: "Smart upscale", heissUpscale: true, ...(phase ? { heissPhase: phase } : {}) } };
+      next[`${prefix}${id}`] = { ...node, inputs, _meta: { title: "Smart upscale", studioUpscale: true, ...(phase ? { studioPhase: phase } : {}) } };
     }
     pairs.push({ base: saveId, upscale: `${prefix}9` });
   });

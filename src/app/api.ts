@@ -75,7 +75,7 @@ async function asPng(blob: Blob): Promise<Blob> {
 }
 
 /**
- * How far the HEISS server's clock runs ahead of this browser's, in ms. Job
+ * How far the Studio server's clock runs ahead of this browser's, in ms. Job
  * times are stamped by the server, which may be another machine, so timers
  * count against this instead of trusting the two clocks to agree.
  */

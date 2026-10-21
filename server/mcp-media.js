@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Native port of the HEISS MCP media service; see mcp.LICENSE.
+// Native port of the Studio MCP media service; see mcp.LICENSE.
 import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -73,7 +73,7 @@ export function mcpOutputPath(value) {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) return false;
   try {
     const url = new URL(value, 'http://localhost');
-    // ComfyUI outputs, or HEISS-owned media (media-paths.js), which the studio serves itself.
+    // ComfyUI outputs, or Studio-owned media (media-paths.js), which the studio serves itself.
     return url.origin === 'http://localhost' && url.pathname === '/comfy/view' && Boolean(url.searchParams.get('filename')) && (!url.searchParams.has('type') || ['output', 'media'].includes(url.searchParams.get('type')));
   } catch { return false; }
 }

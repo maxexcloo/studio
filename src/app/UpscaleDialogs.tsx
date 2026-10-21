@@ -122,7 +122,7 @@ export function UpscaleSetupDialog({
   showToast: ShowToast;
 }) {
   const { stage, pending } = setup;
-  // Downloads land on the computer HEISS UI runs on, so only it (or a device trusted with admin) starts them.
+  // Downloads land on the computer Studio runs on, so only it (or a device trusted with admin) starts them.
   const admin = useThisComputer();
   const progress = install?.totalBytes ? (install.receivedBytes || 0) / install.totalBytes : 0;
   const fallback = status?.substituting ? status.fallbackFile || "another installed SeedVR2 weight" : "";

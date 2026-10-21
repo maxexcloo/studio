@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { readEnvFile } from "./lan.js";
 
 /**
- * Why HEISS UI stopped last time, so a studio that "just exited" has a reason
+ * Why Studio stopped last time, so a studio that "just exited" has a reason
  * on its next start (and in a toast, /api/health previousExit).
  *
  * - The server notes when its run starts and, every minute, that it's alive
@@ -84,7 +84,7 @@ export function startSession({ pid = process.pid, now = Date.now(), bootedAt = n
   };
 }
 
-/** Once a minute while running, so an unexplained stop can say when HEISS was last alive. */
+/** Once a minute while running, so an unexplained stop can say when Studio was last alive. */
 export function noteAlive(now = Date.now()) {
   const session = read(sessionFile());
   if (session && session.pid === process.pid) writeSync(sessionFile(), { ...session, lastSeen: now });

@@ -13,14 +13,14 @@
 .video-preview.is-ready .video-preview-poster { visibility: hidden; }
 .video-preview-placeholder { position: absolute; inset: 0; display: flex !important; align-items: center; justify-content: center; gap: var(--space-4); color: rgb(255 255 255 / .4) !important; font-size: 11px; }
 .video-preview-placeholder > span { font-size: inherit; }
-.heiss-desktop-video .media-settings-menu-trigger,
-.heiss-desktop-video .media-pip-button,
-.heiss-desktop-video .media-cast-button,
-.heiss-desktop-video .media-airplay-button { display: none !important; }
-.heiss-desktop-video .video-controls-content,
-.heiss-desktop-video .video-controls-backdrop { display: none !important; }
-.heiss-video-viewer { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; touch-action: auto; color: #fff; }
-.heiss-desktop-video {
+.studio-desktop-video .media-settings-menu-trigger,
+.studio-desktop-video .media-pip-button,
+.studio-desktop-video .media-cast-button,
+.studio-desktop-video .media-airplay-button { display: none !important; }
+.studio-desktop-video .video-controls-content,
+.studio-desktop-video .video-controls-backdrop { display: none !important; }
+.studio-video-viewer { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; touch-action: auto; color: #fff; }
+.studio-desktop-video {
   --media-accent-color: #fff;
   --media-accent-text-color: #0a0a0a;
   --media-border-color: rgb(255 255 255 / .08);
@@ -33,33 +33,33 @@
 }
 .viewer-canvas.is-video { touch-action: auto; }
 .viewer-canvas.is-video .generation-surface { transform: none; overflow: visible; }
-.viewer-canvas .heiss-video-viewer video { pointer-events: auto; transform: none; transition: none; will-change: auto; width: 100%; height: 100%; border-radius: inherit; }
-.viewer-canvas .heiss-desktop-video:fullscreen { width: 100% !important; height: 100% !important; max-width: none; max-height: none; border-radius: 0; }
+.viewer-canvas .studio-video-viewer video { pointer-events: auto; transform: none; transition: none; will-change: auto; width: 100%; height: 100%; border-radius: inherit; }
+.viewer-canvas .studio-desktop-video:fullscreen { width: 100% !important; height: 100% !important; max-width: none; max-height: none; border-radius: 0; }
 .viewer-stage:has(.viewer-canvas.is-video) .is-zoom-control { display: none; }
-.heiss-phone-video { position: relative; flex: none; max-width: 100%; max-height: 100%; background: #0a0a0a; border-radius: var(--r-media); }
-.heiss-video-controls { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; display: flex; gap: var(--space-3); align-items: center; padding: 20px 8px 8px; border-radius: 0 0 var(--r-media) var(--r-media); background: linear-gradient(transparent, rgb(0 0 0 / .85)); pointer-events: auto; }
+.studio-phone-video { position: relative; flex: none; max-width: 100%; max-height: 100%; background: #0a0a0a; border-radius: var(--r-media); }
+.studio-video-controls { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; display: flex; gap: var(--space-3); align-items: center; padding: 20px 8px 8px; border-radius: 0 0 var(--r-media) var(--r-media); background: linear-gradient(transparent, rgb(0 0 0 / .85)); pointer-events: auto; }
 /* Glass-bar icon buttons: a 44px target with a 36px fill circle (--icon-fill on the desktop bar). */
-.heiss-video-button { --fill-inset: 4px; display: grid; place-items: center; flex: none; width: var(--control-h-touch); height: var(--control-h-touch); padding: var(--fill-inset); border: 0; border-radius: var(--r-pill); color: rgb(255 255 255 / .55); background-color: transparent; background-clip: content-box; cursor: pointer; touch-action: manipulation; transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease); }
-.heiss-video-button:hover { color: rgb(255 255 255 / .9); background-color: var(--control-hover); }
-.heiss-video-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--fill-inset)); }
-.heiss-video-slider:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; border-radius: var(--r-pill); }
-.heiss-video-timeline { flex: 1; min-width: 0; }
-.heiss-video-slider { position: relative; display: flex; align-items: center; width: 100%; height: 44px; touch-action: none; cursor: pointer; user-select: none; }
-.heiss-video-track { position: relative; width: 100%; height: 4px; border-radius: 2px; overflow: hidden; background: rgb(255 255 255 / .22); }
-.heiss-video-fill, .heiss-video-buffer { position: absolute; inset: 0 auto 0 0; width: var(--media-slider-fill); background: #fff; }
-.heiss-video-buffer { width: var(--media-slider-buffer); background: rgb(255 255 255 / .3); }
-.heiss-video-thumb { position: absolute; left: var(--media-slider-fill); width: 12px; height: 12px; border-radius: 50%; transform: translateX(-50%); background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
-.heiss-video-time { display: flex; align-items: center; gap: var(--space-3); margin-top: -6px; font: 10px var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .75); }
-.heiss-video-desktop-controls { left: 12px; right: 12px; bottom: 12px; gap: var(--space-4); padding: 2px 6px; height: 44px; box-sizing: border-box; border-radius: var(--r-pill); background: var(--glass-bar-bg); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: var(--glass-bar-blur); }
-.heiss-video-desktop-controls .heiss-video-button { --fill-inset: calc((38px - var(--icon-fill)) / 2); width: 38px; height: 38px; }
-.heiss-video-desktop-controls .heiss-video-slider { height: 38px; }
-.heiss-video-desktop-controls .heiss-video-button svg { width: 18px; height: 18px; }
-.heiss-video-desktop-controls .heiss-video-time { color: rgb(255 255 255 / .45); }
-.heiss-video-desktop-controls .heiss-video-track { background: rgb(255 255 255 / .12); height: 3px; }
-.heiss-video-desktop-controls .heiss-video-fill { background: rgb(255 255 255 / .6); }
-.heiss-video-desktop-controls .heiss-video-thumb { background: #aaa; width: 9px; height: 9px; }
-.heiss-video-desktop-controls .heiss-video-buffer { background: rgb(255 255 255 / .2); }
-.heiss-video-error { position: absolute; z-index: 20; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-5); padding: 24px; background: rgb(10 10 10 / .94); text-align: center; border-radius: var(--r-media); }
-.heiss-video-error p { max-width: 340px; color: rgb(255 255 255 / .7); line-height: 1.5; }
-.heiss-video-error button { display: flex; align-items: center; gap: var(--space-4); min-height: 44px; padding: 0 18px; border-radius: var(--r-pill); background: #fff; color: #0a0a0a; }
+.studio-video-button { --fill-inset: 4px; display: grid; place-items: center; flex: none; width: var(--control-h-touch); height: var(--control-h-touch); padding: var(--fill-inset); border: 0; border-radius: var(--r-pill); color: rgb(255 255 255 / .55); background-color: transparent; background-clip: content-box; cursor: pointer; touch-action: manipulation; transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease); }
+.studio-video-button:hover { color: rgb(255 255 255 / .9); background-color: var(--control-hover); }
+.studio-video-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--fill-inset)); }
+.studio-video-slider:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; border-radius: var(--r-pill); }
+.studio-video-timeline { flex: 1; min-width: 0; }
+.studio-video-slider { position: relative; display: flex; align-items: center; width: 100%; height: 44px; touch-action: none; cursor: pointer; user-select: none; }
+.studio-video-track { position: relative; width: 100%; height: 4px; border-radius: 2px; overflow: hidden; background: rgb(255 255 255 / .22); }
+.studio-video-fill, .studio-video-buffer { position: absolute; inset: 0 auto 0 0; width: var(--media-slider-fill); background: #fff; }
+.studio-video-buffer { width: var(--media-slider-buffer); background: rgb(255 255 255 / .3); }
+.studio-video-thumb { position: absolute; left: var(--media-slider-fill); width: 12px; height: 12px; border-radius: 50%; transform: translateX(-50%); background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.studio-video-time { display: flex; align-items: center; gap: var(--space-3); margin-top: -6px; font: 10px var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: rgb(255 255 255 / .75); }
+.studio-video-desktop-controls { left: 12px; right: 12px; bottom: 12px; gap: var(--space-4); padding: 2px 6px; height: 44px; box-sizing: border-box; border-radius: var(--r-pill); background: var(--glass-bar-bg); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 rgb(255 255 255 / .04), 0 8px 24px rgb(0 0 0 / .25); backdrop-filter: var(--glass-bar-blur); }
+.studio-video-desktop-controls .studio-video-button { --fill-inset: calc((38px - var(--icon-fill)) / 2); width: 38px; height: 38px; }
+.studio-video-desktop-controls .studio-video-slider { height: 38px; }
+.studio-video-desktop-controls .studio-video-button svg { width: 18px; height: 18px; }
+.studio-video-desktop-controls .studio-video-time { color: rgb(255 255 255 / .45); }
+.studio-video-desktop-controls .studio-video-track { background: rgb(255 255 255 / .12); height: 3px; }
+.studio-video-desktop-controls .studio-video-fill { background: rgb(255 255 255 / .6); }
+.studio-video-desktop-controls .studio-video-thumb { background: #aaa; width: 9px; height: 9px; }
+.studio-video-desktop-controls .studio-video-buffer { background: rgb(255 255 255 / .2); }
+.studio-video-error { position: absolute; z-index: 20; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-5); padding: 24px; background: rgb(10 10 10 / .94); text-align: center; border-radius: var(--r-media); }
+.studio-video-error p { max-width: 340px; color: rgb(255 255 255 / .7); line-height: 1.5; }
+.studio-video-error button { display: flex; align-items: center; gap: var(--space-4); min-height: 44px; padding: 0 18px; border-radius: var(--r-pill); background: #fff; color: #0a0a0a; }
 .video-viewer-loading { display: grid; place-items: center; width: 100%; height: 100%; color: hsl(var(--muted-foreground)); }

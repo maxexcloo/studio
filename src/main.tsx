@@ -329,7 +329,7 @@ function App() {
     setComfyReconnectedAt(Date.now());
   }, [backendStatus.connected, backendStatus.checked, backendStatus.version]);
 
-  // A restart HEISS asked for: every surface says "restarting", the poll speeds
+  // A restart Studio asked for: every surface says "restarting", the poll speeds
   // up so ComfyUI's return shows at once, and a restart that never comes back
   // hands over to plain reconnecting with one clear message.
   const comfyRestarting = Boolean(comfyStatus.restarting);
@@ -702,7 +702,7 @@ function App() {
 
   function refreshHealth() {
     // 503 only means ComfyUI isn't answering: its body still says whether
-    // this is the computer that looks after HEISS UI, so read it either way.
+    // this is the computer that looks after Studio, so read it either way.
     fetch("/api/health", { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json().catch(() => null) as Health | null;

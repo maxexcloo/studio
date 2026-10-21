@@ -27,7 +27,7 @@ async function serverRunning() {
     for (let offset = 0; offset < 10; offset += 1) {
       try {
         const response = await fetch(`http://${host.includes(":") ? `[${host}]` : host}:${port + offset}/api/ping`, { signal: AbortSignal.timeout(800) });
-        if (response.ok && (await response.json().catch(() => ({}))).app === "heiss-ui") return port + offset;
+        if (response.ok && ["studio", "heiss-ui"].includes((await response.json().catch(() => ({}))).app)) return port + offset;
       } catch { /* nothing there */ }
     }
   }

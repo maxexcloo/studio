@@ -187,7 +187,7 @@ async function sourceBytes(filename, subfolder, type) {
     const file = localOutputFile(filename, subfolder, type);
     return file ? fs.promises.readFile(file) : undefined;
   };
-  // HEISS media is only ever on this computer.
+  // Studio media is only ever on this computer.
   if (type === mediaType) return (await local()) || null;
   // ComfyUI just failed to answer: skip the slow refused connection when the file is here.
   if (comfyRecentlyUnreachable()) {
@@ -206,7 +206,7 @@ async function sourceBytes(filename, subfolder, type) {
 
 /*
  * The local copy of an output is only used when it is the file ComfyUI means.
- * If the output folder HEISS UI reads isn't ComfyUI's (another install, a
+ * If the output folder Studio reads isn't ComfyUI's (another install, a
  * moved folder), a file of the same name there is some other picture, and a
  * thumbnail made from it shows the wrong image while the viewer, which asks
  * ComfyUI, shows the right one. So ComfyUI is asked for one byte of the file,
@@ -219,7 +219,7 @@ const checkedLocal = new Map();
 export async function trustedLocalOutput(filename, subfolder = "", type = "output") {
   const file = localOutputFile(filename, subfolder, type);
   if (!file) return null;
-  // HEISS media is the file itself; there is no ComfyUI copy to compare it with.
+  // Studio media is the file itself; there is no ComfyUI copy to compare it with.
   if (type === mediaType) return file;
   let stat;
   try { stat = fs.statSync(file); } catch { return null; }

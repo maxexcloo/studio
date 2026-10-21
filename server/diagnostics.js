@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 
 /**
- * What a bug report needs to know about this setup: HEISS UI, Node.js, the
+ * What a bug report needs to know about this setup: Studio, Node.js, the
  * system, ComfyUI and the GPU. Nothing personal: no prompts, images, file or
  * folder names, and no addresses (only whether ComfyUI runs on this computer).
  */

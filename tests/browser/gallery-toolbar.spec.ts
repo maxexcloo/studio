@@ -408,7 +408,7 @@ test.describe('tooltips with a mouse', () => {
     await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
     await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
     await page.goto('/');
-    const tooltip = page.locator('.heiss-tooltip');
+    const tooltip = page.locator('.studio-tooltip');
     const search = page.locator('.gallery-toolbar').getByRole('button', { name: 'Search Gallery', exact: true });
     await search.hover();
     // Radix repeats the content in a visually hidden copy for screen readers; the first is the label.

@@ -328,7 +328,7 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     : install?.status === "error" ? "error"
     : "models";
 
-  // While setup waits on something outside HEISS UI (installing nodes,
+  // While setup waits on something outside Studio (installing nodes,
   // restarting ComfyUI), watch for it instead of asking for a re-check.
   const watching = setupOpen && (stage === "nodes" || stage === "offline" || stage === "checking");
   useEffect(() => {

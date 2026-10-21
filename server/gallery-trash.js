@@ -8,6 +8,7 @@ import { renameWithRetry } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { forgetItemThumbnails } from "./thumbnails.js";
 import { forgetItemVideoPreviews } from './video-previews.js';
+import { trashFolderName } from "./data-names.js";
 
 /**
  * "Delete all finished images" moves them to a trash instead of deleting
@@ -20,7 +21,7 @@ import { forgetItemVideoPreviews } from './video-previews.js';
  * served as outputs (comfy.js), so the trash is not visible as one either.
  */
 
-export const trashFolderName = ".heiss-trash";
+export { trashFolderName };
 export const trashDays = (() => {
   const days = Number(process.env.STUDIO_TRASH_DAYS || 30);
   return Number.isFinite(days) && days >= 1 ? Math.min(365, days) : 30;
@@ -28,7 +29,7 @@ export const trashDays = (() => {
 const dayMs = 24 * 60 * 60 * 1000;
 
 /**
- * Each item's files are trashed beside them: HEISS media in the media folder,
+ * Each item's files are trashed beside them: Studio media in the media folder,
  * older ComfyUI outputs in ComfyUI's output folder. Without a folder named, every
  * call covers both, so a gallery holding both kinds clears and restores whole.
  */

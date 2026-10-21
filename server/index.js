@@ -113,11 +113,11 @@ async function resolveSignedMcpResult(owner, jobId, index) {
   const filename = source.searchParams.get('filename') || '';
   const subfolder = source.searchParams.get('subfolder') || '';
   const type = source.searchParams.get('type') || 'output';
-  const request = { heissAccount: { userId: owner } };
+  const request = { studioAccount: { userId: owner } };
   if (!ownerMediaTypes.has(type) || !outputMediaPattern.test(filename) || inDotFolder(subfolder) || !outputFilenameBelongsToRequest(filename, subfolder, request)) return null;
   try {
     const backend = item.settings?.comfyBackend || defaultWorkerId();
-    // HEISS media is read from its folder only, whichever worker made it.
+    // Studio media is read from its folder only, whichever worker made it.
     const file = type === mediaType || isDefaultBackend(backend) ? localOutputFile(filename, subfolder, type) : null;
     if (type === mediaType && !file) return null;
     const bytes = file ? await fs.promises.readFile(file) : await withComfyBackend(backend, () => comfy(`/view?${new URLSearchParams({ filename, ...(subfolder ? { subfolder } : {}), type })}`, { timeout: 120000 }));
@@ -204,7 +204,7 @@ const recoverRunningJobs = createJobRecovery({
 }
 
 /**
- * With HEISS media storage, recovered ComfyUI outputs move into HEISS media and
+ * With Studio media storage, recovered ComfyUI outputs move into Studio media and
  * leave ComfyUI. ComfyUI's copies go only after the caller has put the records
  * in the gallery and it is on disk.
  */
@@ -237,7 +237,7 @@ async function recoverGalleryFromHistory() {
       const history = await comfy(`/history?max_items=${Math.min(galleryLimit, 500)}`).catch(() => ({}));
       const records = recordsFromComfyHistory(history);
       const owned = multiUserEnabled ? records.filter((item) => item.ownerId) : records;
-      // Already delivered (and so already in HEISS media): never imported a second time.
+      // Already delivered (and so already in Studio media): never imported a second time.
       // History records carry no index, so a run counts as delivered by its job.
       const delivered = new Set(gallery.filter((item) => item.status === "done" && item.jobId).map((item) => item.jobId));
       recovered.push(...await ingestRecoveredRecords(mediaStorageEnabled ? owned.filter((item) => !delivered.has(item.jobId) && !wasIngested(item.jobId) && !jobs.has(item.jobId)) : owned));
@@ -350,7 +350,7 @@ app.post("/api/network/tls", (req, res) => {
   res.json({ ok: true, tls: report ? tlsSummary(report) : null, restartNeeded: true });
 });
 
-// The Settings switch for other devices. It takes effect when HEISS UI starts again.
+// The Settings switch for other devices. It takes effect when Studio starts again.
 app.post("/api/network/lan", (req, res) => {
   if (!requireAdmin(req, res)) return;
   const enabled = Boolean(req.body?.enabled);
@@ -368,8 +368,8 @@ const appVersion = (() => {
   try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
 })();
 
-// How a second start finds out HEISS UI already holds the port (see launch.js).
-app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "heiss-ui", version: appVersion }));
+// How a second start finds out Studio already holds the port (see launch.js).
+app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "studio", version: appVersion }));
 
 // Readiness: the studio can serve once its data folder is writable. ComfyUI workers may come and go
 // without taking the studio out of service, so they do not decide this.
@@ -422,7 +422,7 @@ void describeNow();
 
 /**
  * What a generation with these settings should take here, for the composer:
- * `ms` once this model's estimates are trusted, and `queueMs` when HEISS's own
+ * `ms` once this model's estimates are trusted, and `queueMs` when Studio's own
  * queue has to finish first. Empty when there is nothing honest to say.
  */
 app.get("/api/estimate", (req, res) => {
@@ -501,7 +501,7 @@ app.get("/api/logs", (req, res) => {
   if (!requireLocal(req, res)) return;
   const lines = Math.max(1, Math.min(500, Number(req.query.lines || 100)));
   try {
-    const text = fs.readFileSync(path.join(logDir, `heiss-${new Date().toISOString().slice(0, 10)}.log`), "utf8");
+    const text = fs.readFileSync(path.join(logDir, `studio-${new Date().toISOString().slice(0, 10)}.log`), "utf8");
     res.type("text/plain").send(text.trimEnd().split("\n").slice(-lines).join("\n"));
   } catch {
     res.type("text/plain").send("");
@@ -517,7 +517,7 @@ app.get("/api/health", async (req, res) => {
   try {
     // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
     await comfy("/system_stats");
-    res.json({ ok: true, ...(req.heissAccount && !canAdmin(req) ? {} : { comfyUrl }), comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
+    res.json({ ok: true, ...(req.studioAccount && !canAdmin(req) ? {} : { comfyUrl }), comfySearch: comfySearchEnabled(), startedAt: serverStartedAt, thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   } catch (error) {
     res.status(503).json({ ok: false, comfySearch: comfySearchEnabled(), thisComputer: canAdmin(req), atComputer: clientOf(req).thisComputer, restarting: comfyRestarting(), error: comfyRestarting() ? "ComfyUI is restarting." : error.message, startedAt: serverStartedAt, ...(previousExit && canAdmin(req) ? { previousExit } : {}) });
   }
@@ -539,7 +539,7 @@ function adoptFoundComfy(found) {
 let lastComfyAnswer = { url: "", version: "", device: "" };
 const backendAnswers = new Map();
 
-// Accounts read their own outputs: ComfyUI's output folder, or HEISS-owned media.
+// Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
 
 /** Ordinary accounts see whether backends answer, never their addresses or nearby hosts. */
@@ -558,7 +558,7 @@ function withoutBackendAddresses(status) {
 const workerStatusEntry = (worker, answer) => ({ id: worker.id, name: worker.name, capabilities: worker.capabilities, ...(isDefaultBackend(worker.id) ? { default: true } : {}), ...answer });
 
 app.get("/api/comfy/status", async function comfyStatus(req, res) {
-  if (req.heissAccount && !canAdmin(req) && !res.locals.ordinaryStatus) {
+  if (req.studioAccount && !canAdmin(req) && !res.locals.ordinaryStatus) {
     res.locals.ordinaryStatus = true;
     const send = res.json.bind(res);
     res.json = (body) => send(withoutBackendAddresses(body));
@@ -671,7 +671,7 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
 });
 
 /**
- * A restart HEISS asked for, as the status poll reports it: restarting, since
+ * A restart Studio asked for, as the status poll reports it: restarting, since
  * when and how long it usually takes; and the one that just ended, so every
  * device that watched it can say how it went. The server's own watcher moves
  * the restart along; this only reads it.
@@ -789,18 +789,18 @@ function unavailableModels() {
 }
 
 function modelsForAccount(models, req) {
-  if (!req.heissAccount) return models;
-  const profiles = visibleGenerationProfiles(models.profiles || [], req.heissAccount).map((profile) => {
-    if (mayUseFeature(req.heissAccount, "loras")) return profile;
+  if (!req.studioAccount) return models;
+  const profiles = visibleGenerationProfiles(models.profiles || [], req.studioAccount).map((profile) => {
+    if (mayUseFeature(req.studioAccount, "loras")) return profile;
     return { ...profile, capabilities: { ...profile.capabilities, lora: false }, options: { ...profile.options, loras: [] } };
   });
   // The Image & Model Library stays administration for now: its saved images are shared across Studio.
-  const features = models.features ? { ...models.features, presets: Boolean(models.features.presets) && req.heissAccount.role === "administrator" } : models.features;
-  return { ...models, loras: mayUseFeature(req.heissAccount, "loras") ? models.loras : [], profiles, ...(features ? { features } : {}) };
+  const features = models.features ? { ...models.features, presets: Boolean(models.features.presets) && req.studioAccount.role === "administrator" } : models.features;
+  return { ...models, loras: mayUseFeature(req.studioAccount, "loras") ? models.loras : [], profiles, ...(features ? { features } : {}) };
 }
 
 function accountMayUseLoras(req) {
-  return !req.heissAccount || mayUseFeature(req.heissAccount, "loras");
+  return !req.studioAccount || mayUseFeature(req.studioAccount, "loras");
 }
 
 app.get("/api/models", async (req, res) => {
@@ -808,7 +808,7 @@ app.get("/api/models", async (req, res) => {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     const { models } = await mediaModels(req.query.cached !== "1");
     // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
-    if (req.heissAccount) try { migrateCloudModelAccess((models.profiles || []).filter(isCloudProfile).map((profile) => profile.id)); } catch { /* Tried again on the next load. */ }
+    if (req.studioAccount) try { migrateCloudModelAccess((models.profiles || []).filter(isCloudProfile).map((profile) => profile.id)); } catch { /* Tried again on the next load. */ }
     res.json(modelsForAccount(models, req));
   } catch {
     res.json(modelsForAccount(unavailableModels(), req));
@@ -862,7 +862,7 @@ registerPresetRoutes(app, { models: async () => {
 } });
 
 app.get("/api/paths", async (req, res) => {
-  if (req.heissAccount && req.heissAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });
+  if (req.studioAccount && req.studioAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });
   await autoDetectOutputDir();
   res.json({ outputDir: comfyOutputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir });
 });
@@ -870,7 +870,7 @@ app.get("/api/paths", async (req, res) => {
 app.post("/api/config/output-dir", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
-    // Only a folder ComfyUI writes to: HEISS serves and clears what is in it.
+    // Only a folder ComfyUI writes to: Studio serves and clears what is in it.
     const choice = await outputDirChoice(req.body?.outputDir || "");
     if (!choice.ok) {
       res.status(400).json({ ok: false, error: choice.error, report: choice.report });
@@ -915,9 +915,9 @@ app.post("/api/output-dir/browse", async (req, res) => {
 
 /** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
 function workflowsForRequest(req, workflows) {
-  if (!req.heissAccount || canAdmin(req)) return workflows;
+  if (!req.studioAccount || canAdmin(req)) return workflows;
   return workflows
-    .filter((item) => mayUseGenerationProfile(req.heissAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw }))
+    .filter((item) => mayUseGenerationProfile(req.studioAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw }))
     .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
 }
 
@@ -996,7 +996,7 @@ app.post("/api/workflows/import", async (req, res) => {
 
 registerProfileEditorRoutes(app, {
   objectInfo: async (kind) => (await withComfyBackend(routeJob(kind === "video" ? "video" : "image")?.id || defaultWorkerId(), () => loadComfyContext())).info,
-  accountName: (req) => req.heissAccount?.userId || ""
+  accountName: (req) => req.studioAccount?.userId || ""
 });
 
 registerGalleryBundleRoutes(app);
@@ -1086,30 +1086,30 @@ registerGalleryHistoryRoutes(app, { recoverGalleryFromHistory });
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.json({ prompts: [], enabled: false });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.json({ prompts: [], enabled: false });
   const ownerId = ownerIdForRequest(req);
   res.json({ prompts: listPrompts(req.query.kind, ownerId), enabled: promptHistoryEnabled(req.query.kind, ownerId) });
 });
 
 app.post("/api/prompts/enabled", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   const ownerId = ownerIdForRequest(req);
   const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
   res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
 });
 
 app.post("/api/prompts/pin", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: setPromptPinned(String(req.body?.text || ""), Boolean(req.body?.pinned), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/forget", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: forgetPrompts([String(req.body?.text || "")], new Set(), req.body?.kind, ownerIdForRequest(req)) });
 });
 
 app.post("/api/prompts/clear", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'promptHistory')) return res.status(403).json({ ok: false, error: 'Prompt history is disabled for this account.' });
   res.json({ ok: true, prompts: clearPromptHistory({ keepPinned: req.body?.keepPinned !== false }, req.body?.kind, ownerIdForRequest(req)) });
 });
 
@@ -1222,8 +1222,8 @@ app.post("/api/start-image", (req, res) => {
 app.get("/api/reference-assets", (req, res) => {
   try {
     const source = req.query.source === "generation" ? "generation" : "upload";
-    const canReference = !req.heissAccount || mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences');
-    if (req.heissAccount && (!canReference || source === 'generation' && !mayUseFeature(req.heissAccount, 'gallery'))) return res.json({ items: [], hasMore: false });
+    const canReference = !req.studioAccount || mayUseFeature(req.studioAccount, 'imageReferences') || mayUseFeature(req.studioAccount, 'videoReferences');
+    if (req.studioAccount && (!canReference || source === 'generation' && !mayUseFeature(req.studioAccount, 'gallery'))) return res.json({ items: [], hasMore: false });
     res.json(listReferenceAssets(req, {
       source,
       cursor: String(req.query.cursor || ""),
@@ -1236,7 +1236,7 @@ app.get("/api/reference-assets", (req, res) => {
 });
 
 app.post("/api/reference-assets/upload", async (req, res) => {
-  const canReference = req.heissAccount && (mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences'));
+  const canReference = req.studioAccount && (mayUseFeature(req.studioAccount, 'imageReferences') || mayUseFeature(req.studioAccount, 'videoReferences'));
   if (!canReference && !requireLocal(req, res)) return;
   try {
     const upload = await readMultipartImage(req);
@@ -1248,8 +1248,8 @@ app.post("/api/reference-assets/upload", async (req, res) => {
 });
 
 app.post("/api/reference-assets/from-gallery", (req, res) => {
-  const canReference = req.heissAccount && (mayUseFeature(req.heissAccount, 'imageReferences') || mayUseFeature(req.heissAccount, 'videoReferences'));
-  if (req.heissAccount && (!canReference || !mayUseFeature(req.heissAccount, 'gallery'))) return res.status(403).json({ ok: false, error: 'Gallery references are disabled for this account.' });
+  const canReference = req.studioAccount && (mayUseFeature(req.studioAccount, 'imageReferences') || mayUseFeature(req.studioAccount, 'videoReferences'));
+  if (req.studioAccount && (!canReference || !mayUseFeature(req.studioAccount, 'gallery'))) return res.status(403).json({ ok: false, error: 'Gallery references are disabled for this account.' });
   if (!canReference && !requireLocal(req, res)) return;
   try {
     const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), { frame: req.body?.frame === "last" ? "last" : "" });
@@ -1260,7 +1260,7 @@ app.post("/api/reference-assets/from-gallery", (req, res) => {
 });
 
 app.get("/api/reference-assets/:id/media", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'imageReferences') && !mayUseFeature(req.heissAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'imageReferences') && !mayUseFeature(req.studioAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
   const asset = readUploadedReference(req.params.id, "media", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=3600");
@@ -1268,7 +1268,7 @@ app.get("/api/reference-assets/:id/media", (req, res) => {
 });
 
 app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'imageReferences') && !mayUseFeature(req.heissAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'imageReferences') && !mayUseFeature(req.studioAccount, 'videoReferences')) return res.status(404).json({ ok: false, error: 'That reference image is gone.' });
   const asset = readUploadedReference(req.params.id, "thumbnail", ownerIdForRequest(req));
   if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
   res.type(asset.mime).setHeader("Cache-Control", "private, max-age=86400");
@@ -1276,7 +1276,7 @@ app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
 });
 
 app.delete("/api/reference-assets/:id", (req, res) => {
-  if (!req.heissAccount && !requireLocal(req, res)) return;
+  if (!req.studioAccount && !requireLocal(req, res)) return;
   try {
     res.json(deleteUploadedReference(req.params.id, ownerIdForRequest(req)));
   } catch (error) {
@@ -1299,7 +1299,7 @@ async function probeComfy(candidate) {
 }
 
 /**
- * Where HEISS UI looks for ComfyUI (the default worker). Testing tries an
+ * Where Studio looks for ComfyUI (the default worker). Testing tries an
  * address without saving; saving keeps it with Studio's workers and takes
  * effect at once. Other workers are edited in Settings › Workers.
  */
@@ -1434,7 +1434,7 @@ app.get("/api/upscale/status", onUpscaleWorker(async (req, res) => {
   if (!info) return;
   const status = upscaleStatus(info, req.query.quality);
   // Install plans name server paths: they are for administrators only.
-  if (req.heissAccount && !canAdmin(req)) return res.json({ ok: true, ...status });
+  if (req.studioAccount && !canAdmin(req)) return res.json({ ok: true, ...status });
   // Only worth the extra round trips while the nodes still need installing.
   if (!status.nodesInstalled) status.nodeSetup = { manager: await managerAvailable(), pack: nodePack("seedvr2"), autoInstall: packInstallRoutes("seedvr2"), ...nodeInstallPlan() };
   // The face pass has its own two packs; each missing one gets the same install panel.
@@ -1487,7 +1487,7 @@ app.post("/api/upscale", onUpscaleWorker(async (req, res) => {
   const quality = normalizeQuality(req.body?.quality);
   const itemId = String(req.body?.galleryItemId || "");
   const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-  if (req.heissAccount && !ownedItem) {
+  if (req.studioAccount && !ownedItem) {
     res.status(404).json({ ok: false, reason: "missing", error: "This image is no longer in the gallery." });
     return;
   }
@@ -1554,9 +1554,9 @@ app.post("/api/upscale", onUpscaleWorker(async (req, res) => {
 app.post("/api/upscale/cancel", async (req, res) => {
   const itemId = String(req.body?.galleryItemId || "");
   const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-  if (req.heissAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
+  if (req.studioAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
   const entry = [...jobs].find(([, job]) => job.kind === "upscale" && job.galleryItemId === itemId && !job.terminalAt
-    && (!req.heissAccount || job.ownerId === req.heissAccount.userId));
+    && (!req.studioAccount || job.ownerId === req.studioAccount.userId));
   if (!entry) {
     // Nothing is running it (the server restarted mid-upscale): just clear the spinner.
     const item = findUpscaleTarget(itemId);
@@ -1574,7 +1574,7 @@ app.post("/api/upscale/toggle", (req, res) => {
   try {
     const itemId = String(req.body?.galleryItemId || "");
     const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-    if (req.heissAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
+    if (req.studioAccount && !ownedItem) return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
     const item = toggleUpscaleView(itemId, req.body?.active);
     res.json({ ok: true, upscaleActive: Boolean(item.upscaleActive), revision: galleryRevisionValue() });
   } catch (error) {
@@ -1583,12 +1583,12 @@ app.post("/api/upscale/toggle", (req, res) => {
 });
 
 app.get("/api/jobs/:id", (req, res) => {
-  if (req.heissAccount && !mayUseFeature(req.heissAccount, 'gallery')) {
+  if (req.studioAccount && !mayUseFeature(req.studioAccount, 'gallery')) {
     res.json({ status: 'missing' });
     return;
   }
   const job = jobs.get(req.params.id);
-  if (!job || req.heissAccount && job.ownerId !== req.heissAccount.userId) {
+  if (!job || req.studioAccount && job.ownerId !== req.studioAccount.userId) {
     res.json({ status: "missing" });
     return;
   }
@@ -1598,7 +1598,7 @@ app.get("/api/jobs/:id", (req, res) => {
 app.post("/api/jobs/:id/cancel", async (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) {
-    // Nothing here runs it any more (HEISS restarted): only the tile is left to settle.
+    // Nothing here runs it any more (Studio restarted): only the tile is left to settle.
     // Its prompt id went with the job, so ComfyUI is left alone rather than interrupted blindly.
     const hasOwnedRecord = recordsForRequest(gallery, req).some((item) => item.jobId === req.params.id);
     if (!hasOwnedRecord) return res.json({ ok: true, stale: true, changed: false });
@@ -1607,7 +1607,7 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
     return;
   }
   // Another account's live job answers exactly like an unknown one.
-  if (req.heissAccount && job.ownerId !== req.heissAccount.userId) return res.json({ ok: true, stale: true, changed: false });
+  if (req.studioAccount && job.ownerId !== req.studioAccount.userId) return res.json({ ok: true, stale: true, changed: false });
   jobs.set(req.params.id, { ...job, status: "canceling" });
   // Its pictures are saved and only Smart upscale is left: they stay, and runJob delivers them.
   if (!job.keepsPicture) updateGalleryJob(req.params.id, { status: "canceled" });
@@ -1621,7 +1621,7 @@ app.post("/api/queue/cancel", async (req, res) => {
   const promptIds = cancelOwnJobs(ownerId);
   setGallery(gallery.map((item) => (recordBelongsToRequest(item, req) && item.status === "pending" && !jobs.get(item.jobId)?.keepsPicture ? { ...item, status: "canceled" } : item)));
   saveGallery();
-  // Only HEISS's own prompts: ComfyUI's queue also holds runs from its own UI and other apps.
+  // Only Studio's own prompts: ComfyUI's queue also holds runs from its own UI and other apps.
   await Promise.allSettled(promptIds.map(({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId))));
   res.json({ ok: true });
 });
@@ -1652,7 +1652,7 @@ app.post("/api/comfy/free", async (req, res) => {
   }
 });
 
-/** Marks every HEISS job still waiting or running as canceled, and returns the prompt ids ComfyUI knows them by. */
+/** Marks every Studio job still waiting or running as canceled, and returns the prompt ids ComfyUI knows them by. */
 function cancelOwnJobs(ownerId = "") {
   const promptIds = [];
   for (const [id, job] of jobs) {
@@ -1676,7 +1676,7 @@ function freeComfyMemory() {
 }
 
 // Model folders ComfyUI is not reading, and adding them to its extra_model_paths.yaml.
-// HEISS can only look at (and change) the machine it runs on, so a remote ComfyUI gets none of this.
+// Studio can only look at (and change) the machine it runs on, so a remote ComfyUI gets none of this.
 const comfyIsLocal = () => {
   try { return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(new URL(comfyUrl).hostname); } catch { return false; }
 };
@@ -1741,7 +1741,7 @@ app.get("/api/comfy/manager", async (_req, res) => {
   res.json({ ok: true, ...(await managerInfo()) });
 });
 
-// ComfyUI is started outside HEISS UI, so only ComfyUI-Manager can restart it in place.
+// ComfyUI is started outside Studio, so only ComfyUI-Manager can restart it in place.
 // Every worker but the default restarts through its own ComfyUI-Manager; its status poll shows it going and coming back.
 async function restartOtherWorker(worker, res) {
   const url = worker.url;
@@ -1834,7 +1834,7 @@ app.get('/comfy/video-preview', async (req, res) => {
   const filename = String(req.query.filename || '');
   const subfolder = String(req.query.subfolder || '');
   const type = String(req.query.type || 'output');
-  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
+  if (req.studioAccount && (!mayUseFeature(req.studioAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).end(); return; }
   if (!['output', 'input', 'temp', mediaType].includes(type) || !/\.(mp4|webm|mov|mkv)$/i.test(filename) || filename !== path.basename(filename) || /[\\/]/.test(filename) || inDotFolder(subfolder)) {
     res.status(404).end(); return;
   }
@@ -1852,7 +1852,7 @@ app.get("/comfy/thumb", async (req, res) => {
   const subfolder = String(req.query.subfolder || "");
   const type = String(req.query.type || "output");
   if (!filename) { res.status(400).json({ error: "filename is required." }); return; }
-  if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
+  if (req.studioAccount && (!mayUseFeature(req.studioAccount, 'gallery') || !ownerMediaTypes.has(type) || !outputFilenameBelongsToRequest(filename, subfolder, req))) { res.status(404).json({ error: "Not an output." }); return; }
   // The same outputs /comfy/view serves, and nothing else.
   if (!["output", "input", "temp", mediaType].includes(type) || !outputMediaPattern.test(filename) || inDotFolder(req.query.subfolder)) { res.status(404).json({ error: "Not an output." }); return; }
   try {
@@ -1920,7 +1920,7 @@ app.get("/comfy/*path", async (req, res) => {
     const query = req.originalUrl.split("?")[1] ? `?${req.originalUrl.split("?")[1]}` : "";
     const proxyPath = Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path;
     const filename = String(req.query.filename || "");
-    if (req.heissAccount && (!mayUseFeature(req.heissAccount, 'gallery') || proxyPath !== "view" || !ownerMediaTypes.has(String(req.query.type || "output")) || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
+    if (req.studioAccount && (!mayUseFeature(req.studioAccount, 'gallery') || proxyPath !== "view" || !ownerMediaTypes.has(String(req.query.type || "output")) || !outputFilenameBelongsToRequest(filename, String(req.query.subfolder || ""), req))) {
       res.status(404).json({ ok: false, error: "Not an output." });
       return;
     }
@@ -1941,7 +1941,7 @@ app.get("/comfy/*path", async (req, res) => {
     // ComfyUI is stopped or restarting: outputs still open from the output folder.
     const localFile = () => (proxyPath === "view" ? localOutputFile(String(req.query.filename || ""), String(req.query.subfolder || ""), String(req.query.type || "output")) : null);
     const sendLocal = (file) => res.sendFile(file, { headers: { "Cache-Control": "private, max-age=0, must-revalidate" } });
-    // HEISS-owned media is served from its folder only, never forwarded to ComfyUI.
+    // Studio-owned media is served from its folder only, never forwarded to ComfyUI.
     if (String(req.query.type || "") === mediaType) {
       const file = localFile();
       if (!file) { res.status(404).json({ ok: false, error: "This file is no longer available." }); return; }
@@ -2019,7 +2019,7 @@ startServers(app, {
     let message = `\n  Studio couldn’t start: ${error.message}\n`;
     // Where the running copy answered: this computer, or the one address HOST names.
     const runningHost = !error.host || error.host === "127.0.0.1" ? "localhost" : error.host.includes(":") ? `[${error.host}]` : error.host;
-    if (error.heissRunning) message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
+    if (error.studioRunning) message = `\n  Studio is already running: http://${runningHost}:${error.port}\n`;
     else if (error.code === "EADDRINUSE") message = dev
       ? `\n  Port ${port} is already in use. Stop what uses it, or set another PORT in .env.\n`
       : `\n  Ports ${port} to ${port + 9} are all in use. Set another PORT in .env.\n`;

@@ -5,7 +5,7 @@ import { nodePack } from "./node-packs.js";
 import { packInstallRoutes } from "./pack-installer.js";
 
 /**
- * How to add a custom node pack to ComfyUI when HEISS cannot do it itself:
+ * How to add a custom node pack to ComfyUI when Studio cannot do it itself:
  * ComfyUI-Manager's Git URL install, or one terminal command. Shared by smart
  * upscale (SeedVR2) and the model families that run on a pack (Sana).
  */

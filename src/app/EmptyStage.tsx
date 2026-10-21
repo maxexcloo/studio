@@ -37,16 +37,16 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
   retrying: boolean;
   onRetry: () => void;
   onOpenConnection: () => void;
-  /** Shown when offline, so it is clear where HEISS UI is looking. */
+  /** Shown when offline, so it is clear where Studio is looking. */
   comfyUrl?: string;
-  /** Other addresses on this computer HEISS UI tries by itself (ComfyUI Desktop's port). */
+  /** Other addresses on this computer Studio tries by itself (ComfyUI Desktop's port). */
   nearby?: string[];
   /** Opens the "No ComfyUI yet?" sheet. */
   onNoComfy?: () => void;
-  /** Connected, but nothing HEISS UI can run: the next step is a model, not a prompt. */
+  /** Connected, but nothing Studio can run: the next step is a model, not a prompt. */
   noModels?: boolean;
   onFindModels?: () => void;
-  /** The "pick a first model" cards, shown when ComfyUI has no model HEISS UI can run. */
+  /** The "pick a first model" cards, shown when ComfyUI has no model Studio can run. */
   starter?: React.ReactNode;
 }) {
   const thisComputer = useThisComputer();
@@ -98,7 +98,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
   }, [phase]);
   const copy = phase === 'offline' ? 'offline' : sayConnected ? 'connected' : phase === 'empty' ? 'empty' : phase === 'waiting' && slowFirstCheck ? 'looking' : '';
   const where = comfyUrl ? comfyUrl.replace(/^https?:\/\//, '') : '';
-  // The other usual ports HEISS UI tries on its own, as ":8000".
+  // The other usual ports Studio tries on its own, as ":8000".
   const ports = nearby.map((address) => /:(\d+)$/.exec(address)?.[1]).filter(Boolean);
 
   return (

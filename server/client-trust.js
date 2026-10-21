@@ -64,8 +64,8 @@ function tokenMatches(given, expected) {
  * The facts about one request, worked out once:
  *   address       who the server thinks the client is
  *   proxied       something between the client and this server added headers
- *   thisComputer  the browser runs on the machine HEISS UI runs on
- *   network       another device HEISS UI may answer once it signs in (LAN mode)
+ *   thisComputer  the browser runs on the machine Studio runs on
+ *   network       another device Studio may answer once it signs in (LAN mode)
  */
 export function classifyClient(req, { lanActions = false, devToken = "", hostOnly = false } = {}) {
   const headers = req?.headers || {};

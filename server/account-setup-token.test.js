@@ -29,7 +29,7 @@ function call(handler, req) {
   return Promise.resolve(handler(req, res)).then(() => res);
 }
 
-// A container platform reaches HEISS through a proxy: never "this computer".
+// A container platform reaches Studio through a proxy: never "this computer".
 const remote = (body) => ({ socket: { remoteAddress: "10.0.0.5" }, headers: { host: "studio.example.test", "x-forwarded-for": "203.0.113.4" }, body });
 
 test("a deployment setup token creates the first administrator remotely, once", async () => {

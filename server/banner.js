@@ -128,7 +128,7 @@ export function terminalSupport(stream = process.stdout, env = process.env, plat
 const dim = (text, depth) => (depth ? `\x1b[2m${text}\x1b[22m` : text);
 const ember = (text, depth) => (depth ? `${colorCode([1, 0.55, 0.18], depth)}${text}\x1b[39m` : text);
 
-/** Print the banner and where HEISS UI is listening. Resolves once drawn. */
+/** Print the banner and where Studio is listening. Resolves once drawn. */
 export function printBanner({ version = "", url = "", comfyUrl = "" } = {}, stream = process.stdout) {
   const support = terminalSupport(stream);
   const { depth, style } = support;

@@ -73,7 +73,7 @@ export function inspectTls(certPath = "", keyPath = "") {
   return report;
 }
 
-/** The pair from the environment, as it was when HEISS UI started. */
+/** The pair from the environment, as it was when Studio started. */
 export const startupTls = inspectTls(process.env.STUDIO_TLS_CERT || "", process.env.STUDIO_TLS_KEY || "");
 
 /** Names the certificate is for: the request guard accepts them as Host. */

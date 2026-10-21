@@ -1,5 +1,5 @@
 /**
- * The setup demo: HEISS UI against a pretend ComfyUI whose models folder is
+ * The setup demo: Studio against a pretend ComfyUI whose models folder is
  * missing text encoders, VAEs, a partner model and a node pack, so every
  * "this model needs files" flow can be tried on a machine without them.
  *

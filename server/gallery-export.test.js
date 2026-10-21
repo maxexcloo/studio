@@ -13,8 +13,8 @@ process.env.STUDIO_MULTI_USER = '1';
 const { setGallery } = await import('./gallery-store.js');
 const { accountOutputSubfolder } = await import('./account-ownership.js');
 const { exportFilename, sendGalleryExport } = await import('./gallery-export.js');
-const ownerA = { heissAccount: { userId: 'account-a' } };
-const ownerB = { heissAccount: { userId: 'account-b' } };
+const ownerA = { studioAccount: { userId: 'account-a' } };
+const ownerB = { studioAccount: { userId: 'account-b' } };
 for (const [owner, name] of [['account-a', 'account-a.png'], ['account-b', 'account-b.png']]) {
   const folder = accountOutputSubfolder(owner);
   fs.mkdirSync(path.join(output, folder), { recursive: true });

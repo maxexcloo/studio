@@ -1,11 +1,11 @@
 /**
- * A copy of HEISS UI's own state, taken the first time a new version starts.
+ * A copy of Studio's own state, taken the first time a new version starts.
  *
  * Updates can change what is in data/ in ways an older version can't read
  * back (sign-in sessions, the gallery file). Before
  * anything else loads, the files a version may rewrite are copied to
  * data/.backups/<from>-to-<to>-<time>/, so going back to the previous version
- * is a matter of stopping HEISS UI and copying them back (docs/guides/TROUBLESHOOTING.md).
+ * is a matter of stopping Studio and copying them back (docs/guides/TROUBLESHOOTING.md).
  *
  * Only the small state files are copied. Thumbnails, reference images and
  * the backups in data/backups stay where they are: no update rewrites them,
@@ -18,6 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { trashFolderNames } from "./data-names.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const defaultDataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
@@ -28,7 +29,7 @@ const keepDays = 14;
 const keepCount = 3;
 // Large, or never rewritten by an update, or not ours to keep. An encrypted
 // vault from before Hidden was removed moves into backups/ on its first start.
-const skipped = new Set([".thumbnails", backupsName, "backups", ".private-vault", "reference-assets", "setup-demo", ".heiss-trash", ".DS_Store", "Thumbs.db"]);
+const skipped = new Set([".thumbnails", backupsName, "backups", ".private-vault", "reference-assets", "setup-demo", ...trashFolderNames, ".DS_Store", "Thumbs.db"]);
 
 function currentVersion() {
   try {

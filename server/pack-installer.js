@@ -25,7 +25,7 @@ import { nodePack } from "./node-packs.js";
  * Either way ComfyUI loads the nodes only after a restart.
  *
  * When ComfyUI-Manager refuses an install because of its security level,
- * HEISS stops and asks (status "blocked"): going around a setting the person
+ * Studio stops and asks (status "blocked"): going around a setting the person
  * chose happens only when they say so.
  */
 
@@ -223,7 +223,7 @@ async function installWithManager(state, pack) {
 
 /**
  * Manager 3 (the custom node) queues by registry id too, but reports results
- * only over its websocket and clears them when the queue ends. So HEISS waits
+ * only over its websocket and clears them when the queue ends. So Studio waits
  * for the queue to stop and then checks the pack is among the installed ones.
  */
 async function installWithManager3(state, pack) {

@@ -30,7 +30,7 @@ test("three families, three versions each, small to large, every file an ungated
       assert.ok(spec, `${item.family}/${entry.id} names a catalog file`);
       assert.match(spec.url, /^https:\/\/huggingface\.co\//);
       assert.ok(spec.bytes > 1e9);
-      assert.ok(families[entry.family || item.family], `${entry.id} belongs to a family HEISS runs`);
+      assert.ok(families[entry.family || item.family], `${entry.id} belongs to a family Studio runs`);
     }
   }
 });

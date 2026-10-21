@@ -88,7 +88,7 @@ function sanitizeInpaint(input, profile, referenceAssets) {
 }
 
 /**
- * A built-in family request, checked against the profile HEISS built for that
+ * A built-in family request, checked against the profile Studio built for that
  * model file: encoders must be files that fit their slot, the VAE must fit (or
  * be the checkpoint's own), and nothing the model needs may be missing.
  */

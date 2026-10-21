@@ -48,7 +48,7 @@ export function ShellCommand({ plan, showToast }: { plan: ShellPlan; showToast: 
 }
 
 /**
- * The Install button: HEISS asks ComfyUI-Manager to install the pack when it is
+ * The Install button: Studio asks ComfyUI-Manager to install the pack when it is
  * in Manager's list, or clones it and installs its requirements itself when
  * ComfyUI runs on this computer. Progress comes from polling the server.
  */
@@ -157,7 +157,7 @@ export function NodeInstall({ pack, plan, managerHint, autoInstall, showToast, o
     decided.current = true;
     setRoute(manager.available ? 'manager' : 'terminal');
   }, [manager]);
-  // One click where HEISS can do it, for whoever may install; the manual routes stay one tap away.
+  // One click where Studio can do it, for whoever may install; the manual routes stay one tap away.
   const admin = useThisComputer();
   const canQuick = Boolean(admin && pack.id && autoInstall && (autoInstall.local || (autoInstall.manager && hasManager)));
   const [manual, setManual] = useState(false);

@@ -1,5 +1,5 @@
 /**
- * A stand-in ComfyUI for tests: the HTTP routes HEISS UI calls, and the
+ * A stand-in ComfyUI for tests: the HTTP routes Studio calls, and the
  * progress WebSocket (enough of RFC 6455 to send text frames). Each queued
  * prompt waits until the test finishes it, so a test can send progress first.
  */
@@ -108,7 +108,7 @@ export async function startFakeComfy({ objectInfo = {}, systemStats = {}, versio
     connected: (clientId) => sockets.has(clientId),
     /** Stops (or resumes) answering: every route fails with 503 meanwhile. */
     setDown(value) { down = Boolean(value); },
-    /** History entries HEISS UI asked ComfyUI to delete. */
+    /** History entries Studio asked ComfyUI to delete. */
     deleted,
     /** Forgets a run without a result, as a ComfyUI restart does. */
     drop(promptId) { ended.add(promptId); },

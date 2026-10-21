@@ -45,7 +45,7 @@ test.after(() => { comfy.close(); fs.rmSync(temporary, { recursive: true, force:
 
 const comfyOutput = (filename, subfolder = "heiss-ui") => ({ type: "image", url: `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`, filename });
 
-test("finished outputs move into the owner's HEISS media folder and leave ComfyUI", async () => {
+test("finished outputs move into the owner's Studio media folder and leave ComfyUI", async () => {
   const { results, comfyFiles } = await media.ingestRunResults([
     { output: comfyOutput("image_00001_.png", "heiss-ui/accounts/x"), upscale: comfyOutput("upscale_00001_.png", "heiss-ui/accounts/x") },
     { output: comfyOutput("missing.png") }
@@ -88,7 +88,7 @@ test("recovered history records move into media and keep their titles", async ()
   assert.equal(comfyFiles.length, 1);
 });
 
-test("clearing a gallery that mixes HEISS media and older ComfyUI outputs trashes and restores both", async () => {
+test("clearing a gallery that mixes Studio media and older ComfyUI outputs trashes and restores both", async () => {
   const trash = await import("./gallery-trash.js");
   const { results } = await media.ingestRunResults([{ output: comfyOutput("image_00009_.png") }], "");
   const mediaItem = { ...results[0].output, id: results[0].output.url, status: "done" };

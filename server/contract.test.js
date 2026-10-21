@@ -16,7 +16,7 @@ import { nodePacks } from "./node-packs.js";
  *
  * - a node this ComfyUI has gets every required input, only inputs it knows,
  *   values in its lists and ranges, and links from outputs of the right type;
- * - a node it lacks must be one HEISS checks for before running (the family's
+ * - a node it lacks must be one Studio checks for before running (the family's
  *   node list, which shows "Newer ComfyUI") or one from a known node pack.
  */
 

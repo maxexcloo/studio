@@ -16,7 +16,7 @@ export type LoraSnapshot = {
 };
 
 /**
- * Everything HEISS UI remembers about LoRAs:
+ * Everything Studio remembers about LoRAs:
  * - strengths: last strength per workflow and LoRA
  * - snapshots: saved stacks, keyed by model family ("family:z-image"); older
  *   builds keyed them by workflow id, which loraStacks() migrates on read

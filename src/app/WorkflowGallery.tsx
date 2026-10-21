@@ -134,7 +134,7 @@ function ImportRisks({ risks }: { risks: WorkflowRisk[] }) {
   );
 }
 
-/** Hands the job of fitting a workflow to an AI agent: a prompt that says what HEISS UI can and can't connect. */
+/** Hands the job of fitting a workflow to an AI agent: a prompt that says what Studio can and can't connect. */
 function AgentGuide({ onCopy, copied, forWorkflow }: { onCopy: () => void; copied: boolean; forWorkflow?: boolean }) {
   return (
     <div className="wf-agent">
@@ -175,7 +175,7 @@ function StatusBadge({ validation }: { validation: WorkflowSummary["validation"]
 
 export function WorkflowGallery({ view }: { view: any }) {
   const comfyRestarting = useComfyRestarting();
-  // Importing and deleting workflow files happens at the computer running HEISS UI.
+  // Importing and deleting workflow files happens at the computer running Studio.
   const thisComputer = useThisComputer();
   const {
     confirmAction, mode, onClose, refreshModels, refreshWorkflows, selectWorkflow, setWorkflowPreferences,

@@ -7,7 +7,7 @@ import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
-import { saveIntoHeissFolder } from "./graphs.js";
+import { saveIntoStudioFolder } from "./graphs.js";
 import { ingestRunResults, mediaStorageEnabled, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 
@@ -88,7 +88,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
   try {
     const { graph: built, plan } = upscaleGraph(body, info);
     // An account's upscale is saved beside its other outputs, in the owner's folder.
-    const graph = body.ownerId ? saveIntoHeissFolder(built, body.ownerId) : built;
+    const graph = body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built;
     target.patch({ status: "running", jobId, quality: plan.quality, faceDetail: Boolean(body.faceDetail), scale: plan.scale, startedAt: new Date().toISOString(), error: "" });
     // How long it should take, from every SeedVR2 upscale here before (upscale-timing.js).
     const learn = { quality: plan.quality, model: plan.model || "", faceDetail: Boolean(body.faceDetail), work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight }) };
@@ -136,7 +136,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         const outputs = outputsFrom({ outputs: { "9": checked.entry?.outputs?.["9"] || {} } });
         let output = outputs.find((item) => item.type === (body.mediaType || "image"));
         if (!output) throw new Error("The upscale ended without a saved result.");
-        // ComfyUI as a worker: the upscale moves into HEISS media beside its source.
+        // ComfyUI as a worker: the upscale moves into Studio media beside its source.
         let comfyCopies = [];
         if (mediaStorageEnabled) {
           const moved = await ingestRunResults([{ output }], body.ownerId || "");

@@ -926,7 +926,7 @@ test('the real demo server exposes native MCP on its existing port and accepts i
   });
   const started = await new Promise((resolve, reject) => {
     child.once('message', resolve);
-    child.once('exit', code => reject(new Error(`Fixture HEISS server exited before starting (${code}).`)));
+    child.once('exit', code => reject(new Error(`Fixture Studio server exited before starting (${code}).`)));
     child.once('error', reject);
   });
   const base = started.url.replace('localhost', '127.0.0.1');

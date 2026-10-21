@@ -254,7 +254,7 @@ function bundledFor(name, header) {
 /* ------------------------------------------------------------ Resolution */
 
 /**
- * Everything HEISS knows about one model file:
+ * Everything Studio knows about one model file:
  *   family   - a key of `families` (runnable), a `knownFamilies` id, or ""
  *   variant  - the variant object within the family
  *   via      - how we know: choice, file, metadata, name, default
@@ -295,7 +295,7 @@ export function classifyModel(source, name) {
       const named = familyFromMetadata(header.__metadata__ || metadataCache.get(choiceKey(source, name)) || {}) || familyFromName(name, source);
       if (families[named]?.sources.includes(source)) return finish(named, "name");
     }
-    // Weights that were read and match nothing HEISS knows are not SD: running them as
+    // Weights that were read and match nothing Studio knows are not SD: running them as
     // SDXL would only end in a shape error. The file asks for its type instead.
     if (family === "other") return finish("other", "file", detail);
   }

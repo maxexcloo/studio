@@ -34,16 +34,16 @@ const body = { prompt: "a lighthouse", seed: "42", width: 1024, height: 768, mod
 test("Smart upscale goes into the run's own graph, fed by the picture the run saves", () => {
   const planned = planRunUpscale(runGraph(), body, info);
   assert.equal(planned.skipped, undefined);
-  assert.deepEqual(planned.pairs, [{ base: "9", upscale: "heiss_up0_9" }]);
+  assert.deepEqual(planned.pairs, [{ base: "9", upscale: "studio_up0_9" }]);
   const { graph } = planned;
   // The run's own save stays, so a stopped upscale still leaves the picture.
   assert.equal(graph["9"].class_type, "SaveImage");
-  assert.deepEqual(graph.heiss_up0_2.inputs.image, ["8", 0]);
-  assert.deepEqual(graph.heiss_up0_5.inputs.image, ["heiss_up0_2", 0]);
-  assert.equal(graph.heiss_up0_5.inputs.color_correction, "wavelet", "automatic upscale uses the same colour correction as manual upscale");
-  assert.deepEqual(graph.heiss_up0_9.inputs.images, ["heiss_up0_5", 0]);
-  assert.equal(graph.heiss_up0_1, undefined, "no LoadImage: nothing is staged");
-  assert.equal(graph.heiss_up0_5._meta.heissPhase, "Upscaling to 4K");
+  assert.deepEqual(graph.studio_up0_2.inputs.image, ["8", 0]);
+  assert.deepEqual(graph.studio_up0_5.inputs.image, ["studio_up0_2", 0]);
+  assert.equal(graph.studio_up0_5.inputs.color_correction, "wavelet", "automatic upscale uses the same colour correction as manual upscale");
+  assert.deepEqual(graph.studio_up0_9.inputs.images, ["studio_up0_5", 0]);
+  assert.equal(graph.studio_up0_1, undefined, "no LoadImage: nothing is staged");
+  assert.equal(graph.studio_up0_5._meta.studioPhase, "Upscaling to 4K");
 });
 
 test("a run whose upscale can't be set up goes ahead and says why", () => {
@@ -55,8 +55,8 @@ test("a run whose upscale can't be set up goes ahead and says why", () => {
 
 test("each saved picture carries its own upscale; upscales are not pictures of their own", () => {
   const image = (filename) => ({ images: [{ filename, subfolder: "heiss-ui", type: "output" }] });
-  const pairs = [{ base: "9", upscale: "heiss_up0_9" }];
-  const done = pairRunOutputs({ "9": { images: [image("a.png").images[0], image("b.png").images[0]] }, heiss_up0_9: { images: [image("a-up.png").images[0], image("b-up.png").images[0]] } }, pairs);
+  const pairs = [{ base: "9", upscale: "studio_up0_9" }];
+  const done = pairRunOutputs({ "9": { images: [image("a.png").images[0], image("b.png").images[0]] }, studio_up0_9: { images: [image("a-up.png").images[0], image("b-up.png").images[0]] } }, pairs);
   assert.deepEqual(done.map((result) => [result.output.filename, result.upscale?.filename]), [["a.png", "a-up.png"], ["b.png", "b-up.png"]]);
   // Stopped mid-upscale: the picture is there, its upscale is not.
   const stopped = pairRunOutputs({ "9": image("a.png") }, pairs);
@@ -67,7 +67,7 @@ test("each saved picture carries its own upscale; upscales are not pictures of t
 
 test("the upscale reads as part of the run, and its time is not the model's", () => {
   const { graph } = planRunUpscale(runGraph(), body, info);
-  const progress = nextProgress(graph, { type: "progress", data: { node: "heiss_up0_5", value: 3, max: 10 } });
+  const progress = nextProgress(graph, { type: "progress", data: { node: "studio_up0_5", value: 3, max: 10 } });
   assert.equal(progress.phase, "Upscaling to 4K");
   assert.equal(progress.steps, false);
   const timer = new RunTimer(graph, { endNodes: ["9"] });

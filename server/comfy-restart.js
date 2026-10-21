@@ -1,5 +1,5 @@
 /**
- * A ComfyUI restart HEISS asked for, so "not answering" can read as
+ * A ComfyUI restart Studio asked for, so "not answering" can read as
  * "restarting" everywhere (every tab and device polls the same server) instead
  * of "offline". It ends when ComfyUI answers again after going down, or after a
  * short while if the restart was too quick to see; past the window it counts

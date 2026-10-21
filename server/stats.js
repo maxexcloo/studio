@@ -1,5 +1,5 @@
 // Numbers for the About page. Computed from the gallery record only: nothing is
-// tracked beyond what HEISS UI already keeps about its own outputs.
+// tracked beyond what Studio already keeps about its own outputs.
 
 const dayKey = (value) => {
   const date = new Date(value);

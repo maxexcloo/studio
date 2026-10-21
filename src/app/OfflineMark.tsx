@@ -1,9 +1,9 @@
 import { SCENE_CELL, ease, fillRects, useCellScene, type CellRect } from './cellScene';
 
 /**
- * The offline empty state: a pixel plug (HEISS) and socket (ComfyUI) in the
+ * The offline empty state: a pixel plug (Studio) and socket (ComfyUI) in the
  * same gray cell mosaic as the About wordmark. A warm pulse runs down the
- * HEISS cable, the plug reaches for the socket, a spark tries to jump the gap
+ * Studio cable, the plug reaches for the socket, a spark tries to jump the gap
  * and dies into a few embers. Then it tries again.
  *
  * Given `connectedAt`, it plays the other ending instead: the plug snaps in,

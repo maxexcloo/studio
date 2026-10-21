@@ -76,7 +76,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const [remoteAnswer, setRemote] = React.useState(false);
   // Known before anyone clicks: a ComfyUI elsewhere cannot receive downloads from here.
   const thisComputer = useThisComputer();
-  // Downloads land on the computer running HEISS UI; from another device they are its job.
+  // Downloads land on the computer running Studio; from another device they are its job.
   const remote = remoteAnswer || state?.local === false || !thisComputer;
   const blocking = profile.missing || [];
   // "Don't show again" hides it at once; the server keeps the answer for good (server/dismissals.js).
@@ -84,7 +84,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   // Nothing needed, but something recommended (FLUX.3's prompt upsampler): the same rows, worded as an offer.
   const optional = !blocking.length && Boolean(profile.recommended?.length) && !dismissedNow;
   const missing = optional ? profile.recommended! : blocking;
-  // Waiting on ComfyUI itself (an update, a node pack and its restart) happens outside HEISS,
+  // Waiting on ComfyUI itself (an update, a node pack and its restart) happens outside Studio,
   // so the panel looks again by itself until it changes, rather than waiting for a reload.
   const waitingOnComfy = missing.some((item) => item.part === 'comfy');
   const [lookedAt, setLookedAt] = React.useState(0);
@@ -155,7 +155,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const [chosen, setChosen] = React.useState<Record<string, string>>({});
   const shownDone = allDone ? installed : ready;
   // A download that just landed waits for the rescan; only a file ComfyUI still does not list after that is stuck.
-  // The server's onDisk covers files fetched before HEISS restarted, which `landed` has forgotten.
+  // The server's onDisk covers files fetched before Studio restarted, which `landed` has forgotten.
   const landedWaiting = missing.some((item) => item.downloads.some((download) => (landed.has(download.file) || download.onDisk) && !downloadFor(state, download.file)));
   const [stuckShown, setStuckShown] = React.useState(false);
   React.useEffect(() => {

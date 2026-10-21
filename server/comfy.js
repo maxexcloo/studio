@@ -83,7 +83,7 @@ export const outputMediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm
  * never from a hidden folder (the trash); null otherwise.
  */
 export function localOutputFile(filename, subfolder = "", type = "output") {
-  // HEISS-owned media (media-paths.js) never lives in ComfyUI's folder.
+  // Studio-owned media (media-paths.js) never lives in ComfyUI's folder.
   if (type === mediaType) return mediaFile(String(filename || ""), String(subfolder || ""));
   if (type !== "output" || !comfyOutputDir || !filename) return null;
   if (!outputMediaPattern.test(String(filename))) return null;

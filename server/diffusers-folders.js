@@ -5,7 +5,7 @@ import { modelFolders } from "./comfy.js";
 /**
  * Hugging Face Diffusers folders in ComfyUI's models/diffusers, for model
  * families whose custom nodes load a whole folder by path (MOSS-Image's own
- * loader). ComfyUI cannot list them, since the node takes free text, so HEISS
+ * loader). ComfyUI cannot list them, since the node takes free text, so Studio
  * looks itself: only on this computer, only one level deep, and only folders
  * whose transformer/config.json names a class the family expects.
  */

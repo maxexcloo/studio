@@ -9,7 +9,7 @@ export function registerComparisonRoutes(app, { dataDir, gallery }) {
   const file = path.join(dataDir, 'comparisons.json');
   const read = () => { try { return readJsonFile(file); } catch (error) { if (error.code === 'ENOENT') return []; throw error; } };
   const allowed = (req, res) => {
-    if (!req.heissAccount || mayUseFeature(req.heissAccount, 'gallery')) return true;
+    if (!req.studioAccount || mayUseFeature(req.studioAccount, 'gallery')) return true;
     res.status(403).json({ error: 'Gallery access is disabled for this account.' }); return false;
   };
   const visible = req => recordsForRequest(gallery(), req).filter(item => item.type === 'image' && item.status !== 'canceled');

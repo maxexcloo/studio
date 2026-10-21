@@ -4,17 +4,17 @@ import { fileURLToPath } from "node:url";
 import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
 
 /**
- * What HEISS UI writes down when something goes wrong, so "the server is down"
- * turns into a reason: data/logs/heiss-YYYY-MM-DD.log, one line per event,
+ * What Studio writes down when something goes wrong, so "the server is down"
+ * turns into a reason: data/logs/studio-YYYY-MM-DD.log, one line per event,
  * kept for a week.
  *
  * - A crash (an uncaught exception) is written with its stack and the last
  *   things that happened, synchronously, before the process exits.
  * - A promise rejection nobody handled is written and the server keeps going:
  *   Node would otherwise stop the whole studio for one failed side task.
- * - ComfyUI going away and coming back is written with what HEISS was doing
+ * - ComfyUI going away and coming back is written with what Studio was doing
  *   at that moment (thumbnails building, requests waiting), so it can be told
- *   apart from HEISS itself going down.
+ *   apart from Studio itself going down.
  * - Every minute a heartbeat: memory and how late the event loop runs. A long
  *   stall or a memory climb shows up before the crash it leads to.
  *
@@ -32,7 +32,7 @@ const probes = new Map();
 let installed = false;
 
 function stamp() { return new Date().toISOString(); }
-function fileFor(date = new Date()) { return path.join(logDir, `heiss-${date.toISOString().slice(0, 10)}.log`); }
+function fileFor(date = new Date()) { return path.join(logDir, `studio-${date.toISOString().slice(0, 10)}.log`); }
 
 function write(level, message, extra) {
   const line = `${stamp()} ${level.padEnd(5)} ${message}${extra ? ` ${JSON.stringify(extra)}` : ""}`;
@@ -71,7 +71,7 @@ function sweep() {
   try {
     const cutoff = Date.now() - keepDays * 86_400_000;
     for (const name of fs.readdirSync(logDir)) {
-      if (!/^heiss-\d{4}-\d{2}-\d{2}\.log$/.test(name)) continue;
+      if (!/^(?:studio|heiss)-\d{4}-\d{2}-\d{2}\.log$/.test(name)) continue;
       const file = path.join(logDir, name);
       if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file, { force: true });
     }

@@ -2,7 +2,7 @@
 
 Common problems and how to get past them. A failed generation's card links to its section below.
 
-Still stuck? **Settings › Maintenance › Copy Diagnostics** copies the Studio, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/maxexcloo/studio/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself. Or skip the pasting: **Report bug** on a failed card, **Idea or bug?** at the bottom of the Settings sidebar send it to the [feedback board](https://heiss-ui.vercel.app/board/), with the setup lines if you want them. For a quick hand, ask in the [Discord](https://discord.gg/Hf7ysvDeGa).
+Still stuck? **Settings › Maintenance › Copy Diagnostics** copies the Studio, Node.js and ComfyUI versions, the system and the GPU, without prompts, images or file names. Paste it into [an issue](https://github.com/maxexcloo/studio/issues) with what you did and what happened. **Copy report** on a failed card adds the error itself.
 
 - [Starting Studio](#starting-studio)
 - [When a generation fails](#when-a-generation-fails)

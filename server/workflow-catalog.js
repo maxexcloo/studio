@@ -123,7 +123,7 @@ function validateWorkflow(workflow, info = {}, profile = null) {
 
 const loaderParts = { CLIPLoader: "encoder", VAELoader: "vae" };
 
-/** The files an imported workflow lacks, shaped like a family's missing parts, with a download where HEISS's catalog has that exact file. */
+/** The files an imported workflow lacks, shaped like a family's missing parts, with a download where Studio's catalog has that exact file. */
 function missingFileParts(workflow, info) {
   return workflowMissingFiles(workflow, info).map(({ file, folder, classType }) => ({
     part: loaderParts[classType] || "model",
@@ -262,7 +262,7 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
     graph,
     detected,
     format,
-    hasHeissUi: Boolean(raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio),
+    hasStudioBlock: Boolean(raw?.heissUi || raw?.heiss_ui || raw?.jAiStudio || raw?.j_ai_studio),
     validation,
     // Nodes that run code, touch files elsewhere or go online: the review says so before saving.
     risks: workflowRisks(graph)

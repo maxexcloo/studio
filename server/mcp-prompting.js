@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Native port of the HEISS MCP prompting service; see mcp.LICENSE.
+// Native port of the Studio MCP prompting service; see mcp.LICENSE.
 import fs from 'node:fs';
 
 export function loadMcpPrompting(file) {

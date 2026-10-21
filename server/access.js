@@ -41,8 +41,8 @@ export const deviceSessionSeconds = (() => {
 /** Who is asking, worked out once per request. */
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false, network: false };
-  if (!req.heissClient) req.heissClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
-  return req.heissClient;
+  if (!req.studioClient) req.studioClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
+  return req.studioClient;
 }
 
 let cache = null;
@@ -273,12 +273,12 @@ export function isSignedInDevice(req) {
  */
 export function canAdmin(req) {
   if (process.env.STUDIO_MULTI_USER === "1") {
-    if (!req?.heissAccount) {
+    if (!req?.studioAccount) {
       const token = parseCookies(req)["studio_account"];
-      if (req) req.heissAccount = accountSession(token);
+      if (req) req.studioAccount = accountSession(token);
     }
     // A personal MCP token never carries administrator authority.
-    return req?.heissAccount?.role === "administrator" && req.heissAccount.credential !== "mcp-token";
+    return req?.studioAccount?.role === "administrator" && req.studioAccount.credential !== "mcp-token";
   }
   if (clientOf(req).thisComputer) return true;
   return devicesMayAdmin() && isSignedInDevice(req);

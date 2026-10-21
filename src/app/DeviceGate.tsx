@@ -23,7 +23,7 @@ type GateState =
 
 /**
  * Other devices sign in before the studio loads: phones and other computers
- * see this screen until the studio password opens it. On the computer HEISS
+ * see this screen until the studio password opens it. On the computer Studio
  * UI runs on the studio starts at once and nothing here shows. When a
  * session ends (a week passed, or "Sign out all devices"), the next request
  * says so and this screen comes back.

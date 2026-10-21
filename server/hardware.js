@@ -18,7 +18,7 @@ import os from "node:os";
 const GiB = 1024 ** 3;
 
 /**
- * The share of a Mac's unified memory HEISS counts on for models when no GPU
+ * The share of a Mac's unified memory Studio counts on for models when no GPU
  * limit is set. Metal's own recommendedMaxWorkingSetSize lands at about 74–78%
  * on recent Macs; a little under that leaves room for macOS and the apps around.
  */

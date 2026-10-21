@@ -37,8 +37,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     }
     let releaseReservation = () => {};
     try {
-      if (req.heissAccount?.role === "user" && !(id && jobs.has(id))) {
-        const reservation = reserveAccountJob(req.heissAccount.userId, jobs, accountReservations, accountJobLimit);
+      if (req.studioAccount?.role === "user" && !(id && jobs.has(id))) {
+        const reservation = reserveAccountJob(req.studioAccount.userId, jobs, accountReservations, accountJobLimit);
         if (!reservation.accepted) {
           return res.status(429).json({ ok: false, reason: "job-limit", error: `You can have up to ${accountJobLimit} outstanding jobs.` });
         }
@@ -58,7 +58,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
    * without the capability, and nothing falls back to the cloud.
    */
   async function dispatchGenerate(req, res) {
-    const accountUser = req.heissAccount?.role === "user";
+    const accountUser = req.studioAccount?.role === "user";
     const workers = listWorkers();
     const kindCapability = req.body?.kind === "video" ? "video" : "image";
     if (!workers.length && !demoMode) return res.status(503).json({ ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) });
@@ -75,15 +75,15 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       }
       if (accountUser) {
         const feature = (req.body?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
-        if (!mayUseGenerationProfile(req.heissAccount, profile) || !mayUseFeature(req.heissAccount, feature)) {
+        if (!mayUseGenerationProfile(req.studioAccount, profile) || !mayUseFeature(req.studioAccount, feature)) {
           return res.status(403).json({ ok: false, error: "This account cannot use the selected generation profile." });
         }
-        if (Array.isArray(req.body?.loras) && req.body.loras.length && !mayUseFeature(req.heissAccount, "loras")) {
+        if (Array.isArray(req.body?.loras) && req.body.loras.length && !mayUseFeature(req.studioAccount, "loras")) {
           return res.status(403).json({ ok: false, error: "LoRAs are not enabled for this account." });
         }
         const hasReference = Boolean(req.body?.startImage || req.body?.startImageId || req.body?.referenceAssets?.length);
         const referenceFeature = feature === "videoGeneration" ? "videoReferences" : "imageReferences";
-        if (hasReference && !mayUseFeature(req.heissAccount, referenceFeature)) {
+        if (hasReference && !mayUseFeature(req.studioAccount, referenceFeature)) {
           return res.status(403).json({ ok: false, error: "References are not enabled for this account." });
         }
       }
@@ -99,7 +99,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const existing = duplicateId && jobs.get(duplicateId);
     // In account mode a job ID belongs to one owner for good: a reused ID must never touch
     // another account's live job or saved outputs, and the answer must not reveal which.
-    if (duplicateId && req.heissAccount) {
+    if (duplicateId && req.studioAccount) {
       const ownerId = ownerIdForRequest(req);
       const foreign = (existing && (existing.ownerId || "") !== ownerId)
         || gallery.some((item) => item.jobId === duplicateId && (item.ownerId || "") !== ownerId);
@@ -170,7 +170,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality) && (demoMode || workerHas(body.comfyBackend, "upscale"))
       ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
       : null;
-    if ((!req.heissAccount || mayUseFeature(req.heissAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
+    if ((!req.studioAccount || mayUseFeature(req.studioAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {

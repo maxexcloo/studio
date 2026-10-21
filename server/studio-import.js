@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { isInside } from "./paths.js";
+import { accountFolders } from "./data-names.js";
 
 /**
  * Moves a whole single-user studio (its data folder and ComfyUI output folder)
@@ -16,7 +17,7 @@ import { isInside } from "./paths.js";
 
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
 const ownerHash = (accountId) => crypto.createHash("sha256").update(String(accountId)).digest("hex");
-export const accountMediaSubfolder = (accountId) => `heiss-ui/accounts/${ownerHash(accountId)}`;
+export const accountMediaSubfolder = (accountId) => accountFolders(ownerHash(accountId))[0];
 const accountDataDir = (dataDir, accountId) => path.join(dataDir, "accounts", ownerHash(accountId));
 // Per-account files that move as they are; the target must not have them yet.
 const perAccountFiles = ["prompt-history.json", "negative-prompt-history.json", "lora-stacks.json"];

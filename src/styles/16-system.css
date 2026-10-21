@@ -255,7 +255,7 @@
 
 /* --------------------------------------------------------------- 7. Tooltip */
 
-.heiss-tooltip {
+.studio-tooltip {
   border: 1px solid var(--glass-border);
   background: var(--surface-grain), var(--glass-panel-bg) !important;
   -webkit-backdrop-filter: var(--glass-panel-blur);

@@ -228,7 +228,7 @@
 .model-menu-find.has-found em { color: var(--ember); }
 .model-menu-find-cta { justify-self: start; margin-top: 8px; }
 
-/* Settings: folders HEISS added, with a way back out. */
+/* Settings: folders Studio added, with a way back out. */
 .set-folder-path { overflow: hidden; font: 500 11.5px var(--font-mono); white-space: nowrap; text-overflow: ellipsis; }
 
 /* Long paths lose their start, not their end, so the folder name stays

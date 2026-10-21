@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { MAX_BATCH, families, runnerFor, sanaConf, sanaLatentNode } from './family-catalog.js';
 import { krea2RawShift } from './model-families.js';
+import { outputFolderName } from "./data-names.js";
 
 /**
  * One graph builder for every family in family-catalog.js. The request arrives
@@ -165,7 +166,7 @@ export function familyGraph(body) {
     const images = decode(add, sampled, vae, body);
     const audio = add("VAEDecodeAudio", { samples: sampled, vae: audioVae });
     const video = add("CreateVideo", { images: [images, 0], audio: [audio, 0], fps: Number(body.fps || family.fps || 24) });
-    add("SaveVideo", { video: [video, 0], filename_prefix: "heiss-ui/video", format: "mp4", codec: "h264" });
+    add("SaveVideo", { video: [video, 0], filename_prefix: `${outputFolderName}/video`, format: "mp4", codec: "h264" });
     return graph;
   }
 
@@ -181,7 +182,7 @@ export function familyGraph(body) {
     const sigmas = add("Ideogram4Scheduler", { steps, width, height, mu: preset.mu, std: preset.std });
     const latent = [add("EmptyFlux2LatentImage", { width, height, batch_size: count }), 0];
     const samples = customSampler(add, { seed, sampler: body.sampler || "euler", guider, sigmas, latent });
-    add("SaveImage", { images: [decode(add, samples, vae, body), 0], filename_prefix: "heiss-ui/image" });
+    add("SaveImage", { images: [decode(add, samples, vae, body), 0], filename_prefix: `${outputFolderName}/image` });
     return graph;
   }
 
@@ -193,7 +194,7 @@ export function familyGraph(body) {
       sampler_name: body.sampler || "euler", scheduler: body.scheduler || "simple",
       positive: [encoded, 0], negative: [encoded, 1], latent_image: [encoded, 2], denoise: 1
     }), 0];
-    add("SaveImage", { images: [decode(add, samples, vae, body), 0], filename_prefix: "heiss-ui/image" });
+    add("SaveImage", { images: [decode(add, samples, vae, body), 0], filename_prefix: `${outputFolderName}/image` });
     return graph;
   }
 
@@ -337,9 +338,9 @@ export function familyGraph(body) {
   if (inpaint) images = stitchInpaint(add, images, inpaint, count);
   if (family.kind === "video") {
     const video = add("CreateVideo", { images, fps: Number(body.fps || family.fps || 16) });
-    add("SaveVideo", { video: [video, 0], filename_prefix: "heiss-ui/video", format: "mp4", codec: "h264" });
+    add("SaveVideo", { video: [video, 0], filename_prefix: `${outputFolderName}/video`, format: "mp4", codec: "h264" });
   } else {
-    add("SaveImage", { images, filename_prefix: "heiss-ui/image" });
+    add("SaveImage", { images, filename_prefix: `${outputFolderName}/image` });
   }
   return graph;
 }
@@ -358,7 +359,7 @@ function sanaGraph({ add, graph, body, variant, seed, width, height, count }) {
       sana_model: model, prompt: body.prompt || "", negative_prompt: variant.negative === "none" ? "" : body.negative || "",
       width, height, steps: Number(body.steps || 20), guidance_scale: Number(body.cfg || 4.5), seed, batch_size: count
     }), 0];
-    add("SaveImage", { images, filename_prefix: "heiss-ui/image" });
+    add("SaveImage", { images, filename_prefix: `${outputFolderName}/image` });
     return graph;
   }
   const settings = { conf: sanaConf(body.model), dtype: variant.dtype || "BF16", gemmaDevice: "cpu", gemmaDtype: "default", latent: sanaLatentNode, ...body.sana };
@@ -379,7 +380,7 @@ function sanaGraph({ add, graph, body, variant, seed, width, height, count }) {
     positive, negative, latent_image: latent, denoise: 1
   }), 0];
   const images = [add("VAEDecode", { samples, vae }), 0];
-  add("SaveImage", { images, filename_prefix: "heiss-ui/image" });
+  add("SaveImage", { images, filename_prefix: `${outputFolderName}/image` });
   return graph;
 }
 

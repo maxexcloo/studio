@@ -1,3 +1,4 @@
+import { generationRecord } from "./generation-record.js";
 import { cloudJobExpired, cloudJobFailedMessage, cloudJobLostMessage } from './cloud-jobs.js';
 
 // Reattach persisted tiles to their existing prompts; never submit replacement work.
@@ -24,13 +25,13 @@ export function createJobRecovery({ backends, finishJob, getGallery, jobs, recor
         const places = new Map();
         for (const [key, status] of [['queue_running', 'running'], ['queue_pending', 'queued']]) {
           for (const entry of queue[key] || []) {
-            const id = entry[3]?.heiss_generation?.jobId;
+            const id = generationRecord(entry[3]).jobId;
             if (id) places.set(id, { promptId: entry[1], status });
           }
         }
         const completed = new Map();
         for (const [promptId, entry] of Object.entries(history)) {
-          const id = entry.prompt?.[3]?.heiss_generation?.jobId;
+          const id = generationRecord(entry.prompt?.[3]).jobId;
           if (id) completed.set(id, { entry, promptId });
         }
         const candidates = new Set(visible(getGallery().filter((item) =>

@@ -45,8 +45,8 @@ test("a reference page maps only the items it returns", async () => {
 
 test("uploaded reference assets and byte reads are limited to their account owner", async () => {
   const buffer = await sharp({ create: { width: 20, height: 18, channels: 3, background: "#456789" } }).png().toBuffer();
-  const ownerA = { heissAccount: { userId: "account-a", role: "user" } };
-  const ownerB = { heissAccount: { userId: "account-b", role: "user" } };
+  const ownerA = { studioAccount: { userId: "account-a", role: "user" } };
+  const ownerB = { studioAccount: { userId: "account-b", role: "user" } };
   const assetA = await referenceAssets.saveUploadedReference({ buffer, name: "same.png", mime: "image/png" }, "account-a");
   const assetB = await referenceAssets.saveUploadedReference({ buffer, name: "same.png", mime: "image/png" }, "account-b");
 
@@ -141,8 +141,8 @@ test('search filters the full reference library before pagination and matches pr
 
 test('a video’s last frame is referenced only by its owner and only for finished videos', async () => {
   const { gallery } = await import('./gallery-store.js');
-  const owner = { heissAccount: { userId: 'account-a', role: 'user' } };
-  const other = { heissAccount: { userId: 'account-b', role: 'user' } };
+  const owner = { studioAccount: { userId: 'account-a', role: 'user' } };
+  const other = { studioAccount: { userId: 'account-b', role: 'user' } };
   const items = [
     { id: 'extend-video', ownerId: 'account-a', type: 'video', status: 'done', url: '/images/extend.mp4', outputName: 'extend.mp4', createdAt: '2026-01-01T00:00:00Z' },
     { id: 'extend-image', ownerId: 'account-a', type: 'image', status: 'done', url: '/images/extend.png', createdAt: '2026-01-01T00:00:00Z' },

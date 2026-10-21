@@ -1,6 +1,6 @@
 /**
  * How long a SeedVR2 upscale takes on this machine, learned from every upscale
- * HEISS UI runs: the arrow on a finished image and Smart upscale inside a run
+ * Studio runs: the arrow on a finished image and Smart upscale inside a run
  * alike, since both load the same weights the same way. One weight costs about
  * the same for the same output size, so an upscale is a fixed part (loading
  * the DiT and VAE, which are never kept loaded) plus a part that grows with

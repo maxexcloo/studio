@@ -15,7 +15,7 @@ import type { ShowToast } from './toast';
 /**
  * Guided setup for a model already in ComfyUI whose family runs more than one
  * way (MOSS-Image: Comfy-Org's single files on ComfyUI's own nodes, or the
- * official folder on its makers' nodes; server/family-setup.js). HEISS never
+ * official folder on its makers' nodes; server/family-setup.js). Studio never
  * fetches the model: the file says which way it runs, and three steps under
  * one hero walk through what that needs. ComfyUI: an update or the node pack.
  * Files: the text encoder and VAE, where the way needs them. Ready. It

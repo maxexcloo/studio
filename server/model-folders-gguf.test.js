@@ -67,7 +67,7 @@ test("a section an older HEISS wrote under unet_gguf is rewritten; other lines a
   ].join("\n");
   const { text, changed } = migrateDerivedKinds(old);
   assert.deepEqual(changed, ["D:\\ComfyUI\\models"]);
-  assert.match(text, /^    unet_gguf: somewhere\/else$/m, "not HEISS's section, not touched");
+  assert.match(text, /^    unet_gguf: somewhere\/else$/m, "not Studio's section, not touched");
   assert.match(text, /^    diffusion_models: 'unet_gguf'$/m);
   assert.match(text, /^    text_encoders: 'clip_gguf'$/m);
   assert.deepEqual(migrateDerivedKinds(text).changed, []);

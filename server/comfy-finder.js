@@ -4,7 +4,7 @@ import { isThisComputer } from "./hardware.js";
 /**
  * Where ComfyUI usually listens on this computer: a manual or portable install
  * on 8188, ComfyUI Desktop on 8000. When the saved address (or the default)
- * does not answer and points at this computer, HEISS looks at these too and
+ * does not answer and points at this computer, Studio looks at these too and
  * keeps whichever answers, so nobody has to know about ports.
  */
 export const usualComfyAddresses = ["http://127.0.0.1:8188", "http://127.0.0.1:8000"];
@@ -46,7 +46,7 @@ async function probeComfy(url) {
 }
 
 /**
- * Whether HEISS may go looking for ComfyUI when its address doesn't answer.
+ * Whether Studio may go looking for ComfyUI when its address doesn't answer.
  * STUDIO_COMFY_SEARCH=0 (Settings › Connection) keeps it on its own ComfyUI,
  * e.g. next to another one on 8188 that it must not adopt.
  */

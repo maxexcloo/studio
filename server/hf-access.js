@@ -5,7 +5,7 @@ import { Readable } from "node:stream";
 import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from "./env.js";
 
 /**
- * How HEISS reaches Hugging Face for model downloads, the way the Hugging Face
+ * How Studio reaches Hugging Face for model downloads, the way the Hugging Face
  * tools themselves do it:
  *   - a token (HF_TOKEN or HUGGING_FACE_HUB_TOKEN, or the one saved in
  *     Settings) opens gated repos. It goes to huggingface.co over HTTPS and

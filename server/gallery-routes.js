@@ -9,7 +9,7 @@ import { mayUseFeature } from './account-policy.js';
 import { requireAdmin, requireLocal } from "./route-access.js";
 
 function requireGalleryAccess(req, res) {
-  if (!req.heissAccount || mayUseFeature(req.heissAccount, 'gallery')) return true;
+  if (!req.studioAccount || mayUseFeature(req.studioAccount, 'gallery')) return true;
   res.status(403).json({ ok: false, error: 'Gallery access is disabled for this account.' });
   return false;
 }
@@ -29,7 +29,7 @@ export function registerGalleryBundleRoutes(app) {
   app.get("/api/gallery/bundles", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
     const options = bundleOptions(req.query);
-    res.json({ bundles: req.heissAccount ? [] : listBundles(), pending: pendingSummary(bundleSourceItems(req), options), ...options });
+    res.json({ bundles: req.studioAccount ? [] : listBundles(), pending: pendingSummary(bundleSourceItems(req), options), ...options });
   });
 
   app.post("/api/gallery/bundles/compact", (req, res) => {
@@ -52,7 +52,7 @@ export function registerGalleryBundleActions(app) {
   app.post("/api/gallery/bundles/:id/cover", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
     if (!requireLocal(req, res)) return;
-    if (req.heissAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
+    if (req.studioAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
     try {
       res.json(setBundleCover(String(req.params.id), String(req.body?.itemId || "")));
     } catch (error) {
@@ -63,7 +63,7 @@ export function registerGalleryBundleActions(app) {
   app.delete("/api/gallery/bundles/:id", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
     if (!requireLocal(req, res)) return;
-    if (req.heissAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
+    if (req.studioAccount) { res.status(404).json({ ok: false, error: "Bundles are unavailable in account mode." }); return; }
     try {
       res.json(dissolveBundle(String(req.params.id)));
     } catch (error) {
@@ -102,7 +102,7 @@ export function registerGalleryReadRoutes(app) {
       if (filter && !filter(item)) return false;
       return item.status !== "canceled";
     });
-    const collapsed = applyBundles(merged, { enabled: !req.heissAccount && req.query.bundles !== "0" && !filter });
+    const collapsed = applyBundles(merged, { enabled: !req.studioAccount && req.query.bundles !== "0" && !filter });
     const start = cursor ? Math.max(0, collapsed.findIndex((item) => String(item.id) === cursor) + 1) : 0;
     const items = collapsed.slice(start, start + limit);
     const nextCursor = start + limit < collapsed.length ? String(items.at(-1)?.id || "") : "";
@@ -128,7 +128,7 @@ export function registerGalleryReadRoutes(app) {
     const limit = Number(req.query.limit || 0);
     const cursor = String(req.query.cursor || "");
     const includeFailed = req.query.includeFailed !== "0";
-    const page = !req.heissAccount && listBundles().length
+    const page = !req.studioAccount && listBundles().length
       ? bundledPage(req)
       : pageGallery({ type, limit: limit || 200, cursor, includeFailed, filter: (item) => recordBelongsToRequest(item, req) && (!searchFilter(req) || searchFilter(req)(item)) });
     res.json({
@@ -141,7 +141,7 @@ export function registerGalleryReadRoutes(app) {
   app.get("/api/gallery/delta", (req, res) => {
     if (!requireGalleryAccess(req, res)) return res.json({ revision: 0, reset: false, upserts: [], removes: [] });
     const since = Number(req.query.since || 0);
-    if (req.heissAccount) {
+    if (req.studioAccount) {
       // Bundles are off in account mode, so the owner's own changes patch in place.
       const delta = galleryDelta({ since, type: String(req.query.type || ""), includeFailed: req.query.includeFailed !== "0", owner: ownerIdForRequest(req), filter: searchFilter(req) });
       res.json(delta);
@@ -254,7 +254,7 @@ export function registerGalleryDeleteRoute(app) {
     const owned = recordsForRequest(gallery, req);
     const removed = owned.filter((item) => item.id === id || item.url === id);
     // Accounts never learn whether another owner's item exists.
-    if (req.heissAccount && !removed.length) { res.status(404).json({ ok: false, error: "That item was not found." }); return; }
+    if (req.studioAccount && !removed.length) { res.status(404).json({ ok: false, error: "That item was not found." }); return; }
     const files = deleteGalleryFiles(removed);
     hideGalleryItems(removed);
     setGallery(gallery.filter((item) => !recordBelongsToRequest(item, req) || item.id !== id && item.url !== id));

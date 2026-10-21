@@ -71,7 +71,7 @@ function shape(header, key) {
   return Array.isArray(header?.[key]?.shape) ? header[key].shape : [];
 }
 
-/** comfy/sd.py detect_te_model, reduced to the kinds HEISS uses, plus UMT5. */
+/** comfy/sd.py detect_te_model, reduced to the kinds Studio uses, plus UMT5. */
 export function encoderKindFromHeader(header) {
   const keys = keySet(header);
   if (!keys.size) return "";

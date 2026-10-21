@@ -44,7 +44,9 @@ function classOf(graph, node) {
 function namedPhase(graph, node) {
   const id = String(node ?? "");
   const meta = graph?.[id]?._meta || graph?.[id.split(/[.:]/)[0]]?._meta;
-  return typeof meta?.heissPhase === "string" && meta.heissPhase ? meta.heissPhase : "";
+  // heissPhase: graphs recorded before the rename.
+  const phase = meta?.studioPhase ?? meta?.heissPhase;
+  return typeof phase === "string" && phase ? phase : "";
 }
 
 /**

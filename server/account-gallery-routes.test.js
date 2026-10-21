@@ -36,7 +36,7 @@ test("gallery pages and exact job reads return only the signed-in account's reco
   const first = item("account-a", "job-a");
   const second = item("account-b", "job-b");
   galleryStore.setGallery([first, second]);
-  const request = { heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: {} };
+  const request = { studioAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: {} };
 
   const page = call(routes["/api/gallery"], request);
   assert.deepEqual(page.items.map((record) => record.id), [first.id]);
@@ -47,14 +47,14 @@ test("gallery pages and exact job reads return only the signed-in account's reco
 
 test("access profiles without gallery permission cannot read pages or exact job outputs", () => {
   galleryStore.setGallery([item("account-a", "job-a")]);
-  const request = { heissAccount: { userId: "account-a", role: "user", authenticated: true, generationProfiles: [], features: { gallery: false } }, query: {} };
+  const request = { studioAccount: { userId: "account-a", role: "user", authenticated: true, generationProfiles: [], features: { gallery: false } }, query: {} };
   assert.deepEqual(call(routes["/api/gallery"], request).items, []);
   assert.deepEqual(call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items, []);
 });
 
 test("account deltas carry only the owner's own upserts and removes", () => {
   galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b")]);
-  const request = (since) => ({ heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: { since: String(since) } });
+  const request = (since) => ({ studioAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query: { since: String(since) } });
   const start = galleryStore.galleryRevisionValue();
   galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b2")]);
   const foreignOnly = call(routes["/api/gallery/delta"], request(start));
@@ -83,7 +83,7 @@ test("finished outputs keep the pending tiles' owner and never replace another o
 test("repeated gallery filters match any of their values and combine across filters", () => {
   const made = (jobId, model, width, height) => ({ ...item("account-a", jobId), model, width, height });
   galleryStore.setGallery([made("job-flux", "flux.safetensors", 1024, 1024), made("job-sdxl", "sdxl.safetensors", 1344, 768), made("job-wan", "wan.safetensors", 1024, 1024)]);
-  const request = (query) => ({ heissAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query });
+  const request = (query) => ({ studioAccount: { userId: "account-a", role: "user", authenticated: true, features: { gallery: true } }, query });
   const ids = (query) => call(routes["/api/gallery"], request({ limit: "50", ...query })).items.map((record) => record.jobId).sort();
   assert.deepEqual(ids({ model: ["flux", "sdxl"] }), ["job-flux", "job-sdxl"]);
   assert.deepEqual(ids({ model: "wan" }), ["job-wan"]);

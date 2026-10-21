@@ -91,7 +91,7 @@ function archiveEntries(req = null, ids = null) {
   const sourceGallery = req ? recordsForRequest(gallery, req) : process.env.STUDIO_MULTI_USER === "1" ? [] : gallery;
   for (const item of filterVisibleGallery(sourceGallery)) {
     if (ids && ![item.id, item.url].some((key) => ids.has(String(key)))) continue;
-    // HEISS media lives in its own folder; everything else in ComfyUI's.
+    // Studio media lives in its own folder; everything else in ComfyUI's.
     const itemBase = isMediaUrl(item.url) ? mediaRoot : base;
     if (item.status !== "done" || !itemBase) continue;
     const file = outputFileCandidates(item).map((candidate) => path.resolve(candidate)).find((resolved) => {

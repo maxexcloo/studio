@@ -66,7 +66,7 @@ const downloadSources = {
   vision: [visionDownloads, "clip_vision"]
 };
 
-/** Every catalog download HEISS will fetch, by id. The only files the download route accepts. */
+/** Every catalog download Studio will fetch, by id. The only files the download route accepts. */
 /**
  * Reference slots for a family that reads images as guidance (an edit model).
  * The first is "reference", like every other model's, so remix and drop-to-
@@ -197,7 +197,7 @@ function sanaFiles(info) {
 /**
  * Model folders a family's runner loads by path (see `runners` in the catalog):
  * MOSS-Image's Diffusers folders in models/diffusers. Only on this computer,
- * where HEISS can look; a remote ComfyUI shows none.
+ * where Studio can look; a remote ComfyUI shows none.
  */
 function runnerFolderFiles() {
   return Object.entries(families).flatMap(([familyId, family]) => Object.entries(family.runners || {})

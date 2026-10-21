@@ -59,7 +59,7 @@ export type FailureFixes = {
 type FixButton = { label: string; icon: React.ReactNode; run: () => unknown };
 
 /**
- * The buttons a failure earns: only fixes HEISS can actually carry out, the
+ * The buttons a failure earns: only fixes Studio can actually carry out, the
  * likeliest first. Freeing ComfyUI's memory and downloading are for the
  * computer itself (`admin`); another device gets what it may run.
  */

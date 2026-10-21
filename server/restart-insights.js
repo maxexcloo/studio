@@ -74,7 +74,7 @@ export function logTextFromRaw(raw) {
 const knownNames = new Map(Object.values(nodePacks).map((pack) => [String(pack.folder).toLowerCase(), pack.name]));
 
 /**
- * A pack's name for people: HEISS's own name when it knows the pack, else the
+ * A pack's name for people: Studio's own name when it knows the pack, else the
  * folder without its ComfyUI prefix or suffix ("comfyui-easy-use" → "Easy Use").
  */
 export function packLabel(folder) {

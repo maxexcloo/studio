@@ -8,7 +8,7 @@ import { nodePack } from "./node-packs.js";
 
 /**
  * Guided setup for a model you already put in ComfyUI, for families that can
- * run more than one way (their `runners` in the catalog). HEISS never fetches
+ * run more than one way (their `runners` in the catalog). Studio never fetches
  * the model itself: it recognises the file, works out how ComfyUI has to run
  * it, and walks through what that needs (an update, a node pack, the text
  * encoder and VAE), watching ComfyUI until the model is ready.

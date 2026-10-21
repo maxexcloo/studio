@@ -193,7 +193,7 @@ export async function getComfyVideoPreview(filename, subfolder, type) {
   const source = comfySource(filename, subfolder, type);
   const local = await trustedLocalOutput(filename, subfolder, type);
   if (local) return getFileVideoPreview(local, source);
-  // HEISS media is never fetched from ComfyUI.
+  // Studio media is never fetched from ComfyUI.
   if (type === mediaType) throw new Error('Source video is unavailable.');
   const key = identityKey(source);
   const known = remoteVersions.get(key);

@@ -8,6 +8,7 @@ import { isInside, samePath } from "./paths.js";
 import { parseA1111Parameters, readPngInfo } from "./png-text.js";
 import { loadSharp } from "./sharp-loader.js";
 import { probeVideo } from "./video-previews.js";
+import { outputFolderNames } from "./data-names.js";
 
 /**
  * Earlier work in the gallery: images from other folders (old ComfyUI
@@ -20,8 +21,8 @@ import { probeVideo } from "./video-previews.js";
  * or A1111's "parameters") so it can be searched and shown. Nothing else is
  * taken from it.
  *
- * What is never read: HEISS UI's own folders (its data, where the thumbnail
- * cache lives, and the app itself), dot folders, and the heiss-ui folder
+ * What is never read: Studio's own folders (its data, where the thumbnail
+ * cache lives, and the app itself), dot folders, and Studio's output folder
  * inside the output folder, whose files are either in the gallery already
  * or deleted on purpose.
  */
@@ -32,11 +33,10 @@ export const videoPattern = /\.(mp4|webm|mov|mkv)$/i;
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|mp4|webm|mov|mkv)$/i;
 export const scanFileLimit = 20000;
 const scanDepth = 8;
-// heiss-ui is where HEISS UI saves into an output folder. Wherever one turns
+// Studio's output folder (data-names.js), under either name. Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in
 // the gallery already or deleted on purpose.
-const ownOutputName = "heiss-ui";
-const skippedNames = new Set(["node_modules", "__pycache__", "$RECYCLE.BIN", "System Volume Information", ownOutputName]);
+const skippedNames = new Set(["node_modules", "__pycache__", "$RECYCLE.BIN", "System Volume Information", ...outputFolderNames]);
 
 function realPath(dir) {
   try { return fs.realpathSync(dir); } catch { return path.resolve(dir); }
@@ -62,7 +62,7 @@ export function libraryFolders() {
   return folders.map((folder) => ({ ...folder, available: folderAvailable(folder) }));
 }
 
-/** Folders HEISS UI keeps to itself: never listed, never served. */
+/** Folders Studio keeps to itself: never listed, never served. */
 function isOwnFolder(dir) {
   return [dataDir, root].some((own) => own && isInside(realPath(own), dir, { orSame: true }));
 }
@@ -265,8 +265,8 @@ export async function importOutputFolder() {
   if (!comfyOutputDir) throw new Error("Set ComfyUI’s output folder first (Settings › Library).");
   const base = realPath(comfyOutputDir);
   try { if (!fs.statSync(base).isDirectory()) throw new Error("missing"); } catch { throw new Error("The output folder can’t be found."); }
-  const own = path.join(base, "heiss-ui");
-  const { files, capped } = await walk(base, (dir) => isInside(own, dir, { orSame: true }) || isOwnFolder(dir));
+  const own = outputFolderNames.map((name) => path.join(base, name));
+  const { files, capped } = await walk(base, (dir) => own.some((folder) => isInside(folder, dir, { orSame: true })) || isOwnFolder(dir));
   const records = await toRecords(files, (file) => {
     const rel = path.relative(base, realPath(file));
     const subfolder = path.dirname(rel) === "." ? "" : path.dirname(rel);
@@ -312,7 +312,7 @@ export function scanLibraryFolder(id) {
 
 /**
  * Adds a folder of earlier images. The output folder (or one inside it) is
- * imported as ordinary outputs instead; HEISS UI's own folders are refused.
+ * imported as ordinary outputs instead; Studio's own folders are refused.
  */
 export async function addLibraryFolder(input) {
   const dir = normalizeFolderInput(input);
@@ -359,14 +359,14 @@ export async function rescanLibraryFolders() {
 
 /**
  * The file behind a library URL, or null. Only media files, only inside the
- * added folder (after following links), never HEISS UI's own folders or the
+ * added folder (after following links), never Studio's own folders or the
  * output folder, and never a dot folder.
  */
 export function libraryFile(folderId, rel) {
   const folder = folders.find((entry) => entry.id === String(folderId || ""));
   const relative = String(rel || "");
   if (!folder || !relative || !mediaPattern.test(relative)) return null;
-  if (relative.split(/[\\/]/).some((part) => !part || part.startsWith(".") || part === ".." || part.toLowerCase() === ownOutputName)) return null;
+  if (relative.split(/[\\/]/).some((part) => !part || part.startsWith(".") || part === ".." || outputFolderNames.includes(part.toLowerCase()))) return null;
   const candidate = path.resolve(folder.path, relative);
   if (!isInside(folder.path, candidate)) return null;
   let real;

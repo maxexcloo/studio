@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Native port of the HEISS MCP service; see mcp.LICENSE.
+// Native port of the Studio MCP service; see mcp.LICENSE.
 import crypto from 'node:crypto';
 import express from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';

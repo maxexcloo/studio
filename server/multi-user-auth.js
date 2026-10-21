@@ -49,14 +49,14 @@ function internalMcpAccount(req, method, routePath) {
 }
 
 export function accountForRequest(req) {
-  if (req?.heissAccount !== undefined) return req.heissAccount;
+  if (req?.studioAccount !== undefined) return req.studioAccount;
   const bearer = /^Bearer ([^\s]+)$/i.exec(String(req?.headers?.authorization || ""))?.[1] || "";
   const routePath = String(req?.path || req?.url || "").split("?")[0];
   const method = String(req?.method || "GET").toUpperCase();
   const account = accountSession(cookieToken(req))
     || (bearer && mcpBearerRouteAllowed(method, routePath) ? verifyAccountMcpToken(bearer) : null)
     || internalMcpAccount(req, method, routePath);
-  if (req) req.heissAccount = account;
+  if (req) req.studioAccount = account;
   return account;
 }
 
@@ -143,7 +143,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       const account = await bootstrapping;
       const session = createAccountSession(account.id);
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
-      res.status(201).json(publicStatus({ ...req, heissAccount: { authenticated: true, userId: account.id, role: account.role, generationProfiles: [], features: {} } }));
+      res.status(201).json(publicStatus({ ...req, studioAccount: { authenticated: true, userId: account.id, role: account.role, generationProfiles: [], features: {} } }));
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     } finally {
@@ -172,7 +172,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     }
     const session = createAccountSession(result.value.userId);
     appendCookie(res, accountCookie(req, session.token, session.maxAge));
-    req.heissAccount = result.value;
+    req.studioAccount = result.value;
     res.json(publicStatus(req));
   });
 
@@ -216,7 +216,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
     revokeAccountSession(cookieToken(req));
     appendCookie(res, accountCookie(req, ""));
     endDeviceSession(req, res);
-    req.heissAccount = null;
+    req.studioAccount = null;
     res.json({ ok: true });
   });
 

@@ -1,7 +1,7 @@
 import type { WorkflowImportPreview } from './types';
 
 /**
- * What HEISS UI can connect in an imported workflow, by the key in its
+ * What Studio can connect in an imported workflow, by the key in its
  * `heissUi.controls` block. The import review and the AI agent prompt both
  * read this, so they never disagree. Keep it in step with applyMappedInputs
  * in server/graphs.js.
@@ -94,7 +94,7 @@ export function agentPrompt() {
 My workflow JSON follows after this message.`;
 }
 
-/** The prompt with one workflow and how HEISS UI read it, ready to paste into an agent. */
+/** The prompt with one workflow and how Studio read it, ready to paste into an agent. */
 export function agentPromptFor(item: { filename?: string; raw: unknown; preview: WorkflowImportPreview; metadata: WorkflowImportPreview["detected"] }) {
   const { controls, guessed = [] } = item.metadata;
   const read = Object.entries(controls || {}).map(([key, mapping]) => `- ${key} → node ${mapping.node}.${mapping.input}${guessed.includes(key) ? " (guessed, check it)" : ""}`);

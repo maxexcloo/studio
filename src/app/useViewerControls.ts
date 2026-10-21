@@ -15,7 +15,7 @@ import { wheelPixels } from './wheel';
 import type { GalleryItem, Profile, TouchGesture } from './types';
 import { MAX_ZOOM, MIN_ZOOM, Velocity, anchoredPan as anchorPan, clampPan, liveTransform, measureViewer, mediaSize, paint, rubber, rubberZoom, type Pan } from './viewerGesture';
 
-const VIEWER_CONTROLS = 'button, a, input, select, textarea, [role="slider"], .heiss-video-error';
+const VIEWER_CONTROLS = 'button, a, input, select, textarea, [role="slider"], .studio-video-error';
 function viewerControl(event: React.SyntheticEvent) {
   const control = (event.target as Element).closest(VIEWER_CONTROLS);
   return control && control !== event.currentTarget;
@@ -418,7 +418,7 @@ export function useViewerControls(view: any) {
     // scrubs), and never pinches or pans: it has no zoom.
     const target = event.target as Element;
     if (viewerControl(event)) return;
-    if (target.closest('[data-video-viewer]') && (event.touches.length !== 1 || viewerZoom > 1 || target.closest('.heiss-video-controls, .heiss-video-error'))) return;
+    if (target.closest('[data-video-viewer]') && (event.touches.length !== 1 || viewerZoom > 1 || target.closest('.studio-video-controls, .studio-video-error'))) return;
     const canvas = viewerCanvas(event);
     // The last swipe is still carrying its picture off: let it land first.
     if (canvas.dataset.settle === "slide") return;

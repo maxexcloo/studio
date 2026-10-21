@@ -17,7 +17,7 @@ import { civitaiFetch } from './civitai-access.js';
  * request can never point the server at an arbitrary URL
  * or path. One file downloads at a time; the rest wait in order. A stopped
  * download keeps its .part file plus a small .part.json note, so it resumes
- * where it left off, even after HEISS restarts.
+ * where it left off, even after Studio restarts.
  *
  * Resuming asks for the rest only if the file is still the one it started
  * (If-Range with the ETag or Last-Modified it saw), so a file changed on

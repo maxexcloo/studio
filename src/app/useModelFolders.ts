@@ -28,7 +28,7 @@ function readDismissed() {
 export function useModelFolders({ connected, emptyModels, onModelsChanged, showToast, hints = true, onStopHints }: {
   /** ComfyUI answers; the scan waits for it. */
   connected: boolean;
-  /** ComfyUI lists no model HEISS can run: found folders then open the dialog by themselves, once. */
+  /** ComfyUI lists no model Studio can run: found folders then open the dialog by themselves, once. */
   emptyModels: boolean;
   onModelsChanged: () => void;
   showToast: ShowToast;
@@ -40,7 +40,7 @@ export function useModelFolders({ connected, emptyModels, onModelsChanged, showT
   hints?: boolean;
   onStopHints?: () => void;
 }) {
-  // Model folders belong to the computer running HEISS UI; other devices never scan or ask.
+  // Model folders belong to the computer running Studio; other devices never scan or ask.
   const thisComputer = useThisComputer();
   const [report, setReport] = useState<ModelFolderReport | null>(null);
   const [open, setOpen] = useState(false);

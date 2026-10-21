@@ -2,7 +2,7 @@ import { apiJson } from './api';
 import { githubUrl } from './constants';
 
 /**
- * The setup lines a bug report needs (HEISS UI, Node.js, system, ComfyUI,
+ * The setup lines a bug report needs (Studio, Node.js, system, ComfyUI,
  * GPU), from /api/diagnostics. Fetched ahead of a copy and kept for a minute,
  * so the copy itself runs straight from the click (Safari refuses a clipboard
  * write that waited on the network).

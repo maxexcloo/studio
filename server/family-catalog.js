@@ -1,5 +1,5 @@
 /**
- * Every model family HEISS can run, as data: how to recognise its weights, which
+ * Every model family Studio can run, as data: how to recognise its weights, which
  * text encoders and VAE it needs, how its graph is shaped, and the settings its
  * makers ship. Values come from Comfy-Org's own workflow templates and the model
  * cards; key signatures mirror ComfyUI's comfy/model_detection.py, checked in the
@@ -302,7 +302,7 @@ export const families = {
       { id: "lcm", label: "LCM", match: (name) => /lcm|pcm|tcd/i.test(name), defaults: { steps: 6, cfg: 1.5, sampler: "lcm", scheduler: "sgm_uniform" } },
       // SDXL-Lightning's steps must equal the count its file is distilled for (2, 4 or 8); DMD2's card uses 4.
       { id: "lightning", label: "Lightning", match: (name) => /lightning|turbo|\d+[-_ ]?steps?/i.test(name), stepsFromName: true, defaults: { steps: 6, cfg: 1, sampler: "euler", scheduler: "sgm_uniform" } },
-      // NoobAI v-pred merges often lack the v_pred key ComfyUI looks for, so HEISS sets the mode itself.
+      // NoobAI v-pred merges often lack the v_pred key ComfyUI looks for, so Studio sets the mode itself.
       { id: "vpred", label: "V-prediction", match: (name, header) => Boolean(header && "v_pred" in header) || /v[-_ ]?pred/i.test(name), vpred: true, defaults: { steps: 30, cfg: 4.5, sampler: "euler", scheduler: "normal" } },
       { id: "pony", label: "Pony", match: (name) => /pony|pdxl|autismmix/i.test(name), defaults: { steps: 25, cfg: 7, sampler: "euler_ancestral", scheduler: "normal" } },
       { id: "anime", label: "Illustrious / NoobAI", match: (name) => /illustrious|noob|ilxl|wai[-_]?nsfw|animagine/i.test(name), defaults: { steps: 28, cfg: 5, sampler: "euler_ancestral", scheduler: "normal" } },
@@ -822,7 +822,7 @@ export function sanaLabel(name = "") {
 }
 
 /**
- * Sana models the ExtraModels loader fetches by name, in the order HEISS lists
+ * Sana models the ExtraModels loader fetches by name, in the order Studio lists
  * them. `conf` is the loader's model config (it picks its own for these, but
  * the input is required); `dir` is where the loader downloads it, under
  * ComfyUI/models/sana. Older duplicates of the same weights are left out.
@@ -859,7 +859,7 @@ export function sanaConf(name = "", detail = null) {
   return (detail?.qkNorm ?? /1[._]?5/.test(base)) ? "SanaMS1.5_1600M_P1_D20" : "SanaMS_1600M_P1_D20";
 }
 
-// Recognised so HEISS can say what they are, but not runnable here yet.
+// Recognised so Studio can say what they are, but not runnable here yet.
 export const knownFamilies = {
   ltx: "LTX-2 video (needs its two-stage audio pipeline)",
   ltxv: "LTX-Video",

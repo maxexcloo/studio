@@ -159,7 +159,7 @@ test("HTTP catalogue and generate select the video node schema, keep Grok primar
   video.drop(h3Prompt.id);
 });
 
-test("completed secondary work recovers after a HEISS restart with prompt and backend provenance", { timeout: 10000 }, async () => {
+test("completed secondary work recovers after a Studio restart with prompt and backend provenance", { timeout: 10000 }, async () => {
   const h3 = (await api("/api/models")).body.profiles.find((profile) => profile.family === "minimax_h3");
   const queued = video.nextPrompt();
   const accepted = await api("/api/generate", generation(h3));

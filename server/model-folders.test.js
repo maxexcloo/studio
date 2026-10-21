@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 // A ComfyUI of our own, a home with a shared models folder in it, and ComfyUI's API answered by hand.
-// .native, like HEISS: Windows temp paths can be 8.3 short names (RUNNER~1).
+// .native, like Studio: Windows temp paths can be 8.3 short names (RUNNER~1).
 const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "heiss-model-folders-")));
 const comfyRoot = path.join(scratch, "ComfyUI");
 const home = path.join(scratch, "home");
@@ -39,7 +39,7 @@ globalThis.fetch = async (url) => {
   return new Response(JSON.stringify(body), { status: body ? 200 : 404, headers: { "content-type": "application/json" } });
 };
 
-const { heissSections, linkModelFolders, modelFolderReport, readLayout, sectionDirs, sectionFor, tildePath, unlinkModelFolder } = await import("./model-folders.js");
+const { studioModelSections, linkModelFolders, modelFolderReport, readLayout, sectionDirs, sectionFor, tildePath, unlinkModelFolder } = await import("./model-folders.js");
 const scan = { home, drives: false };
 const config = path.join(comfyRoot, "extra_model_paths.yaml");
 
@@ -68,7 +68,7 @@ test("adding writes a marked, backed-up section ComfyUI can read, and removing t
   const text = fs.readFileSync(config, "utf8");
   assert.match(text, /^other:\n    base_path: \/elsewhere\n    loras: loras\n\n# >>> Added by Studio: /m, "the person's own section stays as it was");
   assert.match(text, /    diffusion_models: \|\n        diffusion_models\n        unet\n/);
-  assert.equal(heissSections(text).length, 1);
+  assert.equal(studioModelSections(text).length, 1);
 
   // Once ComfyUI reads it, the folder is no longer reported, and shows as read.
   folderPaths.diffusion_models[0].push(path.join(shared, "diffusion_models"), path.join(shared, "unet"));
@@ -86,7 +86,7 @@ test("a section counts as read only once ComfyUI reads every folder it adds", as
   // ComfyUI's own models folder: checkpoints is read from the start, the added unet folder is not.
   const models = path.join(comfyRoot, "models");
   const text = sectionFor(models, [{ kind: "diffusion_models", name: "unet" }, { kind: "loras", name: "a" }, { kind: "loras", name: "b's" }]);
-  assert.deepEqual(sectionDirs(heissSections(text)[0]), ["unet", "a", "b's"].map((name) => path.resolve(models, name)));
+  assert.deepEqual(sectionDirs(studioModelSections(text)[0]), ["unet", "a", "b's"].map((name) => path.resolve(models, name)));
   fs.writeFileSync(config, text);
   const before = await modelFolderReport({ scan });
   assert.equal(before.linked[0].read, false, "checkpoints being read says nothing about unet");
@@ -107,7 +107,7 @@ test("only folders the scan found, or a picked models folder, can be added", asy
   assert.equal(picked.added.length, 1);
   assert.match(fs.readFileSync(config, "utf8"), /checkpoints: 'StableDiffusion'/);
   await unlinkModelFolder(picked.added[0]);
-  assert.equal(fs.existsSync(config), false, "a file HEISS made and emptied goes away");
+  assert.equal(fs.existsSync(config), false, "a file Studio made and emptied goes away");
 });
 
 test("a section's quoting survives odd folder names", () => {
@@ -118,13 +118,13 @@ test("a section's quoting survives odd folder names", () => {
 
 test("sections survive a CRLF save, and adding and removing keep CRLF", async () => {
   const crlf = sectionFor("D:\\AI\\models", [{ kind: "loras", name: "loras" }, { kind: "vae", name: "vae" }]).replace(/\n/g, "\r\n");
-  assert.deepEqual(heissSections(`# mine\r\n\r\n${crlf}`).map((section) => section.path), ["D:\\AI\\models"]);
+  assert.deepEqual(studioModelSections(`# mine\r\n\r\n${crlf}`).map((section) => section.path), ["D:\\AI\\models"]);
 
   fs.writeFileSync(config, "# mine\r\nother:\r\n    base_path: /elsewhere\r\n    loras: loras\r\n");
   await modelFolderReport({ scan });
   await linkModelFolders([shared], { scan });
   const text = fs.readFileSync(config, "utf8");
-  assert.equal(heissSections(text).length, 1);
+  assert.equal(studioModelSections(text).length, 1);
   assert.doesNotMatch(text, /[^\r]\n/, "every line ends in CRLF");
   await unlinkModelFolder(shared);
   assert.equal(fs.readFileSync(config, "utf8"), "# mine\r\nother:\r\n    base_path: /elsewhere\r\n    loras: loras\r\n");

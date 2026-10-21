@@ -144,7 +144,7 @@ button:not(:disabled) {
    5. Tooltips: on-brand floating surface instead of the inverted white pill
 --------------------------------------------------------------------------- */
 
-.heiss-tooltip {
+.studio-tooltip {
   max-width: 248px;
   color: hsl(var(--foreground));
   font-weight: 550;

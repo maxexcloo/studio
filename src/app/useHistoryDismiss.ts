@@ -39,7 +39,7 @@ export function useHistoryDismiss(open: boolean, close: () => void) {
     }
     const entry: Entry = { id: nextId++, close: () => closeRef.current() };
     stack.push(entry);
-    window.history.pushState({ ...(window.history.state || {}), heissOverlay: entry.id }, '');
+    window.history.pushState({ ...(window.history.state || {}), studioOverlay: entry.id }, '');
     return () => {
       const index = stack.indexOf(entry);
       if (index < 0) return; // Already popped by Back.
@@ -47,7 +47,7 @@ export function useHistoryDismiss(open: boolean, close: () => void) {
       stack.splice(index, 1);
       // Only the topmost entry can be rewound cleanly; one buried under another
       // overlay stays behind as a harmless no-op step.
-      if (wasTop && window.history.state?.heissOverlay === entry.id) {
+      if (wasTop && (window.history.state?.studioOverlay ?? window.history.state?.heissOverlay) === entry.id) {
         ignoreNextPop += 1;
         window.history.back();
       }

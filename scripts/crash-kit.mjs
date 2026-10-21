@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Crash kit: puts a running HEISS UI (and the ComfyUI behind it) under the
+// Crash kit: puts a running Studio (and the ComfyUI behind it) under the
 // kind of load the gallery makes, harder, and says whether either stopped
-// answering, how slow they got, and what HEISS wrote in its log meanwhile.
+// answering, how slow they got, and what Studio wrote in its log meanwhile.
 //
 //   node scripts/crash-kit.mjs
 //   node scripts/crash-kit.mjs --heiss http://127.0.0.1:8787 --comfy http://127.0.0.1:8188 --rounds 3 --burst 60
 //
-// Run it on the computer HEISS UI runs on (the API answers this computer
+// Run it on the computer Studio runs on (the API answers this computer
 // without a sign-in). Nothing is changed: it only reads pages, thumbnails,
 // images and video previews, the way scrolling and reloading the gallery does,
 // including requests dropped halfway, as the browser does when tiles scroll away.
@@ -48,7 +48,7 @@ async function timed(url, { abortAfter = 0, timeout = 30_000 } = {}) {
 
 // Both servers are asked every second whether they still answer.
 let watching = true;
-// HEISS answers /api/health with 503 while ComfyUI is away, so for HEISS any
+// Studio answers /api/health with 503 while ComfyUI is away, so for Studio any
 // answer at all means it's up; ComfyUI has to answer its own stats properly.
 async function watch(name, url, list, { anyAnswer = false } = {}) {
   let downSince = 0;
@@ -73,7 +73,7 @@ async function inParallel(urls, limit, options) {
 
 async function main() {
   let health = await timed(`${heiss}/api/health`, { timeout: 5000 });
-  // HEISS UI may listen on "localhost" only (IPv6 on some systems): try that too.
+  // Studio may listen on "localhost" only (IPv6 on some systems): try that too.
   if (!health.answered && !args.heiss) {
     heiss = "http://localhost:8787";
     health = await timed(`${heiss}/api/health`, { timeout: 5000 });
@@ -84,7 +84,7 @@ async function main() {
   if (!comfy) {
     try { comfy = String((await (await fetch(`${heiss}/api/health`)).json()).comfyUrl || "").replace(/\/$/, ""); } catch { comfy = ""; }
   }
-  log(`HEISS ${heiss}${comfy ? ` · ComfyUI ${comfy}` : ""} · ${rounds} rounds of ${burst} at once`);
+  log(`Studio ${heiss}${comfy ? ` · ComfyUI ${comfy}` : ""} · ${rounds} rounds of ${burst} at once`);
   const watchers = [watch("Studio", `${heiss}/api/health`, results.heissDown, { anyAnswer: true })];
   if (comfy) watchers.push(watch("ComfyUI", `${comfy}/system_stats`, results.comfyDown));
 

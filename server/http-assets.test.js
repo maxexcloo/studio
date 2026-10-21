@@ -11,7 +11,7 @@ import { precompressDir } from "../scripts/precompress.mjs";
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "heiss-dist-"));
 const script = `console.log(${JSON.stringify("heiss ".repeat(2000))});`;
 fs.mkdirSync(path.join(dist, "assets"));
-fs.writeFileSync(path.join(dist, "index.html"), `<!doctype html><title>HEISS</title>${"<!-- page -->".repeat(200)}`);
+fs.writeFileSync(path.join(dist, "index.html"), `<!doctype html><title>Studio</title>${"<!-- page -->".repeat(200)}`);
 fs.writeFileSync(path.join(dist, "assets", "index-abc123.js"), script);
 fs.writeFileSync(path.join(dist, "assets", "tiny-abc.css"), "a{}");
 fs.writeFileSync(path.join(dist, "favicon.svg"), "<svg/>");
@@ -80,7 +80,7 @@ test("the page itself is always checked again, and unknown paths get the page", 
   const deep = await raw("/some/client/route");
   assert.equal(deep.status, 200);
   assert.equal(deep.headers["cache-control"], "no-cache");
-  assert.match(deep.body.toString(), /<title>HEISS<\/title>/);
+  assert.match(deep.body.toString(), /<title>Studio<\/title>/);
   const stale = await raw("/assets/index-oldhash.js", { "accept-encoding": "br" });
   assert.equal(stale.status, 404, "a missing built file is missing, not the page");
   const small = await raw("/assets/tiny-abc.css", { "accept-encoding": "br" });

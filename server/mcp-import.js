@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Offline legacy HEISS MCP ownership import; see mcp.LICENSE.
+// Offline legacy Studio MCP ownership import; see mcp.LICENSE.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

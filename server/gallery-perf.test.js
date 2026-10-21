@@ -77,7 +77,7 @@ test("a local output's cached thumbnail is served without fetching the original"
 test("a same-named file that isn't ComfyUI's output is never made into its thumbnail", async (t) => {
   const sharp = await loadSharp();
   if (!sharp) return t.skip("sharp is not installed");
-  // The folder HEISS UI reads holds a red picture; ComfyUI's own file of that name is blue and bigger.
+  // The folder Studio reads holds a red picture; ComfyUI's own file of that name is blue and bigger.
   fs.writeFileSync(path.join(outputDir, "other.png"), await sharp({ create: { width: 16, height: 16, channels: 3, background: "#f00" } }).png().toBuffer());
   const blue = await sharp({ create: { width: 48, height: 48, channels: 3, background: "#00f" } }).png().toBuffer();
   const originalFetch = globalThis.fetch;

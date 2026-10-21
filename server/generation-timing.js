@@ -1,6 +1,6 @@
 /**
  * How long generations take on this machine, learned from ComfyUI's own
- * events and kept only for HEISS UI's estimates.
+ * events and kept only for Studio's estimates.
  *
  * A run splits into setup (loading the model, reading the prompt, encoding a
  * reference), sampling (a steady time per step) and a tail (decoding and

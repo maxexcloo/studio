@@ -8,6 +8,7 @@ import { families } from './family-catalog.js';
 import { familyGraph } from './family-graph.js';
 import { withGgufLoaders } from './gguf.js';
 import { accountOutputSubfolder } from './account-ownership.js';
+import { outputFolderName } from "./data-names.js";
 
 export async function uploadReferenceImage(dataUrl, body = {}) {
   if (!dataUrl || !dataUrl.includes(",")) return "";
@@ -58,13 +59,13 @@ export async function imageGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
   const graph = await builtInGraph(body);
   // Account outputs always land in the owner's folder; single-user images keep upstream's names.
-  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
+  return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
 }
 
 export async function videoGraph(body) {
   if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
   const graph = await builtInGraph(body);
-  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
+  return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
 }
 
 /**
@@ -220,16 +221,16 @@ function applyRadianceLoraStack(graph, body, config) {
 
 /**
  * Points every save node (SaveImage, SaveVideo, VHS_VideoCombine and anything
- * else with a filename_prefix) at the heiss-ui folder, or an account's folder.
+ * else with a filename_prefix) at Studio's output folder (data-names.js), or an account's folder.
  */
-export function saveIntoHeissFolder(graph, ownerId = "") {
+export function saveIntoStudioFolder(graph, ownerId = "") {
   const accountPrefix = accountOutputSubfolder(ownerId);
   for (const node of Object.values(graph || {})) {
     const inputs = node?.inputs;
     if (!inputs || !Object.hasOwn(inputs, "filename_prefix")) continue;
     // Only the name part is kept; a linked or empty prefix becomes a plain one.
     const name = typeof inputs.filename_prefix === "string" ? inputs.filename_prefix.split(/[\\/]/).filter((part) => part && part !== "." && part !== "..").pop() : "";
-    inputs.filename_prefix = `${accountPrefix || "heiss-ui"}/${name || "output"}`;
+    inputs.filename_prefix = `${accountPrefix || outputFolderName}/${name || "output"}`;
   }
   return graph;
 }
@@ -243,5 +244,5 @@ export async function customWorkflowGraph(body) {
   if (workflow.loraStack?.adapter === "rgthree-stack-v1") applyRgthreeLoraStack(graph, body, workflow.loraStack);
   else if (workflow.loraStack?.adapter === "radiance-tags-v1") applyRadianceLoraStack(graph, body, workflow.loraStack);
   else applyPowerLoraStack(graph, body, workflow.loraStack);
-  return body.ownerId ? saveIntoHeissFolder(graph, body.ownerId) : graph;
+  return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
 }
