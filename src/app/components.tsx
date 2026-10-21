@@ -115,9 +115,9 @@ export function StudioSelect({ value, onChange, options, ariaLabel, side }: { va
   );
 }
 
-export function Tip({ content, side = "bottom", forceOpen, children }: { content: React.ReactNode; side?: "top" | "right" | "bottom" | "left"; /** false keeps it shut, e.g. while a tooltip inside it speaks instead. */ forceOpen?: boolean; children: React.ReactElement }) {
+export function Tip({ content, side, forceOpen, children }: { content: React.ReactNode; side?: "top" | "right" | "bottom" | "left"; /** false keeps it shut, e.g. while a tooltip inside it speaks instead. */ forceOpen?: boolean; children: React.ReactElement }) {
   return (
-    <FluidTooltip content={content} side={side} sideOffset={10} forceOpen={forceOpen} className="heiss-tooltip bg-transparent text-foreground px-2.5 py-1.5 rounded-[12px]">
+    <FluidTooltip content={content} side={side} sideOffset={8} forceOpen={forceOpen} className="heiss-tooltip bg-transparent text-foreground px-2.5 py-1.5 rounded-[12px]">
       {children}
     </FluidTooltip>
   );

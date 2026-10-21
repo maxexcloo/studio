@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -81,6 +82,23 @@ function getTransformOrigin(side: TooltipSide) {
   }
 }
 
+const SIDES: readonly TooltipSide[] = ["top", "right", "bottom", "left"];
+
+/**
+ * Which side a tooltip opens on when its caller doesn't say (UI-PATTERNS ›
+ * Buttons & Icon Bars): a bar or panel can name it with `data-tip-side`;
+ * otherwise it opens away from the nearer screen edge, so labels on top bars
+ * drop below them and labels on bottom bars rise above them.
+ */
+export function resolveTooltipSide(trigger: Element | null, side?: TooltipSide): TooltipSide {
+  if (side) return side;
+  const named = trigger?.closest<HTMLElement>("[data-tip-side]")?.dataset.tipSide as TooltipSide | undefined;
+  if (named && SIDES.includes(named)) return named;
+  const rect = trigger?.getBoundingClientRect();
+  if (!rect) return "top";
+  return rect.top + rect.height / 2 < window.innerHeight / 2 ? "bottom" : "top";
+}
+
 /** Keyboard focus only: a click, a tap or focus handed back by a closing menu shouldn't pop a label. */
 function isFocusVisible(target: EventTarget) {
   try {
@@ -112,7 +130,7 @@ function Tooltip(props: TooltipProps) {
 function TooltipInner({
   content,
   children,
-  side = "top",
+  side: sideProp,
   sideOffset = 8,
   className,
   forceOpen,
@@ -125,6 +143,11 @@ function TooltipInner({
   const shape = useShape();
   const reducedMotion = useReducedMotion();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [side, setSide] = useState<TooltipSide>(sideProp || "top");
+  // Settle the side as it opens, from where the trigger sits at that moment.
+  useLayoutEffect(() => {
+    if (open) setSide(resolveTooltipSide(triggerRef.current, sideProp));
+  }, [open, sideProp]);
   const stopWatchingScroll = useRef<(() => void) | null>(null);
 
   useEffect(() => {

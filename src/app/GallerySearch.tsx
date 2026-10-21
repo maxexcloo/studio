@@ -10,6 +10,7 @@ import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { EmptyState } from './EmptyState';
+import { Tip } from './components';
 
 const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.label} (${band.detail})`]));
 const aspectLabels = new Map([...galleryAspects.map((aspect) => [aspect.id, aspect.id] as const), [otherAspect, 'Other']]);
@@ -67,7 +68,7 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
   const short = (value: string) => searchable ? value : labelFor(value).replace(/ \(.*\)$/, '');
   const summary = picked.length === 1 ? short(picked[0]) : label;
   return <>
-    <button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} title={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button>
+    <Tip content={picked.length ? `${name}: ${picked.map(labelFor).join(', ')}` : `Filter By ${name}`}><button ref={anchor} type="button" className={cn('gallery-filter-select', picked.length > 0 && 'is-on')} aria-label={`Filter By ${name}`} aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (!open) setQuery(''); setOpen(!open); }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setQuery(''); setOpen(true); } }}><Icon size={16} /><span>{summary}</span>{picked.length > 1 ? <em className="gallery-filter-count" aria-hidden="true">{picked.length}</em> : null}<ChevronDown size={12} /></button></Tip>
     {open ? createPortal(<div ref={node => { menu.current = node; floatingRef.current = node; }} className="aspect-menu gallery-filter-menu" style={position} data-own-escape onKeyDown={event => {
       const options = [...list.current!.querySelectorAll<HTMLButtonElement>('[role="option"]')];
       const index = options.indexOf(document.activeElement as HTMLButtonElement);
@@ -105,7 +106,7 @@ function FilterControls({ search, setSearch, items, floatingRef, clearable }: { 
   };
   const count = filterCountOf(search);
   return <>
-    <button type="button" className={cn('gallery-filter-select', search.favorites && 'is-on')} aria-pressed={search.favorites} title="Only Starred" onClick={() => setSearch({ ...search, favorites: !search.favorites })}><Star size={16} fill={search.favorites ? 'currentColor' : 'none'} /><span>Starred</span></button>
+    <Tip content={"Only Starred"}><button type="button" className={cn('gallery-filter-select', search.favorites && 'is-on')} aria-pressed={search.favorites} onClick={() => setSearch({ ...search, favorites: !search.favorites })}><Star size={16} fill={search.favorites ? 'currentColor' : 'none'} /><span>Starred</span></button></Tip>
     {(['model', 'lora'] as const).map((key) => {
       const name = key === 'lora' ? 'LoRA' : 'Model';
       const Icon = key === 'model' ? Boxes : Layers;
@@ -113,7 +114,7 @@ function FilterControls({ search, setSearch, items, floatingRef, clearable }: { 
     })}
     <GalleryFilterPicker name="Size" values={search.size || []} options={gallerySizeBands.map((band) => band.id)} icon={Ruler} labelFor={(value) => filterLabel('size', value)} searchable={false} onChange={values => setSearch({ ...search, size: values })} floatingRef={floatingRef} />
     <GalleryFilterPicker name="Aspect Ratio" values={search.aspect || []} options={[...galleryAspects.map((aspect) => aspect.id), otherAspect]} icon={Ratio} labelFor={(value) => filterLabel('aspect', value)} searchable={false} onChange={values => setSearch({ ...search, aspect: values })} floatingRef={floatingRef} />
-    {clearable && count ? <button type="button" className="gallery-filter-icon" aria-label="Clear Filters" title="Clear Filters" onClick={() => setSearch({ ...clearedSearch(search), q: search.q })}><X size={16} /></button> : null}
+    {clearable && count ? <Tip content={"Clear Filters"}><button type="button" className="gallery-filter-icon" aria-label="Clear Filters" onClick={() => setSearch({ ...clearedSearch(search), q: search.q })}><X size={16} /></button></Tip> : null}
   </>;
 }
 
@@ -205,7 +206,7 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
   }, [open]);
   return <motion.div ref={toolsRef} className={cn('gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={false} animate={{ opacity: 1 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
     <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={{ duration: 0 }}>
-      <button type="button" className="gallery-search-trigger" aria-label="Search Gallery" aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
+      <Tip content={"Search"}><button type="button" className="gallery-search-trigger" aria-label="Search Gallery" aria-expanded={searchExpanded} aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button></Tip>
       <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}
           onKeyDown={(event) => {
@@ -213,10 +214,10 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
             if (event.key === 'Enter') event.currentTarget.blur();
           }} placeholder="Search" aria-label="Search Gallery" spellCheck={false} autoComplete="off" enterKeyHint="search" />
       </motion.div>
-      {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear Search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
+      {searchExpanded ? <Tip content={"Clear Search & Close"}><button type="button" className="gallery-query-close" aria-label="Clear Search" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button></Tip> : null}
     </motion.div>
     <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')}>
-      <button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
+      <Tip content={"Filters"}><button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button></Tip>
       <AnimatePresence initial={false}>
         {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
           <div className="gallery-filter-controls" ref={filterControlsRef}>

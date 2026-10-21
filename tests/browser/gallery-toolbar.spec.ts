@@ -127,10 +127,11 @@ test('empty search dismisses outside while active queries and filters stay open'
 });
 
 
-test('search closes smoothly while retaining its input until the animation ends', async ({ page, isMobile }) => {
+test('search closes without resizing in steps and retains its input while it fades', async ({ page, isMobile }) => {
   test.skip(isMobile, 'The phone’s shared search row is checked in phone-dock.spec.ts.');
   await page.goto('/');
-  // The phone's search overlay fades from its close button; the full studio's field narrows into its trigger.
+  // The phone's search overlay fades from its close button; the full studio's field folds into its trigger
+  // at once (widths never animate, UI-PATTERNS › Motion) while the field fades.
   const phone = await studioUi(page).isPhone();
   const opener = page.getByRole('button', { name: 'Search Gallery', exact: true });
   await opener.click();
@@ -154,7 +155,7 @@ test('search closes smoothly while retaining its input until the animation ends'
     expect(frames.some(n => n.opacity > 0 && n.opacity < 1)).toBe(true);
     await expect(page.locator('.phone-searchbar')).toHaveCount(0);
   } else {
-    expect(frames.some(n => n.width > 50 && n.width < frames[0].width - 2)).toBe(true);
+    expect(frames.some(n => n.width > 50 && n.width < frames[0].width - 2)).toBe(false);
     expect(Math.max(...frames.map(n => n.height)) - Math.min(...frames.map(n => n.height))).toBeLessThanOrEqual(0.5);
     await expect(field).toBeDisabled();
   }
@@ -397,4 +398,34 @@ test('video gallery actions run from playback through grouping to Select', async
   await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Queued', exact: true }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').hideQueuedItems)).toBe(true);
   await page.keyboard.press('Escape');
+});
+
+// UI-PATTERNS › Buttons & Icon Bars: tooltips open away from their bar's edge.
+test.describe('tooltips with a mouse', () => {
+  test.use({ hasTouch: false });
+  test('top bar labels open below, bottom bar labels above', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'Phones show no hover labels.');
+    await page.route('**/api/gallery?*', route => route.fulfill({ json: { items, revision: 1, hasMore: false } }));
+    await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
+    await page.goto('/');
+    const tooltip = page.locator('.heiss-tooltip');
+    const search = page.locator('.gallery-toolbar').getByRole('button', { name: 'Search Gallery', exact: true });
+    await search.hover();
+    // Radix repeats the content in a visually hidden copy for screen readers; the first is the label.
+    const searchLabel = tooltip.filter({ hasText: /^Search$/ }).first();
+    await expect(searchLabel).toBeVisible();
+    await page.waitForTimeout(250);
+    const [button, label] = [await search.boundingBox(), await searchLabel.boundingBox()];
+    expect(label!.y).toBeGreaterThanOrEqual(button!.y + button!.height);
+    expect(Math.abs((label!.x + label!.width / 2) - (button!.x + button!.width / 2))).toBeLessThan(2);
+    await page.mouse.move(700, 500);
+    await expect(searchLabel).toHaveCount(0);
+    const settings = page.locator('.studio-dock').getByRole('button', { name: 'Settings', exact: true });
+    await settings.hover();
+    const settingsLabel = tooltip.filter({ hasText: /^Settings$/ }).first();
+    await expect(settingsLabel).toBeVisible();
+    await page.waitForTimeout(250);
+    const [dock, dockLabel] = [await settings.boundingBox(), await settingsLabel.boundingBox()];
+    expect(dockLabel!.y + dockLabel!.height).toBeLessThanOrEqual(dock!.y);
+  });
 });
