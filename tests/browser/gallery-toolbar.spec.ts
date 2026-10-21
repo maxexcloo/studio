@@ -384,15 +384,17 @@ test('video gallery actions run from playback through grouping to Select', async
   const play = toolbar.getByRole('button', { name: /^Grid Autoplay:/ });
   const group = toolbar.getByRole('button', { name: 'Auto-Grouping', exact: true });
   const select = toolbar.getByRole('button', { name: 'Select', exact: true });
-  const failed = toolbar.getByRole('button', { name: 'Failed', exact: true });
+  const status = toolbar.getByRole('button', { name: 'Filter By Status', exact: true });
   await expect(play).toBeVisible();
-  // The view controls in their one order (UI-PATTERNS): Auto-Grouping, Grid Autoplay, Failed, then Select.
+  // The view controls in their one order (UI-PATTERNS): Status, Auto-Grouping, Grid Autoplay, then Select.
+  expect((await status.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
   expect((await group.boundingBox())!.x).toBeLessThan((await play.boundingBox())!.x);
-  expect((await play.boundingBox())!.x).toBeLessThan((await failed.boundingBox())!.x);
-  expect((await failed.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
-  // Failed shows or hides failed outputs, remembered like the other view controls.
-  await expect(failed).toHaveAttribute('aria-pressed', 'true');
-  await failed.click();
-  await expect(failed).toHaveAttribute('aria-pressed', 'false');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').showFailedItems)).toBe(false);
+  expect((await play.boundingBox())!.x).toBeLessThan((await select.boundingBox())!.x);
+  // Status hides queued or failed outputs, remembered like the other view controls.
+  await status.click();
+  await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Failed', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').showFailedItems)).toBe(false);
+  await page.getByRole('listbox', { name: 'Status Filter', exact: true }).getByRole('option', { name: 'Hide Queued', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('heiss-ui-prefs') || '{}').hideQueuedItems)).toBe(true);
+  await page.keyboard.press('Escape');
 });

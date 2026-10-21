@@ -65,11 +65,8 @@ test('an administrator previews a GPU change, confirms the interruption and foll
   expect(posts[0].body).toEqual({ allocation: [{ profile: 'comfyui-image', devices: ['0'] }, { profile: 'comfyui-video', devices: ['1'] }] });
 
   await changes.getByRole('button', { name: 'Apply', exact: true }).click();
-  // Stopping a workload asks first; nothing is applied until it is confirmed.
-  const confirm = page.getByRole('alertdialog', { name: 'Stop Radiance - Gemma 4 31B?' });
-  await expect(confirm).toBeVisible();
-  expect(posts.some((post) => post.path === '/api/ai-control/apply')).toBe(false);
-  await confirm.getByRole('button', { name: 'Apply', exact: true }).click();
+  // The preview above already said what stops: Apply applies at once, with no question.
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect.poll(() => posts.find((post) => post.path === '/api/ai-control/apply')?.body).toEqual({ allocation: [{ profile: 'comfyui-image', devices: ['0'] }, { profile: 'comfyui-video', devices: ['1'] }], signature: 'f'.repeat(64) });
   await expect(page.locator('[data-status-message]').filter({ hasText: 'GPU change applied' }).first()).toBeVisible();
   await expect(changes).toHaveCount(0);

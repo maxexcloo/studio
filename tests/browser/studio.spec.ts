@@ -706,14 +706,9 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   await expect(bar.getByRole('button', { name: 'Delete Selected', exact: true })).toBeDisabled();
   await tile(0).click();
   await tile(1).click();
+  // Undoable, so Delete acts at once with no question.
   await bar.getByRole('button', { name: 'Delete Selected', exact: true }).click();
-  const confirmation = page.getByRole('alertdialog').or(page.getByRole('dialog')).filter({ hasText: 'Delete 2 Items?' });
-  await expect(confirmation).toBeVisible();
-  await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(confirmation).toHaveCount(0);
-  await expect(bar.getByRole('status')).toHaveText('2 Selected');
-  await bar.getByRole('button', { name: 'Delete Selected', exact: true }).click();
-  await confirmation.getByRole('button', { name: 'Delete 2', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect(tile(0)).toHaveCount(0);
   await expect(tile(1)).toHaveCount(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();

@@ -51,7 +51,7 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   for (const unset of ['autoResizeInputs', 'startImageId', 'Negative:']) expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain(unset);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   for (const output of ['forbidden-output.png', 'outputWidth', 'Timing', 'Queue:', 'Active:', 'Generated:', 'Output:', '2026-01-01']) expect(copied).not.toContain(output);
-  for (const input of ['Profile ID: mock-flux-schnell', 'autoResizeInputs: false', 'guidance: 0', 'workflow-input.json', 'input-reference']) expect(copied).toContain(input);
+  for (const input of ['Profile ID: mock-flux-schnell', 'guidance: 0', 'workflow-input.json', 'input-reference']) expect(copied).toContain(input);
   await expect(side.getByRole('button', { name: 'Copy Settings', exact: true })).toHaveCount(0);
   await expect(side.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   // On the phone Info closes Details: one close, and the bar doesn't repeat the footer.

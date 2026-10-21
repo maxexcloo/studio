@@ -41,10 +41,10 @@ test('search and filters share one row: opening one collapses the other to its i
   await expect(filterButton(page)).toHaveAttribute('aria-expanded', 'true');
   // The filters keep the desktop's order on one line that scrolls sideways.
   const names = await filterRow(page).locator('.gallery-filter-select:not(.phone-filter-clear)').evaluateAll((nodes) => nodes.map((node) => node.textContent?.trim()));
-  expect(names).toEqual(['Starred', 'Models', 'LoRAs', 'Size', 'Aspect Ratio']);
+  expect(names).toEqual(['Starred', 'Models', 'LoRAs', 'Size', 'Aspect Ratio', 'Status']);
   // Then the gallery view controls, as on the desktop (Grid Autoplay only where there are videos), and Clear last.
   const row = await filterRow(page).locator('button').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label') || node.textContent?.trim()));
-  expect(row.slice(names.length)).toEqual(['Auto-Grouping', 'Failed', 'Clear Filters']);
+  expect(row.slice(names.length)).toEqual(['Auto-Grouping', 'Clear Filters']);
   expect(await filterRow(page).evaluate((node) => getComputedStyle(node).overflowX)).toBe('auto');
   await searchButton(page).click();
   await expect(filterRow(page)).toHaveCount(0);

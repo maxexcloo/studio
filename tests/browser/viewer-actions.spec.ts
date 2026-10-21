@@ -191,7 +191,6 @@ test('deleting an already removed image keeps it removed without a not-found mes
   await page.goto('/');
   const { viewer } = await open(page);
   await viewer.getByRole('button', { name: 'Delete', exact: true }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
   await expect.poll(() => deleted).toBe(true);

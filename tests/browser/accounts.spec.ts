@@ -96,9 +96,8 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   expect(profile.features.loras).toBe(true);
   expect(profile.features.videoGeneration).toBe(true);
   await page.locator('.set-row').filter({ hasText: 'artist.one' }).getByRole('button', { name: 'Disable', exact: true }).click();
-  // Disabling asks first; nothing is sent until it is confirmed.
-  expect(posts.some((post) => post.url === '/api/accounts/users/artist-id')).toBe(false);
-  await page.getByRole('button', { name: 'Disable Account', exact: true }).click();
+  // Disabling acts at once (it can be enabled again); no question in the pill.
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });
 
   await page.getByLabel('Access Profile to Edit').click();
@@ -113,8 +112,6 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByRole('button', { name: 'Link', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-links')?.body).toEqual({ identity: 'librechat-user-7', accountId: 'artist-id' });
   await page.getByRole('button', { name: 'Dismiss librechat-user-7', exact: true }).click();
-  expect(posts.some((post) => post.url === '/api/accounts/gateway-pending/dismiss')).toBe(false);
-  await page.getByRole('button', { name: 'Dismiss Chat User', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/gateway-pending/dismiss')?.body).toEqual({ identity: 'librechat-user-7' });
 
   // The personal token lives in Account; Users is administration only.
@@ -148,7 +145,8 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(page.getByRole('heading', { name: 'Session', exact: true })).toHaveCount(0);
   await expect(page.getByText('Administrator · full access', { exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  // The phone's Menu or the desktop dock's Account menu.
+  await page.getByRole('button', { name: 'Menu', exact: true }).or(page.getByRole('button', { name: 'Account', exact: true })).first().click();
   await page.getByRole('menuitem', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });

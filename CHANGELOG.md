@@ -11,6 +11,15 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Prompt box:** growing past two lines no longer jumps; the composer resizes in the same frame as the text.
+- **Details:** groups are Prompt, Model, Settings, Output (size, reference, upscale and file together) and Timing, with rows sorted alphabetically. The Image Text button is gone: the summary follows Details. Copy includes only what was set.
+- **Timing:** an Upscale row shows the run's upscale time, which sits outside Active.
+- **Speed:** finished outputs come across from the worker in parallel, and a finished run is picked up within a moment instead of waiting for the next poll.
+- **Gallery:** a Status filter (Hide Queued, Hide Failed) replaces the Failed toggle.
+- **Confirmations:** reversible actions (delete with Undo, stop, disable, restart, revoke) act at once; only Reset All Settings asks. The Confirm Before Removing Things setting is gone.
+- **Settings › Account:** no Session group or Access line; Sign Out is in the Menu.
+
 ## [0.39.0] - 2026-10-21
 
 > Compact pickers, clearer generation Details and a Custom size option

@@ -140,7 +140,6 @@ test('Stop All prevents further video submissions and cancels an in-flight accep
   await generate(ui, 'A stoppable video selection');
   await expect.poll(() => submissions).toBe(1);
   await ui.stopAll();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Stop All', exact: true }).click();
   await expect.poll(() => queueStopped).toBe(true);
   release();
   await expect.poll(() => lateJobStopped).toBe(true);
