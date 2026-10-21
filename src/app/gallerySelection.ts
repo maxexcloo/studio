@@ -12,7 +12,7 @@ export type GallerySelection = {
   selected: Set<string>;
   /** What is selected and still loaded, in gallery order. */
   selectedItems: GalleryItem[];
-  /** Finished and failed items; a running job can't be selected. */
+  /** Finished, failed and in-progress items (in-progress ones only for Stop). */
   selectable: GalleryItem[];
   allSelected: boolean;
   start: (ids?: string[]) => void;
@@ -24,6 +24,9 @@ export type GallerySelection = {
   /** Every failed item loaded, for Retry or Delete. */
   selectFailed: () => void;
   failedCount: number;
+  /** Every queued or running item loaded, for a bulk Stop. */
+  selectRunning: () => void;
+  runningCount: number;
   /** A tile's click: true when selection took it, so the viewer stays shut. */
   click: (item: GalleryItem, event: React.MouseEvent) => boolean;
   /** A tile's context menu, where the gallery offers one. */
@@ -32,7 +35,8 @@ export type GallerySelection = {
 
 export const GallerySelectionContext = React.createContext<GallerySelection | null>(null);
 
-const isSelectable = (item: GalleryItem) => item.status === 'done' || item.status === 'error';
+const isSelectable = (item: GalleryItem) => item.status === 'done' || item.status === 'error' || item.status === 'pending';
+const isFinished = (item: GalleryItem) => item.status === 'done' || item.status === 'error';
 
 /** One selection for the gallery; a change of `resetKey` (layout, space, mode, search) ends it. */
 export function useGallerySelection(items: GalleryItem[], resetKey: string): GallerySelection {
@@ -47,8 +51,11 @@ export function useGallerySelection(items: GalleryItem[], resetKey: string): Gal
   }, [selectable]);
   return React.useMemo(() => {
     const selectedItems = selection ? selectable.filter((item) => selection.has(item.id)) : [];
-    const allSelected = selectable.length > 0 && selectedItems.length === selectable.length;
-    const selectAll = () => setSelection(new Set(selectable.map((item) => item.id)));
+    // Select All takes what has finished; in-progress jobs join only through Select In Progress or a tap.
+    const finished = selectable.filter(isFinished);
+    const allSelected = finished.length > 0 && finished.every((item) => selection?.has(item.id));
+    const selectAll = () => setSelection(new Set(finished.map((item) => item.id)));
+    const running = selectable.filter((item) => item.status === 'pending');
     const failed = selectable.filter((item) => item.status === 'error');
     const toggle = (item: GalleryItem) => {
       if (!isSelectable(item)) return;
@@ -72,6 +79,8 @@ export function useGallerySelection(items: GalleryItem[], resetKey: string): Gal
       selectAll,
       selectFailed: () => setSelection(new Set(failed.map((item) => item.id))),
       failedCount: failed.length,
+      selectRunning: () => setSelection(new Set(running.map((item) => item.id))),
+      runningCount: running.length,
       click: (item, event) => {
         if (!selection && !event.ctrlKey && !event.metaKey && !event.shiftKey) { anchor.current = item.id; return false; }
         if (!isSelectable(item)) return true;

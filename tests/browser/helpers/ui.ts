@@ -143,7 +143,9 @@ export function studioUi(page: Page) {
     /** Starts selecting gallery items, from More on the phone or the gallery toolbar. */
     async enterSelection() {
       if (await isPhone()) {
-        await page.locator('.phone-bar').getByRole('button', { name: 'Select', exact: true }).click();
+        // The phone has no Select button in its top bar: a long press on a tile, or Menu › Select.
+        await page.getByRole('button', { name: 'Menu', exact: true }).click();
+        await page.getByRole('menuitem', { name: 'Select', exact: true }).click();
       } else await page.getByRole('group', { name: 'Gallery Management', exact: true }).getByRole('button', { name: 'Select', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Stop Selecting' })).toBeVisible();
     },
@@ -227,11 +229,15 @@ export async function pickerSearch(scope: Locator, name: string, role: 'textbox'
 /**
  * Chooses a picker view (UI-PATTERNS › Pickers): a tab in the desktop heading,
  * or a row of the heading dropdown in a phone pop-up ("LoRAs · This Model").
+ * On the desktop an open search covers the views, so it is closed first.
  * `name` matches the tab's accessible name ("This Model", /^Selected 1 of/).
  */
 export async function pickerView(surface: Locator, name: string | RegExp) {
   const exact = typeof name === 'string';
   const tab = surface.getByRole('button', { name, exact }).or(surface.getByRole('tab', { name, exact }));
+  // A desktop search covers the heading's views; Close Search (which clears the query) gives them back.
+  const cover = surface.locator('.picker-search-field.is-cover .picker-search-close');
+  if (!await tab.count() && await cover.count()) await cover.click();
   if (await tab.count()) { await tab.first().click(); return; }
   // The heading's views are the shared Dropdown; its menu floats on the page.
   const trigger = surface.locator('.dropdown-trigger.picker-view');

@@ -79,7 +79,7 @@ test('the phone top bar holds the status and the tools, and the prompt bar holds
     await page.setViewportSize(viewport);
     const bar = (await page.locator('.phone-bar').first().boundingBox())!;
     const promptBar = (await page.locator('.phone-prompt-bar').boundingBox())!;
-    const tools = ['Select', 'Search Gallery', 'Open Gallery Filters', 'Menu'];
+    const tools = ['Search Gallery', 'Open Gallery Filters', 'Menu'];
     const boxes = [];
     for (const name of tools) {
       const box = (await page.locator('.phone-bar').getByRole('button', { name, exact: true }).boundingBox())!;
@@ -414,7 +414,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.locator('[data-reference-index]')).toHaveCount(1);
   await page.getByRole('searchbox', { name: 'Search Library' }).fill('No Such Reference');
   await expect(page.getByText('No Matching Images')).toBeVisible();
-  await page.getByRole('button', { name: 'Clear Reference Search' }).click();
+  await page.getByRole('button', { name: 'Close Search', exact: true }).click();
   await expect(page.locator('[data-reference-index]').first()).toBeVisible();
   await expect(page.locator('[data-reference-index][tabindex="0"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
@@ -785,7 +785,7 @@ test('gallery selection supports ranges, context actions, keyboard and mode chan
   await expect(bar.getByRole('button', { name: 'Select', exact: true })).toBeVisible();
 });
 
-test('selection excludes pending jobs and disables unsupported actions for failed or library items', async ({ page, isMobile }) => {
+test('selection takes running jobs only for Stop and disables unsupported actions for failed or library items', async ({ page, isMobile }) => {
   await page.route('**/api/gallery?*', (route) => route.fulfill({ json: {
     items: [{ ...images[0], library: true }, { ...images[1], status: 'error', url: '' }, { ...images[2], status: 'pending' }],
     revision: 1, hasMore: false,
@@ -805,8 +805,14 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   await expect(bar.getByRole('button', { name: 'Star Selected', exact: true })).toBeDisabled();
   await expect(bar.getByRole('button', { name: /^(Download|Share) Selected/ })).toBeDisabled();
   await expect(bar.getByRole('button', { name: 'Delete Selected', exact: true })).toBeEnabled();
+  // A running job joins a selection only for Stop: tapping it adds it, and Stop appears.
+  await page.locator('[data-tile-id="image-2"] .tile').click();
+  await expect(page.locator('.tile.is-selected')).toHaveCount(2);
+  await expect(bar.getByRole('button', { name: /^Stop the Selected Job$/ })).toBeVisible();
   await page.locator('[data-tile-id="image-2"] .tile').click();
   await expect(page.locator('.tile.is-selected')).toHaveCount(1);
+  // Select In Progress picks just the running job; the buttons stay visible when they have nothing to pick.
+  await expect(bar.getByRole('button', { name: 'Select In Progress', exact: true }).or(page.getByRole('button', { name: 'Select In Progress', exact: true }))).toBeEnabled();
   if (!await ui.isPhone()) {
     await page.locator('[data-tile-id="image-1"] .tile').focus();
     await page.keyboard.press('ControlOrMeta+a');

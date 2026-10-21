@@ -201,8 +201,9 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
               <span className="phone-bar-gap" />
             </>}
             {message ? null : <>
-            <button type="button" className={cn('phone-icon', selection.allSelected && 'is-on')} aria-pressed={selection.allSelected} aria-label={selection.allSelected ? 'Select None' : 'Select All'} title={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={20} /></button>
-            {selection.failedCount ? <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={20} /></button> : null}
+            <button type="button" className={cn('phone-icon', selection.allSelected && 'is-on')} aria-pressed={selection.allSelected} aria-label={selection.allSelected ? 'Select None' : 'Select All'} title={selection.allSelected ? 'Select None' : 'Select All'} disabled={!selection.selectable.some((item) => item.status !== 'pending')} onClick={selection.toggleAll}><CheckSquare size={20} /></button>
+            <button type="button" className="phone-icon" aria-label="Select Failed" title="Select Failed" disabled={!selection.failedCount} onClick={selection.selectFailed}><AlertTriangle size={20} /></button>
+            <button type="button" className="phone-icon" aria-label="Select In Progress" title="Select In Progress" disabled={!selection.runningCount} onClick={selection.selectRunning}><LoaderCircle size={20} /></button>
             </>}
           </div>
         ) : (
@@ -218,7 +219,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
             {message ? <StatusPill message={message} className="is-bar" /> : <span className="phone-bar-gap" />}
             {/* A question takes the whole row but "Studio": its answers need the room, and nothing else applies until it is answered. */}
             {message?.confirm ? null : <>
-            <button type="button" className="phone-icon phone-select-trigger" aria-label="Select" disabled={!selectable.length} onClick={startSelecting}><CheckSquare size={20} /></button>
+            {/* No Select button on the phone: a long press on a tile starts selecting. */}
             <ToolButton label="Search Gallery" Icon={Search} count={queryCount} open={expanded === 'search'} onClick={() => toggleTools('search')} />
             <ToolButton label="Open Gallery Filters" Icon={SlidersHorizontal} count={filterCount} open={expanded === 'filters'} onClick={() => toggleTools('filters')} />
             <button type="button" className={cn('phone-icon phone-menu-trigger', moreOpen && 'is-open')} aria-label="Menu" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}><Menu size={22} /></button>
@@ -265,7 +266,8 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
         { id: 'show', Icon: Images, label: 'Show Running', run: () => { setRunningOpen(false); revealRunning(); } },
         { id: 'stop', Icon: CircleStop, label: 'Stop All', count: runningCount, danger: true, run: () => { setRunningOpen(false); view.cancelQueue(); } }
       ]} />
-      <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} />
+      {/* Hold a tile to select; Menu › Select is the way in without a long press (keyboards, screen readers). */}
+      <MoreMenu view={view} open={moreOpen} onClose={() => setMoreOpen(false)} onSelect={selectable.length ? startSelecting : undefined} />
     </>
   );
 }

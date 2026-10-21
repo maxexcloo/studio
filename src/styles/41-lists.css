@@ -350,25 +350,84 @@ button.list-row { isolation: isolate; }
 .reference-selected-row { min-height: 52px; border-radius: 0; background: transparent; }
 .reference-selected-row + .reference-selected-row { border-top: 1px solid var(--list-hairline); }
 
-/* LoRAs: the order mark leads; View Source, Info and Star sit on the right, in that order. */
-.composer-loras .lora-picker-search { order: 1; }
-.composer-loras .lora-library-select[data-highlight="true"] { background: transparent; }
+/* ---------------------------------------------------------------------------
+   LoRA rows (UI-PATTERNS › Pickers): the Models chooser's rows. The friendly
+   name, one muted line of description cut short, then on the right the amber
+   tick, View Source (one icon per host) and Star. Hover and the keyboard
+   cursor fill the whole row; no hairlines, pills or cards. The Selected view
+   adds the grip and order mark, and under the row its information and
+   on/off · strength · order.
+--------------------------------------------------------------------------- */
+.composer-loras .lora-picker-items { gap: var(--space-1); }
+.composer-loras .lora-picker-section { gap: var(--space-1); padding-bottom: 6px; }
+.composer-loras .lora-picker-heading.is-static { height: auto; padding: 6px 10px 2px; color: rgb(255 255 255 / .6); font-size: 10.5px; font-weight: 600; letter-spacing: .01em; }
+.lora-library-row { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; min-width: 0; border-radius: var(--r-item); }
+.lora-library-row > .lora-library-grip { grid-column: 1; }
+.lora-library-row > .lora-library-select { grid-column: 2; }
+.lora-library-row > .lora-row-actions { grid-column: 3; }
+.lora-library-row > .lora-library-expansion { grid-column: 2 / -1; }
+@media (hover: hover) { .lora-library-row:hover { background: var(--cursor-bg); } }
 /* The keyboard cursor shows while the list has keyboard focus, never after a click. */
-.composer-loras .lora-library-select[data-highlight="true"]:focus-visible, .composer-loras .lora-picker-list:has(:focus-visible) .lora-library-select[data-highlight="true"] { background: var(--cursor-bg); }
-.composer-loras .lora-library-row { border-bottom-color: var(--list-hairline); }
-.composer-loras .lora-library-row:has(> .lora-sources) > .lora-library-select { padding-right: 136px; }
-.composer-loras .lora-library-row > .lora-sources { position: absolute; top: 6px; right: 40px; }
+.lora-picker-list:has(:focus-visible) .lora-library-row.is-cursor { background: var(--cursor-bg); }
+.lora-library-select { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-width: 0; min-height: 58px; padding: 6px 8px 6px 10px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--foreground)); font: inherit; text-align: left; cursor: pointer; }
+.lora-library-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.lora-library-select:disabled { cursor: default; }
+.lora-library-select:disabled > .lora-option-copy { opacity: .5; }
+.lora-library-select .lora-option-copy { flex: 1; display: grid; gap: var(--space-1); min-width: 0; }
+.lora-library-select .lora-option-copy strong { overflow: hidden; color: hsl(var(--foreground)); font-size: 12px; font-weight: 500; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+.lora-library-row.is-selected:not(.is-reviewing) .lora-option-copy strong { color: var(--selected-ink); }
+.lora-library-select .lora-option-copy em { overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 12px; font-style: normal; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+/* Why a LoRA can't be added (or may not suit): said in full, never cut off. */
+.lora-library-select .lora-library-note { color: hsl(var(--muted-foreground)); font-size: 11.5px; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.lora-library-select .selected-tick { margin-inline-start: auto; }
+.lora-row-actions { display: inline-flex; align-items: center; gap: 0; padding-right: 4px; }
+.lora-row-actions .lora-option-star { opacity: 1; }
 .lora-sources { display: inline-flex; flex: none; align-items: center; gap: 0; }
-.lora-source { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: var(--control-h-sm); height: var(--control-h-sm); gap: var(--space-1); border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); text-decoration: none; }
-.lora-source small { font-size: 9px; line-height: 1; }
+.lora-source { display: grid; place-items: center; flex: none; width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); color: hsl(var(--muted-foreground)); text-decoration: none; }
 .lora-source:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
 .lora-source:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-@media (pointer: coarse) { .lora-source { width: var(--control-h-touch); height: var(--control-h-touch); } }
-.lora-info-panel { display: grid; gap: var(--space-4); min-width: 0; padding: 12px; border: 1px solid var(--glass-border); border-radius: var(--r-item); background: var(--glass-panel-solid); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.lora-library-grip { display: grid; place-items: center; width: 24px; height: 40px; margin-left: 2px; padding: 0; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--muted-foreground)); cursor: grab; touch-action: none; }
+.lora-library-grip:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
+.lora-library-row:has(> .lora-library-grip) > .lora-library-select { padding-left: 4px; }
+.lora-library-row.is-dragging { opacity: .55; }
+.lora-library-row.is-drop-target { box-shadow: inset 0 0 0 1px hsl(var(--foreground) / .6); }
+/* Selected view: its information, then on/off · strength · order, on the name's left edge (after the order mark). */
+.lora-library-row.is-reviewing { align-items: start; }
+.lora-library-row.is-reviewing > .lora-library-select { min-height: 44px; }
+.lora-library-row.is-reviewing > .lora-row-actions { margin-top: 6px; }
+.lora-library-row.is-reviewing > .lora-library-grip { margin-top: 2px; }
+.lora-library-expansion { display: grid; gap: var(--space-3); min-width: 0; padding: 0 12px 10px 38px; }
+.lora-library-row:has(> .lora-library-grip) > .lora-library-expansion { padding-left: 32px; }
+.lora-library-settings { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.lora-library-settings .lora-strength { flex: 1; min-width: 100px; }
+.lora-library-settings .switch { position: relative; }
+/* The switch is small to look at but a full finger's width to tap. */
+.lora-library-settings .switch::after { content: ""; position: absolute; inset: -13px -4px; }
+.lora-library-order { display: inline-flex; align-items: center; }
+.lora-library-order .prompt-action { width: var(--control-h-sm); height: var(--control-h-sm); border-radius: var(--r-pill); }
+
+/* What a LoRA says about itself (LoraDetails): plain muted text, no card; the same in the Selected view and Details. */
+.lora-info-panel { display: grid; gap: var(--space-3); min-width: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .lora-info-panel p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.lora-info-panel strong { color: hsl(var(--foreground)); font-weight: 600; }
-.composer-loras .lora-library-row > .lora-info-panel { margin: 0 12px 12px 30px; }
-@media (hover: none) { .composer-loras .lora-library-select:hover { background: transparent; } }
+.lora-info-panel strong { color: hsl(var(--foreground)); font-weight: 550; }
+
+/* The phone pop-up: Models' phone rows (15 px names, 12.5 px lines), hairlines between, 40 px icon targets. */
+.reference-popover.is-pop .lora-library-row { border-radius: 0; }
+.reference-popover.is-pop .lora-picker-items { gap: 0; }
+.reference-popover.is-pop .lora-picker-items > .lora-library-row + .lora-library-row { border-top: 1px solid var(--list-hairline); }
+.reference-popover.is-pop .lora-library-select { min-height: 52px; padding: 6px 4px 6px 2px; }
+.reference-popover.is-pop .lora-library-select .lora-option-copy strong { font-size: 15px; font-weight: 450; line-height: 1.35; }
+.reference-popover.is-pop .lora-library-select .lora-option-copy em { font-size: 12.5px; }
+.reference-popover.is-pop .lora-library-select .lora-library-note { font-size: 12.5px; }
+.reference-popover.is-pop .lora-row-actions { padding-right: 0; }
+.reference-popover.is-pop :is(.lora-source, .lora-row-actions .lora-option-star) { width: 40px; height: 40px; }
+.reference-popover.is-pop .lora-picker-heading.is-static { padding: 14px 2px 4px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+.reference-popover.is-pop .lora-picker-section:first-child .lora-picker-heading.is-static { padding-top: 4px; }
+.reference-popover.is-pop .lora-library-expansion { padding: 0 4px 10px 30px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-library-select { min-height: 52px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-row-actions { margin-top: 6px; }
+.reference-popover.is-pop .lora-library-row.is-reviewing > .lora-library-grip { margin-top: 6px; }
+
 
 /* Models on the phone: the same chooser as a Create step: search and filter pills on the sheet itself, no boxed header. */
 
@@ -384,7 +443,7 @@ button.list-row { isolation: isolate; }
 .phone-heading.is-connected .phone-heading-light span { background: hsl(145 70% 48%); box-shadow: 0 0 0 4px hsl(145 70% 48% / .14); }
 .phone-heading.is-offline .phone-heading-light span { background: hsl(0 74% 58%); box-shadow: 0 0 0 4px hsl(0 74% 58% / .14); }
 .phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
-.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; gap: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; gap: var(--space-1); padding: var(--seg-pad); border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
 .phone-prompt-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
 .phone-prompt-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .phone-prompt-bar .phone-gallery-mode button.active, .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { box-shadow: none; font-weight: 650; }
@@ -628,25 +687,6 @@ button.list-row { isolation: isolate; }
 .composer-loras.is-pop .lora-picker-tools.is-heading .picker-search-row { padding: 6px 12px 2px; }
 .phone-model-tools .picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }
 
-/* LoRA rows: the tick ends the name; View Source as two small text pills, then Star, centred on the title line. */
-.composer-loras .lora-library-select .selected-tick { margin-inline-start: auto; }
-.composer-loras .lora-library-row:has(> .lora-sources) > .lora-library-select { padding-right: 112px; }
-.composer-loras .lora-library-row > .lora-sources { top: 13px; right: 36px; gap: var(--space-2); }
-.composer-loras .lora-library-row > .lora-option-star { top: 13px; }
-.lora-source { flex-direction: row; width: auto; min-width: var(--control-h-sm); padding: 0 8px; border-radius: var(--r-pill); background: var(--control-fill); font-size: 11px; font-weight: 550; letter-spacing: .01em; line-height: 1; }
-.lora-source > span { display: block; }
-@media (pointer: coarse) {
-  .lora-source { width: auto; min-width: var(--control-h-touch); }
-  .composer-loras .lora-library-row > .lora-sources { top: 7px; }
-  .composer-loras .lora-library-row:has(> .lora-sources) > .lora-library-select { padding-right: 140px; }
-}
-
-/* An enabled LoRA's information sits under its name, on the same left edge, with no card around it. */
-.lora-info-panel { padding: 0; border: 0; border-radius: 0; background: transparent; }
-.composer-loras .lora-library-row > .lora-info-panel { margin: 2px 12px 8px 2px; }
-.composer-loras .lora-library-row:has(.picker-order) > .lora-info-panel { margin-left: 30px; }
-.composer-loras .lora-library-row:has(> .lora-library-grip) > .lora-info-panel { margin-left: 60px; }
-.lora-info-strength strong { font-weight: 550; }
 
 /* Picked reference tiles: the amber tick badge; the order shows under Selected. */
 .reference-tile-check .selected-tick { width: 14px; height: 14px; color: var(--accent-amber-ink); }
@@ -749,13 +789,18 @@ button.list-row { isolation: isolate; }
 .picker-search-field.is-cover { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 0; }
 .picker-search-field.is-cover > :first-child, .picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
 .picker-search-field, .picker-search-row { position: relative; }
-.picker-search-close { position: absolute; top: 50%; right: 6px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); transform: translateY(-50%); cursor: pointer; }
+/* It overlaps the field's end in the flex row, so it shares the field's centre line on every padding (no transform: touch screens reset button transforms). */
+.picker-search-field, .picker-search-row { display: flex; align-items: center; }
+.picker-search-close { position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: 26px; height: 26px; margin: 0 6px 0 -32px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; }
 .picker-search-close:hover { background-color: var(--control-hover); color: hsl(var(--foreground)); }
 .picker-search-close:focus-visible { box-shadow: var(--focus-ring); outline: none; }
-.picker-search-row > .picker-search-close { right: 18px; }
+/* The cover field fills the heading; its close keeps its own small size, centred inside the field's end. */
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover { flex: 1 1 auto; justify-content: stretch; min-width: 0; margin-inline-start: 0; }
+.reference-popover-head .picker-heading-tools > .picker-search-field.is-cover > :first-child { max-width: none; }
+.reference-popover-head .picker-heading-tools > .picker-search-field > .picker-search-close { flex: none; width: 26px; height: 26px; max-width: none; margin: 0 6px 0 -32px; }
 /* The field's own clear button would duplicate Close Search. */
 :is(.picker-search-field, .picker-search-row) .picker-search > button, :is(.picker-search-field, .picker-search-row) .lora-picker-search > button, :is(.picker-search-field, .picker-search-row) .reference-search > button, :is(.picker-search-field, .picker-search-row) .model-menu-clear { display: none; }
 :is(.picker-search-field, .picker-search-row) input { padding-right: 30px; }
 /* Desktop pickers carry no title or icon: the views lead the heading. */
-@media (min-width: 641px) and (pointer: fine) { :is(.reference-popover, .composer-loras) .surface-title { display: none; } }
+.reference-popover:not(.is-pop) > .reference-popover-head > :is(.surface-title, svg:first-child) { display: none; }
 .reference-upload.picker-search-toggle { flex: none; }

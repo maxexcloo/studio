@@ -270,6 +270,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       retry: (item) => { void live().failureFixes?.retry(item); },
       // One at a time, each its own new job with its own settings.
       retryItems: (items) => { void (async () => { for (const item of items) await live().failureFixes?.retry(item); })(); },
+      stopItems: (items) => { const jobs = [...new Set(items.map((item) => item.jobId).filter(Boolean))]; jobs.forEach((jobId) => { void live().cancelJob(jobId); }); },
     };
   }, [smartUpscale, canUseStartImage, canAnimate]);
   const comfyOffline = comfyStatus && !comfyStatus.connected && !comfyStatus.checking;
@@ -654,6 +655,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         const activeProfile = itemProfile(active, models?.profiles || []);
         const activeProfileName = itemProfileName(active, models?.profiles || []);
         const profileTitle = (activeProfile ? modelName(activeProfile).name : activeProfileName) || (active.settings?.modelName ? partName(String(active.settings.modelName)) : "") || "Generation";
+        // A LoRA's catalogue entry by its saved path, or by its file name when the folder differs.
+        const loraInfoOf = (file: string) => loraInfos?.[file] || Object.entries(loraInfos || {}).find(([name]) => name.split(/[\\/]/).pop() === file)?.[1];
         const detailNames = { profile: activeProfileName, lora: (file: string) => loraName(file, (loraInfos || knownLoraInfo())?.[file]) };
         const detailEntries = generationDetailEntries(active, detailNames);
         const processing: Array<[string, string]> = [];
@@ -748,11 +751,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                                 <ul className="detail-loras" aria-label="LoRAs">
                                   {section.loras.map((lora, index) => (
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
+                                      {/* As in the LoRA chooser: the name, then on the right its strength and View Source; its information under the name. */}
                                       <span className="detail-lora-name" title={lora.file}>{lora.name}</span>
-                                      <LoraSources info={loraInfos?.[lora.file] || Object.entries(loraInfos || {}).find(([file]) => file.split(/[\\/]/).pop() === lora.file)?.[1]} label={lora.name} />
-                                      <LoraDetails info={loraInfos?.[lora.file] || Object.entries(loraInfos || {}).find(([file]) => file.split(/[\\/]/).pop() === lora.file)?.[1]} label={lora.name} enabled file={lora.file} />
-                                      <i aria-hidden="true" />
                                       <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
+                                      <LoraSources info={loraInfoOf(lora.file)} label={lora.name} />
+                                      <LoraDetails info={loraInfoOf(lora.file)} label={lora.name} enabled file={lora.file} />
                                     </li>
                                   ))}
                                 </ul>

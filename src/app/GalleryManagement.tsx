@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { popoverMotion, useSettling } from './composerSurface';
-import { AlertTriangle, CheckSquare, X } from 'lucide-react';
+import { AlertTriangle, CheckSquare, X, LoaderCircle } from 'lucide-react';
 import { GallerySelectionContext, type GallerySelection } from './gallerySelection';
 import { bulkItemActions, useItemActionHandlers, useItemActions, type ItemAction } from './itemActions';
 import { ActionIcon, startsGroup } from './ItemActionSurfaces';
@@ -106,8 +106,10 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
     {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{status}{tools}<div className={selecting ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       <Tip content={selecting ? "Stop Selecting" : "Select · Ctrl/Cmd-Click, Shift-Click a Range"}><button type="button" className="gallery-select-toggle" aria-label={selecting ? 'Stop Selecting' : 'Select'} aria-expanded={selecting} onClick={() => selecting ? selection.end() : selection.start()}>{selecting ? <X size={16} /> : <CheckSquare size={16} />}<span role={selecting ? 'status' : undefined}>{selecting ? `${selected.length} Selected` : 'Select'}</span></button></Tip>
       <AnimatePresence initial={false}>{selecting ? <motion.div className="gallery-selection-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
-        <Tip content={selection.allSelected ? 'Select None' : 'Select All Loaded'}><button type="button" aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Select None' : 'Select All'}</button></Tip>
-        {selection.failedCount ? <Tip content={"Select Failed"}><button type="button" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={16} />Select Failed</button></Tip> : null}
+        <Tip content={selection.allSelected ? 'Select None' : 'Select All Loaded'}><button type="button" aria-label={selection.allSelected ? 'Select None' : 'Select All'} disabled={!selection.selectable.some((item) => item.status !== 'pending')} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Select None' : 'Select All'}</button></Tip>
+        {/* Always shown; greyed out with nothing to select. */}
+        <Tip content={"Select Failed"}><button type="button" aria-label="Select Failed" disabled={!selection.failedCount} onClick={selection.selectFailed}><AlertTriangle size={16} />Select Failed</button></Tip>
+        <Tip content={"Select In Progress"}><button type="button" aria-label="Select In Progress" disabled={!selection.runningCount} onClick={selection.selectRunning}><LoaderCircle size={16} />Select In Progress</button></Tip>
         <span className="gallery-selection-divider" aria-hidden="true" />
         {bulkActions.map((action, index) => actionButton(action, false, startsGroup(bulkActions, index)))}
       </motion.div> : null}</AnimatePresence>

@@ -133,9 +133,10 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 .phone-heading-name { padding-right: 4px; font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
 /* Images | Videos: two icons at the prompt bar's left end, glass-bar icon buttons whose fill is a
    36px circle inside the 44px target; the chosen one takes the selected fill. */
-.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { gap: var(--space-1); margin-left: -4px; }
-.phone-prompt-bar .phone-gallery-mode button { width: var(--control-h-touch); min-width: var(--control-h-touch); height: var(--control-h-touch); padding: 4px; border-radius: var(--r-pill); background-clip: content-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
-.phone-prompt-bar .phone-gallery-mode button > svg { width: var(--icon-touch); height: var(--icon-touch); }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { gap: var(--space-1); margin-left: 0; }
+/* The same track and cells as the Create sheet's Image | Video switcher (.composer-mode-select). */
+.phone-prompt-bar .phone-gallery-mode button { width: auto; min-width: 40px; height: calc(var(--bar-pill-h, 40px) - 2 * var(--seg-pad)); padding: 0 10px; border-radius: var(--r-pill); background-clip: border-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+.phone-prompt-bar .phone-gallery-mode button > svg { width: var(--icon); height: var(--icon); }
 .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { color: var(--selected-ink); background-color: var(--selected-bg); }
 .phone-prompt-bar .phone-gallery-mode button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; }
 /* A message takes the middle: between "Studio" and the tools, its words centred, as tall as the bar's controls. */
@@ -334,8 +335,6 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .compare-variants select { max-width: 100%; }
 .comparison-actions { display: flex; flex-wrap: wrap; gap: var(--space-4); }
 
-.detail-lora:has(.lora-info-panel) { flex-wrap: wrap; }
-.detail-lora .lora-info-panel { flex-basis: 100%; order: 2; }
 
 
 
@@ -347,5 +346,3 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
   visibility: hidden;
 }
 
-/* Details' LoRA row is the box already: its information sits inside without a second card. */
-.detail-lora .lora-info-panel { padding: 4px 0 2px; border: 0; background: transparent; }

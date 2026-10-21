@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, Trash2, Clapperboard } from 'lucide-react';
+import { CheckCircle2, CircleStop, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, Trash2, Clapperboard } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
 import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
@@ -25,7 +25,7 @@ export type ItemActionGroup = 'keep' | 'make' | 'organise';
 
 export type ItemActionId =
   | 'copyItem' | 'share' | 'download' | 'animate' | 'extend' | 'reuse' | 'promptsOnly' | 'reference'
-  | 'retry' | 'upscale' | 'compareVariants' | 'compare' | 'star' | 'select' | 'delete';
+  | 'retry' | 'upscale' | 'compareVariants' | 'compare' | 'star' | 'select' | 'delete' | 'stop';
 
 export type ItemActionHandlers = {
   showToast: ShowToast;
@@ -52,6 +52,8 @@ export type ItemActionHandlers = {
   /* The same for several selected items at once. */
   compareVariants?: (items: GalleryItem[]) => void;
   retryItems: (items: GalleryItem[]) => void;
+  /** Stop the selected jobs that are still queued or running. */
+  stopItems?: (items: GalleryItem[]) => void;
   starItems: (items: GalleryItem[], favorite: boolean) => void;
   removeItems: (items: GalleryItem[]) => Promise<unknown>;
 };
@@ -109,6 +111,7 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   star: ['dock', 'tile', 'menu'],
   select: ['menu'],
   delete: ['bar', 'dock', 'tile', 'menu'],
+  stop: [],
 };
 
 export function upscaleLabel(item: GalleryItem) {
@@ -167,12 +170,14 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
 export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandlers, phone = false): ItemAction[] {
   const ready = items.filter((item) => item.status === 'done' && item.url);
   const failed = items.filter((item) => item.status === 'error' && !item.library);
+  const running = items.filter((item) => item.status === 'pending');
   const starrable = items.filter(canStar);
   const allStarred = starrable.length > 0 && starrable.every((item) => item.favorite);
   const actions: (ItemAction | false)[] = [
     phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
     !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
     failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
+    running.length > 0 && Boolean(handlers.stopItems) && { id: 'stop', group: 'organise', label: 'Stop', tip: running.length > 1 ? `Stop ${running.length} Selected Jobs` : 'Stop the Selected Job', Icon: CircleStop, danger: true, run: () => handlers.stopItems!(running) },
     { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
     { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },
   ];
