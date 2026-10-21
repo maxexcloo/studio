@@ -50,13 +50,15 @@ test('long prompts and advanced options remain inside the viewport', async ({ pa
   await ui.prompt.fill('Scene detail\n'.repeat(60));
   await ui.negativePrompt.fill('Avoid defects\n'.repeat(60));
   await ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true }).click();
-  // A popover above the composer, as wide as it, like LoRAs and References.
+  // One column above its button, start-aligned and on screen (UI-PATTERNS › Composer).
   const advanced = page.getByRole('dialog', { name: 'Advanced Settings', exact: true });
   await expect(advanced).toBeVisible();
+  const opener = ui.composer.getByRole('button', { name: 'Advanced Settings', exact: true });
+  const viewport = page.viewportSize()!;
   await expect.poll(async () => {
     const bounds = (await advanced.boundingBox())!;
-    const composer = (await ui.composer.boundingBox())!;
-    return bounds.y >= 0 && bounds.y + bounds.height <= composer.y + 1 && Math.abs(bounds.x - composer.x) < 1 && Math.abs(bounds.width - composer.width) < 1;
+    const trigger = (await opener.boundingBox())!;
+    return bounds.y >= 0 && bounds.y + bounds.height <= trigger.y + 1 && bounds.width >= 359 && bounds.width <= 421 && Math.abs(bounds.x - Math.min(trigger.x, viewport.width - 8 - bounds.width)) < 1.5;
   }).toBe(true);
   // Escape closes it and gives focus back to its button.
   await page.keyboard.press('Escape');
@@ -188,7 +190,7 @@ test('each expanded field owns its clear action and reset clears only the curren
   await expect(prompt).toHaveValue('A fresh scene');
   await expect(negative).toHaveValue('');
   await negative.fill('Saved negative');
-  await root.getByRole('button', { name: 'Reset Creation', exact: true }).click();
+  await root.getByRole('button', { name: 'Clear All', exact: true }).click();
   await expect(prompt).toHaveValue('');
   await expect(negative).toHaveValue('');
   expect(destructiveRequest).toBe(false);
@@ -259,7 +261,7 @@ test('secondary creation controls share muted, hover and neutral open states wit
   });
   const loras = root.getByRole('button', { name: 'LoRAs', exact: true, includeHidden: true });
   const advanced = root.getByRole('button', { name: 'Advanced Settings', exact: true, includeHidden: true });
-  const reset = root.getByRole('button', { name: 'Reset Creation', exact: true });
+  const reset = root.getByRole('button', { name: 'Clear All', exact: true });
   const model = ui.modelTrigger;
   const send = ui.generate;
   const sendBefore = await send.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, colour: getComputedStyle(element).color }));

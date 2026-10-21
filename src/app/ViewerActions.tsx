@@ -56,7 +56,7 @@ export function DetailsFooter({ onCopy, onRecreate }: { onCopy: () => Promise<bo
   return <div className="details-footer" role="group" aria-label="Details Actions">
     <div className="details-footer-row">
       <button type="button" className={cn('btn details-footer-btn', copy.copied && 'is-copied')} onClick={() => { void copy.copyWith(onCopy); }}><CopyIcon copied={Boolean(copy.copied)} size={15} /><span>{copy.copied ? 'Copied' : 'Copy'}</span></button>
-      {onRecreate ? <Tip content="Recreate With the Same Seed"><button type="button" className="btn is-primary details-footer-btn" onClick={onRecreate}><RotateCcw size={15} /><span>Recreate</span></button></Tip> : null}
+      {onRecreate ? <Tip content="Recreate With the Same Seed"><button type="button" className="btn is-primary details-footer-btn" onClick={onRecreate}><RotateCcw size={16} /><span>Recreate</span></button></Tip> : null}
     </div>
   </div>;
 }

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { studioUi, pickerSearch } from './helpers/ui';
+import { studioUi, pickerSearch, pickerView } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Image ${index}`, model: 'flux1-schnell.safetensors', createdAt: new Date(Date.now() - index * 60000).toISOString(), width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '0' } }));
@@ -64,41 +64,58 @@ test('the phone gallery scrolls the document so a tap on the status bar reaches 
   await expect(page.locator('[data-tile-id="image-0"]')).toBeInViewport();
 });
 
-test('the phone top bar holds Images/Videos and the tools, with Create floating in thumb reach at every phone size', async ({ page, isMobile }, testInfo) => {
-  test.skip(!isMobile, 'The phone top bar and Create button.');
+test('the phone top bar holds the status and the tools, and the prompt bar holds Images/Videos, at every phone size', async ({ page, isMobile }, testInfo) => {
+  test.skip(!isMobile, 'The phone top bar and prompt bar.');
   await page.goto('/');
   const mode = studioUi(page).galleryMode;
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
   await expect(page.locator('.phone-gallery .phone-generation-mode')).toHaveCount(0);
   await expect(mode.locator('select')).toHaveCount(0);
   await expect(mode.getByRole('button')).toHaveCount(2);
-  // No bottom bar: Create is the only thing at the bottom.
-  await expect(page.locator('.phone-dock, .phone-create-pill')).toHaveCount(0);
-  for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 844, height: 390 }]) {
+  // Images | Videos sit at the prompt bar's left end, not in the top bar.
+  await expect(page.locator('.phone-bar').getByRole('group', { name: 'Gallery Mode', exact: true })).toHaveCount(0);
+  await expect(page.locator('.phone-prompt-bar').getByRole('group', { name: 'Gallery Mode', exact: true })).toBeVisible();
+  for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 430, height: 932 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     const bar = (await page.locator('.phone-bar').first().boundingBox())!;
-    const create = (await page.getByRole('button', { name: 'Create', exact: true }).boundingBox())!;
-    for (const button of [...await mode.getByRole('button').all(), page.getByRole('button', { name: 'Search Gallery', exact: true }), page.getByRole('button', { name: 'Open Gallery Filters', exact: true }), page.getByRole('button', { name: 'Menu', exact: true }), page.getByRole('button', { name: 'Select', exact: true })]) {
-      const box = (await button.boundingBox())!;
-      expect(box.width).toBeGreaterThanOrEqual(40);
+    const promptBar = (await page.locator('.phone-prompt-bar').boundingBox())!;
+    const tools = ['Select', 'Search Gallery', 'Open Gallery Filters', 'Menu'];
+    const boxes = [];
+    for (const name of tools) {
+      const box = (await page.locator('.phone-bar').getByRole('button', { name, exact: true }).boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
       expect(box.height).toBeGreaterThanOrEqual(44);
       // All in the one slim bar, on screen.
       expect(box.y).toBeGreaterThanOrEqual(bar.y);
       expect(box.y + box.height).toBeLessThanOrEqual(bar.y + bar.height + 1);
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+      boxes.push(box);
     }
+    // Select · Search · Filter · Menu, left to right, Menu at the right edge.
+    for (let index = 1; index < boxes.length; index += 1) expect(boxes[index - 1].x + boxes[index - 1].width).toBeLessThanOrEqual(boxes[index].x + 1);
+    expect(viewport.width - (boxes[3].x + boxes[3].width)).toBeLessThanOrEqual(16);
     expect(bar.height).toBeLessThanOrEqual(52);
-    if (viewport.width >= 390) await expect(page.locator('.phone-heading-name')).toBeVisible();
-    const select = await page.getByRole('button', { name: 'Select', exact: true }).boundingBox();
-    const filter = await page.getByRole('button', { name: 'Open Gallery Filters', exact: true }).boundingBox();
-    const modeBox = await mode.boundingBox();
-    expect(modeBox!.x + modeBox!.width).toBeLessThanOrEqual(filter!.x + 1);
-    expect(filter!.x + filter!.width).toBeLessThanOrEqual(select!.x + 1);
-    // Create floats bottom right, within thumb reach.
-    expect(create.width).toBeGreaterThanOrEqual(56);
-    expect(create.y).toBeGreaterThan(viewport.height / 2);
+    // The status light and "Studio" share one line, centred on the bar.
+    const light = (await page.locator('.phone-heading-light, .phone-running-inline').first().boundingBox())!;
+    expect(light.x).toBeLessThan(boxes[0].x);
+    if (viewport.width >= 390) {
+      const name = (await page.locator('.phone-heading-name').boundingBox())!;
+      expect(Math.abs((name.y + name.height / 2) - (light.y + light.height / 2))).toBeLessThanOrEqual(2);
+      expect(name.x + name.width).toBeLessThanOrEqual(boxes[0].x);
+    }
+    for (const button of await mode.getByRole('button').all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.y).toBeGreaterThanOrEqual(promptBar.y);
+      expect(box.y + box.height).toBeLessThanOrEqual(promptBar.y + promptBar.height + 1);
+    }
+    const create = (await page.getByRole('button', { name: 'Create', exact: true }).boundingBox())!;
+    const modeBox = (await mode.boundingBox())!;
+    expect(modeBox.x + modeBox.width).toBeLessThanOrEqual(create.x + 1);
     expect(create.x + create.width).toBeLessThanOrEqual(viewport.width);
-    await page.screenshot({ path: testInfo.outputPath(`mode-picker-${viewport.width}.png`) });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    await page.screenshot({ path: testInfo.outputPath(`phone-bars-${viewport.width}.png`) });
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await mode.getByRole('button', { name: /^Images?$/ }).focus();
@@ -137,7 +154,7 @@ test('swipes move through previews and generation details stay accessible', asyn
 });
 
 test('the full studio viewer summary is selectable text', async ({ page, isMobile }) => {
-  test.skip(isMobile, 'The phone viewer has no summary.');
+  test.skip(isMobile, 'The phone viewer keeps its title in the top row.');
   await page.goto('/');
   await studioUi(page).openViewer(page.locator('[data-tile-id]').first());
   await studioUi(page).showDetails();
@@ -154,8 +171,20 @@ test('the phone viewer keeps Star and Info beside Close and its title top left, 
   await studioUi(page).openViewer(page.locator('[data-tile-id]').first());
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
-    // The desktop's title, top left, clear of the corner buttons.
-    await expect(page.locator('.viewer-profile-summary')).toHaveCount(0);
+    // The title, top left in the corner buttons' row, clear of them.
+    const title = page.locator('.viewer-profile-summary');
+    await expect(title).toBeVisible();
+    const titleBox = (await title.boundingBox())!;
+    expect(titleBox.x + titleBox.width).toBeLessThanOrEqual((await page.getByRole('button', { name: /^(Star|Unstar)$/ }).boundingBox())!.x);
+    // The viewer covers the gallery's top bar: nothing of it shows through.
+    expect(await page.evaluate(() => {
+      const bar = document.querySelector('.phone-bar');
+      const scrim = document.querySelector('.scrim');
+      if (!bar || !scrim) return false;
+      const rect = bar.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + 4, rect.top + rect.height / 2);
+      return Boolean(hit && scrim.contains(hit)) && getComputedStyle(scrim).backgroundColor.startsWith('rgb(');
+    })).toBe(true);
     const star = await page.getByRole('button', { name: /^(Star|Unstar)$/ }).boundingBox();
     const info = await page.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await page.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
@@ -365,9 +394,9 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await expect(page.locator('.reference-popover')).toHaveCount(0);
   await page.getByRole('button', { name: 'Reference Image', exact: true }).click();
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
-  await page.getByRole('tab', { name: 'Uploads', exact: true }).click();
+  await pickerView(page.locator('.reference-popover'), 'Uploads');
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0);
-  await page.getByRole('tab', { name: 'Library', exact: true }).click();
+  await pickerView(page.locator('.reference-popover'), 'Library');
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(900);
   await body.evaluate((element) => { element.scrollTop = 0; });
   await expect(page.locator('[data-reference-index="0"]')).toBeVisible();
@@ -460,37 +489,51 @@ test('Fast and Quality filters retain all reference variants and All clears them
     expect(new Set(layout.tops).size).toBe(1);
     expect(layout.contentWidth).toBeLessThanOrEqual(layout.width);
   };
+  // The phone's pop-up carries the filters in its heading dropdown ("Model · All"), as ticks that combine.
+  const filterMenu = menu.getByRole('menu', { name: 'Filter Models', exact: true });
+  const filter = async (name: string) => {
+    if (!phone) { await filters.getByRole('button', { name, exact: true }).click(); return; }
+    if (!(await filterMenu.isVisible())) await menu.locator('.picker-view .picker-dropdown-trigger').click();
+    await filterMenu.getByRole('menuitemcheckbox', { name, exact: true }).click();
+  };
   await expect(rows).toHaveCount(4);
   await expectSingleRow();
   await expect(rows.first()).toContainText('Flash Edit');
   await expect(rows.last()).toContainText('Standard Generate');
-  await filters.getByRole('button', { name: 'Fast', exact: true }).focus();
-  await page.keyboard.press('Enter');
+  if (phone) await filter('Fast');
+  else {
+    await filters.getByRole('button', { name: 'Fast', exact: true }).focus();
+    await page.keyboard.press('Enter');
+  }
   await expect(rows).toHaveCount(2);
-  await expect(filters.getByRole('group', { name: 'Use', exact: true })).toHaveCount(0);
+  await expect(menu.getByRole('group', { name: 'Use', exact: true })).toHaveCount(0);
   await expect(rows.first()).toContainText('Flash Edit');
-  await filters.getByRole('button', { name: 'Quality', exact: true }).click();
+  await filter('Quality');
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toContainText('Standard Edit');
   await expect(rows.last()).toContainText('Standard Generate');
-  await filters.getByRole('button', { name: 'All', exact: true }).click();
+  await filter('All');
   await expect(rows).toHaveCount(4);
-  await filters.getByRole('button', { name: 'Favourites', exact: true }).click();
+  await filter('Favourites');
   await expect(rows).toHaveCount(0);
   await expect(menu.getByText('No Matching Models')).toBeVisible();
-  await filters.getByRole('button', { name: 'All', exact: true }).click();
+  await filter('All');
+  if (phone) await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await ui.closeComposer();
   await ui.switchMode('video');
   await ui.openModelPicker();
   await expect(rows).toHaveCount(2);
-  await expect(filters.getByRole('button', { name: 'Generate', exact: true })).toHaveCount(0);
   await expectSingleRow();
-  await expect(filters.getByRole('button', { name: 'Non-Reference', exact: true })).toHaveCount(0);
-  await expect(filters.getByRole('button', { name: 'Reference', exact: true })).toHaveCount(0);
-  await expect(filters.getByRole('button', { name: 'Fast', exact: true })).toBeVisible();
-  await expect(filters.getByRole('button', { name: 'Quality', exact: true })).toBeVisible();
+  if (phone) await menu.locator('.picker-view .picker-dropdown-trigger').click();
+  const options = phone ? filterMenu : filters;
+  const role = phone ? 'menuitemcheckbox' as const : 'button' as const;
+  await expect(options.getByRole(role, { name: 'Generate', exact: true })).toHaveCount(0);
+  await expect(options.getByRole(role, { name: 'Non-Reference', exact: true })).toHaveCount(0);
+  await expect(options.getByRole(role, { name: 'Reference', exact: true })).toHaveCount(0);
+  await expect(options.getByRole(role, { name: 'Fast', exact: true })).toBeVisible();
+  await expect(options.getByRole(role, { name: 'Quality', exact: true })).toBeVisible();
 });
 
 test('model picker keeps shortcuts in the normal list and supports keyboard selection', async ({ page, isMobile }) => {
@@ -523,14 +566,14 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   if (phone) {
     // The phone list keeps a check column at each row's end (UI-PATTERNS › Lists); only the picked row's shows.
     await expect(selectedRow).toHaveAttribute('aria-current', 'true');
-    await expect(selectedRow.locator('.list-row-check:not(.is-off)')).toHaveCount(1);
-    await expect(rows.filter({ hasText: 'Model 02' }).first().locator('.list-row-check.is-off')).toHaveCount(1);
+    await expect(selectedRow.locator('.selected-tick:not(.is-off)')).toHaveCount(1);
+    await expect(rows.filter({ hasText: 'Model 02' }).first().locator('.selected-tick.is-off')).toHaveCount(1);
   } else {
-    await expect(selectedRow.locator('.model-selection-tick')).toHaveCount(1);
-    expect(await selectedRow.evaluate((row) => row.firstElementChild?.classList.contains('model-selection-tick'))).toBe(true);
+    // The same amber tick as the phone list and every picker (UI-PATTERNS › Pickers), at the row's end.
+    await expect(selectedRow.locator('.model-selection-tick.selected-tick:not(.is-off)')).toHaveCount(1);
     const tick = await selectedRow.locator('.model-selection-tick').boundingBox();
-    const text = await selectedRow.locator('.model-copy, :scope > span').first().boundingBox();
-    expect(tick!.x + tick!.width).toBeLessThan(text!.x);
+    const text = await selectedRow.locator('.model-copy').first().boundingBox();
+    expect(tick!.x).toBeGreaterThan(text!.x + 1);
   }
   await rows.filter({ hasText: 'Model 02' }).click();
   await ui.openModelPicker();
@@ -545,13 +588,15 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   if (phone) {
     await menu.locator('.phone-model-pop-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(search).toBeInViewport();
-    await expect(menu.getByRole('button', { name: 'Fast', exact: true })).toBeInViewport();
+    // The filters live in the heading's dropdown ("Model · All"), which stays in view.
+    await expect(menu.locator('.picker-view .picker-dropdown-trigger')).toBeInViewport();
   } else {
     const bounds = await menu.boundingBox();
     const viewport = page.viewportSize()!;
-    expect(bounds!.x).toBeGreaterThanOrEqual(15);
+    // Anchored at its button and kept 8px inside the window (UI-PATTERNS › Surfaces).
+    expect(bounds!.x).toBeGreaterThanOrEqual(8);
     expect(bounds!.y).toBeGreaterThanOrEqual(7);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width - 15);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width - 8);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height - 7);
   }
   await search.fill('Model 28');
@@ -566,10 +611,17 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   else await search.press('Enter');
   await expect(menu).toHaveCount(0);
   await ui.openModelPicker();
-  await menu.getByRole('button', { name: 'All', exact: true }).click();
+  // On the phone the filters are ticks in the heading's dropdown ("Model · All").
+  const filterMenu = menu.getByRole('menu', { name: 'Filter Models', exact: true });
+  const filter = async (name: string) => {
+    if (!phone) { await menu.getByRole('button', { name, exact: true }).click(); return; }
+    if (!(await filterMenu.isVisible())) await menu.locator('.picker-view .picker-dropdown-trigger').click();
+    await filterMenu.getByRole('menuitemcheckbox', { name, exact: true }).click();
+  };
+  await filter('All');
   await expect(rows).toHaveCount(30);
   await expect(rows.filter({ hasText: 'Model 28' })).toHaveCount(2);
-  await menu.getByRole('button', { name: 'Quality', exact: true }).click();
+  await filter('Quality');
   await expect(rows).toHaveCount(2);
   await expect(menu.getByText('No Matching Models')).toHaveCount(0);
   if (!phone) {
@@ -747,7 +799,8 @@ test('selection excludes pending jobs and disables unsupported actions for faile
   await page.getByRole('button', { name: 'Select All', exact: true }).click();
   const bar = ui.selectionBar;
   await expect(page.locator('.tile.is-selected')).toHaveCount(2);
-  await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  // Phone tiles show only state (UI-PATTERNS › Phone › Tiles): a running tile has no Stop of its own there.
+  if (!isMobile) await expect(page.locator('[data-tile-id="image-2"]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await page.locator('[data-tile-id="image-0"] .tile').click();
   await expect(bar.getByRole('button', { name: 'Star Selected', exact: true })).toBeDisabled();
   await expect(bar.getByRole('button', { name: /^(Download|Share) Selected/ })).toBeDisabled();
@@ -897,9 +950,10 @@ test('generating preserves the gallery scroll position', async ({ page }) => {
     const indicator = page.locator('.phone-bar .phone-running-inline');
     await expect(indicator).toBeVisible();
     await expect(page.locator('.phone-running')).toHaveCount(0);
-    const galleryTitle = await ui.galleryMode.boundingBox();
+    // It sits on the top bar's one line, centred with the bar's tools.
+    const menu = await page.locator('.phone-bar').getByRole('button', { name: 'Menu', exact: true }).boundingBox();
     const badge = await indicator.boundingBox();
-    expect(Math.abs(badge!.y - galleryTitle!.y)).toBeLessThan(3);
+    expect(Math.abs((badge!.y + badge!.height / 2) - (menu!.y + menu!.height / 2))).toBeLessThan(3);
     await indicator.click();
     const running = page.getByRole('menu');
     await expect(running.getByRole('menuitem', { name: /^Stop All \(\d+\)$/ })).toBeVisible();

@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { Tip } from './components';
 
 /**
@@ -8,7 +9,7 @@ import { Tip } from './components';
  */
 export function StackRunsButton({ on, onToggle, disabled = false, labelled = false }: { on: boolean; onToggle: () => void; disabled?: boolean; labelled?: boolean }) {
   const size = 18;
-  const spring = { type: "spring" as const, stiffness: 520, damping: 34 };
+  const reducedMotion = useReducedMotion();
   const rects = on
     ? [{ x: 6.5, y: 2.25, width: 7, height: 0.01 }, { x: 4.5, y: 4.75, width: 11, height: 0.01 }, { x: 2.5, y: 7.5, width: 15, height: 10 }]
     : [{ x: 2.5, y: 2.5, width: 6.5, height: 15 }, { x: 11, y: 2.5, width: 6.5, height: 6.5 }, { x: 11, y: 11, width: 6.5, height: 6.5 }];
@@ -25,10 +26,9 @@ export function StackRunsButton({ on, onToggle, disabled = false, labelled = fal
       >
         <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           {rects.map((rect, index) => (
-            // Height eases instead of springing: a spring overshoots the
-            // collapsed edges' 0.01 into a negative height, which Chrome and
-            // Firefox reject with a console error every frame.
-            <motion.rect key={index} rx={2} initial={false} animate={rect} transition={{ ...spring, delay: on ? (2 - index) * 0.03 : index * 0.03, height: { type: "tween", duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: on ? (2 - index) * 0.03 : index * 0.03 } }} />
+            // A tween, never a spring: a spring overshoots the collapsed edges'
+            // 0.01 into a negative height, which browsers reject every frame.
+            <motion.rect key={index} rx={2} initial={false} animate={rect} transition={reducedMotion ? { duration: 0 } : tweens.base} />
           ))}
         </svg>
         {labelled ? <span>Auto-Grouping</span> : null}

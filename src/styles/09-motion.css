@@ -2,39 +2,33 @@
    One vocabulary of durations, easings and press feedback so every control in
    the app moves the same way. Loaded last so it can normalise earlier layers. */
 
-:root {
-  --motion-instant: 90ms;
-  --motion-fast: 140ms;
-  --motion-base: 200ms;
-  --motion-slow: 320ms;
-  /* Single easing for interactive state changes; --ease-soft stays for staged sequences. */
-  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
-  --press-scale: 0.96;
-}
-
 /* ---------------------------------------------------------------------------
-   1. One press gesture everywhere
-   Several components rolled their own :active transform, which multiplied with
-   the global scale and made presses collapse twice as far as intended.
+   1. One press state everywhere: nothing moves
+   A press darkens the control's fill in place (UI-PATTERNS › Motion). No
+   control scales, shrinks or shifts when it is pressed. Light controls take a
+   dark overlay; gradient buttons dim; tiles and thumbnails dim their media.
+   The overlay is a background-image so it keeps each control's own fill,
+   shape and background-clip (the 32px --icon-fill circles stay circles).
 --------------------------------------------------------------------------- */
 
 button:not(:disabled) {
   transition-timing-function: var(--motion-ease);
   transition-duration: var(--motion-base);
 }
-button:not(:disabled):active {
-  scale: var(--press-scale);
+:is(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a.btn):not(.generate, .phone-generate, .viewer-phone-bar button, .list-row, .phone-row):active {
+  background-image: var(--press-overlay) !important;
   transition-duration: var(--motion-instant);
 }
-
-.mode-tabs button:active,
-.aspect-trigger:active,
-.aspect-option:active,
-.number-picker-btn:active:not(:disabled) {
-  transform: none;
+:is(.btn.is-primary, .island-action, .phone-prompt-go, .lora-chip-action.is-primary, .tile-upscale.is-active, .list-toggle.is-on, .list-switch.is-on):active:not(:disabled) {
+  background-image: var(--press-overlay-dark) !important;
 }
-.generate:active:not(:disabled) {
-  transform: translateY(0);
+:is(.generate, .phone-generate):active:not(:disabled) {
+  filter: brightness(.92);
+  transition-duration: var(--motion-instant);
+}
+:is(.tile, .run-stack, .run-flow, .cover-flow-show, .reference-tile-select, .ref-stack-thumb):active :is(img, video) {
+  filter: var(--press-media);
+  transition: filter var(--motion-instant) var(--motion-ease);
 }
 
 /* ---------------------------------------------------------------------------
@@ -46,28 +40,30 @@ button:not(:disabled):active {
 .zen-prompt-actions .number-picker,
 .zen-prompt-actions .negative-toggle,
 .lora-pill {
-  transition-property: background-color, border-color, color, box-shadow, scale;
-  transition-duration: var(--motion-base);
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: var(--motion-fast);
   transition-timing-function: var(--motion-ease);
 }
 
-/* Hover reads as one family: same lift, same tint. */
+/* Hover reads as one family: the one --control-hover tint over the well. */
 @media (hover: hover) and (pointer: fine) {
   .zen-prompt-actions .model-trigger:hover,
   .zen-prompt-actions .aspect-picker > button:hover,
   .zen-prompt-actions .negative-toggle:hover,
   .zen-prompt-actions .number-picker:hover {
-    background: #161616;
+    background: linear-gradient(var(--control-hover), var(--control-hover)), var(--well);
     border-color: transparent;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    box-shadow: none;
     color: hsl(var(--foreground));
   }
 }
-.zen-prompt-actions .negative-toggle.active {
-  background: #1c1c1c;
+/* A pressed toggle in the bar: the selected chip (amber subtle, amber ink). */
+.zen-prompt-actions .negative-toggle.active,
+.zen-prompt-actions .negative-toggle.active:hover {
+  background: var(--selected-bg);
   border-color: transparent;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
-  color: hsl(var(--foreground));
+  box-shadow: none;
+  color: var(--selected-ink);
 }
 
 /* Icons in the bar rotate/settle on the same curve. */
@@ -79,14 +75,14 @@ button:not(:disabled):active {
 
 /* ---------------------------------------------------------------------------
    3. Concentric radii inside the composer
-   Bar radius 26 - 8 padding = 20 on the controls; controls 20 - 2 padding = 18
-   on anything nested inside them.
+   The bar is --r-panel (28) with 8px of padding; its controls are pills, and
+   so is anything nested inside them.
 --------------------------------------------------------------------------- */
 
 .zen-inline-settings .number-picker-btn,
 .zen-inline-settings .number-picker-value,
 .zen-inline-settings .number-picker-input {
-  border-radius: 17px;
+  border-radius: var(--r-pill);
 }
 
 /* Small steppers keep a 40px hit area without growing visually. */
@@ -158,33 +154,14 @@ button:not(:disabled):active {
 }
 
 /* ---------------------------------------------------------------------------
-   6. Enter motion: split into chunks, staggered, subtle
+   6. Enter motion
+   The composer's controls appear with the bar, all at once: no stagger, no
+   blur. Menus fade and scale from 0.96 at the control they belong to.
 --------------------------------------------------------------------------- */
-
-@keyframes controlIn {
-  from { opacity: 0; transform: translateY(4px) scale(0.98); filter: blur(3px); }
-  to { opacity: 1; transform: none; filter: none; }
-}
-
-/* Fill backwards, never forwards: a forwards-filled filter stays in the
-   computed style as blur(0px), which keeps the control a containing block and
-   traps its dropdown inside the trigger's own width. Backwards fill holds the
-   from-state before the delay elapses and hands the control back afterwards. */
-.prompt-left-actions > *,
-.zen-inline-settings > *,
-.zen-prompt-actions > .generate {
-  animation: controlIn var(--motion-slow) var(--motion-ease) backwards;
-}
-.zen-inline-settings > *:nth-child(1) { animation-delay: 20ms; }
-.zen-inline-settings > *:nth-child(2) { animation-delay: 45ms; }
-.zen-inline-settings > *:nth-child(3) { animation-delay: 70ms; }
-.zen-inline-settings > *:nth-child(4) { animation-delay: 95ms; }
-.zen-inline-settings > *:nth-child(n + 5) { animation-delay: 120ms; }
-.zen-prompt-actions > .generate { animation-delay: 145ms; }
 
 /* Menus open from the control they belong to. */
 @keyframes surfaceIn {
-  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: none; }
 }
 .model-menu,
@@ -205,12 +182,8 @@ button:not(:disabled):active {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .prompt-left-actions > *,
-  .zen-inline-settings > *,
-  .zen-prompt-actions > .generate,
   .model-menu,
   .aspect-menu {
     animation: none;
   }
-  button:not(:disabled):active { scale: 1; }
 }

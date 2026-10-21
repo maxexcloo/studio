@@ -1,4 +1,6 @@
 import type { GalleryItem, Profile } from './types';
+import { modelName } from './catalogueNames';
+import { partName } from './partNames';
 
 /**
  * The profile an output ran through, for its title and Details: by the id it
@@ -33,4 +35,11 @@ export function itemProfileName(item: GalleryItem | null | undefined, profiles: 
   if (profile) return profile.displayName || profile.label;
   const stored = (item?.settings as Record<string, unknown> | undefined)?.profileName;
   return typeof stored === 'string' ? stored : '';
+}
+
+/** The output's title as the viewer and a tile's caption show it: the profile's friendly name, else its model part. */
+export function itemProfileTitle(item: GalleryItem | null | undefined, profiles: Profile[] = []) {
+  const profile = itemProfile(item, profiles);
+  const modelPart = (item?.settings as Record<string, unknown> | undefined)?.modelName;
+  return (profile ? modelName(profile).name : itemProfileName(item, profiles)) || (modelPart ? partName(String(modelPart)) : '');
 }

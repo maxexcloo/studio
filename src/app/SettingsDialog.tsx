@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoraStackSettings } from './LoraStackSettings';
 import { ExternalLink, Group, preferenceLabels, Row, Segmented, Status, SwitchRow } from './SettingsControls';
 import { CopyIcon, useCopyFeedback } from './CopyFeedback';
 import { usePhone, useThisComputer } from './device';
@@ -217,7 +218,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       const item = document.querySelector<HTMLElement>(`.set-nav [data-section="${section}"]`);
       const nav = item?.parentElement;
       if (!item || !nav || nav.scrollWidth <= nav.clientWidth) return;
-      nav.scrollTo({ left: Math.max(0, item.offsetLeft - (nav.clientWidth - item.offsetWidth) / 2), behavior: 'smooth' });
+      nav.scrollTo({ left: Math.max(0, item.offsetLeft - (nav.clientWidth - item.offsetWidth) / 2), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     });
     return () => cancelAnimationFrame(frame);
   }, [open, section]);
@@ -268,6 +269,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                   ]}
                 />
               </Row>
+              <SwitchRow label="Tile Captions" description="On a phone, each tile shows its prompt and name under the picture." checked={Boolean(prefs.phoneTileCaptions)} onChange={(next) => setPrefs({ phoneTileCaptions: next })} />
               <SwitchRow label="Wide Images Take Two Columns" description="Landscape images span two columns when there are three or more." checked={Boolean(prefs.spanWideImages)} onChange={(next) => setPrefs({ spanWideImages: next })} />
             </Group>
             <Group title="General">
@@ -285,6 +287,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
                 <Segmented label="Previews While Generating" value={prefs.generationPreviewMode === 'simple' ? 'simple' : 'advanced'} onChange={(next) => setPrefs({ generationPreviewMode: next })} options={[{ value: 'advanced', label: 'Mosaic' }, { value: 'simple', label: 'Simple' }]} />
               </Row>
             </Group>
+            <LoraStackSettings />
             <Group title="Sharing">
               <SwitchRow label="Share Without Settings" description="Leaves the prompt, seed and workflow out of downloaded and shared files. The gallery’s own files keep them." checked={prefs.shareWithoutSettings === true} onChange={(next) => setPrefs({ shareWithoutSettings: next })} />
             </Group>

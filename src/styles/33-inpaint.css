@@ -74,7 +74,7 @@
   box-shadow: 0 0 0 1px rgb(255 255 255 / .9), 0 0 0 2px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(0 0 0 / .35);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms var(--ease-out), width 140ms var(--ease-out), height 140ms var(--ease-out);
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 .inpaint-ring.is-eraser { box-shadow: 0 0 0 1px rgb(255 255 255 / .9), 0 0 0 2px rgb(0 0 0 / .35); background: rgb(255 255 255 / .08); }
 .inpaint-ring.is-preview { background: rgb(255 154 82 / .3); }
@@ -97,9 +97,9 @@
   white-space: nowrap;
   translate: -50% 0;
   pointer-events: none;
-  transition: opacity 260ms var(--ease-out), translate 360ms var(--ease-out), filter 260ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease);
 }
-.inpaint-hint.is-hidden { opacity: 0; translate: -50% 6px; filter: blur(3px); }
+.inpaint-hint.is-hidden { opacity: 0; }
 
 /* ------------------------------------------------------------- Tool pill */
 
@@ -110,8 +110,8 @@
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
+  gap: 0;
+  padding: var(--space-2);
   border-radius: var(--r-pill);
   background: var(--surface-grain), var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
@@ -121,23 +121,24 @@
 }
 .inpaint-tool {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: var(--control-h);
+  height: var(--control-h);
   display: grid;
   place-items: center;
-  padding: 0;
+  /* A glass-bar icon button: the fill is the --icon-fill circle inside the target. */
+  padding: var(--icon-fill-inset);
   border: 0;
-  border-radius: 50%;
-  background: transparent;
+  border-radius: var(--r-pill);
+  background-color: transparent;
+  background-clip: content-box;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast), scale 100ms;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.inpaint-tool:hover:not(:disabled) { background: var(--control-hover); color: hsl(var(--foreground)); }
-.inpaint-tool:active:not(:disabled) { scale: .92; }
-.inpaint-tool.is-active { background: var(--selected); color: #fff; }
+.inpaint-tool:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
+.inpaint-tool.is-active { background-color: var(--selected-bg); color: var(--selected-ink); }
 .inpaint-tool:disabled { opacity: .35; cursor: default; }
-.inpaint-tool:focus-visible,
+.inpaint-tool:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 .inpaint-zoom-reset:focus-visible,
 .inpaint-size:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .inpaint-divider { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--surface-border); }
@@ -145,9 +146,9 @@
 /* Fit-to-view appears only once zoomed, as the zoom level (mounted only then). */
 .inpaint-zoom { flex: none; overflow: hidden; }
 .inpaint-zoom-reset {
-  height: 36px;
-  margin-left: 2px;
-  padding: 0 10px;
+  height: var(--icon-fill);
+  margin-left: var(--space-1);
+  padding: 0 var(--space-4);
   border: 0;
   border-radius: var(--r-pill);
   background: transparent;
@@ -157,7 +158,7 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--dur-fast);
+  transition: background-color var(--motion-fast) var(--motion-ease);
 }
 .inpaint-zoom-reset:hover { background: var(--control-hover); }
 
@@ -189,7 +190,7 @@
   background: rgb(255 255 255 / .28);
   /* Collapsed: a 4px rod. Open: the wedge. Both shapes have the same points, so it morphs. */
   clip-path: polygon(calc(50% - 2px) 0, calc(50% + 2px) 0, calc(50% + 2px) 100%, calc(50% - 2px) 100%);
-  transition: clip-path 360ms var(--ease-out), background var(--dur-fast);
+  transition: clip-path var(--motion-slow) var(--motion-ease), background var(--motion-fast);
 }
 .inpaint-size:hover .inpaint-size-wedge,
 .inpaint-size:focus-visible .inpaint-size-wedge,
@@ -206,11 +207,7 @@
   background: #fff;
   box-shadow: 0 1px 4px rgb(0 0 0 / .45), 0 0 0 .5px rgb(0 0 0 / .2);
   translate: -50% -50%;
-  transition: top 160ms var(--ease-out), scale 160ms var(--ease-out);
 }
-.inpaint-size:hover .inpaint-size-thumb,
-.inpaint-size.is-dragging .inpaint-size-thumb { scale: 1.12; }
-.inpaint-size.is-dragging .inpaint-size-thumb { transition: scale 160ms var(--ease-out); }
 
 /* ------------------------------------------------------------- Phone */
 
@@ -227,7 +224,6 @@
 }
 @media (max-width: 620px) {
   .inpaint-pill { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100% - 20px); }
-  .inpaint-tool { width: 40px; height: 40px; }
   .inpaint-divider { margin: 0 1px; }
   .inpaint-viewport { top: 68px; bottom: calc(64px + env(safe-area-inset-bottom)); }
   .inpaint-hint { bottom: 8px; }
@@ -269,9 +265,9 @@
   box-shadow: inset 0 0 0 1px var(--surface-border), var(--shadow-float-sm);
   color: hsl(var(--foreground) / .85);
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
-.inpaint-close:hover { background: var(--surface-grain), rgb(48 48 48 / .9); color: hsl(var(--foreground)); }
+.inpaint-close:hover { background: linear-gradient(var(--control-hover), var(--control-hover)), var(--surface-grain), var(--glass-bar-bg); color: hsl(var(--foreground)); }
 .inpaint-close:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (max-width: 640px) {
   .inpaint-close { top: 10px; right: 10px; width: 48px; height: 48px; }

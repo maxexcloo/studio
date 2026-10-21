@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-3);
   width: fit-content;
   max-width: 100%;
   margin: 0 0 12px auto;
@@ -24,7 +24,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: var(--space-4);
   min-height: var(--control-h);
   padding: 8px 12px;
   border: 0;
@@ -33,13 +33,13 @@
   color: hsl(var(--muted-foreground));
   font-size: 12px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .gallery-management button:hover,
 .gallery-context-menu button:hover,
-.gallery-context-menu button:focus-visible { background: var(--control-hover); color: hsl(var(--foreground)); }
+.gallery-context-menu button:focus-visible { background: var(--cursor-bg); color: hsl(var(--foreground)); }
 .gallery-management button:focus-visible,
-.gallery-context-menu button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -3px; }
+.gallery-context-menu button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
 .gallery-management button:disabled,
 .gallery-context-menu button:disabled { opacity: .35; cursor: default; }
 .gallery-management .is-danger,
@@ -60,14 +60,13 @@
   box-shadow: var(--glass-panel-shadow);
 }
 /* A menu, not a bar: full-width rows, the icon muted beside its name, groups
-   split by a hairline, focus as an inset ring rather than an outline. */
-.gallery-context-menu button { justify-content: flex-start; gap: 10px; width: 100%; min-height: 36px; padding: 7px 10px; border-radius: var(--r-item); color: hsl(var(--foreground)); font-size: 13px; }
+   split by a hairline, focus as an inset ring inside the row. */
+.gallery-context-menu button { justify-content: flex-start; gap: var(--space-4); width: 100%; min-height: var(--row-h-menu); padding: 7px 10px; border-radius: var(--r-item); color: hsl(var(--foreground)); font-size: 13px; }
 .gallery-context-menu button > svg { flex: none; color: hsl(var(--muted-foreground)); transition: color var(--motion-fast) var(--motion-ease); }
 .gallery-context-menu button:hover > svg, .gallery-context-menu button:focus-visible > svg { color: hsl(var(--foreground)); }
-.gallery-context-menu button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px hsl(var(--ring)); }
 .gallery-context-menu .is-danger, .gallery-context-menu .is-danger > svg { color: var(--danger-ink); }
 .gallery-context-menu .is-danger:hover { background: var(--danger-fill); }
-.gallery-menu-divider { display: block; height: 1px; margin: 5px 8px; background: var(--glass-border); }
+.gallery-menu-divider { display: block; height: 1px; margin: 5px 8px; background: var(--line); }
 .gallery-menu-title { margin: 0; padding: 6px 10px 4px; color: hsl(var(--muted-foreground)); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .tile-overlay.is-selecting > :not(.tile-check) { display: none; }
 @media (forced-colors: active) {
@@ -84,7 +83,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: var(--space-5);
   min-height: var(--dock-h);
   margin-bottom: 20px;
 }
@@ -106,26 +105,26 @@
 .gallery-toolbar .gallery-generation-mode { position: static; width: 160px; margin: 0; }
 .gallery-toolbar .gallery-generation-mode button { min-height: var(--control-h); }
 .gallery-toolbar-actions,
-.gallery-search-tools { display: flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; min-width: 0; }
+.gallery-search-tools { display: flex; align-items: center; gap: var(--space-4); width: max-content; max-width: 100%; min-width: 0; }
 .gallery-toolbar-actions { justify-self: end; }
 .gallery-search-tools { justify-self: start; }
-.gallery-toolbar .gallery-management { position: static; display: flex; flex-wrap: nowrap; gap: 2px; min-width: 0; margin: 0; }
+.gallery-toolbar .gallery-management { position: static; display: flex; flex-wrap: nowrap; gap: var(--space-1); min-width: 0; margin: 0; }
 .gallery-toolbar .gallery-select-toggle,
 .gallery-toolbar .gallery-action-shell > .zen-control-button,
 .gallery-search-trigger,
 .gallery-filter-trigger,
-.gallery-filter-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 6px; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
+.gallery-filter-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: var(--space-3); width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
 .gallery-toolbar .gallery-select-toggle { font-size: 12px; font-weight: 550; }
 .gallery-toolbar .gallery-select-toggle > span,
 .gallery-filter-label,
 .gallery-toolbar .gallery-action-shell > .zen-control-button > span,
 .gallery-search-clear > span { display: none; }
 .gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
-.gallery-filter-anchor.is-expanded .gallery-filter-trigger { width: auto; padding: 0 10px; }
+.gallery-filter-anchor.is-expanded .gallery-filter-trigger { width: auto; }
 .gallery-toolbar .gallery-select-toggle[aria-expanded="true"] > span,
 .gallery-filter-anchor.is-expanded .gallery-filter-label { display: inline; }
 
-.gallery-toolbar .gallery-action-shell > .zen-control-button.is-on { background: var(--selected); color: hsl(var(--foreground)); }
+.gallery-toolbar .gallery-action-shell > .zen-control-button.is-on { background-color: var(--selected-bg); color: var(--selected-ink); }
 /* "N Selected" reads as plain text beside its close X, not a pressed pill; it still hovers like any toolbar button. */
 .gallery-toolbar .gallery-select-toggle[aria-expanded="true"]:not(:hover) { background: transparent; }
 .gallery-action-shell { display: contents; }
@@ -135,12 +134,12 @@
 .gallery-toolbar .gallery-action-shell > .zen-control-button > svg { width: 16px; height: 16px; }
 .gallery-toolbar .gallery-action-shell > .zen-control-button:disabled { opacity: .45; }
 .gallery-toolbar .gallery-select-toggle:focus-visible,
-.gallery-toolbar .gallery-action-shell > .zen-control-button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-toolbar .gallery-action-shell > .zen-control-button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 .gallery-toolbar .gallery-selection-actions button { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 0; width: var(--control-h); height: var(--control-h); min-height: var(--control-h); padding: 0; font-size: 0; }
 /* Native scrollbar tracks must not change height while an action strip animates. */
-.gallery-selection-actions { display: flex; align-items: center; gap: 2px; min-width: 0; height: var(--control-h); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.gallery-selection-actions { display: flex; align-items: center; gap: var(--space-1); min-width: 0; height: var(--control-h); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .gallery-selection-actions::-webkit-scrollbar { display: none; }
-.app-shell .gallery-toolbar .gallery-search { position: relative; inset: auto; display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: var(--dock-h); height: var(--dock-h); margin: 0; overflow: hidden; translate: initial; transform: none; }
+.app-shell .gallery-toolbar .gallery-search { position: relative; inset: auto; display: flex; flex: 0 1 auto; align-items: center; gap: var(--space-3); min-width: var(--dock-h); height: var(--dock-h); margin: 0; overflow: hidden; translate: initial; transform: none; }
 /* `initial` survives production minification, unlike translate:none beside transform:none. */
 .app-shell .gallery-toolbar .gallery-search.is-expanded { min-width: 64px; max-width: 260px; }
 .gallery-search-field { flex: 1; min-width: 0; overflow: hidden; }
@@ -154,23 +153,23 @@
 .gallery-search-close { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--dock-h); height: var(--dock-h); color: hsl(var(--foreground)); cursor: pointer; }
 .gallery-search-close { width: var(--control-h); min-height: var(--control-h); padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; }
 .gallery-toolbar button:hover:not(:disabled) { background-color: var(--control-hover); color: hsl(var(--foreground)); }
-.gallery-search-tools button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.gallery-search-tools button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: calc(0px - var(--icon-fill-inset)); box-shadow: none; }
 .gallery-toolbar button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
-.gallery-filter-anchor { position: relative; display: flex; flex: none; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.gallery-filter-anchor { position: relative; display: flex; flex: none; align-items: center; gap: var(--space-1); min-width: 0; max-width: 100%; }
 .gallery-filter-trigger { font-size: 12px; }
 .gallery-filter-count { font-size: 10px; }
 .gallery-filter-panel { display: flex; flex: none; align-items: center; min-width: 0; max-width: 560px; overflow: hidden; }
-.gallery-filter-controls { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px; width: max-content; max-width: min(552px, calc(100vw - 32px)); }
-.gallery-filter-select { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px; width: auto; min-width: 0; max-width: 180px; height: var(--control-h); padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); font-size: 12px; cursor: pointer; }
+.gallery-filter-controls { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--space-2); width: max-content; max-width: min(552px, calc(100vw - 32px)); }
+.gallery-filter-select { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: var(--space-2); width: auto; min-width: 0; max-width: 180px; height: var(--control-h); padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); font-size: 12px; cursor: pointer; }
 .gallery-filter-select > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gallery-filter-select > svg { flex: none; }
-.gallery-filter-select:hover { background: var(--control-hover); }
-.gallery-filter-menu { position: fixed; right: auto; bottom: auto; border-radius: var(--r-menu); z-index: var(--z-popover); display: flex; flex-direction: column; gap: 6px; width: min(240px, calc(100vw - 16px)); overflow: hidden; padding: 6px; }
-.gallery-filter-menu .aspect-option { display: flex; justify-content: flex-start; min-height: 40px; width: 100%; padding: 8px 10px; text-align: left; overflow-wrap: anywhere; }
+.gallery-filter-select:hover { background-color: var(--control-hover); }
+.gallery-filter-menu { position: fixed; right: auto; bottom: auto; border-radius: var(--r-menu); z-index: var(--z-popover); display: flex; flex-direction: column; gap: var(--space-3); width: min(240px, calc(100vw - 16px)); overflow: hidden; padding: 6px; }
+.gallery-filter-menu .aspect-option { display: flex; justify-content: flex-start; min-height: var(--row-h-menu); width: 100%; padding: 8px 10px; text-align: left; overflow-wrap: anywhere; }
 /* Active filters take the accent, as on the phone (docs/guides/UI-PATTERNS.md). */
 .gallery-filter-icon.is-on,
 .gallery-filter-select.is-on,
-.gallery-filter-trigger.is-on { background: var(--accent-amber-subtle); color: var(--accent-amber); }
+.gallery-filter-trigger.is-on { background-color: var(--selected-bg); color: var(--selected-ink); }
 /* A narrow lane gives the sliding icons their own compact row, without scrolling. */
 @media (max-width: 1600px) {
   .gallery-toolbar .gallery-search-tools { position: relative; }
@@ -179,7 +178,7 @@
   .gallery-filter-panel { position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; height: auto; max-width: min(560px, calc(100vw - 24px)); padding: 3px; border: 1px solid var(--surface-border); border-radius: var(--r-pill); background: var(--surface-grain), var(--surface-float); -webkit-backdrop-filter: var(--surface-float-blur); backdrop-filter: var(--surface-float-blur); box-shadow: var(--shadow-float-sm); }
 }
 @media (max-width: 1050px) {
-  .gallery-toolbar { --gallery-toolbar-h: 104px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .gallery-toolbar { --gallery-toolbar-h: 104px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-4); }
   .gallery-toolbar .gallery-generation-mode { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
   .gallery-search-tools { grid-column: 1; grid-row: 2; }
   .gallery-toolbar-actions { grid-column: 2; grid-row: 2; }
@@ -190,26 +189,52 @@
   .gallery-search-tools { grid-column: 1; grid-row: 2; }
   .gallery-toolbar-actions { grid-column: 1; grid-row: 3; }
 }
-.phone-running-inline { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px; min-width: 36px; min-height: 44px; padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ember); font-size: 12px; }
-.phone-gallery-options .zen-control-button { position: static; display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; min-height: 48px; margin: 0; padding: 10px 16px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font-size: 14px; }
+.phone-running-inline { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: var(--space-2); min-width: 36px; min-height: 44px; padding: 0 6px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ember); font-size: 12px; }
+.phone-gallery-options .zen-control-button { position: static; display: flex; align-items: center; justify-content: flex-start; gap: var(--space-4); width: 100%; min-height: 48px; margin: 0; padding: 10px 16px; border: 0; border-radius: var(--r-item); background: transparent; color: inherit; font-size: 14px; }
 .phone-gallery-options .zen-control-button:disabled { opacity: .4; }
-.tile.is-selecting:hover,
-.tile.is-selecting:active { transform: none; }
 /* These nodes are virtualised; content-visibility can discard decoded media on selection updates. */
 .tile,
 .tile img,
 .tile video { content-visibility: visible; }
-.tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
+.tile { transition: outline-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease); }
 .stage-gallery { isolation: isolate; z-index: 0; overflow-anchor: none; }
 .app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
 .virtual-gallery .tile,
 .virtual-gallery .run-stack { scroll-margin-top: 120px; }
 @media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
 
-.gallery-filter-search { display: flex; flex: none; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px; border-radius: var(--r-item); background: var(--control-hover); color: hsl(var(--muted-foreground)); }
+.gallery-filter-search { display: flex; flex: none; align-items: center; gap: var(--space-3); min-height: 32px; padding: 0 8px; border-radius: var(--r-item); background: var(--control-hover); color: hsl(var(--muted-foreground)); }
 .gallery-filter-search input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 12px; outline: none; }
 .gallery-filter-search button { display: grid; flex: none; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: inherit; }
-.gallery-filter-options { display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
+.gallery-filter-options { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .gallery-filter-options .aspect-option { flex: none; }
 .tile .generation-surface { transition: opacity var(--motion-base) var(--motion-ease); }
 .tile.is-selecting:not(.is-selected) .generation-surface { opacity: .65; }
+
+/* Glass-bar icon buttons (UI-PATTERNS › Buttons & Icon Bars): a 40px target whose
+   hover and press fill is the --icon-fill circle, drawn on the padding box inside
+   a transparent border so a wider labelled button keeps the same 32px pill. */
+.gallery-toolbar .gallery-select-toggle,
+.gallery-toolbar .gallery-action-shell > .zen-control-button,
+.gallery-toolbar .gallery-selection-actions button,
+.gallery-search-trigger,
+.gallery-filter-trigger,
+.gallery-filter-icon,
+.gallery-query-close,
+.gallery-search-close {
+  border: var(--icon-fill-inset) solid transparent;
+  background-clip: padding-box;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.gallery-toolbar .gallery-select-toggle[aria-expanded="true"],
+.gallery-filter-anchor.is-expanded .gallery-filter-trigger { padding: 0 var(--space-4); }
+/* Filter options are dropdown rows (UI-PATTERNS › Dropdowns): the name, then the shared amber tick at the end. */
+.gallery-filter-option { display: flex; align-items: center; gap: var(--space-4); }
+.gallery-filter-option .gallery-filter-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; }
+.gallery-filter-option.active .gallery-filter-name { color: var(--selected-ink); }
+.gallery-filter-menu-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-h-sm); padding: 0 4px 0 10px; }
+.gallery-filter-menu-head > strong { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.gallery-filter-menu-head > span { font-size: 11.5px; color: hsl(var(--muted-foreground)); }
+.gallery-filter-clear { height: 28px; padding: 0 10px; border: 0; border-radius: var(--r-pill); background-color: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 12px; cursor: pointer; }
+.gallery-filter-clear:hover:not(:disabled) { background-color: var(--control-hover); }
+.gallery-filter-clear:disabled { opacity: .4; cursor: default; }

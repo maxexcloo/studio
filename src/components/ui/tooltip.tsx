@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -14,6 +15,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
+import { tweens } from "@/lib/springs";
 
 // ---------------------------------------------------------------------------
 // Timing: the single source of truth for every tooltip in the app
@@ -67,19 +69,6 @@ function TooltipProvider({ children }: { children: ReactNode }) {
 // Animation helpers
 // ---------------------------------------------------------------------------
 
-function getSlideOffset(side: TooltipSide) {
-  switch (side) {
-    case "top":
-      return { y: 4 };
-    case "bottom":
-      return { y: -4 };
-    case "left":
-      return { x: 4 };
-    case "right":
-      return { x: -4 };
-  }
-}
-
 function getTransformOrigin(side: TooltipSide) {
   switch (side) {
     case "top":
@@ -91,6 +80,23 @@ function getTransformOrigin(side: TooltipSide) {
     case "right":
       return "left center";
   }
+}
+
+const SIDES: readonly TooltipSide[] = ["top", "right", "bottom", "left"];
+
+/**
+ * Which side a tooltip opens on when its caller doesn't say (UI-PATTERNS ›
+ * Buttons & Icon Bars): a bar or panel can name it with `data-tip-side`;
+ * otherwise it opens away from the nearer screen edge, so labels on top bars
+ * drop below them and labels on bottom bars rise above them.
+ */
+export function resolveTooltipSide(trigger: Element | null, side?: TooltipSide): TooltipSide {
+  if (side) return side;
+  const named = trigger?.closest<HTMLElement>("[data-tip-side]")?.dataset.tipSide as TooltipSide | undefined;
+  if (named && SIDES.includes(named)) return named;
+  const rect = trigger?.getBoundingClientRect();
+  if (!rect) return "top";
+  return rect.top + rect.height / 2 < window.innerHeight / 2 ? "bottom" : "top";
 }
 
 /** Keyboard focus only: a click, a tap or focus handed back by a closing menu shouldn't pop a label. */
@@ -124,7 +130,7 @@ function Tooltip(props: TooltipProps) {
 function TooltipInner({
   content,
   children,
-  side = "top",
+  side: sideProp,
   sideOffset = 8,
   className,
   forceOpen,
@@ -137,6 +143,11 @@ function TooltipInner({
   const shape = useShape();
   const reducedMotion = useReducedMotion();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [side, setSide] = useState<TooltipSide>(sideProp || "top");
+  // Settle the side as it opens, from where the trigger sits at that moment.
+  useLayoutEffect(() => {
+    if (open) setSide(resolveTooltipSide(triggerRef.current, sideProp));
+  }, [open, sideProp]);
   const stopWatchingScroll = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -166,8 +177,6 @@ function TooltipInner({
   }, []);
 
   useEffect(() => () => stopWatchingScroll.current?.(), []);
-
-  const slideOffset = getSlideOffset(side);
 
   return (
     <TooltipPrimitive.Root
@@ -210,15 +219,12 @@ function TooltipInner({
                 className
               )}
               style={{ fontVariationSettings: fontWeights.medium, transformOrigin: getTransformOrigin(side) }}
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, filter: "blur(3px)", ...slideOffset }}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
               animate={reducedMotion ? { opacity: open ? 1 : 0 } : {
                 opacity: open ? 1 : 0,
                 scale: open ? 1 : 0.96,
-                filter: open ? "blur(0px)" : "blur(3px)",
-                x: 0,
-                y: 0,
               }}
-              transition={reducedMotion ? { duration: open ? 0.1 : 0.08 } : open ? { type: "spring", duration: 0.26, bounce: 0 } : { duration: 0.12 }}
+              transition={open ? tweens.fast : tweens.instant}
               onAnimationComplete={handleExitComplete}
             >
               {content}

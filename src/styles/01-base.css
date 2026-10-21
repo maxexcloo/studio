@@ -37,10 +37,6 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
 
-  --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
-
   /* One typeface everywhere: Geist, same as the website. */
   font-family: "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -66,12 +62,11 @@ body { margin: 0; min-width: 320px; min-height: 100dvh; background: hsl(var(--ba
 img { color: transparent; }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
-button:not(:disabled) { transition-timing-function: var(--ease-out); transition-duration: 180ms; }
-/* Buttons take the ember focus ring from 22-accents.css; fields brighten their edge. */
+button:not(:disabled) { transition-timing-function: var(--motion-ease); transition-duration: var(--motion-base); }
+/* Buttons take the neutral focus ring from 22-accents.css; fields brighten their edge. */
 input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 0;
-  border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.18);
+  border-color: var(--line-strong);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -126,70 +121,69 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
     transparent 100%
   );
 }
-.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: var(--space-4); margin-bottom: 18px; }
 .brand img { width: 22px; height: 22px; display: block; filter: invert(1); opacity: 0.92; }
 .brand h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); }
 
 .mode-tabs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
-  padding: 3px; border: 1px solid hsl(var(--border));
-  border-radius: calc(var(--radius) + 2px);
-  background: hsl(var(--input));
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1);
+  padding: var(--seg-pad); border: 0;
+  border-radius: var(--r-pill);
+  background: var(--well);
 }
 .mode-tabs button {
-  min-height: 32px;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: calc(var(--control-h) - 2 * var(--seg-pad));
+  display: flex; align-items: center; justify-content: center; gap: var(--space-3);
   border: 0; background: transparent;
-  border-radius: var(--radius);
+  border-radius: var(--r-pill);
   color: hsl(var(--muted-foreground));
   font-size: 13px; font-weight: 500;
   cursor: pointer;
-  transition: color 200ms var(--ease-out), background 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out);
+  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
-.mode-tabs button:hover { color: hsl(var(--foreground)); }
-.mode-tabs button:active { transform: scale(0.97); transition-duration: 60ms; }
-.mode-tabs button.active {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+.mode-tabs button:hover { color: hsl(var(--foreground)); background-color: var(--control-hover); }
+.mode-tabs button.active,
+.mode-tabs button.active:hover {
+  background: var(--selected-bg);
+  color: var(--selected-ink);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.06) inset;
 }
 
 .panel {
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--glass-border);
   background: hsl(var(--card));
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: var(--r-item);
   padding: 14px;
   margin-bottom: 12px;
 }
 
-.field { display: grid; gap: 6px; margin-bottom: 12px; min-width: 0; }
+.field { display: grid; gap: var(--space-3); margin-bottom: 12px; min-width: 0; }
 .field:last-child { margin-bottom: 0; }
 .field > div, .field > label { min-width: 0; }
 .field > span {
   color: hsl(var(--muted-foreground));
   font-size: 12px; font-weight: 500;
   letter-spacing: -0.005em;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: var(--space-3);
 }
 
 textarea, input, select {
   width: 100%;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--glass-border);
   background: hsl(var(--input));
   color: hsl(var(--foreground));
-  border-radius: var(--radius);
+  border-radius: var(--r-field);
   padding: 8px 10px;
   outline: none;
   min-height: 36px;
   font-weight: 400;
   font-size: 13px;
-  transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+  transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 textarea { min-height: 120px; resize: vertical; line-height: 1.5; padding: 10px; }
 textarea.short { min-height: 70px; }
-input:hover, textarea:hover, select:hover { border-color: hsl(var(--border-strong)); }
-input:focus, textarea:focus, select:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / 0.18); }
+input:hover, textarea:hover, select:hover { border-color: var(--line-strong); }
+input:focus, textarea:focus, select:focus { border-color: var(--line-strong); }
 input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground) / 0.6); }
 /* A field set inside its own frame (search pills, inline name and password
    fields): the frame draws the edge and shows focus with :focus-within, so the
@@ -210,40 +204,19 @@ input.is-framed:focus-visible {
 
 .select {
   display: grid; grid-template-columns: 1fr auto;
-  align-items: center; gap: 8px;
-  border: 1px solid hsl(var(--border));
+  align-items: center; gap: var(--space-4);
+  border: 1px solid var(--glass-border);
   background: hsl(var(--input));
-  border-radius: var(--radius);
+  border-radius: var(--r-field);
   padding: 0 10px;
   min-width: 0;
-  transition: border-color 160ms var(--ease-out);
+  transition: border-color var(--motion-fast) var(--motion-ease);
 }
-.select:hover { border-color: hsl(var(--border-strong)); }
-.select:focus-within { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / 0.18); }
+.select:hover { border-color: var(--line-strong); }
+.select:has(:focus-visible) { border-color: var(--line-strong); }
 .select select { border: 0; padding-left: 0; padding-right: 0; appearance: none; background: transparent; min-width: 0; min-height: 34px; }
 .select svg { color: hsl(var(--muted-foreground)); }
 
-.fluid-select-trigger {
-  min-width: 0 !important;
-  width: 100%;
-  height: var(--control-h) !important;
-  border: 1px solid transparent !important;
-  background: var(--well) !important;
-  border-radius: var(--r-pill) !important;
-  padding: 0 14px 0 16px !important;
-  font-size: 13px !important;
-  color: hsl(var(--foreground)) !important;
-  transition: background-color 160ms var(--ease-out) !important;
-}
-.fluid-select-trigger:hover { background: #141414 !important; }
-.fluid-select-trigger > span { min-width: 0; }
-.fluid-select-content {
-  border: 1px solid hsl(var(--border)) !important;
-  background: hsl(var(--popover)) !important;
-  border-radius: calc(var(--radius) + 2px) !important;
-  padding: 4px !important;
-  box-shadow: var(--shadow-lg) !important;
-}
 
 .aspect-picker, .model-picker { position: relative; min-width: 0; }
 
@@ -251,7 +224,7 @@ input.is-framed:focus-visible {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   min-width: 0;
   height: 44px;
   min-height: 44px;
@@ -262,7 +235,7 @@ input.is-framed:focus-visible {
   color: hsl(var(--muted-foreground));
   cursor: text;
 }
-.picker-search:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .16); color: hsl(var(--foreground)); }
+.picker-search:focus-within { box-shadow: inset 0 0 0 1px var(--line-strong); color: hsl(var(--foreground)); }
 .picker-search input {
   flex: 1;
   min-width: 0;
@@ -287,7 +260,7 @@ input.is-framed:focus-visible {
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -298,21 +271,21 @@ input.is-framed:focus-visible {
 .model-trigger, .model-option {
   width: 100%;
   min-height: 50px;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--glass-border);
   background: hsl(var(--input));
   color: hsl(var(--foreground));
-  border-radius: var(--radius);
+  border-radius: var(--r-field);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-4);
   padding: 6px 10px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
-.model-trigger:hover, .model-option:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); }
-.model-copy { min-width: 0; display: grid; gap: 2px; }
+.model-trigger:hover { border-color: var(--line-strong); background: var(--control-hover); }
+.model-copy { min-width: 0; display: grid; gap: var(--space-1); }
 .model-copy strong {
   display: block; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -333,7 +306,7 @@ input.is-framed:focus-visible {
 .model-trigger.needs-setup { position: relative; }
 .model-setup-flag {
   position: absolute; top: 6px; right: 6px;
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: var(--r-pill);
   background: var(--ember);
   box-shadow: 0 0 0 2px hsl(var(--input));
 }
@@ -344,7 +317,7 @@ input.is-framed:focus-visible {
   min-height: 40px;
   height: 40px;
   grid-template-columns: minmax(0, 150px) 12px;
-  gap: 7px;
+  gap: var(--space-4);
   padding: 0 10px;
 }
 .model-picker.is-compact .model-copy { gap: 0; }
@@ -353,54 +326,53 @@ input.is-framed:focus-visible {
   left: 0; right: auto;
   min-width: 304px;
   top: auto; bottom: calc(100% + 6px);
-  animation: popUp 180ms var(--spring);
+  transform-origin: bottom left;
 }
 .model-menu {
   position: absolute; z-index: 14;
   top: calc(100% + 6px); left: 0; right: 0;
-  display: grid; gap: 2px;
+  display: grid; gap: var(--space-1);
   padding: 4px;
-  animation: pop 180ms var(--spring);
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: top center;
 }
-.model-option { min-height: 54px; border-color: transparent; background: transparent; }
-.model-option:hover { border-color: transparent; background: hsl(var(--accent)); }
-.model-option.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.model-option.active:hover { background: hsl(var(--primary)); }
-.model-option.active .model-copy strong { color: hsl(var(--primary-foreground)); }
-.model-option.active .model-copy em { color: hsl(var(--primary-foreground) / 0.7); }
+/* Options: the cursor is a rounded --cursor-bg fill; the pick shows amber ink, never a row fill. */
+.model-option { min-height: 54px; border-color: transparent; border-radius: var(--r-item); background: transparent; }
+.model-option:hover { border-color: transparent; background: var(--cursor-bg); }
+.model-option.active { background: transparent; color: hsl(var(--foreground)); }
+.model-option.active:hover { background: var(--cursor-bg); }
+.model-option.active .model-copy strong { color: var(--selected-ink); }
 .model-badge {
   margin: 0 !important;
   padding: 3px 7px;
   border: 1px solid currentColor;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   color: hsl(var(--muted-foreground));
   font-size: 10px !important;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
 }
-.model-option.active .model-badge { color: hsl(var(--primary-foreground) / 0.7); }
 
 .aspect-trigger, .aspect-option {
   width: 100%;
   min-height: 40px;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--glass-border);
   background: hsl(var(--input));
   color: hsl(var(--foreground));
-  border-radius: var(--radius);
+  border-radius: var(--r-field);
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-4);
   padding: 0 12px;
   cursor: pointer;
   text-align: left;
   font-size: 13px;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out), transform 180ms var(--spring);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
-.aspect-trigger:hover, .aspect-option:hover { border-color: hsl(var(--border-strong)); background: hsl(var(--accent)); }
-.aspect-trigger:active, .aspect-option:active { transform: scale(0.97); transition-duration: 60ms; }
+.aspect-trigger:hover { border-color: var(--line-strong); background: var(--control-hover); }
 .aspect-trigger > span:nth-child(2),
 .aspect-option > span:nth-child(2) {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -411,17 +383,17 @@ input.is-framed:focus-visible {
   position: absolute; z-index: 12;
   top: calc(100% + 6px); left: 0;
   width: max(100%, min(280px, calc(100vw - 32px)));
-  display: grid; gap: 3px;
+  display: grid; gap: var(--space-2);
   padding: 6px;
-  animation: pop 180ms var(--spring);
+  animation: surfaceIn var(--motion-base) var(--motion-ease) both;
+  transform-origin: top left;
 }
-.aspect-option { grid-template-columns: 30px minmax(44px, auto) minmax(80px, 1fr); border-color: transparent; background: transparent; }
-.aspect-option:hover { border-color: transparent; background: hsl(var(--accent)); }
-.aspect-option.active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
-.aspect-option.active:hover { background: hsl(var(--primary)); }
+.aspect-option { grid-template-columns: 30px minmax(44px, auto) minmax(80px, 1fr); border-color: transparent; border-radius: var(--r-item); background: transparent; box-shadow: none; }
+.aspect-option:hover { border-color: transparent; background: var(--cursor-bg); }
+.aspect-option.active { background: transparent; color: var(--selected-ink); }
+.aspect-option.active:hover { background: var(--cursor-bg); }
 .aspect-option > span:nth-child(2) { overflow: visible; text-overflow: clip; }
 .aspect-option em { color: hsl(var(--muted-foreground)); font-size: 11px; font-style: normal; text-align: right; white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
-.aspect-option.active em { color: hsl(var(--primary-foreground) / 0.7); }
 .aspect-shape { justify-self: center; display: block; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.88; }
 .aspect-shape.default { width: 18px; height: 18px; }
 .aspect-shape.custom { width: 22px; height: 22px; border-style: dashed; }
@@ -429,7 +401,7 @@ input.is-framed:focus-visible {
 .split, .advanced-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--space-4);
   align-items: start;
 }
 .advanced-grid { margin-top: 10px; }
@@ -441,7 +413,7 @@ input.is-framed:focus-visible {
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-5);
   padding: 2px 1px;
 }
 
@@ -458,41 +430,22 @@ input.is-framed:focus-visible {
   width: 100%;
   min-height: 40px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r-pill);
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   font-weight: 600;
   font-size: 13px;
   letter-spacing: -0.005em;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
+  display: flex; align-items: center; justify-content: center; gap: var(--space-4);
   cursor: pointer;
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06) inset;
-  transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out), opacity 200ms var(--ease-out);
-}
-.generate::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  pointer-events: none;
-  background: linear-gradient(100deg, transparent 28%, hsl(var(--primary-foreground) / 0.18) 48%, transparent 68%);
-  opacity: 0;
-  transform: translateX(-120%);
+  transition: box-shadow var(--motion-fast) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), filter var(--motion-instant) var(--motion-ease);
 }
 .generate:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 3px 8px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.08) inset;
-}
-.generate:active:not(:disabled) { transform: scale(0.98) translateY(0); box-shadow: 0 1px 2px rgb(0 0 0 / 0.4); transition-duration: 80ms; }
-.generate:active:not(:disabled)::after {
-  opacity: 1;
-  transform: translateX(120%);
-  transition: transform 520ms var(--ease-soft), opacity 260ms var(--ease-out);
 }
 .generate.is-working:not(.is-offline) {
   box-shadow: 0 3px 10px rgb(0 0 0 / 0.38), 0 0 0 1px rgb(255 255 255 / 0.08) inset, 0 0 24px hsl(var(--foreground) / 0.08);
-}
-.generate.is-working:not(.is-offline) svg {
-  animation: generateIconLift 1.6s var(--ease-soft) infinite;
 }
 .generate:disabled,
 .generate[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
@@ -507,15 +460,10 @@ input.is-framed:focus-visible {
 .generate.is-offline:hover {
   background: hsl(0 0% 24%);
 }
-@keyframes generateIconLift {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  45% { transform: translateY(-1px) rotate(-6deg); }
-  70% { transform: translateY(0) rotate(4deg); }
-}
 
 /* What a model can do with a picture: bare muted icons just before its family badge. */
-.model-tags { display: inline-flex; align-items: center; gap: 8px; flex: none; }
-.model-abilities { display: inline-flex; align-items: center; gap: 6px; color: hsl(var(--muted-foreground) / .8); }
+.model-tags { display: inline-flex; align-items: center; gap: var(--space-4); flex: none; }
+.model-abilities { display: inline-flex; align-items: center; gap: var(--space-3); color: hsl(var(--muted-foreground) / .8); }
 .model-ability { display: grid; place-items: center; }
 .model-option:hover .model-abilities,
 .model-option.active .model-abilities { color: hsl(var(--foreground) / .8); }

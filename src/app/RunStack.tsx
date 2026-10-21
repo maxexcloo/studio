@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { ChevronsDownUp, Ungroup } from 'lucide-react';
 import { cn } from './format';
 import { Media, Tip } from './components';
@@ -107,9 +108,9 @@ function BurstStack({ run, width, height, arriving = false, onOpen, titleFromPro
       className={cn("run-stack-wrap is-burst", width < 190 && "is-compact")}
       data-tile-id={run.id}
       style={{ width, height }}
-      initial={arriving && !reducedMotion ? { scale: 0.96, opacity: 0.4 } : false}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 420, damping: 30 }}
+      initial={arriving && !reducedMotion ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={tweens.base}
     >
       <button type="button" className="run-stack run-burst" aria-label={`${title}. ${runKind(run)}. Open the Stack`} onClick={onOpen}>
         <span className="run-burst-edge is-2" aria-hidden="true" />
@@ -202,9 +203,9 @@ function FlowStack({ run, width, height, arriving = false, onOpen, titleFromProm
       className={cn("run-stack-wrap is-flow", compact && "is-compact")}
       data-tile-id={run.id}
       style={{ width, height }}
-      initial={arriving && !reducedMotion ? { scale: 0.96, opacity: 0.4 } : false}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ type: "spring", stiffness: 420, damping: 30 }}
+      initial={arriving && !reducedMotion ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={tweens.base}
     >
       <button type="button" className="run-stack run-flow" aria-label={`${title}. ${runKind(run)}. Open the Stack`} onClick={onOpen}>
         {frontReady ? <span className="run-flow-ambient" aria-hidden="true"><Still item={run.cover} /></span> : null}
@@ -270,22 +271,22 @@ export function RunShelf({ run, y, width, height, folding, arriving, onClose, on
       className={cn("run-shelf", run.live && "is-live")}
       data-run-shelf={run.id}
       style={{ left: 0, top: 0, width, height }}
-      initial={arriving && !reducedMotion ? { y: y + 8, opacity: 0 } : false}
+      initial={arriving && !reducedMotion ? { y, opacity: 0 } : false}
       animate={{ y, opacity: folding ? 0 : 1 }}
-      transition={{ type: "spring", stiffness: 420, damping: 42, opacity: { duration: folding ? 0.2 : 0.3 } }}
+      transition={{ ...tweens.slow, opacity: folding ? tweens.base : tweens.slow }}
     >
       <header className="run-shelf-head" style={{ height: SHELF_HEAD }}>
         <strong>{title}</strong>
         <small>{meta.map((part, index) => <React.Fragment key={part}>{index ? <i aria-hidden="true">·</i> : null}{part}</React.Fragment>)}</small>
         <span className="run-shelf-actions">
           <button type="button" className="run-shelf-action" aria-label={`Stack ${title}`} onClick={onClose}>
-            <ChevronsDownUp size={13} strokeWidth={2.2} />
+            <ChevronsDownUp size={14} strokeWidth={2.2} />
             <span>Stack</span>
           </button>
           {onUnstack ? (
             <Tip content="Keep These as Separate Images">
               <button type="button" className="run-shelf-action" aria-label={`Unstack ${title}`} onClick={onUnstack}>
-                <Ungroup size={13} strokeWidth={2} />
+                <Ungroup size={14} strokeWidth={2} />
                 <span>Unstack</span>
               </button>
             </Tip>

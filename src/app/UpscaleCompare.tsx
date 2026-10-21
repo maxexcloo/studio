@@ -139,7 +139,7 @@ export function UpscaleCompare({ item, zoomed }: { item: GalleryItem; zoomed: bo
           <SafeImg className="upscale-compare-image" src={mediaUrl(item.url, item)} draggable={false} />
         </div>
         <div className="upscale-compare-line" aria-hidden="true">
-          <span><ChevronsLeftRight size={15} strokeWidth={2.2} /></span>
+          <span><ChevronsLeftRight size={16} strokeWidth={2.2} /></span>
         </div>
         <span className="upscale-compare-tag is-before">Original</span>
         <span className="upscale-compare-tag is-after">Upscaled{item.upscale?.scale ? ` ${item.upscale.scale}×` : ''}</span>

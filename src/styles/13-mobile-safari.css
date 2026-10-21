@@ -88,7 +88,7 @@ body {
   }
 
   .tile:hover { transform: none; box-shadow: none; }
-  .tile-hover-actions { top: 6px; right: 6px; gap: 4px; }
+  .tile-hover-actions { top: 6px; right: 6px; }
 
   .zen-prompt { --prompt-text-inset: 8px; padding: 7px; }
   .zen-prompt textarea { min-height: 46px; max-height: 96px; padding-inline: var(--prompt-text-inset, 8px); }

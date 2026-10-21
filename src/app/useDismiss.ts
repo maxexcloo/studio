@@ -25,6 +25,8 @@ export function useDismiss(refs: Refs, open: boolean, onDismiss: () => void) {
       if (inForeignDialog(event.target)) return;
       // The status message (an Undo, a Dismiss) is never a click away from the surface.
       if (event.target instanceof Element && event.target.closest('[data-status-message]')) return;
+      // A dropdown's menu (Dropdown.tsx) floats on the page but belongs to the surface its trigger is in.
+      if (event.target instanceof Element && event.target.closest('.dropdown-menu')) return;
       if (!inside(event.target as Node)) onDismiss();
     }
     function onKeyDown(event: KeyboardEvent) {

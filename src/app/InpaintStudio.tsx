@@ -1,6 +1,8 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { tweens } from "@/lib/springs";
+import { popoverMotion, useSettling } from "./composerSurface";
 import { Brush, BrushCleaning, Eraser, Hand, Redo2, Undo2, X } from "lucide-react";
 import { cn } from "./format";
 import { Tip } from "./components";
@@ -165,6 +167,8 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
   onChange: (dataUrl: string | null) => void;
   onClose: () => void;
 }) {
+  const settling = useSettling();
+  const reducedMotion = useReducedMotion();
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -543,14 +547,12 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
     <motion.div
       ref={popRef}
       className={cn("inpaint-studio", asSheet && "is-sheet")}
-      style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom, height }}
+      style={asSheet ? undefined : { left: box.left, width: box.width, bottom: box.bottom, height, transformOrigin: "bottom center" }}
       role="dialog"
       aria-label="Paint the Part to Change"
       data-open-surface
-      initial={{ opacity: 0, y: 10, scale: 0.97, filter: "blur(4px)" }}
-      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={{ opacity: 0, y: 8, scale: 0.98, filter: "blur(3px)" }}
-      transition={{ type: "spring", duration: 0.38, bounce: 0.12 }}
+      {...popoverMotion}
+      {...settling}
     >
       <div
         ref={viewportRef}
@@ -595,10 +597,10 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
             <motion.div
               key="zoom"
               className="inpaint-zoom"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: "auto", opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", duration: 0.32, bounce: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0 } }}
+              transition={reducedMotion ? { duration: 0 } : tweens.fast}
             >
               <Tip content={<>Fit to view <kbd>0</kbd></>}>
                 <button type="button" className="inpaint-zoom-reset" onClick={resetZoom}>{zoom.percent}%</button>

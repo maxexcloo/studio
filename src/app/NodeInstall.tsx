@@ -107,7 +107,7 @@ function QuickInstall({ pack, onDone, showToast, onRestarted, afterRestart }: {
   if (state?.status === 'done') {
     return (
       <div className="node-quick is-done" role="status">
-        <p><Check size={13} strokeWidth={3} /><span>{pack.name} is installed. <strong>Restart ComfyUI</strong> to load it.{afterRestart ? ` ${afterRestart}` : ''}</span></p>
+        <p><Check size={14} strokeWidth={2.5} /><span>{pack.name} is installed. <strong>Restart ComfyUI</strong> to load it.{afterRestart ? ` ${afterRestart}` : ''}</span></p>
         <ComfyRestart compact className="upscale-restart" onBack={onRestarted} />
       </div>
     );

@@ -4,7 +4,6 @@ import { cn } from './format';
 
 /** Preference switches shown both in Settings and on the phone's More sheet, under one name. */
 export const preferenceLabels = {
-  confirmActions: 'Confirm Before Removing Things',
   showFailedItems: 'Show Failed Items',
   smartUpscale: 'Upscale',
 } as const;

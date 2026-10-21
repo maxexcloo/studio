@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { scrollBehavior } from "@/lib/springs";
 import { Rows3 } from 'lucide-react';
 import { Sheet } from './Sheet';
 import { Media } from './components';
@@ -84,7 +85,7 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
             onClick={(event) => {
               if (position === index) { onOpen(item); return; }
               const card = event.currentTarget;
-              track.current?.scrollTo({ left: card.offsetLeft + card.offsetWidth / 2 - (track.current.clientWidth / 2), behavior: "smooth" });
+              track.current?.scrollTo({ left: card.offsetLeft + card.offsetWidth / 2 - (track.current.clientWidth / 2), behavior: scrollBehavior() });
             }}
           >
             <span className="cover-flow-face">{Math.abs(position - index) <= 1 ? <Media item={item} muted /> : <Still item={item} />}</span>

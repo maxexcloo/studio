@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { GallerySelectionContext } from './gallerySelection';
 import { GalleryTile } from './GalleryTile';
 import { RunShelf, RunStack, MomentHeading } from './RunStack';
@@ -73,8 +74,8 @@ function useElementWidth<T extends HTMLElement>() {
 }
 
 const emptySet = new Set<string>();
-/** Tiles glide to new places (a run opening above them, a column change) on one soft spring. */
-const glide = { type: "spring" as const, stiffness: 420, damping: 42, mass: 0.9 };
+/** Tiles glide to new places (a run opening above them, a column change) without overshooting. */
+const glide = tweens.slow;
 /** How long a run takes to fold back into its stack before the grid closes over it. */
 const FOLD_MS = 300;
 
@@ -447,9 +448,6 @@ export function VirtualMasonryGallery({
           const ofRun = entry.kind === "stack" || !entry.run ? undefined : freshRun(entry.run);
           const inFold = Boolean(ofRun && folding && ofRun.id === folding);
           const dealing = Boolean(ofRun && flying && ofRun.id === flying.runId);
-          // Tiles deal out in the order they were made, and fold back the other way.
-          const order = ofRun && entry.kind === "tile" ? Math.max(0, ofRun.items.findIndex((item) => item.id === entry.item.id)) : 0;
-          const step = Math.min(order, 12) * 0.028;
           return (
             <motion.div
               key={entry.key}
@@ -459,17 +457,17 @@ export function VirtualMasonryGallery({
                 entry.kind === "tile" && !ofRun && entry.w > (containerWidth / safeColumns) * 1.5 && "is-wide",
                 ofRun && "in-run"
               )}
-              style={{ left: 0, top: 0, width: entry.w, height: entry.h + spacing, transformOrigin: "50% 60%" }}
+              style={{ left: 0, top: 0, width: entry.w, height: entry.h + spacing }}
               initial={dealing && !reducedMotion
-                ? { x: entry.x, y: entry.y + 22, scale: 0.94, opacity: 0 }
+                ? { x: entry.x, y: entry.y, opacity: 0 }
                 : false}
               animate={inFold
-                ? { x: entry.x, y: entry.y + 14, scale: 0.95, opacity: 0 }
-                : { x: entry.x, y: entry.y, scale: 1, opacity: 1 }}
+                ? { x: entry.x, y: entry.y, opacity: 0 }
+                : { x: entry.x, y: entry.y, opacity: 1 }}
               transition={inFold
-                ? { duration: 0.22, ease: [0.4, 0, 1, 1], delay: Math.max(0, 0.08 - step / 3) }
+                ? tweens.base
                 : dealing
-                  ? { type: "spring", stiffness: 300, damping: 30, mass: 0.9, delay: 0.06 + step, opacity: { duration: 0.32, ease: [0.16, 1, 0.3, 1], delay: 0.06 + step } }
+                  ? { ...glide, opacity: tweens.slow }
                   : glide}
             >
               {entry.kind === "stack" ? (

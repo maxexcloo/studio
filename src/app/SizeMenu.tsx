@@ -1,6 +1,7 @@
 import React from 'react';
-import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
+import { Check, Link2, Pencil, RotateCcw, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMotionTween } from '@/lib/springs';
 import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
 import { formatMp, MEGAPIXEL, parseSize, ratioName, snapSide, type SideLimits, type Size } from './sizing';
@@ -345,7 +346,7 @@ export function MegapixelField({ current, control, custom }: {
     <div className="size-mp">
       <span className="size-mp-label">
         Megapixels
-        {set ? <button type="button" className="size-mp-reset" onClick={control.onReset}>Reset</button> : <small>{custom ? "this size" : "as the model draws"}</small>}
+        <small>{custom ? "this size" : set ? "every shape" : "as the model draws"}</small>
       </span>
       <div className={cn("size-field size-mp-field", dragging && "is-dragging")} onClick={(event) => { if (event.target === event.currentTarget) input.current?.focus(); }}>
         <input
@@ -370,6 +371,10 @@ export function MegapixelField({ current, control, custom }: {
           <span className="size-field-key" {...handlers} aria-hidden="true">MP</span>
         </Tip>
       </div>
+      {/* Its slot is always there, so the field never moves when Reset comes and goes. */}
+      <span className="size-mp-reset-slot">
+        {set ? <Tip content="Reset Megapixels to the Model's Own"><button type="button" className="size-mp-reset" aria-label="Reset Megapixels" onClick={control.onReset}><RotateCcw size={14} aria-hidden="true" /></button></Tip> : null}
+      </span>
     </div>
   );
 }
@@ -425,7 +430,7 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
       {onSave ? <div className="size-custom-note">
           <button type="button" className={cn("size-save", saved && "is-saved")} disabled={saved} onClick={onSave}>
             {/* Keyed, so the word changes with a small lift rather than a jump. */}
-            <span key={saved ? "saved" : "save"}>{saved ? <><Check size={12} strokeWidth={2.6} /> Saved</> : "Save size"}</span>
+            <span key={saved ? "saved" : "save"}>{saved ? <><Check size={12} strokeWidth={2.5} /> Saved</> : "Save size"}</span>
           </button>
       </div> : null}
     </fieldset>
@@ -456,13 +461,14 @@ export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPrev
     if (keep && name && name !== saved.name) onRename(name);
     setRenaming(false);
   };
+  const heightTween = useMotionTween();
   return (
     <motion.div
       className="size-saved"
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: "auto", opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+      transition={heightTween}
     >
       <div className={cn("size-saved-row", renaming && "is-renaming")} onPointerEnter={(event) => { if (event.pointerType !== "touch") onPreview(true); }}>
         {renaming ? (
@@ -503,7 +509,7 @@ export function SavedSizeRow({ saved, active, onPick, onRename, onRemove, onPrev
         )}
         {renaming ? null : (
           <span className="size-saved-actions">
-            <Tip content="Rename"><button type="button" aria-label={`Rename ${saved.name}`} onClick={() => { setDraft(saved.name); setRenaming(true); }}><Pencil size={13} /></button></Tip>
+            <Tip content="Rename"><button type="button" aria-label={`Rename ${saved.name}`} onClick={() => { setDraft(saved.name); setRenaming(true); }}><Pencil size={14} /></button></Tip>
             <Tip content="Remove"><button type="button" className="is-remove" aria-label={`Remove ${saved.name}`} onClick={onRemove}><Trash2 size={13} /></button></Tip>
           </span>
         )}

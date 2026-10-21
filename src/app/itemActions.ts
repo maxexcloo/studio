@@ -86,16 +86,20 @@ export type ItemActionExtras = {
   select?: (item: GalleryItem) => void;
 };
 
-// Where each action appears. The phone viewer's bar shares where it can and
+// Where each action appears. A desktop tile's top row follows the desktop
+// viewer bar's order (Download | Animate or Extend · Recreate or Retry | Star ·
+// Delete); its upscale arrow keeps its own corner (GalleryTile.tsx), and what
+// a narrow tile has no room for waits behind More, the context menu.
+// The phone viewer's bar shares where it can and
 // downloads only where the share sheet can't take the file; it keeps Star and
 // Info in the top corners. The desktop downloads and never shares.
 const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   copyItem: ['bar', 'dock', 'menu'],
   share: ['bar'],
   download: canShareFiles ? ['dock', 'tile', 'menu'] : ['bar', 'dock', 'tile', 'menu'],
-  animate: ['bar', 'dock', 'menu'],
-  extend: ['bar', 'dock', 'menu'],
-  reuse: ['bar', 'dock', 'menu'],
+  animate: ['bar', 'dock', 'tile', 'menu'],
+  extend: ['bar', 'dock', 'tile', 'menu'],
+  reuse: ['bar', 'dock', 'tile', 'menu'],
   promptsOnly: [],
   reference: ['bar', 'dock', 'menu'],
   retry: ['bar', 'dock', 'tile', 'menu'],
@@ -147,7 +151,9 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
       Icon: Trash2, danger: true, run: () => handlers.remove(item),
     },
   ];
-  return actions.filter((action): action is ItemAction => Boolean(action) && placement[(action as ItemAction).id].includes(surface));
+  return actions.filter((action): action is ItemAction => Boolean(action) && placement[(action as ItemAction).id].includes(surface)
+    // A failed tile offers Retry where a finished one offers Recreate.
+    && !(surface === 'tile' && (action as ItemAction).id === 'reuse' && item.status === 'error'));
 }
 
 /**

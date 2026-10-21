@@ -13,6 +13,17 @@ version opens with a `> ` summary line.
 
 ### Changed
 - **References:** a model that takes no reference shows no References control; Reference With is gone.
+- **Pickers:** References, LoRAs and Models share one heading row (the views, Stacks, Clear, search and Close); desktop search grows inside it and the hint text is gone. On the phone the views are a dropdown in the title ("LoRAs · This Model"), so the list starts higher.
+- **Picks:** every chooser marks a pick with the same amber tick as the model list; order numbers show only under Selected. LoRA source links are small "com" and "red" pills beside Star.
+- **LoRA information:** shown once, on the row's edge, without File, Family, an empty description or notes that repeat the trigger or strength, in the picker and in Details.
+- **LoRA stacks:** a Stacks menu at the top of the LoRAs picker applies, saves, updates, renames and deletes stacks, with Undo; Settings › Studio › LoRA Stacks edits their LoRAs and strengths. Enable All and Disable All are gone.
+- **Popovers:** every popover opens directly above the button that opened it, aligned to it and kept on screen; near the top of the screen it opens below.
+- **Advanced Settings:** one compact column above the Advanced button, with the shared dropdowns and steppers.
+- **Dropdowns:** one dropdown on the desktop and the phone (no more native phone pickers), with an amber tick for the choice, keyboard and type-ahead; segmented toggles and steppers share one size in rows.
+- **Gallery tiles:** the hover caption reads the prompt, then the time and profile (and a video's length).
+- **Tile actions:** a desktop tile's top row follows the viewer bar (Download, Recreate or Retry, Star, Delete); narrow tiles put the rest behind More, which opens the right-click menu.
+- **Phone tiles:** nothing covers the picture but progress, failures and selection checks; Settings › Studio › Gallery › Tile Captions brings the caption back.
+- **Phone viewer:** a clean top with the title (profile, position such as 2 / 40, time and size) in the row beside Star · Info · Close; Details opens right under it, the same as on the desktop. Details drops the output Type, Weights that repeat the profile name and empty LoRA descriptions.
 - **Prompt box:** growing past two lines no longer jumps; the composer resizes in the same frame as the text.
 - **Details:** groups are Prompt, Model, Settings, Output (size, reference, upscale and file together) and Timing, with rows sorted alphabetically. The Image Text button is gone: the summary follows Details. Copy includes only what was set.
 - **Timing:** an Upscale row shows the run's upscale time, which sits outside Active.
@@ -21,7 +32,7 @@ version opens with a `> ` summary line.
 - **Confirmations:** reversible actions (delete with Undo, stop, disable, restart, revoke) act at once; only Reset All Settings asks. The Confirm Before Removing Things setting is gone.
 - **Settings › Account:** no Session group or Access line; Sign Out is in the Menu.
 - **Access profiles:** Cloud Models, NSFW Models and Presets & Civitai Imports are access-profile features. Cloud models no longer appear in the Models list: Cloud Models grants them, and the server enforces it for generation, the model list and MCP. Profiles that granted a cloud model start with Cloud Models on; the old global LoRAs and Cloud Models switches become each profile's starting value once, so nobody gains or loses access. A deployment that switches a feature off shows it locked.
-- **Access profiles:** All in Features picks every feature in one press; All in Models also grants local models added later. Picked rows use the accent, Models has no search box and the Profile ID row is gone (new IDs come from the name).
+- **Access profiles:** All in Features picks every feature in one press; All in Models also grants local models added later. Picked rows take the amber tick, Models has no search box and the Profile ID row is gone (new IDs come from the name).
 - **Default access profile:** administrators choose one default for new accounts, used for accounts added in Settings, first single sign-on and chat gateway accounts. Built-in Administrator (everything) and User (no NSFW models, cloud models, LoRAs or presets) profiles are added when absent. A Require Approval switch beside it (on by default) keeps new single sign-on and chat gateway accounts waiting in Users until approved onto the default; turned off, they start on it at once. Without a default, sign-ons still wait for approval.
 - **NSFW marker:** a model profile can set `"nsfw": true` in its `heissUi` block; access profiles without NSFW Models never offer it.
 - **Settings:** Profiles (the model profile JSON editor) is its own page for administrators; New Account sits on the Accounts heading; Upscale Status moved to Workers; the LoRAs, Cloud Models and Presets & Civitai Imports switches left Models. Pages, groups and rows read alphabetically (Account first), and rows that only open a website show a plain link.
@@ -29,6 +40,14 @@ version opens with a `> ` summary line.
 - **Routing:** each job goes to a worker with the capability it needs, preferring one that answers and already has the model, then list order; upscales go to an upscale worker. Nothing falls back to another kind of worker or the cloud, and with no worker Studio says so plainly and refuses the job.
 - **Settings › Workers:** every worker uses one standard group (Address, Capabilities, Status with Test, Open, Restart) with the same words; an action that doesn't apply shows off with its reason.
 - **AI Control:** the panel in Settings › Workers and Studio's `/api/ai-control` routes are gone; GPU allocation stays in AI Control's own UI and Mise. The AI Control MCP tools are unchanged.
+- **Presses:** nothing moves when you click or tap any more; buttons, rows and tiles darken in place instead of shrinking or sliding.
+- **Motion:** one set of timings everywhere, with no overshoot, hover lifts, staggered entrances, sliding highlights or endless glows; popovers fade and scale in at their trigger, and the composer opens and closes on a smooth curve.
+- **Selection:** selected chips, tabs, segments, toggles and Settings sections share one amber highlight; list rows show an amber check instead of a grey fill; switches, checkboxes and the picker order mark are amber; keyboard focus shows one neutral ring.
+- **Geometry:** shared spacing, control, row, radius, line and icon sizes; menus and their rows have rounded corners, segmented toggles come in two sizes and small icon buttons in lists are round 32 px targets.
+- **Tooltips:** labels open away from their bar's edge (below the gallery toolbar, above the composer and docks), and the gallery toolbar's buttons use them instead of the browser's own hints.
+- **Size:** the Size button never cuts its label short after picking Default, 2K or 4K; Megapixels' Reset is a small round icon at the end of its row that appears without moving the field.
+- **Phone bars:** the top bar reads the status and "Studio" on the left and Select, Search, Filter and Menu on the right; Images | Videos moved to the left end of the bottom prompt bar, whose prompt now reads faded.
+- **Phone Create:** the prompt's Select All, History and Clear sit in one row at its top right, alike in colour and size; a focused prompt fills the screen with just its text. The footer's Clear All is a round eraser button on the row's centre line, matching the filter row's Clear.
 
 ## [0.39.0] - 2026-10-21
 

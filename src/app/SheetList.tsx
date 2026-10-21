@@ -1,7 +1,7 @@
 import React from 'react';
-import { Check, ChevronRight, ChevronsUpDown, X } from 'lucide-react';
+import { Check, ChevronRight, X } from 'lucide-react';
 import { cn } from './format';
-import { StudioSelect } from './components';
+import { Dropdown } from './Dropdown';
 
 /*
  * The flat settings list every phone sheet uses (UI-PATTERNS › Lists): full
@@ -60,30 +60,18 @@ export { SwitchRow as ListSwitch } from './SettingsControls';
 type SelectOption = { value: string; label: string; detail?: string };
 
 /**
- * A row's select: the phone's own picker (a native select, its options with
- * their file names), the studio's select on the desktop. The row shows the
- * friendly name; a value no longer offered still shows as itself.
+ * A row's select (UI-PATTERNS › Dropdowns): the value muted at the row's end
+ * with a chevron, opening the shared dropdown on both devices (never the
+ * phone's own picker). The row shows the friendly name and the menu adds each
+ * option's detail (a file name); a value no longer offered still shows as itself.
  */
-export function ListSelect({ label, value, options, onChange, native }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void; native: boolean }) {
+export function ListSelect({ label, value, options, onChange }: { label: string; value: string; options: SelectOption[]; onChange: (value: string) => void; /** Unused: both devices use the same dropdown. */ native?: boolean }) {
   const known = options.some((option) => option.value === value);
   const all = known || !value ? options : [{ value, label: value }, ...options];
-  if (native) {
-    // The friendly name shows; the native select lies over it, invisible, so a tap opens the phone's picker.
-    const current = all.find((option) => option.value === value);
-    return (
-      <span className="list-select">
-        <span className="list-select-value">{current?.label || 'Not Set'}</span>
-        <ChevronsUpDown size={14} aria-hidden="true" />
-        <select value={value} aria-label={label} onChange={(event) => onChange(event.target.value)}>
-          {all.map((option) => <option key={option.value} value={option.value}>{option.detail ? `${option.label} · ${option.detail}` : option.label}</option>)}
-        </select>
-      </span>
-    );
-  }
-  return <StudioSelect ariaLabel={label} value={value} options={all.map((option) => ({ value: option.value, label: option.label }))} onChange={onChange} />;
+  return <Dropdown label={label} value={value} options={all} onChange={onChange} variant="row" />;
 }
 
 /** The chooser's Clear Selection, beside its tabs (UI-PATTERNS › Pickers); a phone shows "Clear", as the tabs need the room. */
 export function ClearSelection({ onClick }: { onClick: () => void }) {
-  return <button type="button" className="picker-clear-all" aria-label="Clear Selection" onClick={onClick}><X size={13} aria-hidden="true" /><span className="picker-clear-long">Clear Selection</span><span className="picker-clear-short" aria-hidden="true">Clear</span></button>;
+  return <button type="button" className="picker-clear-all" aria-label="Clear Selection" onClick={onClick}><X size={14} aria-hidden="true" /><span className="picker-clear-long">Clear Selection</span><span className="picker-clear-short" aria-hidden="true">Clear</span></button>;
 }

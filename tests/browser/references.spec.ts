@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { studioUi, pickerSearch } from './helpers/ui';
+import { studioUi, pickerSearch, pickerView } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
 const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '' });
@@ -48,7 +48,7 @@ test('several slots share one References button whose chooser fills, reviews and
   await expectPicked(page, 3, 3);
   expect(uploads).toHaveLength(3);
   // Picking several stays open for the rest; Selected reviews them in order.
-  await picker.getByRole('tab', { name: 'Selected 3 of 3', exact: true }).click();
+  await pickerView(picker, 'Selected 3 of 3');
   const rows = picker.getByRole('list', { name: 'Selected References' }).getByRole('listitem');
   await expect(rows).toHaveCount(3);
   await picker.getByRole('button', { name: 'Remove uploaded-1', exact: true }).click();
@@ -166,7 +166,7 @@ test('reference sources name their search and keep one upload action', async ({ 
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.locator('.reference-popover');
   await expect(picker.getByRole('button', { name: 'Close References', exact: true })).toBeVisible();
-  await picker.getByRole('tab', { name: 'Library', exact: true }).click();
+  await pickerView(picker, 'Library');
   // Typing in the picker opens its compact search with that text, on both layouts.
   if (!phone) {
     await page.keyboard.type('n');
@@ -176,7 +176,7 @@ test('reference sources name their search and keep one upload action', async ({ 
   }
   await expect(await pickerSearch(picker, 'Search Library', 'searchbox')).toHaveAttribute('placeholder', 'Search Library');
   await expect(picker.getByText('No Outputs Yet', { exact: true })).toBeVisible();
-  await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
+  await pickerView(picker, 'Uploads');
   await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
   await expect(await pickerSearch(picker, 'Search Uploads', 'searchbox')).toHaveAttribute('placeholder', 'Search Uploads');
   await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
@@ -203,7 +203,7 @@ test('reference selection stays open, keeps picks in place across searches and t
   const search = await pickerSearch(picker, 'Search Library', 'searchbox');
   await search.fill('no matching images');
   await expect(picker.locator('.reference-tile-select')).toHaveCount(2);
-  await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
+  await pickerView(picker, 'Uploads');
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'Selected: second.png', exact: true }).click();
   await expectPicked(page, 1, 2);
@@ -230,7 +230,10 @@ test('a real ten-slot profile shows one References button, however its slots are
   await expect(references(page)).toHaveCount(1);
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
-  await expect(picker.getByRole('tab', { name: 'Selected 0 of 10', exact: true })).toBeVisible();
+  if (await studioUi(page).isPhone()) {
+    await picker.locator('.picker-view .picker-dropdown-trigger').click();
+    await expect(picker.getByRole('menuitemcheckbox', { name: 'Selected 0 of 10', exact: true })).toBeDisabled();
+  } else await expect(picker.getByRole('tab', { name: 'Selected 0 of 10', exact: true })).toBeVisible();
 });
 
 test('Clear Selection beside the chooser tabs empties every reference and Undo brings them back', async ({ page }) => {
@@ -252,7 +255,7 @@ test('picked references reorder by dragging in the Selected tab', async ({ page 
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
   for (const name of ['first.png', 'second.png', 'third.png']) await picker.getByRole('button', { name, exact: true }).click();
-  await picker.getByRole('tab', { name: 'Selected 3 of 3', exact: true }).click();
+  await pickerView(picker, 'Selected 3 of 3');
   const names = () => picker.locator('.reference-selected-name').allTextContents();
   await expect.poll(names).toEqual(['first', 'second', 'third']);
   // Drag the last one's grip onto the first row: it moves there and the others shift down.

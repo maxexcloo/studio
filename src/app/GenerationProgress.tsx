@@ -1,5 +1,6 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { cn } from './format';
 import { ElapsedTime } from './ElapsedTime';
 import { serverClockOffset } from './api';
@@ -8,8 +9,8 @@ import type { GalleryItem, Profile, Progress } from './types';
 
 const numberVariants = {
   initial: { opacity: 0, y: 3 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const } },
-  exit: { opacity: 0, y: -3, transition: { duration: 0.1 } },
+  animate: { opacity: 1, y: 0, transition: tweens.base },
+  exit: { opacity: 0, y: -3, transition: tweens.instant },
 };
 
 /**

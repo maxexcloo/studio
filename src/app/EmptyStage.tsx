@@ -124,8 +124,8 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
               <h2>{retrying ? 'Looking for ComfyUI…' : 'ComfyUI Is Offline'}</h2>
               <p>Start ComfyUI and it connects.{where ? <> Checking <code className="stage-code">{where}</code>{ports.length ? <> and port {ports.join(', ')}</> : null}.</> : null}</p>
               <div className="empty-actions">
-                <button className="reconnect-btn primary" onClick={onRetry} disabled={retrying} aria-busy={retrying || undefined}><RefreshCw size={13} className={cn(retrying && 'spin')} /> {retrying ? 'Checking…' : 'Check Again'}</button>
-                {thisComputer ? <button className="reconnect-btn" onClick={onOpenConnection}><Plug size={13} /> Change Address</button> : null}
+                <button className="reconnect-btn primary" onClick={onRetry} disabled={retrying} aria-busy={retrying || undefined}><RefreshCw size={14} className={cn(retrying && 'spin')} /> {retrying ? 'Checking…' : 'Check Again'}</button>
+                {thisComputer ? <button className="reconnect-btn" onClick={onOpenConnection}><Plug size={14} /> Change Address</button> : null}
               </div>
               {onNoComfy
                 ? <button type="button" className="stage-link" onClick={onNoComfy}>No ComfyUI Yet?</button>
@@ -133,7 +133,7 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
             </>
           ) : copy === 'connected' ? (
             <>
-              <h2 className="stage-connected"><span><Check size={12} strokeWidth={3} /></span> Connected</h2>
+              <h2 className="stage-connected"><span><Check size={12} strokeWidth={2.5} /></span> Connected</h2>
               <p>{device ? `ComfyUI on ${device}` : 'ComfyUI is ready.'}</p>
             </>
           ) : copy === 'empty' && noModels && starter && thisComputer ? (
@@ -147,8 +147,8 @@ export function EmptyStage({ known, offline, restarting = false, device, retryin
               <h2>No Models Yet</h2>
               <p>{thisComputer ? 'Put a checkpoint or diffusion model in ComfyUI’s models folder, or find models elsewhere on this computer.' : 'Add a checkpoint or diffusion model to the connected ComfyUI instance, and it shows up here.'}</p>
               <div className="empty-actions">
-                {onFindModels && thisComputer ? <button className="reconnect-btn primary" onClick={onFindModels}><FolderSearch size={13} /> Find Models</button> : null}
-                <a className="reconnect-btn" href={`${githubUrl}#supported-models`} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Which Models Work</a>
+                {onFindModels && thisComputer ? <button className="reconnect-btn primary" onClick={onFindModels}><FolderSearch size={14} /> Find Models</button> : null}
+                <a className="reconnect-btn" href={`${githubUrl}#supported-models`} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Which Models Work</a>
               </div>
             </>
           ) : copy === 'empty' ? (

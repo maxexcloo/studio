@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { springs } from '@/lib/springs';
+import { tweens } from '@/lib/springs';
 import { cn } from './format';
 
 /** Animate the actual content height, keeping the prompt, model and send mounted. */
@@ -33,7 +33,7 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
     aria-label="Create"
     initial={false}
     animate={{ height: toggling && !reduced ? height ?? 'auto' : 'auto' }}
-    transition={reduced || !toggling ? { duration: 0 } : springs.slow}
+    transition={reduced || !toggling ? { duration: 0 } : tweens.slow}
     style={{ overflow: animating ? 'hidden' : 'visible' }}
     onAnimationStart={() => setAnimating(true)}
     onAnimationComplete={() => setAnimating(false)}

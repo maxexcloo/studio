@@ -7,29 +7,73 @@ the pattern occurs in the same piece of work.
 
 ## Motion
 
-- **Durations:** `--motion-instant` (90 ms) for presses, `--motion-fast`
-  (140 ms) for hover, focus and small state changes, `--motion-base` (200 ms)
-  for surfaces entering or leaving, `--motion-slow` (320 ms) for height
-  changes such as a row's details expanding.
-- **Easing:** `--motion-ease` for interactive state changes; `--ease-soft` for
-  staged sequences and sheets; framer-motion springs (`stiffness: 420,
-  damping: 40`) only for sheets that follow a finger.
-- **Enter and exit:** popovers fade and scale from 0.96 at their trigger;
-  sheets slide up from the bottom edge and leave the same way; inline sections
-  grow their height from 0 with opacity. Exits are as long as entries or
-  shorter, never longer.
+- **Tokens:** every duration and easing comes from `00-tokens.css`:
+  `--motion-instant` (90 ms) for presses, `--motion-fast` (140 ms) for hover,
+  focus and small state changes, `--motion-base` (200 ms) for surfaces
+  entering or leaving, `--motion-slow` (320 ms) for height changes such as a
+  row's details expanding. `--motion-ease` for interactive state changes;
+  `--ease-soft` for staged sequences and sheets. No raw milliseconds or
+  `cubic-bezier()` in transitions.
+- **Framer motion** uses `src/lib/springs.ts` only: `tweens.*` match the CSS
+  tokens, `springs.*` have no bounce, and `springs.sheet` (`stiffness: 420,
+  damping: 40`) is only for sheets that follow a finger. Nothing overshoots.
+- **Presses never move anything.** No control scales, shrinks, lifts or shifts
+  when it is pressed or hovered. A press darkens the fill in place at
+  `--motion-instant` (one global rule in `09-motion.css`): `--press-overlay`
+  on dark controls, `--press-overlay-dark` on light ones, a slight dim on
+  Generate, and `--press-media` on the picture of a tile or thumbnail.
+- **Animate only `transform` and `opacity`.** Never transition `top`, `left`,
+  `width`, `height`, margins, padding or grid tracks; such changes are
+  instant. The one exception is an inline section's framer `height: 'auto'`
+  at `--motion-slow`. Never `transition: all`.
+- **Enter and exit:** popovers fade and scale from 0.96 at their trigger
+  (`popoverMotion` in `composerSurface.ts`, the `surfaceIn` keyframe in CSS);
+  sheets, nested ones too, slide up from the bottom edge and leave the same
+  way; inline sections grow their height from 0 with opacity. Exits are as
+  long as entries or shorter, never longer. No filter blur in any entry.
 - **Reduced motion:** with `prefers-reduced-motion` (or `useReducedMotion()`),
   movement becomes a plain fade or an instant change, and smooth scrolling
-  becomes `behavior: 'auto'`. Nothing essential depends on an animation
-  finishing.
-- **Media:** a picture never resizes while it loads. Reserve its final box from
-  its known size, show the thumbnail in it, and cross-fade the sharp copy over
-  the top (no fade with reduced motion).
+  becomes `behavior: 'auto'`. The CSS kill-switch covers CSS; framer height,
+  width and filter animations and JS scrolling branch on `useReducedMotion()`.
+  Nothing essential depends on an animation finishing.
+- **Media:** a picture never resizes or zooms while it loads. Reserve its
+  final box from its known size, show the thumbnail in it, and cross-fade the
+  sharp copy over the top (no fade with reduced motion).
 - Gallery column changes keep moving tiles inside the grid horizontally. Clip
   overflow on the virtual spacer without creating another scrolling container,
   so focus and selection cannot pan the gallery or move its toolbar sideways.
-- No decorative motion: no bouncing rows, no reorder animation, no odd
-  open/close flourishes on pickers.
+- No decorative motion: no hover lifts or nudges, no bouncing rows, no
+  staggered entrances, no reorder animation, no sliding highlights, no
+  bobbing, wobble or endless glow (real progress and status indicators may
+  pulse or spin), and no odd open/close flourishes on pickers.
+
+## Geometry
+
+Use the tokens in `00-tokens.css`, never raw values:
+
+- **Spacing:** gaps and padding step through `--space-1`…`--space-7`
+  (2, 4, 6, 8, 12, 16, 24 px). No 1, 3, 5, 7, 9, 10, 11 or 14 px gaps.
+- **Control sizes:** `--control-h` (40 px) on the desktop, `--control-h-touch`
+  (44 px) on touch screens, `--control-h-sm` (32 px) for controls inside rows
+  (Advanced Settings selects, pickers, toggles and segments) and small icon
+  buttons in lists (Star, View Source, Search, Close), which are round.
+- **Segmented tracks** come in two sizes only, large (`--control-h`) and small
+  (`--control-h-sm`), with `--seg-pad` (3 px) of track around the options.
+- **Rows:** `--row-h-menu` (38 px) in desktop menus and popovers,
+  `--row-h-settings` (44 px) in Settings, `--list-row-h` (48 px, 44 px on
+  short screens) in phone sheets and pop-up lists.
+- **Lines:** `--glass-border` for the edge of a surface, `--line` for
+  separators between rows and groups, `--line-strong` for a focused field's
+  edge. One edge per side: a panel with a shadow has no extra border.
+- **Radii** follow radius = inner + padding: `--r-panel` (28) for the
+  composer, sidebar and modals, `--r-menu` (22) for menus and popovers,
+  `--r-item` (14) for rows and options inside them, `--r-media` (10) for tiles
+  and thumbnails, `--r-field` (10) for fields that are not pills, `--r-check`
+  (5) for checkboxes and `--r-pill` for controls, chips and every circle.
+  Nothing inside a rounded surface has square corners.
+- **Icons:** 16 px (`--icon`) for actions, 14 px (`--icon-sm`) in chips and
+  rows, 20 px (`--icon-touch`) on phone bars; the default stroke, and check
+  marks at `--check-stroke` (2.5).
 
 ## Media
 
@@ -69,9 +113,16 @@ Pick the lightest surface that fits:
 1. **Inline expansion** for more of the same thing (a row's details). It
    pushes content down with a smooth height transition.
 2. **Anchored popover** on the desktop for choosing or tuning something
-   (model, LoRAs, references, Advanced Settings, size, filters). It opens at
-   its trigger and closes on outside click or Escape. On the phone the same
-   content is a pop-up list over Create (see [Layering](#layering)).
+   (model, LoRAs, references, Advanced Settings, size, filters, dropdowns). It
+   opens directly above the button that opened it, start-aligned to the
+   button and shifted to stay 8 px inside the screen, 8 px from the button,
+   scaling from it; a trigger near the top (the gallery toolbar's filters, a
+   header's menu) has no room above, so the same rule flips and it opens
+   below. Its width comes from its content within limits (pickers 360–560 px).
+   One helper places them all (`anchoredPlacement` in `composerSurface.ts`).
+   It closes on outside click or Escape. On the phone the same content is a
+   pop-up list over Create, anchored to the row that opened it (see
+   [Layering](#layering)).
 3. **Side panel or sheet** for a task with several steps or a long list
    (Settings, the Details panel, Create on the phone). Sheets have a handle,
    swipe down to close, a backdrop, and scroll inside themselves.
@@ -119,8 +170,8 @@ both devices:
 | A failure that needs action | The error tone, the words and one action (Try Again, Set Up) | 3 s |
 | A question (confirmations) | The question, **Cancel** and the answer ("Delete 6"); under the pill, its whole text and, for several items, a scrolling list of their thumbnails and short names | Until it is answered; Escape or Cancel answers no |
 
-- **Where:** the phone's top bar, in its centre slot (it takes the place of
-  Images | Videos, or of "n Selected" while selecting); the desktop gallery's
+- **Where:** the phone's top bar, in its centre slot (empty otherwise, or
+  "n Selected" while selecting); the desktop gallery's
   top bar, before its tools. A surface that covers the bar (a sheet, a pop-up
   list, a dialog, the viewer) shows the pill at its own top edge while open,
   in its title's place. Only the newest open host shows it.
@@ -165,9 +216,10 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
   phone (44 px on short screens), 38 px in desktop popovers, hairlines between
   them. No row sits in a card, and no card sits in a card.
 - **Controls stay in the row:** a `NumberPicker` for numbers (Steps, CFG,
-  percentages), a select that shows the friendly name (the phone's own picker
-  on a phone, the studio's select on the desktop), a pill toggle for one choice
-  (Seed's Random), a switch for on and off.
+  percentages), a dropdown that shows the friendly name (the app's own on
+  both devices, never the phone's native picker; see [Dropdowns](#dropdowns)),
+  a pill toggle for one choice (Seed's Random), a segmented toggle for a few,
+  a switch for on and off, all at `--control-h-sm`.
 - **Full-row toggles:** a row with a switch toggles from anywhere on the row,
   not only the switch (`SwitchRow`).
 - **Save & Discard:** an editor that changes several things at once (an access
@@ -197,41 +249,83 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
   ratio caption under the fields (the preview names the size). No preview
   stage on the phone.
 
+## Dropdowns
+
+One dropdown everywhere, desktop and phone (`Dropdown.tsx`; `StudioSelect`,
+`ListSelect` and `MultiSelect` are its forms): Advanced Settings, Settings
+rows, forms, the composer's Recipe and the pickers' heading menus. No native
+`<select>` and no phone picker.
+
+- **Trigger:** the value and a chevron at `--control-h-sm`: muted at the end
+  of its row in a list (`row`), a compact bordered pill in a toolbar (`pill`),
+  or a filled well in a form (`field`). It is a combobox named by its label.
+- **Menu:** the shared popover placement and motion (see
+  [Surfaces](#surfaces)), on the panel glass with `--r-menu`; on a phone the
+  pop-up list's width, still anchored to its trigger and one layer only. Rows
+  are `--row-h-menu` (44 px on touch), `--r-item`, `--cursor-bg` under the
+  pointer or keyboard cursor, and the chosen option shows the shared amber
+  tick (`SelectedTick`) with no row fill. Long lists scroll and offer a search
+  field.
+- **Keyboard:** the arrow keys, Home and End move between options, typing
+  jumps to a name, Enter or Space chooses, Escape or a click outside closes,
+  and the focus returns to the trigger.
+- **Several values** (`multiple`): the same rows and ticks; the menu stays
+  open, with All and Clear in its head, and the trigger names the one value or
+  counts them. The gallery's filter menus follow the same rows and ticks.
+
 ## Pickers
 
-One chooser pattern for References, LoRAs and Models: a title bar with Close
-on the right, one toolbar (`PickerTools.tsx`) with the tab pills or filters,
-Clear Selection and a search icon, then the grid or list. On the desktop it is
-an anchored popover; on the phone a pop-up list over Create (see
-[Layering](#layering)).
+One chooser pattern for References, LoRAs and Models (`PickerTools.tsx`): one
+heading row, then the grid or list. On the desktop it is an anchored popover;
+on the phone a pop-up list over Create (see [Layering](#layering)).
 
-- **Compact search:** search is an icon at the end of the toolbar, not a
-  permanent row. The icon (or typing anywhere in the chooser) opens the field
-  under the toolbar with the focus in it; Close Search clears the query and
-  folds it away, and the field stays open while a query is active, with the
-  icon in the accent. Where the toolbar runs out of room, Clear Selection and
-  the icon wrap to the right of a second line; the tabs never hide.
-
-- The reference and LoRA choosers share one tab row: the pills (Library |
-  Uploads | Selected n/max, or This Model | All Models | Selected n/max), then
-  **Clear Selection** on the right of the same row, before the search icon (just "Clear" under 480 px), shown only while
-  something is picked. Clear Selection empties the selection at once and offers
-  Undo in the status pill; it never asks first.
-- One tap adds or removes; a picked item highlights in place and shows its
-  order number (an empty ring, then the number on white, the same mark in
-  every chooser) and stays picked across searches and tabs. It never moves and
-  enabled LoRAs reveal their information below the row. The Selected tab lists
-  the picks in their order with strength and enable controls.
-- **Reordering** happens in the Selected tab: drag a row's grip with a mouse,
+- **Desktop heading:** the title, the views (Library | Uploads | Selected
+  n/max, This Model | All Models | Selected n/max, or All | Favourites, Fast |
+  Quality), the LoRA **Stacks** dropdown, Upload (References), **Clear**, the
+  search icon, then Close, all on one centre line. There is no hint text and no
+  toolbar row under the heading. A narrow LoRAs popover drops the title and the
+  Stacks label before anything else.
+- **Phone heading:** the views become a dropdown that carries the title
+  ("LoRAs · This Model ▾", "References · Library ▾", "Model · All ▾"); the
+  filters that combine (Favourites with Fast or Quality) are ticks in the same
+  menu, which stays open while choosing. Then Stacks (its icon), Clear, the
+  search icon and Close, every target 44 px. The list starts right under the
+  heading.
+- **Compact search:** an icon, not a permanent row. The icon (or typing
+  anywhere in the chooser) opens the field with the focus in it: on the
+  desktop it grows leftwards from the icon inside the heading row, at
+  `--control-h-sm`, and the views give way to it; on the phone it opens under
+  the heading. Close Search clears the query and folds it away; the field stays
+  open while a query is active, with the icon in the accent.
+- **Clear** shows only while something is picked. It empties the selection at
+  once and offers Undo in the status pill; it never asks first.
+- **One selected mark:** a picked row or tile shows the amber tick
+  (`SelectedTick`: the same icon, size, stroke 2.5 and place at the row's end
+  in every chooser, the model lists included; on a tile, an amber badge in the
+  corner). One tap adds or removes; a pick stays where it is, across searches
+  and views. Order numbers (the number on amber) appear only in the Selected
+  view, where the picks are listed in order with strength and enable controls.
+- **Reordering** happens in the Selected view: drag a row's grip with a mouse,
   pen or finger (`useReorderDrag.ts`), or press the arrow keys on the grip.
-- A LoRA row's actions sit on the right in this order: View Source (a link
-  icon for each source host, when present), then Star. Enabled LoRAs show their
-  information automatically below the row.
+- A LoRA row's actions sit on the right, centred on its title line, in this
+  order: the tick, View Source (small equal text pills, "com" and "red", 32 px
+  targets, 44 px on touch), then Star. Enabled LoRAs show their information
+  automatically below the row, on the title's left edge (see [Action
+  Placement](#action-placement) › LoRA information).
+- **LoRA stacks:** the Stacks dropdown, the same on both devices, lists the
+  model family's saved stacks alphabetically with the one in use ticked;
+  choosing one applies it at once with Undo. Under them: Save Current as New
+  Stack, and for the stack in use Update "…" with Current Picks, Rename and
+  Delete (at once, with Undo). There is no Enable All or Disable All; each pick
+  has its own switch in the Selected view. Settings › Studio › LoRA Stacks
+  edits them.
+- **Heading dropdowns** (the phone views, Stacks) use the shared popover
+  entry, `--r-menu`, rows of `--row-h-menu` (44 px on touch) with the amber
+  tick, the arrow keys, and Escape that closes the menu only.
 - **Models** have no modal: the model button opens the chooser with the same
-  toolbar (All | Favourites, Fast | Quality, then the search icon) and family
-  groups (fine tunes under their family), and nothing else. Profile names show as they are, on two lines at
-  most.
-- A model's own LoRA limit shows as one muted line above the LoRA search
+  heading and family groups (fine tunes under their family), and nothing else.
+  Profile names show as they are, on two lines at most.
+- A model's own LoRA limit shows as one quiet line under the heading
   (Radiance video: "Up to rank 64 in total").
 
 ## Empty States
@@ -265,25 +359,34 @@ A picker, tab or list with nothing to show uses `EmptyState`
   touch screens each part is a 44 px target. Names read "Decrease Images",
   "Increase Steps".
 - **Phone Create sheet:** one flat column. The prompt takes the height the
-  rest leaves (it scrolls rather than grows), with History, Select All and
-  Clear close together at the middle of its right edge; Negative is two lines.
+  rest leaves (it scrolls rather than grows), with Select All, History and
+  Clear in one row at its top right, centred on the first line of text (the
+  text runs beside it; the row has room for one more action). Every icon there
+  is the same quiet button: muted, `--control-hover`, the global press, amber
+  only while its surface (History) is open. Negative is two lines with History
+  and Clear.
   Then one row each for Model, References, LoRAs (their Clear on the right),
   Size and Advanced; each opens its pop-up list over Create. The sticky footer
-  has two lines, always in view: Steps and the image count, labelled, then
-  Image/Video · Clear · Generate. Nothing reaches past the right edge at
+  has two lines, always in view: Steps then the image count, labelled (the
+  desktop composer's order), then Image/Video · Clear All · Generate, all
+  44 px high on one centre line. Clear All is a round ghost icon (an eraser)
+  that clears the prompt, negative prompt, references and LoRAs at once, with
+  Undo; the phone filter row's Clear is the same icon button. Nothing reaches past the right edge at
   320–430 px (`phone-create.spec.ts`). Editing Prompt or Negative with the keyboard up
   shows only that field (see [Keyboard & visual viewport](#keyboard--visual-viewport)).
 
 - The desktop composer stays bottom centre and expands upwards; its pickers
-  are anchored popovers. Every control stays in its bar: as room runs out they
+  are anchored popovers, each above the button that opened it. Every control stays in its bar: as room runs out they
   step down to compact and then mini chips, and there is no More Settings
   drawer.
 - **Advanced Settings** open in the composer popover, like LoRAs and
-  References: anchored above the composer at its width, the same glass,
-  motion and dismissal (outside click, Escape, its button again; focus returns
-  to the button). It is the flat list, dense, in two columns where the popover
-  is wide, with every option the profile exposes but Width and Height (they
-  belong to Size). Close is on the right. **Upscale** and **Face Detail** are
+  References: anchored above the Advanced button, the same glass, motion and
+  dismissal (outside click, Escape, its button again; focus returns to the
+  button). It is one column about 400 px wide: the flat list, dense
+  (`--row-h-menu` rows, labels on the left, dropdowns and `NumberPicker`
+  steppers on the right at `--control-h-sm`, one quiet heading per group),
+  as tall as its rows and scrolling inside past the room above, with every
+  option the profile exposes but Width and Height (they belong to Size). Close is on the right. **Upscale** and **Face Detail** are
   chosen per generation here, starting from Settings › Studio; face detail
   runs only with an upscale. The phone shows the same list as a pop-up over
   Create.
@@ -305,7 +408,7 @@ holds:
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
 | Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
-| Studio | Features (Inpainting and Upscale as plain rows), Gallery, General, Generation and Sharing | Everyone |
+| Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
 | Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
 | Workers | Every ComfyUI worker in one standard group (Address, Capabilities, Status with Test, Open, Restart; adding, editing and removing Studio's own), then Upscale's status as its own group | Administrators; everyone reads Upscale's status |
 
@@ -330,7 +433,8 @@ devices) hide in account mode, and there are no upstream community, feedback
 or donation links. Settings use the flat list (see [Lists](#lists)), dense:
 44 px rows, a one-line description, one heading per group. **Sign Out** is in
 the desktop dock's Account menu and at the top of the phone's More (not in
-Settings); it asks first only while something is generating.
+Settings); it never asks first, even while something is generating (the runs
+finish on the server and appear on the next sign-in).
 
 Gallery **Date Headers** ("Today", "This Evening") are a Studio › Gallery
 switch, off by default. Auto-Grouping, Grid Autoplay and Failed are not
@@ -384,19 +488,27 @@ phone) and one page at a time with its title and one line.
 - **Glass icon buttons** in a 48 px bar (the docks, the viewer bar) keep the
   40 px target, but their hover and press fill is a smaller circle
   (`--icon-fill`, 32 px), inset evenly by `--icon-fill-inset` so 8 px of glass
-  shows around it on every side. Hover is `--control-hover`, press
-  `--control-press` with a slight shrink, the keyboard ring (`--icon-ring`)
-  traces the fill circle inside the bar. Hover and focus change at
-  `--motion-fast`, presses at `--motion-instant`. Change only
-  `background-color` on these buttons: the `background` shorthand resets the
-  clip and the fill grows to the full target again.
+  shows around it on every side; the phone's 44 px bars use the same pattern.
+  Hover is `--control-hover`, a press darkens the fill and nothing moves, the
+  keyboard ring (`--icon-ring`) traces the fill circle inside the bar. Hover
+  and focus change at `--motion-fast`, presses at `--motion-instant`. Change
+  only `background-color` on these buttons: the `background` shorthand resets
+  the clip and the fill grows to the full target again.
+- **Presses:** every button, row and tile darkens in place when pressed (see
+  [Motion](#motion)); none scales, shrinks or shifts, Generate included.
 - Tile corner buttons are their own glass circles: hover darkens them, a press
-  shrinks them, and the keyboard ring sits just outside the circle. The phone
-  viewer bar's press fill is a rounded shape inset inside its cell, never
-  touching a divider or the bar's edge.
-- A bar's tooltips open on the side away from the screen edge and nothing else
-  floats on that side: the viewer's zoom pill sits in the bottom right corner,
-  level with the bar, not above it.
+  darkens them further, and the keyboard ring sits just outside the circle.
+  The phone viewer bar's press fill is a rounded shape inset inside its cell,
+  never touching a divider or the bar's edge.
+- **Tooltips** open on the side away from their bar's edge, 8 px from the
+  control: below top bars (the gallery toolbar, the viewer's top corner,
+  Settings and Library headers), above bottom bars (the composer, the docks,
+  the viewer's action bar). `Tip` works this out from where its control sits;
+  a bar or side panel that needs another side says so once with
+  `data-tip-side` instead of a prop on every button. Desktop controls use
+  `Tip`, never the native `title`. Nothing else floats on a bar's tooltip side:
+  the viewer's zoom pill sits in the bottom right corner, level with the bar,
+  not above it.
 - Icon bars group related actions with a divider between groups; the same
   action has the same icon everywhere. Action icons are outlines at one stroke
   weight, including Upscale's arrow.
@@ -410,12 +522,29 @@ phone) and one page at a time with its title and one line.
 
 ## Selected & Focus States
 
-- Focus rings show only for keyboard focus (`:focus-visible`). A click never
-  leaves a ring, highlight or pill behind.
-- A selected option shows its checkmark or pressed fill, not an extra row
-  highlight. Plain text (such as "N Selected") never looks selected.
-- Hover is never the only way to reach something; tile captions also show on
-  `:focus-visible`/`:focus-within`.
+Selection uses the accent (`--selected-bg`, `--selected-ink`); the keyboard
+cursor and hover in a list use the neutral `--cursor-bg`. One treatment per
+kind of element:
+
+| Element | Selected / on | Hover / keyboard cursor | Shape |
+| --- | --- | --- | --- |
+| Rows and list options (menus, pickers, filters, model, size, LoRA, starter versions) | No row fill: an amber check or lead; amber checkboxes (`--accent-amber` with an `--accent-amber-ink` check) | `--cursor-bg`, inset inside the popover | `--r-item`, never bleeding past the rounded popover |
+| Chips, tabs, segmented toggles, filter triggers, pressed toggles | `--selected-bg` with `--selected-ink` | `--control-hover` | `--r-pill`; a static fill, no sliding indicator |
+| Icon toggles in bars (Star, Search, Info, Filter) | An amber icon (Star filled); no disc | `--control-hover` inside `--icon-fill` | Circle |
+| Switches | Track `--accent-amber`, thumb `--accent-amber-ink` | — | Pill |
+| Tiles and media | A 2 px `--accent-amber` outline inside the edge and an amber check badge | `--glass-border` outline | `--r-media` |
+| Section rails (Settings sections, sidebar tabs) | As chips: `--selected-bg` with `--selected-ink`; no marker or underline | `--control-hover` | `--r-item` |
+
+- **Focus rings** show only for keyboard focus (`:focus-visible`); a click
+  never leaves a ring, highlight or pill behind, so `:focus-within` styling
+  uses `:has(:focus-visible)`. A standalone control takes
+  `box-shadow: var(--focus-ring)`; inside a surface or bar the ring is
+  `outline: 2px solid var(--icon-ring)` with `outline-offset: -2px`,
+  following the element's radius. Rings are never amber, blue or white.
+- **Hover** is one fill, `--control-hover` (on glass circles as a
+  `background-image` so the clip stays). Hover is never the only way to reach
+  something; tile captions also show on `:focus-visible`/`:focus-within`.
+- Plain text (such as "N Selected") never looks selected.
 
 ## Action Placement
 
@@ -431,40 +560,65 @@ phone) and one page at a time with its title and one line.
 - **Recreate** ("Recreate With the Same Seed") loads the model, both prompts,
   size, LoRAs, references, every setting and the same seed into Create. The
   viewer closes and Create opens, ready to change or generate.
+- **Tiles, desktop:** one row of 32 px glass circles along the top right (a
+  40 px target each), from `itemActions.ts`'s `tile` placement in the viewer
+  bar's order: Download | Animate or Extend · Recreate | Star · Delete, with
+  Retry in Recreate's place on a failed item and a little more room between
+  the groups. The upscale arrow keeps the top left corner, where its progress
+  and its amber "showing the upscale" state stay in view. A narrow tile drops
+  the make group first, then Download; Star and Delete stay longest, and
+  **More** (⋯) takes the last slot and opens the same menu as a right-click.
+  The circles show on hover and keyboard focus; a set Star stays in view.
+- **Tile caption, desktop:** two lines at the bottom on hover and keyboard
+  focus: the prompt on one line, then the time · the profile's friendly name
+  (· a video's length), as in "2:14 PM · FLUX.1 Schnell · 6 s". Nothing else.
 - **Viewer, desktop:** Copy · Download | Animate · Recreate · Reference ·
   Upscale | Star · Delete, then Close. Info sits alone in the top right (beside
   the corner Close on tablets); it opens Details, and the open Details panel
   has its own Close in its header, as Info's corner is under it.
-- **Viewer, phone:** the desktop's title top left (the profile name and its
-  settings line; a message takes its place for a moment); Star · Info · Close
-  top right; the bottom bar Copy · Share | Animate · Recreate · Reference ·
-  Upscale | Delete, centred with even sides in a bar-height row above the home
-  indicator.
+- **Viewer, phone:** a solid backdrop that hides the gallery's top bar
+  completely. One top row: the title on the left (the profile's friendly name,
+  then a short muted line: its place in the gallery "2 / 40", the time and the
+  size · steps; a message takes its place for a moment), Star · Info · Close
+  on the right, all on one centre line. The bottom bar Copy · Share | Animate ·
+  Recreate · Reference · Upscale | Delete, centred with even sides in a
+  bar-height row above the home indicator.
   Download replaces Share only where the browser can't share files. Info
-  toggles Details: the bar is a trigger surface, so a tap on Info while
-  Details is open closes it.
+  toggles Details (pressed, its icon turns amber with no disc): the bar is a
+  trigger surface, so a tap on Info while Details is open closes it. Details
+  opens under the top row, which stays as it is; the title never pushes it
+  down. Gestures: swipe sideways to step, pull down to close, double-tap to
+  zoom; with reduced motion they change at once.
 - **Zoom:** a small `− 100% +` pill, bottom middle above the bar, faded until
   used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
 - **Details:** Prompt and Negative each keep Copy beside their label. The
   groups are Prompt, Model, Settings and Output (the picture's size, reference,
   upscale and its file together), then Timing, in one readable heading style;
-  empty groups are left out. Rows within a group read alphabetically, except
-  Timing (measured times before the estimates).
+  empty groups and rows are left out, and nothing repeats (no output Type;
+  Weights only when they differ from the profile's name). Rows within a group
+  read alphabetically, except Timing (measured times before the estimates).
+  The phone and the desktop show the same Details, from one component.
   The one footer is Copy · Recreate. Copy includes generation inputs and saved
   settings, including IDs, seed and reference settings; output filenames,
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run
   after queueing) before Queue and Total (which also counts transfer and
   finishing), with one muted line saying so; split-up times keep "(Est.)".
-- **Image Text:** a short image summary (profile, size and steps) follows the
-  Details toggle: it shows while Details is open and never otherwise, with no
-  separate button. Keep it clear of the Details controls and image actions.
-- **LoRA information:** an enabled LoRA automatically shows its filename,
-  compatibility, suggested strength, description, notes and triggers inside a
-  shared information panel. Turning it off hides the panel and filename at
-  once; the friendly title stays. Two separate inline source icons open
-  civitai.com and civitai.red. Source links never repeat inside the information
-  panel. Apply this pattern in the picker and generation Details.
+- **Viewer title:** always shown top left on both devices, as plain text with
+  no box: the profile name, then a muted line with the position ("2 / 40"),
+  the time, the size and steps (a video adds its duration). The phone keeps it
+  inline with Star · Info · Close. There is no Image Text button. Keep it clear
+  of the Details controls and image actions.
+- **LoRA information:** an enabled LoRA automatically shows what it says about
+  itself under its name, on the name's left edge, with no card or extra inset
+  (`LoraDetails`): the description once, any catalogue note that adds
+  something, the suggested strength once and the trigger words once as chips.
+  No File or Family line, no "No description" placeholder, and no note that
+  only repeats the trigger or the strength; with nothing to say there is no
+  panel. Turning it off hides the panel at once; the friendly title stays and
+  the file name is only in its tooltip. The source pills ("com", "red") open
+  civitai.com and civitai.red and never repeat inside the panel. The same
+  panel serves the picker and generation Details.
 - **Selecting:** a long press on a phone tile starts selecting with that item
   (there is no long-press action sheet). Selecting offers Select All, then
   Select Failed (in that order on both), then Download (a zip when several)
@@ -523,23 +677,23 @@ iOS status bar still scrolls the document to the top. No bottom navigation
 and no boxes in the bars.
 
 - **Left:** the status light (its colour says whether generation can run; a
-  tap checks again) and "Studio". While jobs run, a spinner and count replace
-  the light in the same space; a tap opens Show Running and Stop All. On
-  narrow phones the name hides and the mode buttons follow Menu in normal
-  flow, keeping every touch target separate.
-- **Centre:** the gallery's **Images | Videos** as two icons. A message takes
-  this slot while it shows (see [Messages](#messages)).
-- **Right:** **Search**, **Filter** and **Select**. Menu sits on the left
-  beside the status light; its pop-up list holds Library · Settings, then
-  Account and Sign Out in account mode.
+  tap checks again) and "Studio", centred on one line. While jobs run, a
+  spinner and count replace the light in the same space; a tap opens Show
+  Running and Stop All. On narrow phones (under 380 px) the name hides.
+- **Centre:** empty and flexible; a message takes it while it shows (see
+  [Messages](#messages)).
+- **Right,** in this order: **Select**, **Search**, **Filter** and **Menu**,
+  all 44 px icon buttons. Menu's pop-up list, anchored at the right edge,
+  holds Library · Settings, then Account and Sign Out in account mode.
 - **One bar height:** the top bar, the select bar, the viewer's top icons and
   the status pill share `--bar-h` and `--bar-pill-h`, so nothing jumps when one
   replaces another.
 - **The prompt bar** is a slim glass bar at the bottom, on the shared bar
-  height with safe-area padding: the prompt on one line (cut short, or "Describe
-  an image…"), which opens the Create sheet, and Generate, which runs it as is
-  (a ring fills while runs are going). A prompt waiting in Create reads bright
-  with an accent dot. The gallery's bottom padding clears it; it hides while
+  height with safe-area padding: the gallery's **Images | Videos** as two icons
+  at its left end, the prompt on one line in faded text (cut short, or
+  "Describe an image…"), which opens the Create sheet, and Generate, which runs
+  it as is (a ring fills while runs are going). A prompt waiting in Create
+  keeps the faded text and adds an accent dot. The gallery's bottom padding clears it; it hides while
   selecting, when the select bar takes the bottom edge. Only this bar lives at
   the bottom: navigation never does.
 - Selecting swaps the top bar's contents; the select bar shows at the bottom
@@ -555,8 +709,11 @@ and no boxes in the bars.
   filter row's Clear, its icon, Escape, or starting Select) clears the query
   and every filter. It is part of the top bar, not an
   overlay, so scrolling the gallery leaves it open.
-- **Tiles** show the prompt and the output's name or type, never the
-  generation time (the desktop shows the time).
+- **Tiles** show nothing over the picture but its state: running or queued
+  progress, a failed mark and, while selecting, the checks. No caption, corner
+  icons or Stop. Settings › Studio › Gallery › **Tile Captions** (off by
+  default) brings back the caption: the prompt and the output's name or type,
+  never the generation time.
 - **The viewer keeps the gallery's place:** opening a tile, even one half under
   the bar, never scrolls the gallery; closing lands on the same scroll position.
   Only stepping to another item brings its tile into view behind the viewer.
@@ -595,10 +752,11 @@ padding, and the page returns to where it rested once the keyboard closes.
 **Focused text:** while a long text field (Prompt, Negative Prompt, the
 profile JSON in Settings) has the focus and the on-screen keyboard is up, it
 is the only thing on screen (`useTextFocus.ts`): it fills the visible height
-above the keyboard, the other Create rows, the footer, the handle and the
-page's bars hide, and nothing scrolls under it. Its actions (Select All,
-History, Clear) sit in a row along its top with a small **Done** at the end,
-and a tap on one keeps the keyboard up. Done, a blur, Back or hiding the
+above the keyboard with no box or border, just the text at its normal
+padding; the other Create rows, the footer, the handle and the page's bars
+hide, and nothing scrolls under it. Its actions (Select All, History, Clear)
+keep the same row at the top right, centred on the first line, with a small
+**Done** at the end, and a tap on one keeps the keyboard up. Done, a blur, Back or hiding the
 keyboard puts the sheet back; a hardware keyboard leaves the layout alone.
 The caret stays in view.
 

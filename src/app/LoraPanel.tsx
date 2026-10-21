@@ -1,16 +1,17 @@
 import { compatibilityNote, strengthRange as publishedStrengthRange } from '../../server/lora-policy';
+import { scrollBehavior } from '@/lib/springs';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink, GripVertical, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Bookmark, Check, ChevronDown, ChevronUp, GripVertical, Layers, Plus, Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLoras, type FitOf } from './loras';
 import { Switch } from './SettingsControls';
 import { Tip } from './components';
 import { EmptyState } from './EmptyState';
 import { useReorderDrag } from './useReorderDrag';
-import { PickerTools } from './PickerTools';
+import { MenuDivider, MenuRow, PickerDropdown, PickerTools, SelectedTick } from './PickerTools';
 import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
@@ -140,21 +141,35 @@ export function loraSources(info?: LoraInfo): Array<{ label: string; url: string
   } catch { return []; }
 }
 
+/** View Source as small equal text pills ("com", "red"), centred on the row's title line. */
 export function LoraSources({ info, label }: { info?: LoraInfo; label: string }) {
   const sources = loraSources(info);
-  return sources.length ? <span className="lora-sources">{sources.map(source => <Tip key={source.label} content={`View ${label} on ${source.label}`}><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${label} on ${source.label}`}><ExternalLink size={14} /><small>{source.label === 'Source' ? 'Source' : source.label.replace('civitai', '')}</small></a></Tip>)}</span> : null;
+  return sources.length ? <span className="lora-sources">{sources.map(source => <Tip key={source.label} content={`View ${label} on ${source.label}`}><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${label} on ${source.label}`}><span aria-hidden="true">{source.label === 'Source' ? 'Source' : source.label.replace('civitai.', '')}</span></a></Tip>)}</span> : null;
 }
 
-export function LoraDetails({ info, label, enabled, file }: { info?: LoraInfo; label: string; enabled: boolean; file?: string }) {
+/** A catalogue line that only says the trigger or the strength again, which the panel already shows. */
+function repeatsKnown(text: string, info?: LoraInfo) {
+  let rest = ` ${text.toLowerCase()} `;
+  for (const word of info?.triggers || []) rest = rest.split(word.toLowerCase()).join(' ');
+  rest = rest.replace(/\b(trigger(s|\s*words?)?|use|with|strength|suggested|recommended|weight|at|of|and|or|between|to|the|a)\b/g, ' ').replace(/[\d.,:;·–—\-+()'"“”‘’\s]+/g, '');
+  return rest.length < 4;
+}
+
+/**
+ * What an enabled LoRA says about itself (UI-PATTERNS › LoRA information), in
+ * the picker and in Details: the description once, the suggested strength
+ * once and the trigger words once, as chips. No file or family lines, and no
+ * catalogue note that only repeats the trigger or the strength.
+ */
+export function LoraDetails({ info, label, enabled }: { info?: LoraInfo; label: string; enabled: boolean; file?: string }) {
   if (!enabled) return null;
-  const description = info?.description || info?.about;
+  const description = (info?.description || info?.about || '').trim();
+  const extra = [info?.note, info?.guidance].map((line) => (line || '').trim()).filter((line, index, all) => line && line !== description && all.indexOf(line) === index && !repeatsKnown(line, info));
+  if (!description && !info?.strengthRange && !extra.length && !info?.triggers?.length) return null;
   return <section className="lora-info-panel" aria-label={`${label} Information`}>
-      {file ? <p className="lora-info-file"><strong>File</strong> {file}</p> : null}
-      {info?.families?.length ? <p><strong>Family</strong> {info.families.join(', ')}</p> : info?.base ? <p><strong>Family</strong> {info.base}</p> : null}
-      {info?.strengthRange ? <p><strong>Suggested Strength</strong> {info.strengthRange.min}–{info.strengthRange.max}</p> : null}
-      <p>{description || 'No description is available.'}</p>
-      {info?.note ? <p>{info.note}</p> : null}
-      {info?.guidance ? <p className="lora-guidance">{info.guidance}</p> : null}
+      {description ? <p>{description}</p> : null}
+      {extra.map((line) => <p key={line}>{line}</p>)}
+      {info?.strengthRange ? <p className="lora-info-strength"><strong>Suggested Strength</strong> {info.strengthRange.min}–{info.strengthRange.max}</p> : null}
       {info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
   </section>;
 }
@@ -177,7 +192,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
   const controls = useDragControls();
   const label = loraName(item.name, info);
   return (
-    <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ scale: 1.02, zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
+    <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
       {count > 1 ? (
         <button
           type="button"
@@ -189,14 +204,14 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
             if (event.key === 'ArrowDown' && index < count - 1) { event.preventDefault(); onMove(index + 1); }
           }}
         >
-          <GripVertical size={13} />
+          <GripVertical size={14} />
         </button>
       ) : null}
       <div className="lora-card-top">
         <Tip content={`${item.name} · Click to Swap`}>
           <button type="button" className="lora-name" onClick={onSwap}>{label}</button>
         </Tip>
-        <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={13} /></button></Tip>
+        <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={14} /></button></Tip>
         <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={(enabled) => onChange({ enabled })} />
       </div>
       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={(strength) => onChange({ strength })} />
@@ -307,7 +322,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       const adding = !inlineSelection.items.some((item) => item.name === name);
       inlineSelection.toggle(name);
       // Bring the new strength controls into view once they have opened.
-      if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 260);
+      if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }), 260);
       return;
     }
     if (isAdded(name)) return;
@@ -323,8 +338,14 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
         <span>{swapping ? <>Replace <strong>{nameOf(swapping)}</strong></> : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
       </div> : null}
       {profile?.loraNote ? <p className="lora-picker-note">{profile.loraNote}</p> : null}
-      <PickerTools className="lora-picker-tools" query={query} onClearSearch={() => setQuery('')} onType={typeSearch} searchLabel="Search LoRAs"
+      <PickerTools className="lora-picker-tools" extra={libraryView ? stackControls : undefined} query={query} onClearSearch={() => setQuery('')} onType={typeSearch} searchLabel="Search LoRAs"
         clear={libraryView && current.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+        onClear={libraryView && current.length > 0 && onClearAll ? onClearAll : undefined}
+        views={libraryView ? { label: 'LoRA Model Filter', current: view === 'model' ? 'This Model' : view === 'all' ? 'All Models' : `Selected ${current.length}/${max}`, options: [
+          { id: 'model', label: 'This Model', checked: view === 'model', onSelect: () => setView('model') },
+          { id: 'all', label: 'All Models', checked: view === 'all', onSelect: () => setView('all') },
+          { id: 'selected', label: `Selected ${current.length}/${max}`, ariaLabel: `Selected ${current.length} of ${max}`, checked: view === 'selected', disabled: !current.length, onSelect: () => setView('selected') },
+        ] } : undefined}
         search={<label className={cn("lora-picker-search", libraryView && "picker-search")}>
         <Search size={14} />
         <input
@@ -347,7 +368,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (query) setQuery(''); else onClose(); }
           }}
         />
-        {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
+        {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={14} /></button> : null}
       </label>}>
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
           <button type="button" className={cn(view === 'model' && 'active')} aria-pressed={view === 'model'} onClick={() => setView('model')}>This Model</button>
@@ -378,13 +399,14 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                   return <div key={row.key} data-lora-name={row.name} data-reorder-key={reviewing ? row.name : undefined} className={cn('lora-library-row', item && 'is-selected', reorder.rowState(row.name).dragging && 'is-dragging', reorder.rowState(row.name).over && 'is-drop-target')}>
                     {item && reviewing && inlineSelection.items.length > 1 ? <button type="button" className="lora-library-grip" aria-label={`Drag ${label} to Reorder`} {...reorder.grip(row.name)}><GripVertical size={14} /></button> : null}
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
-                      {/* Picked: its place in the stack, as a picked reference shows its number. */}
-                      <span className={cn('picker-order', item && 'is-on')} aria-hidden="true">{item ? inlineSelection.items.indexOf(item) + 1 : null}</span>
+                      {/* The Selected view shows each pick's place in the stack; elsewhere a pick is the amber tick, as in Models. */}
+                      {reviewing ? <span className="picker-order is-on" aria-hidden="true">{item ? inlineSelection.items.indexOf(item) + 1 : null}</span> : null}
                       <span className="lora-option-copy"><strong>{label}</strong></span>
+                      {reviewing ? null : <SelectedTick on={Boolean(item)} />}
                     </button>
                     <LoraSources info={info} label={label} />
                     <LoraDetails info={info} label={label} enabled={Boolean(item && item.enabled !== false)} file={row.name} />
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={14} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
                     {item && reviewing ? <div className="lora-library-expansion"><div className="lora-library-settings">
@@ -394,7 +416,6 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                         <button type="button" className="prompt-action" aria-label={`Move ${label} Up`} disabled={inlineSelection.items.indexOf(item) === 0} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index - 1); }}><ChevronUp size={14} /></button>
                         <button type="button" className="prompt-action" aria-label={`Move ${label} Down`} disabled={inlineSelection.items.indexOf(item) === inlineSelection.items.length - 1} onClick={() => { const index = inlineSelection.items.indexOf(item); move(index, index + 1); }}><ChevronDown size={14} /></button>
                       </span> : null}
-                      {item.enabled && info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
                     </div></div> : null}
                   </div>;
                 }
@@ -412,7 +433,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     onClick={() => choose(row.name)}
                   >
                     {libraryView ? <span className="lora-option-preview" aria-hidden="true"><Layers size={24} /></span> : null}
-                    {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={3} /> : null}</span> : null}
+                    {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={2.5} /> : null}</span> : null}
                     <span className="lora-option-copy">
                       <strong>{nameOf(row.name)}</strong>
 
@@ -426,7 +447,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                       aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`}
                       onClick={(event) => { event.stopPropagation(); onToggleFavorite(row.name); }}
                     >
-                      <Star size={13} fill={favorite ? 'currentColor' : 'none'} />
+                      <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
                     </button>
                   </div>
                 );
@@ -439,7 +460,6 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
             ? <EmptyState title="Nothing Selected">Pick LoRAs from This Model or All Models.</EmptyState>
             : <EmptyState title="No LoRAs for This Model">Choose All Models to browse the rest.</EmptyState>}
       </div>
-      {libraryView && stackControls ? <div className="lora-library-footer">{stackControls}</div> : null}
       {multi && !libraryView ? (
         <div className="lora-picker-foot">
           <span>{full && remaining > 0 ? `This workflow takes ${remaining} more` : selected.length ? `${selected.length} selected` : 'Click to select, Enter to toggle'}</span>
@@ -476,25 +496,25 @@ function NameField({ initial, action, onSave, onCancel }: { initial: string; act
   const [value, setValue] = useState(initial);
   const save = () => { const name = value.trim(); if (name) onSave(name); else onCancel(); };
   return (
-    <form className="lora-name-field" onSubmit={(event) => { event.preventDefault(); save(); }}>
+    <form className="lora-name-field" data-own-escape onSubmit={(event) => { event.preventDefault(); save(); }}>
       <input
         autoFocus
-        className="is-framed"
         aria-label="Stack Name"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onFocus={(event) => event.target.select()}
         onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onCancel(); } }}
       />
-      <button type="submit" className="lora-chip-action is-primary" disabled={!value.trim()}>{action}</button>
-      <button type="button" className="lora-chip-action" aria-label="Cancel" onClick={onCancel}><X size={13} /></button>
+      <button type="submit" className="picker-menu-action is-primary" disabled={!value.trim()}>{action}</button>
     </form>
   );
 }
 
 /**
- * Stacks live in plain sight as chips: one click loads one, the active one is
- * lit, and saving only appears when there is something new to save.
+ * Saved stacks for this model family as one Stacks dropdown in the picker's
+ * heading, the same on both devices (UI-PATTERNS › Pickers): the stacks
+ * alphabetically (choosing one applies it, with Undo), then Save Current as
+ * New Stack, and for the stack in use Update, Rename and Delete (with Undo).
  */
 function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
   library: LoraLibraryApi;
@@ -503,7 +523,7 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
   setActiveId: (id: string) => void;
   onLoad: (stack: LoraSnapshot) => void;
 }) {
-  const [naming, setNaming] = useState<null | { mode: 'new' } | { mode: 'rename'; id: string }>(null);
+  const [naming, setNaming] = useState<null | 'new' | 'rename'>(null);
   // The stack you're working from: the one you loaded, an exact match, or one with
   // the same LoRAs (so nudging a strength reads as "changed", not "unsaved").
   const sameSet = (stack: LoraSnapshot) => stack.loras.length === loras.length && stack.loras.every((item) => loras.some((current) => current.name === item.name));
@@ -511,67 +531,38 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
     || library.stacks.find((stack) => sameStack(stack.loras, loras))
     || (loras.length ? library.stacks.find(sameSet) : null)
     || null;
-  const modified = Boolean(active && loras.length && !sameStack(active.loras, loras));
-  const matchesSaved = library.stacks.some((stack) => sameStack(stack.loras, loras));
-  const canSaveNew = loras.length > 0 && !matchesSaved && !modified;
+  const modified = Boolean(active && !sameStack(active.loras, loras));
+  const sorted = [...library.stacks].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   const family = library.familyLabel || 'this model';
-
-  if (!library.stacks.length && !loras.length) return null;
-  const remove = async (stack: LoraSnapshot) => { if (await library.deleteStack(stack) && stack.id === activeId) setActiveId(''); };
-
   return (
-    <section className="lora-stacks" aria-label={`Saved Stacks for ${family}`}>
-      {library.stacks.length ? (
-        <div className="lora-chips">
-          {library.stacks.map((stack) => {
-            const isActive = stack.id === active?.id;
-            if (naming?.mode === 'rename' && naming.id === stack.id) {
-              return <NameField key={stack.id} initial={stack.name} action="Rename" onSave={(name) => { library.renameStack(stack.id, name); setNaming(null); }} onCancel={() => setNaming(null)} />;
-            }
-            return (
-              <Tip key={stack.id} content={<>{stack.loras.map((item) => loraName(item.name, knownLoraInfo()?.[item.name])).join(', ') || 'Empty'}<br /><span className="lora-tip-hint">Double-click to rename</span></>}>
-                <span className={cn('lora-chip', isActive && 'is-active', isActive && modified && 'is-modified')}>
-                  <button
-                    type="button"
-                    className="lora-chip-load"
-                    aria-pressed={isActive}
-                    onClick={() => { if (!isActive || modified) onLoad(stack); setActiveId(stack.id); }}
-                    onDoubleClick={() => setNaming({ mode: 'rename', id: stack.id })}
-                    onKeyDown={(event) => {
-                      if (event.key === 'F2') { event.preventDefault(); setNaming({ mode: 'rename', id: stack.id }); }
-                      if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); remove(stack); }
-                    }}
-                  >
-                    <span className="lora-chip-name">{stack.name}</span>
-                    <em>{stack.loras.length}</em>
-                  </button>
-                  <button type="button" className="lora-chip-remove" aria-label={`Delete Stack ${stack.name}`} onClick={() => remove(stack)}><X size={11} /></button>
-                </span>
-              </Tip>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {naming?.mode === 'new' ? (
+    <PickerDropdown className="lora-stacks" label={`Saved Stacks for ${family}`} triggerLabel={active ? `Stacks: ${active.name}` : 'Stacks'} trigger={<><Bookmark size={14} className="lora-stacks-icon" aria-hidden="true" /><span className="picker-dropdown-text">{active ? active.name : 'Stacks'}</span>{modified ? <i className="lora-stack-modified" aria-hidden="true" /> : null}</>}>
+      {(close) => naming ? (
         <NameField
-          initial={suggestStackName(loras, library.stacks.map((stack) => stack.name))}
-          action="Save"
-          onSave={(name) => { const stack = library.saveStack(name); setActiveId(stack.id); setNaming(null); }}
+          initial={naming === 'rename' && active ? active.name : suggestStackName(loras, library.stacks.map((stack) => stack.name))}
+          action={naming === 'rename' ? 'Rename' : 'Save'}
+          onSave={(name) => {
+            if (naming === 'rename' && active) library.renameStack(active.id, name);
+            else { const stack = library.saveStack(name); setActiveId(stack.id); }
+            setNaming(null);
+            close();
+          }}
           onCancel={() => setNaming(null)}
         />
-      ) : modified && active ? (
-        <div className="lora-stack-changes">
-          <span><i aria-hidden="true" />Unsaved Changes</span>
-          <Tip content={`Save These LoRAs into ${active.name}`}><button type="button" className="lora-text-action is-strong" onClick={() => library.updateStack(active.id)}>Update</button></Tip>
-          <button type="button" className="lora-text-action" onClick={() => setNaming({ mode: 'new' })}>Save As New</button>
-        </div>
-      ) : canSaveNew ? (
-        <button type="button" className="lora-save-chip" onClick={() => setNaming({ mode: 'new' })}>
-          <Save size={12} /> Save Stack{library.stacks.length ? '' : <span> for every {family} workflow</span>}
-        </button>
-      ) : null}
-    </section>
+      ) : <>
+        {sorted.length ? sorted.map((stack) => (
+          <MenuRow key={stack.id} checked={stack.id === active?.id} label={`${stack.name}, ${stack.loras.length} LoRA${stack.loras.length === 1 ? '' : 's'}`} onSelect={() => { onLoad(stack); setActiveId(stack.id); close(); }}>
+            {stack.name}<em className="picker-menu-count">{stack.loras.length}</em>
+          </MenuRow>
+        )) : <p className="picker-menu-note">No saved stacks yet.</p>}
+        <MenuDivider />
+        <MenuRow disabled={!loras.length} onSelect={() => setNaming('new')}>Save Current as New Stack</MenuRow>
+        {active ? <>
+          <MenuRow disabled={!modified || !loras.length} onSelect={() => { library.updateStack(active.id); close(); }}>Update “{active.name}” with Current Picks</MenuRow>
+          <MenuRow onSelect={() => setNaming('rename')}>Rename “{active.name}”</MenuRow>
+          <MenuRow danger onSelect={() => { void library.deleteStack(active); setActiveId(''); close(); }}>Delete “{active.name}”</MenuRow>
+        </> : null}
+      </>}
+    </PickerDropdown>
   );
 }
 
@@ -618,12 +609,11 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
   const update = (index: number, patch: Partial<LoraSelection>) => setLoras((current) => current.map((item, i) => i === index ? { ...item, ...patch } : item));
   const remove = (index: number) => withUndo(`Removed ${loraName(loras[index].name, infos[loras[index].name])}`, loras.filter((_, i) => i !== index));
   const clearAll = () => { withUndo(`Cleared ${loras.length} LoRA${loras.length === 1 ? '' : 's'}`, []); setActiveStackId(''); };
+  // Applying a stack replaces the picks at once; Undo in the status pill brings them back.
   const loadStack = (stack: LoraSnapshot) => {
-    const unsaved = loras.length > 0 && !library.stacks.some((item) => sameStack(item.loras, loras));
-    if (unsaved) withUndo(`Loaded ${stack.name}`, stack.loras);
+    if (loras.length && !sameStack(loras, stack.loras)) withUndo(`Applied ${stack.name}`, stack.loras);
     else library.loadStack(stack);
   };
-  const allOff = loras.length > 0 && loras.every((item) => !item.enabled);
   const move = (from: number, to: number) => setLoras((current) => { const next = [...current]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; });
   const add = (names: string[]) => {
     const fresh = names.filter((name) => !loras.some((item) => item.name === name)).slice(0, Math.max(0, cap - loras.length));
@@ -655,10 +645,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
           max={cap}
           swapping={picker?.swap || null}
           libraryView={browseFirst}
-          stackControls={browseFirst ? <>
-            <Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} />
-            {loras.length ? <div className="lora-library-actions"><button type="button" className="lora-head-action" onClick={() => setLoras(current => current.map(item => ({ ...item, enabled: allOff })))}>{allOff ? 'Enable All' : 'Disable All'}</button></div> : null}
-          </> : undefined}
+          stackControls={browseFirst ? <Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} /> : undefined}
           inlineSelection={{
             items: loras,
             move,
@@ -687,9 +674,6 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
         <span className="lora-count">{loras.length ? <>{activeCount} active <em>· {loras.length}/{cap}</em></> : `Up to ${cap} LoRAs`}</span>
         {loras.length ? (
           <>
-            <Tip content={allOff ? 'Turn All LoRAs Back On' : 'Turn All LoRAs Off'}>
-              <button type="button" className="lora-head-action" onClick={() => setLoras((current) => current.map((item) => ({ ...item, enabled: allOff })))}>{allOff ? 'All on' : 'All off'}</button>
-            </Tip>
             <Tip content="Remove All LoRAs">
               <button type="button" className="lora-head-action" onClick={clearAll}>Clear</button>
             </Tip>
@@ -697,7 +681,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
         ) : null}
       </header>
 
-      <Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} />
+      <div className="lora-head-stacks"><Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} /></div>
 
       {loras.length ? (
         <Reorder.Group as="div" axis="y" values={loras} onReorder={(next) => setLoras(next)} className="lora-list">

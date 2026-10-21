@@ -130,7 +130,7 @@ export function FailurePanel({ item, onCopy, onReuse, fixes, showToast, onNodesI
       {hasDetail ? (
         <div className={cn('failure-detail', open && 'is-open')}>
           <button type="button" className="failure-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-            {open ? 'Hide details' : 'Show details'} <ChevronDown size={13} />
+            {open ? 'Hide details' : 'Show details'} <ChevronDown size={14} />
           </button>
           {open ? (
             <div className="failure-detail-body">

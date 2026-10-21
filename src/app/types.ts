@@ -289,7 +289,6 @@ export type Preferences = {
   variationQueueMode: "batch" | "separate";
   controlsPinned?: boolean;
   countDefaultsVersion?: number;
-  confirmActions: boolean;
   enterToGenerate: boolean;
   /** Wide images take two gallery columns, from three columns up. */
   spanWideImages: boolean;
@@ -299,6 +298,8 @@ export type Preferences = {
   /** Headings for each stretch of time in the gallery ("This evening"). */
   /** Date headings in the gallery ("Today", "This Evening"), from Settings › Studio › Gallery. */
   dateHeaders: boolean;
+  /** Phone tiles show their prompt and name under the picture (Settings › Studio › Gallery); off, only state shows. */
+  phoneTileCaptions?: boolean;
   /** Runs of one idea fold into stacks (runs.js). */
   stackRuns: boolean;
   /** A folded run: a photo with edges under it, or a cover flow inside one card. */

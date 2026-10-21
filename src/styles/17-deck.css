@@ -27,7 +27,7 @@
   z-index: 13;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   padding: 3px;
 }
 
@@ -46,7 +46,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: var(--space-3);
   pointer-events: none;
 }
 .dock-transients > * { pointer-events: auto; }
@@ -54,11 +54,11 @@
 .dock-chip {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
   height: 36px;
   padding: 0 5px 0 13px;
   border: 1px solid var(--glass-border);
-  border-radius: 18px;
+  border-radius: var(--r-pill);
   background: var(--glass-bar-bg);
   -webkit-backdrop-filter: var(--glass-bar-blur);
   backdrop-filter: var(--glass-bar-blur);
@@ -69,11 +69,11 @@
   letter-spacing: -.005em;
   white-space: nowrap;
   cursor: pointer;
-  transition-property: background-color, color, scale;
-  transition-duration: var(--motion-base, 180ms);
-  transition-timing-function: var(--motion-ease, cubic-bezier(.2, 0, 0, 1));
+  transition-property: background-color, background-image, color;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease);
 }
-.dock-chip:hover:not(:disabled) { background: rgb(42 42 42 / .94); }
+.dock-chip:hover:not(:disabled) { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
 .dock-chip:disabled { opacity: .6; cursor: progress; }
 .dock-chip svg { flex: none; opacity: .8; }
 .dock-count {
@@ -82,7 +82,7 @@
   min-width: 26px;
   height: 26px;
   padding: 0 7px;
-  border-radius: 13px;
+  border-radius: var(--r-pill);
   background: #f2f2f2;
   color: #0b0b0b;
   font-size: 11.5px;

@@ -190,13 +190,13 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
   return <Modal open onOpenChange={(next) => { if (!next) onClose(); }} size="sheet" title="Image & Model Library" className="settings-modal library-modal" bodyClassName="set-layout" busy={busy}
     footer={selected && section === 'images' ? <>
       <button className="btn" disabled={busy || !selected.prompt} onClick={() => { onPrompt(selected); onClose(); }}><Wand2 size={15} />Use Prompt</button>
-      <button className="btn is-primary" disabled={busy || Boolean(fit?.blockers.length) || !profile} onClick={() => { if (profile) { onApply(selected, profile); onClose(); } }}><SlidersHorizontal size={15} />Use Settings</button>
+      <button className="btn is-primary" disabled={busy || Boolean(fit?.blockers.length) || !profile} onClick={() => { if (profile) { onApply(selected, profile); onClose(); } }}><SlidersHorizontal size={16} />Use Settings</button>
     </> : undefined}>
     <nav className="set-nav" aria-label="Library Sections">
       {sections.map((item) => {
         const Icon = item.icon;
         return <button key={item.id} type="button" className={cn('set-nav-item', section === item.id && 'active')} aria-current={section === item.id ? 'page' : undefined} aria-controls="library-panel" data-section={item.id} disabled={busy} onClick={() => { setSection(item.id); setSelected(null); }}>
-          <Icon size={15} /><span>{item.label}</span>{item.count ? <small className="library-nav-count">{item.count}</small> : null}
+          <Icon size={16} /><span>{item.label}</span>{item.count ? <small className="library-nav-count">{item.count}</small> : null}
         </button>;
       })}
     </nav>
@@ -204,7 +204,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
     <div className="set-panel library-panel" ref={panel} key={section} id="library-panel" role="region" aria-labelledby="library-panel-title" data-library-ready={loading ? undefined : ''}>
       {section === 'images' && selected ? <>
         <div className="library-review-bar">
-          <button type="button" className="btn is-ghost library-back" disabled={busy} onClick={() => setSelected(null)}><ArrowLeft size={15} />Saved Images</button>
+          <button type="button" className="btn is-ghost library-back" disabled={busy} onClick={() => setSelected(null)}><ArrowLeft size={16} />Saved Images</button>
           <div className="library-review-actions">
             <a className="btn is-ghost library-icon" href={selected.sourceUrl} target="_blank" rel="noreferrer" aria-label="View on Civitai" title="View on Civitai"><ExternalLink size={16} /></a>
             <button type="button" className="btn is-ghost library-icon is-danger" disabled={busy} aria-label="Delete Saved Image" title="Delete Saved Image" onClick={() => remove(selected)}><Trash2 size={16} /></button>
@@ -269,7 +269,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
           {missing.length ? <p className="set-note">Missing files queue on their own when an image is saved.</p> : null}
           {offline}
         </section>
-        {!selected.galleryItemId ? <button type="button" className="btn library-save-legacy" disabled={busy} onClick={() => void run(async () => { const data = await post<{ preset: ImagePreset }>('/api/presets/import', { url: selected.sourceUrl }); select(data.preset); setSaved((current) => keep([data.preset, ...current.filter((preset) => preset.id !== data.preset.id)])); })}><Download size={15} />Save to Gallery</button> : null}
+        {!selected.galleryItemId ? <button type="button" className="btn library-save-legacy" disabled={busy} onClick={() => void run(async () => { const data = await post<{ preset: ImagePreset }>('/api/presets/import', { url: selected.sourceUrl }); select(data.preset); setSaved((current) => keep([data.preset, ...current.filter((preset) => preset.id !== data.preset.id)])); })}><Download size={16} />Save to Gallery</button> : null}
       </> : null}
 
       {section === 'images' && !selected ? <>
@@ -280,15 +280,15 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         <form className="library-link" onSubmit={(event) => { event.preventDefault(); void run(importingImage); }}>
           <label className="sr-only" htmlFor="civitai-image-link">Image Link</label>
           <input id="civitai-image-link" type="url" placeholder="Paste a Civitai image link" disabled={busy} value={url} onChange={(event) => setUrl(event.target.value)} required autoComplete="off" />
-          <button className={cn('btn', url.trim() && 'is-primary')} disabled={busy || !url.trim()}><Link size={15} />{importing ? 'Saving…' : 'Save Image'}</button>
+          <button className={cn('btn', url.trim() && 'is-primary')} disabled={busy || !url.trim()}><Link size={16} />{importing ? 'Saving…' : 'Save Image'}</button>
         </form>
         {importing ? <p className="set-note" role="status">Importing image: reading its settings, saving the original and checking its model files.</p> : null}
         {saved.length > 1 ? <label className="library-search">
-          <Search size={15} aria-hidden="true" />
+          <Search size={16} aria-hidden="true" />
           <input type="search" aria-label="Search Saved Images" placeholder="Search Saved Images" value={query} onChange={(event) => setQuery(event.target.value)} />
         </label> : null}
         {loading ? <div className="library-grid" aria-busy="true" aria-label="Loading Saved Images">{Array.from({ length: 8 }, (_, index) => <span key={index} className="library-card is-skeleton"><span className="library-card-image" /><span className="library-card-text"><i /><i /></span></span>)}</div>
-          : loadError && !saved.length ? <EmptyState title="Couldn’t Load Saved Images" action={<button className="btn" onClick={() => { setLoading(true); void load(); }}><RefreshCw size={15} />Try Again</button>}><span role="alert">{loadError}</span></EmptyState>
+          : loadError && !saved.length ? <EmptyState title="Couldn’t Load Saved Images" action={<button className="btn" onClick={() => { setLoading(true); void load(); }}><RefreshCw size={16} />Try Again</button>}><span role="alert">{loadError}</span></EmptyState>
           : visible.length ? <div className="library-grid">{visible.map((preset) => {
             const count = missingCount(preset);
             return <button type="button" className="library-card" disabled={busy} key={preset.id} onClick={() => open(preset)}>
@@ -307,7 +307,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         <form className="library-link" onSubmit={(event) => { event.preventDefault(); void run(async () => { const data = await post<{ file: ModelFile }>('/api/library/downloads/preview', { url: modelUrl, folder }); setFile(data.file); }); }}>
           <label className="sr-only" htmlFor="model-download-link">Model Or LoRA Link</label>
           <input id="model-download-link" disabled={busy} type="url" value={modelUrl} onChange={(event) => { setModelUrl(event.target.value); setFile(null); }} placeholder="Paste a Civitai model or Hugging Face file link" required autoComplete="off" />
-          <button className="btn" disabled={busy || !modelUrl.trim()}><Search size={15} />Preview Download</button>
+          <button className="btn" disabled={busy || !modelUrl.trim()}><Search size={16} />Preview Download</button>
         </form>
         {huggingFace ? <section className="set-group"><div className="set-card"><div className="set-row">
           <div className="set-row-text"><strong>Destination</strong><span>Hugging Face links name a SafeTensors or GGUF file; choose its folder.</span></div>
@@ -316,7 +316,7 @@ export function PresetLibrary({ onClose, models, refreshModels, onApply, onPromp
         </div></div></section> : <p className="set-note">Civitai models choose their folder on their own.</p>}
         {file ? <section className="set-group"><h4 className="set-group-title">Ready to Download</h4><div className="set-card"><div className="set-row">
           <div className="set-row-text"><strong>{file.file}</strong><span>{[folderName(file.folder), size(file.bytes)].filter(Boolean).join(' · ')}</span></div>
-          <div className="set-row-control"><button type="button" className="btn is-primary" disabled={busy || !access?.available || pending.some((item) => item.id === file.id)} onClick={() => void run(async () => { await post('/api/library/downloads', { id: file.id }); setFile(null); setModelUrl(''); showToast('Download queued', 'success'); })}><Download size={15} />Download</button></div>
+          <div className="set-row-control"><button type="button" className="btn is-primary" disabled={busy || !access?.available || pending.some((item) => item.id === file.id)} onClick={() => void run(async () => { await post('/api/library/downloads', { id: file.id }); setFile(null); setModelUrl(''); showToast('Download queued', 'success'); })}><Download size={16} />Download</button></div>
         </div></div></section> : null}
         {offline}
         <section className="set-group">

@@ -93,14 +93,14 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Profile Name').fill('Video Artists');
   // The ID comes from the name; there is no Profile ID row.
   await expect(page.getByLabel('Profile ID')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Features', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Features', exact: true }).click();
   const features = page.getByRole('listbox', { name: 'Features', exact: true });
   await expect(features.getByRole('option')).toHaveText([/^Cloud Models/, /^Gallery/, /^Image Generation/, /^Image References/, /^LoRAs/, /^NSFW Models/, /^Presets & Civitai Imports/, /^Prompt History/, /^Video Generation/, /^Video References/]);
   // All picks everything at once, dependants included; presets stay with administrators.
-  await page.locator('.multi-select-menu').getByRole('button', { name: 'All', exact: true }).click();
+  await page.locator('.dropdown-menu').getByRole('button', { name: 'All', exact: true }).click();
   for (const name of ['Cloud Models', 'Image References', 'LoRAs', 'NSFW Models', 'Video References']) await expect(features.getByRole('option', { name: new RegExp(`^${name}`) })).toHaveAttribute('aria-selected', 'true');
   await expect(features.getByRole('option', { name: /^Presets & Civitai Imports/ })).toBeDisabled();
-  await page.locator('.multi-select-menu').getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.locator('.dropdown-menu').getByRole('button', { name: 'Clear', exact: true }).click();
   await features.getByRole('option', { name: /^Image Generation/ }).click();
   await features.getByRole('option', { name: /^Video Generation/ }).click();
   await features.getByRole('option', { name: /^LoRAs/ }).click();
@@ -109,11 +109,11 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await expect(features).toHaveCount(0);
   await expect(page.getByLabel('Profile Name')).toBeVisible();
   const users = page.getByRole('region', { name: 'Users', exact: true });
-  await users.getByRole('button', { name: 'Models', exact: true }).click();
-  // Models has no search box; picked rows use the shared accent.
+  await users.getByRole('combobox', { name: 'Models', exact: true }).click();
+  // Models has no search box.
   await expect(page.getByLabel('Search Models', { exact: true })).toHaveCount(0);
   await page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ }).click();
-  await expect(page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ })).toHaveCSS('background-color', 'rgba(255, 154, 82, 0.14)');
+  await expect(page.getByRole('listbox', { name: 'Models', exact: true }).getByRole('option', { name: /^video-hd/ })).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('group', { name: 'Unsaved Changes' }).getByRole('button', { name: 'Discard', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Create Profile', exact: true }).click();
@@ -145,7 +145,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Access Profile to Edit').click();
   await page.getByRole('option', { name: 'Artists', exact: true }).click();
   await expect(page.getByLabel('Profile Name')).toHaveValue('Artists');
-  await expect(users.getByRole('button', { name: 'Models', exact: true })).toContainText('image-fast');
+  await expect(users.getByRole('combobox', { name: 'Models', exact: true })).toContainText('image-fast');
 
   // The placeholder shows by name, not as its sentinel value.
   await expect(page.getByLabel('Account for librechat-user-7')).toContainText('Choose an Account');

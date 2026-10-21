@@ -5,6 +5,7 @@ import { clientJobUuid } from './format';
 import { Modal } from './Modal';
 import { SafeImg } from './SafeImg';
 import type { GalleryItem, Profile } from './types';
+import { Dropdown } from './Dropdown';
 
 export function canAnimatePhoto(item: GalleryItem) {
   return item.status === 'done' && item.type === 'image' && Boolean(item.url) && !item.library;
@@ -101,7 +102,7 @@ export function AnimatePhotos({ items, profiles, autoResizeInputs, onClose }: {
     <button type="button" className="btn" disabled={busy} onClick={onClose}>{remaining.length ? 'Cancel' : 'Done'}</button>
     {remaining.length ? <button type="button" className="btn is-primary" disabled={busy || !profile || remaining.some((draft) => !draft.prompt.trim())} onClick={() => { void submit(); }}>{busy ? 'Queueing…' : queued || drafts.some((draft) => draft.error) ? `Retry ${remaining.length} Remaining` : `Queue ${remaining.length} ${noun(remaining.length)}`}</button> : null}
   </>}>
-    {available.length ? <label className="animation-model">Video Model<select disabled={busy || queued > 0} value={profileId} onChange={(event) => setProfileId(event.target.value)}>{available.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.displayName || candidate.label}</option>)}</select></label> : <p role="status">No ready MiniMax H3 image-to-video model is available. Add its workflow and required model files, then rescan models.</p>}
+    {available.length ? <div className="animation-model"><span aria-hidden="true">Video Model</span><Dropdown label="Video Model" variant="field" disabled={busy || queued > 0} value={profileId} options={available.map((candidate) => ({ value: candidate.id, label: candidate.displayName || candidate.label }))} onChange={setProfileId} /></div> : <p role="status">No ready MiniMax H3 image-to-video model is available. Add its workflow and required model files, then rescan models.</p>}
     {drafts.map((draft, index) => <section className="animation-photo" key={draft.item.id}>
       <SafeImg src={draft.item.thumbnailUrl || draft.item.url} alt={`${extend ? 'Video' : 'Photo'} ${index + 1}`} fallback={<span className="animation-photo-fallback" role="img" aria-label={`${extend ? 'Video' : 'Photo'} ${index + 1} Unavailable`}><Video size={24} /></span>} />
       <label>{extend ? 'Extension' : 'Animation'} Prompt {index + 1}<textarea disabled={busy || draft.queued} maxLength={profile?.constraints?.prompt?.max} rows={4} value={draft.prompt} onChange={(event) => patch(draft.item.id, { prompt: event.target.value })} /></label>

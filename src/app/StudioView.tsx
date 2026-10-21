@@ -1,4 +1,6 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
+import { scrollBehavior } from "@/lib/springs";
+import { popoverMotion } from "./composerSurface";
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
@@ -194,7 +196,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   // A long press selects: the item's actions live in the viewer and the select bar.
   const startSelection = React.useRef(selection.start);
   startSelection.current = selection.start;
-  const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]) } : null, [phone]);
+  const phoneTileCaptions = Boolean(prefs.phoneTileCaptions);
+  const phoneTiles = React.useMemo(() => phone ? { onLongPress: (item: GalleryItem) => startSelection.current([item.id]), captions: phoneTileCaptions } : null, [phone, phoneTileCaptions]);
   const openSearch = React.useCallback(() => {
     setSearchOpen(true);
     document.querySelector<HTMLInputElement>('.gallery-search input, .phone-tools-field input')?.focus();
@@ -342,8 +345,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       // The run's own tile, wherever it is; the top when it isn't rendered yet.
       window.requestAnimationFrame(() => {
         const tile = galleryStageRef.current?.querySelector(`[data-tile-id="${CSS.escape(String(item.id))}"]`);
-        if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
-        else galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        if (tile) tile.scrollIntoView({ block: "center", behavior: scrollBehavior() });
+        else galleryStageRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() });
       });
     },
     onView: (item) => openItem(item)
@@ -390,7 +393,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   }, []);
   // One compact dock, bottom right, in both layouts. Transient actions (tidy up,
   // cancel queue) rise above it as small chips, so the dock never changes size.
-  const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
+  const dockChip = popoverMotion;
   const studioDockRef = React.useRef<HTMLDivElement>(null);
   React.useLayoutEffect(() => {
     const dock = studioDockRef.current;
@@ -665,6 +668,16 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           active.settings?.steps ? `${active.settings.steps} Steps` : '',
           active.type === 'video' && active.settings?.duration ? `${active.settings.duration} s` : '',
         ].filter(Boolean).join(' · ');
+        // The phone's title sits in the top row beside Star · Info · Close: the
+        // name, then where it is in the gallery, when it was made and its size.
+        const viewerList = (view.viewerGallery || []) as GalleryItem[];
+        const viewerIndex = viewerList.findIndex((item) => item.id === active.id);
+        const madeAt = active.createdAt ? new Date(active.createdAt) : null;
+        const phoneDetail = [
+          viewerList.length > 1 && viewerIndex >= 0 ? `${viewerIndex + 1} / ${viewerList.length}` : '',
+          madeAt && !Number.isNaN(madeAt.getTime()) ? madeAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '',
+          profileDetail,
+        ].filter(Boolean).join(' · ');
         return (
           <div className="scrim" role="dialog" aria-modal="true" aria-label="Image Viewer" data-focus-trap tabIndex={-1} onClick={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -673,10 +686,11 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           }} ref={setViewerNode}>
             <div className="viewer-shell" onClick={(event) => event.stopPropagation()}>
               <div className={cn("viewer-stage", showDetails && "with-side")} data-viewer-empty>
-                {showDetails && active.type === "image" ? <header className="viewer-profile-summary" data-open-surface>
+                {/* The title, always (UI-PATTERNS › Action Placement): the profile, then where it is, when and how it was made. */}
+                <header className={cn("viewer-profile-summary", phone && "is-phone")} data-open-surface>
                   <strong>{profileTitle}</strong>
-                  {profileDetail ? <span>{profileDetail}</span> : null}
-                </header> : null}
+                  {phoneDetail ? <span>{phoneDetail}</span> : null}
+                </header>
                 <div
                   data-generation-size={`${active.width} × ${active.height}`}
                   className={cn("viewer-canvas", active.type === 'video' && 'is-video', viewerZoom > 1 && "is-zoomed", isDraggingViewer && "is-dragging")}

@@ -5,6 +5,8 @@ import { CellBar } from './UpscaleDialogs';
 import { Tip } from './components';
 import { cn } from './format';
 import { usePageHidden, usePausableTimeout } from '@/hooks/use-pausable-timeout';
+import { tweens } from '@/lib/springs';
+import { useSettling } from './composerSurface';
 
 /**
  * Activities: the long-running work that floats at the top edge while it
@@ -71,7 +73,8 @@ export type Activity = {
   expire?: { after: number; run: () => void };
 };
 
-const ENTER = { type: 'spring', duration: 0.46, bounce: 0.16 } as const;
+// Enter and leave at --motion-base; the height follows content at --motion-slow, never overshooting.
+const ENTER = { ...tweens.base, height: tweens.slow };
 
 /**
  * The column, in the order given. `onHeight` reports how tall it is, so the
@@ -113,6 +116,7 @@ function keyboardFocus(target: EventTarget) {
 
 function ActivityIsland({ activity }: { activity: Activity }) {
   const reduced = useReducedMotion();
+  const settling = useSettling();
   const [held, setHeld] = useState(false);
   const pageHidden = usePageHidden();
   const [height, setHeight] = useState<number>();
@@ -191,10 +195,11 @@ function ActivityIsland({ activity }: { activity: Activity }) {
       role="status"
       aria-live="polite"
       // Opacity on the glass itself: on a parent it would cut off the backdrop blur.
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: -18, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1, height: height ?? 'auto' }}
-      exit={reduced ? { opacity: 0 } : { opacity: 0, y: -14, scale: 0.96 }}
-      transition={reduced ? { duration: 0.15 } : ENTER}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1, height: height ?? 'auto' }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: tweens.fast }}
+      transition={reduced ? { ...tweens.fast, height: { duration: 0 } } : ENTER}
+      {...settling}
       drag={activity.compact && activity.dismiss ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.55}
@@ -221,10 +226,10 @@ function ActivityIsland({ activity }: { activity: Activity }) {
               <motion.span
                 key={activity.phase}
                 className="activity-copy"
-                initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6, filter: 'blur(3px)' }}
-                animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6, filter: 'blur(3px)' }}
-                transition={{ type: 'spring', duration: 0.38, bounce: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={tweens.fast}
               >
                 <span className="activity-title">
                   <strong>{activity.title}</strong>
@@ -242,7 +247,7 @@ function ActivityIsland({ activity }: { activity: Activity }) {
         </Main>
         {activity.action ? <button type="button" className="island-action" onClick={activity.action.run}>{activity.action.label}</button> : null}
         {activity.dismiss ? (
-          <button type="button" className="island-close" onClick={activity.dismiss.run} aria-label={activity.dismiss.label} title={activity.dismiss.title}><X size={13} /></button>
+          <button type="button" className="island-close" onClick={activity.dismiss.run} aria-label={activity.dismiss.label} title={activity.dismiss.title}><X size={14} /></button>
         ) : null}
         {/* Popped out of the flow as it leaves, so the glass closes while the buttons fade. */}
         <AnimatePresence mode="popLayout" initial={false}>
@@ -253,10 +258,10 @@ function ActivityIsland({ activity }: { activity: Activity }) {
               role="group"
               aria-label="Controls"
               aria-live="off"
-              initial={reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.94, filter: 'blur(4px)' }}
-              animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.97, filter: 'blur(4px)' }}
-              transition={reduced ? { duration: 0.12 } : { type: 'spring', duration: 0.4, bounce: 0.12 }}
+              initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+              animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: tweens.fast }}
+              transition={tweens.base}
             >
               {controls!.map((control) => (
                 <Tip key={control.key} content={control.tip}>
