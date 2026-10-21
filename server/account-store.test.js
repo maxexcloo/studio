@@ -118,7 +118,7 @@ test("the old global switches become per-profile values once, never widening acc
   assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).profiles.mixed.features.cloudModels, true);
 });
 
-test("new accounts start on the default access profile: local, single sign-on and chat gateway", async () => {
+test("new accounts start on the default access profile: local at once, single sign-on and chat gateway after approval unless it is off", async () => {
   store.saveAccessProfile({ id: "starter", name: "Starter", generationProfiles: ["image-fast"], features: { imageGeneration: true } }, ["image-fast"]);
   assert.equal(store.defaultAccessProfileId(), "");
   // Without a default, a new sign-on account waits and an unknown gateway email gets nothing.
@@ -130,8 +130,24 @@ test("new accounts start on the default access profile: local, single sign-on an
   assert.equal(store.setDefaultAccessProfile("starter"), "starter");
   const local = await store.createLocalAccount({ username: "local@example.com", password: "a valid long password" });
   assert.equal(local.accessProfileId, "starter");
-  const signedOn = store.signInWithOidcIdentity({ issuer: "https://id.example", subject: "two", email: "two@example.com", emailVerified: true });
   const profileOf = (username) => store.listAccounts().find((item) => item.username === username);
+
+  // Require Approval is on until an administrator turns it off: new arrivals wait, unassigned.
+  assert.equal(store.requireApproval(), true);
+  assert.deepEqual(store.signInWithOidcIdentity({ issuer: "https://id.example", subject: "waits", email: "waits@example.com", emailVerified: true }), { pending: true });
+  assert.equal(profileOf("waits@example.com").pending, true);
+  assert.equal(profileOf("waits@example.com").accessProfileId, undefined);
+  assert.equal(store.gatewayAccountAccess("chat-waits", "chat.waits@example.com"), null);
+  const waiting = profileOf("chat.waits@example.com");
+  assert.equal(waiting.pending, true);
+  assert.equal(store.gatewayAccountAccess("chat-waits"), null, "linked, but nothing until it is approved");
+  // Approval gives it the default access profile.
+  store.assignAccessProfile(waiting.id, store.defaultAccessProfileId());
+  assert.equal(store.gatewayAccountAccess("chat-waits").userId, waiting.id);
+  assert.throws(() => store.setRequireApproval("no"), /on or off/);
+
+  assert.equal(store.setRequireApproval(false), false);
+  const signedOn = store.signInWithOidcIdentity({ issuer: "https://id.example", subject: "two", email: "two@example.com", emailVerified: true });
   assert.equal(signedOn.access.authenticated, true);
   assert.equal(profileOf("two@example.com").accessProfileId, "starter");
   assert.equal(profileOf("two@example.com").pending, undefined);

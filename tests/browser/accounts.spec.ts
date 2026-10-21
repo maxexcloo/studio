@@ -9,8 +9,10 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   const profiles = [{ id: 'artists', name: 'Artists', generationProfiles: ['image-fast'], features: { loras: true } }];
   const accounts = [
     { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator', disabled: false },
-    { id: 'artist-id', username: 'artist.one', displayName: 'Artist One', role: 'user', accessProfileId: 'artists', disabled: false }
+    { id: 'artist-id', username: 'artist.one', displayName: 'Artist One', role: 'user', accessProfileId: 'artists', disabled: false },
+    { id: 'pending-id', username: 'waiting@example.com', displayName: 'Waiting One', role: 'user', pending: true, signInLinked: true, disabled: false }
   ];
+  const defaults = { defaultAccessProfileId: '', requireApproval: true };
   const route = async (request: import('@playwright/test').Route) => {
     const url = new URL(request.request().url());
     if (url.pathname === '/api/accounts/status') return request.fulfill({ json: { ok: true, mode: 'multi-user', signedIn, account: signedIn ? { id: 'admin-id', role: 'administrator' } : null } });
@@ -20,7 +22,7 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
     }
     if (url.pathname === '/api/accounts/mcp-token' && request.request().method() === 'GET') return request.fulfill({ json: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } });
     if (url.pathname === '/api/accounts/me') return request.fulfill({ json: { ok: true, account: { id: 'admin-id', username: 'recovery', displayName: 'Recovery', role: 'administrator' }, mcp: { enabled: false, createdAt: '', endpoint: 'https://studio.example.test/mcp' } } });
-    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], defaultAccessProfileId: '', lockedFeatures: { loras: false, cloudModels: false, presets: false }, gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
+    if (url.pathname === '/api/accounts/admin') return request.fulfill({ json: { ok: true, accounts, accessProfiles: profiles, availableProfiles: ['image-fast', 'video-hd'], ...defaults, lockedFeatures: { loras: false, cloudModels: false, presets: false }, gateway: { links: [], pending: [{ identity: 'librechat-user-7', firstSeenAt: '2026-10-19T00:00:00.000Z', lastSeenAt: '2026-10-19T00:00:00.000Z' }] } } });
     if (url.pathname === '/api/accounts/gateway-links') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, gateway: { links: [], pending: [] } } });
@@ -34,14 +36,16 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
       return request.fulfill({ json: { ok: true, profile: request.request().postDataJSON() } });
     }
     if (url.pathname === '/api/accounts/default-profile' && request.request().method() === 'POST') {
-      posts.push({ url: url.pathname, body: request.request().postDataJSON() });
-      return request.fulfill({ json: { ok: true, defaultAccessProfileId: request.request().postDataJSON().accessProfileId } });
+      const body = request.request().postDataJSON();
+      posts.push({ url: url.pathname, body });
+      Object.assign(defaults, typeof body.accessProfileId === 'string' ? { defaultAccessProfileId: body.accessProfileId } : {}, typeof body.requireApproval === 'boolean' ? { requireApproval: body.requireApproval } : {});
+      return request.fulfill({ json: { ok: true, ...defaults } });
     }
     if (url.pathname === '/api/accounts/users' && request.request().method() === 'POST') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, account: { ...request.request().postDataJSON(), id: 'new-user', role: 'user' } } });
     }
-    if (url.pathname === '/api/accounts/users/artist-id' && request.request().method() === 'PATCH') {
+    if (/^\/api\/accounts\/users\/(artist|pending)-id$/.test(url.pathname) && request.request().method() === 'PATCH') {
       posts.push({ url: url.pathname, body: request.request().postDataJSON() });
       return request.fulfill({ json: { ok: true, account: { id: 'artist-id', ...request.request().postDataJSON() } } });
     }
@@ -125,6 +129,14 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   await page.getByLabel('Default Access Profile', { exact: true }).click();
   await page.getByRole('option', { name: 'Artists', exact: true }).click();
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/default-profile')?.body).toEqual({ accessProfileId: 'artists' });
+  // Require Approval sits beside it, on until turned off; a waiting sign-in is approved onto the default.
+  const approval = page.getByRole('switch', { name: 'Require Approval', exact: true });
+  await expect(approval).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: 'Approve Waiting One', exact: true }).click();
+  await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/pending-id')?.body).toEqual({ accessProfileId: 'artists' });
+  await approval.click();
+  await expect.poll(() => posts.filter((post) => post.url === '/api/accounts/default-profile').at(-1)?.body).toEqual({ requireApproval: false });
+  await expect(approval).toHaveAttribute('aria-checked', 'false');
   await page.locator('.set-row').filter({ hasText: 'artist.one' }).getByRole('button', { name: 'Disable', exact: true }).click();
   // Disabling is reversible, so it acts at once.
   await expect.poll(() => posts.find((post) => post.url === '/api/accounts/users/artist-id')?.body).toEqual({ disabled: true });

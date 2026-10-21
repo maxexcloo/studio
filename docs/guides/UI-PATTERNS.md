@@ -305,7 +305,7 @@ holds:
 | Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery, General, Generation and Sharing | Everyone |
-| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile, then each account; New Account on the heading) and Chat Gateway | Administrators |
+| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
 | Workers | ComfyUI connections, restart, AI Control (what each GPU runs), then Upscale's status as its own group | Administrators; everyone reads AI Control's and Upscale's status |
 
 **Order:** Account comes first, then the pages alphabetically; groups, rows,

@@ -126,6 +126,24 @@ export function defaultAccessProfileId() {
   return validAccountKey(id) && store.profiles[id] ? id : "";
 }
 
+/**
+ * Whether new single sign-on and chat gateway accounts wait for an administrator even with a
+ * default access profile. On unless an administrator turned it off, so an upgrade widens nothing.
+ */
+export function requireApproval() {
+  return readStore().requireApproval !== false;
+}
+
+export function setRequireApproval(on) {
+  if (typeof on !== "boolean") throw new Error("Choose on or off.");
+  readStore().requireApproval = on;
+  saveStore();
+  return requireApproval();
+}
+
+/** The default access profile a new self-arriving account starts on now, or "" when it waits. */
+const startingProfileId = () => requireApproval() ? "" : defaultAccessProfileId();
+
 export function setDefaultAccessProfile(profileId) {
   const store = readStore();
   if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId])) throw new Error("Choose an existing access profile.");
@@ -383,27 +401,37 @@ export function gatewayAccountAccess(identity, email = "") {
 }
 
 // The gateway is trusted and its emails come from the shared identity provider, so a matching username is the same person.
-// An email no account has becomes a new account on the default access profile, when there is one.
+// While a default access profile is set, an email no account has becomes a new account: on the
+// default at once, or waiting for approval (linked already, so approval is all it needs).
 function linkGatewayEmail(store, identity, email) {
   if (!validGatewayIdentity(email) || !email.includes("@")) return null;
   const key = usernameKey(email);
   let account = store.accounts.find((item) => usernameKey(item.username) === key);
+  let created = false;
   if (!account && defaultAccessProfileId() && validUsername(email)) {
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username: String(email).trim().normalize("NFKC"),
       displayName: String(email).trim().slice(0, 80),
       role: accountRoles.user,
-      accessProfileId: defaultAccessProfileId(),
+      ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
       identity: { provider: "gateway" },
       disabled: false,
       createdAt: new Date().toISOString()
     };
     store.accounts.push(account);
+    created = true;
   }
   if (account?.disabled) return null;
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
-  if (!access?.authenticated) return null;
+  if (!access?.authenticated) {
+    if (created) {
+      store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
+      store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
+      saveStore();
+    }
+    return null;
+  }
   store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
   store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
   saveStore();
@@ -493,8 +521,8 @@ export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerif
       role: accountRoles.user,
       identity: { provider: "pocket-id" },
       oidc: { issuer, subject, linkedAt: new Date().toISOString() },
-      // With a default access profile it starts on that; otherwise an administrator approves it.
-      ...(defaultAccessProfileId() ? { accessProfileId: defaultAccessProfileId() } : { pending: true }),
+      // With a default access profile and approval off it starts on that; otherwise an administrator approves it.
+      ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
       disabled: false,
       createdAt: new Date().toISOString()
     };

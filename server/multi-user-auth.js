@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, defaultAccessProfileId, ensureBuiltInAccessProfiles, listAccessProfiles, setDefaultAccessProfile, listAccounts, migrateCloudModelAccess, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
+import { accountAccessForId, ownAccount, updateOwnAccount, validateOwnAccountChange, wrongCurrentPassword, dismissGatewayIdentity, listGatewayIdentities, setGatewayLink, signInWithOidcIdentity, accountMcpTokenStatus, accountSession, accountStoreSnapshot, assignAccessProfile, createAccountSession, createLocalAccount, defaultAccessProfileId, requireApproval, setRequireApproval, ensureBuiltInAccessProfiles, listAccessProfiles, setDefaultAccessProfile, listAccounts, migrateCloudModelAccess, revokeAccountMcpToken, revokeAccountSession, rotateAccountMcpToken, saveAccessProfile, setAccountDisabled, verifyAccountMcpToken, verifyLocalAccount } from "./account-store.js";
 import { canAdmin, clientOf, endDeviceSession } from "./access.js";
 import { grokEnabled, lorasEnabled, presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
@@ -293,6 +293,7 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
       accessProfiles: listAccessProfiles(),
       availableProfiles: profiles,
       defaultAccessProfileId: defaultAccessProfileId(),
+      requireApproval: requireApproval(),
       // Features the deployment switched off for everyone; their access-profile options show locked.
       lockedFeatures: { loras: !lorasEnabled, cloudModels: !grokEnabled, presets: !presetsEnabled() },
       gateway: listGatewayIdentities()
@@ -302,7 +303,10 @@ export function registerMultiUserAuthRoutes(app, { availableProfiles = async () 
   post("/api/accounts/default-profile", (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     try {
-      res.json({ ok: true, defaultAccessProfileId: setDefaultAccessProfile(typeof req.body?.accessProfileId === "string" ? req.body.accessProfileId : "") });
+      const body = req.body || {};
+      if (typeof body.requireApproval === "boolean") setRequireApproval(body.requireApproval);
+      if (typeof body.accessProfileId === "string") setDefaultAccessProfile(body.accessProfileId);
+      res.json({ ok: true, defaultAccessProfileId: defaultAccessProfileId(), requireApproval: requireApproval() });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }

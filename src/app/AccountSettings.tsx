@@ -1,10 +1,10 @@
 import React from 'react';
-import { Ban, Copy, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
+import { Ban, Check, Copy, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
 import { cachedMe, emailFieldProps, knownAccountStatus, loadMe, looksLikeEmail, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
 import { apiJson } from './api';
 import { Skeleton, StudioSelect } from './components';
 import { MultiSelect, type MultiSelectOption } from './MultiSelect';
-import { Group, GroupAction, Row, SaveRow } from './SettingsControls';
+import { Group, GroupAction, Row, SaveRow, SwitchRow } from './SettingsControls';
 import type { ConfirmAction } from './useConfirmation';
 import type { ShowToast } from './toast';
 
@@ -12,7 +12,7 @@ type Feature = 'cloudModels' | 'gallery' | 'imageGeneration' | 'imageReferences'
 type AccessProfile = { id: string; name: string; generationProfiles: string[]; allModels?: boolean; features: Record<Feature, boolean> };
 type Account = { id: string; username: string; displayName: string; role: 'administrator' | 'user'; accessProfileId?: string; disabled: boolean; identity?: { provider?: string }; pending?: boolean; signInLinked?: boolean };
 type GatewayIdentities = { links: { identity: string; accountId: string; linkedAt: string }[]; pending: { identity: string; firstSeenAt: string; lastSeenAt: string }[] };
-type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; defaultAccessProfileId?: string; lockedFeatures?: Partial<Record<Feature, boolean>>; gateway?: GatewayIdentities };
+type AdminData = { accessProfiles: AccessProfile[]; availableProfiles: string[]; accounts: Account[]; defaultAccessProfileId?: string; requireApproval?: boolean; lockedFeatures?: Partial<Record<Feature, boolean>>; gateway?: GatewayIdentities };
 export type ProfileInfo = { label: string; kind?: string; cloud?: boolean; nsfw?: boolean };
 
 /** Access-profile features, alphabetically (UI-PATTERNS › Settings). */
@@ -364,6 +364,10 @@ function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: Ad
     if (next === (admin.defaultAccessProfileId || '')) return;
     if (await run('default', () => apiJson('/api/accounts/default-profile', jsonPost('POST', { accessProfileId: next })), 'Couldn’t save the default access profile')) showToast('Default access profile saved', 'success');
   };
+  const approval = admin.requireApproval !== false;
+  const setApproval = async (next: boolean) => {
+    if (await run('approval', () => apiJson('/api/accounts/default-profile', jsonPost('POST', { requireApproval: next })), 'Couldn’t save Require Approval')) showToast(next ? 'New sign-ins wait for approval' : 'New sign-ins start at once', 'success');
+  };
   const reset = () => { setUsername(''); setDisplayName(''); setPassword(''); setProfileId(startingProfile()); setCreating(false); };
   const create = async () => {
     if (await run('new', () => apiJson('/api/accounts/users', jsonPost('POST', { username: username.trim(), displayName, ...(password ? { password } : {}), accessProfileId: profileId })), 'Couldn’t create the account')) {
@@ -385,9 +389,11 @@ function AccountsGroup({ admin, showToast, confirmAction, onSaved }: { admin: Ad
     <Row label="Default Access Profile" description={defaultId ? 'New accounts start on it: added here, through single sign-on or the chat gateway.' : 'New single sign-on accounts wait for approval, and the chat gateway adds no accounts.'} disabled={busy === 'default'}>
       <div className="set-type-picker"><StudioSelect ariaLabel="Default Access Profile" value={defaultId || NONE} options={[{ label: 'None · Approve Each', value: NONE }, ...byProfileName(admin.accessProfiles).map((profile) => ({ label: profile.name, value: profile.id }))]} onChange={(value) => void setDefault(value)} /></div>
     </Row>
+    {defaultId ? <SwitchRow label="Require Approval" description={approval ? 'New single sign-on and chat gateway accounts wait here, then get the default access profile when approved.' : 'New single sign-on and chat gateway accounts start on the default access profile at once.'} checked={approval} disabled={busy === 'approval'} onChange={(next) => void setApproval(next)} /> : null}
     {byName(admin.accounts).map((account) => {
       const isAdmin = account.role === 'administrator';
       return <Row key={account.id} label={account.displayName} description={`${account.username} · ${isAdmin ? 'Administrator' : 'User'}${account.signInLinked ? ' · single sign-on' : ''}${account.identity?.provider === 'gateway' ? ' · chat gateway' : ''}${account.pending ? ' · waiting for approval' : ''}${account.disabled ? ' · disabled' : ''}`} disabled={account.disabled}>
+        {account.pending && defaultId ? <button className="btn is-primary" disabled={Boolean(busy)} aria-label={`Approve ${account.displayName}`} onClick={() => void assign(account, defaultId)}><Check size={14} /> Approve</button> : null}
         {isAdmin ? <span className="set-locked-value">Full Access</span> : <div className="set-type-picker"><StudioSelect ariaLabel={`Access Profile for ${account.username}`} value={account.accessProfileId || NONE} options={profileOptions(account.accessProfileId || '')} onChange={(value) => void assign(account, value)} /></div>}
         <button className="btn is-ghost" disabled={Boolean(busy)} onClick={() => void toggleDisabled(account)}>{account.disabled ? <><Power size={14} /> Enable</> : <><Ban size={14} /> Disable</>}</button>
       </Row>;
