@@ -15,9 +15,11 @@ import { LibraryDownloads } from './LibraryDownloads';
 
 /*
  * The Library (UI-PATTERNS › Library), administrators only: the Settings
- * panel's anatomy with five pages, one at a time. Import takes a link;
+ * panel's anatomy with five pages, one at a time. Import takes a link or an
+ * image file;
  * Images are the saved Civitai images with their grade; LoRAs and Models are
- * what is installed and catalogued, with provenance; Downloads lists every
+ * what is installed and catalogued, with provenance and Update Available
+ * (Updates view); Downloads lists every
  * model download. Import and Images follow the deployment's Presets &
  * Civitai Imports switch. Messages go to the status pill.
  */
@@ -132,9 +134,9 @@ export function Library({ onClose, models, refreshModels, onApply, onPrompt, sho
         })}
       </nav>
       <div className="set-panel library-panel" key={`${section}:${visit}`} id="library-panel" role="region" aria-labelledby="library-panel-title">
-        {section === 'import' ? <LibraryImport showToast={showToast} downloads={downloads} landed={landed} busy={busy} run={runAndPoll} refreshModels={refreshModels} onOpenImage={(id) => { setOpenImage(id); setSection('images'); }} /> : null}
+        {section === 'import' ? <LibraryImport showToast={showToast} downloads={downloads} landed={landed} busy={busy} run={runAndPoll} refreshModels={refreshModels} onOpenImage={(id) => { setOpenImage(id); setSection('images'); }} models={models} onApply={onApply} onPrompt={onPrompt} onClose={onClose} /> : null}
         {section === 'images' ? <LibraryImages models={models} refreshModels={refreshModels} onApply={onApply} onPrompt={onPrompt} onClose={onClose} showToast={showToast} downloads={downloads} landed={landed} busy={busy} run={runAndPoll} open={openImage} onOpened={() => setOpenImage('')} onImport={() => go('import')} onCount={setImageCount} /> : null}
-        {section === 'loras' || section === 'models' ? <LibraryItems page={section} landed={landed} showToast={showToast} /> : null}
+        {section === 'loras' || section === 'models' ? <LibraryItems page={section} landed={landed} showToast={showToast} busy={busy} run={runAndPoll} onUpdates={() => void refreshModels(false)} /> : null}
         {section === 'downloads' ? <LibraryDownloads downloads={downloads} busy={busy} run={run} onChanged={changed} /> : null}
       </div>
     </Modal>

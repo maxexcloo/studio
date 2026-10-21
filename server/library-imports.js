@@ -9,6 +9,13 @@
  * grades it (library-grade.js), writes catalogue entries for LoRAs and queues Download Missing
  * through the worker model API (library-downloads.js → model-downloads.js → worker-models.js).
  * Nothing downloads on its own. Checkpoint imports are recorded only; profile drafts come later.
+ *
+ * Dropped image files (PNG, WebP, JPEG) are read by image-metadata.js: their prompt, settings and
+ * files become the record's preset and resources, matched by hash first, then by name. An image
+ * without metadata is described by the assistant's vision model (graded Partial). A missing file
+ * gets the nearest installed stand-in (library-substitutes.js), marked and lowering the grade,
+ * with Use Exact File once the exact one is installed. Offers (library-offers.js) are other
+ * versions and variants that fit; one is downloaded only when chosen.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -17,6 +24,8 @@ import { currentDataDir } from './data-dir.js';
 import { readJsonFile, removeJsonFile, writeJsonFile } from './json-store.js';
 import { gradeImport, presetGrade } from './library-grade.js';
 import { catalogueKinds } from './library-catalogue.js';
+import { imageRecipe, readImageMetadata } from './image-metadata.js';
+import { publicOffers } from './library-offers.js';
 
 export const importLimit = 500;
 const idPattern = /^imp-[a-z0-9]{6,40}$/;
@@ -99,8 +108,8 @@ export function importStore(options = {}) {
 /** A record as the browser and MCP see it: no download specs. */
 export function publicImport(record) {
   if (!record) return null;
-  const { pendingEntries: _pending, ...rest } = record;
-  return { ...rest, resources: (record.resources || []).map(({ spec, ...resource }) => resource) };
+  const { pendingEntries: _pending, entryBase: _entry, ...rest } = record;
+  return { ...rest, resources: (record.resources || []).map(({ spec, ...resource }) => resource), offers: publicOffers(record.offers || []) };
 }
 
 /** The import's state from its resources. */
@@ -108,17 +117,42 @@ export function importState(record) {
   if (record.state === 'failed' || record.state === 'cancelled' || record.state === 'resolving') return record.state;
   const resources = record.resources || [];
   if (resources.some((resource) => resource.status === 'downloading')) return 'downloading';
+  if (record.input?.kind === 'described') return 'ready';
+  // A recipe is ready once every file it needs is there, a stand-in included.
+  if (record.recipe) return resources.filter((resource) => !resource.optional).every((resource) => ['installed', 'substitute'].includes(resource.status)) ? 'ready' : 'needs-files';
   const required = resources.filter((resource) => !resource.optional);
   const counted = required.length ? required : resources.filter((resource) => resource.status === 'installed');
   if (counted.length && counted.every((resource) => resource.status === 'installed')) return 'ready';
   return 'needs-files';
 }
 
-/** Grade a model-file import (no prompt to grade) or a saved image (its preset). */
+const modelRoles = new Set(['checkpoint', 'diffusion_model']);
+
+/** Grade a model-file import (no prompt to grade), a saved image (its preset), a dropped image (its recipe) or a described one. */
 export function gradeRecord(record, preset = null) {
   if (preset) return presetGrade(preset);
-  return gradeImport({ resources: (record.resources || []).map((resource) => ({ ...resource, name: resource.name || resource.want?.file })) });
+  const resources = (record.resources || []).map((resource) => ({ ...resource, name: resource.name || resource.want?.file }));
+  if (record.input?.kind === 'described') {
+    // Always Partial: nothing was recorded, so nothing can be matched exactly.
+    const notes = [record.suggestion?.profileLabel ? `Suggested profile: ${record.suggestion.profileLabel}` : '', resources.length ? `Suggested LoRAs: ${resources.map((resource) => resource.name).join(', ')}` : ''].filter(Boolean);
+    return { value: 'partial', reasons: ['Described by AI; no recorded settings', ...notes], missingFields: [] };
+  }
+  if (record.recipe) {
+    const models = resources.filter((resource) => modelRoles.has(resource.role) && !resource.optional);
+    const model = models.find((resource) => resource.status === 'installed' || resource.status === 'substitute');
+    const settings = record.preset?.settings || {};
+    return gradeImport({
+      resources,
+      recipe: { ...settings, prompt: record.preset?.prompt, negative: record.preset?.negative, negativeUsed: record.recipe.negativeUsed, cfgUsed: true },
+      approximate: record.recipe.approximate || [],
+      extraProcessing: Boolean(record.recipe.extraProcessing),
+      baseModel: { required: models.length > 0, installed: Boolean(model), profile: Boolean(model?.status === 'substitute' ? model.substitute?.profileId || model.profileId : model?.profileId) }
+    });
+  }
+  return gradeImport({ resources });
 }
+
+const fileTitle = (name) => String(name || '').replace(/\\/g, '/').split('/').pop().replace(/\.(png|webp|jpe?g)$/i, '').trim().slice(0, 200);
 
 /* --------------------------------------------------------------- Engine */
 
@@ -131,8 +165,17 @@ export function gradeRecord(record, preset = null) {
  *   catalogue                             library-catalogue.js store (edit)
  *   importImage(url)                      a saved image: the matched preset (preset-routes.js)
  *   resolvePreset(id, {verify})           a saved image again, matched
+ *   matchImage(item)                      a dropped image's recipe resource → {name, version, want, spec?, unavailable?, nameOnly?, unsourced?, note}
+ *   substituteFor(resource, record)       the nearest installed stand-in (library-substitutes.js), or null
+ *   profileFor(file)                      the profile id that runs an installed base model, or '' (may be async)
+ *   pictures                              {save(id, buffer), copy(from, to)}: the import's own picture
+ *   describe({id})                        the vision model's prompt for the import's picture
+ *   vision()                              {available, reason}: whether the assistant can read images
  */
-export function createImportEngine({ store = importStore(), resolveCivitai, resolveHf, detect, inspect, downloads, startDownload, catalogue, importImage, resolvePreset }) {
+export function createImportEngine({ store = importStore(), resolveCivitai, resolveHf, detect, inspect, downloads, startDownload, catalogue, importImage, resolvePreset,
+  matchImage = async (item) => ({ name: item.name || item.file, want: { file: item.file || '', folder: item.folder || '', sha256: '' }, unsourced: true }),
+  substituteFor = async () => null, profileFor = () => '', pictures = { save: async () => false, copy: async () => false },
+  describe = async () => { throw new Error('The prompt assistant isn’t set up.'); }, vision = async () => ({ available: false, reason: 'The prompt assistant isn’t set up.' }) }) {
   /** Each resource's status from the files and the download queue, then the grade and state. */
   async function refresh(record, { verify = false } = {}) {
     if (record.state === 'failed' || record.state === 'resolving') return record;
@@ -158,14 +201,31 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
       }
       delete resource.progress;
       if (resource.downloadId && recent.get(resource.downloadId)?.status === 'error') resource.downloadError = recent.get(resource.downloadId).error || 'The download stopped.';
-      const found = await inspect(resource.want, { verify }).catch(() => ({ status: 'missing' }));
+      const found = resource.want.file ? await inspect(resource.want, { verify }).catch(() => ({ status: 'missing' })) : { status: 'missing' };
+      // A stand-in stays in use until Use Exact File, which appears once the exact file is installed.
+      if (resource.substitute) {
+        resource.status = 'substitute';
+        resource.exactInstalled = found.status === 'installed';
+        continue;
+      }
       if (found.status === 'installed') {
         resource.status = 'installed';
         delete resource.downloadError;
         if (found.unverified) resource.unverified = true; else delete resource.unverified;
+        if (modelRoles.has(resource.role)) resource.profileId = await Promise.resolve(profileFor(resource.want.file)).catch(() => '') || '';
       } else if (resource.unavailable) resource.status = 'unavailable';
-      else if (!resource.spec) resource.status = 'unsupported';
+      else if (!resource.spec) resource.status = resource.unsourced ? 'missing' : 'unsupported';
       else resource.status = found.status === 'conflict' ? 'conflict' : 'missing';
+      if (record.recipe && !resource.optional && resource.status !== 'installed' && resource.status !== 'conflict') {
+        const stand = await Promise.resolve(substituteFor(resource, record)).catch(() => null);
+        if (stand?.file) {
+          resource.substitute = stand;
+          resource.status = 'substitute';
+          resource.exactInstalled = false;
+          if (stand.profileId) resource.profileId = stand.profileId;
+          else if (modelRoles.has(resource.role)) resource.profileId = await Promise.resolve(profileFor(stand.file)).catch(() => '') || '';
+        }
+      }
     }
     record.grade = gradeRecord(record);
     record.state = importState(record);
@@ -198,7 +258,8 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
       const resolved = kind === 'civitai-model' ? await resolveCivitai(record.input.url) : await resolveHf(record.input.url);
       Object.assign(record, {
         title: resolved.title, version: resolved.version || '', baseModel: resolved.baseModel || '', modelType: resolved.type || '', nsfw: resolved.nsfw ?? null, links: resolved.links || {},
-        resources: resolved.resources.map((resource) => ({ ...resource, status: 'missing' })), state: 'needs-files'
+        resources: resolved.resources.map((resource) => ({ ...resource, status: 'missing' })), offers: resolved.offers || [], state: 'needs-files',
+        ...(resolved.entry ? { entryBase: resolved.entry } : {})
       });
       await refresh(record);
       const entries = kind === 'civitai-model' ? [{ resource: record.resources[0], patch: resolved.entry }]
@@ -222,7 +283,8 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
     if (record.input.kind === 'civitai-image') throw new Error('Saved images download their files from Images.');
     await refresh(record);
     const chosen = record.resources.filter((resource, index) => indices ? indices.includes(index) : !resource.optional);
-    const queue = chosen.filter((resource) => ['missing'].includes(resource.status) && resource.spec && !resource.unavailable);
+    // A stand-in's exact file downloads only when chosen.
+    const queue = chosen.filter((resource) => (resource.status === 'missing' || (indices && resource.status === 'substitute' && !resource.exactInstalled)) && resource.spec && !resource.unavailable);
     if (!queue.length) throw new Error(chosen.some((resource) => resource.unavailable) ? 'Those files can’t be downloaded.' : 'Nothing is missing.');
     const failures = [];
     for (const resource of queue) {
@@ -280,5 +342,112 @@ export function createImportEngine({ store = importStore(), resolveCivitai, reso
     return store.put(record);
   }
 
-  return { create, list, open, refresh, downloadMissing, setFolder };
+  /** Prompt, settings and files read from a dropped image; without metadata, the vision model describes it. */
+  async function createFromImage({ data, name = '', by = '', origin = 'ui' } = {}) {
+    const metadata = Buffer.isBuffer(data) ? readImageMetadata(data) : null;
+    if (!metadata) throw new Error('Drop a PNG, WebP or JPEG image.');
+    const recipe = imageRecipe(metadata);
+    const record = store.put({ id: importId(), createdAt: now(), by: String(by || ''), origin, input: { kind: 'image-file', fileName: String(name || '').slice(0, 200), format: metadata.format }, state: 'resolving', title: fileTitle(name) || 'Dropped Image', resources: [], offers: [], grade: { value: 'partial', reasons: ['Resolving'], missingFields: [] }, results: { catalogueKeys: [] } });
+    try {
+      record.picture = Boolean(await pictures.save(record.id, data).catch(() => false));
+      if (!recipe) {
+        const sight = await vision().catch(() => ({ available: false, reason: 'The assistant couldn’t be reached.' }));
+        if (!sight.available) {
+          record.state = 'failed';
+          record.error = `This image has no generation metadata. ${sight.reason || 'The assistant model can’t read images.'}`;
+          record.grade = { value: 'partial', reasons: [record.error], missingFields: [] };
+          return store.put(record);
+        }
+        return await describeInto(record);
+      }
+      record.recipe = { source: recipe.source, negativeUsed: recipe.negativeUsed, approximate: recipe.approximate, extraProcessing: recipe.extraProcessing };
+      record.preset = { prompt: recipe.prompt, negative: recipe.negative, settings: recipe.settings, warnings: recipe.warnings };
+      record.warnings = recipe.warnings;
+      if (recipe.resources.length > 24) throw new Error('This image references too many files to import.');
+      for (const item of recipe.resources) {
+        const matched = await matchImage(item).catch((error) => ({ name: item.name || item.file, want: { file: item.file || '', folder: item.folder, sha256: '' }, unsourced: true, note: error.message }));
+        record.resources.push({ role: item.role, ...(item.role === 'lora' ? { strength: item.strength ?? null } : {}), ...matched, status: 'missing' });
+      }
+      record.state = 'needs-files';
+      await refresh(record);
+      return store.put(record);
+    } catch (error) {
+      record.state = 'failed';
+      record.error = error.message || 'Couldn’t read that image.';
+      record.grade = { value: 'partial', reasons: [record.error], missingFields: [] };
+      return store.put(record);
+    }
+  }
+
+  /** The vision model's prompt, negative, profile and LoRAs for the record's picture. */
+  async function describeInto(record) {
+    try {
+      const result = await describe({ id: record.id });
+      record.input = { ...record.input, kind: 'described' };
+      record.preset = { prompt: result.prompt, negative: result.negative || '', settings: {}, warnings: [] };
+      record.suggestion = { profileId: result.profileId || '', profileLabel: result.profileLabel || '', model: result.model || '' };
+      record.resources = (result.loras || []).map((lora) => ({ role: 'lora', name: lora.title || lora.name || lora, want: { file: lora.name || lora, folder: 'loras', sha256: '' }, strength: lora.strength ?? null, suggested: true, optional: true, unsourced: true, note: 'Suggested by the assistant', status: 'missing' }));
+      delete record.recipe;
+      delete record.error;
+      record.state = 'ready';
+      await refresh(record);
+      return store.put(record);
+    } catch (error) {
+      record.state = 'failed';
+      record.error = `The assistant couldn’t describe this image: ${error.message}`;
+      record.grade = { value: 'partial', reasons: [record.error], missingFields: [] };
+      return store.put(record);
+    }
+  }
+
+  /** Describe an imported image with the vision model, as a new record beside the original. */
+  async function describeImport(id, { by = '', origin = 'ui' } = {}) {
+    const source = store.get(id);
+    if (!source?.picture) throw new Error('Only an imported image can be described.');
+    const sight = await vision();
+    if (!sight.available) throw new Error(sight.reason || 'The assistant model can’t read images.');
+    const record = store.put({ id: importId(), createdAt: now(), by: String(by || ''), origin, input: { kind: 'described', fileName: source.input.fileName || '', fromId: source.id }, state: 'resolving', title: source.title, resources: [], offers: [], grade: { value: 'partial', reasons: ['Resolving'], missingFields: [] }, results: { catalogueKeys: [] } });
+    record.picture = Boolean(await pictures.copy(source.id, record.id).catch(() => false));
+    return describeInto(record);
+  }
+
+  /** Swap a stand-in back for the exact file, once it is installed. */
+  async function useExact(id, index) {
+    const record = store.get(id);
+    const resource = record?.resources?.[index];
+    if (!resource?.substitute) throw new Error('That file isn’t using a substitute.');
+    await refresh(record, { verify: true });
+    if (!resource.exactInstalled) throw new Error(`${resource.want.file || resource.name} isn’t installed yet. Download it first.`);
+    delete resource.substitute;
+    delete resource.exactInstalled;
+    await refresh(record, { verify: true });
+    return store.put(record);
+  }
+
+  /** Download one offered version or variant: it joins the import as an optional file. */
+  async function acceptOffer(id, index, { by = '' } = {}) {
+    const record = store.get(id);
+    const offer = record?.offers?.[index];
+    if (!offer) throw new Error('That offer is gone. Open the import again.');
+    if (!offer.spec) throw new Error(offer.unavailable?.note || 'That file can’t be downloaded.');
+    let at = record.resources.findIndex((resource) => resource.spec?.id === offer.spec.id);
+    if (at < 0) {
+      const { url, ...source } = offer.source || {};
+      record.resources.push({
+        role: catalogueKinds[offer.folder] || 'model', name: record.title || offer.file, version: offer.label,
+        want: { file: offer.file, folder: offer.folder, sha256: offer.spec.sha256, bytes: offer.bytes, source: { ...source, url } },
+        supported: true, spec: offer.spec, optional: true, offered: offer.relation, note: `${offer.variant}${offer.baseModel ? ` · ${offer.baseModel}` : ''}`, status: 'missing'
+      });
+      at = record.resources.length - 1;
+      if (offer.folder === 'loras' && record.entryBase && source.provider) {
+        const links = source.provider === 'civitai' ? { civitaiCom: url, civitaiRed: String(url).replace('://civitai.com/', '://civitai.red/') } : { hf: url };
+        record.pendingEntries = { ...(record.pendingEntries || {}), [offer.file]: { ...record.entryBase, version: offer.label, sha256: offer.spec.sha256, ...(offer.bytes ? { bytes: offer.bytes } : {}), links, source } };
+      }
+      store.put(record);
+    }
+    offer.taken = true;
+    return downloadMissing(id, { indices: [at], by });
+  }
+
+  return { create, createFromImage, describeImport, useExact, acceptOffer, list, open, refresh, downloadMissing, setFolder };
 }

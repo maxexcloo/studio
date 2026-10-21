@@ -227,3 +227,30 @@
 span.set-progress { display: block; }
 .set-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--ember); }
 .library-download .library-error { display: block; margin-top: var(--space-2); }
+
+/* ------------------------------------------------- Image imports & updates */
+
+/* Choose Image sits in the link field's row: icon and a short word, the word gone on narrow phones. */
+.library-pick { gap: var(--space-2); }
+@media (max-width: 400px) { .library-pick span { display: none; } }
+
+/* A stand-in is marked in amber with its reason; Use Exact File sits on the right. */
+.library-status.is-substitute,
+.library-substitute { color: var(--accent-amber); }
+
+/* Update Available: the accent, a dot on the dock icon, a count on the Updates tab. */
+.library-status.is-update { color: var(--ember); }
+.library-update-line { color: hsl(var(--foreground)); }
+.library-view-count { margin-left: var(--space-2); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ember); }
+.library-dock-button { position: relative; }
+.library-update-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ember);
+  box-shadow: 0 0 0 2px hsl(var(--card));
+  pointer-events: none;
+}
