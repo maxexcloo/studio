@@ -10,6 +10,7 @@ import type { ShowToast } from './toast';
 import { EmptyState } from './EmptyState';
 import { Group, GroupAction, Row } from './SettingsControls';
 import { FileStatus, GradeChip, LibraryFooter, percent, post, size, type Grade } from './libraryShared';
+import { ProgressBar, transferWords } from './Progress';
 
 /*
  * Library › Images: the saved Civitai images as an even 4:5 grid, each with
@@ -110,9 +111,7 @@ export function LibraryImages({ models, refreshModels, onApply, onPrompt, onClos
     if (resource.status === 'installed') return resource.nameOnly ? 'Found By Filename' : 'Installed';
     if (resource.unavailable) return 'Unavailable';
     const download = downloadFor(resource);
-    if (download?.status === 'queued') return 'Queued';
-    if (download?.status === 'downloading') return download.totalBytes ? `Downloading ${percent(download)}%` : 'Downloading…';
-    if (download && ['error', 'paused', 'canceled'].includes(download.status)) return download.status === 'error' ? 'Download Failed' : download.status === 'paused' ? 'Paused' : 'Cancelled';
+    if (download && download.status !== 'done') return transferWords(download);
     return resource.status === 'conflict' ? 'Filename Conflict' : resource.status === 'unsupported' ? 'Needs Review' : 'Missing';
   };
   const state = !selected ? '' : !selected.galleryItemId ? 'Not Saved Yet' : selected.resources.some((resource) => activeFor(resource.versionId)) ? 'Downloading Models' : fit?.blockers.length ? 'Needs Review' : 'Ready To Use';
@@ -189,7 +188,7 @@ export function LibraryImages({ models, refreshModels, onApply, onPrompt, onClos
         return <Row className="library-resource" key={resource.versionId} label={resource.name} description={<>
           <span className="library-line">{[resource.type, resource.version, resource.weight !== null && resource.folder === 'loras' ? `Weight ${resource.weight}` : '', size(resource.bytes)].filter(Boolean).join(' · ')}</span>
           {resource.unavailable ? <span className="library-line">{resource.unavailable.note || resource.note}</span> : resource.note ? <span className="library-line">{resource.note}</span> : null}
-          {moving ? <span className="set-progress" aria-hidden="true"><span style={{ width: `${percent(download)}%` }} /></span> : null}
+          {moving ? <ProgressBar value={percent(download) / 100} label={`${resource.file || resource.name} Progress`} /> : null}
         </>}>
           <FileStatus status={resource.unavailable ? 'unavailable' : resource.status || 'missing'}>{resourceStatus(resource)}</FileStatus>
         </Row>;

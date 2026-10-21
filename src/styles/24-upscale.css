@@ -236,7 +236,6 @@
 .upscale-callout strong { font-weight: 550; overflow-wrap: anywhere; }
 .upscale-callout span { color: hsl(var(--muted-foreground)); }
 .upscale-callout.is-warn { background: rgb(255 180 90 / .1); }
-.upscale-callout.is-danger { background: var(--danger-fill); color: var(--danger-ink); }
 
 /* Effort picker: what you get and what it weighs, side by side. */
 .upscale-efforts {
@@ -319,20 +318,6 @@
 .upscale-meter div { display: grid; gap: var(--space-2); padding-bottom: 3px; font-size: 12.5px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
 .upscale-meter div span:first-child { color: hsl(var(--foreground)); }
 
-/* Progress cut into cells: the track and the fill share one mask, so they line up. */
-.cell-bar {
-  height: 6px;
-  background: repeating-linear-gradient(90deg, rgb(255 255 255 / .1) 0 4px, transparent 4px 6px);
-}
-.cell-bar > div {
-  height: 100%;
-  background: linear-gradient(90deg, #a8381a, var(--ember) 72%, #fff1dc);
-  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
-  mask-image: repeating-linear-gradient(90deg, #000 0 4px, transparent 4px 6px);
-  transition: background var(--motion-base) var(--motion-ease);
-}
-.cell-bar.is-done > div { background: #f4f4f4; }
-
 /* The image that is waiting on setup, shown as it starts. */
 .upscale-pending {
   display: flex;
@@ -386,7 +371,6 @@
   .udw-spark,
   .udw-scan,
   .udw-arrow.is-ready { animation: none; }
-  .cell-bar > div { transition: none; }
 }
 
 /* Restart ComfyUI: one control reused wherever a restart finishes a setup step. */

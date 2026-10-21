@@ -140,7 +140,6 @@
 .starter-card-foot { margin-top: auto; }
 .starter-card-foot > .btn { width: 100%; }
 .starter-progress { display: grid; gap: var(--space-4); }
-.starter-progress .cell-bar { height: 5px; }
 .starter-progress-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 30px; }
 .starter-progress-row small { color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; }
 .starter-progress .btn.is-icon { width: 30px; height: 30px; min-height: 30px; padding: 0; flex: none; }

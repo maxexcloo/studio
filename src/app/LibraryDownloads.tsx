@@ -2,7 +2,8 @@ import { Download, RefreshCw, X } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { Group, Row } from './SettingsControls';
 import type { ModelDownload } from './types';
-import { downloadWords, FileStatus, folderName, percent, post, size } from './libraryShared';
+import { FileStatus, folderName, post, size } from './libraryShared';
+import { ProgressBar, transferWords } from './Progress';
 
 /*
  * Library › Downloads: every model download, running, failed and done, as
@@ -31,10 +32,10 @@ export function LibraryDownloads({ downloads, busy, run, onChanged }: { download
     {groups.length ? groups.map((group) => <Group key={group.title} title={group.title}>
       {group.items.map((item) => <Row key={`${item.id}:${item.finishedAt || item.status}`} className="library-download" label={item.label && item.label !== item.file ? item.label : item.file} description={<>
         <span className="library-line">{[item.label && item.label !== item.file ? item.file : '', folderName(item.folder), size(item.totalBytes)].filter(Boolean).join(' · ')}</span>
-        {item.status === 'downloading' || item.status === 'paused' ? <span className="set-progress" aria-hidden="true"><span style={{ width: `${percent(item)}%` }} /></span> : null}
+        {item.status === 'downloading' || item.status === 'paused' ? <ProgressBar value={item.totalBytes ? (item.receivedBytes || 0) / item.totalBytes : 0} tone={item.status === 'paused' ? 'paused' : 'live'} label={`${item.file} Progress`} /> : null}
         {item.error && item.status !== 'done' ? <span className="library-line library-error" role="alert">{item.error}</span> : null}
       </>}>
-        <FileStatus status={item.status}>{downloadWords(item)}</FileStatus>
+        <FileStatus status={item.status}>{transferWords(item)}</FileStatus>
         {item.status === 'downloading' || item.status === 'queued' ? <button type="button" className="btn is-sm is-ghost" disabled={busy} aria-label={`Cancel ${item.file}`} onClick={() => cancel(item)}><X size={14} />Cancel</button> : null}
         {(failed(item) || item.status === 'paused') && item.retryable !== false && item.id ? <button type="button" className="btn is-sm" disabled={busy} aria-label={`${item.status === 'paused' ? 'Resume' : 'Retry'} ${item.file}`} onClick={() => retry(item)}>{item.status === 'paused' ? <Download size={14} /> : <RefreshCw size={14} />}{item.status === 'paused' ? 'Resume' : 'Retry'}</button> : null}
       </Row>)}

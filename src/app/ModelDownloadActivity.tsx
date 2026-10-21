@@ -3,7 +3,8 @@ import { Pause, Play, X } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { MiniArrow, formatEta } from './UpscaleDownloadActivity';
 import { formatBytes } from './useUpscale';
-import { downloadFor, downloadOrigin, islandActions, revealDownload, useModelDownloads, type DownloadOrigin } from './useModelDownloads';
+import { downloadActions, downloadFor, downloadOrigin, islandActions, revealDownload, useModelDownloads, type DownloadOrigin } from './useModelDownloads';
+import { toast } from './toast';
 import { isStarterFile, starterHas } from './StarterModels';
 import { cn } from './format';
 import type { Activity, ActivityControl } from './Activities';
@@ -27,9 +28,10 @@ function waiting(count: number, word: string) {
 
 /**
  * The upscale download's sibling for model files, text encoders and VAEs: an
- * activity while a file downloads, a "ready" note when the last one lands,
- * and a failure that stays until dismissed (it is the only place that says
- * so; no toast repeats it).
+ * activity while a file downloads and a "ready" note when the last one lands.
+ * A failure says why in the status pill, with Try Again (or Show, where the
+ * download needs the browser or can't be retried), as every other failure
+ * does (UI-PATTERNS › Messages); Library › Downloads keeps it under Failed.
  *
  * Hovered, focused or tapped, it grows Pause (or Resume) and Cancel for the
  * whole line of downloads; a cancel holds the partial file for a few seconds
@@ -40,10 +42,25 @@ function waiting(count: number, word: string) {
  */
 export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (item: ModelDownload) => void; hidden: boolean; onOpen: (where: DownloadOrigin['kind']) => void }): Activity | null {
   const [flash, setFlash] = React.useState<ModelDownload | null>(null);
-  const [failed, setFailed] = React.useState<ModelDownload | null>(null);
+  const openRef = React.useRef(onOpen);
+  openRef.current = onOpen;
   const downloads = useModelDownloads({
     onDone: (item) => { onDone(item); if (!item.already) setFlash(item); },
-    onError: (item) => setFailed(item)
+    onError: (item) => {
+      const name = item.label || item.file || 'the model file';
+      const retry = item.retryable !== false && !item.needsBrowser && item.id;
+      const show = async () => {
+        const where = placeOf(item) || (await isStarterFile(item.file) ? 'starter' : 'setup');
+        const origin = downloadOrigin(item.id);
+        revealDownload(item, where, origin?.kind === 'setup' ? origin.subject : undefined);
+        openRef.current(where);
+      };
+      const why = item.needsBrowser ? 'Open model setup to download it in the browser' : item.error ? String(item.error).replace(/\.$/, '') : '';
+      toast.error(`Couldn’t download ${name}${why ? `. ${why}` : ''}`, {
+        group: `model-download-failed:${item.id || item.file}`,
+        action: retry ? { label: 'Try Again', onClick: () => { downloadActions.start(item.id).catch(() => downloads.refresh()); } } : { label: 'Show', onClick: () => { void show(); } }
+      });
+    }
   });
   // The gallery shows the same landing itself; a note waiting behind it would be old news.
   React.useEffect(() => { if (hidden) setFlash(null); }, [hidden]);
@@ -54,7 +71,6 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
   const mode = canceled.length ? 'canceled' as const
     : active ? 'downloading' as const
     : held.length ? 'paused' as const
-    : failed ? 'error' as const
     : flash && !queued ? 'ready' as const
     : null;
   if (!mode || hidden) return null;
@@ -63,7 +79,6 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
   const shown: ModelDownload | null = mode === 'canceled' ? canceled[0]
     : mode === 'downloading' ? active
     : mode === 'paused' ? { ...held[0], ...downloadFor(state, held[0].file), id: held[0].id }
-    : mode === 'error' ? failed
     : flash;
   const label = shown?.label || 'model file';
   const received = shown?.receivedBytes || 0;
@@ -73,18 +88,13 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
   const title = mode === 'downloading' ? `Downloading ${label}`
     : mode === 'paused' ? `${label} paused`
     : mode === 'canceled' ? (canceled.length > 1 ? `${canceled.length} downloads canceled` : `${label} canceled`)
-    : mode === 'ready' ? `${flash?.label || 'File'} downloaded`
-    : `${failed?.label || 'Download'} stopped`;
+    : `${flash?.label || 'File'} downloaded`;
   const sizes = received ? `${formatBytes(received)} of ${formatBytes(total)}` : total ? formatBytes(total) : '';
   const meta = mode === 'downloading'
     ? [sizes, active?.verifying ? 'checking the file' : speed > 0 ? `${formatBytes(speed)}/s` : active?.reconnecting ? 'connection dropped, reconnecting' : 'connecting', speed > 0 ? formatEta((total - received) / speed) : ''].filter(Boolean).join(' · ')
     : mode === 'paused' ? [sizes, 'resumes where it stopped'].filter(Boolean).join(' · ')
     : mode === 'canceled' ? (received ? `Undo keeps the ${formatBytes(received)} already here` : 'Undo puts it back in line')
-    : mode === 'ready' ? 'Ready to use'
-    : failed?.needsBrowser ? 'Open model setup to download it in the browser'
-    : failed?.retryable === false ? (failed.error || 'Open model setup for details')
-    : failed?.error ? `${failed.error}. Click to resume`
-    : 'Click to resume';
+    : 'Ready to use';
 
   // A failed request leaves the island as it was; the next poll says how things stand.
   const guard = (action: () => Promise<unknown>) => () => action().catch(() => downloads.refresh());
@@ -105,11 +115,11 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
     revealDownload(shown, where, origin?.kind === 'setup' ? origin.subject : undefined);
     onOpen(where);
   };
-  const dismiss = () => { setFailed(null); setFlash(null); };
+  const dismiss = () => setFlash(null);
   return {
     id: 'model-download',
     phase: mode,
-    state: mode === 'error' ? 'error' : mode === 'ready' || mode === 'canceled' ? 'done' : 'live',
+    state: mode === 'ready' || mode === 'canceled' ? 'done' : 'live',
     glyph: (
       <span className={cn('model-dl-glyph', `is-${mode}`)}>
         <MiniArrow mode={mode === 'paused' || mode === 'canceled' ? 'downloading' : mode} progress={progress} />
@@ -120,7 +130,6 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
     figure: mode === 'downloading' || mode === 'paused' ? <><AnimatedNumber value={Math.floor(progress * 100)} />%</> : undefined,
     progress: mode === 'downloading' || mode === 'paused' ? progress : undefined,
     meta,
-    metaTitle: mode === 'error' ? meta : undefined,
     open: { label: `${title}. Show it in ${place ? placeName[place] : 'model setup'}`, run: () => { open(); } },
     openHint: place ? `Show in ${placeName[place]}` : 'Show',
     controls,

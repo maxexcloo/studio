@@ -3,7 +3,7 @@ import { Check, Download, Pause, Play, RotateCw } from 'lucide-react';
 import { apiJson } from './api';
 import { cn } from './format';
 import { Modal } from './Modal';
-import { CellBar } from './UpscaleDialogs';
+import { ProgressBar } from './Progress';
 import { formatEta } from './UpscaleDownloadActivity';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
 import { formatDownload, formatGB, hardwareSentence, memoryWord, type Hardware } from './hardware';
@@ -181,7 +181,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                   <p className="starter-remote">{thisComputer ? 'ComfyUI runs on another computer. Download it there.' : 'Get it on the computer running Studio.'}</p>
                 ) : progress.state === 'moving' || progress.state === 'paused' ? (
                   <div className="starter-progress">
-                    <CellBar value={progress.total ? progress.received / progress.total : 0} />
+                    <ProgressBar value={progress.total ? progress.received / progress.total : 0} tone={progress.state === 'paused' ? 'paused' : 'live'} label={`${family.title} Progress`} />
                     <div className="starter-progress-row">
                       <small>
                         {progress.state === 'paused' ? 'Paused' : 'Downloading'} · {formatDownload(progress.received) || '0 MB'} of {formatDownload(progress.total)}

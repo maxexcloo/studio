@@ -7,12 +7,13 @@ import type { UpscaleSetup } from './useUpscale';
 import type { UpscaleInstall } from './types';
 import { SafeImg } from './SafeImg';
 import type { Activity } from './Activities';
+import { toast } from './toast';
 import { useCellGap } from './cells';
 
 /**
  * While the SeedVR2 weights download with the setup dialog closed, an
  * activity floats at the top: the setup hero's arrow in miniature, filling
- * with heat, over a cell bar and the numbers. The arrow is shared by the other
+ * with heat, over the shared progress bar and the numbers. The arrow is shared by the other
  * download and update activities.
  */
 
@@ -87,14 +88,15 @@ export function formatEta(seconds: number) {
 /**
  * The download as an activity: shown while it runs with setup closed. Once it
  * lands it becomes the "ready" note (with the image it went on to upscale) and
- * leaves by itself; a failed download stays until it is dealt with. Clicking
- * it reopens setup, which takes over while open.
+ * leaves by itself. A failed download says why in the status pill with Set
+ * Up (UI-PATTERNS › Messages), unless setup is open and says so itself.
+ * Clicking it reopens setup, which takes over while open.
  */
 export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: UpscaleInstall): Activity | null {
   const { stage, open } = setup;
   // The image it went on to upscale once ready: its thumbnail, 'pending' without one, '' when none waited.
   const [finished, setFinished] = useState<string | null>(null);
-  const [dismissedError, setDismissedError] = useState<string>('');
+  const toldError = useRef('');
   // setup clears the waiting image the moment it starts the upscale, so keep a copy for the ready note.
   const lastPending = useRef<string>('');
   if (setup.pending) lastPending.current = setup.pending.thumbnailUrl || setup.pending.url || 'pending';
@@ -109,11 +111,18 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
   }, [stage, open]);
   useEffect(() => { if (open) setFinished(null); }, [open]);
 
-  const errorKey = install?.status === 'error' ? `${install.error}` : '';
+  const errorKey = install?.status === 'error' ? `${install.error || 'The download stopped'}` : '';
+  const openSetup = useRef(setup.openSetup);
+  openSetup.current = setup.openSetup;
+  useEffect(() => {
+    if (!errorKey) { toldError.current = ''; return; }
+    if (open || stage !== 'error' || toldError.current === errorKey) return;
+    toldError.current = errorKey;
+    toast.error(`Couldn’t download SeedVR2. ${errorKey.replace(/\.$/, '')}`, { group: 'upscale-download-failed', action: { label: 'Set Up', onClick: () => openSetup.current() } });
+  }, [errorKey, open, stage]);
   const mode: Mode | null = open ? null
     : stage === 'downloading' ? 'downloading'
     : stage === 'verifying' ? 'verifying'
-    : stage === 'error' && errorKey && errorKey !== dismissedError ? 'error'
     : finished !== null ? 'ready'
     : null;
   if (!mode) return null;
@@ -125,19 +134,15 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
   const eta = speed > 0 ? (total - received) / speed : 0;
   const readyThumb = finished && finished !== 'pending' ? finished : '';
   const waitingThumb = mode !== 'ready' ? setup.pending?.thumbnailUrl : '';
-  const dismiss = () => {
-    if (mode === 'error') setDismissedError(errorKey);
-    setFinished(null);
-  };
+  const dismiss = () => setFinished(null);
 
   const title = mode === 'downloading' ? 'Downloading SeedVR2'
     : mode === 'verifying' ? 'Checking the download'
-    : mode === 'ready' ? 'Upscale is ready'
-    : 'Download stopped';
+    : 'Upscale is ready';
   return {
     id: 'upscale-download',
     phase: mode,
-    state: mode === 'error' ? 'error' : mode === 'ready' ? 'done' : 'live',
+    state: mode === 'ready' ? 'done' : 'live',
     glyph: <MiniArrow mode={mode} progress={progress} />,
     title,
     figure: mode === 'downloading' ? <><AnimatedNumber value={Math.floor(progress * 100)} />%</> : undefined,
@@ -145,13 +150,12 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
     meta: mode === 'downloading'
       ? [received ? `${formatBytes(received)} of ${formatBytes(total)}` : total ? formatBytes(total) : '', speed > 0 ? `${formatBytes(speed)}/s` : 'connecting', formatEta(eta)].filter(Boolean).join(' · ')
       : mode === 'verifying' ? 'Almost ready'
-      : mode === 'ready' ? (finished ? 'Upscaling the image' : 'Use the upscale arrow on any image')
-      : 'Click to resume',
+      : finished ? 'Upscaling the image' : 'Use the upscale arrow on any image',
     aside: waitingThumb ? <SafeImg className="activity-thumb is-waiting" src={waitingThumb} draggable={false} title="Upscales When the Download Is Done" />
       : readyThumb ? <SafeImg className="activity-thumb" src={readyThumb} draggable={false} />
       : null,
     open: { label: `${title}. Open upscale setup`, run: () => setup.openSetup() },
-    dismiss: mode === 'error' || mode === 'ready' ? { label: 'Dismiss', run: dismiss } : undefined,
+    dismiss: mode === 'ready' ? { label: 'Dismiss', run: dismiss } : undefined,
     expire: mode === 'ready' ? { after: READY_HOLD_MS, run: () => setFinished(null) } : undefined
   };
 }

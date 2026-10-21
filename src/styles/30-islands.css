@@ -86,7 +86,6 @@ button.activity-main { cursor: pointer; }
 .activity-copy small { overflow: hidden; font-size: 11.5px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); white-space: nowrap; text-overflow: ellipsis; }
 /* A release headline gets two lines rather than an ellipsis. */
 .activity-copy small.is-two-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.4; white-space: normal; }
-.activity .cell-bar { height: 5px; }
 .activity-body > .island-action { margin-right: 4px; }
 .activity-body > .island-action:last-child { margin-right: 12px; }
 /* A count after the title ("+2"): more of the same work waiting its turn. */

@@ -434,8 +434,6 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .model-setup .btn { height: 30px; min-height: 30px; padding: 0 11px; gap: var(--space-3); font-size: 12px; }
 .model-setup .btn.is-icon { width: 30px; padding: 0; flex: none; }
 .model-setup-progress { display: grid; gap: var(--space-3); overflow: hidden; }
-.model-setup-progress .cell-bar { height: 5px; }
-.model-setup-item.is-paused .cell-bar > div { background: rgb(255 154 82 / .45); }
 .model-setup-progress small { font-size: 11px; font-variant-numeric: tabular-nums; color: hsl(var(--muted-foreground)); }
 .model-setup-detail, .model-setup-error { margin: 0 0 0 26px; font-size: 11.5px; line-height: 1.4; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
 .model-setup-error { color: rgb(255 140 120); }
