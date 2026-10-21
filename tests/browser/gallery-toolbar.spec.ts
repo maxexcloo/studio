@@ -53,8 +53,14 @@ test.describe('with a mouse', () => {
     await expect(toolbar.getByRole('status')).toHaveText('8 Selected');
     const centred = await toolbar.locator('.gallery-selection-actions button').evaluateAll(buttons => buttons.every(button => { const a = button.getBoundingClientRect(), b = button.querySelector('svg')!.getBoundingClientRect(); return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 0.5 && Math.abs(a.y + a.height / 2 - b.y - b.height / 2) < 0.5; }));
     expect(centred).toBe(true);
-    // The view toggles step aside while selecting, so every selection action has room.
+    // The view toggles step aside while selecting, so every selection action has room,
+    // down to the narrowest one-row toolbar (Tablet starts at 1050 px).
     await expect(grouping).toHaveCount(0);
+    for (const width of [1051, 1066, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect.poll(() => toolbar.locator('.gallery-selection-actions').evaluate(n => n.scrollWidth <= n.clientWidth), `selection actions fit at ${width} px`).toBe(true);
+      await expect(toolbar.getByRole('button', { name: 'Delete Selected' })).toBeInViewport({ ratio: 1 });
+    }
     await toolbar.getByRole('button', { name: 'Stop Selecting' }).click();
     await expect(grouping).toBeVisible();
     for (const width of [1440, 900, 640]) {

@@ -284,8 +284,11 @@ words and actions on both devices:
   Touching it never dismisses the surface under it.
 - **Words:** Title Case for questions and actions; sentence case for news,
   without a full stop; "Couldn’t …" for failures.
-- Screen readers hear every message through one announcer (polite, failures
-  assertive).
+- Screen readers hear every message through one announcer (`StatusAnnouncer`:
+  polite, failures assertive). Generation progress (started, ready; never
+  each step) speaks through the same polite region, which says whichever
+  changed last. There is no second app-wide announcer; a surface's own status
+  line (an import's progress, an empty state) stays where it is.
 
 ## Lists
 
@@ -999,7 +1002,7 @@ everywhere, only where there are videos) and **Hide Failed & Queued** (one
 toggle that hides failed and not-yet-running outputs), in that order. They are pressed toggles, not settings and not filters, so
 Clear leaves them alone. The desktop gallery toolbar holds them after its
 filters and they step aside while selecting (grouping is off while selecting
-anyway), so every selection action fits without being cut off; the phone's filter row ends with them, after a divider and before
+anyway), and above Tablet the actions' column takes the room it needs from the search side (the columns stay even when there is room), so every selection action fits without being cut off; the phone's filter row ends with them, after a divider and before
 Clear. Stop All, with the running count, sits in the desktop dock and in the
 phone's running menu.
 
