@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Studio gains the Library (Civitai, Hugging Face and image imports, graded with their missing files, substitutes, version offers and update checks), a prompt assistant in the composer, Refine in Chat, Studio-owned profiles and guides with versions and AI drafts, and MCP admin tools for the Library and profiles, plus a round of UI polish: Groups, pickers, selection and the phone shell
+
 ### Added
 - **Prompt assistant engine:** one LiteLLM engine on the prompt writer's gateway credentials rewrites prompts (streamed, with the Enhance, Spicy, Photographic, Cinematic, Concise and Candid presets), writes negatives, suggests LoRAs, describes images (vision, with a text fallback) and drafts guides and profiles. Each call has a timeout and a fallback, and reasoning is stripped. MCP Generate's prompt writer runs on it unchanged. The account-scoped `/api/assistant` routes serve the composer and MCP.
 - **Settings › Models › Integrations:** Assistant Model (by default the prompt writer's model) and Assistant Spicy Model rows list the gateway's models and say whether each reads reference images. Spicy stays off until a Spicy model is chosen.
@@ -60,6 +62,7 @@ version opens with a `> ` summary line.
 - **Saved sizes:** Save Size, the saved rows with Rename and Remove, and the `/api/sizes` route are gone; the Size menu holds the model's presets and Custom on both devices. Sizes saved before stay in `saved-sizes.json` and browser storage, unread.
 
 ### Fixed
+- The desktop composer no longer stays pinned short (Generate cut off) after collapsing mid-animation, such as when opening the Library.
 - **Reset All Settings** asks again: its button in Settings › Maintenance did nothing because the action never reached Settings.
 
 
