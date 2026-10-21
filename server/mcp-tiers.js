@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Speed tiers for MCP: read from the tier segment of a profile label such as "Krea 2 Turbo · Super Fast · 2 Steps".
 
+import { isCloudProfile } from './cloud-profiles.js';
+
 export const mcpTiers = ['quality', 'standard', 'fast', 'turbo'];
 
 /** A provider-backed cloud profile (Grok). MCP never chooses one by itself. */
-export const isCloudProfile = (profile) => profile?.family === 'grok' || /^grok/i.test(String(profile?.id || ''));
+export { isCloudProfile };
 // "grok" anywhere; "cloud" only as a request for it ("in the cloud", "a cloud model"), so "a cloud over the hills" stays local.
 const cloudWords = /\bgrok\b|\b(?:in|on|via|use|using|with|through|to)\s+(?:the\s+)?cloud\b|\bcloud\s+(?:models?|profiles?|videos?|images?|generation|version)\b/i;
 /** Whether the user's request asks for the cloud: "grok", or "cloud" as a request for it. */

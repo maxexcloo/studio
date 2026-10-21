@@ -29,6 +29,8 @@ Use ComfyUI's API workflow JSON format, then add a `heissUi` block that tells th
 }
 ```
 
+Mark a workflow that makes adult content with `"nsfw": true` in its `heissUi` block. Access profiles without the NSFW Models feature (such as the built-in User profile) never offer it; administrators always can.
+
 Only mapped controls are changed by HEISS UI. Everything else stays exactly as it was in the exported ComfyUI API workflow.
 
 The controls it can map are `prompt`, `negative`, `seed`, `steps`, `cfg`, `sampler`, `scheduler`, `denoise`, `width`, `height`, `count` (batch size), `frames`, `fps` and `startImage`, plus the loader choices `model`, `textEncoder`, `vae`, `clipType` and `weightDtype`. Each points at one input on one node. A second sampler or prompt encoder keeps its saved values unless you feed both from one node (a core `PrimitiveInt` or `PrimitiveString`) and map that.

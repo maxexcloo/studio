@@ -177,7 +177,19 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
 - **Names, not files:** model parts read as names ("Qwen3 VL 8B INT8"), with
   the file name only in the picker (`partNames.js`).
 - **Sections** have one quiet heading, never repeating the row label under it
-  ("Sampling", then Steps, Sampler, Scheduler, CFG and Seed).
+  ("Sampling", then Steps, Sampler, Scheduler, CFG and Seed). A heading may
+  carry one action on its right, on the same line (`Group`'s `action` with
+  `GroupAction`: Accounts' New Account), instead of a row that only holds a
+  button.
+- **External links:** a row whose only control opens a website (About's
+  Changelog, Licence, Source and Credits; Help's Troubleshooting) shows a
+  plain link aligned like other row values (`ExternalLink` in
+  `SettingsControls.tsx`): muted text with a small external-link mark, the
+  accent and an underline on hover, no button chrome.
+- **Multi-selects** (`MultiSelect.tsx`): picked rows take the accent tint and
+  its tick. **All** picks everything at once, even values that wait for
+  another one (References need Generation): pass `onAll`. A short list
+  (an access profile's Models) has no search box.
 - **Size** shows the resolutions and then the shapes as full-width toggles with
   no label, with **Custom** as the last option and Width and Height always at
   the bottom. The fields are enabled only while Custom is the pick; choosing a
@@ -287,13 +299,27 @@ holds:
 
 | Section | Holds | Who |
 | --- | --- | --- |
-| Account | Profile (name, email, password) and MCP | Every account |
-| Users | Accounts, Access Profiles (a picker with New, multi-selects, Save & Discard), Chat Gateway and Profiles (a JSON editor; an edited copy stops receiving repository updates) | Administrators |
-| Studio | General, Generation, Features (Upscale and Inpainting as plain rows), Gallery and Sharing | Everyone |
-| Models | Defaults, Catalogue (LoRAs, Cloud Models, Presets & Civitai Imports), LoRAs & Supporting Files and Integrations | Administrators |
-| Workers | ComfyUI connections, restart, and AI Control (what each GPU runs) | Administrators; everyone reads AI Control's status |
-| Maintenance | Clean Up, Reset and Help | Everyone (each item as the device allows) |
-| About | The banner, stats, licence and credits to the upstream projects | Everyone |
+| Account | MCP and Profile (name, email, password) | Every account |
+| About | The banner, Version, Changelog, Licence, Source, credits to the upstream projects and stats | Everyone |
+| Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
+| Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
+| Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
+| Studio | Features (Inpainting and Upscale as plain rows), Gallery, General, Generation and Sharing | Everyone |
+| Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile, then each account; New Account on the heading) and Chat Gateway | Administrators |
+| Workers | ComfyUI connections, restart, AI Control (what each GPU runs), then Upscale's status as its own group | Administrators; everyone reads AI Control's and Upscale's status |
+
+**Order:** Account comes first, then the pages alphabetically; groups, rows,
+option lists and pills inside them read alphabetically too. The exceptions are
+logical ones: a master switch comes before what depends on it, Save & Discard
+is an editor's last row, an editor's fields follow the order they are filled
+in, Version leads About, Reset (destructive) stays its own group, and Workers
+lists its workers before AI Control and Upscale.
+
+**Access profiles** grant features and local models. Cloud models are never
+listed: the Cloud Models feature grants them. NSFW Models gates any model
+profile marked `nsfw`. A feature the deployment switched off (LoRAs, Cloud
+Models, Presets & Civitai Imports) shows disabled with "Off for This
+Deployment"; there are no global switches for them in Settings.
 
 A new setting goes in the section that matches who changes it and why;
 destructive actions live in Maintenance, never beside everyday switches.

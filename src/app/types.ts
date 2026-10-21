@@ -121,6 +121,8 @@ export type Profile = {
   recipe?: { modelLabel: string; conditioning: string; label: string; adapters?: string[] };
   workflow: string;
   family: string;
+  /** Adult content (the profile's `heissUi.nsfw`): access profiles need NSFW Models to offer it. */
+  nsfw?: boolean;
   /** The family's name as people know it ("Flux.1"), for built-in families. */
   familyName?: string;
   /** Parts it runs without but works better with (FLUX.3's prompt upsampler), offered like missing ones. */

@@ -65,6 +65,7 @@ export function validateProfileText(id, text, { info = null } = {}) {
     if (!String(meta.name || "").trim()) errors.push("heissUi.name is required.");
     if (meta.id && meta.id !== id) errors.push(`heissUi.id must stay "${id}"; save a copy under a new file to rename it.`);
     if (meta.kind && !["image", "video"].includes(meta.kind)) errors.push("heissUi.kind must be image or video.");
+    if ("nsfw" in meta && typeof meta.nsfw !== "boolean") errors.push("heissUi.nsfw must be true or false.");
     if (!meta.controls || typeof meta.controls !== "object") errors.push("heissUi.controls is required.");
     else if (!meta.controls.prompt) errors.push("heissUi.controls.prompt is required.");
   }

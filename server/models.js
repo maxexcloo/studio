@@ -107,11 +107,12 @@ function customAspectSet(defaults, ratios = [], ranges = {}) {
   }).length ? aspectSet(defaults, ratios.map((item) => Array.isArray(item) ? item : [item.label || item.value || "Custom", Number(item.w || 1), Number(item.h || 1)]), ranges) : [];
 }
 
-export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe, prompting }) {
+export function buildProfile({ id, kind, label, displayName, description, model, baseModel, workflow, family, defaults, aspects, aspectDefault = "", options = {}, capabilities = {}, constraints = {}, mediaInputs = [], aspectPolicy = "manual", maxLoras = 8, imageModes = {}, native = {}, recipe, prompting, nsfw = false }) {
   return {
     id,
     kind,
     label,
+    ...(nsfw === true ? { nsfw: true } : {}),
     displayName: displayName || label,
     description: description || modelBasename(model),
     ...((imageModes.generate?.prompting ?? prompting) ? { prompting: structuredClone(imageModes.generate?.prompting ?? prompting) } : {}),
@@ -253,6 +254,7 @@ export function inferModels(info, stats = {}) {
       baseModel: modelBasename(defaults.model || ""),
       workflow: workflow.profileId,
       family: workflow.family,
+      nsfw: workflow.nsfw,
       recipe: workflow.recipe,
       defaults: {
         count: detectedDefault(countRange, Number(defaults.count || 1)),

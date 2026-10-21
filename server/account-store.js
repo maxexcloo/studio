@@ -4,7 +4,7 @@ import path from "node:path";
 import { root } from "./comfy.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
-import { accountRoles, effectiveAccountAccess, normaliseAccessProfile, validAccountKey } from "./account-policy.js";
+import { accountRoles, builtInAccessProfiles, effectiveAccountAccess, migrateCloudModels, migrateFeatureOptions, normaliseAccessProfile, predatesCloudModels, validAccountKey } from "./account-policy.js";
 
 const dataDir = path.resolve(process.env.HEISS_DATA_DIR || path.join(root, "data"));
 const storePath = path.join(dataDir, "accounts.json");
@@ -79,12 +79,74 @@ export function listAccessProfiles() {
   return Object.values(readStore().profiles).map((profile) => normaliseAccessProfile(profile));
 }
 
-export function saveAccessProfile(input, availableProfiles = []) {
+/**
+ * Settles Cloud Models on every stored access profile that predates it, from the cloud
+ * profiles discovery found (see account-policy.js). Does nothing until a cloud profile is known.
+ */
+export function migrateCloudModelAccess(cloudProfiles = []) {
+  const store = readStore();
+  let changed = false;
+  for (const [id, profile] of Object.entries(store.profiles)) {
+    const next = migrateCloudModels(profile, cloudProfiles);
+    if (next !== profile) { store.profiles[id] = next; changed = true; }
+  }
+  if (changed) saveStore();
+  return changed;
+}
+
+/**
+ * Adds the built-in Administrator and User access profiles where no profile has their ID.
+ * An existing profile with that ID is never changed.
+ */
+export function ensureBuiltInAccessProfiles() {
+  const store = readStore();
+  const missing = builtInAccessProfiles.filter((profile) => !store.profiles[profile.id]);
+  for (const profile of missing) store.profiles[profile.id] = structuredClone(profile);
+  if (missing.length) saveStore();
+  return missing.map((profile) => profile.id);
+}
+
+/**
+ * Carries the retired global LoRAs and Cloud Models switches into every stored access
+ * profile, once (see account-policy.js). Returns whether this run did it.
+ */
+export function migrateFeatureOptionAccess(globals = {}) {
+  const store = readStore();
+  if (store.featureOptionsMigrated) return false;
+  for (const [id, profile] of Object.entries(store.profiles)) store.profiles[id] = migrateFeatureOptions(profile, globals);
+  store.featureOptionsMigrated = true;
+  saveStore();
+  return true;
+}
+
+/** The access profile new ordinary accounts start with, or "" when each one waits for an administrator. */
+export function defaultAccessProfileId() {
+  const store = readStore();
+  const id = store.defaultAccessProfileId;
+  return validAccountKey(id) && store.profiles[id] ? id : "";
+}
+
+export function setDefaultAccessProfile(profileId) {
+  const store = readStore();
+  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId])) throw new Error("Choose an existing access profile.");
+  if (profileId) store.defaultAccessProfileId = profileId;
+  else delete store.defaultAccessProfileId;
+  saveStore();
+  return defaultAccessProfileId();
+}
+
+export function saveAccessProfile(input, availableProfiles = [], cloudProfiles = []) {
+  migrateCloudModelAccess(cloudProfiles);
   // New grants must be currently available; keep existing grants if discovery is degraded.
-  const existing = validAccountKey(input?.id) ? readStore().profiles[input.id]?.generationProfiles || [] : [];
-  const profile = normaliseAccessProfile(input, [...availableProfiles, ...existing]);
+  const stored = validAccountKey(input?.id) ? readStore().profiles[input.id] : null;
+  const existing = stored?.generationProfiles || [];
+  const cloud = new Set(cloudProfiles);
+  // Cloud profiles follow Cloud Models, never a grant of their own.
+  const profile = normaliseAccessProfile({ ...input, generationProfiles: Array.isArray(input?.generationProfiles) ? input.generationProfiles.filter((id) => !cloud.has(id)) : [], retiredCloudGrants: stored?.retiredCloudGrants }, [...availableProfiles, ...existing].filter((id) => !cloud.has(id)));
   if (!profile.id) throw new Error("Choose a valid profile ID.");
   if (!profile.name) throw new Error("Enter a name for this access profile.");
+  // A profile that could not be settled yet keeps its old cloud grants unless this save turns Cloud Models on.
+  if (stored && predatesCloudModels(stored) && !profile.features.cloudModels) delete profile.features.cloudModels;
   readStore().profiles[profile.id] = profile;
   saveStore();
   return structuredClone(profile);
@@ -104,6 +166,8 @@ export function assignAccessProfile(accountId, profileId) {
 
 export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
   const key = usernameKey(username);
+  // Without a choice, an ordinary account starts on the default access profile.
+  if (role === accountRoles.user && !accessProfileId) accessProfileId = defaultAccessProfileId();
   if (!validUsername(username)) throw new Error("Use an email address of up to 128 characters.");
   // An ordinary account may start without a password and sign in through single sign-on only.
   const withPassword = Boolean(String(password || ""));
@@ -305,7 +369,8 @@ export function setAccountDisabled(accountId, disabled) {
  * forwards its own user ID, and optionally the user's email. A link maps that ID
  * to an account: an administrator's, or one made here when the forwarded email is
  * an enabled account's username. Unlinked IDs are remembered so they can be
- * linked, and get nothing. Accounts are never created this way.
+ * linked, and get nothing. A forwarded email no account has becomes a new account only
+ * while a default access profile is set.
  */
 export function gatewayAccountAccess(identity, email = "") {
   if (!validGatewayIdentity(identity)) return null;
@@ -318,10 +383,25 @@ export function gatewayAccountAccess(identity, email = "") {
 }
 
 // The gateway is trusted and its emails come from the shared identity provider, so a matching username is the same person.
+// An email no account has becomes a new account on the default access profile, when there is one.
 function linkGatewayEmail(store, identity, email) {
   if (!validGatewayIdentity(email) || !email.includes("@")) return null;
   const key = usernameKey(email);
-  const account = store.accounts.find((item) => usernameKey(item.username) === key && item.disabled !== true);
+  let account = store.accounts.find((item) => usernameKey(item.username) === key);
+  if (!account && defaultAccessProfileId() && validUsername(email)) {
+    account = {
+      id: crypto.randomBytes(18).toString("base64url"),
+      username: String(email).trim().normalize("NFKC"),
+      displayName: String(email).trim().slice(0, 80),
+      role: accountRoles.user,
+      accessProfileId: defaultAccessProfileId(),
+      identity: { provider: "gateway" },
+      disabled: false,
+      createdAt: new Date().toISOString()
+    };
+    store.accounts.push(account);
+  }
+  if (account?.disabled) return null;
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
   if (!access?.authenticated) return null;
   store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
@@ -413,7 +493,8 @@ export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerif
       role: accountRoles.user,
       identity: { provider: "pocket-id" },
       oidc: { issuer, subject, linkedAt: new Date().toISOString() },
-      pending: true,
+      // With a default access profile it starts on that; otherwise an administrator approves it.
+      ...(defaultAccessProfileId() ? { accessProfileId: defaultAccessProfileId() } : { pending: true }),
       disabled: false,
       createdAt: new Date().toISOString()
     };

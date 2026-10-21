@@ -88,3 +88,8 @@ test("start and end frames and differently named slots stay separate", () => {
   assert.deepEqual(workflow.mediaInputs.map((input) => input.follows), [undefined, undefined, undefined, undefined]);
   assert.deepEqual(workflow.mediaInputs.slice(0, 2).map((input) => input.role), ["start", "end"]);
 });
+
+test("the nsfw marker reaches the profile only when it is true", () => {
+  assert.equal(metadataFromJson({ heissUi: { id: "spicy", nsfw: true }, graph: {} }, "spicy.json").nsfw, true);
+  assert.equal("nsfw" in metadataFromJson({ heissUi: { id: "plain", nsfw: "yes" }, graph: {} }, "plain.json"), false);
+});

@@ -495,3 +495,27 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .phone-model-tools .picker-tools .picker-toolbar { padding: 4px 0 6px; }
 .phone-model-tools .picker-search-row { padding: 0 0 6px; }
 .phone-model-tools .picker-controls .model-filter-group button { padding: 0 10px; font-size: inherit; }
+
+/* A group heading with one action on its right (Settings › Users › Accounts: New Account). */
+.set-group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 2px; }
+.set-group-head > .list-section-title { margin: 0; }
+.set-group-action {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 24px; padding: 0 2px; border: 0; background: transparent;
+  color: var(--accent-amber); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border-radius: var(--r-pill);
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+.set-group-action:hover { color: var(--accent-amber-hover); }
+.set-group-action:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: 2px; }
+
+/* A row whose only control leaves Studio: a plain link aligned like other values (UI-PATTERNS › Lists). */
+.set-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: hsl(var(--muted-foreground)); font-size: 13px; text-decoration: none; white-space: nowrap;
+  border-radius: 4px;
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+.set-link:hover { color: var(--accent-amber); text-decoration: underline; text-underline-offset: 3px; }
+.set-link:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: 2px; color: var(--accent-amber); }
+.set-link > svg { flex: none; opacity: .7; }

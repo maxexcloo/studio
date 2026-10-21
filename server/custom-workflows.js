@@ -169,6 +169,8 @@ export function metadataFromJson(raw, file) {
     ...(meta.prompting && typeof meta.prompting === "object" && !Array.isArray(meta.prompting) ? { prompting: structuredClone(meta.prompting) } : {}),
     kind: meta.kind === "video" ? "video" : "image",
     family: meta.family || "custom",
+    // Adult content: access profiles without NSFW Models never see it.
+    ...(meta.nsfw === true ? { nsfw: true } : {}),
     recipe: meta.recipe,
     graph,
     controls,

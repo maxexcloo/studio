@@ -491,6 +491,10 @@
 .multi-select-menu .gallery-filter-check { display: grid; flex: none; place-items: center; width: 16px; height: 16px; margin-right: 8px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px hsl(var(--muted-foreground) / .6); }
 .multi-select-menu .gallery-filter-option.active .gallery-filter-check { background: var(--accent-amber); box-shadow: none; color: var(--accent-amber-ink); }
 .multi-select-option { align-items: center; }
+/* Picked rows take the shared accent (UI-PATTERNS › Accent), not the grey selected chip. */
+.multi-select-menu .multi-select-option.active,
+.multi-select-menu .multi-select-option.active:hover { background: var(--accent-amber-subtle); color: hsl(var(--foreground)); box-shadow: none; }
+.multi-select-menu .multi-select-option.active .multi-select-text > small { color: hsl(var(--muted-foreground)); }
 .multi-select-option:disabled { opacity: .5; cursor: default; }
 .multi-select-text { display: grid; min-width: 0; }
 .multi-select-text > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

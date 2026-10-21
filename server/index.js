@@ -37,7 +37,8 @@ import { mcpOutputPath } from './mcp-media.js';
 import { stripMetadata } from './metadata-strip.js';
 import { httpsListening, httpsProblem, startServers } from './listen.js';
 import { httpsPort, inspectTls, startupTls, tlsHostNames, tlsSummary } from './tls.js';
-import { envFileKeys, writeLocalEnvValue } from './env.js';
+import { envFileKeys, removeLocalEnvValue, writeLocalEnvValue } from './env.js';
+import { retireFeatureSwitches } from './feature-options.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
 import { lorasEnabled, presetsEnabled } from './features.js';
 import { catalogueFlags, describeFlag, isCatalogueFlag, saveDeploymentSetting, settingSource } from './deployment-settings.js';
@@ -87,8 +88,8 @@ import { forgetComfyRun } from './comfy-traces.js';
 import { accountForRequest, internalMcpHeaders, multiUserEnabled, registerMultiUserAuthRoutes } from './multi-user-auth.js';
 import { enforceMultiUserRequest } from './multi-user-gate.js';
 import { ownerIdForRequest, outputFilenameBelongsToRequest, recordBelongsToRequest, recordsForRequest } from './account-ownership.js';
-import { mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
-import { accountAccessForId, gatewayAccountAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
+import { isCloudProfile, mayUseFeature, mayUseGenerationProfile, visibleGenerationProfiles } from './account-policy.js';
+import { accountAccessForId, gatewayAccountAccess, migrateCloudModelAccess, migrateFeatureOptionAccess, noteGatewayIdentity, verifyAccountMcpToken } from './account-store.js';
 
 // Thumbnails building and waiting, in every heartbeat and crash line.
 addProbe("thumbs", () => buildStats());
@@ -261,11 +262,17 @@ registerAccessRoutes(app);
 // What each GPU runs, through AI Control with the server's key; administrators change it by hand.
 registerAiControlRoutes(app, { isAdmin: canAdmin });
 // Grantable profiles come from the same discovery as /api/models, across image and video backends.
+// Cloud profiles are granted by the Cloud Models feature, so they are listed apart.
+const discoveredProfiles = async () => {
+  const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
+  return models.profiles || [];
+};
+// The retired global LoRAs and Cloud Models switches become per-profile starting values, once.
+try { retireFeatureSwitches({ multiUser: multiUserEnabled, source: settingSource, migrate: migrateFeatureOptionAccess, remove: removeLocalEnvValue }); }
+catch (error) { console.warn(`[accounts] Couldn’t carry the old feature switches into access profiles: ${error.message}`); }
 registerMultiUserAuthRoutes(app, {
-  availableProfiles: async () => {
-    const models = await mediaModels(false).then((result) => result.models).catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
-    return (models.profiles || []).map((profile) => profile.id);
-  }
+  availableProfiles: async () => (await discoveredProfiles()).filter((profile) => !isCloudProfile(profile)).map((profile) => profile.id),
+  cloudProfiles: async () => (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id)
 });
 
 function openFolder(folder) {
@@ -724,7 +731,9 @@ function modelsForAccount(models, req) {
     if (mayUseFeature(req.heissAccount, "loras")) return profile;
     return { ...profile, capabilities: { ...profile.capabilities, lora: false }, options: { ...profile.options, loras: [] } };
   });
-  return { ...models, loras: mayUseFeature(req.heissAccount, "loras") ? models.loras : [], profiles };
+  // The Image & Model Library stays administration for now: its saved images are shared across Studio.
+  const features = models.features ? { ...models.features, presets: Boolean(models.features.presets) && req.heissAccount.role === "administrator" } : models.features;
+  return { ...models, loras: mayUseFeature(req.heissAccount, "loras") ? models.loras : [], profiles, ...(features ? { features } : {}) };
 }
 
 function accountMayUseLoras(req) {
@@ -734,7 +743,10 @@ function accountMayUseLoras(req) {
 app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
-    res.json(modelsForAccount((await mediaModels(req.query.cached !== "1")).models, req));
+    const { models } = await mediaModels(req.query.cached !== "1");
+    // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
+    if (req.heissAccount) try { migrateCloudModelAccess((models.profiles || []).filter(isCloudProfile).map((profile) => profile.id)); } catch { /* Tried again on the next load. */ }
+    res.json(modelsForAccount(models, req));
   } catch {
     res.json(modelsForAccount(demoMode ? mockModelResult() : offlineModelResult(comfyUrl), req));
   }
@@ -842,7 +854,7 @@ app.post("/api/output-dir/browse", async (req, res) => {
 function workflowsForRequest(req, workflows) {
   if (!req.heissAccount || canAdmin(req)) return workflows;
   return workflows
-    .filter((item) => mayUseGenerationProfile(req.heissAccount, item.profileId))
+    .filter((item) => mayUseGenerationProfile(req.heissAccount, { id: item.profileId, family: item.family, nsfw: item.nsfw }))
     .map(({ path: _path, deleteId: _deleteId, ...item }) => item);
 }
 
