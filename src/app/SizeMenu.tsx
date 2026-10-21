@@ -404,7 +404,7 @@ export function LinkedSizeFields({ size, limits, onChange, disabled = false }: {
         <SizeField axis="W" value={size.width} limits={limits.width} onStart={begin} onChange={setWidth} />
         <Tip content={linked ? "Linked: the shape stays as you resize. Click to unlink" : "Unlinked: width and height change on their own. Click to link"}>
           <button type="button" className="size-link" aria-pressed={linked} aria-label={linked ? "Unlink Width & Height" : "Link Width & Height"} onClick={() => { begin(); setFresh(true); setLinked((value) => !value); }} onPointerLeave={() => setFresh(false)}>
-            {/* Keyed, so each change plays the icon's turn (37-size-menu.css). */}
+            {/* Keyed, so each change plays the icon's turn (pickers.css). */}
             <span key={linked ? "linked" : "apart"} className="size-link-icon">{linked ? <Link2 size={14} strokeWidth={2.2} /> : <Unlink2 size={14} strokeWidth={2.2} />}</span>
           </button>
         </Tip>

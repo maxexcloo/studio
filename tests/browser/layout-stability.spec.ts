@@ -114,7 +114,7 @@ test('phone filter tools stay on screen and yield to create and reference sheets
 test('horizontal dock and Generate keep separate lanes without changing dock orientation', async ({ page, isMobile }) => {
   test.skip(isMobile, 'Desktop deck lanes.');
   await page.goto('/');
-  for (const width of [1041, 1200, 1440]) {
+  for (const width of [1051, 1200, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await expect.poll(() => page.locator('.studio-dock').evaluate((dock) => {
       const prompt = document.querySelector('.zen-prompt')!.getBoundingClientRect();

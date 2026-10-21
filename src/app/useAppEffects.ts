@@ -10,7 +10,7 @@ export const OPEN_DIALOG = '[role="dialog"]:not([data-focus-trap]), [role="alert
 export function useWindowGuards(mode: Mode) {
   // Chrome on Windows can hand playing videos to a hardware layer that frosted
   // glass can't blur, so the glass over the video gallery shows it through.
-  // There, in video mode, the glass turns nearly opaque (16-system.css).
+  // There, in video mode, the glass turns nearly opaque (tokens.css).
   useEffect(() => {
     const root = document.documentElement;
     const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "";

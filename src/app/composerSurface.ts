@@ -138,7 +138,7 @@ export function useComposerSurfaceBox(anchor: HTMLElement | null, opener?: HTMLE
 
 /**
  * While a glass surface moves in or out it skips its backdrop blur (a solid
- * fill stands in, `[data-settling]` in 18-surfaces.css): re-blurring the page
+ * fill stands in, `[data-settling]` in surfaces.css): re-blurring the page
  * behind on every frame of the motion is what made sheets and popovers stutter.
  * The glass returns once it settles. Spread onto the moving motion element.
  */

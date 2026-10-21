@@ -34,7 +34,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
  * A heading-only group (no rows) carries just that action and its note.
  *
  * Settings rows are the flat list every phone sheet uses (SheetList.tsx,
- * 41-lists.css, UI-PATTERNS › Lists and › Settings): a quiet heading over
+ * lists.css, UI-PATTERNS › Lists and › Settings): a quiet heading over
  * full-width rows split by hairlines, no cards. A Settings row may carry one
  * line of description under its label.
  */

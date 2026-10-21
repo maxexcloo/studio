@@ -326,7 +326,7 @@
 .upscale-compare-tag.is-after { right: 12px; }
 .upscale-compare[data-edge="start"] .upscale-compare-tag.is-before { opacity: 0; translate: -4px 0; }
 .upscale-compare[data-edge="end"] .upscale-compare-tag.is-after { opacity: 0; translate: 4px 0; }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .upscale-compare-tag { top: 8px; font-size: 10px; padding: 3px 7px; }
   .upscale-compare-tag.is-before { left: 8px; }
   .upscale-compare-tag.is-after { right: 8px; }
@@ -375,17 +375,17 @@
 .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: calc(380px + 18px); }
 /* Too narrow beside an open Details column for the bar and the pill side by
    side: the top right corner of the picture's column instead. */
-@media (min-width: 1025px) and (max-width: 1120px) {
+@media (min-width: 1051px) and (max-width: 1120px) {
   .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { top: 18px; bottom: auto; }
 }
-@media (max-width: 1024px) {
+@media (max-width: 1050px) {
   .viewer-zoom-pill:not(.is-phone),
   .viewer-stage.with-side .viewer-zoom-pill:not(.is-phone) { right: max(12px, env(safe-area-inset-right)); }
   .viewer-zoom-pill:not(.is-phone) { bottom: calc(14px + env(safe-area-inset-bottom) + (var(--dock-h) - 34px) / 2); }
 }
 /* A narrow window: the bar spans the width, leaving the pill no room beside
    it; zoom by pinch, wheel or double click there, as the dock's own zoom does. */
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .viewer-zoom-pill:not(.is-phone) { display: none; }
 }
 .viewer-zoom-step { display: grid; place-items: center; width: 30px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); cursor: pointer; }
@@ -436,7 +436,7 @@
 .viewer-info:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
 .viewer-info:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--glass-bar-shadow); }
 .viewer-side-close { flex: none; margin: -8px -10px -8px 0; }
-@media (max-width: 1024px) {
+@media (max-width: 1050px) {
   /* Beside the corner Close. */
   .viewer-info { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px); }
 }
@@ -454,7 +454,7 @@
   .viewer-stage.with-side .viewer-profile-summary { max-width: calc(100% - 468px); }
 }
 .detail-settings .detail-note { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .viewer-shell { grid-template-rows: minmax(0, 1fr); }
   .viewer-stage.with-side { grid-template-columns: minmax(0, 1fr); }
   .viewer-canvas { padding: 8px 8px 80px; }
@@ -538,14 +538,14 @@
 .viewer-arrow:hover { background-image: linear-gradient(var(--control-hover), var(--control-hover)); box-shadow: var(--glass-bar-shadow); }
 /* --------------------------------------------------------------- 3. Modals
    Solid sheets for things you open on purpose. Dialogs are <Modal>, styled in
-   18-surfaces.css; the viewer's side panel uses the same material. */
+   surfaces.css; the viewer's side panel uses the same material. */
 .viewer-side { background: var(--surface-modal); box-shadow: inset 1px 0 0 var(--glass-border); }
 /* The viewer's upscale button while it counts down: the time beside the stop square. */
 .icon-button.has-count { width: auto; min-width: 34px; padding-inline: 9px; gap: var(--space-3); }
 .viewer-upscale-left { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* ----------------------------------------------------------------- Viewer */
 .viewer-close { display: none; }
-@media (max-width: 1024px) {
+@media (max-width: 1050px) {
   /* The side panel overlays the image instead of taking a 380px column. */
   .viewer-stage.with-side { grid-template-columns: minmax(0, 1fr); }
   .viewer-stage.with-side .viewer-dock { left: 50%; }
@@ -591,7 +591,7 @@
     color: hsl(var(--foreground));
   }
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   /* Pinch and double tap zoom; the zoom buttons would push actions off-screen. */
   .viewer-dock .is-zoom-control,
   .viewer-dock .viewer-divider { display: none; }
@@ -614,7 +614,7 @@
   }
 }
 /* ------------------------------------------------------------------ Stars */
-/* A tile's Star sits in its top row (04-gallery.css); once set it stays in view. */
+/* A tile's Star sits in its top row (gallery.css); once set it stays in view. */
 .viewer-dock .icon-button.viewer-star.is-on,
 .viewer-dock .icon-button.viewer-star.is-on:hover { color: var(--ember); }
 /* ---------------------------------------------------------------------------
@@ -828,7 +828,7 @@
   border-radius: 24px 24px 0 0;
   transform-origin: 50% 100%;
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   .inpaint-pill { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); max-width: calc(100% - 20px); }
   .inpaint-divider { margin: 0 1px; }
   .inpaint-viewport { top: 68px; bottom: calc(64px + env(safe-area-inset-bottom)); }

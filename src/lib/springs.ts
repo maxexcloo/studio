@@ -2,7 +2,7 @@ import { useReducedMotion } from "framer-motion";
 
 /**
  * Framer motion presets (UI-PATTERNS › Motion). Nothing overshoots: springs
- * have no bounce, and the tweens match the CSS tokens in 00-tokens.css.
+ * have no bounce, and the tweens match the CSS tokens in tokens.css.
  * Use these instead of raw timings.
  */
 const ease = [0.2, 0, 0, 1] as const;

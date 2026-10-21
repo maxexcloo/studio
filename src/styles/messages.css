@@ -31,7 +31,7 @@
 .lora-mismatch-action.is-quiet:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
 .lora-mismatch-close { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: var(--r-pill); background: none; color: hsl(var(--foreground) / .6); cursor: pointer; }
 .lora-mismatch-close:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
-/* At 760px and below the docks rise to sit on the prompt box (17-deck.css); the note goes above them. */
+/* At 760px and below the docks rise to sit on the prompt box (shell.css); the note goes above them. */
 @media (max-width: 760px) {
   .lora-mismatch { bottom: calc(100% + var(--deck-gap, 18px) + var(--deck-h, 44px) + 10px); }
 }
@@ -261,7 +261,7 @@ button.activity-main { cursor: pointer; }
    Messages show in the Studio status pill (src/app/StatusMessage.tsx), never
    as floating toasts: on the desktop the gallery's top bar, or the header of a
    dialog or the viewer that covers it; on the phone one pill at the top of the
-   screen, over everything (42-phone-pop.css). The light takes the message's
+   screen, over everything (phone.css). The light takes the message's
    tone; on the desktop the words never wrap. */
 .status-pill {
   --tone: rgb(255 255 255 / .88);

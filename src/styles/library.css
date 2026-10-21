@@ -3,7 +3,7 @@
 /* ---------------------------------------------------------------------------
    The Library (src/app/Library.tsx and its Library* pages)
 
-   The Settings panel's anatomy (19-settings.css): a section rail, one page at
+   The Settings panel's anatomy (settings.css): a section rail, one page at
    a time with its title and one line, groups of rows. Images is a grid of
    even cards; a card or an import opens its review in place, with Back.
 --------------------------------------------------------------------------- */

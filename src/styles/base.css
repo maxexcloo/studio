@@ -12,7 +12,7 @@ body { margin: 0; min-width: 320px; color: hsl(var(--foreground)); }
 img { color: transparent; }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
-/* Buttons take the neutral focus ring from 22-accents.css; fields brighten their edge. */
+/* Buttons take the neutral focus ring from focus.css; fields brighten their edge. */
 input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 0;
   border-color: var(--line-strong);
@@ -81,7 +81,7 @@ input.is-framed:focus-visible {
   0% { background-position: 200% 0; }
   100% { background-position: -60% 0; }
 }
-@media (max-width: 620px) {
+@media (max-width: 640px) {
   body { overflow: hidden; }
 }
 @theme inline {
@@ -148,7 +148,7 @@ body {
   overscroll-behavior: none;
 }
 @media (max-width: 760px) {
-  /* Bottom deck placement (controls button, zoom, dock) lives in 17-deck.css. */
+  /* Bottom deck placement (controls button, zoom, dock) lives in shell.css. */
   input,
   textarea,
   select {
