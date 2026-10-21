@@ -336,11 +336,9 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .compare-variants select { max-width: 100%; }
 .comparison-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.detail-lora:has(.lora-details[open]) { flex-wrap: wrap; }
-.detail-lora .lora-details summary { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; cursor: pointer; }
-.detail-lora .lora-details[open] { flex-basis: 100%; order: 2; }
-.detail-lora .lora-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.detail-lora .lora-details a { display: inline-flex; align-items: center; min-height: 44px; }
+.detail-lora:has(.lora-info-panel) { flex-wrap: wrap; }
+.detail-lora .lora-info-panel { flex-basis: 100%; order: 2; }
+
 
 
 /* Confirmation answers need the corner tools' space; Close stays available. */
@@ -350,3 +348,17 @@ html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidd
 .scrim .viewer-stage:has(.viewer-phone-bar):has(.status-pill.is-viewer[role="alertdialog"]) :is(.viewer-phone-star, .viewer-phone-info) {
   visibility: hidden;
 }
+
+/* The optional image summary belongs to Details and stays over the uncovered preview. */
+.scrim .viewer-stage.with-side:has(.viewer-phone-bar) .viewer-profile-summary {
+  display: grid;
+  top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 10px);
+  max-width: calc(100vw - 32px);
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.scrim .viewer-stage:has(.viewer-phone-bar):has(.viewer-profile-summary) .viewer-side { top: calc(max(10px, env(safe-area-inset-top)) + var(--dock-h) + 70px); }
+/* Details' LoRA row is the box already: its information sits inside without a second card. */
+.detail-lora .lora-info-panel { padding: 4px 0 2px; border: 0; background: transparent; }

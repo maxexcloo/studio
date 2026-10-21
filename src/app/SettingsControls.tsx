@@ -5,7 +5,7 @@ import { cn } from './format';
 export const preferenceLabels = {
   confirmActions: 'Confirm Before Removing Things',
   showFailedItems: 'Show Failed Items',
-  smartUpscale: 'Smart Upscale',
+  smartUpscale: 'Upscale',
 } as const;
 
 export function Switch({ checked, onChange, disabled, label, size = 'md' }: { checked: boolean; onChange: (next: boolean) => void; disabled?: boolean; label: string; size?: 'sm' | 'md' }) {

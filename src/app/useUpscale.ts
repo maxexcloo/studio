@@ -17,7 +17,7 @@ export function upscaleDisplayThumbnail(item: GalleryItem) {
 }
 
 /**
- * Upscaled as part of its run (Smart upscale's 2K / 4K): one picture, so it
+ * Upscaled as part of its run (Upscale's 2K / 4K): one picture, so it
  * offers no original to flip back to, no comparison and no upscale arrow.
  */
 export function upscaledWithRun(item: GalleryItem) {
@@ -62,7 +62,7 @@ export function upscaleTooltip(item: GalleryItem, leftMs: number | null = null) 
   }
   if (state?.status === "error") return `${state.error || "Upscale failed"}. Click to try again`;
   if (state?.url) return item.upscaleActive ? "Showing the upscale · click for the original" : "Showing the original · click for the upscale";
-  return "Smart upscale";
+  return "Upscale";
 }
 
 /** Decimal units, like the Finder and every model setup panel, so one file never shows two sizes. */
@@ -253,21 +253,21 @@ export function useUpscale({ gallery, prefs, showToast, loadGalleryDelta, patchG
     // body means something other than this route answered (SPA shell, proxy).
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      console.warn(`Smart upscale status: ${contentType || "unknown type"} (HTTP ${response.status}) instead of JSON`);
+      console.warn(`Upscale status: ${contentType || "unknown type"} (HTTP ${response.status}) instead of JSON`);
       return failStatus("Restart Studio to finish updating.");
     }
     let payload: UpscaleStatus & { error?: string; offline?: boolean };
     try {
       payload = await response.json();
     } catch {
-      return failStatus(`Couldn’t read the smart upscale status (HTTP ${response.status}).`);
+      return failStatus(`Couldn’t read the upscale status (HTTP ${response.status}).`);
     }
     if (!response.ok) {
       if (payload?.install !== undefined) setInstall(payload.install);
-      return failStatus(payload?.error || `Couldn’t check smart upscale (HTTP ${response.status}).`, Boolean(payload?.offline));
+      return failStatus(payload?.error || `Couldn’t check upscale (HTTP ${response.status}).`, Boolean(payload?.offline));
     }
     if (typeof payload?.nodesInstalled !== "boolean") {
-      return failStatus(`Couldn’t check smart upscale’s nodes (HTTP ${response.status}).`);
+      return failStatus(`Couldn’t check upscale’s nodes (HTTP ${response.status}).`);
     }
     setStatus(payload);
     setInstall(payload.install);

@@ -171,7 +171,7 @@ export function useViewerControls(view: any) {
   }
 
   /**
-   * Rerun: loads an output's model, prompts, size, LoRAs, references and
+   * Recreate: loads an output's model, prompts, size, LoRAs, references and
    * settings into the composer, seed included, so generating makes the same
    * picture again unless something is changed. Edit (`newSeed`) loads the same
    * with a new seed, to change it. Returns whether its model is installed.

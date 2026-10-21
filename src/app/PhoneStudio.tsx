@@ -1,3 +1,4 @@
+import { PickerTools } from './PickerTools';
 import { PromptField } from './PromptField';
 import { CatalogueFilters } from './CatalogueFilters';
 import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
@@ -456,14 +457,13 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
     <>
       <div className="phone-model-tools">
         {recipes.length ? <ListItem label="Recipe"><ListSelect native label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
-        {profiles.length ? (
-          <label className="picker-search">
+        {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" search={<label className="picker-search">
             <Search size={15} aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
             {query ? <button type="button" aria-label="Clear Model Search" onClick={() => setQuery('')}><X size={14} /></button> : null}
-          </label>
-        ) : null}
-        {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
+          </label>}>
+          <CatalogueFilters value={filters} onChange={setFilters} />
+        </PickerTools> : null}
       </div>
       {!profiles.length ? (view.comfyStatus?.connected ? <EmptyState title="No Models Yet">Add a model to ComfyUI to see it here.</EmptyState> : <EmptyState title="ComfyUI Is Offline">Models show up when it’s back.</EmptyState>) : null}
       {sections.map((section) => <ListSection key={section.id} title={section.label || undefined}>{section.rows.map(row)}</ListSection>)}
@@ -507,9 +507,16 @@ function PhoneSize({ view }: { view: Record<string, any> }) {
             <span aria-hidden="true">{row.key === 'default' ? 'Default' : row.label}</span>
           </button>
         ))}
+        {customLimits ? (
+          <button type="button" role="radio" aria-checked={custom && !savedMatch} className={cn('size-shape is-custom', custom && !savedMatch && 'is-active')}
+            aria-label={custom ? `Custom, ${picked.width} × ${picked.height}` : 'Custom'} onClick={() => chooseSizeTier('custom')}>
+            <span className="aspect-shape" style={shapeIn(shown.width, shown.height)} aria-hidden="true" />
+            <span aria-hidden="true">Custom</span>
+          </button>
+        ) : null}
       </div>
       {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
-      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} onSave={ownSize || savedMatch ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} /></div> : null}
+      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} onSave={custom && (ownSize || savedMatch) ? () => { saveCustomSize(); } : undefined} saved={Boolean(savedMatch)} disabled={!custom} /></div> : null}
       {note ? <p className="list-note">{note}</p> : null}
       {saved.length ? (
         <>

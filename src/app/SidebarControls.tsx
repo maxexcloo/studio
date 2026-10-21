@@ -47,7 +47,7 @@ export function practicalStepRange(profile: any, meta: { min?: number; max?: num
  * popover and the phone sheet: one line per setting, the label on the left
  * and its control on the right. Steppers for numbers, the studio's select on
  * the desktop and the phone's own picker on a phone, friendly names for the
- * model parts, Smart Upscale for the run, and Back to Recommended. Steps sit
+ * model parts, Upscale for the run, and Back to Recommended. Steps sit
  * in the composer (the phone's Create footer); width and height belong to Size.
  */
 export function PhoneAdvancedControls({ view }: { view: any }) {
@@ -61,7 +61,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
     prefs, setPrefs, upscaleStatus, recommended
   } = view;
   const phone = usePhone();
-  // Smart Upscale as part of the run (server/run-upscale.js): offered for pictures once Settings › Studio has it on.
+  // Upscale as part of the run (server/run-upscale.js): offered for pictures once Settings › Studio has it on.
   const upscaleOffered = mode === "image" && Boolean(prefs?.smartUpscale) && currentProfile?.family !== "grok";
   const runUpscale = Number(prefs?.runUpscale) || 0;
   const faceDetailReady = Boolean(upscaleStatus?.faceDetail?.nodesInstalled);
@@ -114,7 +114,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
               <Switch label="Face Detail" checked={Boolean(prefs.upscaleFaceDetail) && faceDetailReady} disabled={!faceDetailReady} onChange={(next) => setPrefs({ upscaleFaceDetail: next })} />
             </ListItem>
           ) : null}
-          {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Smart Upscale needs its models first: set it up in Settings › Studio.</p> : null}
+          {runUpscale && !upscaleStatus?.ready ? <p className="list-note">Upscale needs its models first: set it up in Settings › Studio.</p> : null}
         </ListSection>
       ) : null}
 

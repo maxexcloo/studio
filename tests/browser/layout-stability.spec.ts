@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
-import { studioUi } from './helpers/ui';
+import { studioUi, pickerSearch } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="640"><rect width="512" height="640" fill="#497e7b"/></svg>');
 const items = Array.from({ length: 12 }, (_, index) => ({ id: `layout-${index}`, url: picture, filename: `layout-${index}.png`, type: 'image', status: 'done', prompt: 'Layout test', createdAt: '2026-01-01T00:00:00Z', width: 512, height: 640 }));
@@ -105,7 +105,7 @@ test('phone filter tools stay on screen and yield to create and reference sheets
   const composer = await ui.openComposer();
   await reachable(ui.prompt, true);
   await composer.locator('.ref-add').click();
-  await reachable(page.locator('.reference-popover').getByRole('searchbox', { name: 'Search Library', exact: true }));
+  await reachable(await pickerSearch(page.locator('.reference-popover'), 'Search Library', 'searchbox'));
   await page.locator('.reference-popover').getByRole('button', { name: 'Close References', exact: true }).click();
   await reachable(composer.getByRole('button', { name: 'Close', exact: true }));
 });

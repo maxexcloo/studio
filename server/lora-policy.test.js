@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compatibilityNote, compatibleLoras, loraCompatibility, loraName, strengthRange } from './lora-policy.js';
+import { compatibilityNote, compatibleLoras, loraCompatibility, loraName, sameLoraFamily, strengthRange } from './lora-policy.js';
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from './lora-catalogue.js';
 
 const profile = { id: 'custom:fl', family: 'minimax_h3', baseModel: 'models/h3.safetensors', recipe: { conditioning: 'FL2VA' } };
@@ -113,4 +113,15 @@ test('a LoRA reads by its catalogue title, else a cleaned Title Case stem', () =
   assert.equal(loraName('pawg_krea2.safetensors', { title: 'PAWG Krea 2' }), 'PAWG Krea 2');
   assert.equal(loraName('loras/krea/soft_light-v3.safetensors'), 'Soft Light V3');
   assert.equal(loraName('detailer.gguf', { title: '   ' }), 'Detailer');
+});
+
+
+test('model changes retain stacks only within a known shared LoRA family', () => {
+  assert.equal(sameLoraFamily({ id: 'base', family: 'moss' }, { id: 'fast', family: 'moss' }), true);
+  assert.equal(sameLoraFamily({ family: 'flux3_klein' }, { family: 'flux3' }), true);
+  assert.equal(sameLoraFamily({ family: 'minimax-h3' }, { family: 'minimax_h3' }), true);
+  assert.equal(sameLoraFamily({ family: 'moss' }, { family: 'boogu' }), false);
+  assert.equal(sameLoraFamily({ family: 'custom' }, { family: 'custom' }), false);
+  assert.equal(sameLoraFamily({ id: 'same', family: 'custom' }, { id: 'same', family: 'custom' }), true);
+  assert.equal(sameLoraFamily(undefined, { family: 'moss' }), false);
 });

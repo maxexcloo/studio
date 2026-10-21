@@ -11,6 +11,20 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Compact pickers, clearer generation Details and a Custom size option
+
+### Changed
+- **Generation Details:** clearer section headings and a Copy · Recreate footer. Copy preserves saved generation inputs and references while excluding output files, timestamps and timing. Edit and Copy Settings are removed.
+- **Image Text:** an optional concise summary appears only while Details is open.
+- **LoRAs:** enabled adapters show their filename and information automatically in a shared panel. Civitai sources have separate .com and .red icons beside the row; links are removed from the information panel.
+- Variant comparison controls are hidden while existing records and APIs remain intact.
+- **Notifications:** every notification closes after three seconds with a countdown ring around Dismiss; hover, focus and a background tab pause it. Questions still wait for an answer.
+- **Names:** Smart Upscale is now Upscale and Rerun is now Recreate; saved preferences keep working.
+- **Timing:** Details explains Active and Total and keeps estimates marked.
+- **Pickers:** References, LoRAs and Models share one compact toolbar with Clear Selection on the right and search behind an icon (or start typing).
+- **Size:** Custom is the last size option and is the only one that unlocks Width and Height; the megapixel and ratio caption under them is gone.
+- **Model changes:** switching to another model family clears the LoRA stack; models in the same family keep it.
+
 ## [0.38.0] - 2026-10-21
 
 > Active worker model storage and clean container shutdown

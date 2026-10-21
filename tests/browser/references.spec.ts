@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { studioUi } from './helpers/ui';
+import { studioUi, pickerSearch } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#699b88"/></svg>');
 const image = (id: string) => ({ id, source: 'upload', name: `${id}.png`, url: picture, thumbnailUrl: picture, mime: 'image/png', width: 80, height: 80, size: 10, createdAt: '' });
@@ -165,15 +165,20 @@ test('reference sources name their search and keep one upload action', async ({ 
   await page.route('**/api/reference-assets?*', (route) => route.fulfill({ json: { items: [], nextCursor: '' } }));
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.locator('.reference-popover');
-  // Open and type on desktop; the phone sheet takes focus itself so no keyboard pops up.
-  if (!phone) await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
   await expect(picker.getByRole('button', { name: 'Close References', exact: true })).toBeVisible();
   await picker.getByRole('tab', { name: 'Library', exact: true }).click();
-  await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveAttribute('placeholder', 'Search Library');
+  // Typing in the picker opens its compact search with that text, on both layouts.
+  if (!phone) {
+    await page.keyboard.type('n');
+    await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toBeFocused();
+    await expect(picker.getByRole('searchbox', { name: 'Search Library', exact: true })).toHaveValue('n');
+    await picker.getByRole('button', { name: 'Close Search', exact: true }).click();
+  }
+  await expect(await pickerSearch(picker, 'Search Library', 'searchbox')).toHaveAttribute('placeholder', 'Search Library');
   await expect(picker.getByText('No Outputs Yet', { exact: true })).toBeVisible();
   await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
   await expect(picker.getByText('No Uploads Yet', { exact: true })).toBeVisible();
-  await expect(picker.getByRole('searchbox', { name: 'Search Uploads', exact: true })).toHaveAttribute('placeholder', 'Search Uploads');
+  await expect(await pickerSearch(picker, 'Search Uploads', 'searchbox')).toHaveAttribute('placeholder', 'Search Uploads');
   await expect(picker.getByRole('button', { name: 'Upload', exact: true })).toHaveCount(1);
   await expect(picker.locator('.empty-state button')).toHaveCount(0);
 });
@@ -195,14 +200,15 @@ test('reference selection stays open, keeps picks in place across searches and t
   await expectPicked(page, 2, 2);
   await expect(picker.getByRole('button', { name: 'third.png', exact: true })).toHaveAttribute('aria-disabled', 'true');
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeEnabled();
-  const search = picker.getByRole('searchbox');
+  const search = await pickerSearch(picker, 'Search Library', 'searchbox');
   await search.fill('no matching images');
   await expect(picker.locator('.reference-tile-select')).toHaveCount(2);
   await picker.getByRole('tab', { name: 'Uploads', exact: true }).click();
   await expect(picker.getByRole('button', { name: 'Selected: second.png', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'Selected: second.png', exact: true }).click();
   await expectPicked(page, 1, 2);
-  await search.clear();
+  // The query follows the tab; its field takes the tab's name.
+  await picker.getByRole('searchbox', { name: 'Search Uploads', exact: true }).clear();
   await picker.getByRole('button', { name: 'third.png', exact: true }).click();
   await expectPicked(page, 2, 2);
   await page.keyboard.press('Escape');

@@ -31,3 +31,54 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   await page.mouse.up();
   await expect(notification).toHaveCount(0);
 });
+
+test('error notifications count down three seconds and pause on hover, focus and hidden tabs', async ({ page }) => {
+  await page.route('**/api/generate', route => route.fulfill({ status: 400, json: { error: 'Countdown test failure' } }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  test.skip(await ui.isPhone(), 'Hover and focus pauses are desktop pointer behaviour; the timeout itself is shared.');
+  await ui.openComposer();
+  await ui.prompt.fill('Test notification timing');
+  await ui.generate.click();
+  const notice = page.locator('.status-message').filter({ hasText: 'Countdown test failure' });
+  await expect(notice).toBeVisible();
+  const ring = notice.locator('.status-pill-countdown');
+  await expect(ring).toHaveCSS('animation-duration', '3s');
+  await notice.hover();
+  await expect(ring).toHaveCSS('animation-play-state', 'paused');
+  await page.waitForTimeout(3500);
+  await expect(notice).toBeVisible();
+  await notice.getByRole('button', { name: 'Dismiss', exact: true }).focus();
+  await page.mouse.move(0, 0);
+  await expect(ring).toHaveCSS('animation-play-state', 'paused');
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, value: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await expect(ring).toHaveCSS('animation-play-state', 'paused');
+  await page.waitForTimeout(3500);
+  await expect(notice).toBeVisible();
+  await page.evaluate(() => { Reflect.deleteProperty(document, 'hidden'); document.dispatchEvent(new Event('visibilitychange')); });
+  await expect(ring).toHaveCSS('animation-play-state', 'running');
+  await expect(notice).toHaveCount(0, { timeout: 6000 });
+});
+
+test('repeated error notifications reset their countdown and reduced motion still expires', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/api/generate', route => route.fulfill({ status: 400, json: { error: 'Repeated countdown failure' } }));
+  await page.goto('/');
+  const ui = studioUi(page);
+  test.skip(await ui.isPhone(), 'Create closes on the phone after Generate; the shared timer is covered on the desktop.');
+  await ui.openComposer();
+  await ui.prompt.fill('Test repeated notification timing');
+  await ui.generate.click();
+  const notice = page.locator('.status-message').filter({ hasText: 'Repeated countdown failure' });
+  const ring = notice.locator('.status-pill-countdown');
+  await expect(ring).toBeVisible();
+  await expect(ring).toHaveCSS('animation-name', 'none');
+  const original = await ring.elementHandle();
+  await page.waitForTimeout(2000);
+  await ui.generate.click();
+  await expect.poll(() => original!.evaluate(element => element.isConnected)).toBe(false);
+  await page.waitForTimeout(2000);
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(0, { timeout: 3000 });
+});

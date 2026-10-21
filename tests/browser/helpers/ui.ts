@@ -177,12 +177,12 @@ export function studioUi(page: Page) {
       } else await page.locator('.dock-chip.is-cancel').filter({ hasText: /Stop/i }).click();
     },
 
-    /** The viewer's Rerun (an exact rerun): in its action bar, on the phone and the desktop. */
+    /** The viewer's Recreate (an exact rerun): in its action bar, on the phone and the desktop. */
     async reuseButton() {
-      // With Details open, Rerun is in its footer and the bar leaves it out.
-      if (await page.locator('.viewer-side').count()) return page.locator('.viewer-side').getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Rerun', exact: true });
+      // With Details open, Recreate is in its footer and the bar leaves it out.
+      if (await page.locator('.viewer-side').count()) return page.locator('.viewer-side').getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Recreate', exact: true });
       const actions = await isPhone() ? viewer.getByRole('navigation', { name: 'Image Actions', exact: true }) : viewer.getByRole('toolbar', { name: 'Image Actions', exact: true });
-      return actions.getByRole('button', { name: 'Rerun', exact: true });
+      return actions.getByRole('button', { name: 'Recreate', exact: true });
     },
 
     /** Closes Details: its own Close on the desktop, Info (pressed) on the phone. */
@@ -214,4 +214,12 @@ export function studioUi(page: Page) {
       await expect(viewer).toHaveCount(0);
     },
   };
+}
+
+/** Opens a picker's compact search (PickerTools) and returns its field. */
+export async function pickerSearch(scope: Locator, name: string, role: 'textbox' | 'searchbox' | 'combobox' = 'textbox') {
+  const field = scope.getByRole(role, { name, exact: true });
+  if (!(await field.isVisible())) await scope.getByRole('button', { name, exact: true }).click();
+  await expect(field).toBeVisible();
+  return field;
 }

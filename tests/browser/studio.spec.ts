@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { studioUi } from './helpers/ui';
+import { studioUi, pickerSearch } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 const images = Array.from({ length: 80 }, (_, index) => ({ id: `image-${index}`, url: `${picture}#${index}`, filename: `image-${index}.png`, type: 'image', status: 'done', prompt: `Image ${index}`, model: 'flux1-schnell.safetensors', createdAt: new Date(Date.now() - index * 60000).toISOString(), width: 512, height: 512, settings: { profileId: 'mock-flux-schnell', steps: 4, cfg: 1, seed: '0' } }));
@@ -131,7 +131,7 @@ test('swipes move through previews and generation details stay accessible', asyn
     await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--pan-x'))).toBe('0px');
   }
   await ui.showDetails();
-  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Generation', exact: true })).toBeVisible();
   await expect(page.locator('details').filter({ hasText: 'Settings' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -140,6 +140,7 @@ test('the full studio viewer summary is selectable text', async ({ page, isMobil
   test.skip(isMobile, 'The phone viewer has no summary.');
   await page.goto('/');
   await studioUi(page).openViewer(page.locator('[data-tile-id]').first());
+  await studioUi(page).showDetails();
   const summary = page.locator('.viewer-profile-summary');
   await expect(summary).toBeVisible();
   expect(await summary.evaluate((element) => getComputedStyle(element).userSelect)).toBe('text');
@@ -154,12 +155,10 @@ test('the phone viewer keeps Star and Info beside Close and its title top left, 
   for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport);
     // The desktop's title, top left, clear of the corner buttons.
-    const title = await page.locator('.viewer-profile-summary').boundingBox();
+    await expect(page.locator('.viewer-profile-summary')).toHaveCount(0);
     const star = await page.getByRole('button', { name: /^(Star|Unstar)$/ }).boundingBox();
     const info = await page.getByRole('button', { name: 'Info', exact: true }).boundingBox();
     const close = await page.getByRole('button', { name: 'Close Viewer', exact: true }).boundingBox();
-    expect(title!.x).toBeLessThan(viewport.width / 4);
-    expect(title!.x + title!.width).toBeLessThanOrEqual(star!.x);
     expect(info!.x - star!.x - star!.width).toBeCloseTo(8, 0);
     expect(info!.x).toBeGreaterThan(viewport.width / 2);
     expect(close!.x - info!.x - info!.width).toBeCloseTo(8, 0);
@@ -381,7 +380,7 @@ test('reference failures can retry and searching reaches beyond loaded pages', a
   await page.keyboard.press('Home');
   await expect(page.locator('[data-reference-index="0"]')).toBeFocused();
   expect(await page.locator('[data-reference-index][tabindex="0"]').count()).toBe(1);
-  await page.getByRole('searchbox', { name: 'Search Library' }).fill('Reference 999');
+  await (await pickerSearch(page.locator('.reference-popover'), 'Search Library', 'searchbox')).fill('Reference 999');
   await expect(page.getByRole('button', { name: 'Reference 999', exact: true })).toBeVisible();
   await expect(page.locator('[data-reference-index]')).toHaveCount(1);
   await page.getByRole('searchbox', { name: 'Search Library' }).fill('No Such Reference');
@@ -537,8 +536,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await shortcut.locator('..').getByRole('button', { name: /Add .*Favourites/ }).click();
   await expect(rows.filter({ hasText: 'Model 02' })).toHaveCount(2);
   await expect(menu.getByRole('heading', { name: 'Favourites', exact: true }).or(menu.getByRole('group', { name: 'Favourites', exact: true }))).toBeVisible();
-  const search = menu.getByLabel('Search Models', { exact: true });
-  await expect(search).toBeVisible();
+  const search = phone ? await pickerSearch(menu, 'Search Models') : await pickerSearch(menu, 'Search Models', 'combobox');
   if (phone) {
     await menu.locator('.phone-model-pop-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(search).toBeInViewport();

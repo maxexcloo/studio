@@ -20,7 +20,7 @@
  * - Not when the result is right there: a copied prompt shows a check on its
  *   button, a new cover is the new cover, a saved setting reads as saved.
  * - An error says what to do next, and offers it as the action when the app
- *   can do it (Try again, Set up, See why). It stays until dismissed.
+ *   can do it (Try again, Set up, See why). It closes after three seconds of visible, unpaused time.
  */
 
 export type ToastTone = 'neutral' | 'success' | 'warning' | 'error' | 'removed';
@@ -36,7 +36,7 @@ export type ToastOptions = {
   count?: number;
   /** The title once the count is over one, e.g. `(n) => `${n} items deleted``. The number in it rolls. */
   plural?: (count: number) => string;
-  /** Milliseconds on screen. Hovering pauses it. `Infinity` waits for a dismiss. */
+  /** Notifications use three seconds. `Infinity` is reserved for live progress; questions always wait for an answer. */
   duration?: number;
   action?: ToastAction;
   /** A question in the pill (useConfirmation): `action` answers yes, Cancel or a dismiss answers no; it waits for one. */
@@ -65,7 +65,7 @@ export type ToastRecord = {
 type Callbacks = { actions: Array<() => void>; closers: Array<() => void> };
 
 const MAX_TOASTS = 5;
-const BASE_DURATION: Record<ToastTone, number> = { neutral: 3500, success: 3500, removed: 6000, warning: 6500, error: 6500 };
+const NOTIFICATION_DURATION = 3000;
 
 let toasts: ToastRecord[] = [];
 const callbacks = new Map<string, Callbacks>();
@@ -96,17 +96,10 @@ export function toastSnapshot() {
   return toasts;
 }
 
-/**
- * An error stays until it is dismissed: it is often the only place a failure
- * is said, and it may land while you look elsewhere. Everything else times
- * out; long messages stay long enough to read, and anything with an action
- * gets at least six seconds.
- */
-function durationFor(tone: ToastTone, title: string, options: ToastOptions) {
-  if (options.duration !== undefined) return options.duration;
-  if (tone === 'error' || options.confirm) return Infinity;
-  const reading = BASE_DURATION[tone] + Math.max(0, title.length - 48) * 45;
-  return Math.min(12000, options.action ? Math.max(6000, reading) : reading);
+/** Questions and explicit live progress wait; every notification shares one countdown. */
+function durationFor(options: ToastOptions) {
+  if (options.confirm || options.duration === Infinity) return Infinity;
+  return NOTIFICATION_DURATION;
 }
 
 function close(id: string, ran: 'action' | 'close') {
@@ -125,7 +118,7 @@ function close(id: string, ran: 'action' | 'close') {
 function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
   const count = Math.max(1, options.count ?? 1);
   const group = options.group ?? (options.id ? `id:${options.id}` : `${tone}:${title}`);
-  const duration = durationFor(tone, title, options);
+  const duration = durationFor(options);
   const live = toasts.find((toast) => (options.id ? toast.id === options.id : toast.group === group));
 
   if (live) {
@@ -155,7 +148,7 @@ function show(tone: ToastTone, title: string, options: ToastOptions = {}) {
   }
 
   // One message at a time: a new one replaces what is showing, so nothing stacks or turns up stale
-  // later. Errors and questions wait for their answer; a replaced message's onClose still runs.
+  // later. Questions wait for their answer; a replaced message's onClose still runs.
   // A message with an action (Undo) also stays until its time is up; plain news behind it is dropped rather than shown stale.
   const plain = tone !== 'error' && tone !== 'warning' && !options.action && !options.confirm;
   if (plain && toasts.some((toast) => weight(toast) > 1)) return '';

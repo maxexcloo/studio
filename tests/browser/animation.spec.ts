@@ -69,6 +69,6 @@ test('Animate stays out of the menu while no ready H3 image-to-video profile is 
   await page.goto('/');
   await page.locator('[data-tile-id="animate-0"] .tile').click({ button: 'right' });
   const menu = page.getByRole('menu');
-  await expect(menu.getByRole('menuitem', { name: 'Rerun' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Recreate' })).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Animate' })).toHaveCount(0);
 });

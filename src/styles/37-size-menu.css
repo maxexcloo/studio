@@ -150,7 +150,9 @@
    hovering it draws them in, and linking slides them together under it.
    The link itself never grows a shape of its own. */
 .size-custom { overflow: hidden; }
-.size-custom-body { display: grid; gap: 6px; padding: 8px 0 0; }
+.size-custom-body { display: grid; gap: 6px; min-inline-size: 0; margin: 0; padding: 8px 0 0; border: 0; }
+.size-custom-body:disabled { opacity: .5; }
+.size-custom-body:disabled .size-field-key { pointer-events: none; }
 .size-fields {
   --cell-spring: cubic-bezier(.3, 1.45, .45, 1);
   --pill: 18px; /* half the cells' height: a full round end */

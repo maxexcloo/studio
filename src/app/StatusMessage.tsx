@@ -60,15 +60,17 @@ function messageText(message: ToastRecord) {
 /**
  * The pill showing one message: the status light in the message's tone, the
  * words, its action (Undo, View, Try Again) and a Dismiss. It times out like
- * a toast did (errors wait), pauses while hovered or focused, and a sideways
+ * a toast did, pauses while hovered or focused, and a sideways
  * flick dismisses it. `children` is what the pill shows between messages,
  * such as the phone's "Studio"; without it the pill is only there for one.
  */
 export function StatusPill({ message, className, children }: { message: ToastRecord | null; className?: string; children?: React.ReactNode }) {
   const reduced = useReducedMotion();
   const pageHidden = usePageHidden();
-  const [held, setHeld] = useState(false);
-  usePausableTimeout(message ? message.duration : null, () => { if (message) dismissToast(message.id); }, held || pageHidden, message ? `${message.id}:${message.version}` : '');
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const paused = hovered || focused || pageHidden;
+  usePausableTimeout(message ? message.duration : null, () => { if (message) dismissToast(message.id); }, paused, message ? `${message.id}:${message.version}` : '');
   if (!message && !children) return null;
   const fade = reduced ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0, transition: { duration: 0.1 } } } : {
     initial: { opacity: 0, y: 4 },
@@ -92,10 +94,10 @@ export function StatusPill({ message, className, children }: { message: ToastRec
       dragElastic={0.5}
       dragSnapToOrigin
       onDragEnd={(_, info) => { if (message && (Math.abs(info.offset.x) > 48 || Math.abs(info.velocity.x) > 420)) dismissToast(message.id); }}
-      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHeld(true); }}
-      onPointerLeave={(event) => { if (event.pointerType === 'mouse') setHeld(false); }}
-      onFocus={() => setHeld(true)}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setHeld(false); }}
+      onPointerEnter={(event) => { if (event.pointerType === 'mouse') setHovered(true); }}
+      onPointerLeave={(event) => { if (event.pointerType === 'mouse') setHovered(false); }}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setFocused(false); }}
     >
       <AnimatePresence mode="popLayout" initial={false}>
         {message ? (
@@ -108,7 +110,7 @@ export function StatusPill({ message, className, children }: { message: ToastRec
             {message.confirm ? <ConfirmPanel title={messageText(message)} confirm={message.confirm} /> : null}
             {message.confirm ? <ConfirmButtons message={message} /> : <>
               {message.actionLabel ? <button type="button" className="status-pill-action" onClick={() => runToastAction(message.id)}>{message.actionLabel}</button> : null}
-              <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}><X size={13} /></button>
+              <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}>{Number.isFinite(message.duration) ? <svg key={`${message.id}:${message.version}`} className="status-pill-countdown" viewBox="0 0 28 28" aria-hidden="true" style={{ animationDuration: `${message.duration}ms`, animationPlayState: paused ? 'paused' : 'running' }}><circle cx="14" cy="14" r="12" pathLength="1" /></svg> : null}<X size={13} /></button>
             </>}
           </motion.span>
         ) : (

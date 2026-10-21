@@ -293,6 +293,8 @@ export type Preferences = {
   /** Headings for each stretch of time in the gallery ("This evening"). */
   /** Date headings in the gallery ("Today", "This Evening"), from Settings › Studio › Gallery. */
   dateHeaders: boolean;
+  /** The short image summary over the viewer while Details is open. */
+  viewerImageText: boolean;
   /** Runs of one idea fold into stacks (runs.js). */
   stackRuns: boolean;
   /** A folded run: a photo with edges under it, or a cover flow inside one card. */

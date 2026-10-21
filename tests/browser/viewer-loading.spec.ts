@@ -41,7 +41,7 @@ test('the viewer shows each picture at its final size from the first frame, shar
     const tick = () => {
       const canvas = document.querySelector('.viewer-canvas');
       const layers = canvas ? [...canvas.querySelectorAll<HTMLImageElement>('img')].filter((image) => image.naturalWidth && getComputedStyle(image).opacity !== '0') : [];
-      const id = canvas?.closest('[role="dialog"]')?.querySelector('.viewer-profile-summary span')?.textContent?.split(' · ')[0] || '';
+      const id = canvas?.getAttribute('data-generation-size') || '';
       if (layers.length) frames.push({ id, sharp: Math.max(...layers.map((image) => image.naturalWidth)), rects: layers.map((image) => {
         const box = image.getBoundingClientRect();
         const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight);

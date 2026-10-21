@@ -249,9 +249,10 @@
 }
 .reference-tabs button:hover { color: hsl(var(--foreground)); }
 .reference-tabs button.active { background: var(--selected); color: #fff; }
-/* Clear Selection beside a picker's tabs (references and LoRAs), only while something is picked. */
+/* Clear Selection stays at the right of its tabs row in references and LoRAs. */
 .picker-clear-all {
   flex: none;
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;

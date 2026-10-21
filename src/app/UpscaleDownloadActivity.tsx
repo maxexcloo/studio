@@ -132,7 +132,7 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
 
   const title = mode === 'downloading' ? 'Downloading SeedVR2'
     : mode === 'verifying' ? 'Checking the download'
-    : mode === 'ready' ? 'Smart upscale is ready'
+    : mode === 'ready' ? 'Upscale is ready'
     : 'Download stopped';
   return {
     id: 'upscale-download',
@@ -150,7 +150,7 @@ export function useUpscaleDownloadActivity(setup: UpscaleSetup, install: Upscale
     aside: waitingThumb ? <SafeImg className="activity-thumb is-waiting" src={waitingThumb} draggable={false} title="Upscales When the Download Is Done" />
       : readyThumb ? <SafeImg className="activity-thumb" src={readyThumb} draggable={false} />
       : null,
-    open: { label: `${title}. Open smart upscale setup`, run: () => setup.openSetup() },
+    open: { label: `${title}. Open upscale setup`, run: () => setup.openSetup() },
     dismiss: mode === 'error' || mode === 'ready' ? { label: 'Dismiss', run: dismiss } : undefined,
     expire: mode === 'ready' ? { after: READY_HOLD_MS, run: () => setFinished(null) } : undefined
   };

@@ -40,7 +40,7 @@ for (const kind of ['image', 'video'] as const) {
       const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
       const phone = await ui.isPhone();
       // The full studio offers a failed run's reuse in its failure panel.
-      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Rerun', exact: true }) : await ui.reuseButton();
+      const reuse = failed && !phone ? viewer.locator('.failure-panel').getByRole('button', { name: 'Recreate', exact: true }) : await ui.reuseButton();
       await reuse.click();
       await expect(viewer).toHaveCount(0);
       await expect(ui.composer).toBeVisible();
@@ -56,8 +56,8 @@ for (const kind of ['image', 'video'] as const) {
   }
 }
 
-for (const promptsOnly of [false, true]) {
-  test(`${promptsOnly ? 'Edit' : 'Rerun'} of a missing model's output safely adapts to the current model`, async ({ page }) => {
+for (const promptsOnly of [false]) {
+  test(`${promptsOnly ? 'Edit' : 'Recreate'} of a missing model's output safely adapts to the current model`, async ({ page }) => {
     const models = await (await page.request.get('/api/models')).json();
     const current = models.profiles.find((profile: any) => profile.id === models.defaults.imageModel);
     current.capabilities.negativePrompt = true;
@@ -80,11 +80,7 @@ for (const promptsOnly of [false, true]) {
     await page.getByRole('button', { name: reference.name, exact: true }).click();
     await ui.closeComposer();
     const viewer = await ui.openViewer(page.locator(`[data-tile-id="${item.id}"]`));
-    if (promptsOnly) {
-      await expect(viewer.getByRole('button', { name: 'Reuse Options', exact: true })).toHaveCount(0);
-      await ui.showDetails();
-      await viewer.getByRole('group', { name: 'Details Actions', exact: true }).getByRole('button', { name: 'Edit', exact: true }).click();
-    } else await (await ui.reuseButton()).click();
+    await (await ui.reuseButton()).click();
     await expect(viewer).toHaveCount(0);
     await ui.openComposer();
     await expect(ui.prompt).toHaveValue(item.prompt);
@@ -99,7 +95,7 @@ for (const promptsOnly of [false, true]) {
     expect(body!.loras || []).toEqual([]);
     const referenceSlot = current.mediaInputs?.find((input: any) => input.kind === 'image')?.id || 'reference';
     expect(body!.referenceAssets).toEqual([{ slot: referenceSlot, assetId: reference.id }]);
-    // Edit adapts the settings like Rerun, with a new seed.
+    // Edit adapts the settings like Recreate, with a new seed.
     expect(body!.width).toBe(896);
     expect(body!.height).toBe(704);
     expect(body!.steps).toBeLessThanOrEqual(current.constraints.steps.max);

@@ -25,7 +25,7 @@ test('compact creation keeps a one-line prompt and send aligned through expansio
   await expect(composer.getByRole('button', { name: 'Clear Prompt', exact: true })).toBeVisible();
   await model.click();
   // Models choose from the one chooser: search, families and tiers, with no modal behind it.
-  await expect(ui.modelPicker.getByRole('combobox', { name: 'Search Models', exact: true })).toBeVisible();
+  await expect(ui.modelPicker.getByRole('button', { name: 'Search Models', exact: true })).toBeVisible();
   await expect(ui.modelPicker.getByRole('button', { name: 'Browse Models', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await ui.gallery.click({ position: { x: 150, y: 150 } });

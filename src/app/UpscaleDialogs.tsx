@@ -87,15 +87,15 @@ function fileLine(file: UpscaleInstallFile) {
 
 const copyFor = (stage: UpscaleSetupStage, quality: string, pending: boolean, fallback: string): { title: string; description: string } => {
   switch (stage) {
-    case "checking": return { title: "Setting Up Smart Upscale", description: "Checking ComfyUI…" };
+    case "checking": return { title: "Setting Up Upscale", description: "Checking ComfyUI…" };
     case "offline": return { title: "Waiting for ComfyUI", description: "Start ComfyUI to continue." };
-    case "nodes": return { title: "Add SeedVR2 to ComfyUI", description: "Smart upscale runs on the SeedVR2 nodes. Install them through ComfyUI-Manager or a terminal." };
+    case "nodes": return { title: "Add SeedVR2 to ComfyUI", description: "Upscale runs on the SeedVR2 nodes. Install them through ComfyUI-Manager or a terminal." };
     case "models": return { title: "Download the Upscale Model", description: `${upscaleQualityLabel(quality)} upscaling needs its SeedVR2 weights, a one-time download from Hugging Face.${fallback ? ` Until then it uses ${fallback}.` : ""}` };
     case "downloading": return { title: "Downloading SeedVR2", description: pending ? "The image upscales when this finishes. The download continues if you close this." : "The download continues if you close this." };
     case "verifying": return { title: "Checking the Download", description: "Making sure the files are complete." };
     case "ready": return fallback && !pending
       ? { title: "Ready with a Fallback Model", description: `${upscaleQualityLabel(quality)} works, but not with its own model.` }
-      : { title: "Smart Upscale Is Ready", description: pending ? "Starting the upscale." : "Every finished image has an upscale arrow in its corner." };
+      : { title: "Upscale Is Ready", description: pending ? "Starting the upscale." : "Every finished image has an upscale arrow in its corner." };
     case "error": return { title: "The Download Stopped", description: "Try again to resume." };
   }
 };
@@ -164,7 +164,7 @@ export function UpscaleSetupDialog({
         <Watcher lastChecked={setup.lastChecked}>Waiting for the SeedVR2 nodes…</Watcher>
         {status?.detectedNodes?.length ? (
           <p className="upscale-fine">
-            A different or older SeedVR2 pack is installed ({status.detectedNodes.join(", ")}). Smart upscale needs the one above.
+            A different or older SeedVR2 pack is installed ({status.detectedNodes.join(", ")}). Upscale needs the one above.
           </p>
         ) : null}
       </>
@@ -180,7 +180,7 @@ export function UpscaleSetupDialog({
     body = !admin ? (
       <div className="upscale-callout">
         <strong>The upscale model downloads on the computer running Studio.</strong>
-        <span>Set up smart upscale there, and it works here too.</span>
+        <span>Set up upscale there, and it works here too.</span>
       </div>
     ) : !status?.canDownload ? (
       <div className="upscale-callout">

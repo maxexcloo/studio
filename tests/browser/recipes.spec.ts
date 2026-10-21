@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { studioUi } from './helpers/ui';
+import { studioUi, pickerSearch } from './helpers/ui';
 
 test('prepared recipes select actual workflows without merging conditioning variants', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -21,7 +21,7 @@ test('prepared recipes select actual workflows without merging conditioning vari
   await recipe.selectOption('example-turbo');
   await expect(recipe).toHaveValue('example-turbo');
   const menu = phone ? ui.modelPicker : await ui.openModelPicker();
-  await menu.getByPlaceholder('Search Models', { exact: true }).fill('Example');
+  await (await pickerSearch(menu, 'Search Models', phone ? 'textbox' : 'combobox')).fill('Example');
   await expect(ui.modelOptions.filter({ hasText: 'Example Base' })).toHaveCount(1);
   await expect(ui.modelOptions.filter({ hasText: 'Example Reference' })).toHaveCount(1);
   await ui.modelOptions.filter({ hasText: 'Example Reference' }).click();

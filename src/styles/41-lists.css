@@ -303,6 +303,21 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .is-sheet .picker-title { font-size: 16px; }
 .picker-toolbar { flex: none; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 10px 12px 0; }
 .picker-toolbar .reference-tabs { flex: none; }
+/* PickerTools: tabs or filters, then Clear Selection on the right, then the search icon; search opens
+   as its own row under them only when asked for (or while a query is active). */
+.picker-tools { flex: none; display: grid; min-width: 0; }
+.picker-tools .picker-toolbar { padding: 8px 12px 0; }
+.picker-tools .picker-toolbar { flex-wrap: wrap; row-gap: 6px; }
+/* The tabs never hide behind Clear or search: when a narrow picker has no room, those two wrap to the right of a second line. */
+.picker-controls { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.picker-tools .picker-clear-all + .picker-search-toggle { margin-inline-start: 0; }
+.picker-search-toggle { flex: none; display: grid; place-items: center; width: 36px; height: 36px; margin-inline-start: auto; border: 0; border-radius: 50%; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
+.picker-search-toggle:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
+.picker-search-toggle[aria-expanded="true"] { color: var(--accent-amber); }
+.picker-search-toggle:focus-visible { outline: 2px solid var(--accent-amber); outline-offset: 1px; }
+@media (pointer: coarse) { .picker-search-toggle { width: 44px; height: 44px; } }
+.picker-search-row { padding: 8px 12px 0; }
+.picker-search-row > .picker-search, .picker-search-row > .lora-picker-search, .picker-search-row > .reference-search, .picker-search-row > .model-menu-search { margin: 0; }
 .picker-clear-short { display: none; }
 @media (max-width: 480px) {
   .picker-clear-long { display: none; }
@@ -334,9 +349,16 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 .composer-loras .lora-library-select[data-highlight="true"] { background: transparent; }
 .composer-loras .lora-library-select[data-highlight="true"]:focus-visible, .composer-loras .lora-picker-list:focus-within .lora-library-select[data-highlight="true"] { background: rgb(255 255 255 / .04); }
 .composer-loras .lora-library-row { border-bottom-color: var(--list-hairline); }
-.composer-loras .lora-library-row:has(> .lora-source) > .lora-library-select { padding-right: 108px; }
-.composer-loras .lora-library-row > .lora-source, .composer-loras .lora-library-row > a.lora-source { position: absolute; top: 12px; right: 72px; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-item); color: hsl(var(--muted-foreground)); }
-.composer-loras .lora-library-row > .lora-source:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
+.composer-loras .lora-library-row:has(> .lora-sources) > .lora-library-select { padding-right: 136px; }
+.composer-loras .lora-library-row > .lora-sources { position: absolute; top: 6px; right: 40px; }
+.lora-sources { display: inline-flex; flex: none; align-items: center; gap: 0; }
+.lora-source { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; gap: 1px; border-radius: var(--r-item); color: hsl(var(--muted-foreground)); text-decoration: none; }
+.lora-source small { font-size: 9px; line-height: 1; }
+.lora-source:hover { color: hsl(var(--foreground)); background: var(--control-hover); }
+.lora-info-panel { display: grid; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--glass-border); border-radius: var(--r-item); background: var(--glass-panel-solid); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.lora-info-panel p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lora-info-panel strong { color: hsl(var(--foreground)); font-weight: 600; }
+.composer-loras .lora-library-row > .lora-info-panel { margin: 0 12px 12px 30px; }
 @media (hover: none) { .composer-loras .lora-library-select:hover { background: transparent; } }
 
 /* Models on the phone: the same chooser as a Create step: search and filter pills on the sheet itself, no boxed header. */
@@ -462,3 +484,14 @@ button.list-row:focus-visible { outline: 2px solid var(--accent-amber); outline-
 
 /* A model's LoRA limit in a line above the search (Radiance video: "Up to rank 64 in total"). */
 .lora-picker-note { margin: 0 2px 6px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+
+/* Model filters in PickerTools: one row that scrolls sideways beside the search icon, on both layouts. */
+.picker-controls:has(.model-filters) { flex: 1 1 auto; min-width: 0; }
+.picker-controls .model-filters { display: flex; flex: 1 1 auto; gap: 6px; min-width: 0; padding: 0; overflow-x: auto; scrollbar-width: none; }
+.picker-controls .model-filter-group { flex: none; flex-wrap: nowrap; }
+.picker-controls .model-filter-label { display: none; }
+.picker-controls .model-filter-group:not(.model-filter-library) { padding-left: 6px; border-left: 1px solid var(--surface-border); }
+.picker-controls .model-filter-group button { flex: none; height: 32px; padding: 0 10px; }
+.phone-model-tools .picker-tools .picker-toolbar { padding: 4px 0 6px; }
+.phone-model-tools .picker-search-row { padding: 0 0 6px; }
+.phone-model-tools .picker-controls .model-filter-group button { padding: 0 10px; font-size: inherit; }

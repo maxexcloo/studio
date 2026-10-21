@@ -3,13 +3,14 @@ import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
-import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink, GripVertical, Info, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, ExternalLink, GripVertical, Layers, Plus, RotateCcw, Save, Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLoras, type FitOf } from './loras';
 import { Switch } from './SettingsControls';
 import { Tip } from './components';
 import { EmptyState } from './EmptyState';
 import { useReorderDrag } from './useReorderDrag';
+import { PickerTools } from './PickerTools';
 import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
@@ -139,25 +140,23 @@ export function loraSources(info?: LoraInfo): Array<{ label: string; url: string
   } catch { return []; }
 }
 
-function LoraSource({ info, label }: { info?: LoraInfo; label: string }) {
-  const source = loraSources(info)[0];
-  return source ? <Tip content="View Source"><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View Source of ${label}`}><ExternalLink size={14} /></a></Tip> : null;
+export function LoraSources({ info, label }: { info?: LoraInfo; label: string }) {
+  const sources = loraSources(info);
+  return sources.length ? <span className="lora-sources">{sources.map(source => <Tip key={source.label} content={`View ${label} on ${source.label}`}><a className="lora-source" href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`View ${label} on ${source.label}`}><ExternalLink size={14} /><small>{source.label === 'Source' ? 'Source' : source.label.replace('civitai', '')}</small></a></Tip>)}</span> : null;
 }
 
-export function LoraDetails({ info, label }: { info?: LoraInfo; label: string }) {
+export function LoraDetails({ info, label, enabled, file }: { info?: LoraInfo; label: string; enabled: boolean; file?: string }) {
+  if (!enabled) return null;
   const description = info?.description || info?.about;
-  return <details className="lora-details">
-    <summary aria-label={`Information About ${label}`} title="Info"><Info size={14} /></summary>
-    <div>
-      {info?.families?.length ? <p>Family: {info.families.join(', ')}</p> : info?.base ? <p>Family: {info.base}</p> : null}
-      {info?.strengthRange ? <p>Suggested Strength: {info.strengthRange.min}–{info.strengthRange.max}</p> : null}
-      {loraSources(info).map(source => <p key={source.label}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.label === 'Source' ? 'View Source' : source.label}</a></p>)}
-      {description ? <p>{description}</p> : <p>No description is available.</p>}
+  return <section className="lora-info-panel" aria-label={`${label} Information`}>
+      {file ? <p className="lora-info-file"><strong>File</strong> {file}</p> : null}
+      {info?.families?.length ? <p><strong>Family</strong> {info.families.join(', ')}</p> : info?.base ? <p><strong>Family</strong> {info.base}</p> : null}
+      {info?.strengthRange ? <p><strong>Suggested Strength</strong> {info.strengthRange.min}–{info.strengthRange.max}</p> : null}
+      <p>{description || 'No description is available.'}</p>
       {info?.note ? <p>{info.note}</p> : null}
       {info?.guidance ? <p className="lora-guidance">{info.guidance}</p> : null}
       {info?.triggers?.length ? <TriggerWords words={info.triggers} /> : null}
-    </div>
-  </details>;
+  </section>;
 }
 
 function LoraCard({ item, index, count, missing, overLimit, info, otherModel, policyNote, onChange, onRemove, onSwap, onMove }: {
@@ -257,7 +256,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { inputRef.current?.focus(); }, []);
+
   // Rows keep their places: a pick shows as its tick and number, never by moving
   // the row. The Selected tab lists the picks in stack order.
   const move = (from: number, to: number) => { inlineSelection?.move(from, to); };
@@ -301,6 +300,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
   // A LoRA made for another family is shown under All Models, but never added; a picked one can still come off.
   const blocked = (name: string) => fitOf(name) === 'other' && !current.includes(name);
   const blockedNote = (name: string) => policyNoteOf(name) || `This LoRA does not support the selected model variant${baseOf(name) ? ` (made for ${baseOf(name)})` : ''}.`;
+  const typeSearch = React.useCallback((key: string) => setQuery((value) => value + key), []);
   const choose = (name: string) => {
     if (blocked(name)) return;
     if (libraryView && inlineSelection && !swapping) {
@@ -323,7 +323,9 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
         <span>{swapping ? <>Replace <strong>{nameOf(swapping)}</strong></> : remaining > 0 ? `Add up to ${remaining}` : 'Stack is full'}</span>
       </div> : null}
       {profile?.loraNote ? <p className="lora-picker-note">{profile.loraNote}</p> : null}
-      <label className={cn("lora-picker-search", libraryView && "picker-search")}>
+      <PickerTools className="lora-picker-tools" query={query} onClearSearch={() => setQuery('')} onType={typeSearch} searchLabel="Search LoRAs"
+        clear={libraryView && current.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+        search={<label className={cn("lora-picker-search", libraryView && "picker-search")}>
         <Search size={14} />
         <input
           ref={inputRef}
@@ -346,15 +348,13 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
           }}
         />
         {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
-      </label>
-      <div className="lora-filter">
+      </label>}>
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
           <button type="button" className={cn(view === 'model' && 'active')} aria-pressed={view === 'model'} onClick={() => setView('model')}>This Model</button>
           <button type="button" className={cn(view === 'all' && 'active')} aria-pressed={view === 'all'} onClick={() => setView('all')}>All Models</button>
           {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
-        {libraryView && current.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
-      </div>
+      </PickerTools>
       <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi}>
         {hasRows ? sections.map((section) => {
           const isCollapsed = collapsed.has(section.id);
@@ -380,10 +380,10 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     <button type="button" role="checkbox" aria-checked={Boolean(item)} aria-label={`Select ${label}`} disabled={(!item && remaining <= 0) || blocked(row.name)} className="lora-library-select" data-highlight={index === highlight} onMouseEnter={() => setHighlight(index)} onClick={() => choose(row.name)}>
                       {/* Picked: its place in the stack, as a picked reference shows its number. */}
                       <span className={cn('picker-order', item && 'is-on')} aria-hidden="true">{item ? inlineSelection.items.indexOf(item) + 1 : null}</span>
-                      <span className="lora-option-copy"><strong>{label}</strong><span title={row.name}>{row.name}</span></span>
+                      <span className="lora-option-copy"><strong>{label}</strong></span>
                     </button>
-                    <LoraSource info={info} label={label} />
-                    <LoraDetails info={info} label={label} />
+                    <LoraSources info={info} label={label} />
+                    <LoraDetails info={info} label={label} enabled={Boolean(item && item.enabled !== false)} file={row.name} />
                     <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
@@ -415,7 +415,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={3} /> : null}</span> : null}
                     <span className="lora-option-copy">
                       <strong>{nameOf(row.name)}</strong>
-                      <span title={row.name}>{row.name}</span>
+
                       {blocked(row.name) ? <span>{blockedNote(row.name)}</span> : policyNoteOf(row.name) ? <span>{policyNoteOf(row.name)}</span> : null}
                       {folderOf(row.name) && (query || !section.collapsible) ? <span>{folderOf(row.name)}</span> : null}
                     </span>

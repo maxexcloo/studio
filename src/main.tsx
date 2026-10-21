@@ -1,5 +1,6 @@
 import "./app/domGuard";
 import { withReferenceChains } from "../server/reference-chains.js";
+import { sameLoraFamily } from "../server/lora-policy.js";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "framer-motion";
@@ -275,8 +276,8 @@ function App() {
     return () => { stop(); offLibrary(); offSync(); };
   }, []);
 
-  // Keep the selected stack across model changes. Compatibility warnings stay
-  // visible, and switching image/video modes restores that mode's own stack.
+  // Keep the current stack within one model family; a different family starts empty.
+  // Explicit recreated settings and image/video mode drafts restore their own stacks.
   const lorasModelRef = useRef("");
   useEffect(() => {
     const previous = lorasModelRef.current;
@@ -287,7 +288,9 @@ function App() {
       return;
     }
     if (previous) {
-      setLorasWithMemory((current) => current);
+      const before = models?.profiles.find(profile => profile.id === previous);
+      const after = models?.profiles.find(profile => profile.id === model);
+      setLorasWithMemory(sameLoraFamily(before, after) ? current => current : []);
       return;
     }
     let current = true;

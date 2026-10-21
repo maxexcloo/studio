@@ -52,7 +52,7 @@ function UpscaleBarButton({ item, action }: { item: GalleryItem; action: ItemAct
 }
 
 /**
- * The phone viewer: Copy · Share | Animate · Rerun · Reference · Upscale |
+ * The phone viewer: Copy · Share | Animate · Recreate · Reference · Upscale |
  * Delete along the bottom (stepping aside while Details is open), Star in the top left and Info (Details) in the top
  * right beside Close. The bar is a trigger surface, so a tap on Info while
  * Details is open closes it rather than closing and reopening it.
@@ -61,7 +61,7 @@ export function PhoneViewerBar({ item, showDetails, onToggleDetails, compare }: 
   React.useEffect(() => { prefetchShare(item); }, [item]);
   const handlers = useItemActionHandlers();
   const all = useItemActions(item, 'bar', { compare });
-  // With Details open its footer holds Copy, Edit and Rerun: the bar steps aside rather than repeat them.
+  // With Details open its footer holds Copy and Recreate: the bar steps aside rather than repeat them.
   const actions = showDetails ? [] : all.filter((action) => action.id !== 'star');
   const star = handlers && canStar(item) ? { pressed: Boolean(item.favorite), run: () => handlers.star(item) } : null;
   const copy = useCopyFeedback();
@@ -116,9 +116,9 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
 const dockKeys: Partial<Record<ItemAction['id'], string>> = { star: 'F', delete: 'Del' };
 
 
-export function ViewerDockActions({ item, compare, details = false }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; /** Details is open: its footer has Rerun, so the dock leaves it out. */ details?: boolean }) {
+export function ViewerDockActions({ item, compare, details = false }: { item: GalleryItem; compare: NonNullable<ItemActionExtras['compare']>; /** Details is open: its footer has Recreate, so the dock leaves it out. */ details?: boolean }) {
   React.useEffect(() => { prefetchShare(item); }, [item]);
-  // By intent: Copy · Download | Animate · Rerun · Reference · Upscale | Star · Delete.
+  // By intent: Copy · Download | Animate · Recreate · Reference · Upscale | Star · Delete.
   const actions = useItemActions(item, 'dock', { compare }).filter((action) => !(details && action.id === 'reuse'));
   const copy = useCopyFeedback();
   return (

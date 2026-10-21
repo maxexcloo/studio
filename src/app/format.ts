@@ -131,7 +131,7 @@ export function settingsText(item: GalleryItem) {
   return lines.filter(Boolean).join("\n");
 }
 
-export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; file: string; strength: string }> };
+export type GenerationDetailSection = { title: string; rows: Array<[string, string]>; loras?: Array<{ name: string; file: string; strength: string }>; note?: string };
 
 /**
  * The "Generation details" panel, most useful first: what made the picture
@@ -163,7 +163,7 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     if (modelSection) modelSection.loras = loras;
     else sections.push({ title: "Model", rows: [], loras });
   }
-  section("Sampling", (add) => {
+  section("Generation", (add) => {
     if (!grok) {
       add("Steps", settings.steps);
       add("CFG", settings.cfg);
@@ -191,16 +191,26 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     }
   });
   section("Timing", (add) => {
-    add("Total", item.durationMs ? formatElapsed(item.durationMs) : "");
     const timing = item.timing;
     const elapsed = (value?: number) => value !== undefined && Number.isFinite(value) && value >= 0 ? formatElapsed(value) : "";
-    add("Queue", elapsed(timing?.queueMs));
     add("Active", elapsed(timing?.runMs));
+    add("Queue", elapsed(timing?.queueMs));
+    add("Total", item.durationMs ? formatElapsed(item.durationMs) : "");
     add("Setup (Est.)", elapsed(timing?.setupMs));
     add("Sampling (Est.)", elapsed(timing?.samplingMs));
     add("Finishing (Est.)", elapsed(timing?.finishMs));
   });
-  section("File", (add) => {
+  const timingSection = sections.find((entry) => entry.title === "Timing");
+  // Measured times are worker execution (Active) and the whole wait (Total); the Est. rows split Active up.
+  if (timingSection) {
+    const has = (test: (label: string) => boolean) => timingSection.rows.some(([label]) => test(label));
+    timingSection.note = [
+      has((label) => label === "Active") ? "Active is the worker’s run after queueing." : "",
+      has((label) => label === "Total") ? "Total also counts queueing, transfer and finishing." : "",
+      has((label) => label.endsWith("(Est.)")) ? "Est. rows are estimates." : "",
+    ].filter(Boolean).join(" ");
+  }
+  section("Output", (add) => {
     add("Output", item.outputName || item.filename);
     add("Generated", formatGeneratedAt(item.createdAt));
     add("Type", item.type);

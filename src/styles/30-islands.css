@@ -369,3 +369,9 @@ button.activity-main { cursor: pointer; }
 .status-pill-list img, .status-pill-list-blank { flex: none; width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: var(--well); }
 /* A question keeps its words and both answers on the desktop toolbar rather than squeezing under its neighbours. */
 .status-pill.is-toolbar:has(.is-question) { flex: none; max-width: none; }
+
+/* The dismiss ring uses the same paused time and reset key as the message timer. */
+.status-pill-countdown { position: absolute; inset: 1px; width: 28px; height: 28px; pointer-events: none; overflow: visible; animation-name: status-pill-countdown; animation-timing-function: linear; animation-fill-mode: forwards; }
+.status-pill-countdown circle { fill: none; stroke: var(--tone); stroke-width: 1.5; stroke-dasharray: 1; transform: rotate(-90deg); transform-origin: center; }
+@keyframes status-pill-countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 1; } }
+@media (prefers-reduced-motion: reduce) { .status-pill-countdown { animation-name: none; } }

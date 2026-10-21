@@ -15,6 +15,7 @@ import { ReferenceGrid } from "./ReferenceGrid";
 import { SafeImg } from './SafeImg';
 import { showToastTone } from './toast';
 import { usePhoneLayer } from './phoneLayers';
+import { PickerTools } from './PickerTools';
 import { ClearSelection } from './SheetList';
 import { useReorderDrag } from './useReorderDrag';
 
@@ -103,6 +104,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     return () => window.clearTimeout(timer);
   }, [search]);
   const uploadInput = React.useRef<HTMLInputElement>(null);
+  const typeSearch = React.useCallback((key: string) => setSearch((value) => value + key), []);
   const label = (input.label || "Reference Image").toLowerCase();
   const [newId, setNewId] = React.useState("");
 
@@ -115,9 +117,8 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   usePhoneLayer(Boolean(onPhone && present), 'pop');
   React.useEffect(() => {
     if (!box) return;
-    // Open and type: search takes focus on desktop. On the phone the sheet does, so no keyboard pops up.
-    if (onPhone) popRef.current?.focus({ preventScroll: true });
-    else searchRef.current?.focus({ preventScroll: true });
+    // The popover takes focus, so no keyboard pops up on the phone; typing opens search (PickerTools).
+    popRef.current?.focus({ preventScroll: true });
   }, [Boolean(box)]);
 
   // Dragging a file over the popover means "add to my uploads".
@@ -284,21 +285,19 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         <input ref={uploadInput} hidden type="file" multiple={upload.multiple} accept="image/*" onChange={(event) => { uploadAndUse(Array.from(event.target.files || [])); event.currentTarget.value = ""; }} />
         <Tip content="Close (Esc)"><button type="button" className="reference-popover-close" aria-label="Close References" onClick={onClose}><X size={15} /></button></Tip>
       </header>
-      <div className="picker-toolbar">
+      <PickerTools query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
+        clear={multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+        search={tab !== 'selected' ? (<div className="reference-search picker-search">
+        <Search size={15} aria-hidden="true" />
+        <input ref={searchRef} type="search" aria-label={tab === "upload" ? "Search Uploads" : "Search Library"} placeholder={tab === "upload" ? "Search Uploads" : "Search Library"} value={search} onChange={(event) => setSearch(event.target.value)} />
+        {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
+      </div>) : undefined}>
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
           <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
           {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
         </div>
-        {/* Clear Selection sits with the tabs, only while something is picked (UI-PATTERNS › Pickers). */}
-        {multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
-      </div>
-
-      {tab !== "selected" ? <div className="reference-search picker-search">
-        <Search size={15} aria-hidden="true" />
-        <input ref={searchRef} type="search" aria-label={tab === "upload" ? "Search Uploads" : "Search Library"} placeholder={tab === "upload" ? "Search Uploads" : "Search Library"} value={search} onChange={(event) => setSearch(event.target.value)} />
-        {search ? <button type="button" aria-label="Clear Reference Search" onClick={() => { setSearch(''); searchRef.current?.focus({ preventScroll: true }); }}><X size={14} /></button> : null}
-      </div> : null}
+      </PickerTools>
       <div ref={bodyRef} className="reference-popover-body" onScroll={(event) => { if (restoreTab.current === null && tab !== "selected") memory.scroll[tab] = event.currentTarget.scrollTop; }} role="tabpanel" aria-busy={page.loading || search.trim() !== query}>
         {tab === "selected" && !selected.length ? (
           <EmptyState title="Nothing Selected">Pick images from Library or Uploads.</EmptyState>

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { studioUi } from './helpers/ui';
+import { studioUi, pickerSearch } from './helpers/ui';
 
 test('optional LoRAs show unverified variants and expose full published strength bounds', async ({ page }) => {
   const models = await (await page.request.get('/api/models')).json();
@@ -17,7 +17,9 @@ test('optional LoRAs show unverified variants and expose full published strength
   const composer = await studioUi(page).openComposer();
   await composer.getByRole('button', { name: /^LoRAs/ }).click();
   const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
-  await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
+  // Search stays behind its icon until asked for (UI-PATTERNS › Pickers).
+  await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toHaveCount(0);
+  await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'Manage Stack', exact: true })).toHaveCount(0);
   await expect(picker.getByText('Uses file metadata.', { exact: false })).toHaveCount(0);
   await expect(picker.getByRole('button', { name: 'This Model', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -81,8 +83,7 @@ test('LoRA library offers direct list selection with inline strengths and access
     return box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1;
   })).toBe(true);
   const picker = page.getByRole('group', { name: 'LoRA Library', exact: true });
-  const search = picker.getByRole('textbox', { name: 'Search LoRAs', exact: true });
-  await expect(search).toBeVisible();
+  const search = await pickerSearch(picker, 'Search LoRAs');
   await expect(picker.locator('.lora-option-preview')).toHaveCount(0);
   await expect.poll(() => picker.locator('.lora-picker-items').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
   await search.fill('Cards Two');
@@ -126,11 +127,15 @@ test('LoRA library offers direct list selection with inline strengths and access
   await picker.getByRole('button', { name: /^Save Stack/ }).click();
   await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
   await picker.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true })).toBeVisible();
+  await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true }).or(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true }))).toBeVisible();
   await picker.getByRole('button', { name: 'Disable All', exact: true }).click();
   await expect(strength).toBeDisabled();
+  await expect(picker.locator('.lora-info-panel')).toHaveCount(0);
+  await expect(picker.getByText('cards-two.safetensors', { exact: true })).toHaveCount(0);
   await picker.getByRole('button', { name: 'Enable All', exact: true }).click();
   await expect(strength).toBeEnabled();
+  await expect(picker.getByRole('region', { name: 'Cards Two Information', exact: true })).toBeVisible();
+  await expect(picker.getByRole('region', { name: 'Cards Two Information', exact: true })).toContainText('cards-two.safetensors');
   await picker.getByRole('button', { name: 'Clear Selection', exact: true }).click();
   await expect(row).toHaveAttribute('aria-checked', 'false');
   await page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true }).click();
@@ -141,9 +146,9 @@ test('LoRA library offers direct list selection with inline strengths and access
   await other.click();
   // A pick stays where it was clicked; it doesn't jump away from the pointer.
   await expect.poll(async () => Math.abs((await other.boundingBox())!.y - before!.y)).toBeLessThan(2);
-  await picker.getByLabel('Information About Cards One', { exact: true }).click();
+  await expect(picker.getByRole('region', { name: 'Cards One Information', exact: true })).toBeVisible();
   await expect(picker.getByText('Use for printed card illustrations.', { exact: true })).toBeVisible();
-  await expect(picker.getByRole('link', { name: 'View Source', exact: true })).toHaveAttribute('href', 'https://example.com/cards');
+  await expect(picker.getByRole('link', { name: 'View Cards One on Source', exact: true })).toHaveAttribute('href', 'https://example.com/cards');
   await expect(other).toHaveAttribute('aria-checked', 'true');
   // Rows never move: the stack order shows in the Selected tab, where they reorder by drag, grip keys or Move.
   const firstRow = await picker.getByRole('checkbox').first().getAttribute('aria-label');

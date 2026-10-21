@@ -1,3 +1,4 @@
+import { PickerTools } from './PickerTools';
 import { CatalogueFilters } from './CatalogueFilters';
 import { modelFamily, modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
@@ -458,11 +459,19 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
                   />
                 )) : null}
               </AnimatePresence>
+              {/* Custom closes the list; its width and height unlock only while it is the pick. */}
+              {limits && onCustomSize && onTierChange ? (
+                <button type="button" className={cn("aspect-option is-custom", custom && !savedMatch && "active")} role="option" aria-selected={custom && !savedMatch} onClick={() => onTierChange("custom")}>
+                  <span className="aspect-shape" style={aspectIconStyle({ label: "Custom", value: "custom", w: shown.width, h: shown.height })} />
+                  <span>Custom</span>
+                  <em>{custom ? `${picked.width}×${picked.height}` : ""}</em>
+                </button>
+              ) : null}
             </div>
             {/* Under every shape: how big they're all drawn. */}
             {megapixel ? <MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixel} custom={custom} /> : null}
-            {/* Width and height, always in view at the bottom: typing a side makes it a custom size (UI-PATTERNS › Composer). */}
-            {limits && onCustomSize ? <div className="size-custom"><LinkedSizeFields size={custom ? picked : shown} limits={limits} onChange={onCustomSize} onSave={ownSize || savedMatch ? onSaveSize : undefined} saved={Boolean(savedMatch)} /></div> : null}
+            {/* Width and height stay in view at the bottom, enabled only for Custom (UI-PATTERNS › Lists). */}
+            {limits && onCustomSize ? <div className="size-custom"><LinkedSizeFields size={custom ? picked : shown} limits={limits} onChange={onCustomSize} onSave={custom && (ownSize || savedMatch) ? onSaveSize : undefined} saved={Boolean(savedMatch)} disabled={!custom} /></div> : null}
             {note ? <p className="size-menu-note">{note}</p> : null}
           </div>
         </div>
@@ -592,7 +601,9 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
       pick(flat[cursor].id);
     } else if (searchable && event.key.length === 1 && !event.metaKey && !event.ctrlKey && document.activeElement !== searchRef.current) {
       // Typing anywhere in the menu goes to the search field.
-      searchRef.current?.focus();
+      event.preventDefault();
+      setQuery(query + event.key);
+      requestAnimationFrame(() => searchRef.current?.focus());
     }
   };
 
@@ -618,14 +629,13 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
               {emptyHint || "No usable models in ComfyUI yet."}
             </EmptyState>
           )}
-          {searchable ? (
-            <label className="model-menu-search picker-search">
+          {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" search={searchable ? (<label className="model-menu-search picker-search">
               <Search size={14} aria-hidden="true" />
               <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}
-            </label>
-          ) : null}
-          {profiles.length ? <CatalogueFilters value={filters} onChange={setFilters} /> : null}
+            </label>) : undefined}>
+            <CatalogueFilters value={filters} onChange={setFilters} />
+          </PickerTools> : null}
           {profiles.length ? (
             <div id={menuId} className="model-menu-list" ref={listRef} role="listbox" aria-label="Models" tabIndex={-1} aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined}>
               {sections.map((section) => (

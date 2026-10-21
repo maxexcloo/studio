@@ -22,7 +22,7 @@ export type DeploymentSettings = {
 type BackendStatus = { connected: boolean; device?: string; restarting?: boolean };
 
 const FIRST_READY = '__first-ready__';
-// Inpainting is switched in Studio › Features, beside Smart Upscale.
+// Inpainting is switched in Studio › Features, beside Upscale.
 export const inpaintFlagKey = 'HEISS_ENABLE_INPAINT';
 const hiddenCatalogueKeys = new Set([inpaintFlagKey]);
 const sourceWords: Record<Source['source'], string> = { deployment: 'Deployment', studio: 'This Studio', default: 'Default' };

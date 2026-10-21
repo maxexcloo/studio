@@ -559,3 +559,19 @@
   /* Beside the corner Close. */
   .viewer-info { top: max(10px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + var(--dock-h) + 8px); }
 }
+
+/* Detail group labels share one readable hierarchy. */
+.prompt-readout-head > span:first-child, .detail-heading {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.image-text-toggle { margin-left: auto; gap: 6px; min-height: 36px; font-size: 12px; }
+.image-text-toggle[aria-pressed="true"] { color: var(--accent-amber); }
+
+.viewer-profile-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-profile-summary span { white-space: nowrap; }
+@media (min-width: 901px) { .viewer-stage.with-side .viewer-profile-summary { max-width: calc(100% - 468px); } }
+.detail-settings .detail-note { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.45; }

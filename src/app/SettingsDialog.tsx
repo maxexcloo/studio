@@ -75,10 +75,10 @@ function ShortcutsDrawer() {
   );
 }
 
-/** Where Smart Upscale stands, in words: read only, as its weights and nodes are the worker's business. */
+/** Where Upscale stands, in words: read only, as its weights and nodes are the worker's business. */
 function upscaleReadiness(status: UpscaleStatus | null, reason: string | undefined, install: UpscaleInstall): { tone: 'ok' | 'warn' | 'bad'; label: string; detail: string } {
   if (install?.status === 'running') return { tone: 'warn', label: 'Downloading', detail: `${formatBytes(install.receivedBytes)} of ${formatBytes(install.totalBytes)} of the upscale model.` };
-  if (!status) return { tone: 'warn', label: 'Unavailable', detail: reason || 'Smart Upscale isn’t available right now.' };
+  if (!status) return { tone: 'warn', label: 'Unavailable', detail: reason || 'Upscale isn’t available right now.' };
   if (!status.nodesInstalled) return { tone: 'warn', label: 'Not Set Up', detail: 'The worker needs the SeedVR2 nodes.' };
   if (install?.status === 'error' && !status.ready) return { tone: 'bad', label: 'Download Stopped', detail: install.error || 'The upscale model didn’t finish downloading.' };
   if (status.needsDownload) return { tone: 'warn', label: 'Not Set Up', detail: `The worker needs ${formatBytes(status.downloadBytes)} of SeedVR2 weights.` };

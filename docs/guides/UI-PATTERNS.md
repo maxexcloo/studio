@@ -114,9 +114,9 @@ both devices:
 
 | Kind | Shows | Stays |
 | --- | --- | --- |
-| Info and success ("Prompt copied", "Settings applied") | The words, short, in the neutral or success tone | About 3.5 s (longer for long words) |
-| Something undoable ("2 items deleted") | The words and **Undo** inside the pill | 6 s, then the change is final |
-| A failure that needs action | The error tone, the words and one action (Try Again, Set Up) | Until it is answered or dismissed |
+| Info and success ("Prompt copied", "Settings applied") | The words, short, in the neutral or success tone | 3 s |
+| Something undoable ("2 items deleted") | The words and **Undo** inside the pill | 3 s, then the change is final |
+| A failure that needs action | The error tone, the words and one action (Try Again, Set Up) | 3 s |
 | A question (confirmations) | The question, **Cancel** and the answer ("Delete 6"); under the pill, its whole text and, for several items, a scrolling list of their thumbnails and short names | Until it is answered; Escape or Cancel answers no |
 
 - **Where:** the phone's top bar, in its centre slot (it takes the place of
@@ -124,6 +124,12 @@ both devices:
   top bar, before its tools. A surface that covers the bar (a sheet, a pop-up
   list, a dialog, the viewer) shows the pill at its own top edge while open,
   in its title's place. Only the newest open host shows it.
+- **Timeout:** finite notifications last three visible, unpaused seconds. A
+  circular ring around Dismiss shows the remaining time; hover, focus and a
+  background tab pause both. A repeated or merged notification resets the
+  countdown. Reduced motion keeps a static ring. Confirmation questions wait
+  for an answer, and explicitly persistent operation progress stays until its
+  producer finishes; its completion notification lasts three seconds.
 - **One at a time:** a new message replaces what is showing; nothing stacks or
   turns up stale later. Failures and questions wait for their answer, and
   plain news that arrives behind an Undo or a failure is dropped. A repeat of
@@ -169,33 +175,45 @@ Settings, More) and Settings use one flat list (`src/app/SheetList.tsx`,
 - **Sections** have one quiet heading, never repeating the row label under it
   ("Sampling", then Steps, Sampler, Scheduler, CFG and Seed).
 - **Size** shows the resolutions and then the shapes as full-width toggles with
-  no label, and Width and Height always at the bottom: there is no Custom Size
-  toggle, on the desktop or the phone. No preview stage on the phone.
+  no label, with **Custom** as the last option and Width and Height always at
+  the bottom. The fields are enabled only while Custom is the pick; choosing a
+  shape locks them again. There is no Custom Size toggle and no megapixel or
+  ratio caption under the fields (the preview names the size). No preview
+  stage on the phone.
 
 ## Pickers
 
 One chooser pattern for References, LoRAs and Models: a title bar with Close
-on the right, the tab pills with Clear Selection, a search field, then the
-grid or list. On the desktop it is an anchored popover; on the phone a pop-up
-list over Create (see [Layering](#layering)).
+on the right, one toolbar (`PickerTools.tsx`) with the tab pills or filters,
+Clear Selection and a search icon, then the grid or list. On the desktop it is
+an anchored popover; on the phone a pop-up list over Create (see
+[Layering](#layering)).
+
+- **Compact search:** search is an icon at the end of the toolbar, not a
+  permanent row. The icon (or typing anywhere in the chooser) opens the field
+  under the toolbar with the focus in it; Close Search clears the query and
+  folds it away, and the field stays open while a query is active, with the
+  icon in the accent. Where the toolbar runs out of room, Clear Selection and
+  the icon wrap to the right of a second line; the tabs never hide.
 
 - The reference and LoRA choosers share one tab row: the pills (Library |
   Uploads | Selected n/max, or This Model | All Models | Selected n/max), then
-  **Clear Selection** beside them (just "Clear" under 480 px), shown only while
+  **Clear Selection** on the right of the same row, before the search icon (just "Clear" under 480 px), shown only while
   something is picked. Clear Selection empties the selection at once and offers
   Undo in the status pill; it never asks first.
 - One tap adds or removes; a picked item highlights in place and shows its
   order number (an empty ring, then the number on white, the same mark in
   every chooser) and stays picked across searches and tabs. It never moves and
-  nothing opens under it: every item keeps its place in the list, and only the
-  Selected tab lists the picks, in their order, with a LoRA's strength.
+  enabled LoRAs reveal their information below the row. The Selected tab lists
+  the picks in their order with strength and enable controls.
 - **Reordering** happens in the Selected tab: drag a row's grip with a mouse,
   pen or finger (`useReorderDrag.ts`), or press the arrow keys on the grip.
 - A LoRA row's actions sit on the right in this order: View Source (a link
-  icon, when the catalogue has a source), Info, Star.
-- **Models** have no modal: the model button opens the chooser with search,
-  favourites, Fast | Quality and family groups (fine tunes under their
-  family), and nothing else. Profile names show as they are, on two lines at
+  icon for each source host, when present), then Star. Enabled LoRAs show their
+  information automatically below the row.
+- **Models** have no modal: the model button opens the chooser with the same
+  toolbar (All | Favourites, Fast | Quality, then the search icon) and family
+  groups (fine tunes under their family), and nothing else. Profile names show as they are, on two lines at
   most.
 - A model's own LoRA limit shows as one muted line above the LoRA search
   (Radiance video: "Up to rank 64 in total").
@@ -254,7 +272,8 @@ A picker, tab or list with nothing to show uses `EmptyState`
   Create.
 - **Size** stays open while choosing: the resolution is a segmented toggle of
   the model's native options (Default · 2K · 4K), beside the shapes, so both
-  can be picked in one go.
+  can be picked in one go. Custom is the last row of the list and unlocks
+  Width and Height under it.
 
 ## Settings
 
@@ -266,7 +285,7 @@ holds:
 | --- | --- | --- |
 | Account | Profile (name, email, password), MCP and Session (Sign Out) | Every account |
 | Users | Accounts, Access Profiles (a picker with New, multi-selects, Save & Discard), Chat Gateway and Profiles (a JSON editor; an edited copy stops receiving repository updates) | Administrators |
-| Studio | General, Generation, Features (Smart Upscale and Inpainting as plain rows), Gallery and Sharing | Everyone |
+| Studio | General, Generation, Features (Upscale and Inpainting as plain rows), Gallery and Sharing | Everyone |
 | Models | Defaults, Catalogue (LoRAs, Cloud Models, Presets & Civitai Imports), LoRAs & Supporting Files and Integrations | Administrators |
 | Workers | ComfyUI connections, restart, and AI Control (what each GPU runs) | Administrators; everyone reads AI Control's status |
 | Maintenance | Clean Up, Reset and Help | Everyone (each item as the device allows) |
@@ -325,7 +344,7 @@ phone) and one page at a time with its title and one line.
 
 - Icon buttons are 40 px on the desktop and 44 px on the phone, round, ghost
   until hovered, with an accessible name and a tooltip naming the action.
-  A tooltip starts with the action's name and fits on one line ("Rerun With
+  A tooltip starts with the action's name and fits on one line ("Recreate With
   the Same Seed"), so it never covers a neighbouring control.
 - **Glass icon buttons** in a 48 px bar (the docks, the viewer bar) keep the
   40 px target, but their hover and press fill is a smaller circle
@@ -369,23 +388,21 @@ phone) and one page at a time with its title and one line.
   surface (viewer bar, tile, context menu, select bar) and in which order.
   Surfaces render from it and never build their own lists.
 - **Order by intent,** with a divider between groups: keep it (Copy,
-  Download or Share) | make more (Animate or Extend, Rerun, Edit,
-  Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete) | Info.
+  Download or Share) | make more (Animate or Extend, Recreate,
+  Reference, Retry, Upscale) | organise (Star, Select, Delete) | Info.
 - **One-word names** everywhere: Copy, Download, Share, Animate, Extend,
-  Rerun, Edit, Reference, Retry, Upscale, Star, Delete, Info. Tooltips
+  Recreate, Reference, Retry, Upscale, Star, Delete, Info. Tooltips
   may say more.
-- **Rerun** ("Rerun With the Same Seed") is an exact rerun: it loads the
-  model, both prompts, size, LoRAs, references, every setting and the same
-  seed. **Edit** ("Edit Prompt & Settings in Create") loads the same with a
-  new seed. After either the viewer closes and Create opens. Edit is never a
-  ghost button.
-- **Viewer, desktop:** Copy · Download | Animate · Rerun · Reference ·
+- **Recreate** ("Recreate With the Same Seed") loads the model, both prompts,
+  size, LoRAs, references, every setting and the same seed into Create. The
+  viewer closes and Create opens, ready to change or generate.
+- **Viewer, desktop:** Copy · Download | Animate · Recreate · Reference ·
   Upscale | Star · Delete, then Close. Info sits alone in the top right (beside
   the corner Close on tablets); it opens Details, and the open Details panel
   has its own Close in its header, as Info's corner is under it.
 - **Viewer, phone:** the desktop's title top left (the profile name and its
   settings line; a message takes its place for a moment); Star · Info · Close
-  top right; the bottom bar Copy · Share | Animate · Rerun · Reference ·
+  top right; the bottom bar Copy · Share | Animate · Recreate · Reference ·
   Upscale | Delete, centred with even sides in a bar-height row above the home
   indicator.
   Download replaces Share only where the browser can't share files. Info
@@ -393,13 +410,25 @@ phone) and one page at a time with its title and one line.
   Details is open closes it.
 - **Zoom:** a small `− 100% +` pill, bottom middle above the bar, faded until
   used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
-- **Details:** Prompt and Negative each with Copy beside their label (no
-  per-prompt Use and no shortcut chips), Settings unboxed below with friendly
-  profile, weight and LoRA names. Header actions are Copy (both prompts and
-  every recorded setting) and Copy Settings (settings only). Each prompt
-  keeps its own Copy. The footer offers Edit · Rerun · Compare Variants.
-  LoRA information includes compatibility, suggested strength, triggers and
-  source links; Civitai sources offer both civitai.com and civitai.red. One Close only.
+- **Details:** Prompt and Negative each keep Copy beside their label. Prompt,
+  Model, Generation, Image/Video, Processing, Timing and Output share one
+  readable heading style; omit empty groups and the redundant Settings heading.
+  The one footer is Copy · Recreate. Copy includes generation inputs and saved
+  settings, including IDs, seed and reference settings; output filenames,
+  timestamps, timing and artefact metadata stay out. There is no Edit or
+  separate Copy Settings action. **Timing** lists Active (the worker's run
+  after queueing) before Queue and Total (which also counts transfer and
+  finishing), with one muted line saying so; split-up times keep "(Est.)".
+- **Image Text:** an on/off button in Details controls a short image summary
+  (profile, size and steps), remembered as a preference. It appears only while
+  Details is open; turning it off removes it. Keep it clear of the Details
+  controls and image actions.
+- **LoRA information:** an enabled LoRA automatically shows its filename,
+  compatibility, suggested strength, description, notes and triggers inside a
+  shared information panel. Turning it off hides the panel and filename at
+  once; the friendly title stays. Two separate inline source icons open
+  civitai.com and civitai.red. Source links never repeat inside the information
+  panel. Apply this pattern in the picker and generation Details.
 - **Selecting:** a long press on a phone tile starts selecting with that item
   (there is no long-press action sheet). Selecting offers Select All, then
   Select Failed (in that order on both), then Download (a zip when several)
@@ -426,10 +455,10 @@ phones, default stroke):
 | Action | Icon | Action | Icon |
 | --- | --- | --- | --- |
 | Animate | `Clapperboard` | Info | `Info` |
-| Copy | `Copy` | Rerun | `RotateCcw` |
+| Copy | `Copy` | Recreate | `RotateCcw` |
 | Delete | `Trash2` | Reference | `ImagePlus` |
 | Download | `Download` | Retry | `RotateCw` |
-| Extend | `FastForward` | Edit | `TextQuote` |
+| Extend | `FastForward` | Recreate | `RotateCcw` |
 | Image / Video | `Image` / `Film` | Share | `Share` |
 | Menu | `Menu` | Star | `Star` (filled when on) |
 | Upscale | `UpscaleArrow` | Zoom | `Minus` / `Plus` |
@@ -545,7 +574,7 @@ The caret stays in view.
   "Catalogue", "Colour").
 - Standard words: Images/Videos (gallery modes), Image/Video (generation),
   Model, Prompt, Negative Prompt, Reference Image, LoRAs, Animate, Star.
-- Item actions: "Edit", "Rerun", "Copy", "Copy Settings", "Retry";
+- Item actions: "Recreate", "Copy", "Retry";
   the Library's "Use Prompt" and "Use Settings".
 - Chat and links name results "Result N".
 - Messages: "Couldn’t …" for failures, without a full stop; "Prompt copied".
@@ -553,12 +582,6 @@ The caret stays in view.
 
 ## Comparisons
 
-Compare Variants opens one sheet from Details or the gallery action menu.
-Start with one image or 2–4 selected images; each variant has a prompt and
-editable generation settings. One numeric seed applies to every variant,
-including seed 0. Validate every editor before submitting any jobs; an accepted
-job remains in the gallery if a later request fails, without automatic retries.
-History and votes belong to the signed-in account. Only available finished
-images can receive a vote; removed images show as unavailable and lose their
-visible vote. A shared seed helps compare changes, although different model
-families may interpret it differently.
+The variant comparison interface is hidden for now. Keep existing comparison
+records and account-owned API behaviour intact until the interface returns.
+The separate upscale/original comparison remains available.

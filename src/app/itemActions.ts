@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, TextQuote, Trash2, Clapperboard } from 'lucide-react';
+import { CheckCircle2, Columns2, Copy, Download, FastForward, ImagePlus, RotateCcw, RotateCw, Share, Star, Trash2, Clapperboard } from 'lucide-react';
 import { canAnimatePhoto, canExtendVideo } from './AnimatePhotos';
 import { canStar } from './favorites';
 import { canShareFiles, downloadItem, downloadItems, downloadUrl, shareItem, shareItems } from './share';
@@ -14,7 +14,7 @@ import type { ShowToast } from './toast';
  * actions and the gallery's context menu. Each action says when it applies;
  * each surface picks the ones it has room for, always in this order, with
  * these one-word names and icons, grouped by intent (docs/guides/UI-PATTERNS.md):
- * keep it (Copy, Download or Share) | make more (Animate or Extend, Rerun,
+ * keep it (Copy, Download or Share) | make more (Animate or Extend, Recreate,
  * Edit, Reference, Retry, Upscale, Compare) | organise (Star, Select, Delete).
  */
 
@@ -37,7 +37,7 @@ export type ItemActionHandlers = {
   copyPrompt: (item: GalleryItem, announce?: string) => Promise<boolean>;
   /** The image itself, its link, or its details. */
   copyItem: (item: GalleryItem) => Promise<boolean>;
-  /** Rerun: an exact rerun, with its model, prompts, size, LoRAs, references, settings and seed, loaded into Create. */
+  /** Recreate: an exact rerun, with its model, prompts, size, LoRAs, references, settings and seed, loaded into Create. */
   reuse: (item: GalleryItem) => void;
   /** Edit: the prompts and settings, with a new seed, loaded into Create to change. */
   promptsOnly: (item: GalleryItem) => void;
@@ -96,12 +96,12 @@ const placement: Record<ItemActionId, readonly ItemSurface[]> = {
   animate: ['bar', 'dock', 'menu'],
   extend: ['bar', 'dock', 'menu'],
   reuse: ['bar', 'dock', 'menu'],
-  promptsOnly: ['menu'],
+  promptsOnly: [],
   reference: ['bar', 'dock', 'menu'],
   retry: ['bar', 'dock', 'tile', 'menu'],
   upscale: ['bar', 'dock', 'menu'],
   compare: ['bar', 'dock'],
-  compareVariants: ['menu'],
+  compareVariants: [],
   star: ['dock', 'tile', 'menu'],
   select: ['menu'],
   delete: ['bar', 'dock', 'tile', 'menu'],
@@ -128,8 +128,7 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     Boolean(item.url) && item.status !== 'pending' && { id: 'download', group: 'keep', label: 'Download', tip: upscaled ? 'Download the Upscale' : 'Download', Icon: Download, href: downloadUrl(item), run: () => downloadItem(item) },
     handlers.animate && canAnimatePhoto(item) && { id: 'animate', group: 'make', label: 'Animate', tip: 'Animate Into a Video', Icon: Clapperboard, run: () => handlers.animate!(item) },
     handlers.animate && canExtendVideo(item) && { id: 'extend', group: 'make', label: 'Extend', tip: 'Extend This Video', Icon: FastForward, run: () => handlers.animate!(item) },
-    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Rerun', tip: 'Rerun With the Same Seed', Icon: RotateCcw, run: () => handlers.reuse(item) },
-    Boolean(item.prompt) && { id: 'promptsOnly', group: 'make', label: 'Edit', tip: 'Edit Prompt & Settings in Create', Icon: TextQuote, run: () => handlers.promptsOnly(item) },
+    Boolean(item.prompt) && { id: 'reuse', group: 'make', label: 'Recreate', tip: 'Recreate With the Same Seed', Icon: RotateCcw, run: () => handlers.reuse(item) },
     done && handlers.useAsReference && item.type === 'image' && !item.library && {
       id: 'reference', group: 'make', label: 'Reference', tip: 'Reference This Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
     },
@@ -138,7 +137,6 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
       id: 'upscale', group: 'make', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
       run: () => (item.upscale?.status === 'running' ? handlers.cancelUpscale(item) : handlers.upscale(item)),
     },
-    done && item.type === 'image' && Boolean(item.prompt && item.settings?.profileId) && handlers.compareVariants && { id: 'compareVariants', group: 'make', label: 'Compare Variants', Icon: Columns2, run: () => handlers.compareVariants!([item]) },
     extras.compare && item.type === 'image' && Boolean(item.upscale?.url) && !upscaledWithRun(item) && {
       id: 'compare', group: 'make', label: 'Compare', tip: extras.compare.open ? 'Hide the Comparison' : 'Compare With the Original', Icon: Columns2, pressed: extras.compare.open, run: extras.compare.toggle,
     },
@@ -168,7 +166,6 @@ export function bulkItemActions(items: GalleryItem[], handlers: ItemActionHandle
   const actions: (ItemAction | false)[] = [
     phone && canShareFiles && { id: 'share', group: 'keep', label: 'Share', tip: 'Share Selected', Icon: Share, disabled: !ready.length, run: () => { void shareItems(ready, handlers.showToast); } },
     !(phone && canShareFiles) && { id: 'download', group: 'keep', label: 'Download', tip: ready.length > 1 ? 'Download Selected as a Zip' : 'Download Selected', Icon: Download, disabled: !ready.length, run: () => { void downloadItems(ready, handlers.showToast); } },
-    Boolean(handlers.compareVariants) && { id: 'compareVariants', group: 'make', label: 'Compare', tip: 'Compare Variants', Icon: Columns2, disabled: ready.length < 1 || ready.length > 4 || ready.some(item => item.type !== 'image' || !item.settings?.profileId), run: () => handlers.compareVariants!(ready) },
     failed.length > 0 && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry Selected', Icon: RotateCw, run: () => handlers.retryItems(failed) },
     { id: 'star', group: 'organise', label: allStarred ? 'Unstar' : 'Star', tip: allStarred ? 'Unstar Selected' : 'Star Selected', Icon: Star, disabled: !starrable.length, run: () => handlers.starItems(starrable, !allStarred) },
     { id: 'delete', group: 'organise', label: items.length > 0 && items.every((item) => item.library) ? 'Remove' : 'Delete', tip: items.length > 0 && items.every((item) => item.library) ? 'Remove Selected' : 'Delete Selected', Icon: Trash2, danger: true, disabled: !items.length, run: () => { void handlers.removeItems(items); } },

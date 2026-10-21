@@ -3,7 +3,7 @@ import { Check, Link2, Pencil, Trash2, Unlink2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { aspectIconStyle, cn } from './format';
 import { Tip } from './components';
-import { formatMp, MEGAPIXEL, megapixels, parseSize, ratioName, snapSide, type SideLimits, type Size } from './sizing';
+import { formatMp, MEGAPIXEL, parseSize, ratioName, snapSide, type SideLimits, type Size } from './sizing';
 import { sizePlan } from './useUpscale';
 import type { AspectPreset, NativeSupport, SavedSize } from './types';
 
@@ -379,7 +379,7 @@ export function MegapixelField({ current, control, custom }: {
  * at the shape it had when the change began (so snapping never drifts it);
  * a side that would pass its limit holds the pair at the limit instead.
  */
-export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false }: {
+export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false, disabled = false }: {
   size: Size;
   limits: { width: SideLimits; height: SideLimits };
   onChange: (size: Size) => void;
@@ -387,6 +387,7 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
   onSave?: () => void;
   /** This exact size is saved already. */
   saved?: boolean;
+  disabled?: boolean;
 }) {
   const [linked, setLinked] = React.useState(true);
   // Just clicked: the hover lean waits until the pointer leaves the link, so the click's move plays in full.
@@ -396,20 +397,21 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
   const maxW = limits.width.max ?? 4096;
   const maxH = limits.height.max ?? 4096;
   const setWidth = (width: number) => {
+    if (disabled) return;
     if (!linked) return onChange({ width, height: size.height });
     let height = snapSide(width / shape.current, limits.height);
     if (width / shape.current > maxH) { height = maxH; width = snapSide(maxH * shape.current, limits.width); }
     onChange({ width, height });
   };
   const setHeight = (height: number) => {
+    if (disabled) return;
     if (!linked) return onChange({ width: size.width, height });
     let width = snapSide(height * shape.current, limits.width);
     if (height * shape.current > maxW) { width = maxW; height = snapSide(maxW / shape.current, limits.height); }
     onChange({ width, height });
   };
-  const atLimit = size.width >= maxW || size.height >= maxH;
   return (
-    <div className="size-custom-body">
+    <fieldset className="size-custom-body" disabled={disabled} aria-label="Custom Dimensions">
       <div className={cn("size-fields", linked && "is-linked", fresh && "is-fresh")}>
         <SizeField axis="W" value={size.width} limits={limits.width} onStart={begin} onChange={setWidth} />
         <Tip content={linked ? "Linked: the shape stays as you resize. Click to unlink" : "Unlinked: width and height change on their own. Click to link"}>
@@ -420,16 +422,13 @@ export function LinkedSizeFields({ size, limits, onChange, onSave, saved = false
         </Tip>
         <SizeField axis="H" value={size.height} limits={limits.height} onStart={begin} onChange={setHeight} />
       </div>
-      <div className="size-custom-note">
-        <span>{megapixels(size)} · {ratioName(size.width, size.height)}{atLimit ? <span className="is-limit"> · up to {Math.min(maxW, maxH)} px</span> : null}</span>
-        {onSave ? (
+      {onSave ? <div className="size-custom-note">
           <button type="button" className={cn("size-save", saved && "is-saved")} disabled={saved} onClick={onSave}>
             {/* Keyed, so the word changes with a small lift rather than a jump. */}
             <span key={saved ? "saved" : "save"}>{saved ? <><Check size={12} strokeWidth={2.6} /> Saved</> : "Save size"}</span>
           </button>
-        ) : null}
-      </div>
-    </div>
+      </div> : null}
+    </fieldset>
   );
 }
 
