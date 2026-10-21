@@ -7,7 +7,7 @@ import { AnimatedNumber } from './AnimatedNumber';
 import { ComfyRestart, useComfyRestarting } from './ComfyRestart';
 import { ModelFoldersHero } from './ModelFoldersHero';
 import { Watcher } from './UpscaleDialogs';
-import { cn } from './format';
+import { cn, plural } from './format';
 import { formatBytes } from './useUpscale';
 import type { ModelFolders, ModelFolderStage } from './useModelFolders';
 import type { StrayModelFolder } from './types';
@@ -37,7 +37,6 @@ export function folderSummary(folder: StrayModelFolder) {
   return [...byKind].sort((a, b) => b[1] - a[1]).map(([kind, count]) => kindLabel(kind, count)).join(' · ');
 }
 
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 const STEPS = [
   { label: 'Find', stages: ['scanning', 'found', 'none', 'remote', 'offline'] },

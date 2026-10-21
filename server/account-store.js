@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
-import { root } from "./comfy.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
 import { accountRoles, builtInAccessProfiles, effectiveAccountAccess, migrateCloudModels, migrateFeatureOptions, normaliseAccessProfile, predatesCloudModels, validAccountKey } from "./account-policy.js";
+import { currentDataDir } from "./data-dir.js";
 
-const dataDir = path.resolve(process.env.STUDIO_DATA_DIR || path.join(root, "data"));
+const dataDir = currentDataDir();
+
 const storePath = path.join(dataDir, "accounts.json");
 const sessionLifetimeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessions = 500;

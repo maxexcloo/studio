@@ -17,11 +17,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { trashFolderNames } from "./data-names.js";
+import { appVersion, currentDataDir } from "./data-dir.js";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultDataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
+const defaultDataDir = currentDataDir();
 
 const markerName = ".version";
 const backupsName = ".backups";
@@ -31,13 +30,7 @@ const keepCount = 3;
 // vault from before Hidden was removed moves into backups/ on its first start.
 const skipped = new Set([".thumbnails", backupsName, "backups", ".private-vault", "reference-assets", "setup-demo", ...trashFolderNames, ".DS_Store", "Thumbs.db"]);
 
-function currentVersion() {
-  try {
-    return String(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version || "");
-  } catch {
-    return "";
-  }
-}
+const currentVersion = () => String(appVersion || "");
 
 const safeName = (text) => String(text || "earlier").replace(/[^0-9A-Za-z.+-]/g, "-");
 

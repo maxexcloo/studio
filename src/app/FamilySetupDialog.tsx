@@ -6,7 +6,7 @@ import { FamilySetupHero, type FamilySetupHeroStage } from './FamilySetupHero';
 import { CellBar, Watcher } from './UpscaleDialogs';
 import { formatEta } from './UpscaleDownloadActivity';
 import { apiJson } from './api';
-import { cn } from './format';
+import { cn, formatDownloadSize } from './format';
 import { useThisComputer } from './device';
 import { downloadFor, useModelDownloads } from './useModelDownloads';
 import type { MissingPart, ModelDownload } from './types';
@@ -57,11 +57,6 @@ export function useFamilySetupRequests(onOpen: (request: Request) => void) {
 
 /* ------------------------------------------------------------ Helpers */
 
-function formatBytes(bytes = 0) {
-  if (!bytes) return '';
-  const gb = bytes / 1e9;
-  return gb >= 1 ? `${gb.toFixed(gb >= 10 ? 0 : 1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
-}
 
 const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'comfy', label: 'ComfyUI' },
@@ -278,8 +273,8 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
           <div className="upscale-meter">
             <strong>{Math.floor(progress * 100)}<small>%</small></strong>
             <div>
-              <span>{formatBytes(totals.received) || '0 MB'} of {formatBytes(totals.total)}</span>
-              <span>{totals.speed > 0 ? `${formatBytes(totals.speed)}/s · ${formatEta((totals.total - totals.received) / totals.speed)}` : 'Connecting to Hugging Face'}</span>
+              <span>{formatDownloadSize(totals.received) || '0 MB'} of {formatDownloadSize(totals.total)}</span>
+              <span>{totals.speed > 0 ? `${formatDownloadSize(totals.speed)}/s · ${formatEta((totals.total - totals.received) / totals.speed)}` : 'Connecting to Hugging Face'}</span>
             </div>
           </div>
         ) : null}
@@ -300,7 +295,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
                     : state === 'downloading' ? `${Math.floor(value * 100)}%`
                     : state === 'paused' ? 'Paused'
                     : state === 'error' ? 'Stopped'
-                    : formatBytes(row.download?.bytes)}
+                    : formatDownloadSize(row.download?.bytes)}
                 </span>
               </li>
             );
@@ -308,7 +303,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
         </ul>
         {!admin ? <p className="upscale-fine">Files download on the computer running Studio. Set {title} up there.</p>
           : plan.local === false ? <p className="upscale-fine">ComfyUI runs on another computer. Put these files in its model folders there.</p>
-          : short ? <p className="upscale-fine is-warn">These need {formatBytes(remaining)} and the disk has {formatBytes(space?.free)} free.</p>
+          : short ? <p className="upscale-fine is-warn">These need {formatDownloadSize(remaining)} and the disk has {formatDownloadSize(space?.free)} free.</p>
           : null}
         {!pending.length && !moving.length ? <Watcher lastChecked={checkedAt}>Waiting for ComfyUI to list the files…</Watcher> : null}
       </>
@@ -323,7 +318,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
           </>
         ) : pending.length && admin && plan.local !== false ? (
           <button className="btn is-primary" disabled={busy || short} onClick={getAll}>
-            <Download size={14} /> {failed || pending.some((row) => rowState(row.download, row.have) === 'paused') ? 'Resume' : 'Download'} · {formatBytes(remaining)}
+            <Download size={14} /> {failed || pending.some((row) => rowState(row.download, row.have) === 'paused') ? 'Resume' : 'Download'} · {formatDownloadSize(remaining)}
           </button>
         ) : null}
       </>

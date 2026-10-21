@@ -5,6 +5,7 @@ import type { ShowToast } from './toast';
 import { mediaUrl } from './mediaUrl';
 import { fitRatio } from './sizing';
 import { formatLeft, useRunClock } from './GenerationProgress';
+import type { Size } from './sizing';
 
 /** The gallery keeps the original as the record; only the view swaps. */
 export function upscaleDisplayUrl(item: GalleryItem) {
@@ -90,7 +91,6 @@ export function upscaleSize(tier: AutoUpscale | undefined): "none" | "2k" | "4k"
   return tier?.startsWith("4k") ? "4k" : tier && tier !== "none" ? "2k" : "none";
 }
 
-type Size = { width: number; height: number };
 
 /** The picked aspect with its long side at `long`, in steps of 64, never past the model's max. */
 function drawnAt({ width, height }: Size, long: number, max: number): Size {

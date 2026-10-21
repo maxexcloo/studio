@@ -6,12 +6,12 @@ import { apiJson } from './api';
 import { Group, Row, SwitchRow } from './SettingsControls';
 import { clearPrompts, setPromptHistoryEnabled, usePromptHistory } from './recentPrompts';
 import type { ShowToast } from './toast';
+import { plural } from './format';
 
 /* ---------------------------------------------------------------------------
    Settings rows about what Studio keeps: recent prompts, and the LoRA and supporting-file inventory.
 --------------------------------------------------------------------------- */
 
-const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count === 1 ? '' : 's'}`;
 
 /** Recent prompts: whether to keep them, what the list holds, and the way to empty it. */
 export function PromptHistoryRow({ showToast }: { showToast: ShowToast }) {

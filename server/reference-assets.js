@@ -7,7 +7,7 @@ import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
 import { dataDir, importedImageFile, filterVisibleGallery, gallery, galleryKey, outputFileCandidates } from "./gallery-store.js";
 
 import { extractLastFrame } from "./video-previews.js";
-import { renameWithRetry } from "./json-store.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
@@ -40,9 +40,10 @@ function ensureDirs() {
   fs.mkdirSync(thumbsDir, { recursive: true });
 }
 
+// The crash-safe JSON store (json-store.js), like every other file Studio remembers.
 function loadManifest() {
   try {
-    const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const parsed = readJsonFile(manifestPath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -51,9 +52,7 @@ function loadManifest() {
 
 function writeManifest(items) {
   ensureDirs();
-  const temporary = `${manifestPath}.${process.pid}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(items, null, 2), { mode: 0o600 });
-  renameWithRetry(temporary, manifestPath);
+  writeJsonFile(manifestPath, items, { mode: 0o600 });
 }
 
 function publicUploadAsset(record) {

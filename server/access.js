@@ -1,11 +1,14 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { allowLanActions, dockerHostOnly, root } from "./comfy.js";
+import { allowLanActions, dockerHostOnly } from "./comfy.js";
 import { classifyClient } from "./client-trust.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
 import { accountSession } from "./account-store.js";
+import { currentDataDir } from "./data-dir.js";
+
+const dataDir = currentDataDir();
 
 /**
  * Other devices: how they sign in, how long they stay signed in, and what
@@ -24,7 +27,6 @@ import { accountSession } from "./account-store.js";
  * Everything lives in data/access.json (0600).
  */
 
-const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 const accessPath = path.join(dataDir, "access.json");
 export const deviceCookieName = "studio_device";
 /** The cookie's name before Studio's hard fork: still read, then moved to the new name (migrateDeviceCookie). */

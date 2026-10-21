@@ -21,11 +21,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { currentDataDir } from "./data-dir.js";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultDataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
+const defaultDataDir = currentDataDir();
 
 export const flagName = ".hidden-removed-v1";
 export const backupsName = "backups";

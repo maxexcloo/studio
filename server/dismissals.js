@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { currentDataDir } from "./data-dir.js";
+
+const dataDir = currentDataDir();
 
 /**
  * Recommendations someone said not to show again ("flux3:upsampler"): kept in
@@ -9,8 +11,6 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
  * device, until they bring it back.
  */
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 const file = path.join(dataDir, "dismissed.json");
 const keyPattern = /^[a-z0-9_]{1,40}:[a-z0-9_]{1,40}$/;
 

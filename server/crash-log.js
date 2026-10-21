@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
+import { currentDataDir } from "./data-dir.js";
+
+const dataDir = currentDataDir();
 
 /**
  * What Studio writes down when something goes wrong, so "the server is down"
@@ -21,9 +23,6 @@ import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
  * Nothing about prompts, images or file names goes in: only what happened.
  */
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, "..");
-const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
 export const logDir = path.join(dataDir, "logs");
 const keepDays = 7;
 const recent = [];

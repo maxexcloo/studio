@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { envFileKeys, writeLocalEnvValue } from "./env.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { currentDataDir } from "./data-dir.js";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
@@ -28,8 +28,8 @@ export const workerCapabilities = [
 ];
 const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = () => (process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data"));
+// Read on each call: tests and the first start may set the folder after this loads.
+const dataDir = () => currentDataDir();
 export const workersFile = () => path.join(dataDir(), "workers.json");
 
 const LEGACY_IMAGE_ID = "primary";

@@ -42,6 +42,7 @@ import { startServers } from './listen.js';
 import { httpsPort, startupTls, tlsHostNames } from './tls.js';
 import { legacyEnvInUse, removeLocalEnvValue } from './env.js';
 import { sharedRequests } from './shared-requests.js';
+import { appVersion } from './data-dir.js';
 import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from './env-names.js';
 import { retireFeatureSwitches } from './feature-options.js';
 import { inferModels, mockModelResult, offlineModelResult } from './models.js';
@@ -305,9 +306,6 @@ registerMultiUserAuthRoutes(app, {
   cloudProfiles: async () => (await discoveredProfiles()).filter(isCloudProfile).map((profile) => profile.id)
 });
 
-const appVersion = (() => {
-  try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
-})();
 
 // How a second start finds out Studio already holds the port (see launch.js).
 app.get("/api/ping", (_req, res) => res.json({ ok: true, app: "studio", version: appVersion }));

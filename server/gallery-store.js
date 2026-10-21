@@ -4,14 +4,15 @@ import { mediaFile, mediaParams, mediaPath } from './media-paths.js';
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyOutputDir, localOutputFile, root } from './comfy.js';
+import { comfyOutputDir, localOutputFile } from './comfy.js';
 import { defaultWorkerId } from './workers.js';
 
 import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from './json-store.js';
 import { isInside } from './paths.js';
 import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from './gallery-order.js';
+import { currentDataDir } from "./data-dir.js";
 
-export const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
+export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
 export const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
 export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);

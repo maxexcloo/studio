@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { ChevronsDownUp, Ungroup } from 'lucide-react';
-import { cn } from './format';
+import { cn, fileStem } from './format';
 import { Media, Tip } from './components';
 import { SafeImg } from './SafeImg';
 import { mediaUrl } from './mediaUrl';
@@ -265,7 +265,7 @@ export function RunShelf({ run, y, width, height, folding, arriving, onClose, on
 }) {
   const reducedMotion = useReducedMotion();
   const title = runTitle(run);
-  const meta = [run.live ? "Generating" : runKind(run), run.model ? modelName(run.model) : "", timeSpan(run.start, run.end)].filter(Boolean);
+  const meta = [run.live ? "Generating" : runKind(run), run.model ? fileStem(run.model) : "", timeSpan(run.start, run.end)].filter(Boolean);
   return (
     <motion.div
       className={cn("run-shelf", run.live && "is-live")}
@@ -298,9 +298,4 @@ export function RunShelf({ run, y, width, height, folding, arriving, onClose, on
   );
 }
 
-/** "flux1-dev-fp8.safetensors" → "flux1-dev-fp8". */
-export function modelName(model: string) {
-  const base = model.split(/[\\/]/).pop() || model;
-  return base.replace(/\.(safetensors|ckpt|gguf|pt|pth|bin)$/i, "");
-}
 

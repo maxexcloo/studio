@@ -3,7 +3,8 @@ import { scrollBehavior } from "@/lib/springs";
 import { Rows3 } from 'lucide-react';
 import { Sheet } from './Sheet';
 import { Media } from './components';
-import { Still, modelName, runKind, timeSpan } from './RunStack';
+import { Still, runKind, timeSpan } from './RunStack';
+import { fileStem } from './format';
 import { runTitle, type Run } from './runs';
 import type { GalleryItem } from './types';
 
@@ -93,7 +94,7 @@ function CoverFlow({ run, onOpen, onShowInGallery }: { run: Run; onOpen: (item: 
         ))}
       </div>
       <div className="cover-flow-caption">
-        <small>{index + 1} of {items.length}{run.model ? <> · {modelName(run.model)}</> : null} · {timeSpan(run.start, run.end)}</small>
+        <small>{index + 1} of {items.length}{run.model ? <> · {fileStem(run.model)}</> : null} · {timeSpan(run.start, run.end)}</small>
         <strong>{runTitle(run)}</strong>
         {current?.prompt && run.variations > 1 ? <p>{current.prompt}</p> : null}
       </div>

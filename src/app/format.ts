@@ -102,7 +102,8 @@ export function fullGenerationText(item: GalleryItem) {
   return lines.join("\n");
 }
 
-function fileStem(name: unknown) {
+/** "flux1-dev-fp8.safetensors" (or a path to it) → "flux1-dev-fp8". */
+export function fileStem(name: unknown) {
   return String(name || "").split(/[\\/]/).pop()!.replace(/\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i, "");
 }
 
@@ -237,4 +238,16 @@ export function clientJobUuid() {
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** A download's size, rounded the way setup screens show it: "6.5 GB", "320 MB"; "" when unknown. */
+export function formatDownloadSize(bytes = 0) {
+  if (!bytes) return '';
+  const gb = bytes / 1e9;
+  return gb >= 1 ? `${gb.toFixed(gb >= 10 ? 0 : 1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+}
+
+/** "1 model", "3 models", "1,204 recent prompts". */
+export function plural(count: number, one: string, many = `${one}s`) {
+  return `${count.toLocaleString()} ${count === 1 ? one : many}`;
 }

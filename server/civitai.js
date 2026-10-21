@@ -5,6 +5,7 @@ import { localOutputFile, modelFolders } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, renameWithRetryAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
+import { appVersion } from "./data-dir.js";
 
 /**
  * Civitai-ready PNGs, always on.
@@ -25,9 +26,6 @@ const hashesPath = path.join(dataDir, "model-hashes.json");
 // The old on/off switch is gone: a saved choice, "off" included, is dropped quietly.
 try { fs.rmSync(path.join(dataDir, "civitai.json"), { force: true }); } catch { /* read-only data: nothing to forget */ }
 
-const appVersion = (() => {
-  try { return JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).version || ""; } catch { return ""; }
-})();
 
 /* ------------------------------------------------------------ Names */
 

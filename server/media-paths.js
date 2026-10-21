@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { isInside } from "./paths.js";
+import { currentDataDir } from "./data-dir.js";
 
 /**
  * Studio-owned media storage. With it, ComfyUI is a worker: each finished output
@@ -13,8 +13,7 @@ import { isInside } from "./paths.js";
  * On by default in multi-user mode; `STUDIO_OUTPUT_STORAGE=studio` opts a
  * single-user studio in and `=comfy` keeps ComfyUI's output folder.
  */
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-export const dataDir = process.env.STUDIO_DATA_DIR ? path.resolve(process.env.STUDIO_DATA_DIR) : path.join(root, "data");
+export const dataDir = currentDataDir();
 
 export const mediaType = "media";
 /** Whether outputs live in Studio media; any value other than `studio` or `comfy` is refused. */

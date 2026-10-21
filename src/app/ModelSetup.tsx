@@ -7,7 +7,7 @@ import { ComfyRestart } from './ComfyRestart';
 import { NodeInstall, ShellCommand } from './NodeInstall';
 import { CellBar, Watcher } from './UpscaleDialogs';
 import { formatEta } from './UpscaleDownloadActivity';
-import { cn } from './format';
+import { cn, formatDownloadSize } from './format';
 import { downloadFor, scrollRevealed, useDownloadReveal, useModelDownloads } from './useModelDownloads';
 import type { MissingPart, ModelDownload, PartDownload, Profile } from './types';
 import { useThisComputer } from './device';
@@ -15,11 +15,6 @@ import type { ShowToast } from './toast';
 import { openFamilySetup } from './FamilySetupDialog';
 import { apiJson } from './api';
 
-function formatBytes(bytes = 0) {
-  if (!bytes) return '';
-  const gb = bytes / 1e9;
-  return gb >= 1 ? `${gb.toFixed(gb >= 10 ? 0 : 1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`;
-}
 
 const partVerb: Record<MissingPart['part'], string> = {
   encoder: 'Text encoder',
@@ -221,7 +216,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
   const short = startable.length > 1 ? [...perDisk.values()].find((disk) => disk.need > disk.free) : undefined;
   const getAll = () => {
     if (short) {
-      showToast(`Not enough space. These need ${formatBytes(short.need)} and the disk has ${formatBytes(short.free)} free. Free up space or get them one at a time.`, 'error');
+      showToast(`Not enough space. These need ${formatDownloadSize(short.need)} and the disk has ${formatDownloadSize(short.free)} free. Free up space or get them one at a time.`, 'error');
       return;
     }
     run(async () => { for (const row of startable) await start(row.download!.id); });
@@ -256,7 +251,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
       <header className="model-setup-head">
         <div>
           <strong>{title}</strong>
-          <span>{short && !moving ? `These need ${formatBytes(short.need)} and the disk has ${formatBytes(short.free)} free.` : subtitle}</span>
+          <span>{short && !moving ? `These need ${formatDownloadSize(short.need)} and the disk has ${formatDownloadSize(short.free)} free.` : subtitle}</span>
         </div>
         {profile.setupGuide ? (
           // A family with its own guided setup: the same parts, with the choices that come before them.
@@ -264,7 +259,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         ) : null}
         {startable.length > 1 && !outdated ? (
           <button type="button" className={cn('btn', short ? 'is-ghost' : 'is-primary')} onClick={getAll}>
-            <Download size={14} /> Get All{remainingBytes ? ` · ${formatBytes(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}
+            <Download size={14} /> Get All{remainingBytes ? ` · ${formatDownloadSize(remainingBytes)}${sizeUnknown ? '+' : ''}` : ''}
           </button>
         ) : null}
       </header>
@@ -338,7 +333,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
 
 /** Who publishes a build, as a short line: Comfy-Org's own repackaging, or the community converter's name. */
 function sourceLine(download: PartDownload) {
-  const size = formatBytes(download.bytes);
+  const size = formatDownloadSize(download.bytes);
   const who = download.source === 'Comfy-Org' ? 'Comfy-Org' : download.source ? `${download.source} (community)` : '';
   return [size, who].filter(Boolean).join(' · ');
 }
@@ -408,12 +403,12 @@ function SetupRowShell({ item, rowState }: { item: MissingPart; rowState: RowSta
 function progressLine(current: ModelDownload, rowState: RowState) {
   const pct = current.totalBytes ? Math.floor((current.receivedBytes / current.totalBytes) * 100) : 0;
   if (rowState === 'queued') return current.receivedBytes ? `Waiting · resumes at ${pct}%` : 'Waiting for the previous file';
-  if (rowState === 'paused') return `Paused at ${pct}% · ${formatBytes(current.receivedBytes)} of ${formatBytes(current.totalBytes)}`;
+  if (rowState === 'paused') return `Paused at ${pct}% · ${formatDownloadSize(current.receivedBytes)} of ${formatDownloadSize(current.totalBytes)}`;
   if (current.reconnecting) return `Connection dropped at ${pct}% · reconnecting (try ${current.reconnecting} of 3)…`;
-  if (current.verifying) return `${formatBytes(current.totalBytes)} · checking the file…`;
+  if (current.verifying) return `${formatDownloadSize(current.totalBytes)} · checking the file…`;
   const speed = current.bytesPerSecond || 0;
   const eta = speed > 0 && current.totalBytes ? formatEta((current.totalBytes - current.receivedBytes) / speed) : '';
-  return [`${pct}%`, current.receivedBytes ? `${formatBytes(current.receivedBytes)} of ${formatBytes(current.totalBytes)}` : formatBytes(current.totalBytes), speed > 0 ? `${formatBytes(speed)}/s` : 'connecting', eta].filter(Boolean).join(' · ');
+  return [`${pct}%`, current.receivedBytes ? `${formatDownloadSize(current.receivedBytes)} of ${formatDownloadSize(current.totalBytes)}` : formatDownloadSize(current.totalBytes), speed > 0 ? `${formatDownloadSize(speed)}/s` : 'connecting', eta].filter(Boolean).join(' · ');
 }
 
 /** Throwing away gigabytes takes a second tap: the first one asks, then it resets. */
@@ -425,7 +420,7 @@ function DiscardButton({ file, receivedBytes, onDiscard }: { file: string; recei
     return () => window.clearTimeout(timer);
   }, [asking]);
   if (asking) {
-    return <button type="button" className="btn is-danger-soft" onClick={() => { setAsking(false); onDiscard(); }}>Discard {formatBytes(receivedBytes) || 'it'}?</button>;
+    return <button type="button" className="btn is-danger-soft" onClick={() => { setAsking(false); onDiscard(); }}>Discard {formatDownloadSize(receivedBytes) || 'it'}?</button>;
   }
   return <Tip content="Discard"><button type="button" className="btn is-ghost is-icon" aria-label={`Discard Partial Download of ${file}`} onClick={() => setAsking(true)}><X size={14} /></button></Tip>;
 }
@@ -469,7 +464,7 @@ function RowActions({ rowState, download, current, remote, run, start, pause, di
     <>
       {!remote ? (
         <button type="button" className="btn" onClick={() => run(() => start(download.id))} title={[download.file, download.source].filter(Boolean).join(' · ')}>
-          <Download size={14} /> {download.bytes ? formatBytes(download.bytes) : 'Get'}
+          <Download size={14} /> {download.bytes ? formatDownloadSize(download.bytes) : 'Get'}
         </button>
       ) : null}
       {link}
