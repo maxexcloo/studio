@@ -13,6 +13,12 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
   const [height, setHeight] = React.useState<number>();
   const [animating, setAnimating] = React.useState(false);
   const reduced = useReducedMotion();
+  // Only opening and closing spring; text growing a line resizes at once, so the bottom-anchored
+  // composer never spills downward and then slides back up while typing.
+  const toggledAt = React.useRef(-Infinity);
+  const wasExpanded = React.useRef(expanded);
+  if (wasExpanded.current !== expanded) { wasExpanded.current = expanded; toggledAt.current = performance.now(); }
+  const toggling = performance.now() - toggledAt.current < 600;
   React.useLayoutEffect(() => {
     const node = body.current;
     if (!node) return;
@@ -26,8 +32,8 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
     className={cn('zen-prompt', expanded && 'is-expanded')}
     aria-label="Create"
     initial={false}
-    animate={{ height: height ?? 'auto' }}
-    transition={reduced ? { duration: 0 } : springs.slow}
+    animate={{ height: toggling && !reduced ? height ?? 'auto' : 'auto' }}
+    transition={reduced || !toggling ? { duration: 0 } : springs.slow}
     style={{ overflow: animating ? 'hidden' : 'visible' }}
     onAnimationStart={() => setAnimating(true)}
     onAnimationComplete={() => setAnimating(false)}

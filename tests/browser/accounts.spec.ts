@@ -142,9 +142,14 @@ test('administrators can manage access profiles, accounts and a personal MCP tok
   // A menu still closing takes the first outside click for itself, so go to Account until it shows.
   await expect(async () => {
     await page.getByRole('navigation', { name: 'Settings Sections' }).getByRole('button', { name: 'Account', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible({ timeout: 2000 });
+    await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible({ timeout: 2000 });
   }).toPass({ timeout: 15000 });
-  await page.getByRole('button', { name: 'Sign Out', exact: true }).click();
+  // Settings › Account has no Session group or Access line; Sign Out lives in the Menu.
+  await expect(page.getByRole('heading', { name: 'Session', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Administrator · full access', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Sign Out', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign In', exact: true })).toBeVisible();
 });
 
@@ -167,7 +172,7 @@ test('ordinary accounts open their own studio without administration sections', 
   await sections.getByRole('button', { name: 'Account', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Access Profiles', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create Token', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign Out', exact: true })).toHaveCount(0);
 });
 
 const signedOutStatus = (extra: object = {}) => ({ ok: true, mode: 'multi-user', signedIn: false, account: null, ...extra });

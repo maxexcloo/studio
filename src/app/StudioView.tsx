@@ -7,9 +7,9 @@ import React from 'react';
 import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GalleryViewControls } from './GalleryViewControls';
-import { CircleStop, ChevronLeft, ChevronRight, Info, Library, Settings, Type, X } from 'lucide-react';
+import { CircleStop, ChevronLeft, ChevronRight, Info, Library, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn, nearTextLimit, type GenerationDetailSection } from './format';
+import { cn, nearTextLimit, sortDetailRows, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Tip } from './components';
 import { useWheelRef } from './wheel';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -358,7 +358,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
     return () => { live = false; };
   }, [activeHasLoras, loraInfos]);
   const [compareOpen, setCompareOpen] = React.useState(false);
-  const imageText = prefs.viewerImageText !== false;
   // The pictures either side of the open one are fetched ahead, so a swipe lands on one already there.
   useNeighborPrefetch(active || null, (view.viewerGallery || []) as GalleryItem[]);
   // On a phone Details covers the video, so it pauses until Details closes (mediaCover.ts).
@@ -658,7 +657,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         if (active.upscale?.status === 'done') processing.push(['Upscale', active.upscale.width && active.upscale.height ? `${active.upscale.width} × ${active.upscale.height}` : 'Applied']);
         if (active.upscale?.faceDetail) processing.push(['Face Detail', 'Applied']);
         if (active.settings?.inpaint) processing.push(['Inpainting', 'Applied']);
-        if (processing.length) detailEntries.splice(Math.max(0, detailEntries.findIndex((section: GenerationDetailSection) => section.title === 'Timing')), 0, { title: 'Processing', rows: processing });
+        const outputSection = detailEntries.find((section: GenerationDetailSection) => section.title === 'Output');
+        if (processing.length && outputSection) { outputSection.rows.push(...processing); sortDetailRows(outputSection); }
         const profileDetail = [
           active.width && active.height ? `${active.width} × ${active.height}` : '',
           active.settings?.steps ? `${active.settings.steps} Steps` : '',
@@ -672,7 +672,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
           }} ref={setViewerNode}>
             <div className="viewer-shell" onClick={(event) => event.stopPropagation()}>
               <div className={cn("viewer-stage", showDetails && "with-side")} data-viewer-empty>
-                {showDetails && imageText && active.type === "image" ? <header className="viewer-profile-summary" data-open-surface>
+                {showDetails && active.type === "image" ? <header className="viewer-profile-summary" data-open-surface>
                   <strong>{profileTitle}</strong>
                   {profileDetail ? <span>{profileDetail}</span> : null}
                 </header> : null}
@@ -709,7 +709,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
                   <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()}>
                     <div className="viewer-side-head">
                       <h3>Details</h3>
-                      {active.type === 'image' ? <Tip content={imageText ? "Hide the Image Summary" : "Show the Image Summary"}><button type="button" className="btn image-text-toggle" aria-label="Image Text" aria-pressed={imageText} onClick={() => setPrefs({ viewerImageText: !imageText })}><Type size={15} /><span>Image Text</span></button></Tip> : null}
                       {/* The desktop panel closes itself, as it covers the corner Info sits in; on the phone Info (pressed) closes it, so there is one close. */}
                       {phone ? null : <Tip content="Close Details (I)"><button type="button" className="icon-button viewer-side-close" aria-label="Close Details" onClick={() => setShowDetails(false)}><X size={16} /></button></Tip>}
                     </div>

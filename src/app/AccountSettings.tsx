@@ -1,6 +1,6 @@
 import React from 'react';
-import { Ban, Copy, FileJson, KeyRound, Link2, LogOut, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
-import { cachedMe, emailFieldProps, knownAccountStatus, loadMe, looksLikeEmail, signOutAccount, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
+import { Ban, Copy, FileJson, KeyRound, Link2, Power, RefreshCw, Unlink, UserPlus, X } from 'lucide-react';
+import { cachedMe, emailFieldProps, knownAccountStatus, loadMe, looksLikeEmail, updateCachedMe, type McpTokenStatus, type Me, type OwnAccount } from './accounts';
 import { apiJson } from './api';
 import { Skeleton, StudioSelect } from './components';
 import { MultiSelect, type MultiSelectOption } from './MultiSelect';
@@ -100,15 +100,7 @@ export function AccountSettings({ showToast, copyToClipboard, confirmAction }: {
         <button className="btn is-primary" onClick={() => void copy(issuedToken, 'Token')}><Copy size={14} /> Copy Token</button>
       </Row> : null}
     </Group>
-    <Group title="Session" note="Sign out of this browser before handing it to someone else.">
-      <Row label="This Browser"><button className="btn is-ghost" disabled={busy} onClick={() => void run(signOutAccount, 'Couldn’t sign out')}><LogOut size={14} /> Sign Out</button></Row>
-    </Group>
   </div>;
-}
-
-function accessWords(account: OwnAccount) {
-  if (account.role === 'administrator') return 'Administrator · full access';
-  return `User · ${account.accessProfile?.name || 'no access profile yet'}`;
 }
 
 /** Display name and email, saved together; a new email asks for the current password. */
@@ -148,7 +140,6 @@ function ProfileGroup({ account, showToast, onSaved }: { account: OwnAccount | n
     </Row> : null}
     <SaveRow dirty={dirty} busy={busy} onSave={() => void save()} onDiscard={discard} canSave={Boolean(name.trim()) && !emailInvalid && (!emailChanged || Boolean(current))} note={error || undefined} />
     <PasswordRows account={account} showToast={showToast} />
-    <Row label="Access" description={account ? accessWords(account) : <Skeleton className="skeleton-text short" />} />
   </Group>;
 }
 

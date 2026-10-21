@@ -16,9 +16,9 @@ export const defaultPrefs: Preferences = {
   enterToGenerate: true,
   spanWideImages: false,
   showFailedItems: true,
+  hideQueuedItems: false,
   // Off until chosen: a new key, so preferences saved under the old hidden showMoments don't switch it on.
   dateHeaders: false,
-  viewerImageText: true,
   stackRuns: false,
   runStackStyle: "burst",
   smartUpscale: true,

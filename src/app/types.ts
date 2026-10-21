@@ -3,7 +3,7 @@ export type Mode = "image" | "video";
 /** `steps` marks a sampler's count; other nodes report a `phase` ("Encoding image") instead. */
 export type Progress = { value: number; max: number; node?: string; phase?: string; steps?: boolean; /** When the run should be done, on the server's clock; only there when it can be said honestly. */ endsAt?: number; /** When ComfyUI started running it (not queued), on the server's clock. */ runStartedAt?: number; /** ComfyUI is out of reach for now; the server keeps trying for about a minute. */ reconnecting?: boolean; /** The picture is saved and Smart upscale is working on it: stopping now keeps the picture. */ upscaling?: boolean };
 /** How long a finished run took in ComfyUI itself, without waiting in its queue; `slow` when its steps ran far slower than this model's usual. */
-export type RunTiming = { runMs: number; finishMs?: number; queueMs?: number; samplingMs?: number; setupMs?: number; stepMs?: number; slow?: boolean };
+export type RunTiming = { runMs: number; upscaleMs?: number; finishMs?: number; queueMs?: number; samplingMs?: number; setupMs?: number; stepMs?: number; slow?: boolean };
 export type Output = { url: string; filename: string; type: "image" | "video"; prompt?: string; negative?: string; outputName?: string };
 export type LoraSelection = { name: string; enabled: boolean; strength: number };
 export type MediaInput = {
@@ -290,11 +290,11 @@ export type Preferences = {
   /** Wide images take two gallery columns, from three columns up. */
   spanWideImages: boolean;
   showFailedItems: boolean;
+  /** Status filter: queued jobs (not yet running) leave the gallery view; they still count as running. */
+  hideQueuedItems?: boolean;
   /** Headings for each stretch of time in the gallery ("This evening"). */
   /** Date headings in the gallery ("Today", "This Evening"), from Settings › Studio › Gallery. */
   dateHeaders: boolean;
-  /** The short image summary over the viewer while Details is open. */
-  viewerImageText: boolean;
   /** Runs of one idea fold into stacks (runs.js). */
   stackRuns: boolean;
   /** A folded run: a photo with edges under it, or a cover flow inside one card. */

@@ -568,8 +568,6 @@
   font-weight: 600;
   letter-spacing: -0.005em;
 }
-.image-text-toggle { margin-left: auto; gap: 6px; min-height: 36px; font-size: 12px; }
-.image-text-toggle[aria-pressed="true"] { color: var(--accent-amber); }
 
 .viewer-profile-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-profile-summary span { white-space: nowrap; }

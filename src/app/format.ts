@@ -138,6 +138,11 @@ export type GenerationDetailSection = { title: string; rows: Array<[string, stri
  * (model, LoRAs as cards of their own), then how it was sampled, then the
  * size, then file metadata.
  */
+/** A Details group's rows in alphabetical order of their labels. */
+export function sortDetailRows(section: GenerationDetailSection) {
+  section.rows.sort(([a], [b]) => a.localeCompare(b, "en", { sensitivity: "base" }));
+}
+
 export function generationDetailEntries(item: GalleryItem, names: { profile?: string; lora?: (file: string) => string } = {}): GenerationDetailSection[] {
   const settings = item.settings || {};
   const grok = String(settings.modelName || "").startsWith("grok-imagine-");
@@ -163,7 +168,7 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     if (modelSection) modelSection.loras = loras;
     else sections.push({ title: "Model", rows: [], loras });
   }
-  section("Generation", (add) => {
+  section("Settings", (add) => {
     if (!grok) {
       add("Steps", settings.steps);
       add("CFG", settings.cfg);
@@ -173,12 +178,13 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     add("Seed", settings.seed);
     if (item.type === "image" && !String(settings.modelName || "").endsWith(".rad") && (item.referenceImage || settings.referenceImageName)) add("Denoise", settings.denoise);
   });
-  section(item.type === "video" ? "Video" : "Image", (add) => {
+  // What came out, the picture and its file together (UI-PATTERNS › Action Placement › Details).
+  section("Output", (add) => {
     // The size of the picture shown: an upscale's own size when that's the one on screen.
     const upscaled = item.upscaleActive && item.upscale?.status === "done" && item.upscale.width && item.upscale.height ? item.upscale : null;
     add("Size", upscaled ? `${upscaled.width} × ${upscaled.height}` : `${item.width || "?"} × ${item.height || "?"}`);
     if (settings.resolution) add("Resolution", settings.resolution);
-    if (upscaled) add("Drawn at", `${item.width || "?"} × ${item.height || "?"}`);
+    if (upscaled) add("Drawn At", `${item.width || "?"} × ${item.height || "?"}`);
     if (settings.duration) add("Duration", `${settings.duration} Seconds`);
     if (item.type === "image") {
       const count = Number(settings.count || 0);
@@ -189,11 +195,17 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
       add("Frames", settings.frames);
       add("FPS", settings.fps);
     }
+    add("File", item.outputName || item.filename);
+    add("Generated", formatGeneratedAt(item.createdAt));
+    add("Type", item.type);
   });
+  // Rows read alphabetically; Timing keeps measured times before the estimates that split them.
+  for (const entry of sections) sortDetailRows(entry);
   section("Timing", (add) => {
     const timing = item.timing;
     const elapsed = (value?: number) => value !== undefined && Number.isFinite(value) && value >= 0 ? formatElapsed(value) : "";
     add("Active", elapsed(timing?.runMs));
+    add("Upscale", elapsed(timing?.upscaleMs));
     add("Queue", elapsed(timing?.queueMs));
     add("Total", item.durationMs ? formatElapsed(item.durationMs) : "");
     add("Setup (Est.)", elapsed(timing?.setupMs));
@@ -206,15 +218,11 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     const has = (test: (label: string) => boolean) => timingSection.rows.some(([label]) => test(label));
     timingSection.note = [
       has((label) => label === "Active") ? "Active is the worker’s run after queueing." : "",
+      has((label) => label === "Upscale") ? "Upscale runs after the picture is saved." : "",
       has((label) => label === "Total") ? "Total also counts queueing, transfer and finishing." : "",
       has((label) => label.endsWith("(Est.)")) ? "Est. rows are estimates." : "",
     ].filter(Boolean).join(" ");
   }
-  section("Output", (add) => {
-    add("Output", item.outputName || item.filename);
-    add("Generated", formatGeneratedAt(item.createdAt));
-    add("Type", item.type);
-  });
   return sections;
 }
 

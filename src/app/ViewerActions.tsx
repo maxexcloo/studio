@@ -31,7 +31,11 @@ export function PromptReadout({ label, text, onCopy, onUse }: {
   );
 }
 
-/** Copies the saved generation inputs, retaining IDs, zeroes, false values and nested reference settings. */
+/** Only what was set: no empty text, lists, objects or switched-off flags; numbers (seed 0 too) stay. */
+const isSet = (value: unknown): boolean => value !== undefined && value !== null && value !== false && value !== ''
+  && !(Array.isArray(value) && !value.length) && !(typeof value === 'object' && !Array.isArray(value) && !Object.keys(value as object).length);
+
+/** Copies the saved generation inputs that were set, with IDs, numbers and nested reference settings. */
 export function generationInputsText(item: GalleryItem) {
   const settings = Object.fromEntries(Object.entries(item.settings || {}).filter(([key]) => !/^(?:output|artifact|timing|preview|thumbnail)/i.test(key) && !['createdAt', 'durationMs', 'jobId', 'url', 'filename', 'status', 'progress'].includes(key)));
   const inputs = {
@@ -44,7 +48,7 @@ export function generationInputsText(item: GalleryItem) {
     ...(item.referenceImageName ? { startImageName: item.referenceImageName } : {}),
   };
   const labels: Record<string, string> = { seed: 'Seed', model: 'Model', kind: 'Kind', width: 'Width', height: 'Height', profileId: 'Profile ID', steps: 'Steps', cfg: 'CFG' };
-  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', ...Object.entries(inputs).filter(([, value]) => value !== undefined).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
+  return [item.prompt ? `Prompt: ${item.prompt}` : '', item.negative ? `Negative: ${item.negative}` : '', ...Object.entries(inputs).filter(([, value]) => isSet(value)).map(([key, value]) => `${labels[key] || key}: ${typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}`)].filter(Boolean).join('\n\n');
 }
 
 export function DetailsFooter({ onCopy, onRecreate }: { onCopy: () => Promise<boolean>; onRecreate?: () => void }) {

@@ -131,7 +131,7 @@ test('swipes move through previews and generation details stay accessible', asyn
     await expect.poll(() => canvas.evaluate((element) => element.style.getPropertyValue('--pan-x'))).toBe('0px');
   }
   await ui.showDetails();
-  await expect(page.getByRole('heading', { name: 'Generation', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(page.locator('details').filter({ hasText: 'Settings' })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

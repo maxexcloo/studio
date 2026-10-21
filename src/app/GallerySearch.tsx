@@ -19,7 +19,7 @@ export const filterLabel = (key: 'size' | 'aspect', value?: string) => (value ? 
  * One multi-select filter: its trigger shows how many values are picked, its
  * menu toggles values (any of them matches) and has its own Clear.
  */
-function GalleryFilterPicker({ name, label = name, values: picked, options: values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; label?: string; values: string[]; options: string[]; icon: typeof Boxes; onChange: (values: string[]) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
+export function GalleryFilterPicker({ name, label = name, values: picked, options: values, icon: Icon, onChange, floatingRef, labelFor = (option) => option, searchable = true }: { name: string; label?: string; values: string[]; options: string[]; icon: typeof Boxes; onChange: (values: string[]) => void; floatingRef: React.RefObject<HTMLDivElement | null>; labelFor?: (value: string) => string; searchable?: boolean }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [position, setPosition] = React.useState({ left: 0, top: 0, maxHeight: 280 });

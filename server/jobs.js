@@ -367,6 +367,8 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       // Finished: look for the images now rather than at the next poll.
       if (message.type === "execution_success" || (message.type === "executing" && (data.node === null || data.node === undefined))) {
         if (timing?.upscale?.startAt) timing.upscale.endAt ??= Date.now();
+        // Remembered as well as woken: a finish that lands mid-check must not wait out a full poll.
+        run.finished = true;
         run.wake?.();
       }
       // Stopped or failed while upscaling: runJob delivers the saved picture instead.
@@ -417,8 +419,13 @@ function learnFromFailure(body, message = "") {
   return `This checkpoint has no ${part} built in, so it now uses a separate one. Rescan models, pick one in Advanced (or download it), and generate again.`;
 }
 
-/** Waits before the next look at ComfyUI; a finished-run message on the socket ends the wait early. */
+/**
+ * Waits before the next look at ComfyUI; a finished-run message on the socket ends the wait early.
+ * Once the run has finished, history can lag the message by a moment, so it is checked again soon.
+ */
+export const FINISHED_POLL_MS = 150;
 async function pause(run, ms) {
+  if (run.finished) ms = Math.min(ms, FINISHED_POLL_MS);
   await new Promise((resolve) => {
     run.wake = resolve;
     setTimeout(resolve, ms).unref?.();
@@ -654,7 +661,10 @@ function recordTiming(id, body, timing) {
   if (!result) return;
   recordGeneration({ body, result, predicted: timing.estimate, warm: timing.warm });
   const slow = slowSteps(result, timing.estimate);
-  jobs.set(id, { ...jobs.get(id), timing: { ...completedTiming(timing.timer, body.startedAt, result), ...(slow ? { slow: true } : {}) } });
+  // Upscale runs in the same ComfyUI prompt after the picture is saved, so it is outside Active: kept on its own.
+  const up = timing.upscale;
+  const upscaleMs = up?.startAt && up?.endAt && up.endAt > up.startAt ? Math.round(up.endAt - up.startAt) : 0;
+  jobs.set(id, { ...jobs.get(id), timing: { ...completedTiming(timing.timer, body.startedAt, result), ...(upscaleMs ? { upscaleMs } : {}), ...(slow ? { slow: true } : {}) } });
 }
 
 function hashString(str = "") {

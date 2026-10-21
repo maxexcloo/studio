@@ -127,8 +127,8 @@ export function StatusPill({ message, className, children }: { message: ToastRec
  * each, scrolling when there are many).
  */
 function ConfirmPanel({ title, confirm }: { title: string; confirm: NonNullable<ToastRecord['confirm']> }) {
-  return <div className="status-pill-panel">
-    <strong>{title}</strong>
+  // The question is already the pill's words; the panel adds only what happens and what it acts on.
+  return <div className="status-pill-panel" aria-label={title}>
     {confirm.detail ? <p>{confirm.detail}</p> : null}
     {confirm.items?.length ? <ul className="status-pill-list" aria-label="Items">
       {confirm.items.map((item) => <li key={item.id}>

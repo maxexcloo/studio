@@ -135,7 +135,11 @@ both devices:
   plain news that arrives behind an Undo or a failure is dropped. A repeat of
   the same message folds into the one on screen and restarts its time, with
   no "×3"; only a count the words themselves say ("4 items deleted") grows.
-- **Confirmations ask inline** in the pill, never in a dialog (`useConfirmation`).
+- **Almost nothing asks first.** Reversible actions (delete with Undo, stop,
+  disable, restart, revoke) act at once; only what can't be undone (Reset All
+  Settings) asks. There is no Confirm Before Removing Things setting.
+- **Confirmations ask inline** in the pill, never in a dialog (`useConfirmation`), with
+  the question once and one line on what happens under it.
   Cancel takes the focus first. The pill is an `alertdialog` named by the
   question. Deleting several items lists them under the question, with the
   count in it ("Delete 6 Items?"), and Undo follows in the same pill.
@@ -283,7 +287,7 @@ holds:
 
 | Section | Holds | Who |
 | --- | --- | --- |
-| Account | Profile (name, email, password), MCP and Session (Sign Out) | Every account |
+| Account | Profile (name, email, password) and MCP | Every account |
 | Users | Accounts, Access Profiles (a picker with New, multi-selects, Save & Discard), Chat Gateway and Profiles (a JSON editor; an edited copy stops receiving repository updates) | Administrators |
 | Studio | General, Generation, Features (Upscale and Inpainting as plain rows), Gallery and Sharing | Everyone |
 | Models | Defaults, Catalogue (LoRAs, Cloud Models, Presets & Civitai Imports), LoRAs & Supporting Files and Integrations | Administrators |
@@ -298,8 +302,8 @@ Every row does something in the running deployment: rows for a local install
 devices) hide in account mode, and there are no upstream community, feedback
 or donation links. Settings use the flat list (see [Lists](#lists)), dense:
 44 px rows, a one-line description, one heading per group. **Sign Out** is in
-the desktop dock's Account menu and at the top of the phone's More, as well as
-Settings › Account; it asks first only while something is generating.
+the desktop dock's Account menu and at the top of the phone's More (not in
+Settings); it asks first only while something is generating.
 
 Gallery **Date Headers** ("Today", "This Evening") are a Studio › Gallery
 switch, off by default. Auto-Grouping, Grid Autoplay and Failed are not
@@ -410,19 +414,20 @@ phone) and one page at a time with its title and one line.
   Details is open closes it.
 - **Zoom:** a small `− 100% +` pill, bottom middle above the bar, faded until
   used; the percentage cycles Fit, 1:1 and Full Size. The same on both.
-- **Details:** Prompt and Negative each keep Copy beside their label. Prompt,
-  Model, Generation, Image/Video, Processing, Timing and Output share one
-  readable heading style; omit empty groups and the redundant Settings heading.
+- **Details:** Prompt and Negative each keep Copy beside their label. The
+  groups are Prompt, Model, Settings and Output (the picture's size, reference,
+  upscale and its file together), then Timing, in one readable heading style;
+  empty groups are left out. Rows within a group read alphabetically, except
+  Timing (measured times before the estimates).
   The one footer is Copy · Recreate. Copy includes generation inputs and saved
   settings, including IDs, seed and reference settings; output filenames,
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run
   after queueing) before Queue and Total (which also counts transfer and
   finishing), with one muted line saying so; split-up times keep "(Est.)".
-- **Image Text:** an on/off button in Details controls a short image summary
-  (profile, size and steps), remembered as a preference. It appears only while
-  Details is open; turning it off removes it. Keep it clear of the Details
-  controls and image actions.
+- **Image Text:** a short image summary (profile, size and steps) follows the
+  Details toggle: it shows while Details is open and never otherwise, with no
+  separate button. Keep it clear of the Details controls and image actions.
 - **LoRA information:** an enabled LoRA automatically shows its filename,
   compatibility, suggested strength, description, notes and triggers inside a
   shared information panel. Turning it off hides the panel and filename at

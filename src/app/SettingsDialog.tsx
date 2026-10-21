@@ -277,7 +277,6 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
         {section === 'studio' ? (
           <>
             <Group title="General">
-              <SwitchRow label={preferenceLabels.confirmActions} description="Asks before deleting or stopping something. Permanent deletes always ask." checked={prefs.confirmActions} onChange={(next) => setPrefs({ confirmActions: next })} />
               <SwitchRow label="Enter to Generate" description="Press Enter to generate and Shift+Enter for a new line." checked={prefs.enterToGenerate} onChange={(next) => setPrefs({ enterToGenerate: next })} />
               {phoneDevice ? null : <ShortcutsDrawer />}
             </Group>

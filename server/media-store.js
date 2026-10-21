@@ -106,10 +106,11 @@ export async function ingestRunResults(results, ownerId = "") {
       return output;
     }
   };
-  const moved = [];
-  for (const result of results) {
-    moved.push({ ...result, output: await move(result.output), ...(result.upscale ? { upscale: await move(result.upscale) } : {}) });
-  }
+  // Every picture and upscale comes across at once rather than one after another.
+  const moved = await Promise.all(results.map(async (result) => {
+    const [output, upscale] = await Promise.all([move(result.output), result.upscale ? move(result.upscale) : null]);
+    return { ...result, output, ...(result.upscale ? { upscale } : {}) };
+  }));
   return { results: moved, comfyFiles };
 }
 

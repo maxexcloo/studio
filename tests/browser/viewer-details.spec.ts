@@ -46,12 +46,14 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   await copy.getByRole('button', { name: 'Copy', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(item.prompt);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('Seed: 123');
+  // Only what was set: zero numbers stay, switched-off flags and absent inputs don't.
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('guidance: 0');
+  for (const unset of ['autoResizeInputs', 'startImageId', 'Negative:']) expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain(unset);
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   for (const output of ['forbidden-output.png', 'outputWidth', 'Timing', 'Queue:', 'Active:', 'Generated:', 'Output:', '2026-01-01']) expect(copied).not.toContain(output);
   for (const input of ['Profile ID: mock-flux-schnell', 'autoResizeInputs: false', 'guidance: 0', 'workflow-input.json', 'input-reference']) expect(copied).toContain(input);
   await expect(side.getByRole('button', { name: 'Copy Settings', exact: true })).toHaveCount(0);
   await expect(side.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
-  await expect(side.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(0);
   // On the phone Info closes Details: one close, and the bar doesn't repeat the footer.
   if (phone) {
     await expect(side.getByRole('button', { name: 'Close Details', exact: true })).toHaveCount(0);
@@ -65,7 +67,12 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
   }
   // Measured times are explained, and estimates stay marked as estimates.
   await expect(settings.getByText('Active is the worker’s run after queueing. Total also counts queueing, transfer and finishing. Est. rows are estimates.', { exact: true })).toBeVisible();
-  await expect(settings.getByRole('heading', { name: 'Settings', exact: true })).toHaveCount(0);
+  // Prompt, Model, Settings and Output (the picture and its file together), then Timing; rows read alphabetically.
+  expect(await settings.locator('.detail-heading').allInnerTexts()).toEqual(['Model', 'Settings', 'Output', 'Timing']);
+  const output = settings.locator('.detail-section').filter({ has: page.getByRole('heading', { name: 'Output', exact: true }) });
+  const labels = (await output.locator('.detail-grid > :nth-child(odd)').allInnerTexts()).map((label) => label.trim());
+  expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+  expect(labels).toEqual(expect.arrayContaining(['File', 'Generated', 'Size', 'Type']));
   expect(await side.locator('.detail-settings').evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('0px');
   await prompt.getByRole('button', { name: 'Copy Prompt', exact: true }).click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(item.prompt);
@@ -108,7 +115,7 @@ test('LoRA Details includes its information and both Civitai hosts', async ({ pa
 });
 
 
-test('image text is concise, optional and appears only while Details is open', async ({ page }) => {
+test('image text is concise and follows the Details toggle', async ({ page }) => {
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: [item], revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
   await page.goto('/');
@@ -116,13 +123,11 @@ test('image text is concise, optional and appears only while Details is open', a
   await ui.hideDetails();
   await expect(viewer.locator('.viewer-profile-summary')).toHaveCount(0);
   await ui.showDetails();
-  const toggle = viewer.getByRole('button', { name: 'Image Text', exact: true });
+  await expect(viewer.getByRole('button', { name: 'Image Text', exact: true })).toHaveCount(0);
   const summary = viewer.locator('.viewer-profile-summary');
   await expect(summary).toBeVisible();
   await expect(summary).toContainText('512 × 512 · 4 Steps');
   await expect(summary).not.toContainText('CFG');
   await expect(summary).not.toContainText('Seed');
-  await toggle.click(); await expect(summary).toHaveCount(0);
-  await toggle.click(); await expect(summary).toBeVisible();
   await ui.hideDetails(); await expect(summary).toHaveCount(0);
 });

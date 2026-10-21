@@ -1,6 +1,7 @@
 import "./app/domGuard";
 import { withReferenceChains } from "../server/reference-chains.js";
 import { sameLoraFamily } from "../server/lora-policy.js";
+import { isQueuedItem } from "./app/GalleryViewControls";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MotionConfig } from "framer-motion";
@@ -197,7 +198,9 @@ function App() {
   // Moments and runs: a way of looking at the gallery, worked out from what is
   // loaded (runs.js). Runs stack only when asked, and never in search results.
   const stackRuns = Boolean(prefs.stackRuns) && !searchActive(gallerySearch);
-  const foundGroups = useGalleryGroups(visibleGallery, { runs: stackRuns });
+  // The Status filter's Hide Queued: only the gallery view drops them; running counts and Stop All still see them.
+  const shownGallery = useMemo(() => prefs.hideQueuedItems ? visibleGallery.filter((item) => !isQueuedItem(item)) : visibleGallery, [visibleGallery, prefs.hideQueuedItems]);
+  const foundGroups = useGalleryGroups(shownGallery, { runs: stackRuns });
   const { groups: keptGroups, unstack } = useUnstackedRuns(foundGroups);
   // Runs settle rather than snap: a run being worked on stays plain tiles, and
   // folds once it's been quiet and is off screen (useRunSettling).
@@ -225,7 +228,7 @@ function App() {
   }, [unstack]); // eslint-disable-line react-hooks/exhaustive-deps
   // The viewer steps through the gallery as it is laid out: a stacked run's
   // takes one after another where the stack stands, not wherever they fell in time.
-  const viewerGallery = useMemo(() => viewerOrder(visibleGallery, stackRuns ? galleryGroups : null, openRuns), [visibleGallery, stackRuns, galleryGroups, openRuns]);
+  const viewerGallery = useMemo(() => viewerOrder(shownGallery, stackRuns ? galleryGroups : null, openRuns), [shownGallery, stackRuns, galleryGroups, openRuns]);
 
   // Chrome on Windows can hand playing videos to a hardware layer that frosted
   // glass can't blur, so the glass over the video gallery shows it through.
@@ -612,7 +615,8 @@ function App() {
       showToast("Couldn’t save settings", "error");
     }
   }
-  const { confirmAction, confirmationDialog } = useConfirmation(prefs.confirmActions);
+  // Only what can't be undone asks first (UI-PATTERNS › Messages); everything else acts at once.
+  const { confirmAction, confirmationDialog } = useConfirmation(false);
 
   const { upscaleStatus, upscaleUnavailableReason, upscaleSetup, upscaleInstall, upscaleBusyIds, refreshUpscaleStatus, cancelUpscaleInstall, activateUpscale, toggleUpscale, cancelUpscale, chooseAutoUpscale } = useUpscale({
     gallery,
