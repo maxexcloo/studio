@@ -748,8 +748,12 @@ function modelsForAccount(models, req) {
 /** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
 function withLibrary(models, req) {
   if (!models?.features) return models;
-  return { ...models, features: { ...models.features, library: canAdmin(req) } };
+  const library = canAdmin(req);
+  // Update Available puts a dot on the Library's dock icon.
+  const updates = library ? libraryUpdates?.summary().available || 0 : 0;
+  return { ...models, features: { ...models.features, library, ...(updates ? { libraryUpdates: updates } : {}) } };
 }
+let libraryUpdates = null;
 
 function accountMayUseLoras(req) {
   return !req.studioAccount || mayUseFeature(req.studioAccount, "loras");
@@ -814,13 +818,37 @@ const presetRoutes = registerPresetRoutes(app, { models: async () => {
 } });
 // The Library (library-routes.js): imports, their records and grades, and what is installed with its provenance.
 const unique = (...lists) => [...new Set(lists.flat().filter((name) => typeof name === "string" && name))];
-registerLibraryRoutes(app, {
+const presetModels = async () => {
+  const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
+  return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
+};
+/** What still uses a model file, so an update removes the old one only when nothing does (Decision 4). */
+async function modelFileReferences({ file }) {
+  if (!file) return [];
+  const users = [];
+  const quoted = JSON.stringify(file);
+  try {
+    for (const name of await fs.promises.readdir(userWorkflowsDir)) {
+      if (!name.endsWith(".json") || name.startsWith(".")) continue;
+      const text = await fs.promises.readFile(path.join(userWorkflowsDir, name), "utf8").catch(() => "");
+      if (text.includes(quoted)) users.push(`the ${name.replace(/\.json$/, "")} profile`);
+    }
+  } catch { /* No profile folder. */ }
+  for (const profile of (await presetModels().catch(() => ({ profiles: [] }))).profiles || []) {
+    if ([profile.defaults?.model, profile.model, profile.baseModel].includes(file) && !users.includes(`the ${profile.id} profile`)) users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
+  }
+  const stacks = [path.join(dataDir, "lora-stacks.json")];
+  try { for (const owner of await fs.promises.readdir(path.join(dataDir, "accounts"))) stacks.push(path.join(dataDir, "accounts", owner, "lora-stacks.json")); } catch { /* Single-user. */ }
+  let saved = 0;
+  for (const stack of stacks) if ((await fs.promises.readFile(stack, "utf8").catch(() => "")).includes(quoted)) saved += 1;
+  if (saved) users.push(saved === 1 ? "a saved LoRA stack" : `${saved} saved LoRA stacks`);
+  return users;
+}
+const library = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
   draftProfile: (record, options) => draftCheckpointProfile(record, options),
-  // Lookup says which ready profiles a link's base model fits.
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-  profiles: async () => ((await mediaModels(false)).models.profiles || []).filter((profile) => profile.ready !== false).map(({ id, family }) => ({ id, family })),
   loraInfo: (names) => lorasEnabled ? loraInfos(names) : Promise.resolve({}),
   installed: async () => {
     const { info } = await loadComfyContext();
@@ -832,8 +860,18 @@ registerLibraryRoutes(app, {
       vae: optionsFor(info, "VAELoader", "vae_name"),
       clip_vision: optionsFor(info, "CLIPVisionLoader", "clip_name")
     };
-  }
+  },
+  // Lookup says which ready profiles a link's base model fits.
+  readyProfiles: async () => ((await mediaModels(false)).models.profiles || []).filter((profile) => profile.ready !== false).map(({ id, family }) => ({ id, family })),
+  profiles: async () => ((await presetModels()).profiles || []).map((profile) => ({ id: profile.id, label: profile.displayName || profile.label || profile.id, kind: profile.kind, family: profile.family || "", familyName: profile.familyName || "", model: profile.defaults?.model || profile.model || "" })),
+  familiesOf: (name) => familiesFromMetadata({ base_model: String(name || "") }),
+  gguf: async () => Boolean((await loadComfyContext()).info?.UnetLoaderGGUF),
+  // The assistant registers below; the Library asks for it only when describing an image.
+  assistant: () => assistantEngine,
+  references: modelFileReferences,
+  schedule: !demoMode
 });
+libraryUpdates = library.updates;
 
 app.get("/api/paths", async (req, res) => {
   if (req.studioAccount && req.studioAccount.role !== 'administrator') return res.status(403).json({ ok: false, error: 'Administrator access is required.' });

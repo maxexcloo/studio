@@ -10,6 +10,7 @@ import { civitaiLink, versionResource } from './civitai-import.js';
 import { catalogueKinds } from './library-catalogue.js';
 import { hfFetch } from './hf-access.js';
 import { civitaiAvailability } from './library-availability.js';
+import { civitaiOffers, hfOffers } from './library-offers.js';
 
 export { civitaiAvailability };
 
@@ -57,9 +58,11 @@ const roleOf = (folder) => catalogueKinds[folder] || 'model';
 
 /**
  * A Civitai model or version link: the version's primary file as one resource, the catalogue
- * patch for a LoRA, and a free version to suggest when this one is paid or in early access.
+ * patch for a LoRA, a free version to suggest when this one is paid or in early access, and the
+ * model's other versions and files that fit (library-offers.js). `familiesOf(baseModel)` gives
+ * family ids; `gguf` says whether the worker has the GGUF loader.
  */
-export async function resolveCivitaiModel(value, { json = civitaiJson, now = Date.now() } = {}) {
+export async function resolveCivitaiModel(value, { json = civitaiJson, now = Date.now(), familiesOf = () => [], gguf = false } = {}) {
   const { id, versionId } = civitaiLink(value, 'models');
   const model = await json(`models/${id}`);
   if (!model || Number(model.id) !== id) throw new Error('That Civitai model is unavailable.');
@@ -101,6 +104,7 @@ export async function resolveCivitaiModel(value, { json = civitaiJson, now = Dat
     links: civitaiLinks(id, version.id),
     // A checkpoint's page, for its drafted profile and guide (profile-drafts.js).
     sourceText: folder === 'loras' ? '' : [plainDescription(model.description), plainDescription(version.description), resource.trainedWords?.length ? `Trigger words: ${resource.trainedWords.join(', ')}` : ''].filter(Boolean).join('\n\n').slice(0, 12000),
+    offers: civitaiOffers({ model, version, familiesOf, gguf, now }),
     resources: [{
       role: roleOf(folder), name: String(model.name || resource.name), version: resource.version,
       want: { file: resource.file, folder, sha256: resource.sha256, bytes: resource.bytes, source: { provider: 'civitai', modelId: id, versionId: version.id, ...(file?.id ? { fileId: file.id } : {}), url: civitaiLinks(id, version.id).civitaiCom } },
@@ -143,7 +147,7 @@ export function parseHfLink(value) {
  * A Hugging Face file link imports that file; a repository (or folder) link lists its SafeTensors
  * and GGUF files, each optional unless there is only one. Gated repositories use the saved token.
  */
-export async function resolveHuggingFace(value, { request = hfFetch } = {}) {
+export async function resolveHuggingFace(value, { request = hfFetch, gguf = false } = {}) {
   const link = parseHfLink(value);
   const { owner, repo } = link;
   const response = await request(`https://huggingface.co/api/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/revision/${encodeURIComponent(link.revision)}?blobs=true`, { signal: AbortSignal.timeout(30000) });
@@ -179,6 +183,8 @@ export async function resolveHuggingFace(value, { request = hfFetch } = {}) {
       ...(spec ? {} : { unavailable: { reason: 'no-checksum', note: 'Hugging Face publishes no SHA-256 for this file.' } })
     };
   });
+  // A file link offers the same model's other precisions and formats from the repository.
+  const offers = link.filePath && resources[0] ? hfOffers({ siblings, chosenPath: link.filePath, repo: `${owner}/${repo}`, revision: metadata.sha, folder: resources[0].want.folder, gguf }) : [];
   const instance = typeof card.instance_prompt === 'string' ? card.instance_prompt.split(',').map((word) => word.trim()).filter(Boolean).slice(0, 6) : [];
   return {
     title: `${owner}/${repo}`, version: metadata.sha.slice(0, 7), baseModel, type: resources.length === 1 ? resources[0].role : 'repository', nsfw,
@@ -186,6 +192,7 @@ export async function resolveHuggingFace(value, { request = hfFetch } = {}) {
     links: { hf: link.filePath ? `${repoUrl}/blob/${metadata.sha}/${link.filePath}` : repoUrl },
     gated: Boolean(metadata.gated),
     resources,
+    offers,
     /** A LoRA file's catalogue patch, built per resource when it is written. */
     entryFor: (resource) => resource.want.folder !== 'loras' ? null : {
       title: `${repo}${resources.length > 1 ? ` · ${resource.want.file}` : ''}`.slice(0, 300),
