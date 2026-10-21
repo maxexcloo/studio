@@ -284,9 +284,9 @@ button.activity-main { cursor: pointer; }
   touch-action: pan-y;
   -webkit-font-smoothing: antialiased;
 }
-.status-pill.is-success { --tone: hsl(145 70% 48%); --tone-soft: hsl(145 70% 48% / .16); }
+.status-pill.is-success { --tone: hsl(var(--status-ready)); --tone-soft: hsl(var(--status-ready) / .16); }
 .status-pill.is-warning { --tone: var(--accent-amber); --tone-soft: var(--accent-amber-subtle); }
-.status-pill.is-error { --tone: hsl(0 74% 58%); --tone-soft: hsl(0 74% 58% / .16); }
+.status-pill.is-error { --tone: hsl(var(--status-offline)); --tone-soft: hsl(var(--status-offline) / .16); }
 .status-pill.is-removed { --tone: rgb(255 255 255 / .5); --tone-soft: rgb(255 255 255 / .06); }
 .status-pill-body { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .status-pill-light { flex: none; width: 10px; height: 10px; border-radius: var(--r-pill); background: var(--tone); box-shadow: 0 0 0 4px var(--tone-soft); }
@@ -341,7 +341,7 @@ button.activity-main { cursor: pointer; }
 .status-pill-text.is-question { flex: 1 1 auto; min-width: 72px; }
 .status-pill-action.is-cancel { background: transparent; }
 .status-pill-action.is-cancel:hover { background: var(--control-hover); }
-.status-pill-action.is-danger { background: hsl(0 74% 58% / .9); color: #fff; }
+.status-pill-action.is-danger { background: hsl(var(--status-offline) / .9); color: #fff; }
 .status-pill-action.is-danger:hover { background: hsl(0 74% 52%); }
 .status-pill-action.is-primary { background: hsl(var(--foreground)); color: hsl(var(--background)); }
 .status-pill-panel {

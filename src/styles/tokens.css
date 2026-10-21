@@ -44,6 +44,11 @@
   --danger-ink: #ffc4b9;
   --danger-fill: rgb(255 120 100 / .14);
   --danger-ring: rgb(255 120 100 / .24);
+  /* The connection light's states (HSL channels, so a glow can add alpha): ready, waiting, offline, busy. */
+  --status-ready: 145 70% 48%;
+  --status-waiting: 45 90% 58%;
+  --status-offline: 0 74% 58%;
+  --status-busy: 38 92% 60%;
 
   /* A press never moves anything: the control's fill darkens (a light overlay
      on dark controls, a dark one on light controls; media dims). */
