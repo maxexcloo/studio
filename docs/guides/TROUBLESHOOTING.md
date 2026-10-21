@@ -127,7 +127,7 @@ The link in this version is out of date (HTTP 404). Deploy a newer Studio image.
 
 ### A download needs a Hugging Face sign-in
 
-Some models need a sign-in and an accepted licence first (HTTP 401 or 403). Accept it on the page that opens. Then either save a Hugging Face token in **Settings › Models** and download again, or download the file in the browser, put it in the named ComfyUI folder, and use **Rescan** in Settings › Models.
+Some models need a sign-in and an accepted licence first (HTTP 401 or 403). Accept it on the page that opens. Then either have the deployment set `HF_TOKEN` in Studio's environment, restart and download again, or download the file in the browser, put it in the named ComfyUI folder, and use **Rescan** in Settings › Models.
 
 ### ComfyUI-Manager blocks a node pack install
 
@@ -152,7 +152,18 @@ The first time a new version starts, it saves a copy of the settings, the galler
 
 ## Phones and other devices
 
-### A phone can't open the studio
+### A phone or another computer can't sign in
+
+In account mode every device signs in with its own account, the same way as on a computer.
+
+1. Open the address the deployment publishes (its proxy's name, listed in `STUDIO_ALLOWED_HOSTS`). Another name is turned away before the sign-in page.
+2. Sign in with the account's email and password, or with single sign-on. A single sign-on account that is still waiting for approval can't open the studio until an administrator approves it in **Settings › Users**.
+3. After too many wrong passwords, Studio asks you to wait (up to 15 minutes) before the next try.
+4. Signed out on every device at once? Changing the password in **Settings › Account** ends your other sessions, and disabling an account ends all of them.
+
+### A phone can't open a single-user studio (LAN mode)
+
+Only without accounts (`STUDIO_MULTI_USER` unset), for a studio on your own computer.
 
 1. Turn on **Settings › Workers › Other devices** and restart Studio.
 2. Use one of the addresses Settings shows. The phone must be on the same network.

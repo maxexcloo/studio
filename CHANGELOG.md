@@ -16,6 +16,7 @@ version opens with a `> ` summary line.
 
 ### Changed
 - **Server:** the exit record finds the data folder through the shared helper the rest of the server uses; trash batches, download resume notes, the SeedVR2 validation cache, Studio imports and the exit record are written with the server's crash-safe JSON write.
+- **Docs:** Security and Troubleshooting describe account mode first; LAN mode and the studio password are described only for a single-user studio.
 
 ## [0.43.0] - 2026-10-21
 
