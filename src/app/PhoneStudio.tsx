@@ -10,6 +10,8 @@ import { recipesFor } from './modelRecipes';
 import { modelName } from './catalogueNames';
 import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useMotionTween } from '@/lib/springs';
+import { popoverMotion, useSettling } from './composerSurface';
 import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, ListRestart, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, Trash2, UserRound, Wand2, X, Images } from 'lucide-react';
 import { cn, aspectIconStyle } from './format';
 import { NumberPicker } from './components';
@@ -279,6 +281,7 @@ function ToolButton({ label, Icon, count, open, onClick }: { label: string; Icon
 /* ------------------------------------------------------------ Create */
 
 function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }: { view: Record<string, any>; open: boolean; onClose: () => void; canUseNegativePrompt: boolean; comfyOffline: boolean }) {
+  const heightTween = useMotionTween();
   const {
     prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
     aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
@@ -380,7 +383,7 @@ function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }
           {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
           <AnimatePresence initial={false}>
             {referenceRole ? (
-              <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
+              <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={heightTween}>
                 <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What This Image Is">
                   <i aria-hidden="true" />
                   {(['edit', 'reference'] as const).map((value) => (
@@ -458,7 +461,7 @@ function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicke
       <div className="phone-model-tools">
         {recipes.length ? <ListItem label="Recipe"><ListSelect native label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
         {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" search={<label className="picker-search">
-            <Search size={15} aria-hidden="true" />
+            <Search size={16} aria-hidden="true" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
             {query ? <button type="button" aria-label="Clear Model Search" onClick={() => setQuery('')}><X size={14} /></button> : null}
           </label>}>
@@ -572,13 +575,14 @@ function PhoneSavedSize({ saved, active, editing, pressHandlers, onPick, onRenam
     onRename(name);
   };
   const ratio = ratioName(saved.width, saved.height);
+  const heightTween = useMotionTween();
   return (
     <motion.div
       className="phone-size-saved"
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: 'auto', opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+      transition={heightTween}
     >
       <div className={cn('phone-row phone-size-row is-saved', active && 'is-current', editing && 'is-editing')} {...(editing ? {} : pressHandlers)}>
         {editing ? null : <button type="button" className="phone-size-hit" role="option" aria-selected={active} aria-label={`${saved.name}, ${ratio}, ${saved.width} × ${saved.height}`} onClick={onPick} />}
@@ -636,13 +640,12 @@ function PhoneMenu({ open, onClose, trigger, label, items, align = 'right' }: { 
   }, [open, onClose]);
   const [left] = React.useState(() => 0);
   const anchorLeft = open && align === 'left' ? Math.max(8, (opener.current?.getBoundingClientRect().left || 8) - 4) : left;
-  const reduced = useReducedMotion();
+  const settling = useSettling();
   return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div ref={menuRef} key="menu" className={cn('phone-menu', align === 'left' && 'is-left')} style={align === 'left' ? { left: anchorLeft, right: 'auto' } : undefined} role="menu" aria-label={label}
-          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: -4 }}
-          transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}>
+          {...popoverMotion} {...settling}>
           {items.map((item, index) => item === 'divider'
             ? <i key={`divider-${index}`} className="phone-menu-divider" aria-hidden="true" />
             : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} aria-label={item.count ? `${item.label} (${item.count})` : undefined} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span>{item.count ? <i className="phone-menu-count">{item.count}</i> : null}</button>)}

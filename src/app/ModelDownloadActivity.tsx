@@ -91,10 +91,10 @@ export function useModelDownloadActivity({ onDone, hidden, onOpen }: { onDone: (
   // One key for Pause and Resume: the same button changes, so keyboard focus stays on it.
   const controls: ActivityControl[] | undefined = mode === 'downloading' ? [
     ...(active?.verifying ? [] : [{ key: 'toggle', icon: <Pause size={14} fill="currentColor" strokeWidth={0} />, tip: queued ? 'Pause All' : 'Pause', label: queued ? `Pause All ${queued + 1} Downloads` : `Pause ${label}`, run: guard(islandActions.pauseAll) }]),
-    { key: 'cancel', icon: <X size={15} />, tone: 'danger', tip: 'Cancel', label: `Cancel ${label}`, run: guard(() => islandActions.cancel([active!])) }
+    { key: 'cancel', icon: <X size={16} />, tone: 'danger', tip: 'Cancel', label: `Cancel ${label}`, run: guard(() => islandActions.cancel([active!])) }
   ] : mode === 'paused' ? [
     { key: 'toggle', icon: <Play size={14} fill="currentColor" strokeWidth={0} />, tip: held.length > 1 ? 'Resume All' : 'Resume', label: held.length > 1 ? `Resume All ${held.length} Downloads` : `Resume ${label}`, run: guard(islandActions.resumeAll) },
-    { key: 'cancel', icon: <X size={15} />, tone: 'danger', tip: held.length > 1 ? 'Cancel All' : 'Cancel', label: held.length > 1 ? `Cancel All ${held.length} Downloads` : `Cancel ${label}`, run: guard(() => islandActions.cancel(held)) }
+    { key: 'cancel', icon: <X size={16} />, tone: 'danger', tip: held.length > 1 ? 'Cancel All' : 'Cancel', label: held.length > 1 ? `Cancel All ${held.length} Downloads` : `Cancel ${label}`, run: guard(() => islandActions.cancel(held)) }
   ] : undefined;
 
   const place = shown ? placeOf(shown) : null;

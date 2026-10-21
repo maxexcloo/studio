@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { springs } from '@/lib/springs';
+import { tweens } from '@/lib/springs';
+import { popoverMotion, useSettling } from './composerSurface';
 import { AlertTriangle, CheckSquare, X } from 'lucide-react';
 import { GallerySelectionContext, type GallerySelection } from './gallerySelection';
 import { bulkItemActions, useItemActionHandlers, useItemActions, type ItemAction } from './itemActions';
@@ -20,6 +21,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   tools?: React.ReactNode;
 }) {
   const reducedMotion = useReducedMotion();
+  const menuSettling = useSettling();
   const [menu, setMenu] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuOpener = useRef<HTMLElement | null>(null);
@@ -38,7 +40,8 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
     if (!menu) return;
     const root = menuRef.current;
     if (root) {
-      const bounds = root.getBoundingClientRect();
+      // Layout sizes: the entry's scale must not shrink what is measured.
+      const bounds = { width: root.offsetWidth, height: root.offsetHeight };
       root.style.left = `${Math.max(8, Math.min(menu.x, window.innerWidth - bounds.width - 8))}px`;
       root.style.top = `${Math.max(8, Math.min(menu.y, window.innerHeight - bounds.height - 8))}px`;
       root.querySelector<HTMLElement>('button:not(:disabled)')?.focus({ preventScroll: true });
@@ -101,7 +104,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   return <GallerySelectionContext.Provider value={menuSelection}>
     {showToolbar ? <header className="gallery-toolbar">{search}{modeSelector}<div className="gallery-toolbar-actions">{status}{tools}<div className={selecting ? "gallery-management is-selecting" : "gallery-management"} role="group" aria-label="Gallery Management">
       <button type="button" className="gallery-select-toggle" aria-label={selecting ? 'Stop Selecting' : 'Select'} aria-expanded={selecting} title="Ctrl/Cmd-Click to Select; Shift-Click to Select a Range" onClick={() => selecting ? selection.end() : selection.start()}>{selecting ? <X size={16} /> : <CheckSquare size={16} />}<span role={selecting ? 'status' : undefined}>{selecting ? `${selected.length} Selected` : 'Select'}</span></button>
-      <AnimatePresence initial={false}>{selecting ? <motion.div className="gallery-selection-actions" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+      <AnimatePresence initial={false}>{selecting ? <motion.div className="gallery-selection-actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
         <button type="button" title={selection.allSelected ? 'Select None' : 'Select All Loaded'} aria-label={selection.allSelected ? 'Select None' : 'Select All'} onClick={selection.toggleAll}><CheckSquare size={16} />{selection.allSelected ? 'Select None' : 'Select All'}</button>
         {selection.failedCount ? <button type="button" title="Select Failed" aria-label="Select Failed" onClick={selection.selectFailed}><AlertTriangle size={16} />Select Failed</button> : null}
         <span className="gallery-selection-divider" aria-hidden="true" />
@@ -109,7 +112,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
       </motion.div> : null}</AnimatePresence>
     </div></div></header> : null}
     {children}
-    {menu ? createPortal(<div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y }} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
+    {menu ? createPortal(<motion.div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y, transformOrigin: 'top left' }} initial={popoverMotion.initial} animate={popoverMotion.animate} {...menuSettling} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
@@ -119,6 +122,6 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
     }}>
       {single ? null : <p className="gallery-menu-title" aria-hidden="true">{targets.length} Selected</p>}
       {(single ? singleActions : bulkActions).map((action, index, list) => actionButton(action, true, startsGroup(list, index), !single))}
-    </div>, document.body) : null}
+    </motion.div>, document.body) : null}
   </GallerySelectionContext.Provider>;
 }

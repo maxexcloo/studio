@@ -77,7 +77,7 @@ function SetupSteps({ step }: { step: Step }) {
         const state = step === 'ready' || index < current ? 'done' : index === current ? 'active' : 'todo';
         return (
           <li key={item.id} className={`is-${state}`} aria-current={state === 'active' ? 'step' : undefined}>
-            <i aria-hidden="true">{state === 'done' ? <Check size={10} strokeWidth={3} /> : null}</i>
+            <i aria-hidden="true">{state === 'done' ? <Check size={10} strokeWidth={2.5} /> : null}</i>
             <span>{item.label}</span>
           </li>
         );
@@ -220,7 +220,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
 
   let body: React.ReactNode = null;
   let footer: React.ReactNode = <button className="btn is-ghost" onClick={close}>Not Now</button>;
-  const recheck = <button className="btn" onClick={() => reload()}><RefreshCw size={13} /> Check Again</button>;
+  const recheck = <button className="btn" onClick={() => reload()}><RefreshCw size={14} /> Check Again</button>;
   const nextStep: Step = route === 'pack' || !parts.some((row) => !row.have) ? 'ready' : 'files';
 
   if (!plan) {
@@ -233,7 +233,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
     body = (
       <>
         <div className="family-setup-file">
-          <span className="family-setup-file-dot" aria-hidden="true"><Check size={11} strokeWidth={3} /></span>
+          <span className="family-setup-file-dot" aria-hidden="true"><Check size={11} strokeWidth={2.5} /></span>
           <div>
             <strong>{name}{plan.profile?.variant ? <em>{plan.profile.variant}</em> : null}</strong>
             <code>{plan.profile?.model}</code>
@@ -260,7 +260,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
             <span>The {pack.name} nodes are in, but this ComfyUI lacks the layer skip node they sample with. Version 0.38 or newer has it.</span>
           </div>
         ) : (
-          <p className="family-setup-ok family-setup-gap"><Check size={13} strokeWidth={2.6} aria-hidden="true" /> {route === 'native' ? `This ComfyUI runs ${title} on its own.` : `The ${pack?.name} nodes are in.`}</p>
+          <p className="family-setup-ok family-setup-gap"><Check size={14} strokeWidth={2.5} aria-hidden="true" /> {route === 'native' ? `This ComfyUI runs ${title} on its own.` : `The ${pack?.name} nodes are in.`}</p>
         )}
       </>
     );
@@ -296,7 +296,7 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
                   {state === 'downloading' || state === 'paused' ? <CellBar value={value} /> : <code>{row.have || row.download?.file}</code>}
                 </div>
                 <span>
-                  {done ? <><Check size={12} strokeWidth={3} /> {state === 'installed' ? 'In place' : 'Downloaded'}</>
+                  {done ? <><Check size={12} strokeWidth={2.5} /> {state === 'installed' ? 'In place' : 'Downloaded'}</>
                     : state === 'downloading' ? `${Math.floor(value * 100)}%`
                     : state === 'paused' ? 'Paused'
                     : state === 'error' ? 'Stopped'
@@ -315,10 +315,10 @@ export function FamilySetupDialog({ family, profileId, open, onOpenChange, showT
     );
     footer = (
       <>
-        <button className="btn is-ghost" onClick={() => setStep('comfy')}><ArrowLeft size={13} /> Back</button>
+        <button className="btn is-ghost" onClick={() => setStep('comfy')}><ArrowLeft size={14} /> Back</button>
         {moving.length ? (
           <>
-            <button className="btn" onClick={() => run(async () => { for (const row of moving) await pause(row.download!.id); })}><Pause size={13} /> Pause</button>
+            <button className="btn" onClick={() => run(async () => { for (const row of moving) await pause(row.download!.id); })}><Pause size={14} /> Pause</button>
             <button className="btn is-primary" onClick={close}>Continue in Background</button>
           </>
         ) : pending.length && admin && plan.local !== false ? (

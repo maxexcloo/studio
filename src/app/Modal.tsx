@@ -98,7 +98,7 @@ export function Modal({
               <SurfaceStatus active={open} />
               {headerActions ? <div className="modal-head-actions">{headerActions}</div> : null}
               {hideClose ? null : (
-                <Dialog.Close className="modal-close" aria-label="Close" disabled={busy}><X size={15} /></Dialog.Close>
+                <Dialog.Close className="modal-close" aria-label="Close" disabled={busy}><X size={16} /></Dialog.Close>
               )}
             </header>
             <div className={cn('modal-body', bodyClassName)}>{children}</div>

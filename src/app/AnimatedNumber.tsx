@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { cn } from './format';
 
 /**
@@ -34,10 +35,10 @@ export function AnimatedNumber({ value, className }: { value: string | number; c
             <motion.span
               key={`${index}-${character}`}
               className="animated-number-char"
-              initial={{ y: `${direction * 90}%`, opacity: 0, filter: 'blur(3px)' }}
-              animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-              exit={{ y: `${direction * -90}%`, opacity: 0, filter: 'blur(3px)' }}
-              transition={{ type: 'spring', duration: 0.32, bounce: 0 }}
+              initial={{ y: `${direction * 90}%`, opacity: 0 }}
+              animate={{ y: '0%', opacity: 1 }}
+              exit={{ y: `${direction * -90}%`, opacity: 0 }}
+              transition={tweens.base}
             >
               {character}
             </motion.span>

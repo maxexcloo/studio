@@ -243,7 +243,7 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       const item = document.querySelector<HTMLElement>(`.set-nav [data-section="${section}"]`);
       const nav = item?.parentElement;
       if (!item || !nav || nav.scrollWidth <= nav.clientWidth) return;
-      nav.scrollTo({ left: Math.max(0, item.offsetLeft - (nav.clientWidth - item.offsetWidth) / 2), behavior: 'smooth' });
+      nav.scrollTo({ left: Math.max(0, item.offsetLeft - (nav.clientWidth - item.offsetWidth) / 2), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     });
     return () => cancelAnimationFrame(frame);
   }, [open, section]);

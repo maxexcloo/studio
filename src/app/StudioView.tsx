@@ -1,4 +1,6 @@
 import { ViewerZoomControls } from './ViewerZoomControls';
+import { scrollBehavior } from "@/lib/springs";
+import { popoverMotion } from "./composerSurface";
 import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
@@ -340,8 +342,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       // The run's own tile, wherever it is; the top when it isn't rendered yet.
       window.requestAnimationFrame(() => {
         const tile = galleryStageRef.current?.querySelector(`[data-tile-id="${CSS.escape(String(item.id))}"]`);
-        if (tile) tile.scrollIntoView({ block: "center", behavior: "smooth" });
-        else galleryStageRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        if (tile) tile.scrollIntoView({ block: "center", behavior: scrollBehavior() });
+        else galleryStageRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() });
       });
     },
     onView: (item) => openItem(item)
@@ -388,7 +390,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   }, []);
   // One compact dock, bottom right, in both layouts. Transient actions (tidy up,
   // cancel queue) rise above it as small chips, so the dock never changes size.
-  const dockChip = { initial: { opacity: 0, y: 8, scale: 0.94 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: 6, scale: 0.96 }, transition: { type: "spring" as const, duration: 0.34, bounce: 0 } };
+  const dockChip = popoverMotion;
   const studioDockRef = React.useRef<HTMLDivElement>(null);
   React.useLayoutEffect(() => {
     const dock = studioDockRef.current;

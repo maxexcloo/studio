@@ -8,7 +8,7 @@ import type { GalleryItem } from './types';
 import { searchFilterKeys, type GallerySearch } from './favorites';
 import { SearchMark } from './SearchMark';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
-import { springs } from '@/lib/springs';
+import { tweens } from '@/lib/springs';
 import { EmptyState } from './EmptyState';
 
 const sizeLabels = new Map(gallerySizeBands.map((band) => [band.id, `${band.label} (${band.detail})`]));
@@ -83,7 +83,7 @@ export function GalleryFilterPicker({ name, label = name, values: picked, option
       {searchable ? <div className="gallery-filter-search"><Search size={14} /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={event => { setQuery(event.target.value.slice(0, 100)); if (list.current) list.current.scrollTop = 0; }} />{query ? <button type="button" aria-label="Clear Option Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
       <div id={id} ref={list} className="gallery-filter-options" role="listbox" aria-multiselectable="true" aria-label={`${name} Filter`}>{matches.map(option => {
         const on = picked.includes(option);
-        return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={3} /> : null}</span>{labelFor(option)}</button>;
+        return <button type="button" key={option} className={cn('aspect-option gallery-filter-option', on && 'active')} role="option" tabIndex={-1} aria-selected={on} onClick={() => toggle(option)}><span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={2.5} /> : null}</span>{labelFor(option)}</button>;
       })}{!matches.length ? <EmptyState title={query ? 'No Matches' : 'Nothing to Filter Yet'} compact /> : null}</div>
     </div>, document.body) : null}
   </>;
@@ -203,10 +203,10 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
   React.useEffect(() => {
     if (open) { inputRef.current?.focus({ preventScroll: true }); inputRef.current?.select(); }
   }, [open]);
-  return <motion.div ref={toolsRef} className={cn('gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={false} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
-    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+  return <motion.div ref={toolsRef} className={cn('gallery-search-tools', active && 'is-active')} style={{ '--gallery-filter-row-h': `${filterHeight}px` } as React.CSSProperties} role="search" data-open-surface aria-hidden={!present || undefined} inert={!present} initial={false} animate={{ opacity: 1 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
+    <motion.div className={cn('gallery-search', searchExpanded && 'is-expanded')} initial={false} animate={{ width: searchExpanded ? 220 : 48 }} transition={{ duration: 0 }}>
       <button type="button" className="gallery-search-trigger" aria-label="Search Gallery" aria-expanded={searchExpanded} title="Search" aria-controls={`${id}-query`} onClick={() => { setOpen(!open); if (queryActive) inputRef.current?.focus({ preventScroll: true }); }}><Search size={16} /></button>
-      <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+      <motion.div className="gallery-search-field" aria-hidden={!searchExpanded || !present} initial={false} animate={{ opacity: searchExpanded && present ? 1 : 0 }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
         <input id={`${id}-query`} ref={inputRef} value={search.q} disabled={!searchExpanded || !present} tabIndex={searchExpanded && present ? 0 : -1} onChange={(event) => setSearch({ ...search, q: event.target.value.slice(0, 200) })}
           onKeyDown={(event) => {
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!queryActive) setOpen(false); event.currentTarget.blur(); }
@@ -215,10 +215,10 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
       </motion.div>
       {searchExpanded ? <button type="button" className="gallery-query-close" aria-label="Clear Search" title="Clear Search & Close" onClick={() => { setSearch({ ...search, q: '' }); setOpen(false); }}><X size={14} /></button> : null}
     </motion.div>
-    <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+    <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')}>
       <button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" title="Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button>
       <AnimatePresence initial={false}>
-        {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : springs.moderate}>
+        {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
           <div className="gallery-filter-controls" ref={filterControlsRef}>
           <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} clearable />
           </div>
@@ -242,7 +242,7 @@ export function SearchEmpty({ search, onClear }: { search: GallerySearch; onClea
             ? 'Star an image and it shows up here.'
             : 'Search covers prompts, models and LoRAs. Try fewer words.'}</p>
           <div className="empty-actions">
-            <button type="button" className="reconnect-btn primary" onClick={onClear}><X size={13} /> {onlyStars ? 'Show Everything' : 'Clear Search'}</button>
+            <button type="button" className="reconnect-btn primary" onClick={onClear}><X size={14} /> {onlyStars ? 'Show Everything' : 'Clear Search'}</button>
           </div>
         </div>
       </div>
@@ -285,7 +285,7 @@ export function PhoneGalleryTools({ expanded, search, setSearch, onClose, items 
     return () => window.removeEventListener('keydown', onKey);
   }, [expanded, onClose]);
   return <AnimatePresence initial={false}>
-    {expanded ? <motion.div key="tools" ref={rowRef} className={cn('phone-tools-row', `is-${expanded}`)} role="search" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}>
+    {expanded ? <motion.div key="tools" ref={rowRef} className={cn('phone-tools-row', `is-${expanded}`)} role="search" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : tweens.base}>
       <div className="phone-tools-inner">
         {expanded === 'search' ? <label className="phone-tools-field">
           <Search size={17} aria-hidden="true" />

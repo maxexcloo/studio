@@ -1,4 +1,5 @@
 import { compatibilityNote, strengthRange as publishedStrengthRange } from '../../server/lora-policy';
+import { scrollBehavior } from '@/lib/springs';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -177,7 +178,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
   const controls = useDragControls();
   const label = loraName(item.name, info);
   return (
-    <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ scale: 1.02, zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
+    <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
       {count > 1 ? (
         <button
           type="button"
@@ -189,14 +190,14 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
             if (event.key === 'ArrowDown' && index < count - 1) { event.preventDefault(); onMove(index + 1); }
           }}
         >
-          <GripVertical size={13} />
+          <GripVertical size={14} />
         </button>
       ) : null}
       <div className="lora-card-top">
         <Tip content={`${item.name} · Click to Swap`}>
           <button type="button" className="lora-name" onClick={onSwap}>{label}</button>
         </Tip>
-        <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={13} /></button></Tip>
+        <Tip content="Remove"><button type="button" className="lora-remove" aria-label={`Remove ${label}`} onClick={onRemove}><X size={14} /></button></Tip>
         <Switch size="sm" label={item.enabled ? `Turn Off ${label}` : `Turn On ${label}`} checked={item.enabled} onChange={(enabled) => onChange({ enabled })} />
       </div>
       <StrengthControl label={label} info={info} value={item.strength} disabled={!item.enabled} onChange={(strength) => onChange({ strength })} />
@@ -307,7 +308,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
       const adding = !inlineSelection.items.some((item) => item.name === name);
       inlineSelection.toggle(name);
       // Bring the new strength controls into view once they have opened.
-      if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 260);
+      if (adding) window.setTimeout(() => listRef.current?.querySelector(`[data-lora-name="${CSS.escape(name)}"]`)?.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }), 260);
       return;
     }
     if (isAdded(name)) return;
@@ -347,7 +348,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (query) setQuery(''); else onClose(); }
           }}
         />
-        {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={13} /></button> : null}
+        {query ? <button type="button" aria-label="Clear Search" onClick={() => { setQuery(''); inputRef.current?.focus(); }}><X size={14} /></button> : null}
       </label>}>
         <div className="reference-tabs lora-library-tabs" role="group" aria-label="LoRA Model Filter">
           <button type="button" className={cn(view === 'model' && 'active')} aria-pressed={view === 'model'} onClick={() => setView('model')}>This Model</button>
@@ -384,7 +385,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     </button>
                     <LoraSources info={info} label={label} />
                     <LoraDetails info={info} label={label} enabled={Boolean(item && item.enabled !== false)} file={row.name} />
-                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={13} fill={favorite ? 'currentColor' : 'none'} /></button>
+                    <button type="button" className={cn('lora-option-star', favorite && 'active')} aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`} onClick={() => onToggleFavorite(row.name)}><Star size={14} fill={favorite ? 'currentColor' : 'none'} /></button>
                     {blocked(row.name) ? <p className="lora-library-note">{blockedNote(row.name)}</p> : policyNoteOf(row.name) ? <p className="lora-library-note">{policyNoteOf(row.name)}</p> : fitOf(row.name) === 'other' && baseOf(row.name) ? <p className="lora-library-note">Made for {baseOf(row.name)}</p> : null}
                     {/* A pick only gains its number where it stands (UI-PATTERNS › Pickers): strength and on/off are tuned in the Selected tab, so nothing below moves. */}
                     {item && reviewing ? <div className="lora-library-expansion"><div className="lora-library-settings">
@@ -412,7 +413,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                     onClick={() => choose(row.name)}
                   >
                     {libraryView ? <span className="lora-option-preview" aria-hidden="true"><Layers size={24} /></span> : null}
-                    {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={3} /> : null}</span> : null}
+                    {multi ? <span className="lora-option-check" aria-hidden="true">{checked || added ? <Check size={11} strokeWidth={2.5} /> : null}</span> : null}
                     <span className="lora-option-copy">
                       <strong>{nameOf(row.name)}</strong>
 
@@ -426,7 +427,7 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
                       aria-label={favorite ? `Remove ${nameOf(row.name)} from Favourites` : `Add ${nameOf(row.name)} to Favourites`}
                       onClick={(event) => { event.stopPropagation(); onToggleFavorite(row.name); }}
                     >
-                      <Star size={13} fill={favorite ? 'currentColor' : 'none'} />
+                      <Star size={14} fill={favorite ? 'currentColor' : 'none'} />
                     </button>
                   </div>
                 );
@@ -487,7 +488,7 @@ function NameField({ initial, action, onSave, onCancel }: { initial: string; act
         onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onCancel(); } }}
       />
       <button type="submit" className="lora-chip-action is-primary" disabled={!value.trim()}>{action}</button>
-      <button type="button" className="lora-chip-action" aria-label="Cancel" onClick={onCancel}><X size={13} /></button>
+      <button type="button" className="lora-chip-action" aria-label="Cancel" onClick={onCancel}><X size={14} /></button>
     </form>
   );
 }

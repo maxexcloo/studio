@@ -29,7 +29,7 @@ function Surface({ profiles, onPick, onClose }: { profiles: Profile[]; onPick: (
   const groups = modelGroups(profiles);
   const settling = useSettling();
   return createPortal(<motion.div ref={surface} className={cn('reference-popover reference-with', onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label="Reference With" aria-hidden={!present || undefined} inert={!present} data-open-surface {...popoverMotion} {...settling}>
-    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong>{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={15} /></button></header>
+    <header className="reference-popover-head"><ImagePlus size={16} /><strong>Reference With</strong>{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label="Close Reference With" onClick={close}><X size={16} /></button></header>
     <div className="reference-popover-body reference-with-body">
       {groups.map((group) => (
         <section key={group.id} className="reference-with-group" aria-label={group.label || undefined}>
@@ -57,7 +57,7 @@ export function ReferenceWithButton({ profiles, onPick }: ReferenceWithChoice) {
     <>
       <Tip content="Choose a Model That Takes a Reference Image">
         <button type="button" data-open-trigger className={cn('ref-chip ref-add reference-with-trigger', open && 'is-open')} aria-label="Reference With" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          <ImagePlus size={15} strokeWidth={2.2} />
+          <ImagePlus size={16} strokeWidth={2.2} />
           <span className="ref-add-label"><span>Reference With</span></span>
         </button>
       </Tip>

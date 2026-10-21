@@ -16,6 +16,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import { useShape } from "@/lib/shape-context";
+import { tweens } from "@/lib/springs";
 
 /** Any icon component that takes a size, like lucide-react's. */
 type IconComponent = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
@@ -131,9 +132,9 @@ const triggerVariants = cva(
   [
     "group inline-flex items-center justify-between gap-2 outline-none cursor-pointer",
     "text-[13px] h-9 px-3 min-w-[160px]",
-    "transition-all duration-80",
+    "transition-[background-color,border-color,color] duration-[var(--motion-fast)]",
     "disabled:opacity-50 disabled:pointer-events-none",
-    "focus-visible:ring-1 focus-visible:ring-[#6B97FF]",
+    "focus-visible:shadow-[var(--focus-ring)]",
   ],
   {
     variants: {
@@ -279,7 +280,6 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
     const selectCtx = useSelectContext();
     const contentCtx = useContext(SelectContentContext);
     const internalRef = useRef<HTMLDivElement>(null);
-    const shape = useShape();
     const hasMounted = useRef(false);
 
     useEffect(() => {
@@ -334,7 +334,7 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
           }
         }}
         className={cn(
-          `relative z-10 flex items-center gap-2 ${shape.item} px-2 py-2 text-[13px] cursor-pointer outline-none select-none`,
+          `relative z-10 flex items-center gap-2 rounded-[var(--r-item)] px-2 py-2 text-[13px] cursor-pointer outline-none select-none`,
           "transition-[color] duration-80",
           isActive || isChecked
             ? "text-foreground"
@@ -363,10 +363,10 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="shrink-0 text-foreground"
+              className="shrink-0 text-[var(--selected-ink)]"
               initial={{ opacity: 1 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 1 }}
@@ -376,11 +376,11 @@ const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
                 initial={{ pathLength: skipAnimation ? 1 : 0 }}
                 animate={{
                   pathLength: 1,
-                  transition: { duration: 0.08, ease: "easeOut" },
+                  transition: tweens.instant,
                 }}
                 exit={{
                   pathLength: 0,
-                  transition: { duration: 0.04, ease: "easeIn" },
+                  transition: { duration: 0 },
                 }}
               />
             </motion.svg>

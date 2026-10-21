@@ -165,7 +165,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                       <small>{item.detail}</small>
                     </span>
                     <span className="starter-version-memory">
-                      {item.installed ? <Check size={13} strokeWidth={2.6} aria-label="Installed" /> : <>{formatGB(item.memoryGB)}<small>to run</small></>}
+                      {item.installed ? <Check size={14} strokeWidth={2.5} aria-label="Installed" /> : <>{formatGB(item.memoryGB)}<small>to run</small></>}
                     </span>
                   </button>
                 ))}
@@ -195,7 +195,7 @@ export function StarterModels({ showToast, onStarted, onUse, compact = false }: 
                 ) : progress.state === 'error' ? (
                   <div className="starter-progress">
                     <p className="starter-error">{progress.error || 'The download stopped.'}</p>
-                    <button type="button" className="btn" onClick={() => get(family, version)}><RotateCw size={13} /> {progress.retryable ? 'Resume' : 'Try Again'}</button>
+                    <button type="button" className="btn" onClick={() => get(family, version)}><RotateCw size={14} /> {progress.retryable ? 'Resume' : 'Try Again'}</button>
                   </div>
                 ) : (
                   <button type="button" className="btn" onClick={() => get(family, version)}>

@@ -57,15 +57,15 @@ export function PromptField({ kind, value, onChange, onClear, onHistory, history
       style={fill ? undefined : { paddingRight: 72 }}
     />
     <div className="composer-field-tools">
-      {focus.focused ? <button type="button" className="prompt-action prompt-done" {...focus.keepFocus} onClick={focus.done}><Check size={15} aria-hidden="true" /><span>Done</span></button> : null}
+      {focus.focused ? <button type="button" className="prompt-action prompt-done" {...focus.keepFocus} onClick={focus.done}><Check size={16} aria-hidden="true" /><span>Done</span></button> : null}
       {selectAll ? <Tip content={selectAllLabel}>
-        <button type="button" className="prompt-action prompt-select-all" {...focus.keepFocus} aria-label={selectAllLabel} disabled={!value} onClick={() => { const node = field.current; if (!node) return; node.focus({ preventScroll: true }); node.setSelectionRange(0, node.value.length); }}><TextSelect size={15} aria-hidden="true" /></button>
+        <button type="button" className="prompt-action prompt-select-all" {...focus.keepFocus} aria-label={selectAllLabel} disabled={!value} onClick={() => { const node = field.current; if (!node) return; node.focus({ preventScroll: true }); node.setSelectionRange(0, node.value.length); }}><TextSelect size={16} aria-hidden="true" /></button>
       </Tip> : null}
       {<Tip content={historyLabel}>
-        <button type="button" data-history-trigger disabled={!historyAvailable} className={cn('prompt-action', historyOpen && 'active')} aria-label={historyLabel} aria-expanded={historyOpen} aria-haspopup="dialog" onClick={onHistory}><History size={15} aria-hidden="true" /></button>
+        <button type="button" data-history-trigger disabled={!historyAvailable} className={cn('prompt-action', historyOpen && 'active')} aria-label={historyLabel} aria-expanded={historyOpen} aria-haspopup="dialog" onClick={onHistory}><History size={16} aria-hidden="true" /></button>
       </Tip>}
       <Tip content={clearLabel}>
-        <button type="button" className="prompt-action prompt-clear" {...focus.keepFocus} aria-label={clearLabel} disabled={!value} onClick={onClear}><X size={15} aria-hidden="true" /></button>
+        <button type="button" className="prompt-action prompt-clear" {...focus.keepFocus} aria-label={clearLabel} disabled={!value} onClick={onClear}><X size={16} aria-hidden="true" /></button>
       </Tip>
     </div>
   </div>;

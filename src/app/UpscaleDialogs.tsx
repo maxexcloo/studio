@@ -30,7 +30,7 @@ function SetupSteps({ stage }: { stage: UpscaleSetupStage }) {
         const state = index < current ? "done" : index === current ? "active" : "todo";
         return (
           <li key={step.label} className={`is-${state}`} aria-current={state === "active" ? "step" : undefined}>
-            <i aria-hidden="true">{state === "done" ? <Check size={10} strokeWidth={3} /> : null}</i>
+            <i aria-hidden="true">{state === "done" ? <Check size={10} strokeWidth={2.5} /> : null}</i>
             <span>{step.label}</span>
           </li>
         );
@@ -129,7 +129,7 @@ export function UpscaleSetupDialog({
   const { title, description } = copyFor(stage, quality, Boolean(pending), fallback);
   const close = setup.closeSetup;
   const later = <button className="btn is-ghost" onClick={close}>{stage === "downloading" ? "Continue in background" : "Not now"}</button>;
-  const recheck = <button className="btn" onClick={() => setup.recheck()}><RefreshCw size={13} /> Check Again</button>;
+  const recheck = <button className="btn" onClick={() => setup.recheck()}><RefreshCw size={14} /> Check Again</button>;
 
   const missingModels = (status?.models || []).filter((model) => !model.present);
   const remaining = missingModels.reduce((sum, model) => sum + model.bytes - (model.partialBytes || 0), 0);
@@ -173,7 +173,7 @@ export function UpscaleSetupDialog({
       <>
         {later}
         {recheck}
-        {comfyUrl ? <a className="btn is-primary" href={comfyUrl} target="_blank" rel="noreferrer">Open ComfyUI <ExternalLink size={13} /></a> : null}
+        {comfyUrl ? <a className="btn is-primary" href={comfyUrl} target="_blank" rel="noreferrer">Open ComfyUI <ExternalLink size={14} /></a> : null}
       </>
     );
   } else if (stage === "models") {
@@ -261,7 +261,7 @@ export function UpscaleSetupDialog({
                   <strong>{file.label}{file.detail ? <em>{file.detail}</em> : null}</strong>
                   <CellBar value={done ? 1 : file.totalBytes ? file.bytes / file.totalBytes : 0} tone={done ? "done" : "ember"} />
                 </div>
-                <span>{done ? <><Check size={12} strokeWidth={3} /> Verified</> : fileLine(file)}</span>
+                <span>{done ? <><Check size={12} strokeWidth={2.5} /> Verified</> : fileLine(file)}</span>
               </li>
             );
           })}

@@ -14,6 +14,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
+import { tweens } from "@/lib/springs";
 
 // ---------------------------------------------------------------------------
 // Timing: the single source of truth for every tooltip in the app
@@ -66,19 +67,6 @@ function TooltipProvider({ children }: { children: ReactNode }) {
 // ---------------------------------------------------------------------------
 // Animation helpers
 // ---------------------------------------------------------------------------
-
-function getSlideOffset(side: TooltipSide) {
-  switch (side) {
-    case "top":
-      return { y: 4 };
-    case "bottom":
-      return { y: -4 };
-    case "left":
-      return { x: 4 };
-    case "right":
-      return { x: -4 };
-  }
-}
 
 function getTransformOrigin(side: TooltipSide) {
   switch (side) {
@@ -167,8 +155,6 @@ function TooltipInner({
 
   useEffect(() => () => stopWatchingScroll.current?.(), []);
 
-  const slideOffset = getSlideOffset(side);
-
   return (
     <TooltipPrimitive.Root
       open={forceOpen !== undefined ? forceOpen : internalOpen}
@@ -210,15 +196,12 @@ function TooltipInner({
                 className
               )}
               style={{ fontVariationSettings: fontWeights.medium, transformOrigin: getTransformOrigin(side) }}
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, filter: "blur(3px)", ...slideOffset }}
+              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
               animate={reducedMotion ? { opacity: open ? 1 : 0 } : {
                 opacity: open ? 1 : 0,
                 scale: open ? 1 : 0.96,
-                filter: open ? "blur(0px)" : "blur(3px)",
-                x: 0,
-                y: 0,
               }}
-              transition={reducedMotion ? { duration: open ? 0.1 : 0.08 } : open ? { type: "spring", duration: 0.26, bounce: 0 } : { duration: 0.12 }}
+              transition={open ? tweens.fast : tweens.instant}
               onAnimationComplete={handleExitComplete}
             >
               {content}

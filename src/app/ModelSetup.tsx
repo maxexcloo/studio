@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, ChevronDown, Download, ExternalLink, Pause, Play, RefreshCw, RotateCw, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { ComfyRestart } from './ComfyRestart';
 import { NodeInstall, ShellCommand } from './NodeInstall';
 import { CellBar, Watcher } from './UpscaleDialogs';
@@ -284,7 +285,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
                   initial={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
                   animate={reduced ? { opacity: 1 } : { opacity: 1, height: 'auto' }}
                   exit={reduced ? { opacity: 0 } : { opacity: 0, height: 0 }}
-                  transition={{ duration: 0.22 }}
+                  transition={reduced ? tweens.fast : tweens.slow}
                 >
                   <CellBar value={current.totalBytes ? current.receivedBytes / current.totalBytes : 0} />
                   <small>{progressLine(current, rowState)}</small>
@@ -327,7 +328,7 @@ export function ModelSetup({ profile, showToast, onInstalled, variant = 'sidebar
         <div className="model-setup-watch"><Watcher lastChecked={lookedAt}>{outdated ? 'Watching for the ComfyUI update…' : 'Watching for the nodes…'}</Watcher></div>
       ) : null}
       {manual && !moving && !waitingOnComfy ? (
-        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={13} /> Check Again</button>
+        <button type="button" className="btn is-ghost model-setup-recheck" onClick={onInstalled}><RefreshCw size={14} /> Check Again</button>
       ) : null}
       {remote ? <p className="model-setup-note">{thisComputer ? 'ComfyUI runs on another computer. Put these files in its model folders there, then rescan.' : 'Add these on the computer running Studio.'}</p> : null}
     </section>
@@ -364,7 +365,7 @@ function OtherVersions({ downloads, current, onPick }: { downloads: PartDownload
           {others.map((entry) => (
             <li key={entry.id}>
               <span><strong>{breakable(entry.file)}</strong><small>{sourceLine(entry)}{entry.onDisk ? ' · already downloaded' : ''}</small></span>
-              <button type="button" className="btn is-ghost" onClick={() => { setOpen(false); onPick(entry); }}><Download size={13} /> Download</button>
+              <button type="button" className="btn is-ghost" onClick={() => { setOpen(false); onPick(entry); }}><Download size={14} /> Download</button>
             </li>
           ))}
         </ul>
@@ -384,7 +385,7 @@ function SetupRowHead({ item, rowState, children }: { item: MissingPart; rowStat
   return (
     <div className="model-setup-row">
       <span className={cn('model-setup-dot', `is-${ticked ? 'landed' : rowState}`)} aria-hidden="true">
-        {ticked ? <Check size={11} strokeWidth={3} /> : null}
+        {ticked ? <Check size={11} strokeWidth={2.5} /> : null}
       </span>
       <div className="model-setup-copy">
         <small title={partHint[item.part]}>{partVerb[item.part]}{partHint[item.part] ? <span className="model-setup-hint"> · {partHint[item.part]}</span> : null}</small>
@@ -450,17 +451,17 @@ function RowActions({ rowState, download, current, remote, run, start, pause, di
   if (rowState === 'paused') {
     return (
       <>
-        <button type="button" className="btn" onClick={() => run(() => start(download.id))}><Play size={13} /> Resume</button>
+        <button type="button" className="btn" onClick={() => run(() => start(download.id))}><Play size={14} /> Resume</button>
         <DiscardButton file={download.file} receivedBytes={current?.receivedBytes || 0} onDiscard={() => run(() => discard(download.id))} />
       </>
     );
   }
   if (rowState === 'error' && current?.needsBrowser) {
     // Gated: only a logged-in browser can fetch it, so the way on is its page.
-    return <a className="btn" href={download.url.replace('/resolve/', '/blob/')} target="_blank" rel="noreferrer"><ExternalLink size={13} /> Hugging Face</a>;
+    return <a className="btn" href={download.url.replace('/resolve/', '/blob/')} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Hugging Face</a>;
   }
   if (rowState === 'error') {
-    return <button type="button" className="btn" onClick={() => run(() => start(download.id))}><RotateCw size={13} /> {current?.retryable === false ? 'Try Again' : 'Resume'}</button>;
+    return <button type="button" className="btn" onClick={() => run(() => start(download.id))}><RotateCw size={14} /> {current?.retryable === false ? 'Try Again' : 'Resume'}</button>;
   }
   if (rowState === 'landed') return <span className="model-setup-meta">In Place</span>;
   return (

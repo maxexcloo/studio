@@ -410,7 +410,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       bodyClassName="wf-layout"
       title="Workflows"
       description="Choose a model or import a workflow."
-      headerActions={thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={15} /><span>Import</span></button> : undefined}
+      headerActions={thisComputer ? <button className="btn is-primary" onClick={openImport}><Upload size={16} /><span>Import</span></button> : undefined}
       contentProps={{
         onDragEnter: (event) => { if (event.dataTransfer.types.includes("Files")) { event.preventDefault(); setDragging(true); } },
         onDragOver: (event) => { if (event.dataTransfer.types.includes("Files")) event.preventDefault(); },
@@ -423,7 +423,7 @@ export function WorkflowGallery({ view }: { view: any }) {
           <label className="wf-search picker-search">
             <Search size={14} />
             <input className="is-framed" aria-label="Search Workflows" value={query} placeholder="Search Workflows" onChange={(event) => setQuery(event.target.value)} />
-            {query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery("")}><X size={13} /></button> : null}
+            {query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery("")}><X size={14} /></button> : null}
           </label>
           <Segmented label="Kind" value={kind} onChange={(next) => { setKind(next); setFilter("all"); setSpeed(''); }} options={[{ value: "image", label: "Image" }, { value: "video", label: "Video" }]} />
         </div>
@@ -471,7 +471,7 @@ export function WorkflowGallery({ view }: { view: any }) {
       <aside className={cn("wf-detail", mobileDetailsOpen && "is-open-mobile")}>
         {selected && selectedStatus ? (
           <>
-            <button type="button" className="btn is-ghost wf-back" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft size={15} /> All Workflows</button>
+            <button type="button" className="btn is-ghost wf-back" onClick={() => setMobileDetailsOpen(false)}><ArrowLeft size={16} /> All Workflows</button>
             <div className="wf-detail-head">
               <div className="wf-detail-thumb"><WorkflowThumbnail key={selected.thumbnail} src={selected.thumbnail} /></div>
               <h3>{workflowCardText(selected).name}</h3>
@@ -497,12 +497,12 @@ export function WorkflowGallery({ view }: { view: any }) {
               ) : null}
               {[...(selectedProfile?.missing?.length ? [] : selected.validation.issues.filter((issue) => !(selected.validation.missingNodes?.length && issue.startsWith("Missing node class:")) && !(settingUp && missingFileIssue.test(issue)))), ...(selected.validation.warnings || [])].map((issue) => <p className="wf-issue" key={issue}>{issue}</p>)}
               {selected.validation.missingNodes?.length ? <ComfyRestart compact className="wf-restart" onBack={checkAgain} /> : null}
-              {selectedStatus.state !== "ready" && !settingUp ? <button className="btn is-ghost" onClick={checkAgain} disabled={checking}><RefreshCw size={13} className={cn(checking && "spin")} /> Check Again</button> : null}
+              {selectedStatus.state !== "ready" && !settingUp ? <button className="btn is-ghost" onClick={checkAgain} disabled={checking}><RefreshCw size={14} className={cn(checking && "spin")} /> Check Again</button> : null}
             </div>
 
             <div className="wf-detail-actions">
               <button className="btn is-primary" onClick={() => useWorkflow(selected)} disabled={busy || (!selected.validation.ok && !selectedProfile?.missing?.length) || selected.profileId === model}>
-                {selected.profileId === model ? <><Check size={15} /> In Use</> : "Use workflow"}
+                {selected.profileId === model ? <><Check size={16} /> In Use</> : "Use workflow"}
               </button>
               {selected.deleteId && thisComputer ? <button className="btn is-ghost is-danger-text" disabled={busy} onClick={() => deleteWorkflow(selected)}><Trash2 size={14} /> Delete</button> : null}
             </div>
@@ -552,7 +552,7 @@ export function WorkflowGallery({ view }: { view: any }) {
               <span>or drop them anywhere in this window</span>
             </button>
             <input ref={fileInput} hidden type="file" accept="application/json,.json" multiple onChange={(event) => { if (event.target.files?.length) readFiles(event.target.files); event.currentTarget.value = ""; }} />
-            <Field label={<><ClipboardPaste size={13} /> Or paste the JSON</>}>
+            <Field label={<><ClipboardPaste size={14} /> Or paste the JSON</>}>
               <textarea className="wf-paste" value={pasteJson} onChange={(event) => setPasteJson(event.target.value)} placeholder="{ … }" spellCheck={false} />
             </Field>
             <AgentGuide onCopy={() => copyAgent(agentPrompt(), "guide")} copied={agentCopy.copied === "guide"} />

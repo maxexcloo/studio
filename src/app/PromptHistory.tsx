@@ -1,5 +1,6 @@
 import React from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { popoverMotion, useSettling } from './composerSurface';
 import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './Sheet';
@@ -72,7 +73,7 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
   kind?: PromptKind;
   onError: (message: string) => void;
 }) {
-  const reduced = useReducedMotion();
+  const settling = useSettling();
   return (
     <AnimatePresence>
       {open ? (
@@ -80,10 +81,8 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
           key={`history-${kind}`}
           className="prompt-history"
           data-open-surface
-          initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.985 }}
-          animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-          exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.99 }}
-          transition={{ type: 'spring', duration: 0.28, bounce: 0 }}
+          {...popoverMotion}
+          {...settling}
         >
           <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} onError={onError} />
         </motion.div>
@@ -187,10 +186,10 @@ function HistoryPanel({ onClose, onPick, onError, kind }: { onClose: (reason: 'e
                     <span className="prompt-history-meta">{meta(row.entry)}</span>
                   </button>
                   <button type="button" className="prompt-history-icon is-pin" tabIndex={-1} aria-pressed={Boolean(row.entry.pinned)} aria-label={row.entry.pinned ? 'Unstar This Prompt' : 'Star This Prompt to Keep It'} title={row.entry.pinned ? 'Unstar' : 'Star to Keep'} onClick={() => pin(row.entry)}>
-                    <Star size={13} fill={row.entry.pinned ? 'currentColor' : 'none'} />
+                    <Star size={14} fill={row.entry.pinned ? 'currentColor' : 'none'} />
                   </button>
                   <button type="button" className="prompt-history-icon is-forget" tabIndex={-1} aria-label="Remove This Prompt" title="Remove" onClick={() => forget(row.entry)}>
-                    <X size={13} />
+                    <X size={14} />
                   </button>
                 </div>
               );

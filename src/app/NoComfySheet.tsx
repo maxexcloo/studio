@@ -64,7 +64,7 @@ export function NoComfySheet({ open, onOpenChange, onChangeAddress }: { open: bo
       title="Get ComfyUI"
       description="ComfyUI does the generating. Install and start it, and it connects here."
       className="no-comfy-sheet"
-      footer={onChangeAddress ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onChangeAddress(); }}><Plug size={13} /> Use Another Address</button> : undefined}
+      footer={onChangeAddress ? <button type="button" className="btn is-ghost" onClick={() => { onOpenChange(false); onChangeAddress(); }}><Plug size={14} /> Use Another Address</button> : undefined}
     >
       <ul className="no-comfy-routes">
         {order.map((system) => {

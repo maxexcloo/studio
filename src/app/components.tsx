@@ -505,8 +505,8 @@ function ModelAbilities({ profile, showInpaint = true, onHover }: { profile: Pro
   return (
     // While one of these speaks, the row's own name tooltip stays shut.
     <span className="model-abilities" onPointerEnter={() => onHover?.(true)} onPointerLeave={() => onHover?.(false)}>
-      {edits ? <Tip content="Edits from Reference Images" side="top"><span className="model-ability" aria-label="Edits from Reference Images"><ImagePlus size={13} strokeWidth={1.75} /></span></Tip> : null}
-      {inpaints ? <Tip content="Inpainting: paint over part of an image to change only that" side="top"><span className="model-ability" aria-label="Inpainting"><Brush size={13} strokeWidth={1.75} /></span></Tip> : null}
+      {edits ? <Tip content="Edits from Reference Images" side="top"><span className="model-ability" aria-label="Edits from Reference Images"><ImagePlus size={14} strokeWidth={1.75} /></span></Tip> : null}
+      {inpaints ? <Tip content="Inpainting: paint over part of an image to change only that" side="top"><span className="model-ability" aria-label="Inpainting"><Brush size={14} strokeWidth={1.75} /></span></Tip> : null}
     </span>
   );
 }
@@ -668,7 +668,7 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
                           </button></Tip>
                         {menu ? (
                           <button type="button" className="model-star" aria-pressed={starred} aria-label={starred ? `Remove ${profile.displayName || profile.label} from Favourites` : `Add ${profile.displayName || profile.label} to Favourites`} onClick={() => menu.toggleFavorite(profile.id)}>
-                            <Star size={13} fill={starred ? "currentColor" : "none"} />
+                            <Star size={14} fill={starred ? "currentColor" : "none"} />
                           </button>
                         ) : null}
                       </div>

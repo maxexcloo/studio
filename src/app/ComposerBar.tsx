@@ -2,7 +2,6 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { ComposerModeSelect } from './ComposerModeSelect';
 import { ArrowUp, Dices, CircleDotDashed, Film, Images, Layers, Plus, RefreshCw, ListRestart, SlidersHorizontal } from 'lucide-react';
-import { motion, useReducedMotion } from 'framer-motion';
 import { LoraMismatchChip, type LoraMismatch } from './LoraMismatchChip';
 import { cn } from './format';
 import { recipesFor } from './modelRecipes';
@@ -144,8 +143,6 @@ function useComposerHeightVar(rowRef: React.RefObject<HTMLDivElement | null>) {
   }, []);
 }
 
-const generateButtonSpring = { type: "spring" as const, stiffness: 520, damping: 32, mass: 0.68 };
-
 /**
  * `blocked` looks disabled but stays focusable and clickable, so a press (or a
  * tap on a phone, where there is no tooltip) explains why nothing can run yet.
@@ -153,12 +150,10 @@ const generateButtonSpring = { type: "spring" as const, stiffness: 520, damping:
  * The rest (ref, pointer and focus handlers, aria-describedby) is what the
  * wrapping Tip hangs on its trigger; without it the tooltip never opens.
  */
-type GenerateButtonPassthrough = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "disabled" | "onClick" | "aria-label" | "type" | "style" | "onAnimationStart" | "onDrag" | "onDragStart" | "onDragEnd">;
+type GenerateButtonPassthrough = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "disabled" | "onClick" | "aria-label" | "type">;
 function GenerateButton({ children, className, disabled, blocked, busy, onClick, "aria-label": ariaLabel, ref, ...rest }: GenerateButtonPassthrough & { children: React.ReactNode; className?: string; disabled?: boolean; blocked?: boolean; busy?: boolean; onClick?: React.MouseEventHandler<HTMLButtonElement>; "aria-label"?: string; ref?: React.Ref<HTMLButtonElement> }) {
-  const prefersReducedMotion = useReducedMotion();
-  const inert = disabled || blocked;
   return (
-    <motion.button
+    <button
       {...rest}
       ref={ref}
       type="button"
@@ -168,12 +163,9 @@ function GenerateButton({ children, className, disabled, blocked, busy, onClick,
       aria-disabled={blocked || undefined}
       aria-busy={busy || undefined}
       aria-label={ariaLabel}
-      whileHover={prefersReducedMotion || inert ? undefined : { y: -1 }}
-      whileTap={prefersReducedMotion || inert ? undefined : { y: 0, scale: 0.965 }}
-      transition={generateButtonSpring}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
 
@@ -338,7 +330,7 @@ export function ComposerBar(props: ComposerBarProps) {
   const loraPill = (density: ControlDensity) => onOpenLoras ? (
     <Tip content={loraActiveCount ? `${loraActiveCount} LoRA${loraActiveCount === 1 ? "" : "s"} active. Click to edit` : "LoRAs"}>
       <button type="button" className={cn("lora-pill composer-resource-add", density !== "full" && `is-density-${density}`)} onClick={onOpenLoras} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={lorasOpen}>
-        {loraSummary ? <><Layers size={13} /><span className="lora-pill-summary" title={loraSummary}>{loraSummary}</span></> : <><Plus size={13} /><span>LoRAs</span></>}
+        {loraSummary ? <><Layers size={14} /><span className="lora-pill-summary" title={loraSummary}>{loraSummary}</span></> : <><Plus size={14} /><span>LoRAs</span></>}
       </button>
     </Tip>
   ) : null;
@@ -396,9 +388,9 @@ export function ComposerBar(props: ComposerBarProps) {
           {inline("aspect", aspectPicker)}
           {inline("steps", stepsPicker)}
           {inline("variants", variantsPicker)}
-          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={15} /></button></Tip> : null}
+          {onAdvanced ? <Tip content="Advanced Settings"><button type="button" className="icon-button composer-advanced-trigger" data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={onAdvanced}><SlidersHorizontal size={16} /></button></Tip> : null}
         </div>
-        {onReset ? <Tip content="Reset Creation"><button type="button" className="icon-button composer-reset" aria-label="Reset Creation" onClick={onReset}><ListRestart size={15} /></button></Tip> : null}
+        {onReset ? <Tip content="Reset Creation"><button type="button" className="icon-button composer-reset" aria-label="Reset Creation" onClick={onReset}><ListRestart size={16} /></button></Tip> : null}
         {primaryTarget ? null : submitActions}
       </div>
     </>

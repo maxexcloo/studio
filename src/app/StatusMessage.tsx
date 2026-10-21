@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { X } from 'lucide-react';
 import { cn } from './format';
 import { SafeImg } from './SafeImg';
@@ -72,11 +73,11 @@ export function StatusPill({ message, className, children }: { message: ToastRec
   const paused = hovered || focused || pageHidden;
   usePausableTimeout(message ? message.duration : null, () => { if (message) dismissToast(message.id); }, paused, message ? `${message.id}:${message.version}` : '');
   if (!message && !children) return null;
-  const fade = reduced ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0, transition: { duration: 0.1 } } } : {
-    initial: { opacity: 0, y: 4 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -4, transition: { duration: 0.12 } },
-    transition: { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
+  const fade = reduced ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0, transition: tweens.instant } } : {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0, transition: tweens.fast },
+    transition: tweens.base
   };
   return (
     <motion.div
@@ -87,8 +88,8 @@ export function StatusPill({ message, className, children }: { message: ToastRec
       aria-description={message?.confirm?.detail || undefined}
       initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: { duration: 0.12 } }}
-      transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: tweens.fast }}
+      transition={tweens.base}
       drag={message && !message.confirm ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.5}
@@ -110,7 +111,7 @@ export function StatusPill({ message, className, children }: { message: ToastRec
             {message.confirm ? <ConfirmPanel title={messageText(message)} confirm={message.confirm} /> : null}
             {message.confirm ? <ConfirmButtons message={message} /> : <>
               {message.actionLabel ? <button type="button" className="status-pill-action" onClick={() => runToastAction(message.id)}>{message.actionLabel}</button> : null}
-              <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}>{Number.isFinite(message.duration) ? <svg key={`${message.id}:${message.version}`} className="status-pill-countdown" viewBox="0 0 28 28" aria-hidden="true" style={{ animationDuration: `${message.duration}ms`, animationPlayState: paused ? 'paused' : 'running' }}><circle cx="14" cy="14" r="12" pathLength="1" /></svg> : null}<X size={13} /></button>
+              <button type="button" className="status-pill-close" aria-label="Dismiss" onClick={() => dismissToast(message.id)}>{Number.isFinite(message.duration) ? <svg key={`${message.id}:${message.version}`} className="status-pill-countdown" viewBox="0 0 28 28" aria-hidden="true" style={{ animationDuration: `${message.duration}ms`, animationPlayState: paused ? 'paused' : 'running' }}><circle cx="14" cy="14" r="12" pathLength="1" /></svg> : null}<X size={14} /></button>
             </>}
           </motion.span>
         ) : (

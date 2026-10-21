@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { Check, FolderOpen, FolderPlus, RefreshCw } from 'lucide-react';
 import { Modal } from './Modal';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -52,7 +53,7 @@ function Steps({ stage }: { stage: ModelFolderStage }) {
         const state = index < current ? 'done' : index === current && stage !== 'error' ? 'active' : 'todo';
         return (
           <li key={step.label} className={`is-${state}`} aria-current={state === 'active' ? 'step' : undefined}>
-            <i aria-hidden="true">{state === 'done' ? <Check size={10} strokeWidth={3} /> : null}</i>
+            <i aria-hidden="true">{state === 'done' ? <Check size={10} strokeWidth={2.5} /> : null}</i>
             <span>{step.label}</span>
           </li>
         );
@@ -97,12 +98,12 @@ function FolderCard({ folder, checked, onToggle, index, selectable }: { folder: 
   const more = folder.count - examples.length;
   return (
     <motion.li
-      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.985 }}
-      animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: 'spring', duration: 0.5, bounce: 0.18, delay: reduced ? 0 : 0.06 * index }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={tweens.base}
     >
       <button type="button" role="checkbox" aria-checked={checked} className={cn('mf-folder', checked && 'is-checked')} onClick={onToggle} disabled={!selectable}>
-        <span className="mf-check" aria-hidden="true">{checked ? <Check size={11} strokeWidth={3.2} /> : null}</span>
+        <span className="mf-check" aria-hidden="true">{checked ? <Check size={11} strokeWidth={2.5} /> : null}</span>
         <span className="mf-folder-copy">
           <strong>
             {folder.name}
@@ -169,7 +170,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
   } else if (stage === 'none') {
     body = report?.linked?.length ? (
       <ul className="mf-linked">
-        {report.linked.map((item) => <li key={item.path}><Check size={12} strokeWidth={3} /><code title={item.path}>{item.label}</code><span>{item.read ? 'Read by ComfyUI' : 'Restart ComfyUI to read it'}</span></li>)}
+        {report.linked.map((item) => <li key={item.path}><Check size={12} strokeWidth={2.5} /><code title={item.path}>{item.label}</code><span>{item.read ? 'Read by ComfyUI' : 'Restart ComfyUI to read it'}</span></li>)}
       </ul>
     ) : null;
     footer = <>{choose}<button className="btn is-primary" onClick={state.close}>Done</button></>;
@@ -183,7 +184,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
     footer = <button className="btn is-primary" onClick={state.close}>Done</button>;
   } else if (stage === 'offline') {
     body = <Watcher>Waiting for ComfyUI…</Watcher>;
-    footer = <>{later}<button className="btn" onClick={() => state.scan()}><RefreshCw size={13} /> Check Again</button></>;
+    footer = <>{later}<button className="btn" onClick={() => state.scan()}><RefreshCw size={14} /> Check Again</button></>;
   } else if (stage === 'adding') {
     body = <Watcher>Adding folders…</Watcher>;
   } else if (stage === 'restarting' || stage === 'waiting') {
@@ -223,7 +224,7 @@ export function ModelFoldersDialog({ folders: state, runningCount = 0 }: { folde
                 <span className="mf-done-kinds">{folderSummary(folder)}</span>
                 <code title={folder.path}>{folder.label}</code>
               </div>
-              <span><Check size={12} strokeWidth={3} /> Added</span>
+              <span><Check size={12} strokeWidth={2.5} /> Added</span>
             </li>
           ))}
         </ul>

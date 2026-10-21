@@ -28,7 +28,7 @@ export function ComposerSurface({ title, icon, trigger, className, bodyClassName
   useDismiss([surface, opener], present, close);
   const settling = useSettling();
   return createPortal(<motion.div ref={surface} className={cn('reference-popover', className, onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label={title} aria-hidden={!present || undefined} inert={!present} data-open-surface {...popoverMotion} {...settling}>
-    <header className="reference-popover-head">{icon}<strong>{title}</strong>{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label={`Close ${title}`} onClick={close}><X size={15} /></button></header>
+    <header className="reference-popover-head">{icon}<strong>{title}</strong>{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label={`Close ${title}`} onClick={close}><X size={16} /></button></header>
     <div className={cn('reference-popover-body', bodyClassName)}>{children}</div>
   </motion.div>, document.body);
 }

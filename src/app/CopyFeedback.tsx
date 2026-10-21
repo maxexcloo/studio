@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { tweens } from '@/lib/springs';
 import { Check, Copy } from 'lucide-react';
 import { cn } from './format';
 
@@ -29,7 +30,7 @@ export function useCopyFeedback(ms = 1600) {
   return { copied, mark, copyWith };
 }
 
-/** The copy icon, swapping to a check (and back) with a small spring. */
+/** The copy icon, cross-fading to a check (and back). */
 export function CopyIcon({ copied, size = 14 }: { copied: boolean; size?: number }) {
   const reduced = useReducedMotion();
   return (
@@ -37,10 +38,10 @@ export function CopyIcon({ copied, size = 14 }: { copied: boolean; size?: number
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={copied ? 'check' : 'copy'}
-          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.5, filter: 'blur(2px)' }}
-          animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1, filter: 'blur(0px)' }}
-          exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.5, filter: 'blur(2px)' }}
-          transition={{ type: 'spring', duration: 0.3, bounce: 0.3 }}
+          initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+          animate={reduced ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+          exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+          transition={tweens.fast}
         >
           {copied ? <Check size={size} /> : <Copy size={size} />}
         </motion.span>

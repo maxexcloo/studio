@@ -174,7 +174,7 @@ function GateMessage({ title, text }: { title: string; text: string }) {
           <h2>{title}</h2>
           <p>{text}</p>
           <div className="empty-actions">
-            <button className="reconnect-btn primary" onClick={() => window.location.reload()}><RefreshCw size={13} /> Reload</button>
+            <button className="reconnect-btn primary" onClick={() => window.location.reload()}><RefreshCw size={14} /> Reload</button>
           </div>
         </div>
       </div>

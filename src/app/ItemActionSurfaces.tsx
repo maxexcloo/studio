@@ -105,7 +105,7 @@ function ViewerUpscaleButton({ item, action }: { item: GalleryItem; action: Item
         disabled={busy}
         onClick={action.run}
       >
-        {busy ? <RefreshCw size={15} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
+        {busy ? <RefreshCw size={16} className="spin" /> : running ? <Square size={11} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
         {running && clock.leftMs !== null ? <span className="viewer-upscale-left" aria-hidden="true">{shortLeft(clock.leftMs)}</span> : null}
       </button>
     </Tip>

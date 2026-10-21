@@ -2,9 +2,9 @@
 
 import { forwardRef, useRef, useEffect, useState, useCallback, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { springs } from "@/lib/springs";
+import { tweens } from "@/lib/springs";
 import { useProximityHover } from "@/hooks/use-proximity-hover";
 import { useShape } from "@/lib/shape-context";
 import { SelectContentContext, useSelectContext } from "./select";
@@ -163,11 +163,7 @@ export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
     if (!triggerRect) return null;
 
     const activeRect = activeIndex !== null ? itemRects[activeIndex] : null;
-    const checkedRect =
-      checkedIndex != null ? itemRects[checkedIndex] : null;
     const focusRect = focusedIndex !== null ? itemRects[focusedIndex] : null;
-    const isHoveringOther =
-      activeIndex !== null && activeIndex !== checkedIndex;
 
     return createPortal(
       <SelectContentContext.Provider
@@ -185,9 +181,9 @@ export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
           }}
         >
           <motion.div
-            initial={{ opacity: 0, y: -4, scaleY: 0.96 }}
-            animate={{ opacity: 1, y: 0, scaleY: 1 }}
-            transition={springs.fast}
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={tweens.base}
             style={{ transformOrigin: side === 'top' ? "bottom center" : "top center" }}
           >
           <div
@@ -235,77 +231,21 @@ export const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
               className
             )}
           >
-            {/* Selected background */}
-            <AnimatePresence>
-              {checkedRect && (
-                <motion.div
-                  className={`absolute ${shape.bg} bg-selected/50 dark:bg-accent/40 pointer-events-none`}
-                  initial={false}
-                  animate={{
-                    top: checkedRect.top,
-                    left: checkedRect.left,
-                    width: checkedRect.width,
-                    height: checkedRect.height,
-                    opacity: isHoveringOther ? 0.8 : 1,
-                  }}
-                  exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                  transition={{
-                    ...springs.moderate,
-                    opacity: { duration: 0.08 },
-                  }}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Hover background */}
-            <AnimatePresence>
-              {activeRect && (
-                <motion.div
-                  key={sessionRef.current}
-                  className={`absolute ${shape.bg} bg-accent/40 dark:bg-accent/25 pointer-events-none`}
-                  initial={{
-                    opacity: 0,
-                    top: checkedRect?.top ?? activeRect.top,
-                    left: checkedRect?.left ?? activeRect.left,
-                    width: checkedRect?.width ?? activeRect.width,
-                    height: checkedRect?.height ?? activeRect.height,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    top: activeRect.top,
-                    left: activeRect.left,
-                    width: activeRect.width,
-                    height: activeRect.height,
-                  }}
-                  exit={{ opacity: 0, transition: { duration: 0.06 } }}
-                  transition={{
-                    ...springs.fast,
-                    opacity: { duration: 0.08 },
-                  }}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Focus ring */}
-            <AnimatePresence>
-              {focusRect && (
-                <motion.div
-                  className={`absolute ${shape.focusRing} pointer-events-none z-20 border border-[#6B97FF]`}
-                  initial={false}
-                  animate={{
-                    left: focusRect.left - 2,
-                    top: focusRect.top - 2,
-                    width: focusRect.width + 4,
-                    height: focusRect.height + 4,
-                  }}
-                  exit={{ opacity: 0, transition: { duration: 0.06 } }}
-                  transition={{
-                    ...springs.fast,
-                    opacity: { duration: 0.08 },
-                  }}
-                />
-              )}
-            </AnimatePresence>
+            {/* One static highlight under the hovered or keyboard-cursor option, and
+                a neutral keyboard ring; nothing glides between options. The
+                selected option shows only its amber check. */}
+            {activeRect && (
+              <div
+                className="absolute pointer-events-none"
+                style={{ top: activeRect.top, left: activeRect.left, width: activeRect.width, height: activeRect.height, borderRadius: "var(--r-item)", background: "var(--cursor-bg)" }}
+              />
+            )}
+            {focusRect && (
+              <div
+                className="absolute pointer-events-none z-20"
+                style={{ top: focusRect.top, left: focusRect.left, width: focusRect.width, height: focusRect.height, borderRadius: "var(--r-item)", outline: "2px solid var(--icon-ring)", outlineOffset: "-2px" }}
+              />
+            )}
 
             {children}
           </div>

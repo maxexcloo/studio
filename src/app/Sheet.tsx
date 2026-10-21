@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'framer-motion';
+import { springs, tweens } from '@/lib/springs';
 import { ArrowLeft, X } from 'lucide-react';
 import { cn } from './format';
 import { useFocusTrap } from './useFocusTrap';
@@ -69,7 +70,7 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
               initial={{ backgroundColor: 'rgba(0, 0, 0, 0)' }}
               animate={{ backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
               exit={{ backgroundColor: 'rgba(0, 0, 0, 0)' }}
-              transition={{ duration: 0.2 }}
+              transition={tweens.base}
             />
           )}
           <motion.div
@@ -82,10 +83,11 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             {...settling}
             aria-hidden={covered || undefined}
             inert={overlaid || undefined}
-            initial={reduced ? { opacity: 0 } : nested ? { opacity: 0, y: 24 } : { y: '100%' }}
-            animate={reduced ? { opacity: 1 } : nested ? { opacity: 1, y: 0 } : { y: 0 }}
-            exit={reduced ? { opacity: 0 } : nested ? { opacity: 0, y: 24 } : { y: '100%' }}
-            transition={nested ? { duration: 0.2, ease: [0.2, 0, 0, 1] } : { type: 'spring', stiffness: 420, damping: 40 }}
+            // Every sheet, nested too, slides up from the bottom edge and leaves the same way.
+            initial={reduced ? { opacity: 0 } : { y: '100%' }}
+            animate={reduced ? { opacity: 1 } : { y: 0 }}
+            exit={reduced ? { opacity: 0 } : { y: '100%' }}
+            transition={reduced ? tweens.fast : springs.sheet}
             drag={reduced ? false : 'y'}
             dragControls={drag}
             dragListener={false}

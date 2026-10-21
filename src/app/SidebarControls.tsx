@@ -91,7 +91,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
         <ListItem label="Seed">
           {/* Random until a seed is kept: then the number shows, to edit or copy. */}
           {fixedSeed ? <input className="list-field" inputMode="numeric" pattern="[0-9]*" value={seed} aria-label="Seed" onChange={(event) => setSeed(event.target.value.replace(/[^0-9]/g, ""))} /> : null}
-          <button type="button" className={cn("list-toggle", !fixedSeed && "is-on")} aria-pressed={!fixedSeed} aria-label="Random Seed" title={fixedSeed ? "Use a new seed every time" : "Keep one seed: the same picture every time"} onClick={() => setSeed(fixedSeed ? "" : String(Math.floor(Math.random() * 2 ** 32)))}><Dices size={15} aria-hidden="true" /><span>Random</span></button>
+          <button type="button" className={cn("list-toggle", !fixedSeed && "is-on")} aria-pressed={!fixedSeed} aria-label="Random Seed" title={fixedSeed ? "Use a new seed every time" : "Keep one seed: the same picture every time"} onClick={() => setSeed(fixedSeed ? "" : String(Math.floor(Math.random() * 2 ** 32)))}><Dices size={16} aria-hidden="true" /><span>Random</span></button>
         </ListItem>
       </ListSection>
 
@@ -130,7 +130,7 @@ export function PhoneAdvancedControls({ view }: { view: any }) {
           {currentProfile?.capabilities.weightDtype ? select("Weight Type", weightDtype, profileOptions.weightDtypes || models?.weightDtypes || [], setWeightDtype, true) : null}
         </ListSection>
       ) : null}
-      {recommended?.differs ? <button type="button" className="list-row list-row-action" onClick={recommended.restore}><RotateCcw size={15} aria-hidden="true" /><span className="list-row-label">Back to Recommended</span></button> : null}
+      {recommended?.differs ? <button type="button" className="list-row list-row-action" onClick={recommended.restore}><RotateCcw size={16} aria-hidden="true" /><span className="list-row-label">Back to Recommended</span></button> : null}
     </div>
   );
 }

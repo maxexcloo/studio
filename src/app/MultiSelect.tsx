@@ -90,7 +90,7 @@ export function MultiSelect({ label, values, options, onChange, disabled, allLab
         {matches.map((option) => {
           const on = values.includes(option.value);
           return <button type="button" key={option.value} role="option" tabIndex={-1} aria-selected={on} disabled={option.disabled} title={option.disabled ? option.reason : option.detail} className={cn('aspect-option gallery-filter-option multi-select-option', on && 'active')} onClick={() => toggle(option.value)}>
-            <span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={3} /> : null}</span>
+            <span className="gallery-filter-check" aria-hidden="true">{on ? <Check size={12} strokeWidth={2.5} /> : null}</span>
             <span className="multi-select-text"><span>{option.label}</span>{option.disabled && option.reason ? <small>{option.reason}</small> : option.detail ? <small>{option.detail}</small> : null}</span>
           </button>;
         })}

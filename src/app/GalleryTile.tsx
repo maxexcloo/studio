@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Loader2, MoreHorizontal, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
+import { tweens } from "@/lib/springs";
 import { cn } from './format';
 import { Tip } from './components';
 import { GenerationMedia } from './GenerationPreview';
@@ -58,7 +59,7 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: Galle
         aria-disabled={busy}
         onClick={() => { if (!busy) (running ? onCancelUpscale(item) : onUpscale(item)); }}
       >
-        {busy ? <Loader2 size={14} className="spin" /> : running ? <Square size={10} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={15} />}
+        {busy ? <Loader2 size={14} className="spin" /> : running ? <Square size={10} fill="currentColor" strokeWidth={0} /> : <UpscaleArrow size={16} />}
         {running ? (
           // A stroked circle, not a masked gradient: hard gradient stops are not anti-aliased and read as jagged.
           <svg className="tile-upscale-ring" viewBox="0 0 30 30" aria-hidden="true" focusable="false">
@@ -69,13 +70,6 @@ function UpscaleButton({ item, busy, onUpscale, onCancelUpscale }: { item: Galle
     </Tip>
   );
 }
-
-const tileEnterTransition = {
-  type: "spring" as const,
-  stiffness: 380,
-  damping: 32,
-  mass: 0.86,
-};
 
 function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscale, onCancelUpscale = () => {}, openItem, smartUpscale = false, titleFromPrompt, upscaleBusy = false, width }: GalleryTileProps) {
   const mountedRef = useRef(false);
@@ -121,13 +115,9 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
       data-tile-id={item.id}
       className="tile-motion-wrap"
       style={{ width, height }}
-      initial={prefersReducedMotion || !isEntering ? false : { opacity: 0, y: -18, scale: 0.965 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        opacity: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
-        y: tileEnterTransition,
-        scale: tileEnterTransition,
-      }}
+      initial={prefersReducedMotion || !isEntering ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={tweens.base}
     >
       <button
         className={cn("tile", item.status, phoneTiles && "is-pressable", selecting && "is-selecting", isSelected && "is-selected")}
@@ -160,7 +150,7 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
       {/* Controls are siblings of the tile's button, never inside it: a button
           inside a button is invalid and unreachable by keyboard. */}
       <div ref={overlayRef} className={cn("tile-overlay", menuOpen && "is-menu-open", phoneTiles && "is-phone", selecting && selectable && "is-selecting")}>
-        {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={3} /> : null}</span> : null}
+        {selecting && selectable ? <span className={cn("tile-check", isSelected && "is-on")} aria-hidden="true">{isSelected ? <Check size={16} strokeWidth={2.5} /> : null}</span> : null}
         {smartUpscale && onUpscale && canUpscaleItem(item) ? <UpscaleButton item={item} busy={upscaleBusy} onUpscale={onUpscale} onCancelUpscale={onCancelUpscale} /> : null}
                 {/* Beside Stop, in the overlay, so it holds still while the tile lifts on hover. */}
         {item.status === "pending" ? <GenerationModel item={item} className="tile-action" /> : null}

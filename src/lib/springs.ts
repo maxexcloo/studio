@@ -1,3 +1,5 @@
+import { useReducedMotion } from "framer-motion";
+
 /**
  * Framer motion presets (UI-PATTERNS › Motion). Nothing overshoots: springs
  * have no bounce, and the tweens match the CSS tokens in 00-tokens.css.
@@ -38,3 +40,16 @@ export const tweens = {
 } as const;
 
 export const motionEase = ease;
+
+/** Smooth scrolling becomes an instant jump with reduced motion. */
+export function scrollBehavior(): ScrollBehavior {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
+/**
+ * For height, width and filter animations, which MotionConfig's reduced
+ * motion does not cover: the given tween, or an instant change.
+ */
+export function useMotionTween(tween: { duration: number; ease: typeof ease } = tweens.slow) {
+  return useReducedMotion() ? { duration: 0 } : tween;
+}
