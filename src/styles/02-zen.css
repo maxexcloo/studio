@@ -3,7 +3,7 @@
   position: fixed; bottom: 18px; left: 18px; z-index: 13;
   display: grid; place-items: center;
   cursor: pointer;
-  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out), transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
+  transition: border-color var(--motion-base) var(--motion-ease), background var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
 }
 .zen-control-button:hover { border-color: hsl(var(--border-strong)); box-shadow: 0 4px 14px rgb(0 0 0 / 0.3); }
 
@@ -23,7 +23,7 @@
   transform: translateX(-50%);
   display: grid; gap: 6px;
   padding: 8px 8px 8px 14px;
-  transition: border-color 320ms var(--ease-out), box-shadow 320ms var(--ease-out);
+  transition: border-color var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease);
 }
 .zen-prompt textarea {
   min-height: 44px;
@@ -67,7 +67,7 @@
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height 220ms var(--ease-out), opacity 180ms var(--ease-out), margin 180ms var(--ease-out), padding 180ms var(--ease-out);
+  transition: max-height var(--motion-base) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), margin var(--motion-base) var(--motion-ease), padding var(--motion-base) var(--motion-ease);
   padding: 0 4px;
   margin-top: 0;
   border-top: 1px solid hsl(var(--border) / 0);
@@ -108,7 +108,7 @@
   height: 1lh;
   max-height: none;
   padding: 0;
-  transition: height 120ms var(--ease-out);
+  transition: height var(--motion-fast) var(--motion-ease);
 }
 .negative-drawer .negative-unavailable-frame textarea:focus { height: 2lh; }
 .negative-drawer.open:focus-within { max-height: 140px; }
@@ -240,7 +240,7 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out), color 160ms var(--ease-out);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .negative-toggle:hover {
   background: hsl(var(--accent));
@@ -269,7 +269,7 @@
   background: hsl(var(--muted-foreground));
   opacity: 0.8;
 }
-.negative-toggle svg { transition: transform 160ms var(--ease-out); }
+.negative-toggle svg { transition: transform var(--motion-fast) var(--motion-ease); }
 .negative-toggle svg.flip { transform: rotate(180deg); }
 
 .zen-inline-settings .number-picker { height: 40px; }
@@ -315,7 +315,7 @@
   background: hsl(var(--input));
   user-select: none;
   touch-action: none;
-  transition: border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+  transition: border-color var(--motion-fast) var(--motion-ease), background var(--motion-fast) var(--motion-ease);
 }
 .number-picker:hover { border-color: hsl(var(--border-strong)); }
 .number-picker:focus-within { border-color: hsl(var(--ring)); }
@@ -348,7 +348,7 @@
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background 120ms var(--ease-out), color 120ms var(--ease-out), transform 80ms var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-instant) var(--motion-ease);
 }
 .number-picker-btn:hover:not(:disabled) {
   background: hsl(var(--accent));
@@ -371,7 +371,7 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   cursor: text;
-  transition: background 120ms var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease);
 }
 .number-picker-value:hover { background: hsl(var(--accent) / 0.6); }
 .number-picker-input {
@@ -404,5 +404,5 @@
 .zen-prompt .aspect-menu,
 .zen-prompt .model-menu {
   top: auto; bottom: calc(100% + 6px);
-  animation: popUp 180ms var(--spring);
+  animation: popUp 180ms var(--motion-ease);
 }

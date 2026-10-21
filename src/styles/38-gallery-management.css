@@ -33,7 +33,7 @@
   color: hsl(var(--muted-foreground));
   font-size: 12px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .gallery-management button:hover,
 .gallery-context-menu button:hover,
@@ -199,7 +199,7 @@
 .tile,
 .tile img,
 .tile video { content-visibility: visible; }
-.tile { transition: outline-color 160ms ease, transform 240ms ease, box-shadow 240ms ease; }
+.tile { transition: outline-color var(--motion-fast) var(--motion-ease), transform var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease); }
 .stage-gallery { isolation: isolate; z-index: 0; overflow-anchor: none; }
 .app-shell:has(.gallery-toolbar) .stage-gallery { padding-top: calc(max(var(--deck-gap, 18px), env(safe-area-inset-top)) + var(--islands-h, 0px)); scroll-padding-top: 0; }
 .virtual-gallery .tile,

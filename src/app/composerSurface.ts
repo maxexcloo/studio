@@ -1,17 +1,24 @@
 import React from 'react';
+import { tweens } from '@/lib/springs';
+
+/**
+ * The one popover entry (UI-PATTERNS › Motion): a fade and a scale from 0.96
+ * at the trigger (set `transform-origin` there), at --motion-base in and
+ * --motion-fast out. Spread it with `{...useSettling()}` so the glass does not
+ * blur while it moves.
+ */
+export const popoverMotion = {
+  initial: { opacity: 0, scale: 0.96 },
+  animate: { opacity: 1, scale: 1, transition: tweens.base },
+  exit: { opacity: 0, scale: 0.96, transition: tweens.fast },
+  transition: tweens.base,
+};
 
 /**
  * The floating pickers above the composer (LoRAs, references) share one place,
- * size and motion: as wide as the composer, kept on screen however tall a draft
- * grows, and quick to settle. On the phone they pop up over the Create sheet.
+ * size and motion (`popoverMotion`): as wide as the composer, kept on screen
+ * however tall a draft grows. On the phone they pop up over the Create sheet.
  */
-export const surfaceMotion = {
-  initial: { opacity: 0, y: 8, scale: 0.98 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: 6, scale: 0.985 },
-  transition: { type: 'spring' as const, duration: 0.22, bounce: 0.08 }
-};
-
 export function composerAnchor(opener?: Element | null) {
   return (opener?.closest('.zen-prompt, .phone-create') || document.querySelector('.phone-create, .zen-prompt')) as HTMLElement | null;
 }

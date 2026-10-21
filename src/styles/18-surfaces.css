@@ -21,7 +21,7 @@
   -webkit-backdrop-filter: var(--scrim-blur);
   backdrop-filter: var(--scrim-blur);
   /* The blur joins when the fade ends (stepped), so the fade never re-blurs the page per frame. */
-  animation: modal-fade var(--dur-fast) ease-out, modal-glass var(--dur-fast) step-end;
+  animation: modal-fade var(--motion-fast) ease-out, modal-glass var(--motion-fast) step-end;
 }
 @keyframes modal-glass { from { -webkit-backdrop-filter: none; backdrop-filter: none; } }
 
@@ -41,7 +41,7 @@
   color: hsl(var(--foreground));
   outline: none;
   -webkit-font-smoothing: antialiased;
-  animation: modal-in var(--dur-base) var(--ease-out);
+  animation: modal-in var(--motion-base) var(--motion-ease);
 }
 .modal-alert { width: min(420px, 100%); }
 .modal-wide { width: min(1280px, 100%); height: min(840px, calc(100dvh - 48px)); }
@@ -99,7 +99,7 @@
   background: transparent;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast);
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 .modal-close:hover:not(:disabled) { background: var(--control-hover); color: #fff; }
 .modal-close:disabled { opacity: .4; cursor: default; }
@@ -186,7 +186,7 @@
   font-weight: 550;
   white-space: nowrap;
   cursor: pointer;
-  transition: background var(--dur-fast), color var(--dur-fast), scale 100ms;
+  transition: background var(--motion-fast), color var(--motion-fast), scale var(--motion-instant);
 }
 .btn:hover:not(:disabled) { background: var(--control-hover); }
 .btn:active:not(:disabled) { scale: .97; }

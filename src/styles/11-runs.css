@@ -9,7 +9,6 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  --run-spring: cubic-bezier(.2, .9, .25, 1.12);
   --run-ink-soft: rgb(255 255 255 / .5);
 }
 
@@ -93,7 +92,7 @@
 }
 .run-stack-cover {
   box-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 14px 28px -16px rgb(0 0 0 / .9);
-  transition: transform 420ms var(--run-spring), box-shadow 300ms var(--ease-out);
+  transition: transform var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease);
 }
 .run-stack-cover > img,
 .run-stack-cover > .video-preview,
@@ -105,7 +104,7 @@
   height: 100%;
   object-fit: cover;
 }
-.run-stack-cover > img { transition: filter 560ms cubic-bezier(.16, 1, .3, 1), opacity 380ms ease; }
+.run-stack-cover > img { transition: filter 560ms var(--motion-ease), opacity var(--motion-slow) var(--motion-ease); }
 .run-stack-cover > img.media-loading { filter: blur(22px) saturate(1.25); opacity: 0; }
 .run-stack-skim-frame { position: absolute; inset: 0; }
 .run-stack-shade {
@@ -145,7 +144,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  transition: transform 320ms var(--ease-out);
+  transition: transform var(--motion-slow) var(--motion-ease);
 }
 .run-stack-text small {
   color: rgb(255 255 255 / .7);
@@ -187,21 +186,21 @@
   height: max(20%, 30px);
   padding: 0 4px 9px;
   opacity: 0;
-  transition: opacity 200ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease);
 }
 .run-stack-skim i {
   flex: 1;
   height: 2px;
   border-radius: 1px;
   background: rgb(255 255 255 / .3);
-  transition: background 120ms, height 160ms var(--ease-out);
+  transition: background var(--motion-fast), height var(--motion-fast) var(--motion-ease);
 }
 .run-stack-skim i.is-at { background: #fff; }
 .run-stack-skim.is-on i { height: 3px; }
 .run-stack:hover .run-stack-skim { opacity: .8; }
 .run-stack-skim.is-on { opacity: 1; }
 
-.run-stack:active .run-stack-cover { transform: scale(.985); transition-duration: 140ms; }
+.run-stack:active .run-stack-cover { transform: scale(.985); transition-duration: var(--motion-fast); }
 .run-stack:focus-visible .run-stack-cover { box-shadow: var(--focus-ring); }
 @media (prefers-reduced-motion: reduce) {
   .run-stack-cover, .run-stack-text { transition: none; }
@@ -387,7 +386,7 @@
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), transform var(--motion-fast) var(--motion-ease);
 }
 .run-shelf-action + .run-shelf-action,
 .run-shelf-actions > * + * { position: relative; }
@@ -435,7 +434,7 @@
   background: #111;
   /* Whatever happens inside a card is painted inside it and nowhere else. */
   contain: layout paint;
-  transition: transform 300ms var(--ease-out);
+  transition: transform var(--motion-slow) var(--motion-ease);
 }
 .run-flow-ambient {
   position: absolute;
@@ -463,7 +462,7 @@
   border-radius: 9px;
   background: #1a1a1a;
   box-shadow: 0 8px 22px -8px rgb(0 0 0 / .7);
-  transition: transform 520ms var(--run-spring);
+  transition: transform 520ms var(--motion-ease);
   backface-visibility: hidden;
 }
 /* Turned-away faces darken a little with distance: an overlay rather than a
@@ -475,7 +474,7 @@
   border-radius: inherit;
   background: rgb(0 0 0 / calc(var(--away, 0) * .22));
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / .14);
-  transition: background 400ms var(--ease-out);
+  transition: background var(--motion-slow) var(--motion-ease);
 }
 .run-flow-face > img,
 .run-flow-face > .video-preview,
@@ -495,12 +494,12 @@
   inset: 0;
   background: linear-gradient(to top, rgb(0 0 0 / .78), rgb(0 0 0 / .35) 30%, transparent 52%);
   opacity: 0;
-  transition: opacity 240ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease);
 }
 .run-flow .run-stack-text {
   opacity: 0;
   transform: translateY(3px);
-  transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 @media (hover: hover) {
   .run-flow:is(:hover, :focus-visible) .run-flow-shade::after,
@@ -515,13 +514,13 @@
   border-radius: inherit;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12);
   pointer-events: none;
-  transition: box-shadow 300ms var(--ease-out);
+  transition: box-shadow var(--motion-slow) var(--motion-ease);
 }
 @media (hover: hover) { .run-flow:hover::after { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); } }
 .run-flow .run-stack-count,
 .run-flow .run-stack-text,
 .run-flow .run-stack-skim { z-index: 21; }
-.run-flow:active { transform: scale(.985); transition-duration: 140ms; }
+.run-flow:active { transform: scale(.985); transition-duration: var(--motion-fast); }
 .run-flow:focus-visible::after { box-shadow: var(--focus-ring); }
 @media (prefers-reduced-motion: reduce) {
   .run-flow-face { transition: none; }
@@ -539,7 +538,7 @@
   position: absolute;
   height: 14px;
   border-radius: 0 0 var(--radius) var(--radius);
-  transition: transform 320ms var(--run-spring);
+  transition: transform var(--motion-slow) var(--motion-ease);
 }
 .run-burst-edge.is-1 { left: 6px; right: 6px; bottom: 3px; background: #4a4a4a; }
 .run-burst-edge.is-2 { left: 13px; right: 13px; bottom: 0; background: #2e2e2e; }
@@ -547,7 +546,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 140ms ease;
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 .run-burst .run-stack-skim-frame.is-shown { opacity: 1; }
 .run-burst-shade {
@@ -555,13 +554,13 @@
   inset: 0;
   background: linear-gradient(to top, rgb(0 0 0 / .72), rgb(0 0 0 / .3) 34%, transparent 58%);
   opacity: 0;
-  transition: opacity 240ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease);
   pointer-events: none;
 }
 .run-burst .run-stack-text {
   opacity: 0;
   transform: translateY(3px);
-  transition: opacity 240ms var(--ease-out), transform 240ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease), transform var(--motion-base) var(--motion-ease);
 }
 @media (hover: hover) {
   .run-burst:is(:hover, :focus-visible) .run-burst-shade,
@@ -581,9 +580,9 @@
 .run-stack-skim-frame > img {
   transform-origin: center;
   transition:
-    filter 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 380ms ease,
-    transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+    filter 560ms var(--motion-ease),
+    opacity var(--motion-slow) var(--motion-ease),
+    transform 900ms var(--motion-ease);
 }
 .run-stack-cover > img.media-loading,
 .run-flow-face > img.media-loading,
@@ -598,7 +597,7 @@
 /* Same surface as a tile while the image is on its way. */
 .run-stack-cover, .run-flow { background-color: hsl(var(--card)); }
 @media (prefers-reduced-motion: reduce) {
-  .run-stack-cover > img, .run-flow-face > img, .run-flow-ambient > img { transition: opacity 180ms ease; }
+  .run-stack-cover > img, .run-flow-face > img, .run-flow-ambient > img { transition: opacity var(--motion-base) var(--motion-ease); }
   .run-stack-cover > img.media-loading, .run-flow-face > img.media-loading { filter: none; transform: none; animation: none; }
   .run-flow-ambient { animation: none; }
 }

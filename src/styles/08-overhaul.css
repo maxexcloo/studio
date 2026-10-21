@@ -29,7 +29,6 @@
 }
 
 body { background: #0a0a0a; }
-button:not(:disabled):active { scale: .96; }
 
 .app-shell {
   background: #0a0a0a;
@@ -99,7 +98,7 @@ button:not(:disabled):active { scale: .96; }
 .zen-control-button { left: 18px; }
 .studio-dock .icon-button,
 .studio-dock .comfy-status-dot {
-  transition-property: background-color, color, scale;
+  transition-property: background-color, color;
 }
 .mode-tabs {
   padding: 4px;

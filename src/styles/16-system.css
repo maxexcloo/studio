@@ -298,7 +298,7 @@
   text-decoration: none;
   cursor: pointer;
   pointer-events: auto;
-  transition: background var(--dur-fast), box-shadow var(--dur-fast), color var(--dur-fast), opacity 220ms var(--ease-out);
+  transition: background var(--motion-fast), box-shadow var(--motion-fast), color var(--motion-fast), opacity var(--motion-base) var(--motion-ease);
 }
 .tile-upscale:hover,
 .tile-hover-actions .tile-icon:hover,
@@ -312,7 +312,7 @@
    --motion-fast, a press shrinks the circle at --motion-instant (a tap on a
    phone shows the same), and the keyboard ring follows the circle. */
 .tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more) {
-  transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), opacity 220ms var(--ease-out), scale var(--motion-instant) var(--motion-ease);
+  transition: background-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease), opacity var(--motion-base) var(--motion-ease), scale var(--motion-instant) var(--motion-ease);
 }
 .tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more):active:not([aria-disabled="true"]) { scale: .92; }
 .tile-overlay :is(.tile-upscale, .tile-icon, .tile-delete, .tile-star, .tile-more):focus-visible { outline: 2px solid var(--icon-ring); outline-offset: 2px; }
@@ -350,7 +350,7 @@
   stroke: #fff;
   stroke-width: 2;
   stroke-linecap: round;
-  transition: stroke-dasharray 400ms var(--ease-out);
+  transition: stroke-dasharray var(--motion-slow) var(--motion-ease);
 }
 /* Following the clock: one even sweep per second's tick, not a jump. */
 .tile-upscale.is-timed .tile-upscale-ring circle { transition: stroke-dasharray 1s linear; }

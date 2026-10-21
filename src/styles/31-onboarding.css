@@ -81,7 +81,7 @@
   color: hsl(var(--foreground));
   text-align: left;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  transition: background var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
 }
 .starter-version:hover { background: var(--control-hover); }
 .starter-version.is-selected {

@@ -21,7 +21,7 @@
 .lock-stage .stage-copy { min-height: 170px; }
 .lock-stage .empty-actions { width: 100%; }
 /* The composer fades and settles as it comes and goes. */
-.zen-prompt { transition: opacity 320ms var(--ease-out), translate 320ms var(--ease-out), border-color 320ms var(--ease-out), box-shadow 320ms var(--ease-out); }
+.zen-prompt { transition: opacity var(--motion-slow) var(--motion-ease), translate var(--motion-slow) var(--motion-ease), border-color var(--motion-slow) var(--motion-ease), box-shadow var(--motion-slow) var(--motion-ease); }
 
 /* --------------------------------------------------------------- Unlocking */
 
@@ -37,7 +37,7 @@
   background: var(--well);
   box-shadow: inset 0 0 0 1px var(--surface-border);
   color: hsl(var(--muted-foreground));
-  transition: box-shadow var(--dur-base);
+  transition: box-shadow var(--motion-base);
 }
 .unlock-field:focus-within { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .28), 0 0 0 4px rgb(255 255 255 / .05); }
 .unlock-field input {

@@ -385,7 +385,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   font-size: 12.5px;
   line-height: 1.35;
   text-wrap: pretty;
-  animation: phoneRoleNote 260ms var(--ease-out) both;
+  animation: phoneRoleNote 260ms var(--motion-ease) both;
 }
 @keyframes phoneRoleNote { from { opacity: 0; transform: translateY(3px); } }
 @media (prefers-reduced-motion: reduce) { .phone-ref-role small { animation: none; } }
@@ -527,7 +527,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 46px;
   height: 36px;
   color: hsl(var(--muted-foreground));
-  transition: color 160ms var(--ease-out);
+  transition: color var(--motion-fast) var(--motion-ease);
 }
 .phone-size-row em {
   flex: none;
@@ -563,7 +563,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 /* A saved row is one row in and out of Edit: a see-through button under it
    picks it; under Edit the name's field fills in and Remove slides in. */
 .phone-size-saved { overflow: hidden; }
-.phone-size-row.is-saved { position: relative; isolation: isolate; transition: padding 320ms var(--spring); }
+.phone-size-row.is-saved { position: relative; isolation: isolate; transition: padding var(--motion-slow) var(--motion-ease); }
 .phone-size-row.is-saved.is-editing { padding-right: 4px; }
 .phone-size-row.is-saved:not(.is-editing) > :not(.phone-size-hit) { pointer-events: none; }
 .phone-size-row.is-saved:has(.phone-size-hit:active) { background: rgb(255 255 255 / .07); }
@@ -594,7 +594,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   font-size: 16px;
   font-weight: 500;
   text-overflow: ellipsis;
-  transition: background-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+  transition: background-color var(--motion-base) var(--motion-ease), box-shadow var(--motion-base) var(--motion-ease);
 }
 .phone-size-row.is-editing .phone-size-name { background: var(--well); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
 .phone-size-row.is-editing .phone-size-name:focus { box-shadow: inset 0 1px 2px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 154 82 / .45); }
@@ -606,7 +606,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   width: 0;
   margin-left: -10px;
   overflow: hidden;
-  transition: width 320ms var(--spring), margin 320ms var(--spring);
+  transition: width var(--motion-slow) var(--motion-ease), margin var(--motion-slow) var(--motion-ease);
 }
 .phone-size-row.is-editing .phone-size-remove-slot { width: 44px; margin-left: 0; }
 .phone-size-remove {
@@ -621,7 +621,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   color: var(--danger-ink);
   opacity: 0;
   scale: .7;
-  transition: opacity 180ms var(--ease-out), scale 320ms var(--spring), background-color 140ms var(--ease-out);
+  transition: opacity var(--motion-base) var(--motion-ease), scale var(--motion-slow) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
 }
 .phone-size-row.is-editing .phone-size-remove { opacity: 1; scale: 1; }
 .phone-size-remove:active { background: rgb(255 120 100 / .14); }
@@ -727,7 +727,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
-  transition: stroke-dasharray 400ms var(--ease-out);
+  transition: stroke-dasharray var(--motion-slow) var(--motion-ease);
 }
 .viewer-phone-upscale-ring circle.is-track { stroke: rgb(255 255 255 / .16); }
 .viewer-phone-upscale.is-timed .viewer-phone-upscale-ring circle { transition: stroke-dasharray 1s linear; }
@@ -832,7 +832,7 @@ html:has(.phone-shell):has(.phone-sheet-backdrop, .scrim, .modal-scrim, .referen
 .phone-select-bar button:disabled { opacity: .35; }
 .phone-select-bar button.is-danger { color: var(--danger-ink); }
 
-.tile { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color 160ms var(--ease-out); }
+.tile { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color var(--motion-fast) var(--motion-ease); }
 
 .tile.is-selected { outline-color: #f2f2f2; }
 .tile-check {
@@ -875,7 +875,7 @@ body:has(.phone-shell) .modal:not(.modal-sheet, .modal-wide) {
   padding-bottom: env(safe-area-inset-bottom);
   border-width: 1px 0 0;
   border-radius: 24px 24px 0 0;
-  animation: phone-sheet-up 280ms var(--ease-out);
+  animation: phone-sheet-up 280ms var(--motion-ease);
 }
 @keyframes phone-sheet-up { from { translate: 0 40px; opacity: 0; } }
 body:has(.phone-shell) .modal-close { width: 44px; height: 44px; }
@@ -929,7 +929,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
   padding: 0 14px;
   background: rgb(255 255 255 / .06);
   font-size: 13px;
-  transition: scale 160ms var(--spring), background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+  transition: scale var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-copy:active { scale: .95; }
 .scrim .viewer-stage:has(.viewer-phone-bar) .detail-copy.is-copied { color: var(--ember); }

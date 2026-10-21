@@ -2,39 +2,33 @@
    One vocabulary of durations, easings and press feedback so every control in
    the app moves the same way. Loaded last so it can normalise earlier layers. */
 
-:root {
-  --motion-instant: 90ms;
-  --motion-fast: 140ms;
-  --motion-base: 200ms;
-  --motion-slow: 320ms;
-  /* Single easing for interactive state changes; --ease-soft stays for staged sequences. */
-  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
-  --press-scale: 0.96;
-}
-
 /* ---------------------------------------------------------------------------
-   1. One press gesture everywhere
-   Several components rolled their own :active transform, which multiplied with
-   the global scale and made presses collapse twice as far as intended.
+   1. One press state everywhere: nothing moves
+   A press darkens the control's fill in place (UI-PATTERNS › Motion). No
+   control scales, shrinks or shifts when it is pressed. Light controls take a
+   dark overlay; gradient buttons dim; tiles and thumbnails dim their media.
+   The overlay is a background-image so it keeps each control's own fill,
+   shape and background-clip (the 32px --icon-fill circles stay circles).
 --------------------------------------------------------------------------- */
 
 button:not(:disabled) {
   transition-timing-function: var(--motion-ease);
   transition-duration: var(--motion-base);
 }
-button:not(:disabled):active {
-  scale: var(--press-scale);
+:is(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a.btn):not(.generate, .phone-generate, .viewer-phone-bar button):active {
+  background-image: var(--press-overlay) !important;
   transition-duration: var(--motion-instant);
 }
-
-.mode-tabs button:active,
-.aspect-trigger:active,
-.aspect-option:active,
-.number-picker-btn:active:not(:disabled) {
-  transform: none;
+:is(.btn.is-primary, .island-action, .phone-prompt-go, .lora-chip-action.is-primary, .tile-upscale.is-active, .list-toggle.is-on, .list-switch.is-on):active:not(:disabled) {
+  background-image: var(--press-overlay-dark) !important;
 }
-.generate:active:not(:disabled) {
-  transform: translateY(0);
+:is(.generate, .phone-generate):active:not(:disabled) {
+  filter: brightness(.92);
+  transition-duration: var(--motion-instant);
+}
+:is(.tile, .run-stack, .run-flow, .cover-flow-show, .reference-tile-select, .ref-stack-thumb):active :is(img, video) {
+  filter: var(--press-media);
+  transition: filter var(--motion-instant) var(--motion-ease);
 }
 
 /* ---------------------------------------------------------------------------
@@ -46,7 +40,7 @@ button:not(:disabled):active {
 .zen-prompt-actions .number-picker,
 .zen-prompt-actions .negative-toggle,
 .lora-pill {
-  transition-property: background-color, border-color, color, box-shadow, scale;
+  transition-property: background-color, border-color, color, box-shadow;
   transition-duration: var(--motion-base);
   transition-timing-function: var(--motion-ease);
 }
@@ -212,5 +206,4 @@ button:not(:disabled):active {
   .aspect-menu {
     animation: none;
   }
-  button:not(:disabled):active { scale: 1; }
 }

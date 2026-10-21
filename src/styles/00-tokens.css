@@ -50,12 +50,46 @@
   --danger-fill: rgb(255 120 100 / .14);
   --danger-ring: rgb(255 120 100 / .24);
 
+  /* A press never moves anything: the control's fill darkens (a light overlay
+     on dark controls, a dark one on light controls; media dims). */
+  --press-tint: rgb(255 255 255 / .08);
+  --press-overlay: linear-gradient(var(--press-tint), var(--press-tint));
+  --press-overlay-dark: linear-gradient(rgb(0 0 0 / .1), rgb(0 0 0 / .1));
+  --press-media: brightness(.88);
+
+  /* Geometry (UI-PATTERNS › Geometry). Spacing steps for gaps and padding. */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 24px;
+  /* Control sizes: --control-h (40) on the desktop, 44 for touch, 32 for small
+     controls in rows (Advanced Settings, list icon buttons, segmented tracks). */
+  --control-h-touch: 44px;
+  --control-h-sm: 32px;
+  --seg-pad: 3px;  /* a segmented track's inset around its options */
+  --row-h-menu: 38px;      /* rows in desktop menus and popovers */
+  --row-h-settings: 44px;  /* Settings rows; phone sheets use --list-row-h */
+  /* Icons: 16 for actions, 14 in chips and rows, 20 on touch bars. */
+  --icon: 16px;
+  --icon-sm: 14px;
+  --icon-touch: 20px;
+  --icon-stroke: 2;
+  --check-stroke: 2.5;
+  /* Lines: separators between rows and groups; a stronger edge for a focused field. */
+  --line: rgb(255 255 255 / .08);
+  --line-strong: rgb(255 255 255 / .16);
+
   /* Radius scale. Controls are pills; containers follow radius = inner + padding. */
   --r-panel: 28px;   /* composer, sidebar, modals */
   --r-menu: 22px;    /* menus, popovers */
   --r-item: 14px;    /* rows and options inside a menu or list */
   --r-media: 10px;   /* image tiles and thumbnails */
-  --r-pill: 999px;
+  --r-field: 10px;   /* text fields that are not pills */
+  --r-check: 5px;    /* checkboxes */
+  --r-pill: 999px;   /* controls, chips and every circle */
   --r-island: 28px;  /* the top pills: a capsule on one line, soft when taller */
 
   /* Deck geometry: a 40px control plus 4px of surface on each side. */
@@ -75,7 +109,13 @@
   --ember: var(--accent-amber);
   --ember-soft: var(--accent-amber-subtle);
   --ember-glow: 0 0 10px rgb(255 154 82 / .6);
-  /* Focus and selection stay neutral. */
+  /* Selection: chips, tabs, segments and pressed toggles take the subtle amber
+     fill with amber ink; rows and options show only an amber check or lead.
+     The keyboard cursor and hover in a list are the neutral --cursor-bg. */
+  --selected-bg: var(--accent-amber-subtle);
+  --selected-ink: var(--accent-amber);
+  --cursor-bg: var(--control-hover);
+  /* The keyboard focus ring stays neutral (never amber or blue). */
   --focus-ring: 0 0 0 2px var(--surface-modal), 0 0 0 4px rgb(255 255 255 / .5);
 
   /* Modals: one scrim, one sheet. */
@@ -96,7 +136,14 @@
   --z-phone-pop: 70;
   --z-tooltip: 250;
 
-  /* Motion */
-  --dur-fast: 140ms;
-  --dur-base: 220ms;  /* easing: --ease-out, defined in 01-base */
+  /* Motion (UI-PATTERNS › Motion). Presses at instant, hover and small state
+     changes at fast, surfaces entering or leaving at base, heights at slow.
+     Nothing overshoots: framer uses src/lib/springs.ts (bounce 0) or its tweens. */
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  /* Staged sequences and sheets. */
+  --ease-soft: cubic-bezier(0.32, 0.72, 0, 1);
 }

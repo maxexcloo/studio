@@ -8,7 +8,7 @@ import { SurfaceStatus } from "./StatusMessage";
 import { Tip } from "./components";
 import { EmptyState } from "./EmptyState";
 import { useDismiss } from "./useDismiss";
-import { surfaceMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
+import { popoverMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
@@ -270,7 +270,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       aria-busy={upload.busy || Boolean(selectingId) || undefined}
       tabIndex={-1}
       data-open-surface
-      {...surfaceMotion}
+      {...popoverMotion}
       {...settling}
     >
       {/* The chooser pattern (UI-PATTERNS › Pickers): a title bar, then the tabs with Clear Selection, then search. */}
