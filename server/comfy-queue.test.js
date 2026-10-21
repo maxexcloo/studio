@@ -149,3 +149,36 @@ test("a run that finishes between the history and queue reads is found, not drop
   assert.equal((await tracker.check()).state, "waiting");
   assert.equal((await tracker.check()).state, "done");
 });
+
+test("a worker too busy to answer in time keeps a long run waiting, not abandoned after a minute", async () => {
+  let clock = 0;
+  let busy = true;
+  const timedOut = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+  const { request } = fakeComfy({
+    "/history/p1": () => { if (busy) throw timedOut(); return { p1: { outputs: {} } }; },
+    "/queue": () => { if (busy) throw timedOut(); return { queue_running: [entry("p1")], queue_pending: [] }; }
+  });
+  const tracker = promptTracker("p1", { request, now: () => clock, lostAfterMs: 60_000, busyLostAfterMs: 20 * 60_000 });
+  // Decoding and saving 192 frames: no socket messages and slow answers for minutes.
+  for (clock = 0; clock <= 10 * 60_000; clock += 15_000) {
+    const checked = await tracker.check();
+    assert.equal(checked.state, "waiting");
+    assert.equal(checked.busy, true);
+  }
+  busy = false;
+  assert.equal((await tracker.check()).state, "done");
+});
+
+test("a worker that stays busy and silent past the busy limit is still given up", async () => {
+  let clock = 0;
+  const timedOut = () => Object.assign(new Error("timed out"), { name: "TimeoutError" });
+  const { request } = fakeComfy({ "/history/p1": () => { throw timedOut(); } });
+  const tracker = promptTracker("p1", { request, now: () => clock, busyLostAfterMs: 120_000 });
+  assert.equal((await tracker.check()).state, "waiting");
+  clock = 90_000;
+  tracker.alive();
+  clock = 200_000;
+  assert.equal((await tracker.check()).state, "waiting");
+  clock = 211_000;
+  await assert.rejects(() => tracker.check(), (error) => error.lostConnection === true);
+});
