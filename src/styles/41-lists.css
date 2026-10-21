@@ -444,7 +444,7 @@ button.list-row { isolation: isolate; }
 .phone-heading.is-connected .phone-heading-light span { background: hsl(145 70% 48%); box-shadow: 0 0 0 4px hsl(145 70% 48% / .14); }
 .phone-heading.is-offline .phone-heading-light span { background: hsl(0 74% 58%); box-shadow: 0 0 0 4px hsl(0 74% 58% / .14); }
 .phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(38 92% 60%); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
-.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; gap: var(--space-1); padding: var(--seg-pad); border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; gap: var(--space-1); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
 .phone-prompt-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
 .phone-prompt-bar .phone-gallery-mode button { width: auto; min-width: 44px; height: 44px; min-height: 44px; padding: 0 7px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--muted-foreground)); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .phone-prompt-bar .phone-gallery-mode button.active, .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { box-shadow: none; font-weight: 650; }
