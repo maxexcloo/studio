@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+- **Prompt assistant engine:** one LiteLLM engine on the prompt writer's gateway credentials rewrites prompts (streamed, with the Enhance, Spicy, Photographic, Cinematic, Concise and Candid presets), writes negatives, suggests LoRAs, describes images (vision, with a text fallback) and drafts guides and profiles. Each call has a timeout and a fallback, and reasoning is stripped. MCP Generate's prompt writer runs on it unchanged. The account-scoped `/api/assistant` routes are for the next UI batch.
+- **Settings › Models › Integrations:** Assistant Model (by default the prompt writer's model) and Assistant Spicy Model rows list the gateway's models and say whether each reads reference images. Spicy stays off until a Spicy model is chosen.
+- **Prompt Assistant:** a new access-profile feature, on for the built-in Administrator and User profiles and for every existing access profile. Spicy also needs the account's NSFW Models access, whatever model is selected.
+- **One catalogue:** `library/catalogue.json` holds every known model file (LoRAs, checkpoints, diffusion models, encoders, VAEs, CLIP vision) with its hash, links, licence and provenance. It merges the synced and hand-installed `lora-catalogue.json` files, provider download records, cached hashes and the restore manifest, which stay where they are as backups. LoRA details read the same as before.
+- **Versioned profiles and guides:** every profile save becomes a version under `history/profiles/`, prompting guides move into `guides/prompting.json` with versions under `history/guides/`, and AI drafts carry an AI-Drafted marker until an administrator edits or approves them. `MCP_PROMPTING_PATH` becomes seed input, and `.studio-edits.json` is still written.
+- **Assistant evals:** recorded rewrite, LoRA and negative cases are scored in CI; `mise run eval:assistant` replays them against the live gateway on demand.
+
 ## [0.41.0] - 2026-10-21
 
 > Studio becomes a hard fork of HEISS UI: Studio names everywhere, with the old settings, headers, cookie and browser storage still read, and dead upstream code removed

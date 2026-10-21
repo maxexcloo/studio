@@ -9,7 +9,7 @@
  * discovered catalogue, it keeps exactly its old cloud grants.
  *
  * A generation profile marked `nsfw` needs the NSFW Models feature on top of its
- * grant. Profiles stored before that feature keep it on, as nothing was marked then.
+ * grant. The prompt assistant's Spicy preset needs NSFW Models too, whatever profile is selected. Profiles stored before that feature keep it on, as nothing was marked then.
  * `allModels` grants every local profile, including ones added later.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
@@ -28,11 +28,15 @@ export const accessFeatures = Object.freeze([
   "promptHistory",
   "cloudModels",
   "nsfwModels",
-  "presets"
+  "presets",
+  "promptAssistant"
 ]);
 
-/** Features that default on when a stored access profile has no value for them. */
-const onUnlessStored = new Set(["nsfwModels"]);
+/**
+ * Features that default on when a stored access profile has no value for them. Prompt Assistant
+ * arrived on for every existing profile; an administrator may turn it off per profile.
+ */
+const onUnlessStored = new Set(["nsfwModels", "promptAssistant"]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 

@@ -11,10 +11,13 @@ export type Source = { source: 'deployment' | 'studio' | 'default'; locked: bool
 type DefaultProfile = Source & { key: string; configured: string; effective: string };
 type CatalogueFlag = Source & { key: string; label: string; description: string; value: boolean; defaultOn: boolean; applies: 'now' | 'restart' };
 type TokenStatus = { set: boolean; editable: boolean; source?: string };
+type AssistantModel = Source & { key: string; configured: string; effective: string; vision?: boolean };
+/** The prompt assistant's gateway models (server/assistant-routes.js assistantIntegration). */
+type AssistantIntegration = { available: boolean; note?: string; writerModel: string; models: string[]; model: AssistantModel; spicy: AssistantModel };
 export type DeploymentSettings = {
   defaults: { image: DefaultProfile; video: DefaultProfile; profiles: { id: string; label: string; kind: string; ready: boolean }[] };
   catalogue: CatalogueFlag[];
-  integrations: { civitai: { token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus } };
+  integrations: { civitai: { token: TokenStatus; presets: boolean }; huggingFace: { token: TokenStatus }; assistant?: AssistantIntegration };
   storage: Source & { outputs: 'studio' | 'comfy'; workerToken: boolean; multiUser: boolean };
 };
 
@@ -89,11 +92,43 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
   </>;
 }
 
+const DEFAULT_MODEL = '__default__';
+
+/** The prompt assistant's two models: the everyday one and the uncensored one for Spicy. */
+function AssistantRows({ assistant, showToast, onSaved }: { assistant: AssistantIntegration; showToast?: ShowToast; onSaved?: () => void }) {
+  const [busy, setBusy] = React.useState('');
+  if (!assistant.available) return <Row label="Assistant Model" description={assistant.note || 'The prompt assistant is not configured.'}><Status>Off</Status></Row>;
+  const save = async (key: string, value: string) => {
+    setBusy(key);
+    try {
+      const { response, data } = await postJson('/api/settings/deployment', { key, value });
+      if (!response.ok) { showToast?.(data.error || 'Couldn’t save that setting.', 'error'); return; }
+      showToast?.('Saved', 'success');
+      onSaved?.();
+    } catch { showToast?.('Can’t reach Studio. Make sure it’s running.', 'error'); }
+    finally { setBusy(''); }
+  };
+  const options = (entry: AssistantModel, first: { label: string; value: string }) => {
+    const list = [first, ...assistant.models.map((model) => ({ label: model, value: model }))];
+    if (entry.configured && !assistant.models.includes(entry.configured)) list.push({ label: `${entry.configured} (Not Listed)`, value: entry.configured });
+    return list;
+  };
+  const vision = (on?: boolean) => on ? 'Reads reference images.' : 'Text only: reference images aren’t read.';
+  const row = (entry: AssistantModel, label: string, description: string, first: { label: string; value: string }) => <Row key={entry.key} label={<>{label} <SourceTag source={entry.source} locked={entry.locked} /></>} description={description} disabled={busy === entry.key}>
+    {entry.locked ? <span className="set-locked-value">{entry.configured || first.label}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={label} value={entry.configured || first.value} options={options(entry, first)} onChange={(value) => void save(entry.key, value === first.value ? '' : value)} /></div>}
+  </Row>;
+  return <>
+    {row(assistant.model, 'Assistant Model', `Rewrites prompts, writes negatives and suggests LoRAs. ${vision(assistant.model.vision)}`, { label: `Prompt Writer Model (${assistant.writerModel})`, value: DEFAULT_MODEL })}
+    {row(assistant.spicy, 'Assistant Spicy Model', assistant.spicy.effective ? `An uncensored model for the Spicy preset, for accounts with NSFW Models. ${vision(assistant.spicy.vision)}` : 'An uncensored model for the Spicy preset, for accounts with NSFW Models. Spicy is hidden until one is chosen.', { label: 'Off', value: DEFAULT_MODEL })}
+  </>;
+}
+
 /** Third-party services and storage at a glance: what is on, configured and available. */
-export function IntegrationsOverview({ settings }: { settings: DeploymentSettings }) {
-  const { civitai } = settings.integrations;
+export function IntegrationsOverview({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast?: ShowToast; onSaved?: () => void }) {
+  const { civitai, assistant } = settings.integrations;
   const state = (on: boolean, words: [string, string]) => <Status tone={on ? 'ok' : undefined}>{on ? words[0] : words[1]}</Status>;
   return <Group title="Integrations">
+    {assistant ? <AssistantRows assistant={assistant} showToast={showToast} onSaved={onSaved} /> : null}
     <Row label="Civitai" description={`Token ${civitai.token.set ? 'saved' : 'not set'}${civitai.token.set && !civitai.token.editable ? ' by the deployment' : ''} · presets ${civitai.presets ? 'on' : 'off'}. New PNGs always carry their settings in the form Civitai reads.`}>{state(civitai.token.set || civitai.presets, ['On', 'Off'])}</Row>
     <Row label={<>Output Storage <SourceTag source={settings.storage.source} locked={settings.storage.locked} /></>} description={settings.storage.outputs === 'studio' ? `Studio keeps finished outputs; ComfyUI is a worker.${settings.storage.workerToken ? ' The worker node token is set.' : ''}` : 'Finished outputs stay in ComfyUI’s output folder.'}>{state(settings.storage.outputs === 'studio', ['Studio Media', 'ComfyUI Folder'])}</Row>
   </Group>;
