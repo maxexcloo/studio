@@ -58,7 +58,7 @@ test('an AI-drafted profile opens first, says so and is approved in place', asyn
   const dialog = await openProfiles(page);
   const source = dialog.locator('.set-row').filter({ hasText: 'Source' });
   await expect(source).toContainText('AI-Drafted');
-  await expect(source).toContainText('Only administrators see it until you approve it');
+  await expect(source).toContainText('only administrators see it until approved');
   await source.getByRole('button', { name: 'Approve', exact: true }).click();
   await expect(statusPill(page)).toContainText('Real Skin V3 approved');
   await expect(source).toContainText('Drafted by the Assistant');

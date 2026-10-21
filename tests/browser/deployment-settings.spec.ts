@@ -59,9 +59,9 @@ test('Integrations choose the assistant and Spicy models from the gateway, with 
   await dialog.getByRole('button', { name: 'Models', exact: true }).click();
   const model = dialog.locator('.set-row').filter({ hasText: 'Assistant Model' });
   await expect(model).toContainText('Prompt Writer Model (ai/text-quick)');
-  await expect(model).toContainText('Text only: reference images aren’t read.');
+  await expect(model).toContainText('text only, reference images aren’t read');
   const spicy = dialog.locator('.set-row').filter({ hasText: 'Assistant Spicy Model' });
-  await expect(spicy).toContainText('Spicy is hidden until one is chosen.');
+  await expect(spicy).toContainText('Spicy stays hidden until one is chosen');
   await spicy.getByLabel('Assistant Spicy Model').click();
   await page.getByRole('option', { name: 'ai/uncensored', exact: true }).click();
   await expect.poll(() => posts).toEqual([{ key: 'STUDIO_ASSISTANT_SPICY_MODEL', value: 'ai/uncensored' }]);

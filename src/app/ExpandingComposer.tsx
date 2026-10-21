@@ -1,5 +1,5 @@
 import React from 'react';
-import { animate, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
 import { cn } from './format';
 
@@ -43,11 +43,16 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
     node.style.height = `${from}px`;
     const inner = node.firstElementChild as HTMLElement | null;
     const edges = node.offsetHeight - (inner?.offsetHeight ?? node.offsetHeight);
-    let controls: ReturnType<typeof animate> | null = null;
-    const finish = () => { node.style.height = ''; node.style.overflow = ''; animating.current = false; lastHeight.current = node.offsetHeight; observer.disconnect(); };
+    node.style.height = '';
+    // Web Animations, not framer's animate(): framer renders its height once more a frame after
+    // stop(), which landed after finish() and pinned the composer at a stale height (its foot cut off).
+    let animation: Animation | null = null;
+    const { duration, ease } = tweens.slow;
+    const finish = () => { animation?.cancel(); animation = null; node.style.overflow = ''; animating.current = false; lastHeight.current = node.offsetHeight; observer.disconnect(); };
     const run = (start: number, target: number) => {
-      controls?.stop();
-      controls = animate(node, { height: [start, target] }, { ...tweens.slow, onComplete: finish });
+      animation?.cancel();
+      animation = node.animate([{ height: `${start}px` }, { height: `${target}px` }], { duration: duration * 1000, easing: `cubic-bezier(${ease.join(', ')})` });
+      animation.onfinish = finish;
     };
     // Content that settles mid-way (a row appearing) retargets the same movement instead of snapping at the end.
     let target = to;
@@ -57,7 +62,7 @@ export function ExpandingComposer({ children, expanded, onExpandedChange }: {
     });
     if (inner) observer.observe(inner);
     run(from, to);
-    return () => { controls?.stop(); finish(); };
+    return finish;
   }, [expanded, reduced]);
 
   return <section
