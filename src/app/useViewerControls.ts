@@ -269,7 +269,7 @@ export function useViewerControls(view: any) {
     showToast(removed ? `LoRAs applied · ${removedLorasNote(removed)}` : "LoRAs applied", "success");
   }
 
-  /** What the viewer steps through: the gallery in the order it is laid out (main.tsx viewerGallery). */
+  /** What the viewer steps through: the gallery in the order it is laid out (useStudio.ts viewerGallery). */
   function viewerItems(): GalleryItem[] {
     return view.viewerGallery || visibleGallery.filter((item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error");
   }

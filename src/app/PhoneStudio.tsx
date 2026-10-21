@@ -1,45 +1,23 @@
-import { PickerTools, SelectedTick } from './PickerTools';
-import { PromptField } from './PromptField';
-import { LoraSuggestionChips, NegativeAssistantButton, PromptAssistantButton } from './PromptAssistant';
-import type { PromptAssistant } from './usePromptAssistant';
-import { CatalogueFilters, catalogueViews } from './CatalogueFilters';
-import { ComposerModeSelect, MediaModeToggle } from './ComposerModeSelect';
 import React from 'react';
-import { createPortal } from 'react-dom';
-import { usePhoneLayer } from './phoneLayers';
-import { useDismiss } from './useDismiss';
-import { recipesFor } from './modelRecipes';
-import { modelName } from './catalogueNames';
-import { modelDetails, setupNote, useModelCatalogue, type ModelMenuState } from './modelCatalogue';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useMotionTween } from '@/lib/springs';
-import { popoverMotion, useSettling } from './composerSurface';
-import { AlertTriangle, ArrowUp, Check, CheckSquare, CircleStop, Library, LogOut, RefreshCw, Eraser, LoaderCircle, Menu, Ratio, Search, Settings, SlidersHorizontal, Star, UserRound, Wand2, X, Images } from 'lucide-react';
+import { useReducedMotion } from 'framer-motion';
+import { AlertTriangle, ArrowUp, CheckSquare, CircleStop, Images, LoaderCircle, Menu, Search, SlidersHorizontal, X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { MediaModeToggle } from './ComposerModeSelect';
 import { cn } from './format';
-import { NumberPicker } from './components';
-import { Sheet } from './Sheet';
 import { startsGroup } from './ItemActionSurfaces';
 import { bulkItemActions, useItemActionHandlers } from './itemActions';
 import type { GallerySelection } from './gallerySelection';
-import { ReferenceSlots } from './ReferenceMediaPicker';
 import { progressReading } from './GenerationProgress';
 import { generatingLabel } from './itemWording';
-import { estimatePhrase } from './useGenerationEstimate';
-import type { GalleryItem, Profile } from './types';
-import { LinkedSizeFields, MegapixelField, SizeTabs, sizeMenuModel, type SizeTier } from './SizeMenu';
-import { MEGAPIXEL, ratioName } from './sizing';
-import { ListButton, ListItem, ListSection, ListSelect } from './SheetList';
-import { AdvancedPopover, ComposerSurface } from './LoraPopover';
-import { practicalStepRange } from './SidebarControls';
-import { PromptHistorySheet } from './PromptHistory';
+import type { GalleryItem } from './types';
 import { PhoneGalleryTools, clearedSearch, filterCountOf } from './GallerySearch';
 import { GalleryViewControls } from './GalleryViewControls';
-import { emptySearch, searchActive, type GallerySearch } from './favorites';
-import { usePromptHistory } from './recentPrompts';
-import { signOutAccount } from './accounts';
-import { hasAccountStorageScope } from './api';
+import { searchActive } from './favorites';
 import { PhoneStatus, useStatusHost } from './StatusMessage';
-import { EmptyState } from './EmptyState';
+import type { SettingsSection } from './SettingsDialog';
+import type { StudioViewModel } from './useStudio';
+import { CreateSheet } from './PhoneCreate';
+import { MoreMenu, PhoneMenu } from './PhoneMenu';
 
 /* ---------------------------------------------------------------------------
    The phone studio
@@ -51,16 +29,28 @@ import { EmptyState } from './EmptyState';
    open on tap and show their actions on a long press, and the viewer has a
    labelled action bar. Advanced settings stay one link away.
 
-   The state and logic are the studio's own (main.tsx); this file only lays
-   them out for a phone. StudioView renders it in place of the desktop shells
-   and keeps the shared overlays (viewer, dialogs, toasts).
+   The state and logic are the studio's own (useStudio.ts); these files only
+   lay them out for a phone. StudioView renders the shell in place of the
+   desktop shells and keeps the shared overlays (viewer, dialogs, toasts).
+   The shell (this file) holds the top bar, the gallery, the select bar and
+   the prompt bar; Create is PhoneCreate.tsx, with its Model and Size pop-ups
+   in PhoneCreatePickers.tsx; the top bar's menus are PhoneMenu.tsx.
 --------------------------------------------------------------------------- */
 
+
+/** The studio's view model, with what StudioView adds for the phone: the LoRA chooser, the shared search row and Settings. */
+export type PhoneView = StudioViewModel & {
+  lorasOpen: boolean;
+  openLoras: () => void;
+  phoneSearchOpen: boolean;
+  setPhoneSearchOpen: (open: boolean) => void;
+  openSettings: (section?: SettingsSection) => void;
+};
 
 /* ------------------------------------------------------------ The shell */
 
 export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffline, createOpen, setCreateOpen, selection }: {
-  view: Record<string, any>;
+  view: PhoneView;
   galleryBody: React.ReactNode;
   canUseNegativePrompt: boolean;
   comfyOffline: boolean;
@@ -72,7 +62,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     prompt, runningCount, comfyStatus, retryComfyStatus, mode, changeMode,
     galleryStageRef, onGalleryScroll, generate, generateDisabled, visibleGallery, openItem, active, showToast
   } = view;
-  const gallery = (visibleGallery || []) as GalleryItem[];
+  const gallery = visibleGallery;
   const { selecting, selectedItems, selectable } = selection;
   const handlers = useItemActionHandlers();
   const bulkActions = handlers ? bulkItemActions(selectedItems, handlers, true) : [];
@@ -104,19 +94,7 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
     }));
   };
 
-  // Progress of what is running, for the ring on the pill and its second line.
-  const pending = gallery.filter((item) => item.status === 'pending');
-  const readings = pending.map((item) => progressReading(item.progress));
-  const withSteps = readings.flatMap((reading) => reading.kind === 'steps' ? [reading.ratio] : []);
-  const progress = withSteps.length ? withSteps.reduce((sum, ratio) => sum + ratio, 0) / withSteps.length : 0;
-  // The top bar names what is running: an upscale (on its own, or the end of a run) is not a generation.
-  const upscalingCount = gallery.filter((item) => item.upscale?.status === 'running' || (item.status === 'pending' && item.progress?.upscaling)).length;
-  const generatingCount = Math.max(0, runningCount - upscalingCount);
-  const runningLabel = !upscalingCount
-    ? generatingLabel(generatingCount, pending)
-    : !generatingCount
-      ? upscalingCount === 1 ? 'Upscaling 1 image' : `Upscaling ${upscalingCount}`
-      : `Generating ${generatingCount} · upscaling ${upscalingCount}`;
+  const { pending, progress, label: runningLabel } = runningSummary(gallery, runningCount);
 
   // Finished runs use the shared compact notification, including swipe to dismiss.
   const pendingJobs = React.useRef<Set<string>>(new Set());
@@ -135,12 +113,10 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   // What's running: a tap shows it, or stops it all.
   const [runningOpen, setRunningOpen] = React.useState(false);
   React.useEffect(() => { if (!runningCount) setRunningOpen(false); }, [runningCount]);
-  const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
-  const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
+  const { gallerySearch, setGallerySearch } = view;
   // Search and the filter row share one row under the bar; one is open at a time.
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const searchOpen = Boolean(view.phoneSearchOpen);
-  const setSearchOpen = view.setPhoneSearchOpen as (open: boolean) => void;
+  const { phoneSearchOpen: searchOpen, setPhoneSearchOpen: setSearchOpen } = view;
   const expanded = searchOpen ? 'search' : filtersOpen ? 'filters' : '';
   const queryCount = gallerySearch.q.trim() ? 1 : 0;
   const filterCount = filterCountOf(gallerySearch);
@@ -268,310 +244,31 @@ export function PhoneShell({ view, galleryBody, canUseNegativePrompt, comfyOffli
   );
 }
 
+/**
+ * What is running, for the top bar and the prompt bar: the pending items, their
+ * average step progress (the ring on Generate) and the running count's name. An
+ * upscale (on its own, or the end of a run) is not a generation.
+ */
+function runningSummary(gallery: GalleryItem[], runningCount: number) {
+  const pending = gallery.filter((item) => item.status === 'pending');
+  const withSteps = pending.map((item) => progressReading(item.progress)).flatMap((reading) => reading.kind === 'steps' ? [reading.ratio] : []);
+  const progress = withSteps.length ? withSteps.reduce((sum, ratio) => sum + ratio, 0) / withSteps.length : 0;
+  const upscalingCount = gallery.filter((item) => item.upscale?.status === 'running' || (item.status === 'pending' && item.progress?.upscaling)).length;
+  const generatingCount = Math.max(0, runningCount - upscalingCount);
+  const label = !upscalingCount
+    ? generatingLabel(generatingCount, pending)
+    : !generatingCount
+      ? upscalingCount === 1 ? 'Upscaling 1 image' : `Upscaling ${upscalingCount}`
+      : `Generating ${generatingCount} · upscaling ${upscalingCount}`;
+  return { pending, progress, label };
+}
+
 /** A top-bar tool: tinted with a count badge while it has something applied, pressed while its row is open. */
-function ToolButton({ label, Icon, count, open, onClick }: { label: string; Icon: typeof Search; count: number; open: boolean; onClick: () => void }) {
+function ToolButton({ label, Icon, count, open, onClick }: { label: string; Icon: LucideIcon; count: number; open: boolean; onClick: () => void }) {
   return (
     <button type="button" className={cn('phone-icon phone-tool', count > 0 && 'is-active', open && 'is-open')} aria-label={label} aria-description={count ? `${count} active` : undefined} aria-expanded={open} onClick={onClick}>
       <Icon size={20} />
       {count ? <span className="phone-tool-count" aria-hidden="true">{count}</span> : null}
     </button>
   );
-}
-
-/* ------------------------------------------------------------ Create */
-
-function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOffline }: { view: Record<string, any>; open: boolean; onClose: () => void; canUseNegativePrompt: boolean; comfyOffline: boolean }) {
-  const heightTween = useMotionTween();
-  const {
-    prompt, setPrompt, promptLimit, clampText, negative, setNegative, negativeLimit, currentProfile,
-    aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, mode, count, countMeta, setCount, steps, stepsMeta, setSteps,
-    referenceInputs, referenceInpaint, referenceRole, referenceAssets, selectReferenceAsset, removeReferenceAsset, showToast,
-    generate, generateDisabled, generateDisabledReason, comfyStatus, retryComfyStatus, comfyRetrying, seed, phoneAdvancedControls, generationEstimate,
-    customSize, sizeTier, sizeMax, customLimits, sizeArea, sizeTiers, sampler
-  } = view;
-  const assistant = view.assistant as PromptAssistant | undefined;
-  // Several references: Edit and Ref say what happens to all of them, not only the first.
-  const picked = (referenceAssets || []) as Array<{ slot: string; asset: unknown }>;
-  const many = picked.length > 1;
-  // One pop-up over Create at a time (UI-PATTERNS › Surfaces): Model, Size or Advanced; References and LoRAs have their own.
-  const [pop, setPop] = React.useState<'' | 'model' | 'size' | 'advanced'>('');
-  React.useEffect(() => { if (!open) setPop(''); }, [open]);
-  const toggle = (which: 'model' | 'size' | 'advanced') => setPop((current) => current === which ? '' : which);
-  const [historyOpen, setHistoryOpen] = React.useState(false);
-  const [historyKind, setHistoryKind] = React.useState<'positive' | 'negative'>('positive');
-  const { prompts: recentNegatives } = usePromptHistory(open, 'negative');
-  const { prompts: recentPrompts } = usePromptHistory(open);
-  const restarting = Boolean(comfyStatus?.restarting);
-  const variations = mode === 'video' || currentProfile?.capabilities?.variations !== false;
-  const maxCount = Math.max(1, Number(countMeta?.max || 8));
-  // The size row reads like the desktop's size button: the shape, its name, the size it makes.
-  const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const size = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, targetArea: sizeArea || 0 });
-  const sizeText = `${ratioName(size.shown.width, size.shown.height)} · ${size.shown.width}×${size.shown.height}`;
-  // A long run says so before it starts; a quick one needs no warning.
-  const estimate = generationEstimate?.ms && generationEstimate.ms >= 45_000 ? `Takes ${estimatePhrase(generationEstimate)}.` : '';
-  const hasReferences = Boolean((referenceInputs || []).length);
-  const lorasOffered = mode !== 'video' || currentProfile?.capabilities?.lora;
-  const fixedSeed = String(seed || '').trim();
-  const stepsOffered = currentProfile?.family !== 'grok' && currentProfile?.capabilities?.steps !== false;
-  const advancedText = [sampler ? String(sampler) : '', fixedSeed ? `Seed ${fixedSeed}` : '', Number(view.prefs?.runUpscale) ? `Upscale ${Number(view.prefs.runUpscale) === 4096 ? '4K' : '2K'}` : ''].filter(Boolean).join(' · ');
-  const blocked = restarting || (!comfyOffline && (!prompt.trim() || generateDisabled));
-  const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
-
-  // Clear at the end of the References and LoRAs rows, with Undo in the status pill.
-  const clearReferences = () => {
-    const cleared = [...picked];
-    removeReferenceAsset(cleared.map((item) => item.slot));
-    showToast('References cleared', 'default', { action: { label: 'Undo', onClick: () => cleared.forEach((item) => selectReferenceAsset(item.slot, item.asset)) } });
-  };
-
-  // A focused Prompt or Negative shows only itself, above the keyboard (useTextFocus).
-  const [textFocus, setTextFocus] = React.useState(false);
-  React.useEffect(() => { if (!open) setTextFocus(false); }, [open]);
-
-  const go = () => {
-    if (comfyOffline) { retryComfyStatus(); return; }
-    if (restarting) return;
-    // generate() explains anything missing; only close when it can actually run.
-    const ready = prompt.trim() && !generateDisabled;
-    generate();
-    if (ready) onClose();
-  };
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      full
-      className={cn('phone-create', textFocus && 'is-text-focus')}
-      title="Create"
-      footer={
-        <>
-          {/* Two lines, always in view: Steps and the count, then Image | Video, Clear and Generate. */}
-          {stepsOffered || (variations && maxCount > 1) ? (
-            <div className="create-footer-tune">
-              {stepsOffered ? <NumberPicker className="create-tune create-steps" label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /> : null}
-              {variations && maxCount > 1 ? <NumberPicker className="create-tune composer-count-picker create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" /> : null}
-            </div>
-          ) : null}
-          <div className="create-footer">
-            <ComposerModeSelect mode={mode} onChange={view.changeMode} tips={false} />
-            <button type="button" className="phone-icon create-reset" aria-label="Clear All" aria-description="Clears the prompt, negative prompt, references and LoRAs" onClick={view.resetCreation}><Eraser size={20} /></button>
-            <button type="button" className={cn('phone-generate create-generate', restarting && 'is-restarting', comfyOffline && !restarting && 'is-offline')} aria-label={comfyOffline ? 'Check Again' : 'Generate'} aria-description={(generateDisabled && prompt.trim() ? generateDisabledReason : estimate) || undefined} aria-disabled={blocked || undefined} onClick={go}>
-              {restarting || comfyOffline ? <RefreshCw size={18} className={cn((restarting || comfyRetrying) && 'spin')} /> : <ArrowUp size={18} strokeWidth={2.4} />}
-              <span>{restarting ? 'Restarting' : comfyOffline ? 'Check Again' : 'Generate'}</span>
-            </button>
-          </div>
-        </>
-      }
-    >
-      {/* One flat column: the prompt takes the room that's left, then one row per choice. */}
-      <div className="create-flow">
-        <div className="create-prompts">
-          <PromptField kind="positive" fill selectAll focusMode onFocusModeChange={setTextFocus} value={prompt} ariaLabel="Prompt" onChange={(value) => setPrompt(clampText(value, promptLimit))} onClear={() => setPrompt('')} historyAvailable={Boolean(recentPrompts.length)} historyOpen={historyOpen && historyKind === 'positive'} onHistory={() => { setHistoryKind('positive'); setHistoryOpen(true); }}
-            assistant={assistant?.available ? ({ focused, keepFocus }) => <PromptAssistantButton assistant={assistant} phone focused={focused} keepFocus={keepFocus} hasPrompt={Boolean(prompt.trim())} /> : null} busy={assistant?.busy === 'rewrite'} />
-          {assistant ? <LoraSuggestionChips assistant={assistant} /> : null}
-          {currentProfile?.capabilities?.negativePrompt !== false ? <PromptField kind="negative" minRows={2} focusMode onFocusModeChange={setTextFocus} value={negative} onChange={(value) => setNegative(clampText(value, negativeLimit))} onClear={() => setNegative('')} historyAvailable={Boolean(recentNegatives.length)} historyOpen={historyOpen && historyKind === 'negative'} onHistory={() => { setHistoryKind('negative'); setHistoryOpen(true); }}
-            assistant={assistant?.negativeOffered ? <NegativeAssistantButton assistant={assistant} hasPrompt={Boolean(prompt.trim())} /> : null} busy={assistant?.busy === 'negative'} /> : null}
-        </div>
-        <div className="list-group create-options">
-          <ListButton className="phone-model-browse" label="Model" value={currentProfile ? modelName(currentProfile).name : 'Choose'} data-open-trigger aria-label="Choose Model" aria-haspopup="dialog" aria-expanded={pop === 'model'} onClick={() => toggle('model')} />
-          {hasReferences ? (
-            // The chooser's button lands here (ReferenceSlots portals into the tools), as wide as the row; Clear sits at its end.
-            <div className={cn('list-row is-static create-references', picked.length > 0 && 'has-picks')}>
-              <span className="list-row-label">References</span>
-              <div className="composer-reference-tools" />
-              {picked.length ? <button type="button" className="list-row-clear" aria-label="Clear References" onClick={clearReferences}><X size={16} aria-hidden="true" /></button> : null}
-            </div>
-          ) : null}
-          {/* Edit or Reference, in plain sight: on a phone there's no hover to open the chip's menu, and no tooltip to say what each does. */}
-          <AnimatePresence initial={false}>
-            {referenceRole ? (
-              <motion.div key="role" className="phone-ref-role" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={heightTween}>
-                <div className={cn('ref-menu-role', referenceRole.value === 'reference' && 'is-ref', referenceRole.locked && 'is-locked')} role="radiogroup" aria-label="What This Image Is">
-                  <i aria-hidden="true" />
-                  {(['edit', 'reference'] as const).map((value) => (
-                    // A painted mask settles it as Edit: Reference stays, unavailable, and the line says why.
-                    <button key={value} type="button" role="radio" aria-checked={referenceRole.value === value} aria-disabled={(referenceRole.locked && value === 'reference') || undefined} className={cn(referenceRole.value === value && 'is-active')} onClick={() => { if (referenceRole.locked && value === 'reference') { return; } referenceRole.onChange(value); }}>
-                      {value === 'edit' ? 'Edit' : 'Reference'}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-          {lorasOffered ? (
-            <div className={cn('list-row-wrap', view.loraSummary && 'has-clear')}>
-              <ListButton label="LoRAs" value={view.loraSummary || 'None'} end={view.loraSummary ? 'none' : 'chevron'} data-open-trigger aria-label="LoRAs" aria-haspopup="dialog" aria-expanded={Boolean(view.lorasOpen)} onClick={() => view.openLoras()} />
-              {view.loraSummary ? <button type="button" className="list-row-clear" aria-label="Clear LoRAs" onClick={view.clearLoras}><X size={16} aria-hidden="true" /></button> : null}
-            </div>
-          ) : null}
-          {!aspectLocked ? (
-            <ListButton label="Size" value={sizeText} data-open-trigger aria-label={`Size: ${sizeText}`} aria-haspopup="dialog" aria-expanded={pop === 'size'} onClick={() => toggle('size')} />
-          ) : <ListItem label="Size"><span className="list-row-value">Follows the image · {size.shown.width}×{size.shown.height}</span></ListItem>}
-          <ListButton label="Advanced" value={advancedText} data-open-trigger aria-label="Advanced Settings" aria-haspopup="dialog" aria-expanded={pop === 'advanced'} onClick={() => toggle('advanced')} />
-        </div>
-        <ReferenceSlots
-          scope={`${mode}:${view.model}`}
-          inputs={referenceInputs || []}
-          openRequest={view.referenceOpenRequest}
-          inpaint={referenceInpaint}
-          role={referenceRole}
-          selected={referenceAssets || []}
-          onSelect={selectReferenceAsset}
-          onRemove={removeReferenceAsset}
-          onError={(message) => showToast(message, 'error')}
-        />
-      </div>
-      <PromptHistorySheet
-        kind={historyKind}
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        onPick={(text) => { if (historyKind === 'negative') setNegative(clampText(text, negativeLimit)); else setPrompt(clampText(text, promptLimit)); setHistoryOpen(false); }}
-        onError={(message) => showToast(message, 'error')}
-      />
-
-      <AnimatePresence>
-        {open && pop === 'model' ? <ComposerSurface key="model" title="Model" icon={<Wand2 size={16} />} trigger='[data-open-trigger][aria-label="Choose Model"][aria-expanded="true"]' className="phone-model-pop" bodyClassName="phone-model-pop-body" onClose={() => setPop('')}><PhoneModelList view={view} onPicked={() => setPop('')} /></ComposerSurface> : null}
-        {open && pop === 'size' ? <ComposerSurface key="size" title="Size" icon={<Ratio size={16} />} trigger='[data-open-trigger][aria-label^="Size:"][aria-expanded="true"]' className="phone-size-pop" bodyClassName="phone-size-pop-body" onClose={() => setPop('')}><PhoneSize view={view} /></ComposerSurface> : null}
-      </AnimatePresence>
-      <AdvancedPopover open={open && pop === 'advanced'} onClose={() => setPop('')}>{phoneAdvancedControls}</AdvancedPopover>
-    </Sheet>
-  );
-}
-
-/** The model chooser's list (UI-PATTERNS › Pickers): search, Fast | Quality, favourites and family groups. */
-function PhoneModelList({ view, onPicked }: { view: Record<string, any>; onPicked: () => void }) {
-  const { modelProfiles, model, pickModel, modelMenu } = view as { modelProfiles: Profile[]; model: string; pickModel: (id: string) => void; modelMenu?: ModelMenuState };
-  const { profiles, menu, isFavourite, query, setQuery, filters, setFilters, sections, noMatchText } = useModelCatalogue(modelProfiles, model, modelMenu);
-  const recipes = recipesFor(modelProfiles || [], model);
-  const row = (profile: Profile) => (
-    <div key={profile.id} className={cn('list-row model-pop-row', profile.id === model && 'is-selected')}>
-      <button type="button" className="model-pop-pick" aria-current={profile.id === model || undefined} onClick={() => { pickModel(profile.id); onPicked(); }}>
-        <span className="model-pop-name">{modelName(profile).name}<small className={cn(setupNote(profile) && 'is-setup')}>{[modelDetails(profile), setupNote(profile)].filter(Boolean).join(' · ')}</small></span>
-        <SelectedTick on={profile.id === model} className="list-row-end" />
-      </button>
-      {menu ? (
-        <button type="button" className={cn('picker-star', isFavourite(profile.id) && 'is-on')} aria-pressed={isFavourite(profile.id)} aria-label={isFavourite(profile.id) ? 'Remove from Favourites' : 'Add to Favourites'} onClick={() => menu.toggleFavorite(profile.id)}>
-          <Star size={16} fill={isFavourite(profile.id) ? 'currentColor' : 'none'} />
-        </button>
-      ) : null}
-    </div>
-  );
-  return (
-    <>
-      <div className="phone-model-tools">
-        {recipes.length ? <ListItem label="Recipe"><ListSelect label="Recipe" value={model} options={recipes.map((profile) => ({ value: profile.id, label: profile.recipe!.label }))} onChange={(value) => pickModel(value)} /></ListItem> : null}
-        {profiles.length ? <PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={<label className="picker-search">
-            <Search size={16} aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" spellCheck={false} autoComplete="off" />
-            {query ? <button type="button" aria-label="Clear Model Search" onClick={() => setQuery('')}><X size={14} /></button> : null}
-          </label>}>
-          <CatalogueFilters value={filters} onChange={setFilters} />
-        </PickerTools> : null}
-      </div>
-      {!profiles.length ? (view.comfyStatus?.connected ? <EmptyState title="No Models Yet">Add a model to ComfyUI to see it here.</EmptyState> : <EmptyState title="ComfyUI Is Offline">Models show up when it’s back.</EmptyState>) : null}
-      {sections.map((section) => <ListSection key={section.id} title={section.label || undefined}>{section.rows.map(row)}</ListSection>)}
-      {profiles.length && !sections.length ? <EmptyState title="No Matching Models">{noMatchText}</EmptyState> : null}
-    </>
-  );
-}
-
-/**
- * Size, in the pop-up over Create, as on the desktop: the model's native
- * resolutions as one full-width toggle, then one vertical list of the shapes
- * (the shared list rows: the shape, its name, the size it makes and the amber
- * tick), Custom last, then Width and Height, always in view and enabled only
- * while Custom is the pick. A shape or resolution goes back to the preset.
- */
-const shapeIn = (w: number, h: number) => { const scale = Math.min(22 / (w || 1), 16 / (h || 1)); return { width: Math.max(6, Math.round(w * scale)), height: Math.max(6, Math.round(h * scale)) }; };
-
-function PhoneSize({ view }: { view: Record<string, any> }) {
-  const {
-    aspectOptions, aspectPickerValue, aspectValue, defaultAspectSize, applyAspect, mode, currentProfile, customSize, sizeTier, sizeMax, customLimits,
-    chooseSizeTier, setCustomDimensions, sizeTiers, sizeArea, megapixelControl
-  } = view;
-  const tier: SizeTier = customSize ? 'custom' : sizeTier || 'none';
-  const tiers: SizeTier[] = sizeTiers || (mode === 'image' ? ['none', '2k', 'custom'] : ['none', 'custom']);
-  const { custom, picked, shown, rows, isActive, note } = sizeMenuModel({ value: aspectPickerValue, options: aspectOptions || [], currentSize: aspectValue, defaultSize: defaultAspectSize, tier, native: currentProfile?.native, sizeMax, limits: customLimits, targetArea: sizeArea || 0 });
-  const resolutions = tiers.filter((item) => item !== 'custom');
-  return (
-    <div className="phone-size">
-      {resolutions.length > 1 ? <SizeTabs tiers={resolutions} labelled={false} value={tier} onChange={(next) => { chooseSizeTier(next); }} /> : null}
-      <div className="list-group size-options" role="listbox" aria-label="Shape">
-        {rows.map((row) => (
-          <ListButton key={row.key} className="size-option" role="option" aria-selected={isActive(row)} selected={isActive(row)} end="check"
-            aria-label={`${row.small ? `${row.label}, ${row.small}` : row.label}, ${row.size.width} × ${row.size.height}`}
-            lead={<span className="aspect-shape" style={shapeIn(row.shape.w, row.shape.h)} />}
-            label={<>{row.label}{row.small ? <small>{row.small}</small> : null}</>}
-            value={`${row.size.width}×${row.size.height}`}
-            onClick={() => applyAspect(row.value)} />
-        ))}
-        {customLimits ? (
-          <ListButton className="size-option is-custom" role="option" aria-selected={custom} selected={custom} end="check"
-            aria-label={custom ? `Custom, ${picked.width} × ${picked.height}` : 'Custom'}
-            lead={<span className="aspect-shape" style={shapeIn(shown.width, shown.height)} />}
-            label="Custom" value={custom ? `${picked.width}×${picked.height}` : ''}
-            onClick={() => chooseSizeTier('custom')} />
-        ) : null}
-      </div>
-      {megapixelControl ? <div className="phone-size-mp"><MegapixelField current={(shown.width * shown.height) / MEGAPIXEL} control={megapixelControl} custom={custom} /></div> : null}
-      {customLimits ? <div className="size-custom phone-size-fields"><LinkedSizeFields size={custom ? picked : shown} limits={customLimits} onChange={setCustomDimensions} disabled={!custom} /></div> : null}
-      {note ? <p className="list-note">{note}</p> : null}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ More */
-
-type MenuItem = { id: string; Icon: typeof Search; label: string; run: () => void; danger?: boolean; disabled?: boolean; /** A count after the label, as on the desktop's Stop All. */ count?: number } | 'divider';
-
-/**
- * A small pop-up menu anchored under a top-bar button, over the page
- * (UI-PATTERNS › Surfaces): compact rows with an icon, no boxes. The same
- * glass and motion as the Create pop-ups; one at a time (phoneLayers.ts).
- */
-function PhoneMenu({ open, onClose, trigger, label, items, align = 'right' }: { open: boolean; onClose: () => void; trigger: string; label: string; items: MenuItem[]; align?: 'left' | 'right' }) {
-  const menuRef = React.useRef<HTMLDivElement>(null);
-  const opener = React.useRef<HTMLElement | null>(null);
-  if (open && !opener.current) opener.current = document.querySelector<HTMLElement>(trigger);
-  if (!open) opener.current = null;
-  usePhoneLayer(open, 'pop');
-  useDismiss([menuRef, opener], open, onClose);
-  React.useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-  const [left] = React.useState(() => 0);
-  const anchorLeft = open && align === 'left' ? Math.max(8, (opener.current?.getBoundingClientRect().left || 8) - 4) : left;
-  const settling = useSettling();
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div ref={menuRef} key="menu" className={cn('phone-menu', align === 'left' && 'is-left')} style={align === 'left' ? { left: anchorLeft, right: 'auto' } : undefined} role="menu" aria-label={label}
-          {...popoverMotion} {...settling}>
-          {items.map((item, index) => item === 'divider'
-            ? <i key={`divider-${index}`} className="phone-menu-divider" aria-hidden="true" />
-            : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} aria-label={item.count ? `${item.label} (${item.count})` : undefined} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span>{item.count ? <i className="phone-menu-count">{item.count}</i> : null}</button>)}
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
-/** The top bar's menu: Select, Library, Settings, then Account and Sign Out. Gallery switches live in Settings; Stop All is in what's running. */
-function MoreMenu({ view, open, onClose, onSelect }: { view: Record<string, any>; open: boolean; onClose: () => void; onSelect?: () => void }) {
-  const [signingOut, setSigningOut] = React.useState(false);
-  const items: MenuItem[] = [];
-  if (onSelect) items.push({ id: 'select', Icon: CheckSquare, label: 'Select', run: () => { onClose(); onSelect(); } });
-  // Update Available shows as the Library's count, as the desktop dock's dot.
-  if (view.models?.features?.library === true) items.push({ id: 'library', Icon: Library, label: 'Library', count: view.models.features.libraryUpdates || undefined, run: () => { onClose(); view.setLibraryOpen(true); } });
-  items.push({ id: 'settings', Icon: Settings, label: 'Settings', run: () => { onClose(); view.openSettings('studio'); } });
-  if (hasAccountStorageScope()) items.push('divider',
-    { id: 'account', Icon: UserRound, label: 'Account', run: () => { onClose(); view.openSettings('account'); } },
-    { id: 'sign-out', Icon: LogOut, label: signingOut ? 'Signing Out…' : 'Sign Out', danger: true, disabled: signingOut, run: () => { setSigningOut(true); signOutAccount().catch(() => { setSigningOut(false); view.showToast('Couldn’t sign out', 'error'); }); } });
-  return <PhoneMenu open={open} onClose={onClose} trigger=".phone-menu-trigger" label="Menu" items={items} />;
 }

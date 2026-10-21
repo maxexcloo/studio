@@ -1,14 +1,15 @@
+import type { SidebarView } from './useStudio';
 import { NumberPicker } from './components';
 import { usePhone } from './device';
 import { ListItem, ListSection, ListSelect } from './SheetList';
 import { durationOptions } from './videoDuration';
 
 /** Duration and frame rate for a video model, as rows of the Advanced Settings list. */
-export function VideoDurationControls({ view }: { view: any; phone?: boolean }) {
+export function VideoDurationControls({ view }: { view: SidebarView; phone?: boolean }) {
   const native = usePhone();
   const { currentProfile: profile, mode, frames, setFrames, fps, setFps, fpsMeta } = view;
   if (mode !== 'video' || !profile) return null;
-  const effectiveFps = profile.capabilities.fps ? fps : Number(profile.defaults.fps || profile.constraints.fps?.default || 24);
+  const effectiveFps = profile.capabilities.fps ? fps : Number(profile.defaults.fps || profile.constraints?.fps?.default || 24);
   const options = durationOptions(profile, frames, effectiveFps);
   const editableFps = profile.capabilities.fps && !(Number.isFinite(fpsMeta.min) && fpsMeta.min === fpsMeta.max);
   if (!options.length && !editableFps) return null;

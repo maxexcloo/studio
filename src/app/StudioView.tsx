@@ -5,7 +5,6 @@ import { GalleryManagement } from './GalleryManagement';
 import { AnimatePhotos, animationProfiles } from './AnimatePhotos';
 import { PromptField } from './PromptField';
 import { LoraSuggestionChips, NegativeAssistantButton, PromptAssistantButton, assistantButtonWidth, negativeAssistantWidth } from './PromptAssistant';
-import type { PromptAssistant } from './usePromptAssistant';
 import { AdvancedPopover, LoraPopover } from './LoraPopover';
 import React from 'react';
 import { preloadable } from './preloadable';
@@ -65,18 +64,20 @@ import { useHistoryDismiss } from './useHistoryDismiss';
 import { useFocusTrap } from './useFocusTrap';
 import { PromptHistoryPopover } from './PromptHistory';
 import { GallerySearchBar, SearchEmpty, useGallerySearchKeys } from './GallerySearch';
-import { canStar, emptySearch, FavoriteContext, searchActive, type GallerySearch } from './favorites';
+import { canStar, emptySearch, FavoriteContext, searchActive } from './favorites';
 import { refreshPrompts, usePromptHistory } from './recentPrompts';
-import type { GalleryItem } from './types';
+import type { ComfyStatus, GalleryItem } from './types';
 import { memoLatest } from '@/lib/memo-latest';
 import { useGalleryTopAnchor } from './useGalleryTopAnchor';
+import { StableModelLoraControls, StablePhoneAdvancedControls } from './SidebarControls';
+import type { StudioViewModel } from './useStudio';
 
 // App rebuilds every prop on each render (a keystroke in the prompt, a poll);
 // these skip re-rendering unless their data actually changed.
 const StableGallery = memoLatest(VirtualMasonryGallery);
 const StableComposerBar = memoLatest(ComposerBar);
 
-function comfyStatusLabel(status: any) {
+function comfyStatusLabel(status: ComfyStatus | null | undefined) {
   const name = status?.label || "ComfyUI";
   // No worker can run what's selected (or none is set up): say that, not "offline".
   if (status?.noWorkers) return status.error || "No workers set up";
@@ -98,7 +99,7 @@ const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ def
 // One empty list until models load, so the tiles' profile context holds steady.
 const noProfiles: never[] = [];
 
-function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retrying: boolean; onClick: () => void }) {
+function ComfyConnectionDot({ status, retrying, onClick }: { status: ComfyStatus | null | undefined; retrying: boolean; onClick: () => void }) {
   const state = status?.restarting ? "restarting" : status?.checking || retrying ? "checking" : status?.connected ? "connected" : "disconnected";
   return (
     <Tip content={comfyStatusLabel(status)}>
@@ -109,19 +110,16 @@ function ComfyConnectionDot({ status, retrying, onClick }: { status: any; retryi
   );
 }
 
-export function StudioView({ view }: { view: Record<string, any> }) {
+export function StudioView({ view }: { view: StudioViewModel }) {
   const { active, applyAllSettings, applyLoras, applyAspect, aspectOptions, aspectPickerValue, aspectValue, aspectLocked, defaultAspectSize, canUseStartImage, cancelJob, cancelQueue, characterMeta, clickViewer, comfyStatus, galleryGroups, stackRuns, openRuns, setRunOpen, unstackRun, copyToClipboard, count, countMeta, currentProfile, customSize, formatElapsed, galleryColumnCount, galleryLoaded, galleryCrossing, galleryStageRef, generate, generateDisabled, generateDisabledReason, generationDetailEntries, hasMoreGallery, height, heightMeta, isDraggingViewer, loadMoreGalleryItems, loraActiveCount, loraSummary, mode, model, modelProfiles, models, moveViewer, moveViewerTouch, negative, negativeLimit, onGalleryScroll, openItem, prefs, profileBadges, prompt, promptLimit, refreshComfyStatus, removeReferenceAsset, renderedGallery, resetViewer, runningCount, selectReferenceAsset, setActive, setCount, setHeight, setNegative, setPrompt, setSettings, setShowDetails, setShowNegativePrompt, setSteps, setWidth, setWorkflowGalleryOpen, showDetails, settings, showNegativePrompt, showToast, startViewerDrag, startViewerTouch, steps, stepsMeta, stopViewerDrag, submitPrompt, useOutputAsStartImage, viewerDragEndRef, viewerDragRef, viewerPan, viewerZoom, wheelViewer, width, widthMeta, workflowGalleryOpen, promptRef, dragViewer, endViewerTouch, titleFromPrompt, zoomViewer, clampText, promptRemaining, chooseModel, pickModel, modelMenu, visibleGallery, upscaleBusyIds, activateUpscale, cancelUpscale, upscaleDisplayUrl, upscaleSetup, upscaleStatus, upscaleInstall, upscaleUnavailableReason, health, setPrefs, refreshModels, refreshWorkflows, modelFolders } = view;
   // Smart upscale works on images, and only while it is on in Settings.
   const strayModelCount = modelFolders?.strayCount || 0;
   const canUseNegativePrompt = true;
   const negativeSupported = currentProfile?.capabilities?.negativePrompt !== false;
   const { referenceAssets, referenceInputs, referenceInpaint, referenceRole, retryComfyStatus, comfyRetrying, comfyReconnectedAt } = view;
-  const assistant = view.assistant as PromptAssistant | undefined;
+  const { assistant, gallerySearch, setGallerySearch, toggleFavorite } = view;
   // Refine in Chat opens the deployment's chat, or copies the job reference without one.
   const chatUrl = useChatAddress();
-  const gallerySearch = (view.gallerySearch || emptySearch) as GallerySearch;
-  const setGallerySearch = view.setGallerySearch as (next: GallerySearch) => void;
-  const toggleFavorite = view.toggleFavorite as (items: GalleryItem[], favorite: boolean) => void;
   const searchOn = searchActive(gallerySearch);
   const [searchOpen, setSearchOpen] = React.useState(false);
   // Phones get the simplified phone studio, unless someone chose the full one.
@@ -340,7 +338,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const thisComputer = useThisComputer();
   // A generation stands in for itself only where its tile can't be seen: the
   // viewer on another image, or the gallery scrolled away.
-  const pendingIds = React.useMemo(() => ((visibleGallery || []) as GalleryItem[]).filter((item) => item.status === "pending").map((item) => item.id), [visibleGallery]);
+  const pendingIds = React.useMemo(() => visibleGallery.filter((item) => item.status === "pending").map((item) => item.id), [visibleGallery]);
   const pendingTileOnScreen = useTilesOnScreen(galleryStageRef, !phone && !active ? pendingIds : []);
   const watchingGeneration = active ? active.status === "pending" : pendingTileOnScreen;
   const generationActivity = useGenerationActivity({
@@ -365,7 +363,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   const viewerCopy = useCopyFeedback();
   // The catalogue's LoRA titles, asked for once an output with LoRAs opens, so Details names them (UI-PATTERNS › Lists).
   const [loraInfos, setLoraInfos] = React.useState(() => knownLoraInfo());
-  const activeHasLoras = Boolean(active?.settings?.loras?.length);
+  const activeLoras = active?.settings?.loras;
+  const activeHasLoras = Array.isArray(activeLoras) && activeLoras.length > 0;
   React.useEffect(() => {
     if (!activeHasLoras || loraInfos) return;
     let live = true;
@@ -374,7 +373,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
   }, [activeHasLoras, loraInfos]);
   const [compareOpen, setCompareOpen] = React.useState(false);
   // The pictures either side of the open one are fetched ahead, so a swipe lands on one already there.
-  useNeighborPrefetch(active || null, (view.viewerGallery || []) as GalleryItem[]);
+  useNeighborPrefetch(active || null, view.viewerGallery);
   // On a phone Details covers the video, so it pauses until Details closes (mediaCover.ts).
   React.useEffect(() => (phone && showDetails && active?.type === "video" ? coverMedia() : undefined), [phone, showDetails, active?.id, active?.type]);
   // A different image has its own comparison, so never carry the mode over.
@@ -576,7 +575,6 @@ export function StudioView({ view }: { view: Record<string, any> }) {
               refreshComfyStatus={retryComfyStatus}
               comfyRetrying={Boolean(comfyRetrying)}
               referenceInputs={referenceInputs}
-              referenceOpenRequest={view.referenceOpenRequest}
               referenceInpaint={referenceInpaint}
               referenceRole={referenceRole}
               loraMismatch={view.loraMismatch}
@@ -639,8 +637,8 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         />
       ) : null}
       <ShortcutsSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}>{view.phoneAdvancedControls}</AdvancedPopover>}
-      <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}>{React.isValidElement(view.modelLoraControls) ? React.cloneElement(view.modelLoraControls as React.ReactElement<{ browseFirst?: boolean }>, { browseFirst: true }) : view.modelLoraControls}</LoraPopover>
+      {phone ? null : <AdvancedPopover open={advancedOpen} onClose={() => setAdvancedOpen(false)}><StablePhoneAdvancedControls view={view.sidebarView} /></AdvancedPopover>}
+      <LoraPopover open={lorasOpen} onClose={() => setLorasOpen(false)}><StableModelLoraControls view={view.sidebarView} browseFirst /></LoraPopover>
       {animationItems ? <AnimatePhotos items={animationItems} profiles={models?.profiles || []} autoResizeInputs={prefs.autoResizeInputs} onClose={() => setAnimationItems(null)} /> : null}
       {modelFolders ? <ModelFoldersDialog folders={modelFolders} runningCount={runningCount} /> : null}
       <UpscaleSetupDialog
@@ -656,7 +654,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
       />
       <ActivityColumn activities={[upscaleActivity, modelActivity, generationActivity]} onHeight={setIslandsHeight} />
       {active ? (() => {
-        const hasNeighbors = ((view.viewerGallery || []) as GalleryItem[]).length > 1;
+        const hasNeighbors = view.viewerGallery.length > 1;
         // What made this output, at the top of its preview: the profile it ran
         // through, then the settings worth seeing without opening Details.
         // Its profile's friendly name, also for an output from a profile renamed since (itemProfile.ts).
@@ -680,7 +678,7 @@ export function StudioView({ view }: { view: Record<string, any> }) {
         ].filter(Boolean).join(' · ');
         // The phone's title sits in the top row beside Star · Info · Close: the
         // name, then where it is in the gallery, when it was made and its size.
-        const viewerList = (view.viewerGallery || []) as GalleryItem[];
+        const viewerList = view.viewerGallery;
         const viewerIndex = viewerList.findIndex((item) => item.id === active.id);
         const phoneDetail = [
           viewerList.length > 1 && viewerIndex >= 0 ? `${viewerIndex + 1} / ${viewerList.length}` : '',
