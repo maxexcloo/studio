@@ -214,17 +214,6 @@ export function generationDetailEntries(item: GalleryItem, names: { profile?: st
     add("Sampling (Est.)", elapsed(timing?.samplingMs));
     add("Finishing (Est.)", elapsed(timing?.finishMs));
   });
-  const timingSection = sections.find((entry) => entry.title === "Timing");
-  // Measured times are worker execution (Active) and the whole wait (Total); the Est. rows split Active up.
-  if (timingSection) {
-    const has = (test: (label: string) => boolean) => timingSection.rows.some(([label]) => test(label));
-    timingSection.note = [
-      has((label) => label === "Active") ? "Active is the worker’s run after queueing." : "",
-      has((label) => label === "Upscale") ? "Upscale runs after the picture is saved." : "",
-      has((label) => label === "Total") ? "Total also counts queueing, transfer and finishing." : "",
-      has((label) => label.endsWith("(Est.)")) ? "Est. rows are estimates." : "",
-    ].filter(Boolean).join(" ");
-  }
   return sections;
 }
 

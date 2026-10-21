@@ -65,8 +65,7 @@ test('Details copies generation inputs, excludes output metadata and keeps per-p
     await expect(settings.getByText(label, { exact: true })).toBeVisible();
     await expect(settings.getByText(value, { exact: true })).toBeVisible();
   }
-  // Measured times are explained, and estimates stay marked as estimates.
-  await expect(settings.getByText('Active is the worker’s run after queueing. Total also counts queueing, transfer and finishing. Est. rows are estimates.', { exact: true })).toBeVisible();
+  await expect(settings.locator('.detail-note')).toHaveCount(0);
   // Prompt, Model, Settings and Output (the picture and its file together), then Timing; rows read alphabetically.
   expect(await settings.locator('.detail-heading').allInnerTexts()).toEqual(['Model', 'Settings', 'Output', 'Timing']);
   const output = settings.locator('.detail-section').filter({ has: page.getByRole('heading', { name: 'Output', exact: true }) });

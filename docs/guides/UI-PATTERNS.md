@@ -625,7 +625,7 @@ kind of element:
   timestamps, timing and artefact metadata stay out. There is no Edit or
   separate Copy Settings action. **Timing** lists Active (the worker's run
   after queueing) before Queue and Total (which also counts transfer and
-  finishing), with one muted line saying so; split-up times keep "(Est.)".
+  finishing); split-up times keep "(Est.)". No explanatory line.
 - **Viewer title:** always shown top left on both devices, as plain text with
   no box: the profile name, then a muted line with the position ("2 / 40"),
   the time, the size and steps (a video adds its duration). The phone keeps it
