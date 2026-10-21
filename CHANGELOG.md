@@ -11,6 +11,19 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Studio becomes a hard fork of HEISS UI: Studio names everywhere, with the old settings, headers, cookie and browser storage still read, and dead upstream code removed
+
+### Changed
+- **Hard fork:** Studio no longer follows HEISS UI and owns all of its code. The HEISS UI and J-AI Studio credits and MIT notices stay in Settings › About, `LICENSE` and the README; the upstream-sync instructions and community links are gone.
+- **Settings:** every `HEISS_*` setting is now `STUDIO_*` (`STUDIO_DATA_DIR`, `STUDIO_ALLOWED_HOSTS` and the rest). The old names still work from the environment or Studio's settings file, read when the new name is unset, and the log names any still in use in one line. Saving a setting writes only the new name. See Configuration › Renamed Settings.
+- **Browser names:** pages send `X-Studio` and read `X-Studio-Sign-In`; the old `X-HEISS` header is still accepted. A device signed in with the old `heiss_device` cookie stays signed in and moves to `studio_device`. Preferences, drafts, LoRA favourites and other browser storage move from their `heiss-ui` names to Studio names on the first visit.
+- **On-disk names:** the `heiss-ui` output and media folders, `.heiss-trash` and the `heissUi` profile block stay as they are; Studio also recognises the Studio folder names, and Configuration › On-Disk Names describes the later explicit migration. New ComfyUI run records and upscale markers use Studio names, and those written before are still read. Logs are `studio-YYYY-MM-DD.log`.
+- **`/api/ping`** answers `app: "studio"`.
+- **Removed:** routes and screens no UI reached (the old network, LAN, ComfyUI address and output-folder settings, opening the output folder, Clear Cache, the upscale download preview and the crash kit with its log route), confirmations that never asked, unused packages, styles and images. Only Reset All Settings asks first, as before.
+- **Popovers:** Prompt History and the Size menu open above their buttons and stay on screen like every other popover; the account menu sits 8 px from the dock.
+- **Speed:** a finished run's PNGs get their Civitai parameters in parallel without holding up the server, and requests for a worker's node list share one fetch.
+- **Code:** App state in `main.tsx` is split into focused hooks; the data folder, version, JSON files and duplicate formatters each have one home.
+
 ## [0.40.1] - 2026-10-21
 
 > Publishes the 0.40.0 changes, whose release check timed out; see 0.40.0 below for what changed
