@@ -266,7 +266,9 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
   of its row in a list (`row`), a compact bordered pill in a toolbar (`pill`),
   a filled well in a form (`field`), or a picker heading's menu (`heading`,
   the phone views and Stacks, in the foreground and the selected tint while
-  open). It is a combobox named by its label.
+  open), or only an icon in an icon row (`icon`: the prompt assistant's caret
+  on the desktop and its magic button on the phone). It is a combobox named by
+  its label.
 - **Menu:** the shared popover placement and motion (see
   [Surfaces](#surfaces)), on the panel glass with `--r-menu`; on a phone the
   pop-up list's width, still anchored to its trigger and one layer only. Rows
@@ -343,6 +345,11 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   Profile names show as they are, on two lines at most.
 - A model's own LoRA limit shows as one quiet line under the heading
   (Radiance video: "Up to rank 64 in total").
+- **Suggested:** with the prompt assistant, This Model opens with a Suggested
+  section for the current prompt (cached per prompt and kept while the picker
+  is open, so rows never move), each row's line giving the reason, strength
+  and the trigger words it adds; the rest follow under More LoRAs. Picking a
+  suggested row adds it like a chip: its strength, its triggers, Undo.
 
 ## Empty States
 
@@ -371,16 +378,55 @@ A picker, tab or list with nothing to show uses `EmptyState`
   inpaint brush sit beside the button.
 - **LoRAs** use the same pattern: This Model | All Models | Selected n/max in
   the library, one tap to add or remove, no row animations.
+- **Prompt assistant** (`PromptAssistant.tsx`, `usePromptAssistant.ts`; only
+  for accounts with Prompt Assistant and a configured model, otherwise absent):
+  - **Magic button:** a Sparkles icon first in the prompt's action row, the
+    same quiet icon button as History and Clear. On the desktop a tap rewrites
+    with the last preset (Enhance at first) and a caret beside it opens the
+    shared Dropdown of presets (Enhance, Spicy only with NSFW Models,
+    Photographic, Cinematic, Concise, Candid), each with a one-line
+    description, then Suggest LoRAs as a command. On the phone the button
+    opens that list as the pop-up list, with the last preset ticked; it sits
+    in the row's one free place. In the focused-text row it rewrites with the
+    last preset in one tap and keeps the keyboard up, so the text streams in
+    where it is being edited.
+  - **While it writes:** the text streams into the field in place, the field
+    is read-only (no caret), History and Clear wait, and the button becomes
+    Stop. Stopping or a failure puts the original text back.
+  - **When it ends:** the pill says "Prompt rewritten · Enhance" ("Prompt and
+    negative rewritten" when the negative followed) with one Undo for both,
+    and the replaced text goes to History. Failures say why in the pill
+    ("Couldn’t rewrite the prompt. The prompt assistant took too long") with
+    Try Again; offline and not-set-up say so too. Nothing asks first.
+  - **References:** a vision model reads the attached references (downscaled
+    to 1024 px); otherwise the rewrite is text only and the button's tooltip
+    adds "References not read by this model."
+  - **Negative:** a Sparkles button beside Negative's History writes one, with
+    Undo. It is absent where the profile takes no negative (its capability, or
+    a guide whose negative does nothing), and a rewrite refreshes the
+    negative only there.
+  - **Suggested LoRAs:** after a rewrite or Suggest LoRAs, one row of chips
+    under the prompt (title, strength, the first triggers), ending in Add All
+    and a Dismiss; it scrolls sideways when full. A tap adds the LoRA at its
+    suggested strength, an added chip takes the amber tint and a second tap
+    takes it off. Adding puts its missing trigger words at the start of the
+    prompt (`assistantText.js`); Undo takes the LoRA and the words back. Taking
+    a suggested LoRA off the stack anywhere offers **Remove Trigger Words** in
+    the pill. Nothing is added without a tap.
+  - **Results** record the preset, model and chosen suggestions; Details shows
+    "Written By: Assistant · Enhance" ("Assistant in Chat" for MCP) and
+    the inputs Copy includes it.
 - **Number steppers:** one `NumberPicker` (minus, value, plus) everywhere; on
   touch screens each part is a 44 px target. Names read "Decrease Images",
   "Increase Steps".
 - **Phone Create sheet:** one flat column. The prompt takes the height the
-  rest leaves (it scrolls rather than grows), with Select All, History and
-  Clear in one row at its top right, centred on the first line of text (the
-  text runs beside it; the row has room for one more action). Every icon there
+  rest leaves (it scrolls rather than grows), with the prompt assistant's magic
+  button (when the account has it), Select All, History and Clear in one row at
+  its top right, centred on the first line of text (the text runs beside it).
+  Suggested LoRA chips follow the prompt as one sideways-scrolling row. Every icon there
   is the same quiet button: muted, `--control-hover`, the global press, amber
-  only while its surface (History) is open. Negative is two lines with History
-  and Clear.
+  only while its surface (History, the assistant's list) is open. Negative is
+  two lines with its assistant button, History and Clear.
   Then one row each for Model, References, LoRAs (their Clear on the right),
   Size and Advanced; each opens its pop-up list over Create. The sticky footer
   has two lines, always in view: Steps then the image count, labelled (the

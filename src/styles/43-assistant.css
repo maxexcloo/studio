@@ -1,0 +1,55 @@
+/* ------------------------------------------------------------ The prompt assistant */
+/* The magic button in the prompt's action row, the negative writer beside Negative and the
+   suggested LoRAs as chips under the prompt (PromptAssistant.tsx, UI-PATTERNS › Composer).
+   The same quiet icon buttons as History and Clear: the global press, --control-hover, no
+   movement; amber only for chips whose LoRA is in the stack. */
+.prompt-assistant-split { display: inline-flex; align-items: center; }
+.composer-field-tools .dropdown-trigger.is-icon { justify-content: center; gap: 0; padding: 0; }
+.dropdown-trigger.is-icon > svg { opacity: 1; }
+.composer-field-tools .prompt-assistant-caret.dropdown-trigger { width: 20px; min-width: 20px; height: 28px; min-height: 28px; margin-left: calc(-1 * var(--space-1)); }
+.prompt-assistant-menu.dropdown-trigger[aria-expanded="true"] > svg { rotate: none; }
+.prompt-assistant.is-busy { color: hsl(var(--foreground)); }
+.prompt-assistant-tip small { display: block; margin-top: var(--space-1); color: hsl(var(--muted-foreground)); font-size: 12px; }
+/* While a rewrite streams in, the text reads as written by someone else: no caret to type at. */
+.composer-prompt-field.is-writing textarea { caret-color: transparent; }
+
+/* The phone: the button takes the row's one free place, at the row's size. */
+.create-prompts .composer-field-tools .prompt-assistant-menu.dropdown-trigger { width: var(--prompt-tool-w); min-width: var(--prompt-tool-w); height: var(--prompt-tool-h); min-height: var(--prompt-tool-h); color: hsl(var(--muted-foreground)); }
+.create-prompts .composer-field-tools .prompt-assistant-menu.dropdown-trigger[aria-expanded="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
+.create-prompts .composer-prompt-field.has-assistant textarea { padding-right: calc(4 * var(--prompt-tool-w) + var(--space-3)) !important; }
+.create-prompts .is-negative.has-assistant textarea { padding-right: calc(3 * var(--prompt-tool-w) + var(--space-3)) !important; }
+.create-prompts .composer-prompt-field.is-text-focused.has-assistant textarea { padding-right: calc(4 * var(--prompt-tool-w) + 72px) !important; }
+
+/* Suggested LoRAs: one row of chips (title, strength, triggers) ending in Add All; it scrolls
+   sideways when it runs out of room. */
+.assistant-chips { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: 0 2px; }
+.assistant-chips-label { display: inline-flex; flex: none; color: hsl(var(--muted-foreground)); }
+.assistant-chips-scroll { display: flex; flex: 1 1 auto; align-items: center; gap: var(--space-3); min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.assistant-chips-scroll::-webkit-scrollbar { display: none; }
+.assistant-chip {
+  display: inline-flex; flex: none; align-items: center; gap: var(--space-2);
+  height: var(--control-h-sm); padding: 0 12px 0 10px;
+  border: 1px solid var(--glass-border); border-radius: var(--r-pill);
+  background-color: var(--control-fill); color: hsl(var(--foreground));
+  font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.assistant-chip:hover { background-color: var(--control-hover); }
+.assistant-chip:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.assistant-chip > svg { flex: none; color: hsl(var(--muted-foreground)); }
+.assistant-chip strong { max-width: 180px; overflow: hidden; font-weight: 550; text-overflow: ellipsis; }
+.assistant-chip em { color: hsl(var(--muted-foreground)); font-style: normal; font-variant-numeric: tabular-nums; }
+.assistant-chip small { max-width: 140px; overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 12px; text-overflow: ellipsis; }
+.assistant-chip.is-added { border-color: transparent; background-color: var(--selected-bg); color: var(--selected-ink); }
+.assistant-chip.is-added > svg { color: currentColor; }
+.assistant-chip.is-all { padding: 0 12px; font-weight: 600; }
+.assistant-chips-dismiss { flex: none; }
+.zen-prompt .assistant-chips-dismiss { width: 28px; height: 28px; }
+.zen-prompt:not(.is-expanded) .assistant-chips { display: none; }
+.lora-library-note.is-suggested { color: hsl(var(--muted-foreground)); }
+@media (pointer: coarse) {
+  .assistant-chip, .zen-prompt .assistant-chips-dismiss, .create-prompts .assistant-chips-dismiss { height: var(--control-h-touch); }
+  .create-prompts .assistant-chips-dismiss, .zen-prompt .assistant-chips-dismiss { width: var(--control-h-touch); }
+}
+.create-prompts .assistant-chips { flex: none; }
+.phone-create.is-text-focus .assistant-chips { display: none; }

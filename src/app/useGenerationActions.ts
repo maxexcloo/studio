@@ -189,7 +189,9 @@ export function useGenerationActions(view: any) {
         // Advanced Settings › Upscale: Smart Upscale runs in the run's own graph (server/run-upscale.js).
         ...(mode === "image" && prefs.smartUpscale && [2048, 4096].includes(Number(prefs.runUpscale)) ? { autoUpscale: { quality: prefs.upscaleQuality || "balanced", faceDetail: Boolean(prefs.upscaleFaceDetail), target: Number(prefs.runUpscale) } } : {}),
         startImageId: canUseStartImage ? startImageId : "",
-        startImageName
+        startImageName,
+        // What the prompt assistant did for this prompt (usePromptAssistant.ts), for Details.
+        ...(latest.current.assistantRecord?.() ? { assistant: latest.current.assistantRecord() } : {})
       };
       const queuedJobs: string[] = [];
       let postingError = "";

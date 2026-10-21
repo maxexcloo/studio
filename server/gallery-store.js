@@ -878,6 +878,8 @@ export function makePendingItems(id, body) {
     referenceImageName: body.startImageName || "",
     startImageId: body.startImageId || "",
     settings: generationSettings(body),
+    // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
+    ...(body.assistant ? { assistant: body.assistant } : {}),
     ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {})
   }));
 }
@@ -1034,6 +1036,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
       referenceImageName: body.startImageName || "",
       startImageId: body.startImageId || "",
       settings: generationSettings(body),
+      ...(body.assistant ? { assistant: body.assistant } : {}),
       outputName: item.filename,
       promptId: job.promptId || "",
       index
