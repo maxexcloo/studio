@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-10-21
+
 > Menu search stays in place, gallery searches and filters swap without a reload, Upload leads Uploads, This Model shows the family's LoRAs, Advanced uses one dropdown, and Generate is labelled
 
 ### Changed
@@ -1771,7 +1773,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.44.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.45.0...HEAD
+[0.45.0]: https://github.com/maxexcloo/studio/compare/v0.44.0...v0.45.0
 [0.44.0]: https://github.com/maxexcloo/studio/compare/v0.43.0...v0.44.0
 [0.43.0]: https://github.com/maxexcloo/studio/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/maxexcloo/studio/compare/v0.41.0...v0.42.0
