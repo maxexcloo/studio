@@ -12,6 +12,7 @@ import { libraryDownload, libraryDownloadAccess, libraryDownloads, resolveModelL
 import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from './video-previews.js';
 import { requireAdmin, requireLocal } from './route-access.js';
 import { refreshWorkerModels } from './worker-models.js';
+import { presetGrade } from './library-grade.js';
 
 const presetsPath = path.join(dataDir, 'presets.json');
 const previewsDir = path.join(dataDir, 'preset-previews');
@@ -24,7 +25,7 @@ function summary(preset) {
   const { previewUrl, ...rest } = preset;
   // A saved image always has its own picture; an older recipe has its preview file or link.
   const picture = Boolean(preset.galleryItemId || previewUrl || fs.existsSync(path.join(previewsDir, `${preset.id}.webp`)));
-  return { ...rest, thumbnailUrl: picture ? `/api/presets/${preset.id}/thumbnail` : '' };
+  return { ...rest, thumbnailUrl: picture ? `/api/presets/${preset.id}/thumbnail` : '', ...(Array.isArray(preset.resources) ? { grade: presetGrade(preset) } : {}) };
 }
 
 const thumbnailsDir = path.join(previewsDir, 'thumbnails');
@@ -45,7 +46,7 @@ async function cachedThumbnail(id, source) {
 export function registerPresetRoutes(app, { models, json = civitaiJson, imageRequest = civitaiFetch, download = startLibraryDownload }) {
   useModelHashCache(path.join(dataDir, 'model-hashes.json'));
   const route = (handler, write = false) => async (req, res) => {
-    if (!presetsEnabled()) { res.status(404).json({ ok: false, error: 'Image & Model Library is disabled on this instance.' }); return; }
+    if (!presetsEnabled()) { res.status(404).json({ ok: false, error: 'Imports are off for this deployment.' }); return; }
     if (write && !requireLocal(req, res)) return;
     res.setHeader('Cache-Control', 'no-store');
     try { await handler(req, res); }
@@ -172,6 +173,20 @@ export function registerPresetRoutes(app, { models, json = civitaiJson, imageReq
     if (!spec) throw new Error('Preview a supported model before downloading it.');
     res.json({ ok: true, download: await startLibraryDownload(spec) });
   }, true));
+  // The Library's Import page (library-routes.js): a saved image without its files queued, which
+  // Download Missing does in one tap, and a saved image matched again.
+  const importImage = async (url) => {
+    const source = await importCivitaiImage(url, { json });
+    const preset = await downloadPresetImage({ ...source, savedAt: new Date().toISOString() }, { models, imageRequest, download: async () => null });
+    forgetLegacy(preset.id);
+    return matched(preset);
+  };
+  const resolvePreset = async (id, { verify = false } = {}) => {
+    const preset = lookup(String(id || ''));
+    if (!preset) throw new Error('That saved image is gone.');
+    return matched(preset, undefined, { verify });
+  };
   app.get('/api/settings/civitai-token', route(async (_req, res) => res.json({ ok: true, ...civitaiTokenStatus() })));
   app.post('/api/settings/civitai-token', route(async (req, res) => { if (!requireAdmin(req, res)) return; res.json({ ok: true, ...saveCivitaiToken(req.body?.token) }); }));
+  return { importImage, resolvePreset };
 }

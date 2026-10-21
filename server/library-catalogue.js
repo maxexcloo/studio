@@ -85,13 +85,19 @@ function rawFromEdit(edit = {}) {
 
 const editableFields = new Set(['title', 'version', 'baseModel', 'families', 'role', 'triggers', 'strength', 'promptStyle', 'tags', 'negative', 'description', 'note', 'guidance', 'nsfw', 'licence', 'links', 'compatibility']);
 
-/** An edit patch reduced to the fields Studio may change, each in its stored form. Throws on anything else. */
-export function cleanCataloguePatch(patch) {
+/** What an import knows for certain about a file; never changed by hand. */
+const provenanceFields = new Set(['sha256', 'bytes', 'source']);
+
+/**
+ * An edit patch reduced to the fields Studio may change, each in its stored form. Throws on
+ * anything else. `provenance` (imports only) also accepts the file's hash, size and source.
+ */
+export function cleanCataloguePatch(patch, { provenance = false } = {}) {
   if (!isObject(patch)) throw new Error('A catalogue change is an object of fields.');
   const clean = {};
   for (const [key, value] of Object.entries(patch)) {
     if (key === 'notes') { clean.note = text(value, 500); continue; }
-    if (!editableFields.has(key)) throw new Error(`${key} can't be changed in the catalogue.`);
+    if (!editableFields.has(key) && !(provenance && provenanceFields.has(key))) throw new Error(`${key} can't be changed in the catalogue.`);
     if (value === null) { clean[key] = null; continue; }
     switch (key) {
       case 'triggers': case 'tags': case 'families': clean[key] = list(value, key === 'tags' ? 10 : 30, 80); break;
@@ -116,6 +122,16 @@ export function cleanCataloguePatch(patch) {
         break;
       }
       case 'compatibility': if (!isObject(value)) throw new Error('compatibility is an object.'); clean.compatibility = structuredClone(value); break;
+      case 'sha256': if (!sha(value)) throw new Error('sha256 is 64 hex characters.'); clean.sha256 = sha(value); break;
+      case 'bytes': if (!Number.isSafeInteger(value) || value < 0) throw new Error('bytes is a whole number.'); clean.bytes = value; break;
+      case 'source': {
+        if (!isObject(value) || !['civitai', 'hf', 'manifest', 'manual'].includes(value.provider)) throw new Error('source is {provider: civitai|hf|manifest|manual, …}.');
+        const source = { provider: value.provider };
+        for (const part of ['modelId', 'versionId', 'fileId']) if (Number.isSafeInteger(value[part]) && value[part] > 0) source[part] = value[part];
+        for (const part of ['repo', 'revision', 'path']) if (typeof value[part] === 'string' && value[part].trim()) source[part] = value[part].trim().slice(0, 300);
+        clean.source = source;
+        break;
+      }
       default: clean[key] = text(value, key === 'description' ? 10000 : key === 'guidance' ? 1000 : 500);
     }
   }
@@ -218,7 +234,7 @@ export function createCatalogueStore({ dataDir = currentDataDir(), environment =
     const entry = {
       kind: catalogueKinds[folder], folder, file: name,
       sha256: pick('sha256', sha(provider?.sha256), manifest?.sha256, layers.hashes[key]) || '',
-      bytes: Number(provider?.bytes) || manifest?.size || 0,
+      bytes: Number(fields.bytes) || Number(provider?.bytes) || manifest?.size || 0,
       title: pick('title', text(local.title), providerTitle) || '',
       version: pick('version', text(provider?.version, 200)) || '',
       baseModel,
@@ -236,7 +252,7 @@ export function createCatalogueStore({ dataDir = currentDataDir(), environment =
       // Unknown until a source or an administrator says: null, never assumed safe.
       nsfw: typeof fields.nsfw === 'boolean' ? fields.nsfw : typeof local.nsfw === 'boolean' ? local.nsfw : typeof provider?.nsfw === 'boolean' ? provider.nsfw : null,
       licence: fields.licence || { name: '', commercial: null, restrictions: [] },
-      source,
+      source: fields.source || source,
       // Provider metadata wins for links; then the catalogue's own source page, then the manifest's address.
       links: { ...linksFrom(manifest?.url), ...linksFrom(local.sourceUrl), ...providerLinks, ...(fields.links || {}) },
       origin,
@@ -307,11 +323,11 @@ export function createCatalogueStore({ dataDir = currentDataDir(), environment =
    * Changes one entry as Studio (`origin` admin, import, ai or chat), keeping the previous edit
    * values in its history (last 20) so the change can be undone. A null field clears an edit.
    */
-  function edit(key, patch, { by = '', origin = 'admin', aiDrafted = false } = {}) {
+  function edit(key, patch, { by = '', origin = 'admin', aiDrafted = false, provenance = false } = {}) {
     const { folder, file: name } = splitCatalogueKey(key);
     if (!safeKey(folder, name)) throw new Error('A catalogue key is folder/file, in a model folder.');
     if (!editOrigins.has(origin)) throw new Error('Choose who made the change.');
-    const clean = cleanCataloguePatch(patch);
+    const clean = cleanCataloguePatch(patch, { provenance: provenance && origin !== 'admin' });
     const current = fresh();
     const previous = current.edits[key] || { fields: {}, history: [] };
     const fields = { ...previous.fields };

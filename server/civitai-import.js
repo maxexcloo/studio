@@ -6,6 +6,7 @@ import { remoteModelsEnabled, refreshWorkerModels, workerModelFile } from './wor
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from './civitai-access.js';
 import { sameResourceFilename, workflowModelSources } from './civitai-workflow.js';
 import { readJsonFile, writeJsonFile } from './json-store.js';
+import { civitaiAvailability } from './library-availability.js';
 
 const samplers = {
   'DPM++ 2M': 'dpmpp_2m', 'DPM++ 2M SDE': 'dpmpp_2m_sde', 'DPM++ 2S a': 'dpmpp_2s_ancestral',
@@ -109,7 +110,8 @@ export function imagePreset(image) {
   };
 }
 
-export function versionResource(version, weight = 1) {
+/** A version's primary file as a resource. Paid, early-access and restricted files get no download spec. */
+export function versionResource(version, weight = 1, { now = Date.now() } = {}) {
   if (!Number.isSafeInteger(version?.id) || version.id < 1) throw new Error('Civitai did not return a model version.');
   let folder = Object.hasOwn(folders, version.model?.type) ? folders[version.model.type] : '';
   const fileTypes = ['Model', ...(version.model?.type === 'Checkpoint' ? ['Diffusion Model'] : []), ...(['Diffusion Model', 'Text Encoder', 'VAE'].includes(version.model?.type) ? [version.model.type] : [])];
@@ -117,7 +119,8 @@ export function versionResource(version, weight = 1) {
   const file = files.find((item) => item.primary) || files[0];
   if (file?.type === 'Diffusion Model') folder = 'diffusion_models';
   const sha256 = /^[a-f0-9]{64}$/i.test(file?.hashes?.SHA256 || '') ? file.hashes.SHA256.toLowerCase() : '';
-  const spec = folder && file && sha256 ? {
+  const access = file ? civitaiAvailability(version, file, { now }) : { available: true };
+  const spec = folder && file && sha256 && access.available ? {
     id: `civitai:${version.id}:${file.id}`, file: file.name, folder, label: String(version.model?.name || file.name).slice(0, 200),
     // Construct the endpoint from IDs rather than trusting a URL from metadata.
     url: `https://civitai.com/api/download/models/${version.id}?type=${encodeURIComponent(file.type)}&format=${/\.gguf$/i.test(file.name) ? 'GGUF' : 'SafeTensor'}${file.metadata?.fp ? `&fp=${encodeURIComponent(file.metadata.fp)}` : ''}${file.metadata?.size ? `&size=${encodeURIComponent(file.metadata.size)}` : ''}`,
@@ -131,8 +134,9 @@ export function versionResource(version, weight = 1) {
     versionId: version.id, weight, name: String(version.model?.name || version.name || version.id).slice(0, 200),
     version: String(version.name || '').slice(0, 200), type: String(version.model?.type || 'Unknown'), baseModel: String(version.baseModel || ''),
     sourceUrl: `https://civitai.com/models/${version.modelId}?modelVersionId=${version.id}`,
-    file: file?.name || '', folder, sha256, bytes: spec?.bytes || 0, supported: Boolean(spec), spec,
-    note: !folder ? 'This resource type needs a separate workflow.' : !spec ? 'No supported file with a published SHA-256 is available.' : '',
+    file: file?.name || '', folder, sha256, bytes: spec?.bytes || (Number(file?.sizeKB || 0) * 1024), supported: Boolean(spec), spec,
+    note: !folder ? 'This resource type needs a separate workflow.' : !access.available ? access.note : !spec ? 'No supported file with a published SHA-256 is available.' : '',
+    ...(folder && !access.available ? { unavailable: { reason: access.reason, note: access.note } } : {}),
     trainedWords: (Array.isArray(version.trainedWords) ? version.trainedWords : []).map(String).slice(0, 30)
   };
 }
@@ -245,6 +249,11 @@ async function hashFile(file) {
     if (hashes.size > 512) hashes.delete(hashes.keys().next().value);
   }
   return hashes.get(key);
+}
+
+/** A local model file's SHA-256: worked out in full with `verify`, else only one already known ('' if none). */
+export async function modelChecksum(file, { verify = false } = {}) {
+  return verify ? hashFile(file) : knownHash(file);
 }
 
 /**

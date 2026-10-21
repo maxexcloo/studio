@@ -661,7 +661,7 @@ function MoreMenu({ view, open, onClose, onSelect }: { view: Record<string, any>
   const [signingOut, setSigningOut] = React.useState(false);
   const items: MenuItem[] = [];
   if (onSelect) items.push({ id: 'select', Icon: CheckSquare, label: 'Select', run: () => { onClose(); onSelect(); } });
-  if (view.models?.features?.presets === true) items.push({ id: 'library', Icon: Library, label: 'Library', run: () => { onClose(); view.setPresetLibraryOpen(true); } });
+  if (view.models?.features?.library === true) items.push({ id: 'library', Icon: Library, label: 'Library', run: () => { onClose(); view.setLibraryOpen(true); } });
   items.push({ id: 'settings', Icon: Settings, label: 'Settings', run: () => { onClose(); view.openSettings('studio'); } });
   if (hasAccountStorageScope()) items.push('divider',
     { id: 'account', Icon: UserRound, label: 'Account', run: () => { onClose(); view.openSettings('account'); } },

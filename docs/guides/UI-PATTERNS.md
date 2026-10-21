@@ -422,7 +422,7 @@ holds:
 | Account | MCP and Profile (name, email, password) | Every account |
 | About | The banner, Version, Changelog, Licence, Source, credits (HEISS UI, J-AI Studio, ComfyUI, Radiance) and stats | Everyone |
 | Maintenance | Clean Up, Help and Reset | Everyone (each item as the device allows) |
-| Models | Defaults, Catalogue (only switches that remain global), LoRAs & Supporting Files and Integrations | Administrators |
+| Models | Defaults and Integrations (the assistant models, Civitai and output storage). LoRAs, the catalogue and downloads are in the [Library](#library) | Administrators |
 | Profiles | One model profile's JSON (an edited copy stops receiving repository updates) | Administrators |
 | Studio | Features (Inpainting and Upscale as plain rows), Gallery (Date Headers, Stacks Look Like, Tile Captions, Wide Images), General, Generation, LoRA Stacks (each stack's name, LoRAs and strengths, with Save & Discard; Delete with Undo) and Sharing | Everyone |
 | Users | Access Profiles (a picker with New, multi-selects, Save & Discard), Accounts (the default access profile and Require Approval beside it, then each account, with Approve on a waiting one; New Account on the heading) and Chat Gateway | Administrators |
@@ -472,27 +472,54 @@ Other Workers groups (such as upscale status) follow the worker list.
 
 ## Library
 
-The Image & Model Library (administrators, where presets are on) uses the
-Settings panel's anatomy: the same sheet, a section rail (a sideways row on the
-phone) and one page at a time with its title and one line.
+The Library (`Library.tsx`, administrators only) opens from the desktop dock
+and the phone Menu and uses the Settings panel's anatomy: the same sheet, a
+section rail (a sideways row on the phone) and one page at a time with its
+title and one line. Choosing the page you are on starts it over (a review
+returns to its list). Its five pages, in this order:
 
-- **Saved Images:** a link field with Save Image on one line (the button turns
-  primary once there is a link), search once there are two or more, then a grid
-  of even 4:5 cards: the picture, the name, then the base model and creator. A
-  card with files to fetch carries an amber "n Missing" badge.
-- A card opens its **review in place** (Back reads "Saved Images"), with View on
-  Civitai and Delete as icons on the right of that bar: the picture beside the
-  name, where it stands in one line (Ready To Use, Needs Review, Downloading
-  Models), the prompts and settings, then the Use With and Models & LoRAs
-  groups. Use Prompt and Use Settings sit in the footer.
-- **Models:** a link field with Preview Download, the previewed file as a row
-  with Download, then Downloads: one row per file, its folder by name ("LoRAs",
-  not `loras`), the shared `set-progress` bar while it runs, its state on the
-  right and Retry when it failed.
-- **Speed:** the list compares file names and sizes only; opening one image
-  checks its checksums (kept on disk, so a restart never reads every model
-  again). The code loads while idle (`preloadable.ts`), placeholders hold the
-  grid's place while the list arrives, and the last list shows at once on
+| Page | Holds |
+| --- | --- |
+| Import | One field: paste a Civitai or Hugging Face link, or drop one on it (dropped image files come later). Under it, the History: one row per import with its kind icon, name, kind and date, the grade chip and its state |
+| Images | The saved Civitai images as an even 4:5 grid, each with its grade chip and missing count; search once there are two or more |
+| LoRAs | Installed and catalogued LoRAs and supporting files, with provenance, version, links, trigger words and file |
+| Models | Checkpoints, diffusion models, text encoders, VAEs and CLIP vision the same way, then any catalogue switch that remains global |
+| Downloads | Every model download in Running, Failed and Done groups |
+
+Import and Images follow the deployment's Presets & Civitai Imports switch;
+without it the Library holds LoRAs, Models and Downloads.
+
+- **Grades:** one chip, Exact (green with its tick), Close (quiet) or Partial
+  (amber), with a missing count on an Images card ("Partial · 2 Missing") and
+  its reasons in the tooltip. A review lists the reasons under the chip.
+- **Records open in place:** an import (or an Images card) opens its review
+  where the list was, with Back ("Import", "Images") on the left of the bar and
+  the source links (the LoRA rows' "com" and "red" pills, "HF") or View on
+  Civitai and Delete on the right. Then the name and kind, the grade with its
+  reasons and the Files group.
+- **Files:** one row per file: its name, then its folder by name ("LoRAs",
+  not `loras`), version, size and source; a reason when it is unavailable
+  (paid, early access, restricted, no checksum) with a free version to use
+  instead where there is one; the shared `set-progress` bar while it
+  downloads; its state on the right. A Hugging Face file whose folder is a
+  guess carries its Destination dropdown until it downloads. Check Again sits
+  on the group's heading.
+- **Footer:** the review's actions: **Download Missing** (one tap queues every
+  missing file; unavailable files never download), Use Prompt and Use
+  Settings. A repository's files are optional: each has its own Download.
+- **LoRAs and Models:** compact `PickerTools` search, the Installed |
+  Catalogue views and family (LoRAs) or kind (Models) pills on one row, then a
+  flat list: the title, then what it is, version, base model and size, its
+  provenance ("Civitai · Imported", "From the Seed"), trigger words and
+  strength, and the file; the source links and Installed or Not Installed on
+  the right.
+- **Downloads:** the shared progress pattern: the file, its folder and size,
+  the bar while it runs, the failure under the name, the state on the right
+  with one action (Cancel, Retry or Resume).
+- **Speed:** lists compare file names and sizes only; opening one import or
+  image checks its checksums (kept on disk, so a restart never reads every
+  model again). The code loads while idle (`preloadable.ts`), placeholders hold
+  the list's place while it arrives, and the last list shows at once on
   reopening.
 - Failures go to the status pill; the page never grows its own error box.
 

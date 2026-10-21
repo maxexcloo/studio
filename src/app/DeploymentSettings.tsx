@@ -57,8 +57,8 @@ async function postJson(url: string, body: unknown) {
   return { response, data };
 }
 
-/** The profiles a fresh composer starts on, and what the catalogue offers. */
-export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+/** Saves one deployment setting, with its outcome in the status pill. */
+function useSaveSetting(showToast: ShowToast, onSaved: () => void) {
   const [busy, setBusy] = React.useState('');
   const save = async (key: string, value: string | boolean) => {
     setBusy(key);
@@ -70,6 +70,12 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
     } catch { showToast('Can’t reach Studio. Make sure it’s running.', 'error'); }
     finally { setBusy(''); }
   };
+  return { busy, save };
+}
+
+/** Settings › Models › Defaults: the profiles a fresh composer starts on. */
+export function DefaultsGroup({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+  const { busy, save } = useSaveSetting(showToast, onSaved);
   const label = (id: string) => settings.defaults.profiles.find((profile) => profile.id === id)?.label || id;
   const defaultRow = (kind: 'image' | 'video') => {
     const entry = settings.defaults[kind];
@@ -80,16 +86,19 @@ export function DefaultsCatalogueGroups({ settings, showToast, onSaved }: { sett
       {entry.locked ? <span className="set-locked-value">{entry.configured ? label(entry.configured) : 'First Ready Profile'}</span> : <div className="set-type-picker"><StudioSelect ariaLabel={kind === 'image' ? 'Default Image Profile' : 'Default Video Profile'} value={entry.configured || FIRST_READY} options={options} onChange={(value) => void save(entry.key, value === FIRST_READY ? '' : value)} /></div>}
     </Row>;
   };
+  return <Group title="Defaults" note="Deployment settings override these until they are removed from its configuration.">
+    {defaultRow('image')}
+    {defaultRow('video')}
+  </Group>;
+}
+
+/** Library › Models › Catalogue: the catalogue switches that remain global (none when every one is an access-profile feature). */
+export function CatalogueFlagsGroup({ settings, showToast, onSaved }: { settings: DeploymentSettings; showToast: ShowToast; onSaved: () => void }) {
+  const { busy, save } = useSaveSetting(showToast, onSaved);
   const catalogue = settings.catalogue.filter((item) => !hiddenCatalogueKeys.has(item.key));
-  return <>
-    <Group title="Defaults" note="Deployment settings override these until they are removed from its configuration.">
-      {defaultRow('image')}
-      {defaultRow('video')}
-    </Group>
-    {catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
-      {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
-    </Group> : null}
-  </>;
+  return catalogue.length ? <Group title="Catalogue" note="What the model catalogue offers. Some changes apply after Studio restarts.">
+    {catalogue.map((item) => <SwitchRow key={item.key} label={item.label} tag={<SourceTag source={item.source} locked={item.locked} />} description={`${item.description}${item.applies === 'restart' ? ' Applies after a restart.' : ''}`} checked={item.value} disabled={item.locked || busy === item.key} onChange={(next) => void save(item.key, next)} />)}
+  </Group> : null;
 }
 
 const DEFAULT_MODEL = '__default__';

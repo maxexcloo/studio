@@ -35,6 +35,10 @@ test('deployment settings show sources, keep locked values read-only and save th
   await expect(dialog.getByRole('heading', { name: 'Catalogue', exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('switch')).toHaveCount(0);
 
+  // Settings › Models keeps only Defaults and Integrations; LoRAs, the catalogue and downloads are in the Library.
+  await expect(dialog.locator('#settings-panel .list-section-title')).toHaveText(['Defaults', 'Integrations']);
+  await expect(dialog.getByRole('heading', { name: 'LoRAs & Supporting Files', exact: true })).toHaveCount(0);
+
   // Integrations share the Models page.
   await expect(dialog.locator('.set-row').filter({ hasText: 'Output Storage' })).toContainText('Studio Media');
   await expect(dialog.getByRole('heading', { name: 'Integrations' })).toBeVisible();

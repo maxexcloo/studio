@@ -5,6 +5,8 @@ export type PresetResource = {
   sourceUrl?: string; file?: string; folder?: string; bytes?: number; supported: boolean; note?: string;
   status?: 'installed' | 'missing' | 'conflict' | 'unsupported'; localName?: string; profileId?: string;
   /** Installed by name and size; the checksum is checked when the image opens. */ unverified?: boolean;
+  /** Paid, early-access or restricted on Civitai: never downloaded (server/library-availability.js). */
+  unavailable?: { reason: 'paid' | 'early-access' | 'licence' | 'no-checksum'; note?: string };
 };
 export type ImagePreset = {
   type?: 'image' | 'video';

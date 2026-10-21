@@ -18,6 +18,16 @@ version opens with a `> ` summary line.
 - **One catalogue:** `library/catalogue.json` holds every known model file (LoRAs, checkpoints, diffusion models, encoders, VAEs, CLIP vision) with its hash, links, licence and provenance. It merges the synced and hand-installed `lora-catalogue.json` files, provider download records, cached hashes and the restore manifest, which stay where they are as backups. LoRA details read the same as before.
 - **Versioned profiles and guides:** every profile save becomes a version under `history/profiles/`, prompting guides move into `guides/prompting.json` with versions under `history/guides/`, and AI drafts carry an AI-Drafted marker until an administrator edits or approves them. `MCP_PROMPTING_PATH` becomes seed input, and `.studio-edits.json` is still written.
 - **Assistant evals:** recorded rewrite, LoRA and negative cases are scored in CI; `mise run eval:assistant` replays them against the live gateway on demand.
+- **Library › Import:** one field takes a Civitai image or model link or a Hugging Face file or repository link. Each import is a durable record (`library/imports/<id>.json`, the 500 newest kept) graded Exact, Close or Partial with its reasons; a missing seed, sampler, steps, CFG, size or negative caps the grade at Partial. Its Files group lists every file with its status, size and source, and **Download Missing** queues them all in one tap through the worker model API. A Hugging Face file whose folder is a guess gets a Destination to check first.
+- **LoRA imports write the catalogue:** title, version, family, trigger words, suggested strength, description, both Civitai links (or the Hugging Face page), NSFW (never assumed safe) and checksum. Checkpoint imports are recorded only for now.
+- **Paid and early-access files are never downloaded:** Civitai's availability, early-access dates and prices, download permission and model status are checked, anything unclear counts as unavailable, and the file shows as Unavailable with the reason and, where there is one, a free version to use instead. This also holds for saved images.
+- **Library › LoRAs and › Models:** what is installed and what the catalogue knows, each with its provenance, version, links, trigger words and file, with Installed and Catalogue views, search and family or kind pills.
+- **Library › Downloads:** every model download, running, failed and done, with the shared progress bar, Cancel, Retry and Resume.
+
+### Changed
+- **Library:** the Image & Model Library is now the **Library**, for administrators (whether or not imports are on), from the desktop dock and the phone Menu. It has five pages: Import, Images, LoRAs, Models and Downloads. Import and Images follow `STUDIO_ENABLE_PRESETS`.
+- **Library › Images:** each saved image shows its grade (Exact, Close or Partial) and missing count in place of the amber "n Missing" badge, and its review lists the grade's reasons. Images saved from Import wait for Download Missing instead of queuing their files on their own; the older `/api/presets/import` still queues them for one release.
+- **Settings › Models** keeps only Defaults and Integrations. LoRAs & Supporting Files and the remaining catalogue switches moved to the Library's LoRAs and Models pages, and model downloads to Library › Import and › Downloads.
 
 ## [0.41.0] - 2026-10-21
 

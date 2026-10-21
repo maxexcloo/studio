@@ -81,6 +81,8 @@ test('edits are validated, recorded with who made them, undoable and reviewable'
   const store = f.store();
   store.migrate();
   assert.throws(() => store.edit('loras/style.safetensors', { sha256: hex('9') }), /can't be changed/);
+  assert.throws(() => store.edit('loras/style.safetensors', { sha256: hex('9') }, { provenance: true }), /can't be changed/, 'an administrator never edits provenance');
+  assert.throws(() => store.edit('loras/new.safetensors', { sha256: 'short' }, { origin: 'import', provenance: true }), /64 hex/);
   assert.throws(() => store.edit('../x', { title: 'x' }), /folder\/file/);
   assert.throws(() => store.edit('loras/style.safetensors', { nsfw: 'yes' }), /true or false/);
   const { entry, previous } = store.edit('loras/style.safetensors', { title: 'Drafted', triggers: ['newword'], nsfw: true, notes: 'Use low' }, { by: 'assistant', origin: 'ai', aiDrafted: true });

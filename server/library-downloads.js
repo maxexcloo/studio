@@ -77,7 +77,7 @@ export function libraryDownloadAccess() {
 }
 
 export async function startLibraryDownload(spec) {
-  if (!presetsEnabled()) throw new Error('Presets & Models is disabled on this instance.');
+  if (!presetsEnabled()) throw new Error('Imports and provider downloads are off for this deployment.');
   await refreshWorkerModels({ force: true });
   if (!/^[a-f0-9]{64}$/i.test(spec.sha256 || '')) throw new Error('This model has no valid provider SHA-256 checksum. Preview its source again.');
   if (!libraryDownloadAccess().available) throw new Error(libraryDownloadAccess().note);
