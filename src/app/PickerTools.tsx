@@ -1,10 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronDown, Search, X } from 'lucide-react';
+import { Check, Search, X } from 'lucide-react';
 import { cn } from './format';
-import { useDismiss } from './useDismiss';
-import { popoverMotion, useSettling } from './composerSurface';
+import { Dropdown } from './Dropdown';
 
 /**
  * The one selected mark in every chooser (UI-PATTERNS › Pickers): an amber
@@ -43,74 +41,24 @@ export function HeadingPortal({ children }: { children: React.ReactNode }) {
   return heading?.slot ? createPortal(children, heading.slot) : null;
 }
 
-/* ------------------------------------------------------------ Dropdown */
-
-/**
- * A small menu under a heading trigger: the shared popover entry, rows of
- * --row-h-menu (44 px on touch) with the amber tick for what is chosen, arrow
- * keys between rows, Escape or a tap outside to close, focus back on the
- * trigger. `children` gets `close` for rows that finish the job.
- */
-export function PickerDropdown({ label, trigger, triggerLabel, className, children }: {
-  /** The menu's accessible name. */
-  label: string;
-  trigger: React.ReactNode;
-  triggerLabel?: string;
-  className?: string;
-  children: (close: () => void) => React.ReactNode;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const root = React.useRef<HTMLDivElement>(null);
-  const button = React.useRef<HTMLButtonElement>(null);
-  const menu = React.useRef<HTMLDivElement>(null);
-  const settling = useSettling();
-  const close = React.useCallback(() => { setOpen(false); button.current?.focus({ preventScroll: true }); }, []);
-  useDismiss(root, open, close);
-  React.useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => (menu.current?.querySelector<HTMLElement>('[aria-checked="true"]:not(:disabled)') || menu.current?.querySelector<HTMLElement>('[role^="menuitem"]:not(:disabled), input'))?.focus({ preventScroll: true }));
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    // Escape closes only this menu, not the picker around it (data-own-escape keeps useDismiss out of it).
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
-    if (event.target instanceof HTMLInputElement) return;
-    const items = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') || []);
-    if (!items.length) return;
-    event.preventDefault();
-    const at = items.indexOf(document.activeElement as HTMLElement);
-    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length;
-    items[next].focus({ preventScroll: true });
-  };
-  return <div ref={root} className={cn('picker-dropdown', className)} data-own-escape={open ? '' : undefined} onKeyDown={open ? onKeyDown : undefined}>
-    <button ref={button} type="button" className="picker-dropdown-trigger" aria-haspopup="menu" aria-expanded={open} aria-label={triggerLabel} onClick={() => setOpen((value) => !value)}>
-      {trigger}<ChevronDown size={14} aria-hidden="true" />
-    </button>
-    <AnimatePresence>
-      {open ? <motion.div ref={menu} className="picker-dropdown-menu" role="menu" aria-label={label} {...popoverMotion} {...settling}>
-        {children(close)}
-      </motion.div> : null}
-    </AnimatePresence>
-  </div>;
-}
-
-/** One row in a PickerDropdown: a choice (with its tick) or an action. */
-export function MenuRow({ checked, onSelect, disabled, danger, children, label }: { checked?: boolean; onSelect: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode; label?: string }) {
-  const choice = checked !== undefined;
-  return <button type="button" role={choice ? 'menuitemcheckbox' : 'menuitem'} aria-checked={choice ? checked : undefined} aria-label={label} disabled={disabled} className={cn('picker-menu-row', danger && 'is-danger')} onClick={onSelect}>
-    <span className="picker-menu-label">{children}</span>
-    {choice ? <SelectedTick on={checked} /> : null}
-  </button>;
-}
-
-export function MenuDivider() {
-  return <span className="picker-menu-divider" role="separator" />;
-}
-
 /* -------------------------------------------------------------- Tools */
 
-export type PickerViewOption = { id: string; label: React.ReactNode; checked: boolean; disabled?: boolean; onSelect: () => void; ariaLabel?: string };
+/**
+ * The phone heading's views ("LoRAs · This Model") on the shared Dropdown:
+ * one view at a time, or (`multi`) filters that combine, ticked, with the
+ * menu staying open.
+ */
+function ViewsDropdown({ views, title }: { views: PickerViews; title: string }) {
+  const options = views.options.map((option) => ({ value: option.id, label: option.label, ariaLabel: option.ariaLabel, disabled: option.disabled }));
+  const run = (id: string | undefined) => views.options.find((option) => option.id === id)?.onSelect();
+  const summary = <span className="picker-view-label"><strong>{title}</strong><span aria-hidden="true">·</span><span>{views.current}</span></span>;
+  const checked = views.options.filter((option) => option.checked).map((option) => option.id);
+  return views.multi
+    ? <Dropdown multiple head={false} variant="heading" className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={(next) => run([...next.filter((id) => !checked.includes(id)), ...checked.filter((id) => !next.includes(id))][0])} />
+    : <Dropdown variant="heading" className="picker-view" label={views.label} summary={summary} options={options} value={checked[0] || ''} searchFrom={Infinity} onChange={run} />;
+}
+
+export type PickerViewOption = { id: string; label: string; checked: boolean; disabled?: boolean; onSelect: () => void; ariaLabel?: string };
 /**
  * The chooser's views as data, for the phone's heading dropdown: what is shown
  * now ("This Model") and every option. `multi` keeps the menu open on a choice
@@ -179,9 +127,7 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
   if (phoneHeading && views) {
     return <div ref={root} className={cn('picker-tools is-heading', className)}>
       <HeadingPortal>
-        <PickerDropdown label={views.label} className="picker-view" trigger={<span className="picker-view-label"><strong>{heading!.title}</strong><span aria-hidden="true">·</span><span>{views.current}</span></span>}>
-          {(close) => views.options.map((option) => <MenuRow key={option.id} checked={option.checked} disabled={option.disabled} label={option.ariaLabel} onSelect={() => { option.onSelect(); if (!views.multi) close(); }}>{option.label}</MenuRow>)}
-        </PickerDropdown>
+        <ViewsDropdown views={views} title={heading!.title} />
         {extra}
         {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : null}
         {toggleButton}

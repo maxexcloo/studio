@@ -76,7 +76,7 @@ test('the model chooser heading keeps its filters, search and Close on one centr
   const menu = await ui.openModelPicker();
   const heading = menu.locator('.reference-popover-head').first();
   const centres = () => heading.evaluate((head) => {
-    const parts = [...head.querySelectorAll<HTMLElement>('.surface-title, .picker-view .picker-dropdown-trigger, .model-filters button, .picker-search-toggle, .picker-search-field > *, .reference-popover-close')]
+    const parts = [...head.querySelectorAll<HTMLElement>('.surface-title, .dropdown-trigger.picker-view, .model-filters button, .picker-search-toggle, .picker-search-field > *, .reference-popover-close')]
       .filter((element) => element.getBoundingClientRect().height > 0)
       .map((element) => { const box = element.getBoundingClientRect(); return box.top + box.height / 2; });
     return { spread: Math.max(...parts) - Math.min(...parts), count: parts.length };

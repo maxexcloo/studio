@@ -143,7 +143,9 @@ ad-hoc alpha, blur or shadow values.
 **Glass never blurs while it moves.** A popover or sheet spreads
 `useSettling()` (`composerSurface.ts`) onto its moving element: during its
 entry and exit it shows `--glass-panel-solid` without a blur, and the glass
-returns when it settles. A dialog's scrim adds its blur when its fade ends.
+returns when it settles. Menus on the CSS `surfaceIn` entry (Model, Size)
+spread `useCssSettling()` instead: `[data-settling]` from mount until their
+own `animationend`. A dialog's scrim adds its blur when its fade ends.
 The viewer's backdrop is near-solid with no blur. Animate only `transform`
 and `opacity`; never `top`, `left`, `width`, `height`, margins or padding.
 
@@ -258,7 +260,9 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
 
 - **Trigger:** the value and a chevron at `--control-h-sm`: muted at the end
   of its row in a list (`row`), a compact bordered pill in a toolbar (`pill`),
-  or a filled well in a form (`field`). It is a combobox named by its label.
+  a filled well in a form (`field`), or a picker heading's menu (`heading`,
+  the phone views and Stacks, in the foreground and the selected tint while
+  open). It is a combobox named by its label.
 - **Menu:** the shared popover placement and motion (see
   [Surfaces](#surfaces)), on the panel glass with `--r-menu`; on a phone the
   pop-up list's width, still anchored to its trigger and one layer only. Rows
@@ -271,7 +275,11 @@ rows, forms, the composer's Recipe and the pickers' heading menus. No native
   and the focus returns to the trigger.
 - **Several values** (`multiple`): the same rows and ticks; the menu stays
   open, with All and Clear in its head, and the trigger names the one value or
-  counts them. The gallery's filter menus follow the same rows and ticks.
+  counts them. Filters with their own All (the phone's model filters) drop
+  the head. The gallery's filter menus follow the same rows and ticks.
+- **Commands** (`actions`) follow the options after a divider, as plain rows
+  (Delete in the danger ink); a command closes the menu unless it opens a
+  `panel` in its place, such as the stack name field.
 
 ## Pickers
 
@@ -305,8 +313,11 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   corner). One tap adds or removes; a pick stays where it is, across searches
   and views. Order numbers (the number on amber) appear only in the Selected
   view, where the picks are listed in order with strength and enable controls.
-- **Reordering** happens in the Selected view: drag a row's grip with a mouse,
-  pen or finger (`useReorderDrag.ts`), or press the arrow keys on the grip.
+- **Reordering** happens in the Selected view (and the LoRA card list): drag a
+  row's grip with a mouse, pen or finger (`useReorderDrag.ts`), or press the
+  arrow keys on the grip. Nothing animates: the dragged row dims, the row under
+  it is outlined, and the order changes on the drop. References and LoRAs use
+  the same hook; there is no framer `Reorder`.
 - A LoRA row's actions sit on the right, centred on its title line, in this
   order: the tick, View Source (small equal text pills, "com" and "red", 32 px
   targets, 44 px on touch), then Star. Enabled LoRAs show their information
@@ -319,9 +330,10 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   Delete (at once, with Undo). There is no Enable All or Disable All; each pick
   has its own switch in the Selected view. Settings › Studio › LoRA Stacks
   edits them.
-- **Heading dropdowns** (the phone views, Stacks) use the shared popover
-  entry, `--r-menu`, rows of `--row-h-menu` (44 px on touch) with the amber
-  tick, the arrow keys, and Escape that closes the menu only.
+- **Heading dropdowns** (the phone views, Stacks) are the shared `Dropdown`
+  (`variant="heading"`; the combining filters as `multiple`), so they share its
+  entry, rows, amber tick, keyboard and Escape that closes the menu only.
+  There is no separate picker menu component.
 - **Models** have no modal: the model button opens the chooser with the same
   heading and family groups (fine tunes under their family), and nothing else.
   Profile names show as they are, on two lines at most.
@@ -562,13 +574,16 @@ kind of element:
   viewer closes and Create opens, ready to change or generate.
 - **Tiles, desktop:** one row of 32 px glass circles along the top right (a
   40 px target each), from `itemActions.ts`'s `tile` placement in the viewer
-  bar's order: Download | Animate or Extend · Recreate | Star · Delete, with
-  Retry in Recreate's place on a failed item and a little more room between
-  the groups. The upscale arrow keeps the top left corner, where its progress
-  and its amber "showing the upscale" state stay in view. A narrow tile drops
-  the make group first, then Download; Star and Delete stay longest, and
-  **More** (⋯) takes the last slot and opens the same menu as a right-click.
-  The circles show on hover and keyboard focus; a set Star stays in view.
+  bar's order: Download | Animate or Extend · Recreate · Upscale | Star ·
+  Delete, with Retry in Recreate's place on a failed item and a little more
+  room between the groups. Upscale is one of the row's circles, not a corner
+  button: solid amber and pressed while the upscale shows, with a progress ring
+  while it runs. A narrow tile drops the make group first, then Download; Star
+  and Delete stay longest (and Upscale while it runs or shows), and **More**
+  (⋯) takes the last slot and opens the same menu as a right-click. The
+  circles show on hover and keyboard focus; a set Star and a running or
+  showing Upscale stay in view. The phone has no row: only a running
+  upscale's ring shows, top left.
 - **Tile caption, desktop:** two lines at the bottom on hover and keyboard
   focus: the prompt on one line, then the time · the profile's friendly name
   (· a video's length), as in "2:14 PM · FLUX.1 Schnell · 6 s". Nothing else.

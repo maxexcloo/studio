@@ -553,7 +553,7 @@ button.list-row { isolation: isolate; }
 .picker-heading-tools > .picker-controls::-webkit-scrollbar { display: none; }
 .picker-heading-tools > .picker-clear-all,
 .picker-heading-tools > .reference-upload,
-.picker-heading-tools > .picker-dropdown { flex: none; }
+.picker-heading-tools > .dropdown-trigger { flex: none; }
 .picker-heading-tools .picker-search-toggle { margin-inline-start: 0; }
 /* Upload is a round icon in the heading; its name is in its tooltip and label. */
 .picker-heading-tools > .reference-upload { width: var(--control-h-sm); height: var(--control-h-sm); padding: 0; justify-content: center; border-radius: var(--r-pill); }
@@ -576,22 +576,20 @@ button.list-row { isolation: isolate; }
 .phone-model-tools:not(:has(.list-row, .picker-search-row)) { display: none; }
 
 /* Heading dropdowns: the views on the phone and the LoRA Stacks on both devices. */
-.picker-dropdown { position: relative; flex: none; min-width: 0; }
-.picker-dropdown-trigger { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; height: var(--control-h-sm); padding: 0 10px 0 12px; border: 0; border-radius: var(--r-pill); background: transparent; color: hsl(var(--foreground)); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; }
-.picker-dropdown-trigger:hover { background: var(--control-hover); }
-.picker-dropdown-trigger:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.picker-dropdown-trigger[aria-expanded="true"] { background: var(--selected-bg); color: var(--selected-ink); }
-.picker-dropdown-trigger > svg { flex: none; color: hsl(var(--muted-foreground)); }
-.picker-dropdown-trigger[aria-expanded="true"] > svg { color: currentColor; }
+.dropdown-trigger.is-heading { flex: none; gap: var(--space-2); color: hsl(var(--foreground)); font-weight: 500; white-space: nowrap; }
+.dropdown-trigger.is-heading[aria-expanded="true"] { background-color: var(--selected-bg); color: var(--selected-ink); }
+.dropdown-trigger.is-heading > svg { color: hsl(var(--muted-foreground)); }
+.dropdown-trigger.is-heading[aria-expanded="true"] > svg { color: currentColor; }
+.dropdown-trigger.is-heading > .dropdown-value { display: inline-flex; align-items: center; gap: var(--space-2); }
 .picker-dropdown-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.picker-dropdown.lora-stacks .picker-dropdown-trigger { max-width: 180px; color: hsl(var(--muted-foreground)); }
-.picker-dropdown.lora-stacks .picker-dropdown-trigger:hover { color: hsl(var(--foreground)); }
+.dropdown-trigger.lora-stacks { max-width: 180px; color: hsl(var(--muted-foreground)); }
+.dropdown-trigger.lora-stacks:hover { color: hsl(var(--foreground)); }
 .lora-stack-modified { flex: none; width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--accent-amber); }
 .lora-stacks-icon { flex: none; }
 /* The phone heading keeps its room for "LoRAs · This Model": Stacks is its icon there. */
 .reference-popover.is-pop .lora-stacks .picker-dropdown-text { display: none; }
-.reference-popover.is-pop .lora-stacks .picker-dropdown-trigger { justify-content: center; width: var(--control-h-touch); padding: 0; }
-.reference-popover.is-pop .lora-stacks .picker-dropdown-trigger > svg:last-of-type:not(.lora-stacks-icon) { display: none; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { justify-content: center; width: var(--control-h-touch); padding: 0; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks > svg { display: none; }
 .reference-popover.is-pop .surface-head-slot .picker-heading-clear { padding: 0 8px; }
 .reference-popover.is-pop .reference-popover-head .picker-view-label > strong { font-size: 16px; font-weight: 600; }
 /* A narrow desktop popover drops the title's words before anything else (the icon stays). */
@@ -601,19 +599,15 @@ button.list-row { isolation: isolate; }
   .composer-loras .lora-stacks .picker-dropdown-text { display: none; }
 }
 .picker-heading-tools { gap: var(--space-2); }
-.picker-dropdown-menu { position: absolute; z-index: 5; top: calc(100% + var(--space-2)); right: 0; display: grid; gap: var(--space-1); min-width: 240px; max-width: min(340px, calc(100vw - 32px)); max-height: 360px; padding: var(--space-3); overflow-y: auto; border: 1px solid var(--glass-border); border-radius: var(--r-menu); background: var(--glass-panel-bg); -webkit-backdrop-filter: var(--glass-panel-blur); backdrop-filter: var(--glass-panel-blur); box-shadow: var(--glass-panel-shadow); transform-origin: top right; }
-.picker-view .picker-dropdown-menu { left: 0; right: auto; transform-origin: top left; }
-.picker-menu-row { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: var(--row-h-menu); padding: 0 12px; border: 0; border-radius: var(--r-item); background: transparent; color: hsl(var(--foreground)); font-size: 13px; text-align: left; cursor: pointer; }
-.picker-menu-row:hover:not(:disabled), .picker-menu-row:focus-visible { outline: none; background: var(--cursor-bg); }
-.picker-menu-row:disabled { opacity: .45; cursor: default; }
-.picker-menu-row.is-danger { color: var(--danger-ink); }
-.picker-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-menu-count { margin-left: var(--space-3); color: hsl(var(--muted-foreground)); font-style: normal; font-variant-numeric: tabular-nums; }
-.picker-menu-divider { height: 1px; margin: var(--space-2) var(--space-4); background: var(--line); }
-.picker-menu-note { margin: 0; padding: 8px 12px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
-.picker-dropdown-menu .lora-name-field { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); }
-.picker-dropdown-menu .lora-name-field input { flex: 1; min-width: 0; height: var(--control-h-sm); padding: 0 12px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font-size: 13px; }
-.picker-dropdown-menu .lora-name-field input:focus { outline: none; border-color: var(--line-strong); }
+/* The Stacks menu's extras on the shared dropdown menu: the count, the empty note and the name field. */
+.dropdown-option-meta { flex: none; color: hsl(var(--muted-foreground)); font-style: normal; font-variant-numeric: tabular-nums; }
+.dropdown-option.is-danger { color: var(--danger-ink); }
+.dropdown-divider { display: block; height: 1px; margin: var(--space-2) var(--space-4); background: var(--line); }
+.dropdown-actions { display: flex; flex-direction: column; flex: none; }
+.dropdown-note { margin: 0; padding: 8px 12px; color: hsl(var(--muted-foreground)); font-size: 12.5px; }
+.dropdown-menu .lora-name-field { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); }
+.dropdown-menu .lora-name-field input { flex: 1; min-width: 0; height: var(--control-h-sm); padding: 0 12px; border: 1px solid var(--glass-border); border-radius: var(--r-pill); background: var(--well); color: hsl(var(--foreground)); font-size: 13px; }
+.dropdown-menu .lora-name-field input:focus { outline: none; border-color: var(--line-strong); }
 .picker-menu-action { flex: none; height: var(--control-h-sm); padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--control-fill); color: hsl(var(--foreground)); font-size: 13px; font-weight: 550; cursor: pointer; }
 .picker-menu-action.is-primary { background: var(--action); color: var(--action-ink); }
 .picker-menu-action:disabled { opacity: .45; cursor: default; }
@@ -621,8 +615,7 @@ button.list-row { isolation: isolate; }
 .picker-heading-clear:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .picker-heading-clear:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 @media (pointer: coarse) {
-  .picker-dropdown-trigger, .picker-heading-clear { height: var(--control-h-touch); }
-  .picker-menu-row { min-height: var(--control-h-touch); font-size: 15px; }
+  .picker-heading-clear { height: var(--control-h-touch); }
 }
 
 /* Phone pop-ups: the views dropdown carries the title ("LoRAs · This Model"), and the list starts under the heading. */
@@ -631,13 +624,12 @@ button.list-row { isolation: isolate; }
 .reference-popover.is-pop .reference-popover-head:has(.picker-view) { min-height: 0; padding: 4px 4px 4px 6px; gap: var(--space-2); }
 .reference-popover.is-pop .surface-head-slot { justify-content: flex-start; gap: var(--space-1); }
 .reference-popover.is-pop .picker-view { flex: 0 1 auto; margin-inline-end: auto; }
-.reference-popover.is-pop .picker-view .picker-dropdown-trigger { font-size: 16px; padding-left: 10px; }
+.reference-popover.is-pop .dropdown-trigger.picker-view { font-size: 16px; padding-left: 10px; }
 .picker-view-label { display: inline-flex; align-items: baseline; gap: var(--space-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .picker-view-label > strong { font-weight: 600; }
 .picker-view-label > span { color: hsl(var(--muted-foreground)); font-weight: 450; }
 .picker-view-label > span:last-child { overflow: hidden; text-overflow: ellipsis; }
-.reference-popover.is-pop .picker-view .picker-dropdown-menu { min-width: 220px; }
-.reference-popover.is-pop .lora-stacks .picker-dropdown-trigger { max-width: 130px; }
+.reference-popover.is-pop .dropdown-trigger.lora-stacks { max-width: 130px; }
 .reference-popover.is-pop .reference-upload { width: var(--control-h-touch); height: var(--control-h-touch); padding: 0; justify-content: center; border-radius: var(--r-pill); }
 .reference-popover.is-pop .reference-upload > span { display: none; }
 .reference-popover.is-pop .picker-tools.is-heading .picker-search-row { padding: 6px 0 2px; }

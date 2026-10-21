@@ -3,7 +3,6 @@ import { scrollBehavior } from '@/lib/springs';
 import { optionalLoras } from './modelRecipes';
 import { loraName, modelFamilyLabel, modelLoras } from './catalogueNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, Reorder, useDragControls } from 'framer-motion';
 import { AlertTriangle, ArrowLeft, Bookmark, Check, ChevronDown, ChevronUp, GripVertical, Layers, Plus, Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { defaultLoraStrength, loraGroups, maxLoras, recommendedLoras, rankedLoras, type FitOf } from './loras';
@@ -11,7 +10,8 @@ import { Switch } from './SettingsControls';
 import { Tip } from './components';
 import { EmptyState } from './EmptyState';
 import { useReorderDrag } from './useReorderDrag';
-import { MenuDivider, MenuRow, PickerDropdown, PickerTools, SelectedTick } from './PickerTools';
+import { PickerTools, SelectedTick } from './PickerTools';
+import { Dropdown } from './Dropdown';
 import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
@@ -174,9 +174,8 @@ export function LoraDetails({ info, label, enabled }: { info?: LoraInfo; label: 
   </section>;
 }
 
-function LoraCard({ item, index, count, missing, overLimit, info, otherModel, policyNote, onChange, onRemove, onSwap, onMove }: {
+function LoraCard({ item, count, missing, overLimit, info, otherModel, policyNote, grip, dragging, over, onChange, onRemove, onSwap }: {
   item: LoraSelection;
-  index: number;
   count: number;
   missing: boolean;
   overLimit: boolean;
@@ -187,22 +186,20 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
   onChange: (patch: Partial<LoraSelection>) => void;
   onRemove: () => void;
   onSwap: () => void;
-  onMove: (to: number) => void;
+  /** The grip's drag and arrow-key handlers from useReorderDrag. */
+  grip: React.HTMLAttributes<HTMLButtonElement>;
+  dragging: boolean;
+  over: boolean;
 }) {
-  const controls = useDragControls();
   const label = loraName(item.name, info);
   return (
-    <Reorder.Item as="div" value={item} dragListener={false} dragControls={controls} style={{ position: 'relative' }} whileDrag={{ zIndex: 5, boxShadow: '0 12px 32px rgb(0 0 0 / 0.45), inset 0 0 0 1px rgb(255 255 255 / 0.14)' }} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning')}>
+    <div data-reorder-key={item.name} className={cn('lora-card', !item.enabled && 'is-off', (missing || overLimit) && 'has-warning', dragging && 'is-dragging', over && 'is-drop-target')}>
       {count > 1 ? (
         <button
           type="button"
           className="lora-grip"
           aria-label={`Reorder ${label}. Use the arrow keys to move it.`}
-          onPointerDown={(event) => controls.start(event)}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowUp' && index > 0) { event.preventDefault(); onMove(index - 1); }
-            if (event.key === 'ArrowDown' && index < count - 1) { event.preventDefault(); onMove(index + 1); }
-          }}
+          {...grip}
         >
           <GripVertical size={14} />
         </button>
@@ -221,7 +218,7 @@ function LoraCard({ item, index, count, missing, overLimit, info, otherModel, po
       {!missing && info?.role && info.role !== 'effect' ? <p className="lora-warning is-soft"><AlertTriangle size={12} />{info.role === 'acceleration' ? 'Use its prepared recipe instead of stacking accelerators.' : 'Supporting file; not an optional generation effect.'} {info.note || ''}</p> : null}
       {!missing && policyNote ? <p className="lora-warning is-soft"><AlertTriangle size={12} />{policyNote}</p> : null}
       {!missing && !overLimit && otherModel && !policyNote ? <p className="lora-warning is-soft"><AlertTriangle size={12} /> Made for {otherModel}, so it may not work here</p> : null}
-    </Reorder.Item>
+    </div>
   );
 }
 
@@ -535,8 +532,26 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
   const sorted = [...library.stacks].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   const family = library.familyLabel || 'this model';
   return (
-    <PickerDropdown className="lora-stacks" label={`Saved Stacks for ${family}`} triggerLabel={active ? `Stacks: ${active.name}` : 'Stacks'} trigger={<><Bookmark size={14} className="lora-stacks-icon" aria-hidden="true" /><span className="picker-dropdown-text">{active ? active.name : 'Stacks'}</span>{modified ? <i className="lora-stack-modified" aria-hidden="true" /> : null}</>}>
-      {(close) => naming ? (
+    <Dropdown
+      variant="heading"
+      className="lora-stacks"
+      label={`Saved Stacks for ${family}`}
+      triggerLabel={active ? `Stacks: ${active.name}` : 'Stacks'}
+      summary={<><Bookmark size={14} className="lora-stacks-icon" aria-hidden="true" /><span className="picker-dropdown-text">{active ? active.name : 'Stacks'}</span>{modified ? <i className="lora-stack-modified" aria-hidden="true" /> : null}</>}
+      options={sorted.map((stack) => ({ value: stack.id, label: stack.name, ariaLabel: `${stack.name}, ${stack.loras.length} LoRA${stack.loras.length === 1 ? '' : 's'}`, meta: stack.loras.length }))}
+      value={active?.id || ''}
+      searchFrom={Infinity}
+      empty="No saved stacks yet."
+      onChange={(id) => { const stack = sorted.find((item) => item.id === id); if (stack) { onLoad(stack); setActiveId(stack.id); } }}
+      actions={[
+        { id: 'new', label: 'Save Current as New Stack', disabled: !loras.length, keepOpen: true, onSelect: () => setNaming('new') },
+        ...(active ? [
+          { id: 'update', label: `Update “${active.name}” with Current Picks`, disabled: !modified || !loras.length, onSelect: () => library.updateStack(active.id) },
+          { id: 'rename', label: `Rename “${active.name}”`, keepOpen: true, onSelect: () => setNaming('rename') },
+          { id: 'delete', label: `Delete “${active.name}”`, danger: true, onSelect: () => { void library.deleteStack(active); setActiveId(''); } },
+        ] : []),
+      ]}
+      panel={(close) => naming ? (
         <NameField
           initial={naming === 'rename' && active ? active.name : suggestStackName(loras, library.stacks.map((stack) => stack.name))}
           action={naming === 'rename' ? 'Rename' : 'Save'}
@@ -548,21 +563,8 @@ function Stacks({ library, loras, activeId, setActiveId, onLoad }: {
           }}
           onCancel={() => setNaming(null)}
         />
-      ) : <>
-        {sorted.length ? sorted.map((stack) => (
-          <MenuRow key={stack.id} checked={stack.id === active?.id} label={`${stack.name}, ${stack.loras.length} LoRA${stack.loras.length === 1 ? '' : 's'}`} onSelect={() => { onLoad(stack); setActiveId(stack.id); close(); }}>
-            {stack.name}<em className="picker-menu-count">{stack.loras.length}</em>
-          </MenuRow>
-        )) : <p className="picker-menu-note">No saved stacks yet.</p>}
-        <MenuDivider />
-        <MenuRow disabled={!loras.length} onSelect={() => setNaming('new')}>Save Current as New Stack</MenuRow>
-        {active ? <>
-          <MenuRow disabled={!modified || !loras.length} onSelect={() => { library.updateStack(active.id); close(); }}>Update “{active.name}” with Current Picks</MenuRow>
-          <MenuRow onSelect={() => setNaming('rename')}>Rename “{active.name}”</MenuRow>
-          <MenuRow danger onSelect={() => { void library.deleteStack(active); setActiveId(''); close(); }}>Delete “{active.name}”</MenuRow>
-        </> : null}
-      </>}
-    </PickerDropdown>
+      ) : null}
+    />
   );
 }
 
@@ -591,6 +593,10 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
   const baseOf = (name: string) => infos[name]?.base || '';
   const cap = Math.min(maxLoras, limit);
   const activeCount = loras.filter((item) => item.enabled).length;
+  const move = (from: number, to: number) => setLoras((current) => { const next = [...current]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; });
+  const cardListRef = useRef<HTMLDivElement>(null);
+  // Drag by the grip (mouse, pen or finger) or arrow keys on it; rows don't animate (UI-PATTERNS › Motion).
+  const cardReorder = useReorderDrag(loras.map((item) => item.name), move, cardListRef);
 
   if (unavailableReason) {
     return (
@@ -614,7 +620,6 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
     if (loras.length && !sameStack(loras, stack.loras)) withUndo(`Applied ${stack.name}`, stack.loras);
     else library.loadStack(stack);
   };
-  const move = (from: number, to: number) => setLoras((current) => { const next = [...current]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next; });
   const add = (names: string[]) => {
     const fresh = names.filter((name) => !loras.some((item) => item.name === name)).slice(0, Math.max(0, cap - loras.length));
     setLoras((current) => [...current, ...fresh.map((name) => ({ name, enabled: true, strength: rememberedStrength(name, defaultLoraStrength) }))]);
@@ -684,12 +689,11 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
       <div className="lora-head-stacks"><Stacks library={library} loras={loras} activeId={activeStackId} setActiveId={setActiveStackId} onLoad={loadStack} /></div>
 
       {loras.length ? (
-        <Reorder.Group as="div" axis="y" values={loras} onReorder={(next) => setLoras(next)} className="lora-list">
+        <div ref={cardListRef} className="lora-list">
           {loras.map((item, index) => (
             <LoraCard
               key={item.name}
               item={item}
-              index={index}
               count={loras.length}
               missing={!available.has(item.name)}
               overLimit={index >= cap}
@@ -699,10 +703,12 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
               onChange={(patch) => update(index, patch)}
               onRemove={() => remove(index)}
               onSwap={() => setPicker({ swap: item.name })}
-              onMove={(to) => move(index, to)}
+              grip={cardReorder.grip(item.name)}
+              dragging={cardReorder.rowState(item.name).dragging}
+              over={cardReorder.rowState(item.name).over}
             />
           ))}
-        </Reorder.Group>
+        </div>
       ) : (
         <EmptyState title="No LoRAs Added">{library.stacks.length ? 'Load a saved stack above, or add one.' : 'LoRAs steer style, characters or detail on top of the model.'}</EmptyState>
       )}

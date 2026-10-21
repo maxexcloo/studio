@@ -233,10 +233,11 @@ export async function pickerView(surface: Locator, name: string | RegExp) {
   const exact = typeof name === 'string';
   const tab = surface.getByRole('button', { name, exact }).or(surface.getByRole('tab', { name, exact }));
   if (await tab.count()) { await tab.first().click(); return; }
-  const trigger = surface.locator('.picker-view .picker-dropdown-trigger');
+  // The heading's views are the shared Dropdown; its menu floats on the page.
+  const trigger = surface.locator('.dropdown-trigger.picker-view');
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
-  await surface.getByRole('menuitemcheckbox', { name, exact }).click();
-  await expect(surface.locator('.picker-view .picker-dropdown-menu')).toHaveCount(0);
+  await surface.page().locator('.dropdown-menu').getByRole('option', { name, exact }).click();
+  await expect(surface.page().locator('.dropdown-menu')).toHaveCount(0);
 }
 
 /** Whether a view is the one showing, on either device. */
@@ -246,5 +247,5 @@ export async function expectPickerView(surface: Locator, name: string) {
     await expect.poll(async () => (await tab.first().getAttribute('aria-pressed')) || (await tab.first().getAttribute('aria-selected'))).toBe('true');
     return;
   }
-  await expect(surface.locator('.picker-view .picker-dropdown-trigger')).toContainText(name);
+  await expect(surface.locator('.dropdown-trigger.picker-view')).toContainText(name);
 }

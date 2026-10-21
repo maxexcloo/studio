@@ -16,15 +16,30 @@ export type DropdownOption = {
   disabled?: boolean;
   /** Why it is disabled, shown under its name. */
   reason?: string;
+  /** The accessible name, where the visible label abbreviates ("Selected 2 of 3"). */
+  ariaLabel?: string;
+  /** A muted count or tag at the row's end, before the tick. */
+  meta?: React.ReactNode;
 };
+
+/** A command after the choices (Save Current as New Stack): it runs and the menu closes unless `keepOpen`. */
+export type DropdownAction = { id: string; label: string; onSelect: () => void; disabled?: boolean; danger?: boolean; keepOpen?: boolean };
 
 type Common = {
   /** The accessible name of the trigger and the menu. */
   label: string;
   options: DropdownOption[];
   disabled?: boolean;
-  /** `row`: the value muted at the end of a list row; `pill`: a compact toolbar pill; `field`: a filled control. */
-  variant?: 'row' | 'pill' | 'field';
+  /** `row`: the value muted at the end of a list row; `pill`: a compact toolbar pill; `field`: a filled control; `heading`: a picker heading's menu. */
+  variant?: 'row' | 'pill' | 'field' | 'heading';
+  /** The trigger's accessible name when it differs from the menu's ("Stacks: Portraits"). */
+  triggerLabel?: string;
+  /** Commands under the choices, after a divider. */
+  actions?: DropdownAction[];
+  /** Replaces the choices and commands while it returns something (a name field); gets `close`. */
+  panel?: (close: () => void) => React.ReactNode;
+  /** What an empty list says. */
+  empty?: string;
   /** What the trigger shows instead of the picked option's name. */
   summary?: React.ReactNode;
   placeholder?: string;
@@ -34,7 +49,7 @@ type Common = {
 };
 
 type Single = Common & { value: string; onChange: (value: string) => void; multiple?: false };
-type Multiple = Common & { value: string[]; onChange: (values: string[]) => void; multiple: true; allLabel?: string; noneLabel?: string; onAll?: () => void; allPicked?: boolean };
+type Multiple = Common & { value: string[]; onChange: (values: string[]) => void; multiple: true; allLabel?: string; noneLabel?: string; onAll?: () => void; allPicked?: boolean; /** All and Clear in the menu's head (off for filters that have their own All). */ head?: boolean };
 
 export type DropdownProps = Single | Multiple;
 
@@ -48,9 +63,11 @@ const ROW_TOUCH = 44;
  * Home and End move between rows, typing jumps to a name, Enter or Space picks,
  * Escape or a click outside closes, and the focus returns to the trigger.
  * `multiple` keeps the menu open and ticks several, with All and Clear.
+ * Picker headings use it too (`variant="heading"`): the views, the filters
+ * that combine (`multiple`, no head) and the LoRA Stacks with its commands.
  */
 export function Dropdown(props: DropdownProps) {
-  const { label, options, disabled, variant = 'field', summary, placeholder = 'Not Set', className, searchFrom = 12 } = props;
+  const { label, options, disabled, variant = 'field', summary, placeholder = 'Not Set', className, searchFrom = 12, triggerLabel, actions = [], panel, empty } = props;
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const trigger = React.useRef<HTMLButtonElement>(null);
@@ -68,6 +85,8 @@ export function Dropdown(props: DropdownProps) {
     ? !props.value.length ? props.noneLabel || 'None' : enabled.length > 1 && enabled.every((option) => props.value.includes(option.value)) ? props.allLabel || 'All' : props.value.length === 1 ? labelOf(props.value[0]) : `${props.value.length} Selected`
     : props.value ? labelOf(props.value) : placeholder);
   const searchable = options.length >= searchFrom;
+  const head = props.multiple && props.head !== false;
+  const shownPanel = open && panel ? panel(close) ?? null : null;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matches = terms.length ? options.filter((option) => terms.every((term) => `${option.label} ${option.detail || ''}`.toLocaleLowerCase().includes(term))) : options;
 
@@ -79,7 +98,7 @@ export function Dropdown(props: DropdownProps) {
   // Type-ahead: letters typed in quick succession jump to the first name that starts with them.
   const typed = React.useRef({ text: '', at: 0 });
   const onKeyDown = (event: React.KeyboardEvent) => {
-    const items = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') || []);
+    const items = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled), .dropdown-action:not(:disabled)') || []);
     const at = items.indexOf(document.activeElement as HTMLButtonElement);
     const inField = event.target instanceof HTMLInputElement;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || ((event.key === 'Home' || event.key === 'End') && !inField)) {
@@ -107,7 +126,7 @@ export function Dropdown(props: DropdownProps) {
       className={cn('dropdown-trigger', `is-${variant}`, className)}
       disabled={disabled}
       role="combobox"
-      aria-label={label}
+      aria-label={triggerLabel || label}
       aria-haspopup="listbox"
       aria-expanded={open}
       aria-controls={open ? id : undefined}
@@ -119,11 +138,12 @@ export function Dropdown(props: DropdownProps) {
       <ChevronDown size={14} aria-hidden="true" />
     </button>
     <AnimatePresence>
-      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} rows={matches.length + (searchable ? 1 : 0) + (props.multiple ? 1 : 0)} onKeyDown={onKeyDown}>
-        {props.multiple ? <div className="dropdown-head">
+      {open ? <DropdownSurface key="menu" ref={menu} trigger={trigger.current} rows={shownPanel ? 3 : matches.length + (searchable ? 1 : 0) + (head ? 1 : 0) + (actions.length ? actions.length + 1 : 0)} onKeyDown={onKeyDown}>
+        {shownPanel ?? <>
+        {head ? <div className="dropdown-head">
           <strong>{label}</strong>
-          <button type="button" className="dropdown-head-action" disabled={props.allPicked ?? enabled.every((option) => props.value.includes(option.value))} onClick={() => props.onAll ? props.onAll() : props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])])}>All</button>
-          <button type="button" className="dropdown-head-action" disabled={!props.value.length} onClick={() => props.onChange([])}>Clear</button>
+          <button type="button" className="dropdown-head-action" disabled={props.multiple && (props.allPicked ?? enabled.every((option) => props.value.includes(option.value)))} onClick={() => { if (props.multiple) { if (props.onAll) props.onAll(); else props.onChange([...new Set([...props.value, ...enabled.map((option) => option.value)])]); } }}>All</button>
+          <button type="button" className="dropdown-head-action" disabled={!picked.length} onClick={() => { if (props.multiple) props.onChange([]); }}>Clear</button>
         </div> : null}
         {searchable ? <div className="dropdown-search"><Search size={14} aria-hidden="true" /><input aria-label={`Search ${label}`} placeholder="Search" value={query} autoComplete="off" spellCheck={false} onChange={(event) => setQuery(event.target.value.slice(0, 100))} />{query ? <button type="button" aria-label="Clear Search" onClick={() => setQuery('')}><X size={12} /></button> : null}</div> : null}
         <div id={id} ref={list} className="dropdown-options" role="listbox" aria-label={label} aria-multiselectable={props.multiple || undefined}>
@@ -131,13 +151,21 @@ export function Dropdown(props: DropdownProps) {
             const on = isPicked(option.value);
             const note = option.disabled && option.reason ? option.reason : option.detail;
             const noteId = note ? `${id}-${option.value}` : undefined;
-            return <button key={option.value} type="button" role="option" tabIndex={-1} aria-selected={on} aria-label={option.label} aria-describedby={noteId} data-label={option.label} disabled={option.disabled} className={cn('dropdown-option', on && 'is-selected')} onClick={() => choose(option.value)}>
+            return <button key={option.value} type="button" role="option" tabIndex={-1} aria-selected={on} aria-label={option.ariaLabel || option.label} aria-describedby={noteId} data-label={option.label} disabled={option.disabled} className={cn('dropdown-option', on && 'is-selected')} onClick={() => choose(option.value)}>
               <span className="dropdown-option-text"><span>{option.label}</span>{note ? <small id={noteId}>{note}</small> : null}</span>
+              {option.meta !== undefined ? <em className="dropdown-option-meta">{option.meta}</em> : null}
               <SelectedTick on={on} />
             </button>;
           })}
-          {!matches.length ? <EmptyState title={query ? 'No Matches' : 'Nothing to Choose Yet'} compact /> : null}
+          {!matches.length ? (empty && !query ? <p className="dropdown-note">{empty}</p> : <EmptyState title={query ? 'No Matches' : 'Nothing to Choose Yet'} compact />) : null}
         </div>
+        {actions.length ? <div className="dropdown-actions" role="group" aria-label={`${label} Actions`}>
+          <span className="dropdown-divider" role="separator" />
+          {actions.map((action) => <button key={action.id} type="button" tabIndex={-1} className={cn('dropdown-option dropdown-action', action.danger && 'is-danger')} data-label={action.label} disabled={action.disabled} onClick={() => { action.onSelect(); if (!action.keepOpen) close(); }}>
+            <span className="dropdown-option-text"><span>{action.label}</span></span>
+          </button>)}
+        </div> : null}
+        </>}
       </DropdownSurface> : null}
     </AnimatePresence>
   </>;
@@ -178,7 +206,7 @@ const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement 
   React.useEffect(() => {
     if (!place) return;
     const surface = (ref as React.RefObject<HTMLDivElement | null>).current;
-    const target = surface?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not(:disabled)') || surface?.querySelector<HTMLElement>('.dropdown-search input, [role="option"]:not(:disabled)');
+    const target = surface?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not(:disabled)') || surface?.querySelector<HTMLElement>('.dropdown-search input, [role="option"]:not(:disabled), .dropdown-action:not(:disabled)');
     target?.focus({ preventScroll: true });
     target?.scrollIntoView({ block: 'nearest' });
   }, [Boolean(place)]); // eslint-disable-line react-hooks/exhaustive-deps

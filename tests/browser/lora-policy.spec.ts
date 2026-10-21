@@ -131,11 +131,11 @@ test('LoRA library offers direct list selection with inline strengths and access
   await expect(page.getByLabel('Cards Two Strength Value', { exact: true })).toBeVisible();
   // Stacks live in the heading's Stacks dropdown; there is no footer and no Enable All or Disable All.
   await expect(picker.getByRole('button', { name: /^(Enable|Disable) All$/ })).toHaveCount(0);
-  await picker.getByRole('button', { name: 'Stacks', exact: true }).click();
-  await picker.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
-  await picker.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
-  await picker.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(picker.getByRole('button', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
+  await picker.getByRole('combobox', { name: 'Stacks', exact: true }).click();
+  await page.locator('.dropdown-menu').getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
+  await page.locator('.dropdown-menu').getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');
+  await page.locator('.dropdown-menu').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(picker.getByRole('combobox', { name: 'Stacks: Inline Stack', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'Search LoRAs', exact: true }).or(picker.getByRole('textbox', { name: 'Search LoRAs', exact: true }))).toBeVisible();
   // Each pick turns off and on with its own switch in the Selected view.
   await picker.getByRole('switch', { name: 'Turn Off Cards Two', exact: true }).click();
@@ -276,24 +276,25 @@ test('LoRA stacks apply, update, rename and delete from the Stacks menu with Und
   const picker = page.getByRole('dialog', { name: 'LoRAs', exact: true });
   const ink = picker.getByRole('checkbox', { name: 'Select Ink', exact: true });
   const grain = picker.getByRole('checkbox', { name: 'Select Grain', exact: true });
-  const menu = picker.getByRole('menu', { name: /^Saved Stacks for/ });
-  const openStacks = async () => { await picker.getByRole('button', { name: /^Stacks/ }).click(); await expect(menu).toBeVisible(); };
+  // The Stacks dropdown's menu floats on the page (Dropdown.tsx); its choices are options, its commands buttons.
+  const menu = page.locator('.dropdown-menu').filter({ has: page.getByRole('listbox', { name: /^Saved Stacks for/ }) });
+  const openStacks = async () => { await picker.getByRole('combobox', { name: /^Stacks/ }).click(); await expect(menu).toBeVisible(); };
   await ink.click();
   await openStacks();
-  await menu.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
+  await menu.getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
   await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Zebra');
   await menu.getByRole('button', { name: 'Save', exact: true }).click();
   await grain.click();
   await openStacks();
-  await menu.getByRole('menuitem', { name: 'Save Current as New Stack', exact: true }).click();
+  await menu.getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
   await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Alpha');
   await menu.getByRole('button', { name: 'Save', exact: true }).click();
   // Alphabetical, the one in use ticked.
   await openStacks();
-  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/, /^Zebra/]);
-  await expect(menu.getByRole('menuitemcheckbox', { name: /^Alpha/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(menu.getByRole('option')).toHaveText([/^Alpha/, /^Zebra/]);
+  await expect(menu.getByRole('option', { name: /^Alpha/ })).toHaveAttribute('aria-selected', 'true');
   // Choosing a stack applies it at once, with Undo.
-  await menu.getByRole('menuitemcheckbox', { name: /^Zebra/ }).click();
+  await menu.getByRole('option', { name: /^Zebra/ }).click();
   await expect(grain).toHaveAttribute('aria-checked', 'false');
   // The newest host shows the message: the pop-up's heading on the phone (UI-PATTERNS › Messages).
   const undoButton = page.locator('.status-message').getByRole('button', { name: 'Undo', exact: true });
@@ -303,26 +304,26 @@ test('LoRA stacks apply, update, rename and delete from the Stacks menu with Und
   await expect(grain).toHaveAttribute('aria-checked', 'true');
   // Update the stack in use with the current picks, rename it, then delete it with Undo.
   await openStacks();
-  await menu.getByRole('menuitemcheckbox', { name: /^Zebra/ }).click();
+  await menu.getByRole('option', { name: /^Zebra/ }).click();
   await grain.click();
   await openStacks();
-  await menu.getByRole('menuitem', { name: 'Update “Zebra” with Current Picks', exact: true }).click();
+  await menu.getByRole('button', { name: 'Update “Zebra” with Current Picks', exact: true }).click();
   await openStacks();
-  await expect(menu.getByRole('menuitemcheckbox', { name: 'Zebra, 2 LoRAs', exact: true })).toBeVisible();
-  await menu.getByRole('menuitem', { name: 'Rename “Zebra”', exact: true }).click();
+  await expect(menu.getByRole('option', { name: 'Zebra, 2 LoRAs', exact: true })).toBeVisible();
+  await menu.getByRole('button', { name: 'Rename “Zebra”', exact: true }).click();
   await menu.getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Yak');
   await menu.getByRole('button', { name: 'Rename', exact: true }).click();
   await openStacks();
-  await menu.getByRole('menuitem', { name: 'Delete “Yak”', exact: true }).click();
+  await menu.getByRole('button', { name: 'Delete “Yak”', exact: true }).click();
   await openStacks();
-  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/]);
+  await expect(menu.getByRole('option')).toHaveText([/^Alpha/]);
   // Escape closes the menu only; the picker stays open.
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(picker).toBeVisible();
   await undo();
   await openStacks();
-  await expect(menu.getByRole('menuitemcheckbox')).toHaveText([/^Alpha/, /^Yak/]);
+  await expect(menu.getByRole('option')).toHaveText([/^Alpha/, /^Yak/]);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await expect(picker).toHaveCount(0);

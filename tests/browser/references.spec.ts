@@ -231,8 +231,8 @@ test('a real ten-slot profile shows one References button, however its slots are
   await page.getByRole('button', { name: 'Add References', exact: true }).click();
   const picker = page.getByRole('dialog', { name: 'Choose References', exact: true });
   if (await studioUi(page).isPhone()) {
-    await picker.locator('.picker-view .picker-dropdown-trigger').click();
-    await expect(picker.getByRole('menuitemcheckbox', { name: 'Selected 0 of 10', exact: true })).toBeDisabled();
+    await picker.locator('.dropdown-trigger.picker-view').click();
+    await expect(page.locator('.dropdown-menu').getByRole('option', { name: 'Selected 0 of 10', exact: true })).toBeDisabled();
   } else await expect(picker.getByRole('tab', { name: 'Selected 0 of 10', exact: true })).toBeVisible();
 });
 

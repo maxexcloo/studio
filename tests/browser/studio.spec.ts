@@ -490,11 +490,11 @@ test('Fast and Quality filters retain all reference variants and All clears them
     expect(layout.contentWidth).toBeLessThanOrEqual(layout.width);
   };
   // The phone's pop-up carries the filters in its heading dropdown ("Model · All"), as ticks that combine.
-  const filterMenu = menu.getByRole('menu', { name: 'Filter Models', exact: true });
+  const filterMenu = page.getByRole('listbox', { name: 'Filter Models', exact: true });
   const filter = async (name: string) => {
     if (!phone) { await filters.getByRole('button', { name, exact: true }).click(); return; }
-    if (!(await filterMenu.isVisible())) await menu.locator('.picker-view .picker-dropdown-trigger').click();
-    await filterMenu.getByRole('menuitemcheckbox', { name, exact: true }).click();
+    if (!(await filterMenu.isVisible())) await menu.locator('.dropdown-trigger.picker-view').click();
+    await filterMenu.getByRole('option', { name, exact: true }).click();
   };
   await expect(rows).toHaveCount(4);
   await expectSingleRow();
@@ -526,9 +526,9 @@ test('Fast and Quality filters retain all reference variants and All clears them
   await ui.openModelPicker();
   await expect(rows).toHaveCount(2);
   await expectSingleRow();
-  if (phone) await menu.locator('.picker-view .picker-dropdown-trigger').click();
+  if (phone) await menu.locator('.dropdown-trigger.picker-view').click();
   const options = phone ? filterMenu : filters;
-  const role = phone ? 'menuitemcheckbox' as const : 'button' as const;
+  const role = phone ? 'option' as const : 'button' as const;
   await expect(options.getByRole(role, { name: 'Generate', exact: true })).toHaveCount(0);
   await expect(options.getByRole(role, { name: 'Non-Reference', exact: true })).toHaveCount(0);
   await expect(options.getByRole(role, { name: 'Reference', exact: true })).toHaveCount(0);
@@ -589,7 +589,7 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
     await menu.locator('.phone-model-pop-body').evaluate((element) => { element.scrollTop = element.scrollHeight; });
     await expect(search).toBeInViewport();
     // The filters live in the heading's dropdown ("Model · All"), which stays in view.
-    await expect(menu.locator('.picker-view .picker-dropdown-trigger')).toBeInViewport();
+    await expect(menu.locator('.dropdown-trigger.picker-view')).toBeInViewport();
   } else {
     const bounds = await menu.boundingBox();
     const viewport = page.viewportSize()!;
@@ -612,11 +612,11 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   await expect(menu).toHaveCount(0);
   await ui.openModelPicker();
   // On the phone the filters are ticks in the heading's dropdown ("Model · All").
-  const filterMenu = menu.getByRole('menu', { name: 'Filter Models', exact: true });
+  const filterMenu = page.getByRole('listbox', { name: 'Filter Models', exact: true });
   const filter = async (name: string) => {
     if (!phone) { await menu.getByRole('button', { name, exact: true }).click(); return; }
-    if (!(await filterMenu.isVisible())) await menu.locator('.picker-view .picker-dropdown-trigger').click();
-    await filterMenu.getByRole('menuitemcheckbox', { name, exact: true }).click();
+    if (!(await filterMenu.isVisible())) await menu.locator('.dropdown-trigger.picker-view').click();
+    await filterMenu.getByRole('option', { name, exact: true }).click();
   };
   await filter('All');
   await expect(rows).toHaveCount(30);
