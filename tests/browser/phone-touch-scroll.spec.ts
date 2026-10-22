@@ -56,3 +56,34 @@ test('the phone gallery scrolls by touch and wheel, also after the viewer and Cr
   await page.waitForTimeout(300);
   await expectScrolls(page, 'touch');
 });
+
+/** A one-finger drag between two points on the screen. */
+async function drag(page: Page, x: number, from: number, to: number) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: from }] });
+  for (let step = 1; step <= 8; step += 1) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: from + ((to - from) * step) / 8 }] });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.detach();
+}
+
+test('on the phone a swipe up opens Details and a swipe down closes them, then the viewer', async ({ page, isMobile, browserName }) => {
+  test.skip(!isMobile || browserName !== 'chromium', 'Phone touch through Chromium touch input.');
+  await page.goto('/');
+  const ui = studioUi(page);
+  await ui.openViewer(page.locator('[data-tile-id="touch-0"]'));
+  const details = page.locator('.viewer-side');
+  const canvas = await page.locator('.viewer-canvas').boundingBox();
+  const middle = canvas!.y + canvas!.height / 2;
+  await drag(page, 200, middle + 60, middle - 140);
+  await expect(details).toBeVisible();
+  const sheet = await details.boundingBox();
+  await drag(page, 200, sheet!.y + 30, sheet!.y + 200);
+  await expect(details).toBeHidden();
+  await expect(ui.viewer).toBeVisible();
+  await page.waitForTimeout(450);
+  await drag(page, 200, middle - 100, middle + 120);
+  await expect(ui.viewer).toBeHidden();
+});

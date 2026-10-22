@@ -38,6 +38,11 @@ test('select-mode actions use bulk wording, never one item’s copy', async ({ p
     const selectAll = (await page.getByRole('button', { name: /^Select (All|None)$/ }).boundingBox())!;
     expect(selectAll.width).toBe(44);
     expect(selectAll.height).toBe(44);
+    // Close is the last control, at the right edge, as on every phone surface.
+    const close = (await page.getByRole('button', { name: 'Stop Selecting', exact: true }).boundingBox())!;
+    const lastX = await top.locator('.phone-bar-row button:visible').evaluateAll((nodes) => Math.max(...nodes.map((node) => node.getBoundingClientRect().x)));
+    expect(close.x).toBe(lastX);
+    expect(topRow.x + topRow.width - (close.x + close.width)).toBeLessThanOrEqual(8);
     // The bottom action bar is as tall as the top bar's row.
     const bottom = (await bar.boundingBox())!;
     expect(Math.round(bottom.height)).toBe(Math.round(topRow.height));

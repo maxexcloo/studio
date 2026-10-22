@@ -3,7 +3,7 @@ import { studioUi } from './helpers/ui';
 
 const picture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#527b8f"/></svg>');
 
-test('generation completion stays compact and swipes away', async ({ page }) => {
+test('a finished generation lands in the gallery without a notification', async ({ page }) => {
   const images = Array.from({ length: 80 }, (_, index) => ({ id: `notice-image-${index}`, url: picture, filename: `${index}.png`, type: 'image', status: 'done', prompt: 'A calm landscape', createdAt: new Date(Date.now() - (index + 1) * 60000).toISOString(), width: 512, height: 512 }));
   const pending = { ...images[0], id: 'notice-pending', jobId: 'notice-job', status: 'pending', createdAt: new Date().toISOString(), progress: { value: 1, max: 4 } };
   let complete = false;
@@ -13,23 +13,15 @@ test('generation completion stays compact and swipes away', async ({ page }) => 
   await expect(page.locator('[data-tile-id="notice-pending"]')).toBeVisible();
   const ui = studioUi(page);
   const phone = await ui.isPhone();
-  const scroller = ui.scroller;
-  await scroller.evaluate((element) => element.scrollTo({ top: 1400, behavior: 'instant' }));
-  // The full studio shows progress in its activity island; the phone shows a running badge.
+  await ui.scroller.evaluate((element) => element.scrollTo({ top: 1400, behavior: 'instant' }));
+  // The full studio shows progress in its activity island while the tile is out of view.
   if (!phone) await expect(page.locator('.activity.is-live').filter({ hasText: 'Generating' })).toBeVisible();
   complete = true;
-  // Both say it in the status pill (UI-PATTERNS › Messages).
-  const notification = page.locator('.status-message').filter({ hasText: 'Image ready' });
-  await expect(notification).toBeVisible();
-  await expect(notification.getByRole('button', { name: 'View', exact: true })).toBeVisible();
-  await expect.poll(async () => (await notification.boundingBox())?.height ?? Infinity).toBeLessThanOrEqual(56);
-  const drag = notification;
-  const origin = await drag.boundingBox();
-  await page.mouse.move(origin!.x + origin!.width / 2, origin!.y + origin!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(origin!.x + origin!.width / 2 + 110, origin!.y + origin!.height / 2, { steps: 10 });
-  await page.mouse.up();
-  await expect(notification).toHaveCount(0);
+  if (!phone) await expect(page.locator('.activity.is-live')).toHaveCount(0);
+  await ui.scroller.evaluate((element) => element.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect(page.locator('[data-tile-id="notice-pending"] img').first()).toBeVisible();
+  await page.waitForTimeout(600);
+  await expect(page.locator('.status-message').filter({ hasText: /ready/i })).toHaveCount(0);
 });
 
 test('error notifications count down three seconds and pause on hover, focus and hidden tabs', async ({ page }) => {

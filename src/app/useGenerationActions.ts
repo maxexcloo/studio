@@ -95,7 +95,7 @@ export function useGenerationActions(view: any) {
    * settings again (see retry.ts), past the composer's checks: the server
    * validates that run the same way.
    */
-  async function runGeneration(retry?: RetryRequest) {
+  async function runGeneration(retry?: RetryRequest, onQueued?: () => void) {
     if (generatePostingRef.current) return;
     if (comfyRestarting) {
       showToast("ComfyUI is restarting. Try again in a few seconds.", "warning");
@@ -225,6 +225,7 @@ export function useGenerationActions(view: any) {
         }
         const { jobId, items, notice } = response;
         queuedJobs.push(jobId);
+        if (queuedJobs.length === 1) onQueued?.();
         if (postingRevision !== queueRevision.current) {
           galleryRemove([clientJobId]);
           await stopJob(jobId);
@@ -470,7 +471,11 @@ export function useGenerationActions(view: any) {
   /** The failed run again, as it was (or smaller, or decoding in tiles); the viewer closes onto the new tile. */
   async function retryFailed(item: GalleryItem, options: RetryOptions = {}) {
     setActive(null);
-    await runGeneration(retryRequest(item, options));
+    // Try Again replaces the failure: once the new run is queued, the failed item goes (no Undo; the new run is its replacement).
+    await runGeneration(retryRequest(item, options), () => {
+      galleryRemove([item.id, item.url].filter(Boolean) as string[]);
+      if (!item.optimistic) void commitDelete(item);
+    });
   }
 
   /** Out of memory: let ComfyUI unload what it holds (it does so between runs), then run it again. */

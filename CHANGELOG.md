@@ -11,6 +11,19 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Phone viewer:** a swipe up opens Details; a swipe down closes them (from the top of their scroll), and with them shut a swipe down closes the viewer as before.
+- **Loading, failed and stopped items:** a tap opens them in the viewer like finished ones, with their progress or failure report and Details; a run still generating no longer ignores the tap.
+- **Try Again:** replaces the failed item: once the new run is queued the failed one is removed, so the gallery keeps one tile per attempt.
+- **Finished images:** the reveal takes under a second (it took over two).
+- **Generation notices:** the "ready" pop-ups when generations finish are gone; the status bar and the gallery show it.
+- **Details LoRAs:** each LoRA shows only what it ran with, its name and strength.
+- **Phone status row:** the status light leads, then the text, with the progress and spinner after it; select mode's Close sits on the right.
+- **Phone compact prompt:** the Image/Video switcher is the Create sheet's, cell for cell.
+
+### Fixed
+- **Phone pickers:** the model and LoRA pop-ups open at their row on iOS instead of failing to show.
+
 ## [0.46.0] - 2026-10-22
 
 > Picker search swaps in place, one chooser for image and video references, model views as one choice, steady Settings, LoRA and blur on first open, compact Generate as an icon, and Steps offered alike on both devices

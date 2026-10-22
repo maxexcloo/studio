@@ -37,7 +37,7 @@ export function useViewerControls(view: any) {
     active, generate, generateDisabled, height, lastTapRef,
     models, prefs, setActive, setCfg, setClipType, setCount, setCustomSize, setDenoise, setFps,
     setFrames, setDuration, setResolution, setHeight, setIsDraggingViewer, setLoras, setMode, setModel, setNegative, setPrompt,
-    setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, setStartImage, setStartImageId, setStartImageName, setSteps,
+    setSampler, setScheduler, setSeed, setShowDetails, setShowNegativePrompt, showDetails, setStartImage, setStartImageId, setStartImageName, setSteps,
     setTextEncoder, setTextEncoders, setVae, setViewerPan, setViewerZoom, setWeightDtype, setWidth,
     showToast, viewerDragEndRef, viewerDragRef, viewerPan,
     viewerZoom, visibleGallery, width
@@ -271,7 +271,7 @@ export function useViewerControls(view: any) {
 
   /** What the viewer steps through: the gallery in the order it is laid out (useStudio.ts viewerGallery). */
   function viewerItems(): GalleryItem[] {
-    return view.viewerGallery || visibleGallery.filter((item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error");
+    return view.viewerGallery || visibleGallery.filter((item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error" || item.status === "canceled");
   }
 
   function moveViewer(direction: 1 | -1) {
@@ -481,7 +481,8 @@ export function useViewerControls(view: any) {
         const x = viewerNeighbors() ? gesture.dx : rubber(gesture.dx, 0, 0, 80);
         paint(canvas, 1, { x, y: 0 });
       } else if (gesture.axis === "y") {
-        paint(canvas, 1, { x: 0, y: active ? Math.max(0, gesture.dy) : rubber(gesture.dy, 0, 0, 80) });
+        // Down follows the finger (it closes); up gives a little, as it opens Details on the phone.
+        paint(canvas, 1, { x: 0, y: active && gesture.dy > 0 ? gesture.dy : rubber(gesture.dy, 0, 0, 80) });
       }
       return;
     }
@@ -628,7 +629,18 @@ export function useViewerControls(view: any) {
           swipeTo(canvas, dx < 0 ? 1 : -1);
           return;
         }
+        // On the phone, up opens Details and down closes them first; down with them shut closes the viewer.
+        if (gesture.axis === "y" && active && phoneRef.current && !showDetails && (dy < -70 || (velocity.y < -0.45 && dy < -30))) {
+          settleViewer(canvas, swipeZoom.current, { x: 0, y: 0 });
+          setShowDetails(true);
+          return;
+        }
         if (gesture.axis === "y" && active && (dy > 110 || (velocity.y > 0.45 && dy > 30))) {
+          if (phoneRef.current && showDetails) {
+            settleViewer(canvas, swipeZoom.current, { x: 0, y: 0 });
+            setShowDetails(false);
+            return;
+          }
           setActive(null);
           return;
         }

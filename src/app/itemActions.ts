@@ -139,7 +139,7 @@ export function itemActions(item: GalleryItem, handlers: ItemActionHandlers, sur
     done && handlers.useAsReference && item.type === 'image' && !item.library && {
       id: 'reference', group: 'make', label: 'Reference', tip: 'Reference This Image', Icon: ImagePlus, run: () => handlers.useAsReference!(item),
     },
-    item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Retry as a New Job', Icon: RotateCw, run: () => handlers.retry(item) },
+    item.status === 'error' && !item.library && { id: 'retry', group: 'make', label: 'Retry', tip: 'Try Again, Replacing This One', Icon: RotateCw, run: () => handlers.retry(item) },
     handlers.smartUpscale && canUpscaleItem(item) && {
       id: 'upscale', group: 'make', label: upscaleLabel(item), Icon: UpscaleArrow, pressed: item.upscale?.url ? Boolean(item.upscaleActive) : undefined,
       run: () => (item.upscale?.status === 'running' ? handlers.cancelUpscale(item) : handlers.upscale(item)),

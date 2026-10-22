@@ -226,7 +226,6 @@
   font: 500 12px/1 var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
-.detail-lora > .lora-info-panel { flex-basis: 100%; padding: 0 0 6px; }
 .detail-section h4 {
   margin: 0;
   color: hsl(var(--muted-foreground));

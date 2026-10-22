@@ -64,7 +64,7 @@ test('desktop tile actions follow the viewer bar, Retry stands in on failures, a
       expect(boxes[index].left).toBeGreaterThanOrEqual(boxes[index - 1].right);
     }
     const failedRow = await rowNames(page, 'tile-failed');
-    expect(failedRow.names).toContain('Retry as a New Job');
+    expect(failedRow.names).toContain('Try Again, Replacing This One');
     expect(failedRow.names).not.toContain('Recreate With the Same Seed');
   }
 });

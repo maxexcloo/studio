@@ -148,3 +148,26 @@ test('a tap outside a phone pop-up, dropdown or menu closes it and does nothing 
   await tapOn(clear);
   await expect(page.locator('.viewer-phone-bar')).toBeVisible();
 });
+
+test('the compact prompt bar’s Image/Video switcher is the Create sheet’s, cell for cell', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'The phone prompt bar and Create sheet.');
+  await page.goto('/');
+  const ui = studioUi(page);
+  const measure = (selector: string) => page.locator(selector).evaluate((track) => {
+    const style = getComputedStyle(track);
+    const box = track.getBoundingClientRect();
+    return {
+      track: { width: Math.round(box.width), height: Math.round(box.height), padding: style.padding, radius: style.borderRadius, background: style.backgroundColor },
+      cells: Array.from(track.querySelectorAll('button')).map((button) => {
+        const cell = getComputedStyle(button);
+        const icon = button.querySelector('svg')!.getBoundingClientRect();
+        const rect = button.getBoundingClientRect();
+        return { width: Math.round(rect.width), height: Math.round(rect.height), background: cell.backgroundColor, colour: cell.color, icon: `${icon.width}x${icon.height}` };
+      }),
+    };
+  });
+  const compact = await measure('.phone-prompt-bar .media-mode-toggle');
+  await ui.openComposer();
+  await ui.composerSettled();
+  expect(compact).toEqual(await measure('.create-footer .media-mode-toggle'));
+});

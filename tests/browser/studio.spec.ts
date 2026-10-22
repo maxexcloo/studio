@@ -103,7 +103,7 @@ test('the phone top bar holds the status and the tools, and the prompt bar holds
     expect(viewport.width - (boxes[2].x + boxes[2].width)).toBeLessThanOrEqual(16);
     expect(bar.height).toBeLessThanOrEqual(52);
     // The status light and "Studio" share one line, centred on the bar.
-    const light = (await page.locator('.phone-heading-light, .phone-running-inline').first().boundingBox())!;
+    const light = (await page.locator('.phone-heading-light').boundingBox())!;
     expect(light.x).toBeLessThan(boxes[0].x);
     if (viewport.width >= 390) {
       const name = (await page.locator('.phone-heading-name').boundingBox())!;
@@ -1031,6 +1031,12 @@ test('phone header targets never overlap with or without running jobs', async ({
       }
     }
     if (running) {
+      // The status light stays in front; the spinner and count follow "Studio".
+      const light = (await page.locator('.phone-heading-light').boundingBox())!;
+      const name = (await page.locator('.phone-heading-name').boundingBox())!;
+      const spinner = (await page.locator('.phone-running-inline').boundingBox())!;
+      expect(light.x + light.width).toBeLessThanOrEqual(name.x + 0.5);
+      expect(name.x + name.width).toBeLessThanOrEqual(spinner.x + 0.5);
       await page.locator('.phone-running-inline').click();
       await expect(page.getByRole('menuitem', { name: 'Show Running', exact: true })).toBeVisible();
     }
