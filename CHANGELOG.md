@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Picker search swaps in place, one chooser for image and video references, model views as one choice, steady Settings, LoRA and blur on first open, compact Generate as an icon, and Steps offered alike on both devices
+
 ### Changed
 - **Generate:** in the compact (collapsed) desktop composer Generate is its arrow alone, still named Generate; the word shows once the composer expands. Offline and restarting keep their words in the same slot in both sizes.
 - **Desktop gallery filters:** the filter row opens and folds as the search does, its width at the base motion while it fades, instead of appearing and vanishing at once; instant with reduced motion.
