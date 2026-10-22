@@ -19,7 +19,14 @@ type SurfaceProps = { title: string; icon: React.ReactNode; trigger: string; cla
 export function ComposerSurface({ title, icon, trigger, className, bodyClassName, onClose, children, size, headless = false }: SurfaceProps) {
   const present = useIsPresent();
   const surface = React.useRef<HTMLDivElement>(null);
-  const opener = React.useRef(document.querySelector<HTMLElement>(trigger) || (document.activeElement instanceof HTMLElement ? document.activeElement : null));
+  const opener = React.useRef(document.querySelector<HTMLElement>(trigger) || (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null));
+  // The trigger only reads aria-expanded="true" once this render commits, and iOS never focuses a tapped
+  // button, so the opener is found again after the commit (before paint) and the box placed from it.
+  const [, setOpenerFound] = React.useState(false);
+  React.useLayoutEffect(() => {
+    const found = document.querySelector<HTMLElement>(trigger);
+    if (found && found !== opener.current) { opener.current = found; setOpenerFound(true); }
+  }, [trigger]);
   const [anchor] = React.useState(() => composerAnchor(opener.current));
   const { box, onPhone } = useComposerSurfaceBox(anchor, opener.current, size);
   // On the phone it pops up over the Create sheet, which stays in view behind it.

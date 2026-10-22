@@ -12,6 +12,7 @@ import type { GalleryItem, GenerationFailure } from './types';
 /** The failure a gallery item carries; older items only kept the message in their name. */
 export function failureOf(item: GalleryItem): GenerationFailure {
   if (item.failure) return item.failure;
+  if (item.status === 'canceled') return { title: 'Generation stopped', summary: 'It was stopped before it finished.', detail: '' };
   const text = String(item.filename || '').trim();
   return { title: 'Generation failed', summary: text || 'ComfyUI didn’t say why.', detail: text };
 }

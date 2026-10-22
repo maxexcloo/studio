@@ -460,7 +460,7 @@ export function useStudio() {
   useEffect(() => {
     if (!active) return;
     const activeItem = active;
-    const viewerItems = visibleGallery.filter((item) => item.status === "pending" || item.status === "done" || item.status === "error");
+    const viewerItems = visibleGallery.filter((item) => item.status === "pending" || item.status === "done" || item.status === "error" || item.status === "canceled");
     const currentIndex = viewerItems.findIndex((item) => item.id === activeItem.id);
     function onKeyDown(event: KeyboardEvent) {
       if (document.querySelector(OPEN_DIALOG)) return;

@@ -17,8 +17,8 @@ PRESETS['pixels-organic'] = {
       ...organic.modes.dark,
       revealConfig: {
         ...organic.modes.dark.revealConfig,
-        duration: 2.25,
-        pixDuration: 2.1,
+        duration: 0.9,
+        pixDuration: 0.85,
         pixEasing: 'smoothstep',
         softness: 0.6,
       },

@@ -809,7 +809,7 @@ body:has(.phone-shell) .unlock-field button { min-height: 48px; font-size: 16px;
 .phone-heading.is-connected .phone-heading-light span { background: hsl(var(--status-ready)); box-shadow: 0 0 0 4px hsl(var(--status-ready) / .14); }
 .phone-heading.is-offline .phone-heading-light span { background: hsl(var(--status-offline)); box-shadow: 0 0 0 4px hsl(var(--status-offline) / .14); }
 .phone-heading.is-restarting .phone-heading-light span, .phone-heading.is-checking .phone-heading-light span { background: hsl(var(--status-busy)); animation: comfyStatusPulse 1.2s var(--ease-soft) infinite; }
-.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; padding: 0; border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
+.phone-prompt-bar .phone-gallery-mode.media-mode-toggle { display: flex; flex: none; padding: var(--seg-pad); border: 0; border-radius: var(--r-pill); background: var(--well); box-shadow: none; }
 .phone-prompt-bar .phone-gallery-mode.media-mode-toggle > i { display: none; }
 .phone-prompt-bar .phone-gallery-mode button { min-height: 44px; border: 0; background: transparent; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .phone-prompt-bar .phone-gallery-mode button.active, .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { box-shadow: none; font-weight: 650; }
@@ -944,8 +944,7 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
    36px circle inside the 44px target; the chosen one takes the selected fill. */
 .phone-prompt-bar .phone-gallery-mode.media-mode-toggle { gap: var(--space-1); margin-left: 0; }
 /* The same track and cells as the Create sheet's Image | Video switcher (.composer-mode-select). */
-.phone-prompt-bar .phone-gallery-mode button { width: auto; min-width: 40px; height: var(--control-h-touch); min-width: var(--control-h-touch); padding: 0 10px; border-radius: var(--r-pill); background-clip: border-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
-.phone-prompt-bar .phone-gallery-mode button > svg { width: var(--icon); height: var(--icon); }
+.phone-prompt-bar .phone-gallery-mode button { width: var(--control-h-touch); min-width: var(--control-h-touch); height: var(--control-h-touch); padding: 0; border-radius: var(--r-pill); background-clip: border-box; color: hsl(var(--muted-foreground)); transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
 .phone-prompt-bar .phone-gallery-mode button[aria-pressed="true"] { color: var(--selected-ink); background-color: var(--selected-bg); }
 .phone-prompt-bar .phone-gallery-mode button:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -4px; }
 /* The status pill (UI-PATTERNS › Messages): one for the whole app, at the top of the screen,
@@ -1117,10 +1116,10 @@ html:has(.phone-status .status-message) .scrim .viewer-stage:has(.viewer-phone-b
 .text-focus-field.is-text-focused .profile-editor-text { flex: 1 1 auto; height: auto; min-height: 0; }
 /* While a field is focused nothing else shows, not even the page's bars under the sheet. */
 html:has(.is-text-focused) :is(.phone-prompt-bar, .phone-bar) { visibility: hidden; }
-/* "Studio" and the status light share one line, centred on the bar; the tools keep the right edge. */
+/* The status light, "Studio" and the running spinner share one line, centred on the bar; the tools keep the right edge. */
 .phone-heading { flex: none; height: var(--bar-h); }
 .phone-heading-name { line-height: 1; }
-.phone-heading .phone-running-inline { width: 32px; min-width: 32px; margin-left: -4px; padding: 0; gap: var(--space-1); font-size: 10px; }
+.phone-heading .phone-running-inline { min-width: 32px; margin-left: 0; padding: 0 4px; gap: var(--space-1); font-size: 12px; }
 @media (max-width: 379px) {
   .phone-heading-name { display: none; }
 }

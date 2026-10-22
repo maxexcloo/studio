@@ -102,19 +102,22 @@ export function composerAnchor(opener?: Element | null) {
 export function useComposerSurfaceBox(anchor: HTMLElement | null, opener?: HTMLElement | null, size: { width?: number; fit?: boolean } = {}) {
   const [box, setBox] = React.useState<React.CSSProperties | null>(null);
   const onPhone = Boolean(anchor?.classList.contains('phone-create'));
-  // The row it came from, measured once at opening: rows don't move under a pop-up.
-  const [row] = React.useState(() => onPhone ? (opener?.closest<HTMLElement>('.list-row') || opener || anchor?.querySelector<HTMLElement>('[aria-expanded="true"]') || null) : null);
+  // The row it came from, found after the opening render commits (its aria-expanded is set by then) and
+  // measured from there: rows don't move under a pop-up.
+  const row = React.useRef<HTMLElement | null>(null);
   // The desktop: above the button that opened it (anchoredPlacement), as wide as a picker needs.
   const desktop = useAnchoredBox(onPhone ? null : opener || anchor, { width: size.width ?? 520, minWidth: 360, maxWidth: 560, maxHeight: size.fit ? 560 : 460, minHeight: 280, fit: size.fit }, !onPhone);
   React.useLayoutEffect(() => {
     if (!anchor || !onPhone) return;
+    const from = opener && anchor.contains(opener) ? opener : anchor.querySelector<HTMLElement>('[aria-expanded="true"]');
+    if (from) row.current = from.closest<HTMLElement>('.list-row') || from;
     const measure = () => {
       if (onPhone) {
         const view = window.visualViewport;
         const viewTop = view?.offsetTop || 0;
         const viewHeight = view?.height || window.innerHeight;
         const sheet = anchor.getBoundingClientRect();
-        const rect = row?.getBoundingClientRect() || sheet;
+        const rect = row.current?.getBoundingClientRect() || sheet;
         const top = Math.max(viewTop + 12, sheet.top + 8);
         const bottom = viewTop + viewHeight - 12;
         const above = rect.top - top - 6;
@@ -131,6 +134,6 @@ export function useComposerSurfaceBox(anchor: HTMLElement | null, opener?: HTMLE
     window.addEventListener('resize', measure);
     window.visualViewport?.addEventListener('resize', measure);
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure); };
-  }, [anchor, onPhone, row]);
+  }, [anchor, onPhone, opener]);
   return { box: onPhone ? box : desktop, onPhone };
 }

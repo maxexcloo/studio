@@ -1,7 +1,7 @@
 import type { GalleryGroups } from './runs';
 import type { GalleryItem } from './types';
 
-const viewable = (item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error";
+const viewable = (item: GalleryItem) => item.status === "pending" || item.status === "done" || item.status === "error" || item.status === "canceled";
 
 /**
  * The outputs in the order the gallery lays them out (galleryLayout.ts): a

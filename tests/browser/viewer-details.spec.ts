@@ -144,24 +144,20 @@ test('Details names each LoRA by its catalogue title, with its strength small an
   expect(await page.evaluate(() => navigator.clipboard.readText())).not.toContain('PAWG Krea 2');
 });
 
-test('LoRA Details includes its information and both Civitai hosts', async ({ page }) => {
+test('Details lists each LoRA by its settings only: no information, description or sources', async ({ page }) => {
   const withLoras = { ...item, settings: { ...item.settings, loras: [{ name: 'test.safetensors', strength: 0.8, enabled: true }] } };
   await page.route('**/api/gallery?*', route => route.fulfill({ json: { items: [withLoras], revision: 1, hasMore: false } }));
   await page.route('**/api/gallery/delta?*', route => route.fulfill({ json: { revision: 1, upserts: [], removes: [] } }));
-  await page.route('**/api/loras/info', route => route.fulfill({ json: { loras: { 'test.safetensors': { title: 'Test Adapter', families: ['krea2'], triggers: [], description: 'Catalogue description', sourceUrl: 'https://civitai.red/models/123?modelVersionId=456' } } } }));
+  await page.route('**/api/loras/info', route => route.fulfill({ json: { loras: { 'test.safetensors': { title: 'Test Adapter', families: ['krea2'], triggers: ['trigger'], description: 'Catalogue description', sourceUrl: 'https://civitai.red/models/123?modelVersionId=456' } } } }));
   await page.goto('/');
   const ui = studioUi(page); const viewer = await ui.openViewer(page.locator('[data-tile-id="details-0"] .tile')); await ui.showDetails();
-  await expect(viewer.getByRole('region', { name: 'Test Adapter Information' })).toBeVisible();
-  await expect(viewer.getByText('Catalogue description', { exact: true })).toBeVisible();
-  for (const host of ['civitai.com', 'civitai.red']) await expect(viewer.getByRole('link', { name: `View Test Adapter on ${host}`, exact: true })).toHaveAttribute('href', `https://${host}/models/123?modelVersionId=456`);
-  await expect(viewer.getByRole('region', { name: 'Test Adapter Information' }).getByRole('link')).toHaveCount(0);
-  // View Source is one icon per host, never a text pill.
-  await expect(viewer.locator('.lora-sources a')).toHaveText(['', '']);
-  expect(await viewer.locator('.lora-sources a').evaluateAll(links => {
-    const [com, red] = links.map(link => link.getBoundingClientRect());
-    return com.right <= red.left + 0.1;
-  })).toBe(true);
-
+  const list = viewer.getByRole('list', { name: 'LoRAs' });
+  await expect(list.locator('.detail-lora-name')).toHaveText(['Test Adapter']);
+  await expect(list.locator('.detail-lora-strength')).toHaveText(['0.80']);
+  await expect(viewer.getByRole('region', { name: 'Test Adapter Information' })).toHaveCount(0);
+  await expect(viewer.getByText('Catalogue description', { exact: true })).toHaveCount(0);
+  await expect(list.getByRole('link')).toHaveCount(0);
+  await expect(list.getByRole('button')).toHaveCount(0);
 });
 
 

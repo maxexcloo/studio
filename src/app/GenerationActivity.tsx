@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { toast } from './toast';
+import React, { useEffect, useState } from 'react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { formatLeft, progressLine, progressReading, useRunClock } from './GenerationProgress';
 import { cn, titleFromPrompt } from './format';
@@ -14,13 +13,12 @@ import { useCellGap } from './cells';
  * how long is left. Clicking it brings the work into view; the × puts it away
  * until the next run.
  *
- * When the runs it was standing in for finish, it becomes the note: "Image
- * ready" with the result (a small fan of them for a batch) and View. Failures
- * are left to their own toast, which offers See why.
+ * Finished runs say nothing: the tile lands in the gallery. Failures keep their
+ * own toast, which offers See why.
  */
 
 
-export function useGenerationActivity({ items, enabled, watching, reveal, onJump, onView }: {
+export function useGenerationActivity({ items, enabled, watching, reveal, onJump }: {
   /** The gallery as shown: its pending items are the work, its finished ones the results. */
   items: GalleryItem[];
   /** Off on the phone (it has its own activity chip). */
@@ -30,7 +28,6 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
   /** Whether this item's pictures and prompt may show here. */
   reveal: (item: GalleryItem) => boolean;
   onJump: (item: GalleryItem) => void;
-  onView: (item: GalleryItem) => void;
 }): Activity | null {
   const pending = items.filter((item) => item.status === 'pending');
   // The one ComfyUI is working on; the rest wait behind it.
@@ -38,42 +35,11 @@ export function useGenerationActivity({ items, enabled, watching, reveal, onJump
   const reading = progressReading(current?.progress);
   const clock = useRunClock(current?.progress);
   const [putAway, setPutAway] = useState<Set<string>>(() => new Set());
-  const onViewRef = useRef(onView);
-  onViewRef.current = onView;
 
   const jobsOf = (list: GalleryItem[]) => [...new Set(list.map((item) => item.jobId || item.id))];
   const pendingJobs = jobsOf(pending);
   const standingIn = enabled && !watching && pendingJobs.some((job) => !putAway.has(job));
-
-  // Jobs this activity has stood in for, and the results that came of them so far.
-  const followed = useRef(new Set<string>());
-  const results = useRef<GalleryItem[]>([]);
-  // Whether it was standing in up to the moment the last run finished: by then
-  // there are no rendering tiles left to look for, so `watching` can't tell.
-  const wasStandingIn = useRef(false);
   const pendingKey = pendingJobs.join('|');
-  useEffect(() => {
-    if (standingIn) pendingJobs.forEach((job) => { if (!putAway.has(job)) followed.current.add(job); });
-    const stillRunning = new Set(pendingJobs);
-    for (const job of [...followed.current]) {
-      if (stillRunning.has(job)) continue;
-      followed.current.delete(job);
-      results.current.push(...items.filter((item) => item.status === 'done' && (item.jobId || item.id) === job));
-    }
-    if (pendingJobs.length) {
-      wasStandingIn.current = standingIn;
-      return;
-    }
-    const done = results.current;
-    results.current = [];
-    // What landed says so in the status pill, as on the phone (UI-PATTERNS › Messages), with View.
-    if (done.length && wasStandingIn.current && enabled) {
-      const first = done[0];
-      const kind = first.type === 'video' ? 'Video' : 'Image';
-      toast.success(done.length === 1 ? `${kind} ready` : `${done.length} ${kind.toLowerCase()}s ready`, { group: 'generation-ready', action: { label: 'View', onClick: () => onViewRef.current(first) } });
-    }
-    wasStandingIn.current = false;
-  }, [pendingKey, standingIn, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A new run starts clean: nothing put away.
   useEffect(() => {

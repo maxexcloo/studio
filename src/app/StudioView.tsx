@@ -36,7 +36,6 @@ import { useCopyFeedback } from './CopyFeedback';
 import { DetailsFooter, PromptReadout, generationInputsText } from './ViewerActions';
 import { useMediaFileSize } from './mediaFileSize';
 import { itemProfileName, itemProfileTitle } from './itemProfile';
-import { LoraDetails, LoraSources } from './LoraPanel';
 import { loraName } from './catalogueNames';
 import { fetchLoraInfo, knownLoraInfo } from './useLoraInfo';
 
@@ -362,8 +361,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
         if (tile) tile.scrollIntoView({ block: "center", behavior: scrollBehavior() });
         else galleryStageRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() });
       });
-    },
-    onView: (item) => openItem(item)
+    }
   });
   const [islandsHeight, setIslandsHeight] = React.useState(0);
   // An activity pill or the filter row joining the top never shoves the tiles on screen.
@@ -384,6 +382,22 @@ export function StudioView({ view }: { view: StudioViewModel }) {
   useNeighborPrefetch(active || null, view.viewerGallery);
   // On a phone Details covers the video, so it pauses until Details closes (mediaCover.ts).
   React.useEffect(() => (phone && showDetails && active?.type === "video" ? coverMedia() : undefined), [phone, showDetails, active?.id, active?.type]);
+  // On the phone a swipe down on Details, from the top of their scroll, closes them (up opened them).
+  const detailsSwipeStart = React.useRef<{ y: number; t: number } | null>(null);
+  const detailsSwipe = {
+    onTouchStart: (event: React.TouchEvent<HTMLElement>) => {
+      const body = event.currentTarget.querySelector<HTMLElement>(".viewer-side-body");
+      detailsSwipeStart.current = event.touches.length === 1 && !(body && body.scrollTop > 0) ? { y: event.touches[0].clientY, t: Date.now() } : null;
+    },
+    onTouchEnd: (event: React.TouchEvent<HTMLElement>) => {
+      const start = detailsSwipeStart.current;
+      detailsSwipeStart.current = null;
+      const touch = event.changedTouches[0];
+      if (!start || !touch) return;
+      const dy = touch.clientY - start.y;
+      if (dy > 90 || (dy > 30 && dy / Math.max(1, Date.now() - start.t) > 0.45)) setShowDetails(false);
+    },
+  };
   // A different image has its own comparison, so never carry the mode over.
   React.useEffect(() => { setCompareOpen(false); }, [active?.id]);
   const viewerWheelRef = useWheelRef<HTMLElement>(wheelViewer);
@@ -724,7 +738,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
                   onClick={clickViewer}
                   onDoubleClick={(event) => { event.stopPropagation(); if (Date.now() - Number(event.currentTarget.dataset.lastTouchAt || 0) < 700) return; zoomViewer(viewerZoom > view.viewerNativeZoom * 1.05 ? view.viewerNativeZoom : view.viewerNativeZoom * 2.5, { x: event.clientX, y: event.clientY, element: event.currentTarget }); }}
                 >
-                  {active.status === "error" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => itemActionHandlers.reuse(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
+                  {active.status === "error" || active.status === "canceled" ? <FailurePanel item={active} onCopy={copyToClipboard} onReuse={() => itemActionHandlers.reuse(active)} fixes={view.failureFixes} showToast={showToast} onNodesInstalled={() => { refreshModels(false); refreshWorkflows(); }} /> : compareOpen && active.upscale?.url && !upscaledWithRun(active) ? <UpscaleCompare item={active} zoomed={viewerZoom > 1} /> : (
                   <GenerationMedia item={active} fit="contain" stage scale={(viewerZoom / (view.viewerNativeZoom || 1)) * (window.devicePixelRatio || 1)}>
                   {active.status === "pending" ? <GenerationProgress item={active} formatElapsed={formatElapsed} /> : null}
                   </GenerationMedia>
@@ -737,7 +751,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
                   </>
                 ) : null}
                 {showDetails ? (
-                  <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()}>
+                  <aside translate="no" data-open-surface className="viewer-side" onWheel={(event) => event.stopPropagation()} {...(phone ? detailsSwipe : {})}>
                     <div className="viewer-side-head">
                       <h3>Details</h3>
                       {/* The desktop panel closes itself, as it covers the corner Info sits in; on the phone Info (pressed) closes it, so there is one close. */}
@@ -765,11 +779,9 @@ export function StudioView({ view }: { view: StudioViewModel }) {
                                 <ul className="detail-loras" aria-label="LoRAs">
                                   {section.loras.map((lora, index) => (
                                     <li key={`${lora.name}-${index}`} className="detail-lora">
-                                      {/* As in the LoRA chooser: the name, then on the right its strength and View Source; its information under the name. */}
+                                      {/* Only what it was run with: the name, then its strength on the right. */}
                                       <span className="detail-lora-name" title={lora.file}>{lora.name}</span>
                                       <span className="detail-lora-strength" aria-label={`Strength ${lora.strength}`}>{lora.strength}</span>
-                                      <LoraSources info={loraInfoOf(lora.file)} label={lora.name} />
-                                      <LoraDetails info={loraInfoOf(lora.file)} label={lora.name} enabled file={lora.file} />
                                     </li>
                                   ))}
                                 </ul>

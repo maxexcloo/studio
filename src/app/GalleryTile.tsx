@@ -158,7 +158,7 @@ function GalleryTileComponent({ cancelJob, formatElapsed, height, item, onUpscal
           // A long press already opened the actions; the lift that ends it is not a tap.
           if (press.current?.fired) { press.current = null; return; }
           if (selection?.click(item, event)) return;
-          if (item.status !== "pending") openItem(item);
+          openItem(item);
         }}
         aria-pressed={selecting && selectable ? isSelected : undefined}
       >

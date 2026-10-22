@@ -241,10 +241,10 @@ export function GenerationPreview({ preview, fit = 'cover', aspectRatio = 1, fin
         target.height = Math.min(height, fullHeight);
         context.imageSmoothingQuality = 'high';
         context.drawImage(image, (image.naturalWidth - sw) / 2, (image.naturalHeight - sh) / 2, sw, sh, 0, 0, target.width, target.height);
-        if (width >= fullWidth && height >= fullHeight) { timer = window.setTimeout(() => complete.current?.(), fast ? 90 : 260); return; }
+        if (width >= fullWidth && height >= fullHeight) { timer = window.setTimeout(() => complete.current?.(), fast ? 60 : 120); return; }
         width *= 2;
         height *= 2;
-        timer = window.setTimeout(step, fast ? 70 : 190);
+        timer = window.setTimeout(step, fast ? 50 : 90);
       };
       step();
     };
