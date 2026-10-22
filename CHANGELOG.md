@@ -11,6 +11,9 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **ComfyUI nodes:** the CLIProxyAPI and Radiance worker nodes now live in `comfyui/` next to the Studio worker node, and the image ships all three at `/app/comfyui` for ComfyUI images to copy from the matching release. Their Python tests run with the Studio test suite.
+
 ## [0.48.0] - 2026-10-22
 
 > MCP sends one request per repeated Generate, always adds trigger words, refuses too many LoRAs, answers sooner, links Details to the chat, and rides out brief ComfyUI drops
