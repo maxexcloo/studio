@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Phone model and LoRA pickers open on iOS again, swipe up for Details, loading and failed items open like finished ones, Try Again replaces, and a quicker reveal
+
 ### Changed
 - **Phone viewer:** a swipe up opens Details; a swipe down closes them (from the top of their scroll), and with them shut a swipe down closes the viewer as before.
 - **Loading, failed and stopped items:** a tap opens them in the viewer like finished ones, with their progress or failure report and Details; a run still generating no longer ignores the tap.
