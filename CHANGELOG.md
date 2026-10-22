@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-10-22
+
 > Phone model and LoRA pickers open on iOS again, swipe up for Details, loading and failed items open like finished ones, Try Again replaces, and a quicker reveal
 
 ### Changed
@@ -1809,7 +1811,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.46.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.47.0...HEAD
+[0.47.0]: https://github.com/maxexcloo/studio/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/maxexcloo/studio/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/maxexcloo/studio/compare/v0.44.0...v0.45.0
 [0.44.0]: https://github.com/maxexcloo/studio/compare/v0.43.0...v0.44.0
