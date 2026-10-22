@@ -22,7 +22,13 @@ test("capitalised API paths reach no handler, with or without accounts", { timeo
       env: { ...process.env, NODE_TEST_CONTEXT: "", COMFY_URL: "http://127.0.0.1:1", COMFY_VIDEO_URL: "", STUDIO_DATA_DIR: data, STUDIO_ENV_FILE: path.join(data, ".env"), STUDIO_DEMO: "1", STUDIO_LAN: "0", HOST: "127.0.0.1", PORT: String(port), STUDIO_MULTI_USER: multiUser },
       stdio: "ignore"
     });
-    t.after(() => { child.kill(); fs.rmSync(data, { recursive: true, force: true }); });
+    // The server may still be writing its data folder as it stops: wait for it to exit, then remove the folder (retrying).
+    t.after(async () => {
+      const exited = child.exitCode !== null ? Promise.resolve() : new Promise((resolve) => child.once("exit", resolve));
+      child.kill();
+      await exited;
+      fs.rmSync(data, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    });
     const base = `http://127.0.0.1:${port}`;
     for (let attempt = 0; attempt < 100; attempt += 1) {
       try { if ((await fetch(`${base}/api/ping`)).ok) break; } catch { /* starting */ }

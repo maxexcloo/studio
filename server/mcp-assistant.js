@@ -92,7 +92,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     return mcpJson(written.unused ? { unused: true } : { negative: written.negative });
   }, { readOnlyHint: true });
 
-  tool(server, 'SuggestLoras', 'Suggest LoRAs', 'Suggest LoRAs from the profile’s library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to Generate as loras; with exact_prompt, add their triggers yourself.', {
+  tool(server, 'SuggestLoras', 'Suggest LoRAs', 'Suggest LoRAs from the profile’s library for a prompt, only when asked: name, title, strength, triggers and a reason. Pass chosen ones to Generate as loras; Studio adds their triggers.', {
     prompt, profile_id: profileId
   }, async ({ prompt: text, profile_id }, signal) => {
     const profile = await profileOf(profile_id);

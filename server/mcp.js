@@ -20,9 +20,13 @@ import { createChatAssistantMemory, registerAssistantTools } from './mcp-assista
 import { adminInstructions, registerAdminTools } from './mcp-admin.js';
 import fs from 'node:fs';
 
-// Long enough for a cold image model load, so most images return inline instead of through a separate Result call.
-export const generateWaitSeconds = 60;
+// Most images return inline instead of through a separate Result call; a cold model load or a slow one hands back its link sooner, so the chat never waits near its own timeout.
+export const generateWaitSeconds = 30;
 const maxGenerateWaitSeconds = 60;
+// An identical Generate from the same conversation within this window is the same request (see Generate).
+export const generateDedupeWindowMs = 60_000;
+/** JSON with sorted keys and undefined left out, so equal arguments give equal text. */
+const stableJson = (value) => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().filter(name => item[name] !== undefined).map(name => [name, item[name]])) : item);
 // Every client gets the same workflow rules from Studio itself, so a client needs no prompt prefix; tool descriptions
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords = '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
@@ -77,7 +81,7 @@ export function adminScope({ account, gateway = false, gatewayAdminTools = () =>
 const allocation = z.array(z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict()).max(32);
 
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
-export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, imageWaitSeconds = generateWaitSeconds, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult, gatewayAdminTools = () => false, claimHandover = () => false } = {}) {
+export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process.env, foregroundWaitSeconds = 20, imageWaitSeconds = generateWaitSeconds, generateDedupeMs = generateDedupeWindowMs, fetchImpl = fetch, allowedHost = (req) => hostAllowed(req.headers.host), accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity = () => null, noteGatewayIdentity = () => {}, internalCredential = () => ({}), resolveSignedResult, gatewayAdminTools = () => false, claimHandover = () => false } = {}) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return false;
@@ -104,6 +108,8 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     next();
   });
   const reviewedGuides = new Map();
+  // Generate calls of the last minute by conversation and arguments (Generate dedupes repeats).
+  const recentGenerates = new Map();
   // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
   const inflight = new Map();
   const inflightKey = (actor, requestId) => JSON.stringify([actor.scope, actor.owner, String(requestId)]);
@@ -165,11 +171,11 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     // Admin tools: an administrator's own MCP token, or a gateway-linked administrator while
     // Chat Gateway Admin Tools is on. Ordinary accounts, the shared key alone and the control key never.
     const admin = scope === 'media' && adminScope({ account, gateway: equal(token, mediaKey), gatewayAdminTools });
-    req.mcpActor = { scope, owner, assistant, admin, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
+    req.mcpActor = { scope, owner, assistant, admin, conversation, refs: scope === 'media' && owner ? media.referenceScope(owner, conversation) : '' };
     next();
   };
   const create = (actor) => {
-    const { scope, owner, refs } = actor;
+    const { scope, owner, refs, conversation } = actor;
     const tool = (server, name, title, description, inputSchema, action, annotations = {}) => server.registerTool(name, { title, description, inputSchema, annotations: { readOnlyHint: false, destructiveHint: false, ...annotations } }, async (args, extra = {}) => {
       // The SDK aborts extra.signal when the client disconnects; a cancellation notification aborts it here.
       const controller = new AbortController();
@@ -250,7 +256,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     const submit = async (profile, args, record = {}) => {
       const fresh = !writer && review(refs, profile.id);
       try {
-        const queued = await media.queue(owner, args, refs, record);
+        const queued = await media.queue(owner, args, refs, { ...record, ...(conversation ? { conversation } : {}) });
         return { queued, guide: fresh ? compactGuide(prompting(profile, true)) : '' };
       } catch (error) {
         // A refused submission delivered no guide, so the next attempt carries it.
@@ -308,7 +314,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const detail = {
           ...Object.fromEntries(['id', 'label', 'kind', 'family', 'description', 'mediaInputs', 'aspectPolicy', 'aspectPresets', 'native'].filter(key => key in profile).map(key => [key, profile[key]])),
           tier: tierOf(profile), ...(tierNote ? { note: tierNote.trim() } : {}), defaults, controls, ...(modes ? { imageModes: modes, imageModes_note: 'A mode applies when its media is supplied, such as reference with references.' } : {}),
-          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Studio adds trigger words to prompts it writes; with exact_prompt, put them in yourself.' } : {}),
+          ...(controls.loras ? { loras, loras_total: total, loras_note: 'Each reads name — hint [trigger word]. Pass names to Generate; strength defaults to the recommended value. Studio adds missing trigger words to every prompt.' } : {}),
           prompting: prompting(profile, true)
         };
         return mcpJson(detail);
@@ -316,11 +322,24 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Cloud profiles only if asked. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
         profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
-        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(32).optional(), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
+        loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(8).optional().describe('Up to 8; a profile may take fewer (Models).'), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
         width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().optional()
-      }, async ({ kind, tier: wanted, wait_seconds, aspect, size, request, exact_prompt, ...args }, signal) => {
+      }, (input, signal) => {
+        // A chat that sends the same Generate again within a minute (a retry, a doubled tool call) gets the first call's
+        // jobs and reply, so one request is one set of images; asking again later, or for anything different, queues anew.
+        const now = Date.now();
+        for (const [key, entry] of recentGenerates) if (now - entry.at > generateDedupeMs) recentGenerates.delete(key);
+        const key = `${refs || owner}\n${stableJson({ ...input, wait_seconds: undefined })}`;
+        const earlier = generateDedupeMs > 0 ? recentGenerates.get(key) : null;
+        if (earlier) return earlier.reply;
+        const reply = generateOnce(input, signal);
+        recentGenerates.set(key, { at: now, reply });
+        reply.catch(() => { if (recentGenerates.get(key)?.reply === reply) recentGenerates.delete(key); });
+        return reply;
+      });
+      const generateOnce = async ({ kind, tier: wanted, wait_seconds, aspect, size, request, exact_prompt, ...args }, signal) => {
         if (Boolean(request) === Boolean(args.prompts)) throw new Error(request ? 'Pass request or prompts, not both.' : "Pass request with the user's words.");
         // Instructions sent as an exact prompt would run literally, and their number of images would be lost.
         const instructed = exact_prompt && request ? exactPromptInstructions(request) : '';
@@ -358,7 +377,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const assistant = actor.assistant ? chatAssistant.record(owner, args.prompts || [], args.loras || []) : null;
         const submission = await submit(profile, { ...args, ...sized, profile_id: profile.id }, { ...(request ? { request, styled: source !== 'exact' } : {}), ...(assistant ? { assistant } : {}) });
         return respond(submission.queued, profile, wait_seconds, signal, submission.guide, source, `${tierNote || ''}${faceNote}`);
-      });
+      };
       tool(server, 'Status', 'Check Status', 'Return a job\u2019s status and finished output links. Only when the user asks.', { ...job, wait_seconds: wait(20) }, async ({ job_id, wait_seconds }, signal) => {
         const id = resolve(job_id);
         const status = await media.job(owner, id, capWait(wait_seconds), { signal });

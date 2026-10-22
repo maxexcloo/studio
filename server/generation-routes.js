@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { demoMode } from './comfy.js';
 import { families } from './family-catalog.js';
 import { sanitizeGenerateBody } from './validation.js';
-import { dedupeGallery, gallery, galleryLimit, makePendingItems, setGallery, galleryRevisionValue } from './gallery-store.js';
+import { dedupeGallery, gallery, galleryLimit, makePendingItems, setGallery, galleryRevisionValue, storedChatRecord } from './gallery-store.js';
 import { recordPrompt } from './prompt-history.js';
 import { jobs, runJob, runMockJob } from './jobs.js';
 import { getCustomWorkflow } from './custom-workflows.js';
@@ -168,6 +168,9 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details; only with the feature.
     const assistant = !req.studioAccount || mayUseFeature(req.studioAccount, 'promptAssistant') ? assistantRecord(req.body?.assistant, body.loras) : null;
     if (assistant) body.assistant = assistant; else delete body.assistant;
+    // The chat conversation that asked for it (Studio MCP), so the gallery can link back to it.
+    const chat = storedChatRecord(req.body?.chat);
+    if (chat) body.chat = chat; else delete body.chat;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.

@@ -34,7 +34,7 @@ const loraInfo = {
 };
 const videoProfile = { ...imageProfile, id: 'fixture-video', kind: 'video', label: 'Fixture Video', family: 'minimax_h3', model: 'fixture-video', workflow: 'fixture-video', defaults: { width: 1280, height: 720, count: 1, steps: 12 }, mediaInputs: [] };
 
-async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, gatewayAdminTools, claimHandover, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
+async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, generateDedupeMs = 0, environment: extra = {}, dataDir: existingDir, enabled = true, accountMode = false, authenticateAccountToken = () => null, authenticateGatewayIdentity, noteGatewayIdentity, internalCredential, resolveSignedResult, gatewayAdminTools, claimHandover, controlReply = () => ({ runtimes: {}, signature: 'fixture-preview', id: 'fixture-operation', state: 'running' }), writerReply } = {}) {
   const dataDir = existingDir || fs.mkdtempSync(path.join(os.tmpdir(), 'studio-native-mcp-'));
   const app = express();
   app.use(express.json({ limit: '30mb' }));
@@ -95,6 +95,7 @@ async function fixture(t, { foregroundWaitSeconds, imageWaitSeconds = 0, environ
     authenticateAccountToken,
     // Most tests check the queued response; inline waits have their own tests.
     imageWaitSeconds,
+    generateDedupeMs,
     ...(foregroundWaitSeconds !== undefined ? { foregroundWaitSeconds } : {}),
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
@@ -277,7 +278,7 @@ test('tool lists, schemas and instructions are identical for every caller and ca
   for (const user of ['alice', 'bob', '']) assert.equal(await snapshot(await f.client(user)), first, user || 'native');
   assert.doesNotMatch(first, /\d{4}-\d{2}-\d{2}|fixture-(?:image|video)|Fixture/, 'no dates or catalogue entries in the prefix');
   // Images wait long enough for a cold model load, so they usually return inline.
-  assert.equal(generateWaitSeconds, 60);
+  assert.equal(generateWaitSeconds, 30);
 });
 
 test('native MCP is absent without credentials and refuses missing or incorrect authentication', async t => {
@@ -1199,7 +1200,7 @@ test('negative prompts reach the submission only where they take effect', async 
   assert.equal(f.submitted.length, 1);
 });
 
-test('written prompts carry LoRA triggers and tags, and a guide’s recommended negative fills in unless the caller gives one', async t => {
+test('every prompt carries missing LoRA triggers, written ones also tags, and a guide’s recommended negative fills in unless the caller gives one', async t => {
   const f = await fixture(t);
   const saved = loraInfo['fixture-unknown.safetensors'];
   loraInfo['fixture-unknown.safetensors'] = { families: [], base: '', triggers: ['inkstyle'], note: 'Put the trigger first.', promptStyle: 'tags', tags: ['ink wash', 'lighthouse', 'monochrome'], negative: 'colour bleed' };
@@ -1213,9 +1214,11 @@ test('written prompts carry LoRA triggers and tags, and a guide’s recommended 
   await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A lighthouse at dusk in ink', loras });
   assert.equal(f.submitted.at(-1).prompt, 'inkstyle, A lighthouse at dusk in ink, glowfx\nink wash');
   assert.equal(f.submitted.at(-1).negative, 'blurry, low quality, colour bleed');
-  // The caller's own negative wins, and an exact prompt stays as written.
+  // The caller's own negative wins, and an exact prompt keeps its words with only the missing triggers added (no tag line).
   await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A lighthouse at dusk', exact_prompt: true, negative_prompt: 'people', loras });
-  assert.deepEqual([f.submitted.at(-1).prompt, f.submitted.at(-1).negative], ['A lighthouse at dusk', 'people']);
+  assert.deepEqual([f.submitted.at(-1).prompt, f.submitted.at(-1).negative], ['inkstyle, A lighthouse at dusk, glowfx', 'people']);
+  await call(client, 'Generate', { profile_id: imageProfile.id, prompts: ['glowfx, a lighthouse'], loras });
+  assert.equal(f.submitted.at(-1).prompt, 'inkstyle, glowfx, a lighthouse');
   // Nothing fills at cfg 1, nor where the guide calls a negative optional.
   await call(client, 'Generate', { profile_id: imageProfile.id, request: 'A tree', cfg: 1 });
   assert.equal(f.submitted.at(-1).negative, undefined);
@@ -1448,7 +1451,8 @@ test('Reuse runs a result again with its profile and settings, a new seed and an
   assert.equal(rerun.seed, '', 'a new seed');
   const tweaked = data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', prompt: 'A heron at dusk', count: 2 }));
   assert.equal(tweaked.jobs.length, 2);
-  assert.deepEqual(f.submitted.slice(2).map(body => [body.prompt, body.cfg]), [['A heron at dusk', 4], ['A heron at dusk', 4]]);
+  // The LoRA's trigger joins the new prompt.
+  assert.deepEqual(f.submitted.slice(2).map(body => [body.prompt, body.cfg]), [['A heron at dusk, glowfx', 4], ['A heron at dusk, glowfx', 4]]);
   assert.ok(models() - before <= 1, 'reads the cached catalogue at most once and needs no Models call');
   // A follow-up still waits like Generate, so a quick rerun returns finished markdown.
   f.completeOnSubmit();
@@ -2285,4 +2289,15 @@ test('Reuse carries how a result’s prompt was written into a plain run again, 
   assert.equal(f.submitted.at(-1).assistant, undefined);
   data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'image', request: 'warmer' }));
   assert.equal(f.submitted.at(-1).assistant, undefined);
+});
+
+test('a repeated identical Generate within the minute is one request: the same jobs, nothing queued twice', async t => {
+  const f = await fixture(t, { generateDedupeMs: 60_000 });
+  const client = await f.client();
+  const args = { profile_id: imageProfile.id, prompts: ['A lighthouse'], count: 1 };
+  const [first, second] = await Promise.all([call(client, 'Generate', args), call(client, 'Generate', args)]);
+  assert.equal(f.submitted.length, 1);
+  assert.deepEqual(data(second).jobs.map(job => job.job_id), data(first).jobs.map(job => job.job_id));
+  await call(client, 'Generate', { ...args, prompts: ['A harbour'] });
+  assert.equal(f.submitted.length, 2);
 });

@@ -224,6 +224,9 @@ export function prepareLoras(profile, infos = {}, loras = []) {
   const candidates = loraCandidates(profile, infos);
   const short = shortNames(profile);
   const label = profile.label || profile.id;
+  // Refused, not trimmed: Generate's own check keeps only the first ones, which would drop the caller's picks silently.
+  const max = Math.max(1, Math.min(8, Number(profile.maxLoras) || 8));
+  if (loras.length > max) throw new Error(`${label} takes at most ${max} LoRAs; pass ${max} or fewer.`);
   const stack = [];
   for (const { name: value, strength } of loras) {
     const name = resolveLoraName(profile, value);

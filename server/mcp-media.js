@@ -276,8 +276,8 @@ export class McpMedia {
       const filled = recommendedNegative(profile.prompting, { cfg: cfg ?? profile.defaults?.cfg, stack, infos });
       if (filled) controls.negative = filled;
     }
-    // Written prompts (not exact ones) carry each LoRA's triggers and, for tag-trained LoRAs, a line of tags.
-    const styled = (prompt) => record.styled && stack.length ? withLoraPrompting(prompt, stack, infos, record.request || '') : prompt;
+    // Every prompt carries each LoRA's missing triggers; prompts Studio wrote also get tag-trained LoRAs' line of tags.
+    const styled = (prompt) => stack.length ? withLoraPrompting(prompt, stack, infos, record.request || '', { tags: Boolean(record.styled) }) : prompt;
     const slots = profile.mediaInputs || [];
     if (reference_asset_ids.length > slots.length || slots.some((slot, index) => slot.required && !reference_asset_ids[index])) throw new Error('Supply the references required by this profile.');
     for (const id of reference_asset_ids) this.own(owner, id, 'assets');
@@ -291,7 +291,7 @@ export class McpMedia {
     } else if (face_detail) throw new Error('Choose upscale_quality to enable face_detail.');
     const runs = count;
     assertJobCount(prompts.length, runs);
-    const body = { ...profile.defaults, ...controls, ...(record.assistant ? { assistant: record.assistant } : {}), kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
+    const body = { ...profile.defaults, ...controls, ...(record.assistant ? { assistant: record.assistant } : {}), ...(record.conversation ? { chat: { conversationId: record.conversation } } : {}), kind: profile.kind, profileId: profile_id, model: profile.model, workflow: profile.workflow, count: 1, loras: stack.map(adapter => ({ ...adapter, enabled: true })), referenceAssets: reference_asset_ids.map((id, index) => ({ slot: slots[index].id, assetId: id })) };
     for (const key of ['width', 'height', 'steps']) if (args[key] !== undefined) body[key] = args[key];
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (profile.kind === 'image' && (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)) body.tiledDecode = true;

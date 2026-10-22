@@ -54,8 +54,9 @@ function instructions({ profile, guide, count, references, role }) {
  * A prompt writer, or null when prompt writing is off. write() returns { prompts, source, ms }:
  * source "studio" for written prompts, "request" when it fell back to the given prompts.
  * Generate keeps the prompt writer's own model (STUDIO_PROMPT_WRITER_MODEL), a fast one.
+ * A chat waits on it before anything queues, so a slow gateway falls back to the request itself after 15 s.
  */
-export function createPromptWriter(environment = process.env, { fetchImpl = fetch, timeoutMs = 30000, log = console } = {}) {
+export function createPromptWriter(environment = process.env, { fetchImpl = fetch, timeoutMs = 15000, log = console } = {}) {
   const settings = promptWriterSettings(environment);
   if (!settings) return null;
   const engine = createAssistant(environment, { fetchImpl, timeoutMs, log: {} });

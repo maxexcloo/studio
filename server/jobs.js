@@ -492,7 +492,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", studio_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}), ...(body.assistant ? { assistant: body.assistant } : {}) } } })
+      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", studio_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}), ...(body.assistant ? { assistant: body.assistant } : {}), ...(body.chat ? { chat: body.chat } : {}) } } })
     });
     if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
       // It may already have started on an idle ComfyUI; this stops it either way, and only it.
