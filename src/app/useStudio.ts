@@ -27,7 +27,7 @@ import { useConfirmation } from './useConfirmation';
 import { setShareSettings } from './shareSettings';
 import { validVideoFrames } from './videoDuration';
 import { useGenerationActions } from './useGenerationActions';
-import { knownLoraInfo, loraFit, useLoraInfo } from './useLoraInfo';
+import { knownLoraInfo, loraFit, prefetchLoraInfo, useLoraInfo } from './useLoraInfo';
 import { usePromptAssistant } from './usePromptAssistant';
 import type { LoraMismatch } from './LoraMismatchChip';
 import { useViewerControls } from './useViewerControls';
@@ -1001,6 +1001,16 @@ export function useStudio() {
   // Active LoRAs whose files clearly say another model family (lora-info.js): a quiet note above the prompt bar.
   const loraOptionNames = useMemo(() => ((currentProfile?.options?.loras || models?.loras || []) as unknown[]).map((option) => typeof option === "string" ? option : String((option as { name?: string })?.name || "")).filter(Boolean), [currentProfile, models]);
   const loraInfos = useLoraInfo(loraActiveCount ? loraOptionNames : []);
+  // The LoRA chooser opens on its final names and families: their information is fetched on idle once the models are here.
+  const loraPrefetchKey = currentProfile?.capabilities.lora ? loraOptionNames.join('\n') : '';
+  useEffect(() => {
+    if (!loraPrefetchKey) return;
+    const names = loraPrefetchKey.split('\n');
+    // Safari before 18 has no requestIdleCallback.
+    const hasIdle = typeof window.requestIdleCallback === 'function';
+    const idle = hasIdle ? window.requestIdleCallback(() => prefetchLoraInfo(names), { timeout: 2000 }) : window.setTimeout(() => prefetchLoraInfo(names), 300);
+    return () => { if (hasIdle) window.cancelIdleCallback(idle); else window.clearTimeout(idle); };
+  }, [loraPrefetchKey]);
   // The closed composer names the stack: the first active LoRA, and how many more.
   const activeLoras = loraActiveCount ? loras.filter((item) => item.enabled && item.name) : [];
   const loraSummary = activeLoras.length ? `${loraName(activeLoras[0].name, loraInfos[activeLoras[0].name])}${activeLoras.length > 1 ? ` +${activeLoras.length - 1}` : ''}` : '';

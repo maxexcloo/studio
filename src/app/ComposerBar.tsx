@@ -12,6 +12,7 @@ import { estimatePhrase, formatAbout, type GenerationEstimate } from './useGener
 import type { MegapixelControl, SizeTier } from './SizeMenu';
 import type { SideLimits } from './sizing';
 import { Dropdown } from './Dropdown';
+import { practicalStepRange, stepsOffered } from './SidebarControls';
 
 /* ---------------------------------------------------------------------------
    The density ladder
@@ -305,8 +306,10 @@ export function ComposerBar(props: ComposerBarProps) {
     />
   );
 
-  const stepsPicker = (density: ControlDensity) => currentProfile?.family !== 'grok' ? (
-    <NumberPicker label="Steps" icon={<CircleDotDashed size={14} />} density={density} value={steps} onChange={setSteps} min={stepsMeta.min || 1} max={stepsMeta.max || 150} step={stepsMeta.step || 1} size="sm" />
+  // One rule and one range on both devices (SidebarControls): the phone's Create footer reads the same.
+  const stepRange = practicalStepRange(currentProfile, stepsMeta, steps);
+  const stepsPicker = (density: ControlDensity) => stepsOffered(currentProfile) ? (
+    <NumberPicker label="Steps" icon={<CircleDotDashed size={14} />} density={density} value={steps} onChange={setSteps} min={stepRange.min} max={stepRange.max} step={1} size="sm" />
   ) : null;
 
   const variantsPicker = (density: ControlDensity) => showVariants ? (
@@ -337,7 +340,7 @@ export function ComposerBar(props: ComposerBarProps) {
           >
             {comfyRestarting
               ? <><RefreshCw size={14} className="spin" /><span>Restarting…</span></>
-              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <><ArrowUp size={16} strokeWidth={2.4} /><span>Generate</span></>}
+              : comfyOffline ? <><RefreshCw size={14} className={cn(comfyRetrying && "spin")} /><span>{comfyRetrying ? "Checking…" : "ComfyUI offline"}</span></> : <><ArrowUp size={16} strokeWidth={2.4} /><span className="generate-label">Generate</span></>}
           </GenerateButton>
         </Tip>
         </div>

@@ -837,6 +837,10 @@
   border-radius: var(--r-media);
   background: var(--well);
   cursor: pointer;
+  /* The ring is always drawn, transparent at rest: hover, focus and the pick only change its colour.
+     Switching outline-style on hover started the colour at currentColor (white) and flashed. */
+  outline: 2px solid transparent;
+  outline-offset: -2px;
   transition: outline-color var(--motion-fast) var(--motion-ease);
 }
 /* Upload, the first tile of Uploads: a quiet well with its icon and name, the tiles' size and radius. */
@@ -847,9 +851,11 @@
 .reference-upload-button:disabled { cursor: default; }
 .reference-popover-body > .reference-grid + .empty-state.is-compact { padding-top: var(--space-6); }
 .reference-tile-select img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.reference-tile-select:hover { outline: 2px solid var(--glass-border); outline-offset: -2px; }
-.reference-tile-select:focus-visible { outline: 2px solid var(--icon-ring); outline-offset: -2px; }
-.reference-tile.is-selected .reference-tile-select { outline: 2px solid var(--accent-amber); outline-offset: -2px; }
+@media (hover: hover) {
+  .reference-tile-select:hover { outline-color: var(--glass-border); }
+}
+.reference-tile-select:focus-visible { outline-color: var(--icon-ring); }
+.reference-tile.is-selected .reference-tile-select { outline-color: var(--accent-amber); }
 .reference-tile.is-new .reference-tile-select { animation: ref-pop var(--motion-base) var(--motion-ease); }
 .reference-tile-check {
   position: absolute;
@@ -881,9 +887,11 @@
   cursor: pointer;
   transition: opacity var(--motion-fast), background var(--motion-fast);
 }
-.reference-tile:hover .reference-tile-delete,
+@media (hover: hover) {
+  .reference-tile:hover .reference-tile-delete { opacity: 1; }
+  .reference-tile-delete:hover { background: rgb(196 85 63 / .9); }
+}
 .reference-tile-delete:focus-visible { opacity: 1; }
-.reference-tile-delete:hover { background: rgb(196 85 63 / .9); }
 .reference-tile-busy { position: absolute; inset: 0; display: grid; place-items: center; border-radius: var(--r-media); background: rgb(0 0 0 / .45); color: #fff; }
 .reference-skeleton { aspect-ratio: 1; border-radius: var(--r-media); background: rgb(255 255 255 / .03); animation: mosaic-flicker 2.4s steps(3, jump-none) infinite; }
 .reference-skeleton:nth-child(3n) { animation-delay: -.8s; }
@@ -1735,13 +1743,7 @@
 .picker-heading-tools .reference-tabs { flex: none; }
 .picker-heading-tools .reference-tabs button { padding: 0 10px; }
 .picker-heading-tools > .picker-controls::-webkit-scrollbar { display: none; }
-.picker-heading-tools > .picker-clear-all,
-.picker-heading-tools > .dropdown-trigger { flex: none; }
 .picker-heading-tools .picker-search-toggle { margin-inline-start: 0; }
-.reference-popover-head .picker-heading-tools > .picker-search-field > * { box-sizing: border-box; flex: 1 1 auto; max-width: 280px; height: var(--control-h-sm); min-height: 0; margin: 0; }
-/* The search icon follows the views; the rest (Stacks, Clear) take the far end until the field fills the room. */
-.picker-heading-tools:not(.is-searching) > .picker-search-toggle { margin-inline-end: auto; }
-.picker-heading-tools:not(:has(> .picker-search-toggle)) > .picker-controls { margin-inline-end: auto; }
 .picker-tools.is-searching .picker-toolbar > .picker-search-field { flex: 1 1 220px; min-width: 120px; }
 .picker-tools.is-searching .picker-toolbar > .picker-search-field > * { height: var(--control-h-sm); margin: 0; }
 /* The desktop model menu takes the same heading. */
@@ -1825,20 +1827,26 @@
 .model-filters.reference-tabs button { height: auto; min-height: 30px; padding: 0 12px; border: 0; box-shadow: none; background: transparent; }
 .model-filters.reference-tabs button:not(.active):hover { background-color: var(--control-hover); }
 .model-filters.reference-tabs button.active { background: var(--selected-bg); color: var(--selected-ink); }
-/* Desktop heading search (`inline`): the field opens right of its icon, after the views, and takes the free room. */
-.picker-heading-tools.is-searching { flex: 1 1 auto; }
-/* The views never give way to the field: it takes what they leave, with Stacks down to its icon. */
-.picker-heading-tools.is-searching > .picker-controls { flex: none; }
-.picker-heading-tools.is-searching .lora-stacks .picker-dropdown-text,
-.picker-heading-tools.is-searching .dropdown-trigger.lora-stacks > svg:last-child { display: none; }
-.picker-search-field.is-inline { position: relative; display: flex; flex: 1 1 auto; align-items: center; min-width: 96px; transform-origin: left center; }
-.picker-search-field.is-inline > :first-child, .picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
 /* The row under a heading or toolbar drops down (framer height); its slot clips it while it moves. */
 .picker-search-slot { overflow: hidden; }
 .picker-search-field, .picker-search-row { position: relative; }
 .picker-search-field, .picker-search-row { display: flex; align-items: center; }
-.reference-popover-head .picker-heading-tools > .picker-search-field.is-inline { flex: 1 1 auto; justify-content: stretch; min-width: 96px; margin-inline-start: 0; }
-.reference-popover-head .picker-heading-tools > .picker-search-field.is-inline > :first-child { max-width: none; }
+.picker-search-row > :first-child { flex: 1 1 auto; width: 100%; margin: 0; }
+/* Desktop heading search (References, LoRAs, Models): the views lead and never give way. After them one swap
+   area holds the search icon, Stacks and Clear; searching, the field fades in over that whole area, starting
+   where the icon is (the icon, pressed, is the field's own), while the rest fades out but keeps its room. */
+.picker-heading-tools > .picker-controls { flex: none; }
+.picker-heading-swap { position: relative; flex: 1 1 auto; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.picker-heading-swap > .picker-search-toggle { position: relative; z-index: 1; }
+.picker-heading-rest { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-width: 0; }
+.picker-heading-rest > * { flex: none; }
+.picker-heading-rest:empty { display: none; }
+.picker-search-field.is-swap { position: absolute; inset: 0; display: flex; align-items: center; min-width: 0; }
+.picker-search-field.is-swap > .picker-search { flex: 1 1 auto; width: 100%; padding-inline-start: calc(var(--control-h-sm) + var(--space-1)); }
+.picker-search-field.is-swap > .picker-search > svg:first-child { display: none; }
+@media (pointer: coarse) {
+  .picker-search-field.is-swap > .picker-search { padding-inline-start: calc(var(--control-h-touch) + var(--space-1)); }
+}
 /* Desktop pickers carry no title or icon: the views lead the heading. */
 .reference-popover:not(.is-pop) > .reference-popover-head > :is(.surface-title, svg:first-child) { display: none; }
 /* One search field in every chooser (References, LoRAs, Models): the same height, width, radius, padding and fill. */
@@ -1872,7 +1880,9 @@
 /* Close on the right, a 44 px target like every phone icon button. */
 .reference-popover.is-pop .reference-popover-close { width: 44px; height: 44px; margin-left: auto; border-radius: var(--r-pill); }
 .reference-popover.is-pop .reference-popover-close > svg { width: 19px; height: 19px; }
-.reference-popover.is-pop .reference-popover-body { padding: 0 14px 12px; }
+/* Phone pop-ups: the list starts as far below the heading as it ends above the bottom (12px), clear of the
+   body's 10px top fade, so only content scrolled up under the heading fades. */
+.reference-popover.is-pop .reference-popover-body { padding: 12px 14px; }
 .reference-popover.is-pop .reference-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 .model-pop-row { gap: var(--space-2); padding: 0; }
 .model-pop-pick { display: flex; flex: 1; align-items: center; gap: var(--space-4); min-width: 0; min-height: 52px; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }

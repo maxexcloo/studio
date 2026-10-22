@@ -44,9 +44,12 @@
   cursor: pointer;
   transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
 }
-.comfy-status-dot:hover {
-  background: var(--control-hover);
-  border-color: var(--line-strong);
+/* Hover only where there is a pointer that hovers: a tap on a touch screen leaves no fill behind. */
+@media (hover: hover) {
+  .comfy-status-dot:hover {
+    background: var(--control-hover);
+    border-color: var(--line-strong);
+  }
 }
 .comfy-status-dot span {
   background: hsl(var(--status-waiting));
@@ -375,7 +378,9 @@
   transition-duration: var(--motion-fast);
   transition-timing-function: var(--motion-ease);
 }
-.dock-chip:hover:not(:disabled) { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
+@media (hover: hover) {
+  .dock-chip:hover:not(:disabled) { background-image: linear-gradient(var(--control-hover), var(--control-hover)); }
+}
 .dock-chip:disabled { opacity: .6; cursor: progress; }
 .dock-chip svg { flex: none; opacity: .8; }
 .dock-count {

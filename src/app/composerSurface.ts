@@ -4,8 +4,7 @@ import { tweens } from '@/lib/springs';
 /**
  * The one popover entry (UI-PATTERNS › Motion): a fade and a scale from 0.96
  * at the trigger (set `transform-origin` there), at --motion-base in and
- * --motion-fast out. Spread it with `{...useSettling()}` so the glass does not
- * blur while it moves.
+ * --motion-fast out. The glass blurs from its first frame (UI-PATTERNS › Glass).
  */
 export const popoverMotion = {
   initial: { opacity: 0, scale: 0.96 },
@@ -134,40 +133,4 @@ export function useComposerSurfaceBox(anchor: HTMLElement | null, opener?: HTMLE
     return () => { observer.disconnect(); window.removeEventListener('resize', measure); window.visualViewport?.removeEventListener('resize', measure); };
   }, [anchor, onPhone, row]);
   return { box: onPhone ? box : desktop, onPhone };
-}
-
-/**
- * While a glass surface moves in or out it skips its backdrop blur (a solid
- * fill stands in, `[data-settling]` in surfaces.css): re-blurring the page
- * behind on every frame of the motion is what made sheets and popovers stutter.
- * The glass returns once it settles. Spread onto the moving motion element.
- */
-export function useSettling() {
-  const [settling, setSettling] = React.useState(true);
-  return {
-    'data-settling': settling ? '' : undefined,
-    onAnimationStart: () => setSettling(true),
-    onAnimationComplete: () => setSettling(false),
-  };
-}
-
-/**
- * `useSettling` for a menu on the CSS `surfaceIn` entry (the Model and Size
- * menus): solid, without the blur, from when it mounts until its own
- * `animationend`, and again while an exit animation runs. With reduced motion
- * (no animation, so no end) it starts settled.
- */
-export function useCssSettling(mounted: boolean) {
-  const [settling, setSettling] = React.useState(true);
-  React.useLayoutEffect(() => {
-    if (mounted) setSettling(!window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  }, [mounted]);
-  // Only the surface's own animation counts; a spinner or search field inside it bubbles too.
-  const own = (event: React.AnimationEvent<HTMLElement>) => event.target === event.currentTarget;
-  return {
-    'data-settling': settling ? '' : undefined,
-    onAnimationStart: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(true); },
-    onAnimationEnd: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(false); },
-    onAnimationCancel: (event: React.AnimationEvent<HTMLElement>) => { if (own(event)) setSettling(false); },
-  };
 }

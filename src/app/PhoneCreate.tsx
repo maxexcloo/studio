@@ -15,7 +15,7 @@ import { sizeMenuModel, type SizeTier } from './SizeMenu';
 import { ratioName } from './sizing';
 import { ListButton, ListItem } from './SheetList';
 import { AdvancedPopover, ComposerSurface } from './LoraPopover';
-import { practicalStepRange, StablePhoneAdvancedControls } from './SidebarControls';
+import { practicalStepRange, StablePhoneAdvancedControls, stepsOffered } from './SidebarControls';
 import { PromptHistorySheet } from './PromptHistory';
 import { usePromptHistory } from './recentPrompts';
 import { PhoneModelList, PhoneSize } from './PhoneCreatePickers';
@@ -58,7 +58,7 @@ export function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOf
   const hasReferences = Boolean((referenceInputs || []).length);
   const lorasOffered = mode !== 'video' || currentProfile?.capabilities?.lora;
   const fixedSeed = String(seed || '').trim();
-  const stepsOffered = currentProfile?.family !== 'grok' && currentProfile?.capabilities?.steps !== false;
+  const showSteps = stepsOffered(currentProfile);
   const advancedText = [sampler ? String(sampler) : '', fixedSeed ? `Seed ${fixedSeed}` : '', Number(view.prefs?.runUpscale) ? `Upscale ${Number(view.prefs.runUpscale) === 4096 ? '4K' : '2K'}` : ''].filter(Boolean).join(' · ');
   const blocked = restarting || (!comfyOffline && (!prompt.trim() || generateDisabled));
   const { min: stepMin, max: stepMax } = practicalStepRange(currentProfile, stepsMeta, steps);
@@ -93,9 +93,9 @@ export function CreateSheet({ view, open, onClose, canUseNegativePrompt, comfyOf
       footer={
         <>
           {/* Two lines, always in view: Steps and the count, then Image | Video, Clear and Generate. */}
-          {stepsOffered || (variations && maxCount > 1) ? (
+          {showSteps || (variations && maxCount > 1) ? (
             <div className="create-footer-tune">
-              {stepsOffered ? <NumberPicker className="create-tune create-steps" label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /> : null}
+              {showSteps ? <NumberPicker className="create-tune create-steps" label="Steps" value={steps} min={stepMin} max={stepMax} step={1} onChange={setSteps} size="sm" /> : null}
               {variations && maxCount > 1 ? <NumberPicker className="create-tune composer-count-picker create-count" label={mode === 'video' ? 'Videos' : 'Images'} value={count} min={countMeta.min || 1} max={maxCount} step={countMeta.step || 1} onChange={setCount} size="sm" /> : null}
             </div>
           ) : null}

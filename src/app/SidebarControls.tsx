@@ -31,6 +31,16 @@ function loraSetup(view: SidebarView) {
 }
 
 /**
+ * Whether the composer offers Steps, on the desktop and the phone alike. A
+ * profile with `capabilities.steps: false` runs at its fixed step count (a
+ * turbo or distilled model; MCP leaves steps out the same way), and Grok sets
+ * its own.
+ */
+export function stepsOffered(profile: Profile | null | undefined) {
+  return Boolean(profile) && profile!.family !== 'grok' && profile!.capabilities?.steps !== false;
+}
+
+/**
  * A steps range worth stepping through. A workflow's own limit is usually
  * ComfyUI's technical maximum (10000); the range here is built around the
  * workflow's default instead (a turbo model at 4 steps gets 1-24, one at 20

@@ -141,6 +141,8 @@ test('LoRA library offers direct list selection with inline strengths and access
   // Stacks are a desktop tool; the phone heading leaves them out (Settings › Studio › LoRA Stacks edits them).
   if (phone) await expect(picker.getByRole('combobox', { name: 'Stacks', exact: true })).toHaveCount(0);
   else {
+    // While searching, the field takes the place of Stacks and Clear; folding the search brings them back.
+    await picker.getByRole('button', { name: 'Search LoRAs', exact: true }).click();
     await picker.getByRole('combobox', { name: 'Stacks', exact: true }).click();
     await page.locator('.dropdown-menu').getByRole('button', { name: 'Save Current as New Stack', exact: true }).click();
     await page.locator('.dropdown-menu').getByRole('textbox', { name: 'Stack Name', exact: true }).fill('Inline Stack');

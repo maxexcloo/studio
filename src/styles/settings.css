@@ -66,6 +66,8 @@
 .set-nav-item:hover { background: var(--control-hover); color: hsl(var(--foreground)); }
 .set-nav-item.active { background: var(--selected-bg); color: var(--selected-ink); }
 .set-nav-item.active svg { opacity: 1; }
+/* About stands apart: pushed to the foot of the rail, after a divider (the end of the phone's row). */
+.set-nav-divider { flex: none; box-sizing: content-box; height: 1px; margin: auto 12px 0; padding: var(--space-3) 0; background: var(--glass-border); background-clip: content-box; }
 /* ------------------------------------------------------------------ Page */
 .set-panel {
   min-height: 0;
@@ -115,6 +117,7 @@
   }
   .set-nav::-webkit-scrollbar { display: none; }
   .set-nav-item { flex: none; min-height: 40px; }
+  .set-nav-divider { width: 1px; height: 24px; align-self: center; margin: 0; padding: 0 var(--space-2); }
   .set-panel { padding: 20px 14px 28px; }
 }
 /* The row's edges belong to the card, so hover doesn't paint a rounded patch

@@ -218,12 +218,14 @@ export function SettingsDialog({ view, open, section, onSectionChange, onClose }
       <nav className="set-nav" aria-label="Settings Sections">
         {SETTINGS_SECTIONS.filter((item) => sectionShown(item.id)).map((item) => {
           const Icon = item.icon;
-          return (
+          const button = (
             <button key={item.id} type="button" className={`set-nav-item${section === item.id ? ' active' : ''}`} aria-current={section === item.id ? 'page' : undefined} aria-controls="settings-panel" data-section={item.id} onClick={() => onSectionChange(item.id)}>
               <Icon size={15} />
               <span>{item.label}</span>
             </button>
           );
+          // About stands apart at the foot of the rail (the end of the phone's row), after a divider.
+          return item.id === 'about' ? <React.Fragment key={item.id}><span className="set-nav-divider" aria-hidden="true" />{button}</React.Fragment> : button;
         })}
       </nav>
 

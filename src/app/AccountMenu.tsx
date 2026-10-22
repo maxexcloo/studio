@@ -4,7 +4,7 @@ import { LogOut, Settings, UserRound } from 'lucide-react';
 import { Tip } from './components';
 import { signOutAccount } from './accounts';
 import { useDismiss } from './useDismiss';
-import { popoverMotion, useSettling } from './composerSurface';
+import { popoverMotion } from './composerSurface';
 
 /**
  * The desktop dock's Account button: a small menu above it with Account
@@ -16,7 +16,6 @@ export function AccountMenu({ openAccount, onError }: { openAccount: () => void;
   const root = React.useRef<HTMLDivElement>(null);
   const close = React.useCallback(() => setOpen(false), []);
   useDismiss(root, open, close);
-  const settling = useSettling();
   const signOut = async () => {
     setBusy(true);
     try {
@@ -31,7 +30,7 @@ export function AccountMenu({ openAccount, onError }: { openAccount: () => void;
       <Tip content="Account"><button type="button" className="icon-button" aria-label="Account" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}><UserRound size={16} /></button></Tip>
       <AnimatePresence>
         {open ? (
-          <motion.div className="account-menu-list" role="menu" aria-label="Account" {...popoverMotion} {...settling}>
+          <motion.div className="account-menu-list" role="menu" aria-label="Account" {...popoverMotion}>
             <button type="button" role="menuitem" onClick={() => { close(); openAccount(); }}><Settings size={16} aria-hidden="true" />Account Settings</button>
             <button type="button" role="menuitem" className="is-danger" disabled={busy} onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />{busy ? 'Signing Out…' : 'Sign Out'}</button>
           </motion.div>

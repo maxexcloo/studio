@@ -1071,8 +1071,11 @@ button.lora-pill:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .composer-prompt-preview { display: none; }
 .composer-primary-actions { display: flex; flex: none; align-items: center; }
 .composer-primary-actions .composer-submit-actions { padding: 0; }
-/* Generate is its arrow and its name, as on the phone; offline and restarting say so in the same slot. */
+/* Expanded, Generate is its arrow and its name, as on the phone; offline and restarting say so in the same slot. */
 .zen-prompt .generate { width: auto; min-width: var(--control-h); flex: 0 0 auto; height: var(--control-h); padding: 0 16px 0 13px; gap: var(--space-3); border-radius: var(--r-pill); white-space: nowrap; }
+/* Compact (collapsed) composer: Generate is its arrow alone; its name stays "Generate". Offline and restarting keep their words. */
+.zen-prompt:not(.is-expanded) .generate:not(.is-offline, .is-restarting) { width: var(--control-h); padding: 0; }
+.zen-prompt:not(.is-expanded) .generate .generate-label { display: none; }
 .zen-prompt .composer-secondary-row { align-items: flex-start; padding: 6px 0 0; }
 .zen-prompt .zen-prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: 6px 2px 0; border-top: 1px solid var(--line); }
 .zen-prompt .zen-inline-settings { flex: 1; min-width: 0; flex-wrap: wrap; }

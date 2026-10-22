@@ -242,7 +242,8 @@ export function GallerySearchBar({ search, setSearch, open, setOpen, filterTrigg
     <motion.div className={cn('gallery-filter-anchor', filtersOpen && 'is-expanded')}>
       <Tip content={"Filters"}><button type="button" className={cn('gallery-filter-trigger', filterCount > 0 && 'is-on')} aria-label="Gallery Filters" aria-expanded={filtersOpen} aria-controls={`${id}-filters`} onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={16} /><span className="gallery-filter-label">Filters</span></button></Tip>
       <AnimatePresence initial={false}>
-        {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0 } }} transition={reducedMotion ? { duration: 0 } : tweens.fast}>
+        {/* The filters open and fold as the search does: their width at --motion-base while they fade; instant with reduced motion. */}
+        {filtersOpen ? <motion.div id={`${id}-filters`} className="gallery-filter-panel" role="group" aria-label="Gallery Filters" initial={reducedMotion ? false : { width: 0, opacity: 0 }} animate={{ width: 'auto', opacity: 1 }} exit={reducedMotion ? { opacity: 0 } : { width: 0, opacity: 0 }} transition={reducedMotion ? { duration: 0 } : { width: tweens.base, opacity: tweens.fast }}>
           <div className="gallery-filter-controls" ref={filterControlsRef}>
           <FilterControls search={search} setSearch={setSearch} items={items} floatingRef={floatingRef} clearable />
           </div>

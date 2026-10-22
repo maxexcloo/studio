@@ -2,7 +2,7 @@ import React from 'react';
 import { Tip } from './components';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { popoverMotion, useAnchoredBox, useSettling } from './composerSurface';
+import { popoverMotion, useAnchoredBox } from './composerSurface';
 import { Search, Star, X } from 'lucide-react';
 import { cn } from './format';
 import { Sheet } from './Sheet';
@@ -75,7 +75,6 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
   kind?: PromptKind;
   onError: (message: string) => void;
 }) {
-  const settling = useSettling();
   // Above the clock button that opened it (anchoredPlacement, UI-PATTERNS › Surfaces), in the page's
   // own layer so the composer's edges never clip it. The button says it is open once this renders.
   const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
@@ -92,7 +91,6 @@ export function PromptHistoryPopover({ open, onClose, onPick, onError, kind = 'p
           style={box}
           data-open-surface
           {...popoverMotion}
-          {...settling}
         >
           <HistoryPanel kind={kind} onClose={onClose} onPick={onPick} onError={onError} />
         </motion.div>

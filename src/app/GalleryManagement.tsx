@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { tweens } from '@/lib/springs';
-import { popoverMotion, useSettling } from './composerSurface';
+import { popoverMotion } from './composerSurface';
 import { AlertTriangle, CheckSquare, X, LoaderCircle } from 'lucide-react';
 import { GallerySelectionContext, type GallerySelection } from './gallerySelection';
 import { bulkItemActions, useItemActionHandlers, useItemActions, type ItemAction } from './itemActions';
@@ -22,7 +22,6 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
   tools?: React.ReactNode;
 }) {
   const reducedMotion = useReducedMotion();
-  const menuSettling = useSettling();
   const [menu, setMenu] = useState<{ item: GalleryItem; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuOpener = useRef<HTMLElement | null>(null);
@@ -115,7 +114,7 @@ export function GalleryManagement({ children, modeSelector, search, selection, s
       </motion.div> : null}</AnimatePresence>
     </div></div></header> : null}
     {children}
-    {menu ? createPortal(<motion.div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y, transformOrigin: 'top left' }} initial={popoverMotion.initial} animate={popoverMotion.animate} {...menuSettling} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
+    {menu ? createPortal(<motion.div ref={menuRef} className="gallery-context-menu" role="menu" aria-label={targets.length > 1 ? `${targets.length} Selected Items` : 'Item Actions'} style={{ left: menu.x, top: menu.y, transformOrigin: 'top left' }} initial={popoverMotion.initial} animate={popoverMotion.animate} onContextMenu={(event) => event.preventDefault()} onKeyDown={(event) => {
       const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
       const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {

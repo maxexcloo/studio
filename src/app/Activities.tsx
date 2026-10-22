@@ -6,7 +6,6 @@ import { Tip } from './components';
 import { cn } from './format';
 import { usePageHidden, usePausableTimeout } from '@/hooks/use-pausable-timeout';
 import { tweens } from '@/lib/springs';
-import { useSettling } from './composerSurface';
 
 /**
  * Activities: the long-running work that floats at the top edge while it
@@ -116,7 +115,6 @@ function keyboardFocus(target: EventTarget) {
 
 function ActivityIsland({ activity }: { activity: Activity }) {
   const reduced = useReducedMotion();
-  const settling = useSettling();
   const [held, setHeld] = useState(false);
   const pageHidden = usePageHidden();
   const [height, setHeight] = useState<number>();
@@ -201,7 +199,6 @@ function ActivityIsland({ activity }: { activity: Activity }) {
       animate={{ opacity: 1, scale: 1, height: height ?? 'auto' }}
       exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96, transition: tweens.fast }}
       transition={reduced ? { ...tweens.fast, height: { duration: 0 } } : ENTER}
-      {...settling}
       drag={activity.compact && activity.dismiss ? 'x' : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.55}

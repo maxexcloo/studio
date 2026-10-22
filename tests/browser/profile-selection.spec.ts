@@ -69,7 +69,7 @@ test('model menus show profile details without recent sections or discovery foot
 });
 
 // UI-PATTERNS › Pickers: one heading row. The filters, search and Close share one centre line; the
-// model chooser's search drops down under the heading (`row`) without moving the heading.
+// model chooser's search opens in the heading, as References' and LoRAs' do, without moving the heading.
 test('the model chooser heading keeps its filters, search and Close on one centre line', async ({ page }) => {
   await page.goto('/');
   const ui = studioUi(page);
@@ -97,9 +97,14 @@ test('the model chooser heading keeps its filters, search and Close on one centr
   await expect.poll(async () => (await centres()).spread).toBeLessThanOrEqual(1);
   expect((await centres()).count).toBe(before.count);
   expect(Math.abs((await settled()) - height)).toBeLessThanOrEqual(1);
-  // The field drops down under the heading.
+  // On the desktop the field opens in the heading, in the room after the filters; on the phone it drops down under it.
   const head = (await heading.boundingBox())!;
-  await expect.poll(async () => (await menu.locator('.picker-search-row > .picker-search').boundingBox())!.y).toBeGreaterThanOrEqual(head.y + head.height - 1);
+  if (await ui.isPhone()) await expect.poll(async () => (await menu.locator('.picker-search-row > .picker-search').boundingBox())!.y).toBeGreaterThanOrEqual(head.y + head.height - 1);
+  else {
+    const box = (await menu.locator('.picker-search-field.is-swap > .picker-search').boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(head.y - 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(head.y + head.height + 1);
+  }
   await toggle.click();
   await expect(field).toHaveCount(0);
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');

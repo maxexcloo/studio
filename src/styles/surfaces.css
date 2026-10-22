@@ -20,10 +20,9 @@
   background: var(--scrim);
   -webkit-backdrop-filter: var(--scrim-blur);
   backdrop-filter: var(--scrim-blur);
-  /* The blur joins when the fade ends (stepped), so the fade never re-blurs the page per frame. */
-  animation: modal-fade var(--motion-fast) var(--motion-ease), modal-glass var(--motion-fast) step-end;
+  /* The blur is there from the first frame and fades in with the scrim, never joining late. */
+  animation: modal-fade var(--motion-fast) var(--motion-ease);
 }
-@keyframes modal-glass { from { -webkit-backdrop-filter: none; backdrop-filter: none; } }
 /* ----------------------------------------------------------------- Sheet */
 .modal {
   position: relative;

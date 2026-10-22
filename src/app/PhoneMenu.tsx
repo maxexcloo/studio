@@ -5,7 +5,7 @@ import { CheckSquare, Library, LogOut, Settings, UserRound } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react';
 import { usePhoneLayer } from './phoneLayers';
 import { useDismiss } from './useDismiss';
-import { popoverMotion, useSettling } from './composerSurface';
+import { popoverMotion } from './composerSurface';
 import { cn } from './format';
 import { signOutAccount } from './accounts';
 import { useAccess } from './access';
@@ -33,12 +33,11 @@ export function PhoneMenu({ open, onClose, trigger, label, items, align = 'right
   }, [open, onClose]);
   const [left] = React.useState(() => 0);
   const anchorLeft = open && align === 'left' ? Math.max(8, (opener.current?.getBoundingClientRect().left || 8) - 4) : left;
-  const settling = useSettling();
   return createPortal(
     <AnimatePresence>
       {open ? (
         <motion.div ref={menuRef} key="menu" className={cn('phone-menu', align === 'left' && 'is-left')} style={align === 'left' ? { left: anchorLeft, right: 'auto' } : undefined} role="menu" aria-label={label}
-          {...popoverMotion} {...settling}>
+          {...popoverMotion}>
           {items.map((item, index) => item === 'divider'
             ? <i key={`divider-${index}`} className="phone-menu-divider" aria-hidden="true" />
             : <button key={item.id} type="button" role="menuitem" className={cn('phone-menu-item', item.danger && 'is-danger')} aria-label={item.count ? `${item.label} (${item.count})` : undefined} disabled={item.disabled} onClick={item.run}><item.Icon size={19} aria-hidden="true" /><span>{item.label}</span>{item.count ? <i className="phone-menu-count">{item.count}</i> : null}</button>)}
