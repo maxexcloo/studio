@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.48.1] - 2026-10-22
+
 > The CLIProxyAPI and Radiance ComfyUI nodes ship with Studio
 
 ### Changed
@@ -1830,7 +1832,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.1...HEAD
+[0.48.1]: https://github.com/maxexcloo/studio/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/maxexcloo/studio/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/maxexcloo/studio/compare/v0.45.0...v0.46.0
