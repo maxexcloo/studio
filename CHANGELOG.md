@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> The CLIProxyAPI and Radiance ComfyUI nodes ship with Studio
+
 ### Changed
 - **ComfyUI nodes:** the CLIProxyAPI and Radiance worker nodes now live in `comfyui/` next to the Studio worker node, and the image ships all three at `/app/comfyui` for ComfyUI images to copy from the matching release. Their Python tests run with the Studio test suite.
 
