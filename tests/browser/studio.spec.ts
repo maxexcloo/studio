@@ -441,7 +441,8 @@ test('secondary panels load only when opened and connections identify each gener
   ] } }));
   await page.goto('/');
   await expect(page.locator('[data-tile-id]').first()).toBeVisible();
-  expect(loaded.some((url) => /\/(SettingsDialog|WorkflowGallery|InpaintStudio)-/.test(url))).toBe(false);
+  // Settings is fetched while the studio is idle, so its first open is steady (UI-PATTERNS › Settings); the rest wait to be opened.
+  expect(loaded.some((url) => /\/(WorkflowGallery|InpaintStudio)-/.test(url))).toBe(false);
   const ui = studioUi(page);
   await ui.switchMode('video');
   await expect(page.getByRole('button', { name: /Video Worker (offline|is offline)/ })).toBeVisible();
@@ -496,12 +497,13 @@ test('Fast and Quality filters retain all reference variants and All clears them
     expect(new Set(layout.tops).size).toBe(1);
     expect(layout.contentWidth).toBeLessThanOrEqual(layout.width);
   };
-  // The phone's pop-up carries the filters in its heading dropdown ("Model · All"), as ticks that combine.
-  const filterMenu = page.getByRole('listbox', { name: 'Filter Models', exact: true });
+  // The phone's pop-up carries the filters in its heading dropdown ("Model · All"), one choice at a time.
+  const filterMenu = page.locator('.dropdown-menu');
   const filter = async (name: string) => {
     if (!phone) { await filters.getByRole('button', { name, exact: true }).click(); return; }
-    if (!(await filterMenu.isVisible())) await menu.locator('.dropdown-trigger.picker-view').click();
+    await menu.locator('.dropdown-trigger.picker-view').click();
     await filterMenu.getByRole('option', { name, exact: true }).click();
+    await expect(filterMenu).toHaveCount(0);
   };
   await expect(rows).toHaveCount(4);
   await expectSingleRow();
@@ -525,7 +527,8 @@ test('Fast and Quality filters retain all reference variants and All clears them
   await expect(rows).toHaveCount(0);
   await expect(menu.getByText('No Matching Models')).toBeVisible();
   await filter('All');
-  if (phone) await page.keyboard.press('Escape');
+  // One choice closes the filter menu; Escape then closes the chooser.
+  await expect(filterMenu).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await ui.closeComposer();
@@ -618,12 +621,13 @@ test('model picker keeps shortcuts in the normal list and supports keyboard sele
   else await search.press('Enter');
   await expect(menu).toHaveCount(0);
   await ui.openModelPicker();
-  // On the phone the filters are ticks in the heading's dropdown ("Model · All").
-  const filterMenu = page.getByRole('listbox', { name: 'Filter Models', exact: true });
+  // On the phone the filters are one choice in the heading's dropdown ("Model · All").
+  const filterMenu = page.locator('.dropdown-menu');
   const filter = async (name: string) => {
     if (!phone) { await menu.getByRole('button', { name, exact: true }).click(); return; }
-    if (!(await filterMenu.isVisible())) await menu.locator('.dropdown-trigger.picker-view').click();
+    await menu.locator('.dropdown-trigger.picker-view').click();
     await filterMenu.getByRole('option', { name, exact: true }).click();
+    await expect(filterMenu).toHaveCount(0);
   };
   await filter('All');
   await expect(rows).toHaveCount(30);

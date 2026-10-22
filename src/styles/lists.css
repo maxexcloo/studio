@@ -106,7 +106,6 @@ button.list-row { isolation: isolate; }
   box-shadow: var(--glass-panel-shadow);
   transform-origin: bottom right;
 }
-.account-menu-list[data-settling] { background: var(--glass-panel-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .account-menu-list button {
   display: flex;
   align-items: center;

@@ -7,7 +7,6 @@ import { cn } from './format';
 import { useFocusTrap } from './useFocusTrap';
 import { useHistoryDismiss } from './useHistoryDismiss';
 import { usePhoneLayer } from './phoneLayers';
-import { useSettling } from './composerSurface';
 
 /**
  * A bottom sheet: grab handle, swipe down (or Back, or Escape, or a tap on the
@@ -31,7 +30,6 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
   const drag = useDragControls();
   const reduced = useReducedMotion();
   const { covered, hidden, overlaid, nested } = usePhoneLayer(open);
-  const settling = useSettling();
   useFocusTrap(panelRef, open);
   useHistoryDismiss(open, onClose);
   React.useEffect(() => {
@@ -77,7 +75,6 @@ export function Sheet({ open, onClose, title, children, footer, full = false, cl
             aria-labelledby={titleId}
             tabIndex={-1}
             className={cn('phone-sheet', full && 'is-full', nested && 'is-nested', hidden && 'is-covered', overlaid && 'is-overlaid', className)}
-            {...settling}
             aria-hidden={covered || undefined}
             inert={overlaid || undefined}
             // Every sheet, nested too, slides up from the bottom edge and leaves the same way.

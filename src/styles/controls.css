@@ -35,7 +35,9 @@
   transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 .icon-button { width: 34px; padding: 0; justify-content: center; text-decoration: none; }
-.icon-button:hover { background: var(--control-hover); border-color: var(--line-strong); color: hsl(var(--foreground)); }
+@media (hover: hover) {
+  .icon-button:hover { background: var(--control-hover); border-color: var(--line-strong); color: hsl(var(--foreground)); }
+}
 .skeleton {
   display: block;
   border-radius: var(--r-item);

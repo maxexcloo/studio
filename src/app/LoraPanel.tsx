@@ -15,7 +15,7 @@ import { Dropdown } from './Dropdown';
 import { ClearSelection } from './SheetList';
 import { copyText } from './api';
 import { showToastTone } from './toast';
-import { knownLoraInfo, loraFit, useLoraInfo, type LoraInfo } from './useLoraInfo';
+import { knownLoraInfo, loraFit, useLoraInfoState, type LoraInfo } from './useLoraInfo';
 import type { LoraSnapshot } from './lora-storage';
 import type { LoraSelection, Profile } from './types';
 
@@ -235,8 +235,10 @@ function LoraCard({ item, count, missing, overLimit, info, otherModel, policyNot
 type PickerRow = { key: string; name: string };
 type PickerSection = { id: string; label: string; rows: PickerRow[]; collapsible?: boolean };
 
-function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onClearAll, onAdd, onSwap, onClose }: {
+function LoraPicker({ options, loading = false, profile, fitOf, baseOf, nameOf, policyNoteOf, current, favorites, recents, remaining, max, swapping, libraryView = false, inlineSelection, stackControls, onToggleFavorite, onClearAll, onAdd, onSwap, onClose }: {
   options: string[];
+  /** The LoRA information is still on its first way here: no rows (or empty state) yet. */
+  loading?: boolean;
   profile: Profile | null;
   fitOf: FitOf;
   /** What a LoRA was made for, as people call it. */
@@ -397,8 +399,8 @@ function LoraPicker({ options, profile, fitOf, baseOf, nameOf, policyNoteOf, cur
           {libraryView ? <button type="button" className={cn('reference-selected-tab', view === 'selected' && 'active', current.length >= max && 'is-full')} aria-pressed={view === 'selected'} aria-label={`Selected ${current.length} of ${max}`} disabled={!current.length} onClick={() => setView('selected')}>Selected <em>{current.length}/{max}</em></button> : null}
         </div>
       </PickerTools>
-      <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi}>
-        {hasRows ? sections.map((section) => {
+      <div className="lora-picker-list" ref={listRef} role={libraryView ? "group" : "listbox"} aria-label={libraryView ? "LoRAs" : undefined} aria-multiselectable={libraryView ? undefined : multi} aria-busy={loading || undefined}>
+        {loading ? null : hasRows ? sections.map((section) => {
           const isCollapsed = collapsed.has(section.id);
           return (
             <div className="lora-picker-section" key={section.id}>
@@ -625,7 +627,8 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
 
   const available = useMemo(() => new Set(options), [options]);
   // What each LoRA file says it was made for, so ones that fit list first and the rest say so.
-  const infos = useLoraInfo(options);
+  // On the very first open, before anything is known, the rows wait for their names and families rather than change under the pointer.
+  const { loras: infos, ready: infoReady } = useLoraInfoState(options);
   const fitOf = useMemo<FitOf>(() => (name) => loraFit(infos[name], profile), [infos, profile]);
   const baseOf = (name: string) => infos[name]?.base || '';
   const cap = Math.min(maxLoras, limit);
@@ -675,6 +678,7 @@ export function LoraPanel({ loras, setLoras, options, profile, limit, library, r
       <div className="lora-panel">
         <LoraPicker
           options={optionalLoras(options, infos, profile)}
+          loading={!infoReady}
           profile={profile}
           fitOf={fitOf}
           baseOf={baseOf}

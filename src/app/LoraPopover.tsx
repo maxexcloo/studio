@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { Layers, SlidersHorizontal, X } from 'lucide-react';
 import { useDismiss } from './useDismiss';
-import { composerAnchor, popoverMotion, useComposerSurfaceBox, useSettling } from './composerSurface';
+import { composerAnchor, popoverMotion, useComposerSurfaceBox } from './composerSurface';
 import { usePhoneLayer } from './phoneLayers';
 import { cn } from './format';
 import { SurfaceStatus } from './StatusMessage';
@@ -26,9 +26,8 @@ export function ComposerSurface({ title, icon, trigger, className, bodyClassName
   usePhoneLayer(Boolean(onPhone && present), 'pop');
   const close = React.useCallback(() => { onClose(); opener.current?.focus({ preventScroll: true }); }, [onClose]);
   useDismiss([surface, opener], present, close);
-  const settling = useSettling();
   const heading = useSurfaceHeadingSlot(title, Boolean(onPhone));
-  return createPortal(<motion.div ref={surface} className={cn('reference-popover', className, onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label={title} aria-hidden={!present || undefined} inert={!present} data-open-surface {...popoverMotion} {...settling}>
+  return createPortal(<motion.div ref={surface} className={cn('reference-popover', className, onPhone && 'is-pop')} style={box || undefined} role={present ? 'dialog' : undefined} aria-label={title} aria-hidden={!present || undefined} inert={!present} data-open-surface {...popoverMotion}>
     {headless && !onPhone ? null : <header className="reference-popover-head">{icon}<strong className="surface-title">{title}</strong><span ref={heading.ref} className="surface-head-slot" />{onPhone ? <SurfaceStatus active={present} /> : null}<button type="button" className="reference-popover-close" aria-label={`Close ${title}`} onClick={close}><X size={16} /></button></header>}
     <SurfaceHeadingContext.Provider value={heading.value}><div className={cn('reference-popover-body', bodyClassName)}>{children}</div></SurfaceHeadingContext.Provider>
   </motion.div>, document.body);

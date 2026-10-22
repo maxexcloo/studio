@@ -48,38 +48,32 @@ export function HeadingPortal({ children }: { children: React.ReactNode }) {
 /**
  * The phone heading's views on the shared Dropdown: the title stays plain text
  * and only the view is the trigger ("LoRAs · [This Model ▾]"). One view at a
- * time, or (`multi`) filters that combine, ticked, with the menu staying open.
- * The menu is as wide as its options, not the screen.
+ * time, like the desktop's pills. The menu is as wide as its options, not the screen.
  */
 function ViewsDropdown({ views, title }: { views: PickerViews; title: string }) {
   const options = views.options.map((option) => ({ value: option.id, label: option.label, ariaLabel: option.ariaLabel, disabled: option.disabled }));
   const run = (id: string | undefined) => views.options.find((option) => option.id === id)?.onSelect();
   const summary = <span className="picker-view-label"><span>{views.current}</span></span>;
-  const checked = views.options.filter((option) => option.checked).map((option) => option.id);
-  const menu = views.multi
-    ? <Dropdown multiple head={false} variant="heading" fitMenu className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={(next) => run([...next.filter((id) => !checked.includes(id)), ...checked.filter((id) => !next.includes(id))][0])} />
-    : <Dropdown variant="heading" fitMenu className="picker-view" label={views.label} summary={summary} options={options} value={checked[0] || ''} searchFrom={Infinity} onChange={run} />;
+  const checked = views.options.find((option) => option.checked)?.id || '';
+  const menu = <Dropdown variant="heading" fitMenu className="picker-view" label={views.label} summary={summary} options={options} value={checked} searchFrom={Infinity} onChange={run} />;
   return title ? <span className="picker-view-title"><strong>{title}</strong><span aria-hidden="true">·</span>{menu}</span> : menu;
 }
 
 export type PickerViewOption = { id: string; label: string; checked: boolean; disabled?: boolean; onSelect: () => void; ariaLabel?: string };
-/**
- * The chooser's views as data, for the phone's heading dropdown: what is shown
- * now ("This Model") and every option. `multi` keeps the menu open on a choice
- * (filters that combine, such as Favourites with Fast).
- */
-export type PickerViews = { label: string; current: string; options: PickerViewOption[]; multi?: boolean };
+/** The chooser's views as data, for the phone's heading dropdown: what is shown now ("This Model") and every option. */
+export type PickerViews = { label: string; current: string; options: PickerViewOption[] };
 
 /**
- * One compact controls row; search takes space only when requested. Its icon
- * stays where it is, pressed while the field is open, and pressing it again
- * clears and folds the search. On the desktop heading the icon follows the
- * views and the field opens right after it (`inline`), or drops down under the
- * heading (`row`, the model chooser). In a phone pop-up the row moves into the
- * heading: the views as a dropdown after the title, Clear and the search icon,
- * with the field dropping down under the heading.
+ * One compact controls row; search takes space only when requested. On the
+ * desktop heading (References, LoRAs, Models alike) the search icon follows the
+ * views, and opening it swaps every heading control but the views and Close
+ * (the icon, Stacks, Clear) for the field, in their place: the field's own
+ * icon, pressed, is where the search icon was and folds it again. The views
+ * and Close never move. In a phone pop-up the row moves into the heading: the
+ * views as a dropdown after the title, Clear and the search icon, with the
+ * field dropping down under the heading.
  */
-export function PickerTools({ children, extra, clear, onClear, search, query, onClearSearch, onType, searchLabel, className, views, viewsMenu = false, searchMode = 'inline' }: {
+export function PickerTools({ children, extra, clear, onClear, search, query, onClearSearch, onType, searchLabel, className, views }: {
   children: React.ReactNode;
   /** More heading controls after search (the LoRA Stacks dropdown). */
   extra?: React.ReactNode;
@@ -94,10 +88,6 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
   searchLabel: string;
   className?: string;
   views?: PickerViews;
-  /** On the desktop too, the views are one compact dropdown instead of pills (the model chooser). */
-  viewsMenu?: boolean;
-  /** Desktop heading search: `inline` opens right of the icon, after the views; `row` drops down under the heading. */
-  searchMode?: 'inline' | 'row';
 }) {
   const [open, setOpen] = React.useState(false);
   const expanded = open || Boolean(query);
@@ -153,20 +143,26 @@ export function PickerTools({ children, extra, clear, onClear, search, query, on
   }
 
   if (inHeading) {
-    // The desktop heading: the views · the search icon (and its field) · Stacks · Clear, then Close.
+    // The desktop heading: the views, then one swap area: the search icon · Stacks · Clear at rest. Searching,
+    // the field fades in over the whole area with the icon (pressed) as its own, and the rest fades out and goes
+    // inert but keeps its room, so the views and Close keep their place on every frame, opening and closing alike.
+    const fade = reduced ? { duration: 0 } : tweens.fast;
     return <div ref={root} className={cn('picker-tools is-heading', className)}>
       <HeadingPortal>
-        <div className={cn('picker-heading-tools', expanded && searchMode === 'inline' && 'is-searching')}>
-          {viewsMenu && views ? <ViewsDropdown views={views} title="" /> : <div className="picker-controls">{children}</div>}
-          {toggleButton}
-          <AnimatePresence initial={false}>
-            {search && expanded && searchMode === 'inline' ? <motion.div key="search" id={id} className="picker-search-field is-inline" initial={{ opacity: 0, scaleX: reduced ? 1 : 0.96 }} animate={{ opacity: 1, scaleX: 1 }} exit={{ opacity: 0, transition: tweens.fast }} transition={tweens.fast}>{search}</motion.div> : null}
-          </AnimatePresence>
-          {extra}
-          {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : clear}
+        <div className={cn('picker-heading-tools', expanded && 'is-searching')}>
+          <div className="picker-controls">{children}</div>
+          <div className={cn('picker-heading-swap', expanded && Boolean(search) && 'is-searching')}>
+            {toggleButton}
+            <motion.div className="picker-heading-rest" initial={false} animate={{ opacity: expanded && search ? 0 : 1 }} transition={fade} inert={Boolean(expanded && search)}>
+              {extra}
+              {onClear ? <button type="button" className="picker-heading-clear" aria-label="Clear Selection" onClick={onClear}>Clear</button> : clear}
+            </motion.div>
+            <AnimatePresence initial={false}>
+              {search && expanded ? <motion.div key="search" id={id} className="picker-search-field is-swap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fade}>{search}</motion.div> : null}
+            </AnimatePresence>
+          </div>
         </div>
       </HeadingPortal>
-      {searchMode === 'row' ? row : null}
     </div>;
   }
 

@@ -5,7 +5,7 @@ import { tweens, useMotionTween } from '@/lib/springs';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { cn } from './format';
 import { useDismiss } from './useDismiss';
-import { anchoredPlacement, popoverMotion, useSettling, type AnchoredPlacement } from './composerSurface';
+import { anchoredPlacement, popoverMotion, type AnchoredPlacement } from './composerSurface';
 import { SelectedTick } from './PickerTools';
 import { EmptyState } from './EmptyState';
 
@@ -203,7 +203,6 @@ export function Dropdown(props: DropdownProps) {
  * at its trigger, and on a phone the pop-up list's width.
  */
 const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement | null; rows: number; fitWidth?: number; /** Keeps the height the full list opened at, so a search never shrinks the menu. */ holdHeight?: boolean; onKeyDown: (event: React.KeyboardEvent) => void; children: React.ReactNode }>(function DropdownSurface({ trigger, rows, fitWidth = 0, holdHeight = false, onKeyDown, children }, ref) {
-  const settling = useSettling();
   const [held, setHeld] = React.useState(0);
   const [place, setPlace] = React.useState<(AnchoredPlacement & { offsetLeft: number; offsetTop: number; offsetBottom: number }) | null>(null);
   // A modal ignores clicks and focus outside itself, so the menu joins it; elsewhere (a popover
@@ -253,5 +252,5 @@ const DropdownSurface = React.forwardRef<HTMLDivElement, { trigger: HTMLElement 
     transformOrigin: place.transformOrigin,
     ...(place.upward ? { bottom: (place.bottom || 0) - place.offsetBottom } : { top: (place.top || 0) - place.offsetTop }),
   };
-  return createPortal(<motion.div ref={ref} className="dropdown-menu" style={style} data-open-surface data-own-escape onKeyDown={onKeyDown} {...popoverMotion} {...settling}>{children}</motion.div>, host);
+  return createPortal(<motion.div ref={ref} className="dropdown-menu" style={style} data-open-surface data-own-escape onKeyDown={onKeyDown} {...popoverMotion}>{children}</motion.div>, host);
 });

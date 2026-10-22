@@ -11,6 +11,23 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+- **Generate:** in the compact (collapsed) desktop composer Generate is its arrow alone, still named Generate; the word shows once the composer expands. Offline and restarting keep their words in the same slot in both sizes.
+- **Desktop gallery filters:** the filter row opens and folds as the search does, its width at the base motion while it fades, instead of appearing and vanishing at once; instant with reduced motion.
+- **Chooser search:** in the References, LoRAs and Models choosers on the desktop, the search field takes the place of every heading control but the views and Close: it opens where the search icon is (the icon, pressed, becomes its own) while Stacks and Clear fade out, and closing brings them back in place. The views and Close never move or flash. The Models chooser's field no longer drops down under its heading.
+- **Models chooser views:** All, Favourites, Fast and Quality are one choice, as References' and LoRAs' views are: choosing one leaves the others, and choosing it again goes back to All. On the phone the views dropdown picks one and closes.
+- **Steps:** the desktop composer and the phone's Create footer show Steps by one rule and with one range: a profile that runs at a fixed step count (`capabilities.steps: false`, as MCP already reads it) shows none on either device, and the desktop's range is the phone's practical one around the model's default rather than up to 150.
+- **LoRA chooser:** opens on its final list, with the catalogue's titles, the model family's sections and their order from the first frame. The LoRA information is fetched while Studio is idle after it loads and refreshed in the background; on a first open before it arrives, the list waits for it rather than showing file names that then change.
+- **Settings › About:** About sits at the foot of the section rail, apart from the other sections after a divider. On the phone it stays last in the row, after a divider.
+
+### Fixed
+- **Reference chooser hover:** hovering a picture no longer flashes a white ring that fades out; the ring only changes colour, and only where a pointer hovers.
+- **References in video mode:** a video model's start image is chosen with exactly the image chooser: Selected 1/1, Clear, the tick and staying open after a pick. With its one slot full, tapping another picture swaps it in instead of greying out every other picture and asking to take one off.
+- **Settings, first open:** the first open of a session draws the final Settings sheet from its first frame, on the desktop and the phone, instead of an "Opening settings…" stand-in swapped for the real sheet, which then faded in again. Its code is fetched while the studio is idle and the open waits for it.
+- **Glass blur:** popovers, menus, sheets and dialog scrims blur what is behind them from the first frame of their entry, on every open, instead of a solid fill until they settle: the Model and Size menus, dropdowns, the References, LoRA, Advanced and History popovers, the phone Menu and sheets, and Settings.
+- **Phone pop-up lists:** References, Size, Advanced and Models start their list as far below the heading as it ends above the bottom, so the first row sits clear of the top fade at rest. Models' search stays a solid edge when the list scrolls under it.
+- **Studio and the status light:** tapping them never scrolls the gallery. On the phone the light and the running count beside "Studio" show no pressed box, and on touch screens the dock's status dot, chips and icon buttons keep no hover fill after a tap. Keyboard focus still shows its ring.
+
 ## [0.45.0] - 2026-10-21
 
 > Menu search stays in place, gallery searches and filters swap without a reload, Upload leads Uploads, This Model shows the family's LoRAs, Advanced uses one dropdown, and Generate is labelled

@@ -9,7 +9,7 @@ import { mediaUrl } from './mediaUrl';
 import { useDismiss } from './useDismiss';
 import { Brush, Check, ChevronDown, ImagePlus, Minus, Plus, Search, SlidersHorizontal, Star, X } from 'lucide-react';
 import { Dropdown } from './Dropdown';
-import { anchoredPlacement, useCssSettling } from './composerSurface';
+import { anchoredPlacement } from './composerSurface';
 import { Tooltip as FluidTooltip } from '@/components/ui/tooltip';
 import { EmptyState } from './EmptyState';
 import { AnimatedNumber } from './AnimatedNumber';
@@ -331,7 +331,6 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
 }) {
   const [open, setOpen] = useState(false);
   const presence = usePresence(open);
-  const settling = useCssSettling(presence.mounted);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -422,7 +421,6 @@ export function AspectPicker({ value, options, onChange, currentSize, defaultSiz
           ref={menuRef}
           className={cn("aspect-menu size-menu", presence.closing && "is-closing")}
           data-open-surface
-          {...settling}
           role="dialog"
           aria-label="Size"
           onPointerEnter={(event) => { if (event.pointerType !== "touch") setPeek(true); }}
@@ -524,7 +522,6 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
   // The search clears once the menu has finished closing, so its list doesn't jump on the way out.
   const close = useCallback(() => setOpen(false), []);
   const presence = usePresence(open);
-  const settling = useCssSettling(presence.mounted);
   useEffect(() => { if (!presence.mounted) { setQuery(""); setCursor(-1); } }, [presence.mounted]); // eslint-disable-line react-hooks/exhaustive-deps
   useDismiss(pickerRef, open, close);
   const searchable = profiles.length > 0;
@@ -620,14 +617,14 @@ export function ModelPicker({ value, profiles: modelProfiles, showInpaint = true
           <ChevronDown size={14} className={cn(open && "flip")} />
         </button></Tip>
       {presence.mounted ? (
-        <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface {...settling} onKeyDown={onMenuKey}>
+        <div ref={menuRef} className={cn("model-menu", searchable && "has-search", presence.closing && "is-closing")} data-open-surface onKeyDown={onMenuKey}>
           <header className="reference-popover-head model-menu-head" aria-label="Models">{/* No title on the desktop: the filter dropdown leads the heading. */}<span ref={heading.ref} className="surface-head-slot" /><button type="button" className="reference-popover-close" aria-label="Close Models" onClick={close}><X size={16} /></button></header>
           {profiles.length ? null : (
             <EmptyState title="No Models Yet" action={onGetModels ? <button type="button" className="btn is-primary model-menu-find-cta" onClick={() => { close(); onGetModels(); }}>Get a Model</button> : null}>
               {emptyHint || "Add a model to ComfyUI to see it here."}
             </EmptyState>
           )}
-          {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" searchMode="row" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">
+          {profiles.length ? <SurfaceHeadingContext.Provider value={heading.value}><PickerTools query={query} onClearSearch={() => setQuery('')} searchLabel="Search Models" views={catalogueViews(filters, setFilters)} search={searchable ? (<label className="model-menu-search picker-search">
               <Search size={14} aria-hidden="true" />
               <input ref={searchRef} className="is-framed" role="combobox" aria-autocomplete="list" aria-controls={menuId} aria-expanded={open} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Models" aria-label="Search Models" aria-activedescendant={cursor >= 0 ? `${menuId}-row-${cursor}` : undefined} spellCheck={false} autoComplete="off" />
               {query ? <button type="button" className="model-menu-clear" aria-label="Clear Search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}><X size={12} /></button> : null}

@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { tweens } from "@/lib/springs";
-import { popoverMotion, useSettling } from "./composerSurface";
+import { popoverMotion } from "./composerSurface";
 import { Brush, BrushCleaning, Eraser, Hand, Redo2, Undo2, X } from "lucide-react";
 import { cn } from "./format";
 import { Tip } from "./components";
@@ -169,7 +169,6 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
   onChange: (dataUrl: string | null) => void;
   onClose: () => void;
 }) {
-  const settling = useSettling();
   const reducedMotion = useReducedMotion();
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<HTMLDivElement>(null);
@@ -565,7 +564,6 @@ export function InpaintStudio({ anchor, asset, mask, popRef, onChange, onClose }
       tabIndex={-1}
       data-open-surface
       {...popoverMotion}
-      {...settling}
     >
       <div
         ref={viewportRef}

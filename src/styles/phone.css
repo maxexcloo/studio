@@ -1,6 +1,7 @@
 /* The phone shell: top bar, Create sheet, pop-up lists, select bar and phone viewer. */
 
-:is(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a.btn):not(.generate, .phone-generate, .viewer-phone-bar button, .list-row, .phone-row):active {
+/* The status light and the running count beside "Studio" have no fill to darken: a press leaves them as they are. */
+:is(button:not(:disabled), [role="button"]:not([aria-disabled="true"]), a.btn):not(.generate, .phone-generate, .viewer-phone-bar button, .list-row, .phone-row, .phone-heading-light, .phone-running-inline):active {
   background-image: var(--press-overlay) !important;
   transition-duration: var(--motion-instant);
 }
@@ -881,6 +882,9 @@ html:has(.phone-shell):has(.reference-popover.is-pop) { overflow: hidden; }
 /* Model, in its pop-up: search and filters, then the families. */
 .phone-model-pop-body { display: flex; flex-direction: column; gap: var(--space-2); overflow-y: auto; overscroll-behavior: contain; }
 .phone-model-pop .phone-model-tools { display: grid; gap: var(--space-4); margin: 0 -14px 4px; padding: 4px 14px 8px; background: var(--glass-panel-solid); }
+/* While its search or Recipe shows, the tools stick to the top as a solid edge the rows pass under: no fade over them. */
+.phone-model-pop .phone-model-tools { top: 0; }
+.phone-model-pop-body:has(> .phone-model-tools :is(.picker-search-row, .list-row)) { mask-image: none; }
 /* Size, in its pop-up: the resolutions as a full-width toggle, the shapes as a list, then Width and Height. */
 .phone-size-pop-body { overflow-y: auto; overscroll-behavior: contain; }
 .phone-size { display: grid; gap: var(--space-4); padding-top: 4px; }

@@ -8,7 +8,7 @@ import { SurfaceStatus } from "./StatusMessage";
 import { Tip } from "./components";
 import { EmptyState } from "./EmptyState";
 import { useDismiss } from "./useDismiss";
-import { popoverMotion, useComposerSurfaceBox, useSettling } from "./composerSurface";
+import { popoverMotion, useComposerSurfaceBox } from "./composerSurface";
 import { deleteReferenceAsset, listReferenceAssets, referenceAssetFromGallery, scopedStorageKey, uploadReferenceAsset } from "./api";
 import type { MediaInput, ReferenceAsset, ReferenceInpaint, ReferenceRoleControl, SelectedReferenceAsset } from "./types";
 import { ReferenceGrid } from "./ReferenceGrid";
@@ -94,6 +94,9 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   const previousQuery = React.useRef(query);
   const restoreTab = React.useRef<PickerTab | null>(tab);
   const multiple = max > 1;
+  // One slot (a video's start image, most single-reference models): a tap on another picture swaps it in,
+  // where several slots at their limit ask to take one off first. Everything else is the same chooser.
+  const swaps = max === 1;
   const searchRef = React.useRef<HTMLInputElement>(null);
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const pageErrorRef = React.useRef<HTMLDivElement>(null);
@@ -205,14 +208,13 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
     const asset = await upload.start(files);
     if (!asset) return;
     setPages((current) => ({ ...current, upload: { ...current.upload, items: [asset, ...current.upload.items.filter((item) => item.id !== asset.id)] } }));
-    // Picking several: stay open for the rest.
-    if (!multiple) onClose();
+    // Picking stays open, for the rest or to review under Selected, whatever the slot count.
   };
 
   async function choose(asset: ReferenceAsset) {
     if (selectingId || upload.busy) return;
     if (selected.some(item => item.id === asset.id)) { onDeselect(asset); return; }
-    if (atCapacity) { showToastTone(fullMessage(max), "default"); return; }
+    if (atCapacity && !swaps) { showToastTone(fullMessage(max), "default"); return; }
     setSelectingId(asset.id);
     try {
       const resolved = asset.source === "generation" && asset.galleryItemId ? await referenceAssetFromGallery(asset.galleryItemId) : asset;
@@ -252,7 +254,6 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
   React.useEffect(() => {
     if (page.error) pageErrorRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
   }, [page.error, tab]);
-  const settling = useSettling();
   // The phone heading names the chooser plainly ("Reference · Library ▾"), not the slot (Start Image).
   const pickerTitle = multiple ? "References" : "Reference";
   const heading = useSurfaceHeadingSlot(pickerTitle, Boolean(onPhone));
@@ -280,7 +281,6 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       tabIndex={-1}
       data-open-surface
       {...popoverMotion}
-      {...settling}
     >
       {/* The chooser pattern (UI-PATTERNS › Pickers): one heading row, the title, the views, search, Clear Selection and Close; Upload is the first tile of Uploads. */}
       <header className="reference-popover-head">
@@ -292,12 +292,12 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
       </header>
       <SurfaceHeadingContext.Provider value={heading.value}>
       <PickerTools query={search} onClearSearch={() => setSearch('')} onType={typeSearch} searchLabel={tab === 'upload' ? 'Search Uploads' : 'Search Library'}
-        clear={multiple && selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
-        onClear={multiple && selected.length > 0 && onClearAll ? onClearAll : undefined}
+        clear={selected.length > 0 && onClearAll ? <ClearSelection onClick={onClearAll} /> : null}
+        onClear={selected.length > 0 && onClearAll ? onClearAll : undefined}
         views={{ label: "Reference Image Sources", current: tab === "selected" ? `Selected ${selected.length}/${max}` : tabName[tab], options: [
           { id: "generation", label: "Library", checked: tab === "generation", onSelect: () => changeTab("generation") },
           { id: "upload", label: "Uploads", checked: tab === "upload", onSelect: () => changeTab("upload") },
-          ...(multiple ? [{ id: "selected", label: `Selected ${selected.length}/${max}`, ariaLabel: `Selected ${selected.length} of ${max}`, checked: tab === "selected", disabled: !selected.length, onSelect: () => changeTab("selected") }] : []),
+          { id: "selected", label: `Selected ${selected.length}/${max}`, ariaLabel: `Selected ${selected.length} of ${max}`, checked: tab === "selected", disabled: !selected.length, onSelect: () => changeTab("selected") },
         ] }}
         search={tab !== 'selected' ? (<div className="reference-search picker-search">
         <Search size={16} aria-hidden="true" />
@@ -307,7 +307,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
         <div className="reference-tabs" role="tablist" aria-label="Reference Image Sources">
           <button role="tab" aria-selected={tab === "generation"} className={cn(tab === "generation" && "active")} onClick={() => changeTab("generation")}><Images size={14} /> Library</button>
           <button role="tab" aria-selected={tab === "upload"} className={cn(tab === "upload" && "active")} onClick={() => changeTab("upload")}><ImageIcon size={14} /> Uploads</button>
-          {multiple ? <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button> : null}
+          <button role="tab" aria-selected={tab === "selected"} aria-label={`Selected ${selected.length} of ${max}`} className={cn("reference-selected-tab", tab === "selected" && "active", atCapacity && "is-full")} disabled={!selected.length} onClick={() => changeTab("selected")}><ListChecks size={14} /> Selected <em>{selected.length}/{max}</em></button>
         </div>
       </PickerTools>
       </SurfaceHeadingContext.Provider>
@@ -362,7 +362,7 @@ function ReferencePopover({ memory, input, selected, max, atCapacity, onDeselect
                       className="reference-tile-select"
                       aria-pressed={isSelected}
                       aria-label={`${isSelected ? "Selected: " : ""}${asset.name}`}
-                      aria-disabled={(!isSelected && atCapacity) || undefined}
+                      aria-disabled={(!isSelected && atCapacity && !swaps) || undefined}
                       onClick={() => choose(asset)}
                       disabled={Boolean(selectingId || upload.busy)}
                     >
@@ -431,7 +431,7 @@ function useNoHover() {
 }
 const rememberInpaintIntro = () => { try { localStorage.setItem(scopedStorageKey(inpaintIntroKey), "1"); } catch { /* shown again next time, which is fine */ } };
 
-const fullMessage = (max: number) => `Up to ${max} references. Take one off to add another`;
+const fullMessage = (max: number) => `Up to ${max} reference${max === 1 ? "" : "s"}. Take one off to add another`;
 
 /**
  * One reference input as a chip in the composer's top-right corner. Empty, it
@@ -961,7 +961,8 @@ export function ReferenceSlots({ scope = "image", inputs, inpaint = null, role =
             onClose={() => { if (context.current.revision === revision) close(); }}
             onSelect={(asset) => {
               if (!context.current.active || context.current.revision !== revision) return;
-              const target = !assetFor(openInput.id) && pickerInputs.some(input => input.id === openInput.id) ? openInput : pickerInputs.find(input => !assetFor(input.id));
+              // A single slot that is full takes the new picture in place of the old.
+              const target = !assetFor(openInput.id) && pickerInputs.some(input => input.id === openInput.id) ? openInput : pickerInputs.find(input => !assetFor(input.id)) || (pickerInputs.length === 1 ? pickerInputs[0] : undefined);
               if (target) onSelect(target.id, asset);
             }}
             onDeleted={(asset) => {

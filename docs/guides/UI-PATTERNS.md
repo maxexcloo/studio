@@ -30,8 +30,9 @@ the pattern occurs in the same piece of work.
   `width`, `height`, margins, padding or grid tracks; such changes are
   instant. Two exceptions: an inline section's framer `height: 'auto'` at
   `--motion-slow` (a search field dropping down under a menu's or picker's
-  head is one), and the desktop gallery search, whose pill opens and folds
-  its width at `--motion-base` while its field fades. Never `transition: all`.
+  head is one), and the desktop gallery search and filters: the search pill
+  and the filter row open and fold their width at `--motion-base` while they
+  fade (instant with reduced motion). Never `transition: all`.
 - **Enter and exit:** popovers fade and scale from 0.96 at their trigger
   (`popoverMotion` in `composerSurface.ts`, the `surfaceIn` keyframe in CSS);
   sheets, nested ones too, slide up from the bottom edge and leave the same
@@ -113,7 +114,7 @@ variants included, live in its file; a container's file comes after the parts
 it holds, so its contextual rules win at equal specificity. Put a new rule in
 its component's file, and only reach for `!important` to beat inline styles,
 third-party markup or every component at once (the reduced-motion kill
-switch, `[data-settling]`, the press overlay, forced colours).
+switch, the press overlay, forced colours).
 
 ### Breakpoints
 
@@ -161,7 +162,11 @@ goes, the viewer resumes only if it was playing, and previews resume as usual.
   page, one at a time, anchored to the row or button that opened it, the
   screen's width less a margin, on the solid panel glass. What is under it
   stays in view, dimmed and inert, and Escape, Close or a tap outside closes
-  it.
+  it. A pop-up's list is inset the same at the top and the bottom (12 px), at
+  least the height of its top fade (10 px), so at rest the first row is wholly
+  clear of it and only content scrolled up under the heading fades. A sticky
+  tools row (Models' search) is a solid edge the rows pass under, with no fade
+  over it.
 - **A tap outside only closes.** On the phone a tap outside any pop-up,
   popover or dropdown (Size, Advanced, the `Dropdown` menus, the top bar's
   menu, the gallery filters) closes it and does nothing else: the click that
@@ -216,14 +221,13 @@ two levels:
 Use both `backdrop-filter` and `-webkit-backdrop-filter`. Do not mix in
 ad-hoc alpha, blur or shadow values.
 
-**Glass never blurs while it moves.** A popover or sheet spreads
-`useSettling()` (`composerSurface.ts`) onto its moving element: during its
-entry and exit it shows `--glass-panel-solid` without a blur, and the glass
-returns when it settles. Menus on the CSS `surfaceIn` entry (Model, Size)
-spread `useCssSettling()` instead: `[data-settling]` from mount until their
-own `animationend`. A dialog's scrim adds its blur when its fade ends.
-The viewer's backdrop is near-solid with no blur. Animate only `transform`
-and `opacity`; never `top`, `left`, `width`, `height`, margins or padding.
+**Glass blurs from its first frame.** A popover, menu, sheet or dialog scrim
+has its backdrop blur from the first frame of its entry until it has gone, on
+every open; there is no solid stand-in while it moves (`surface-blur.spec.ts`
+samples every frame on the desktop and the phone). The scrim's blur fades in
+with it. The viewer's backdrop is near-solid with no blur. Animate only
+`transform` and `opacity`; never `top`, `left`, `width`, `height`, margins or
+padding.
 
 ### Accent
 
@@ -393,40 +397,50 @@ heading row, then the grid or list. On the desktop it is an anchored popover;
 on the phone a pop-up list over Create (see [Layering](#layering)).
 
 - **Desktop heading:** no title or icon: the views lead (Library | Uploads |
-  Selected n/max, This Model | All | Selected n/max, or the model filters All ·
-  ★ · Fast · Quality, all on the same selector track), then the search icon
-  right of them, then the LoRA **Stacks** dropdown and **Clear** at the far
-  end, then Close, all on one centre line. There is no hint text and no
-  toolbar row under the heading. A narrow LoRAs popover drops the Stacks label
-  first, and an open search shows Stacks as its icon only. The LoRAs popover
-  is 560 px wide on the desktop to hold the views, the field, Stacks and Clear.
+  Selected n/max, This Model | All | Selected n/max, or the model views All ·
+  ★ · Fast · Quality, all on the same selector track and all one choice at a
+  time), then the search icon right of them, then the LoRA **Stacks**
+  dropdown and **Clear** at the far end, then Close, all on one centre line.
+  There is no hint text and no toolbar row under the heading. A narrow LoRAs
+  popover drops the Stacks label first. The LoRAs popover is 560 px wide on
+  the desktop.
 - **Upload** (References) is the first tile of the Uploads grid, the tiles'
   size and radius, its icon and "Upload" (its progress while uploading), on
   the desktop and the phone. With no uploads it stands alone, with "No Uploads
   Yet" under it; it isn't in Library or in a heading.
 - **Phone heading:** the title stays plain text and only the view after it
   is the dropdown ("LoRAs · [This Model ▾]", "Reference · [Library ▾]" or
-  "References" with several slots, "Model · [All ▾]"); the filters that
-  combine (Favourites with Fast or Quality) are ticks in the same menu, which
-  stays open while choosing. Then Clear, the search icon and Close, every
-  target 44 px. There are no Stacks on
+  "References" with several slots, "Model · [All ▾]"); one view at a time,
+  and choosing one closes the menu. Then Clear, the search icon and Close,
+  every target 44 px. There are no Stacks on
   the phone (Settings › Studio › LoRA Stacks edits them). The list starts
   right under the heading, with no empty tools row.
 - **Compact search:** an icon, not a permanent row. The icon (or typing
   anywhere in the chooser) opens the field with the focus in it; the icon
   stays where it is, pressed (`aria-pressed`, amber) while the field is open,
   and pressing it again clears the query and folds the field. On the desktop
-  References and LoRAs search `inline`: the field opens right of the icon, at
-  `--control-h-sm`, and takes the room the views leave (they never give way);
-  Stacks, Clear and Close stay. Models use `row`: the field drops down under
-  the heading, the popover's width, and the filters stay. On the phone it
-  drops down under the heading. A row field drops down at `--motion-slow`
-  (framer height); an inline one fades in. The field's own Clear Search shows
-  while it holds text. The query stays across views and the field stays open
+  (References, LoRAs and Models alike, one `PickerTools` implementation) the
+  field **swaps in** for every heading control but the views and Close: it
+  fades in over the room after the views, at `--control-h-sm`, starting where
+  the search icon is, which becomes the field's own icon; the search icon's
+  neighbours (Stacks, Clear) fade out and go inert but keep their room. The
+  views and Close never move, disappear or reflow on any frame, opening or
+  closing (`picker-swaps.spec.ts` samples every frame), and closing brings
+  the controls back in place. The swap fades at `--motion-fast` (instant with
+  reduced motion). On the phone the field drops down under the heading at
+  `--motion-slow` (framer height). The field's own Clear Search shows while it
+  holds text. The query stays across views and the field stays open
   while a query is active. Choosers keep a minimum height, so a short list or
   a narrow search doesn't shrink them.
 - **Clear** shows only while something is picked. It empties the selection at
   once and offers Undo in the status pill; it never asks first.
+- **Tiles hold still on hover:** a reference tile's ring is always drawn,
+  transparent at rest; hover (`(hover: hover)` only), focus and a pick change
+  only its colour, so nothing flashes on the way in or out.
+- **Opens on its final list:** the LoRA chooser's names, sections and order
+  are the same in its first frame as a second later. The LoRA information is
+  fetched on idle after load and refreshed in the background; a first open
+  before it has arrived holds the rows (no file names that then change).
 - **One selected mark:** a picked row or tile shows the amber tick
   (`SelectedTick`: the same icon, size and stroke 2.5 in every chooser; it
   leads a row's right-hand icons, so in Models it sits third from the right,
@@ -463,7 +477,7 @@ on the phone a pop-up list over Create (see [Layering](#layering)).
   has its own switch in the Selected view. Settings › Studio › LoRA Stacks
   edits them.
 - **Heading dropdowns** (the phone views, the desktop's Stacks) are the shared `Dropdown`
-  (`variant="heading"`; the combining filters as `multiple`), so they share its
+  (`variant="heading"`), so they share its
   entry, rows, amber tick, keyboard and Escape that closes the menu only.
   There is no separate picker menu component.
 - **Models** have no modal: the model button opens the chooser with the same
@@ -497,7 +511,11 @@ A picker, tab or list with nothing to show uses `EmptyState`
   control per slot. It opens the chooser, which picks several at once up to
   the model's limit (a picked image shows its order number; tapping it takes
   it off) and has a **Selected n/max** tab to review, reorder and remove. A
-  single-slot model keeps its one thumbnail chip. A model that takes no reference shows no
+  single-slot model keeps its one thumbnail chip, but its chooser is the same
+  one, image or video: the same views (Selected 1/1 included), Clear, ticks
+  and staying open; with its one slot full, a tap on another picture swaps it
+  in rather than asking to take one off. What a video model accepts (a start
+  image) is the only difference. A model that takes no reference shows no
   References control at all (no Reference With). Edit | Reference and the
   inpaint brush sit beside the button.
 - **LoRAs** use the same pattern: This Model | All | Selected n/max in
@@ -561,9 +579,15 @@ A picker, tab or list with nothing to show uses `EmptyState`
   320–430 px (`phone-create.spec.ts`). Editing Prompt or Negative with the keyboard up
   shows only that field (see [Keyboard & visual viewport](#keyboard--visual-viewport)).
 
-- **Generate** on the desktop is its arrow and the word "Generate" (as the
-  phone's footer), in images and videos alike; offline and restarting say so
-  in the same slot ("ComfyUI offline", "Restarting…").
+- **Generate** on the desktop is its arrow alone while the composer is
+  compact (collapsed), and its arrow and the word "Generate" (as the phone's
+  footer) once it expands, in images and videos alike; its accessible name is
+  "Generate" either way. Offline and restarting are states, not actions: they
+  say so in the same slot in both sizes ("ComfyUI offline", "Restarting…").
+- **Steps** follow one rule on both devices (`stepsOffered`): offered unless
+  the profile runs at a fixed count (`capabilities.steps: false`, as MCP reads
+  it) or is Grok, with one range (`practicalStepRange`) on the desktop
+  composer and the phone's Create footer.
 - The desktop composer stays bottom centre and expands upwards; its pickers
   are anchored popovers, each above the button that opened it. Every control stays in its bar: as room runs out they
   step down to compact and then mini chips, and there is no More Settings
@@ -618,6 +642,13 @@ logical ones: a master switch comes before what depends on it, Save & Discard
 is an editor's last row, an editor's fields follow the order they are filled
 in, Version leads About, Reset (destructive) stays its own group, and Workers
 lists the deployment's workers before Studio's own.
+
+- **About** sits at the foot of the section rail, after a divider
+  (`.set-nav-divider`), apart from the sections above it, which keep their
+  order; on the phone's sideways row it is last, after a vertical divider.
+- **First open:** Settings opens only once its code is there (fetched while
+  idle, `preloadable`), so the first frame is the final sheet: no stand-in, no
+  rail or page that changes after it shows (`settings-open.spec.ts`).
 
 **Who is an administrator** comes from one access model (`src/app/access.ts`,
 `useAccess`): with accounts, the signed-in account's role, wherever Studio is
@@ -774,6 +805,11 @@ without it the Library holds LoRAs, Models and Downloads.
   and focus change at `--motion-fast`, presses at `--motion-instant`. Change
   only `background-color` on these buttons: the `background` shorthand resets
   the clip and the fill grows to the full target again.
+- Hover fills apply only where a pointer hovers (`@media (hover: hover)`), so
+  a tap on a touch screen never leaves one behind; a control with no fill of
+  its own (the phone's status light) takes no press overlay. Focus rings come
+  from `:focus-visible` only: a pointer click shows none, keyboard focus
+  always does.
 - **Presses:** every button, row and tile darkens in place when pressed (see
   [Motion](#motion)); none scales, shrinks or shifts, Generate included.
 - Tile corner buttons are their own glass circles: hover darkens them, a press
@@ -977,6 +1013,8 @@ and no boxes in the bars.
   tap checks again) and "Studio", centred on one line. While jobs run, a
   spinner and count replace the light in the same space; a tap opens Show
   Running and Stop All. On narrow phones (under 380 px) the name hides.
+  "Studio" is a plain name and the light beside it only checks again: neither scrolls the gallery (only iOS's own status-bar tap does),
+  and neither shows a pressed box or keeps a fill after a tap.
 - **Centre:** empty and flexible. While a message shows, the whole row steps
   aside for the status pill (see [Messages](#messages)).
 - **Right,** in this order: **Search**, **Filter** and **Menu**, all 44 px

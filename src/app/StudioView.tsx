@@ -90,8 +90,8 @@ function comfyStatusLabel(status: ComfyStatus | null | undefined) {
   return `${name} offline${status?.url ? ` · ${status.url}` : ""}${status?.error ? ` · ${status.error}` : ""}`;
 }
 
-const loadSettings = () => import('./SettingsDialog');
-const SettingsDialog = React.lazy(() => loadSettings().then((module) => ({ default: module.SettingsDialog })));
+// Settings opens only once its code is here, so its first open draws the final sheet from the first frame (preloadable.ts).
+const { Component: SettingsDialog, preload: loadSettings } = preloadable(() => import('./SettingsDialog').then((module) => module.SettingsDialog));
 const { Component: Library, preload: loadLibrary } = preloadable(() => import('./Library').then((module) => module.Library));
 const loadWorkflows = () => import('./WorkflowGallery');
 const WorkflowGallery = React.lazy(() => loadWorkflows().then((module) => ({ default: module.WorkflowGallery })));
@@ -129,6 +129,11 @@ export function StudioView({ view }: { view: StudioViewModel }) {
   const [lorasOpen, setLorasOpen] = React.useState(false);
   // Advanced Settings open in a popover above the composer, like LoRAs (UI-PATTERNS › Composer).
   const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  // Settings' code is fetched while idle too, so its first open needn't wait (openSettings).
+  React.useEffect(() => {
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(() => { void loadSettings().catch(() => undefined); }, { timeout: 4000 }) : window.setTimeout(() => { void loadSettings().catch(() => undefined); }, 1500);
+    return () => { if (window.cancelIdleCallback) window.cancelIdleCallback(idle); else window.clearTimeout(idle); };
+  }, []);
   // Where the library is offered, fetch its code while idle, so it opens at once (preloadable.ts).
   const presetsOffered = models?.features?.library === true;
   React.useEffect(() => {
@@ -284,10 +289,13 @@ export function StudioView({ view }: { view: StudioViewModel }) {
   useFocusTrap(viewerRef, Boolean(active));
   useHistoryDismiss(Boolean(workflowGalleryOpen), () => setWorkflowGalleryOpen(false));
   const [settingsSection, setSettingsSection] = React.useState<SettingsSection>("studio");
+  // The sheet waits for its code (fetched while idle, so usually at once) instead of showing a stand-in that swaps.
   const openSettings = React.useCallback((section?: SettingsSection) => {
-    if (section) setSettingsSection(section);
-    setSettings(true);
-  }, [setSettings]);
+    void loadSettings().then(() => {
+      if (section) setSettingsSection(section);
+      setSettings(true);
+    }, () => showToast("Couldn’t open Settings. Check the connection and try again", "error"));
+  }, [setSettings, showToast]);
   useHistoryDismiss(Boolean(settings), () => setSettings(false));
   const [noComfyOpen, setNoComfyOpen] = React.useState(false);
   const [getModelsOpen, setGetModelsOpen] = React.useState(false);
@@ -434,7 +442,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
       </div>
       <ComfyConnectionDot status={comfyStatus} retrying={Boolean(comfyRetrying)} onClick={retryComfyStatus} />
       {models?.features?.library === true ? <Tip content={models.features.libraryUpdates ? `Library · ${models.features.libraryUpdates === 1 ? 'Update Available' : `${models.features.libraryUpdates} Updates Available`}` : 'Library'}><button className="icon-button library-dock-button" aria-label="Library" aria-description={models.features.libraryUpdates ? 'Update Available' : undefined} aria-haspopup="dialog" aria-expanded={Boolean(view.libraryOpen)} onClick={() => view.setLibraryOpen(true)}><LibraryIcon size={16} />{models.features.libraryUpdates ? <span className="library-update-dot" aria-hidden="true" /> : null}</button></Tip> : null}
-      <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => setSettings(true)}><Settings size={16} /></button></Tip>
+      <Tip content="Settings"><button className="icon-button" aria-label="Settings" aria-haspopup="dialog" aria-expanded={Boolean(settings)} onFocus={() => { void loadSettings().catch(() => undefined); }} onPointerEnter={() => { void loadSettings().catch(() => undefined); }} onPointerDown={() => { void loadSettings().catch(() => undefined); }} onClick={() => openSettings()}><Settings size={16} /></button></Tip>
       {accountSignedIn ? <AccountMenu openAccount={() => openSettings('account')} onError={(message) => showToast(message, 'error')} /> : null}
     </div>
   );
@@ -622,7 +630,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
           {composer}
         </>
       )}
-      {settings ? <React.Suspense fallback={<Modal open size="sheet" className="settings-modal" title="Settings" onOpenChange={(open) => { if (!open) setSettings(false); }}><p role="status">Opening settings…</p></Modal>}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={administrator ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
+      {settings ? <React.Suspense fallback={null}><SettingsDialog view={view} open={Boolean(settings)} section={settingsSection} onSectionChange={setSettingsSection} onClose={() => setSettings(false)} onGetModels={administrator ? () => { setSettings(false); openGetModels(); } : undefined} /></React.Suspense> : null}
       <NoComfySheet open={noComfyOpen} onOpenChange={setNoComfyOpen} onChangeAddress={administrator ? () => openSettings("workers") : undefined} />
       <GetModelsSheet open={getModelsOpen} onOpenChange={setGetModelsOpen} showToast={showToast} onStarted={view.onStarterStarted} onUse={view.selectStarterModel} onFindModels={administrator ? modelFolders?.openDialog : undefined} />
       {familySetup.family ? (
