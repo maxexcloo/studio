@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-10-22
+
 > MCP sends one request per repeated Generate, always adds trigger words, refuses too many LoRAs, answers sooner, links Details to the chat, and rides out brief ComfyUI drops
 
 ### Changed
@@ -1823,7 +1825,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.47.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.0...HEAD
+[0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/maxexcloo/studio/compare/v0.46.0...v0.47.0
 [0.46.0]: https://github.com/maxexcloo/studio/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/maxexcloo/studio/compare/v0.44.0...v0.45.0
