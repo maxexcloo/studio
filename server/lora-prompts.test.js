@@ -24,6 +24,12 @@ test('tag-trained LoRAs add one short line of the tags that fit the request; nat
   assert.equal(withLoraPrompting('A woman under a neon sign in the rain', [{ name: 'tags' }, { name: 'natural' }, { name: 'mixed' }], infos, 'neon rain portrait'), 'A woman under a neon sign in the rain\nportrait');
 });
 
+test('a caller’s own prompt gets only the missing triggers, no tag line', () => {
+  const infos = { tags: { promptStyle: 'tags', triggers: ['inkstyle'], tags: ['portrait'] } };
+  assert.equal(withLoraPrompting('A portrait', [{ name: 'tags' }], infos, '', { tags: false }), 'A portrait, inkstyle');
+  assert.equal(withLoraPrompting('inkstyle, a portrait', [{ name: 'tags' }], infos, '', { tags: false }), 'inkstyle, a portrait');
+});
+
 test('a recommended negative fills above cfg 1 with the LoRAs’ own; optional and none never do', () => {
   const recommended = { negative: { effect: 'recommended', default: 'blurry' } };
   const infos = { a: { negative: 'colour bleed' }, b: {} };

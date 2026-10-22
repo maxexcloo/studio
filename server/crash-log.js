@@ -153,6 +153,6 @@ export function noteComfyState(reachable, error) {
     write("warn", "ComfyUI stopped answering", { ...describe(error), ...readings() });
   } else if (reachable && comfyDown) {
     comfyDown = false;
-    write("info", "ComfyUI answering again", { downForS: Math.round((Date.now() - comfyDownSince) / 1000), ...readings() });
+    write("warn", "ComfyUI answering again", { downForS: Math.round((Date.now() - comfyDownSince) / 1000), ...readings() });
   }
 }

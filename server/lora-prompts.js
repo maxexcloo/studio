@@ -28,9 +28,10 @@ export function relevantTags(info, request, prompt = '') {
 
 /**
  * The prompt with each stacked LoRA's triggers (first when its note says so, otherwise at the end) and,
- * for "tags" or "mixed" LoRAs, one comma-separated line of the tags relevant to the request.
+ * for "tags" or "mixed" LoRAs, one comma-separated line of the tags relevant to the request. `tags: false`
+ * (a caller's own prompt) adds only the missing triggers.
  */
-export function withLoraPrompting(prompt, stack = [], infos = {}, request = '') {
+export function withLoraPrompting(prompt, stack = [], infos = {}, request = '', { tags = true } = {}) {
   let text = String(prompt || '').trim();
   const lead = [];
   const tail = [];
@@ -39,7 +40,7 @@ export function withLoraPrompting(prompt, stack = [], infos = {}, request = '') 
     const info = infos[name] || {};
     const triggers = cleanTriggers(info.triggers).filter((trigger) => !has(text, trigger));
     (triggerFirst(info) ? lead : tail).push(...triggers);
-    if (loraPromptStyle(info) !== 'natural') for (const tag of relevantTags(info, request, text)) if (!tagLine.includes(tag)) tagLine.push(tag);
+    if (tags && loraPromptStyle(info) !== 'natural') for (const tag of relevantTags(info, request, text)) if (!tagLine.includes(tag)) tagLine.push(tag);
   }
   if (lead.length) text = `${[...new Set(lead)].join(', ')}, ${text}`;
   if (tail.length) text = `${text.replace(/[.,;\s]+$/, '')}, ${[...new Set(tail)].join(', ')}`;

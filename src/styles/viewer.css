@@ -207,6 +207,9 @@
 /* "Copy as text" in the header: a quiet pill that copies without opening or closing it. */
 .detail-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 /* Each LoRA as a flat row, like the LoRA chooser's: its name, then its strength and View Source on the right; its information under the name. Hairlines between. */
+/* The chat that asked for it (Studio MCP): a quiet link under the prompts. */
+.detail-chat-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; color: hsl(var(--muted-foreground)); font-size: 13px; text-decoration: none; }
+.detail-chat-link:hover, .detail-chat-link:focus-visible { color: hsl(var(--foreground)); text-decoration: underline; }
 .detail-loras { display: grid; gap: 0; margin: 2px 0 0; padding: 0; list-style: none; }
 .detail-lora { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-3); min-height: 40px; padding: 4px 0; }
 .detail-lora + .detail-lora { border-top: 1px solid var(--list-hairline, var(--line)); }

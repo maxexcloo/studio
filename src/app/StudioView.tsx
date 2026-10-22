@@ -1,3 +1,4 @@
+import { conversationUrl, useChatUrl } from './chatLink';
 import { ViewerZoomControls } from './ViewerZoomControls';
 import { scrollBehavior } from "@/lib/springs";
 import { popoverMotion } from "./composerSurface";
@@ -10,7 +11,7 @@ import React from 'react';
 import { preloadable } from './preloadable';
 import { useNeighborPrefetch } from './useNeighborPrefetch';
 import { GalleryViewControls } from './GalleryViewControls';
-import { CircleStop, ChevronLeft, ChevronRight, Info, Library as LibraryIcon, Settings, X } from 'lucide-react';
+import { CircleStop, ChevronLeft, ChevronRight, ExternalLink, Info, Library as LibraryIcon, Settings, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { clockTime, cn, nearTextLimit, sortDetailRows, type GenerationDetailSection } from './format';
 import { GallerySkeleton, Tip } from './components';
@@ -381,6 +382,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
   // The pictures either side of the open one are fetched ahead, so a swipe lands on one already there.
   useNeighborPrefetch(active || null, view.viewerGallery);
   // On a phone Details covers the video, so it pauses until Details closes (mediaCover.ts).
+  const chatUrl = useChatUrl();
   React.useEffect(() => (phone && showDetails && active?.type === "video" ? coverMedia() : undefined), [phone, showDetails, active?.id, active?.type]);
   // On the phone a swipe down on Details, from the top of their scroll, closes them (up opened them).
   const detailsSwipeStart = React.useRef<{ y: number; t: number } | null>(null);
@@ -760,6 +762,7 @@ export function StudioView({ view }: { view: StudioViewModel }) {
                     <div className="viewer-side-body">
                       <PromptReadout label="Prompt" text={active.prompt || ""} onCopy={() => copyToClipboard(active.prompt || "", phone ? "Prompt copied" : "")} />
                       {active.negative ? <PromptReadout label="Negative" text={active.negative} onCopy={() => copyToClipboard(active.negative || "", phone ? "Negative prompt copied" : "")} /> : null}
+                      {active.chat?.conversationId && chatUrl ? <a className="detail-chat-link" href={conversationUrl(chatUrl, active.chat.conversationId)} target="_blank" rel="noreferrer">Open the Chat That Made It<ExternalLink size={13} /></a> : null}
                       {detailEntries.length ? (
                         <section className="detail-settings" aria-label="Generation Details">
                           {detailEntries.map((section: GenerationDetailSection) => (

@@ -11,6 +11,18 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> MCP sends one request per repeated Generate, always adds trigger words, refuses too many LoRAs, answers sooner, links Details to the chat, and rides out brief ComfyUI drops
+
+### Changed
+- **Studio MCP, repeated requests:** the same Generate sent again from one conversation within a minute (a retry or a doubled tool call) returns the first call's jobs and reply instead of queuing the images twice.
+- **Studio MCP, trigger words:** every prompt carries each chosen LoRA's missing trigger words, including prompts the chat wrote itself or sent as exact; the chat is no longer asked to add them.
+- **Studio MCP, LoRA limit:** more LoRAs than the profile takes (8 at most) are refused with the limit, instead of the extras being dropped silently.
+- **Studio MCP, speed:** the prompt writer gives up after 15 s (was 30 s) and Generate uses the request as written, and a Generate waits up to 30 s for its images by default (was 60 s) before handing back links, so a chat no longer waits near its own timeout.
+- **Chat in Details:** an image or video a chat asked for records the conversation, and Details links back to it (with a chat address set, `STUDIO_CHAT_URL`).
+
+### Fixed
+- **ComfyUI blips:** a read that loses its connection is tried once more before ComfyUI counts as gone, so a brief drop on the link to a remote worker no longer fails a run; recovery is logged as a warning with how long it was down.
+
 ## [0.47.0] - 2026-10-22
 
 > Phone model and LoRA pickers open on iOS again, swipe up for Details, loading and failed items open like finished ones, Try Again replaces, and a quicker reveal

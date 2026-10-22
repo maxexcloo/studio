@@ -241,19 +241,34 @@ export function comfyTimeoutFor(pathname = "") {
  */
 export const activeComfyUrl = () => backendUrl();
 
+// Whether ComfyUI's last answer came through (a dropped read is retried only then).
+let comfyAnswering = false;
+
 export async function comfy(pathname, options = {}) {
   const { timeout, ...init } = options;
   const limit = AbortSignal.timeout(Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname));
   init.signal = init.signal ? AbortSignal.any([init.signal, limit]) : limit;
   let response;
   try {
-    response = await fetch(`${activeComfyUrl()}${pathname}`, init);
+    try {
+      response = await fetch(`${activeComfyUrl()}${pathname}`, init);
+    } catch (error) {
+      // A dropped connection ("fetch failed") on a read is tried once more before ComfyUI counts as gone:
+      // the link to a remote worker blips, and one lost GET shouldn't fail a run or a chat's request.
+      // Only while it was answering: a ComfyUI already down fails at once, as before.
+      const method = String(init.method || "GET").toUpperCase();
+      if (!comfyAnswering || method !== "GET" || init.signal.aborted || isComfyTimeout(error) || error?.noWorker || error?.name !== "TypeError") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      response = await fetch(`${activeComfyUrl()}${pathname}`, init);
+    }
   } catch (error) {
+    comfyAnswering = false;
     // A busy worker that is slow to answer still counts as there; only a refusal marks it offline for routing.
     if (!isComfyTimeout(error) && !error?.noWorker) noteWorkerReachable(currentComfyBackend(), false);
     if (isDefaultBackend()) noteComfyFetchError(error);
     throw error;
   }
+  comfyAnswering = true;
   noteComfyReachable();
   // A proxy in front of a stopped worker answers for it: for routing, that worker is offline.
   if ([502, 503, 504].includes(response.status)) noteWorkerReachable(currentComfyBackend(), false);
