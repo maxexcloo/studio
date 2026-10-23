@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - .github/workflows/worker.yaml
+      - LICENSE
       - comfyui/**
       - worker/**
   push:
     branches: [main]
     paths:
       - .github/workflows/worker.yaml
+      - LICENSE
       - comfyui/**
       - worker/**
     tags: [v*]
@@ -71,6 +73,7 @@ jobs:
             command -v flock
             test -x /opt/radiance/runtime/ld-linux-x86-64.so.2
             test -x /opt/radiance/bin/radiance
+            test -s /opt/studio/LICENSE
             python3 -m compileall -q /root/ComfyUI/custom_nodes/radiance /root/ComfyUI/custom_nodes/studio_worker
             bash -n /opt/studio/entrypoint.sh
             sh -n /opt/studio/gpu-lease.sh
