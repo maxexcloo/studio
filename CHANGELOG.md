@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.48.2] - 2026-10-23
+
 > Saved results stay complete while worker cleanup finishes
 
 ### Fixed
@@ -1840,7 +1842,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.1...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.2...HEAD
+[0.48.2]: https://github.com/maxexcloo/studio/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/maxexcloo/studio/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/maxexcloo/studio/compare/v0.46.0...v0.47.0
