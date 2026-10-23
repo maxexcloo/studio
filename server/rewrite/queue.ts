@@ -15,7 +15,7 @@ export interface QueueAdapter {
   submit(job: OwnedJob): Promise<JobObservation>;
   observe(job: OwnedJob): Promise<JobObservation | undefined>;
   cancel(job: OwnedJob): Promise<void>;
-  saveOutputs(job: OwnedJob): Promise<void>;
+  saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   settled?(job: OwnedJob): Promise<void>;
 }
@@ -29,6 +29,7 @@ export class GenerationQueue {
   private runs = new Set<Promise<void>>();
   private observing = new Set<string>();
   private scheduling = new Set<string>();
+  private checkingEligibility = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private acceptedIds = new Set<string>();
   private stopped = false;
@@ -99,9 +100,9 @@ export class GenerationQueue {
             };
             if (observed.status === "completed") {
               job = this.store.save({ ...job, status: "saving" });
-              await this.adapter.saveOutputs(job);
+              const saved = await this.adapter.saveOutputs(job);
               // A cancellation that raced saving cannot discard already saved results.
-              const completed = this.store.save({ ...job, status: "completed" });
+              const completed = this.store.save({ ...job, ...saved, status: "completed" });
               await this.adapter.settled?.(completed);
             } else {
               this.store.save(job);
@@ -149,10 +150,13 @@ export class GenerationQueue {
         try {
           for (let job of candidates) {
             let reason: string | undefined;
+            this.checkingEligibility.add(job.id);
             try {
               reason = await this.adapter.eligible?.(job);
             } catch (error) {
               reason = (error as Error).message;
+            } finally {
+              this.checkingEligibility.delete(job.id);
             }
             job = this.store.job(job.ownerId, job.id)!;
             if (job.status === "cancelled") {
@@ -175,8 +179,8 @@ export class GenerationQueue {
                 ...(observation.status === "completed" ? { status: "saving" as const } : {}),
               });
               if (observation.status === "completed") {
-                await this.adapter.saveOutputs(submitted);
-                submitted = this.store.save({ ...submitted, status: "completed" });
+                const saved = await this.adapter.saveOutputs(submitted);
+                submitted = this.store.save({ ...submitted, ...saved, status: "completed" });
               }
               if (latest.cancelRequested && !terminalStatuses.has(observation.status))
                 await this.adapter.cancel(submitted);
@@ -212,12 +216,15 @@ export class GenerationQueue {
   async cancel(ownerId: string, id: string): Promise<OwnedJob | undefined> {
     const job = this.store.job(ownerId, id);
     if (!job || terminalStatuses.has(job.status)) return job;
-    if (!this.acceptedIds.has(job.id))
-      return this.store.save({
+    if (!this.acceptedIds.has(job.id)) {
+      const cancelled = this.store.save({
         ...job,
-        status: "cancelled",
+        status: "cancelled" as const,
         reason: "Cancelled before submission.",
       });
+      if (!this.checkingEligibility.has(job.id)) await this.adapter.settled?.(cancelled);
+      return cancelled;
+    }
     const pending = this.store.save({
       ...job,
       cancelRequested: true,

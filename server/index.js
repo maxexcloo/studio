@@ -18,9 +18,13 @@ import {
 import { registerComparisonRoutes } from "./comparisons.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./rewrite/admission.ts";
-import { RewriteStore } from "./rewrite/store.ts";
+import { ChatStore } from "./rewrite/chat-store.ts";
+import { ChatService } from "./rewrite/chat.ts";
+import { createChatRouter } from "./rewrite/chat-routes.ts";
+import { publicJob, RewriteStore } from "./rewrite/store.ts";
 import { GenerationQueue } from "./rewrite/queue.ts";
 import { createLegacyQueueAdapter } from "./rewrite/legacy-adapter.ts";
+import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./rewrite/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./rewrite/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { providerMediaWriter } from "./providers/media.ts";
@@ -31,6 +35,7 @@ import { configuredAccountJobLimit } from "./account-jobs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./rewrite/routes.ts";
 import { loadRuntime, registerTextAdmission, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { legacyRecoverySwitchGuard } from "./runtime/legacy-recovery.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library-routes.js";
@@ -45,13 +50,14 @@ import {
 import { registerProfileRoutes } from "./profile-routes.js";
 import { draftProfileFromImport } from "./profile-drafts.js";
 import { seedDirectory, seedMissing } from "./profile-seed.js";
-import { draftedProfile } from "./assistant.js";
+import { draftedProfile, gatewaySettings } from "./assistant.js";
 import { catalogDownloadsForFile } from "./family-profiles.js";
 import { familyFromName } from "./family-catalog.js";
 import {
   assistantIntegration,
   assistantSettingKeys,
   assistantSettingValue,
+  downscaleReferences,
   registerAssistantRoutes,
 } from "./assistant-routes.js";
 import { guideStore, livePrompting, profileStore } from "./profile-store.js";
@@ -206,12 +212,13 @@ import {
   saveLoraStack,
 } from "./lora-stacks.js";
 import {
-  bytesForReference,
+  bytesForReferenceAccount,
   deleteUploadedReference,
   listReferenceAssets,
   readMultipartImage,
   readUploadedReference,
   referenceAssetFromGallery,
+  referenceAssetForAccount,
   saveUploadedReference,
   stageReferenceAssets,
 } from "./reference-assets.js";
@@ -253,13 +260,24 @@ import {
   upscaleStatus,
   uploadUpscaleVideoSource,
 } from "./upscale.js";
-import { findUpscaleTarget, startUpscale, toggleUpscaleView } from "./upscale-jobs.js";
+import {
+  findUpscaleTarget,
+  prepareUpscale,
+  runUpscaleJob,
+  toggleUpscaleView,
+} from "./upscale-jobs.js";
 import { autoDetectOutputDir } from "./output-folder.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { isMediaUrl, mediaRoot, mediaStorageEnabled, mediaType } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
-import { ingestRecords, mediaSubfolder, noteIngested, removeComfyFiles } from "./media-store.js";
+import {
+  ingestRecords,
+  ingestRunResults,
+  mediaSubfolder,
+  noteIngested,
+  removeComfyFiles,
+} from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 import {
   accountForRequest,
@@ -414,7 +432,7 @@ const directCloud =
     mayUseFeature,
     composePrompt: composeWorkflowPrompt,
     reference: async (account, id) =>
-      (await bytesForReference({ studioAccount: account || undefined }, id)).buffer,
+      (await bytesForReferenceAccount(account || undefined, id)).buffer,
   });
 registerTextAdmission(app, runtime);
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
@@ -493,9 +511,18 @@ function refreshComfyContextSoon() {
   setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
+const legacyRecoveryIds = new Set(
+  filterVisibleGallery(gallery)
+    .filter((item) => item.jobId && !item.url && ["pending", "error"].includes(item.status))
+    .map((item) => item.jobId),
+);
+const legacyRecoveryTerminals = new Map();
 const recoverRunningJobs = createJobRecovery({
   backends: configuredBackends,
-  finishJob: setTerminalJob,
+  finishJob: (id, patch) => {
+    const terminal = setTerminalJob(id, patch);
+    if (legacyRecoveryIds.has(id)) legacyRecoveryTerminals.set(id, terminal);
+  },
   getGallery: () => gallery,
   jobs,
   recordsFromHistory: recordsFromComfyHistory,
@@ -2265,6 +2292,46 @@ const queueAdapter = createLegacyQueueAdapter({
   gallery: () => gallery,
   accountForOwner: accountAccessForId,
   flushGallery: flushGalleryStrict,
+  durableSave: async (job) => {
+    if (!mediaStorageEnabled && !mediaLeases.has(job.id)) return;
+    const records = gallery.filter(
+      (item) =>
+        item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
+    );
+    const moved = await withComfyBackend(job.backend, () =>
+      ingestRunResults(
+        records.map((item) => ({
+          output: item,
+          ...(item.upscale?.url ? { upscale: item.upscale } : {}),
+        })),
+        job.ownerId,
+        { strict: true },
+      ),
+    );
+    for (const result of moved.results)
+      updateGalleryJob(result.output.id, {
+        ...result.output,
+        ...(result.upscale ? { upscale: result.upscale } : {}),
+      });
+    await flushGalleryStrict();
+    const live = jobs.get(job.id);
+    if (live && (live.ownerId || "") === job.ownerId)
+      jobs.set(job.id, {
+        ...live,
+        status: "done",
+        error: "",
+        outputs: gallery.filter(
+          (item) =>
+            item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
+        ),
+      });
+    if (moved.comfyFiles.length)
+      await withComfyBackend(job.backend, async () => {
+        await removeComfyFiles(moved.comfyFiles);
+        if (job.providerJobId)
+          await forgetComfyRun({ promptIds: [job.providerJobId] }).catch(() => false);
+      });
+  },
   cancelPrompt: ({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId)),
   recover: async (job) => {
     if (job.providerJobId && !jobs.has(job.id))
@@ -2315,6 +2382,53 @@ for (const job of rewriteStore
   const workload = managedWorkload(job);
   if (workload) mediaLeases.set(job.id, runtime.controller.retain(workload.id));
 }
+if (runtime) {
+  const queuedIds = new Set(rewriteStore.jobs().map((job) => job.id));
+  for (const id of queuedIds) {
+    legacyRecoveryIds.delete(id);
+    legacyRecoveryTerminals.delete(id);
+  }
+  runtime.controller.beforeStop = legacyRecoverySwitchGuard({
+    ids: legacyRecoveryIds,
+    recover: recoverRunningJobs,
+    inspect: (id) => {
+      const job = jobs.get(id) || legacyRecoveryTerminals.get(id);
+      return { backendUrl: workerById(job?.comfyBackend)?.url, settled: Boolean(job?.terminalAt) };
+    },
+    save: async (ids, workload) => {
+      const worker = configuredBackends()
+        .map((id) => workerById(id))
+        .find((item) => item?.url.replace(/\/$/, "") === workload.url.replace(/\/$/, ""));
+      for (const id of ids) {
+        const records = gallery.filter((item) => item.jobId === id && item.status === "done");
+        if (!records.length) continue;
+        const ownerId = records[0].ownerId || "";
+        const moved = await withComfyBackend(
+          (jobs.get(id) || legacyRecoveryTerminals.get(id))?.comfyBackend || worker?.id,
+          () =>
+            ingestRunResults(
+              records.map((output) => ({
+                output,
+                ...(output.upscale?.url ? { upscale: output.upscale } : {}),
+              })),
+              ownerId,
+              { strict: true },
+            ),
+        );
+        for (const result of moved.results)
+          updateGalleryJob(result.output.id, {
+            ...result.output,
+            ...(result.upscale ? { upscale: result.upscale } : {}),
+          });
+      }
+      await flushGalleryStrict();
+      for (const id of ids) {
+        legacyRecoveryIds.delete(id);
+        legacyRecoveryTerminals.delete(id);
+      }
+    },
+  });
+}
 const directCloudAdapter =
   directCloud &&
   createCloudQueueAdapter({
@@ -2343,9 +2457,48 @@ const directCloudAdapter =
       await flushGalleryStrict();
     },
   });
+const upscaleQueueAdapter = createUpscaleQueueAdapter({
+  store: rewriteStore,
+  jobs,
+  itemFor: (ownerId, itemId) =>
+    gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
+  execute: (job, callbacks) =>
+    withComfyBackend(job.backend, async () => {
+      const account = job.ownerId ? accountAccessForId(job.ownerId) : undefined;
+      if (!job.providerJobId && job.ownerId && !account?.authenticated)
+        throw new Error("This account can no longer upscale images.");
+      const info = job.providerJobId ? null : (await loadComfyContext()).info;
+      return runUpscaleJob(job.id, job.input.upscaleBody, info, undefined, {
+        ...callbacks,
+        promptId: job.providerJobId,
+        plan: job.input.upscalePlan,
+      });
+    }),
+  cancelPrompt: (promptId, backend) => withComfyBackend(backend, () => cancelPrompt(promptId)),
+  flushGallery: flushGalleryStrict,
+  eligible: queueAdapter.eligible,
+  settled: async (job) => {
+    const item = gallery.find(
+      (entry) => entry.id === job.input.galleryItemId && (entry.ownerId || "") === job.ownerId,
+    );
+    if (item && item.upscale?.jobId === job.id && ["failed", "cancelled"].includes(job.status))
+      updateGalleryJob(item.id, {
+        upscale: {
+          ...item.upscale,
+          status: job.status === "failed" ? "error" : "canceled",
+          error: job.reason,
+          progress: null,
+        },
+      });
+    await queueAdapter.settled(job);
+  },
+});
 const generationQueue = new GenerationQueue(
   rewriteStore,
-  directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
+  withUpscaleAdapter(
+    directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
+    upscaleQueueAdapter,
+  ),
 );
 registerRewriteRoutes(app, {
   store: rewriteStore,
@@ -2376,6 +2529,119 @@ generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
 });
+
+const sessionChat = new ChatService({
+  store: new ChatStore(rewriteStore.db),
+  settings: gatewaySettings,
+  session: (ownerId, id) => rewriteStore.session(ownerId, id),
+  reference: async (ownerId, id) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (ownerId && !account?.authenticated)
+      throw Object.assign(new Error("This account no longer has access."), { status: 403 });
+    const reference = await bytesForReferenceAccount(account, id);
+    const [image] = await downscaleReferences([
+      `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
+    ]);
+    if (!image)
+      throw Object.assign(new Error("This reference image cannot be used by Chat."), {
+        status: 400,
+      });
+    return `data:${image.mime};base64,${image.data}`;
+  },
+  admit: async ({ ownerId, sessionId, turnId, draft }) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
+      throw Object.assign(new Error("The prompt assistant is off for this account."), {
+        status: 403,
+      });
+    const models = await mediaModels(false)
+      .then((result) => result.models)
+      .catch((error) => {
+        if (demoMode) return mockModelResult();
+        throw error;
+      });
+    const profile = models.profiles?.find((item) => item.id === draft.input?.profileId);
+    if (!profile)
+      throw new Error("Choose an available generation model before asking Chat to create media.");
+    const kind = draft.operation === "animate" ? "video" : "image";
+    if ((profile.kind || "image") !== kind)
+      throw new Error(
+        `Choose a ${kind} model for this action; the selected model will not be changed automatically.`,
+      );
+    const input = {
+      ...draft.input,
+      kind,
+      clientJobId: turnId,
+      allowFallback: draft.input.allowFallback === true,
+    };
+    let parentJobId = draft.parentJobId;
+    if (draft.operation !== "image") {
+      if (
+        !(
+          profile.capabilities?.startImage ||
+          profile.imageModes?.reference ||
+          profile.mediaInputs?.length
+        )
+      )
+        throw new Error("Choose a model that supports image references for this action.");
+      const parent = parentJobId
+        ? rewriteStore.job(ownerId, parentJobId)
+        : rewriteStore
+            .jobs(ownerId, sessionId)
+            .filter((job) => job.status === "completed" && job.outputs.length)
+            .at(-1);
+      if (parentJobId && !parent) throw new Error("Parent generation must belong to this session.");
+      if (parent && parent.sessionId !== sessionId)
+        throw new Error("Parent generation must belong to this session.");
+      parentJobId = parent?.id;
+      if (!Array.isArray(input.referenceAssets) || !input.referenceAssets.length) {
+        const source =
+          parent &&
+          gallery.find(
+            (item) =>
+              (item.ownerId || "") === ownerId &&
+              item.status === "done" &&
+              (item.jobId === parent.id || item.upscale?.jobId === parent.id),
+          );
+        if (!source)
+          throw new Error(
+            "Choose an image result or attach a reference before asking Chat to refine or animate it.",
+          );
+        const asset = referenceAssetForAccount(account, source.id, {
+          frame: source.type === "video" ? "last" : "",
+        });
+        input.referenceAssets = [
+          {
+            assetId: asset.id,
+            source: asset.source,
+            slot: profile.mediaInputs?.[0]?.id || "reference",
+          },
+        ];
+        input.referenceRole = "edit";
+      }
+    }
+    const result = await admitGeneration(input, account || undefined, {
+      sessionId,
+      operation: draft.operation,
+      parentJobId,
+    });
+    if (result.status >= 400)
+      throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
+        status: result.status,
+      });
+    return publicJob(rewriteStore.job(ownerId, result.payload.jobId));
+  },
+});
+app.use(
+  "/api",
+  createChatRouter(sessionChat, (req) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "promptAssistant"))
+      throw Object.assign(new Error("The prompt assistant is off for this account."), {
+        status: 403,
+      });
+    return ownerIdForRequest(req);
+  }),
+);
 
 // Only generation and its owned results use direct domain calls; other MCP tools retain their transport.
 async function mcpGenerationRequest(method, route, input, owner) {
@@ -2567,7 +2833,7 @@ app.post(
       });
       return;
     }
-    if (item.upscale?.status === "running") {
+    if (["queued", "running"].includes(item.upscale?.status)) {
       res.status(409).json({ ok: false, error: "This image is already being upscaled." });
       return;
     }
@@ -2615,7 +2881,7 @@ app.post(
     const customWorkflow = String(item.model || "").startsWith("custom:")
       ? getCustomWorkflow(item.model)
       : null;
-    const { jobId, plan } = startUpscale({
+    const { body, plan } = prepareUpscale({
       item: upscaleItem,
       imageName,
       quality,
@@ -2623,7 +2889,38 @@ app.post(
       info,
       customWorkflow,
     });
-    res.json({ ok: true, jobId, plan, revision: galleryRevisionValue() });
+    const ownerId = ownerIdForRequest(req);
+    const parent = item.jobId && rewriteStore.job(ownerId, item.jobId);
+    const session = parent
+      ? rewriteStore.session(ownerId, parent.sessionId)
+      : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
+    let queued;
+    try {
+      queued = rewriteStore.enqueue(
+        ownerId,
+        session.id,
+        {
+          prompt: item.prompt || "",
+          galleryItemId: item.id,
+          upscaleBody: body,
+          upscalePlan: plan,
+        },
+        "upscale",
+        parent?.id,
+        `worker:${currentComfyBackend()}`,
+        undefined,
+        req.studioAccount?.role === "user" ? accountJobLimit : undefined,
+      );
+    } catch (error) {
+      if (error.status === 429)
+        return res.status(429).json({ ok: false, reason: error.reason, error: error.message });
+      throw error;
+    }
+    updateGalleryJob(item.id, {
+      upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
+    });
+    void generationQueue.tick().catch(() => undefined);
+    res.json({ ok: true, jobId: queued.id, plan, revision: galleryRevisionValue() });
   }),
 );
 
@@ -2633,6 +2930,18 @@ app.post("/api/upscale/cancel", async (req, res) => {
   const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
   if (req.studioAccount && !ownedItem)
     return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
+  const queued = rewriteStore
+    .jobs(ownerIdForRequest(req))
+    .find(
+      (job) =>
+        job.operation === "upscale" &&
+        job.input.galleryItemId === itemId &&
+        !["completed", "failed", "cancelled"].includes(job.status),
+    );
+  if (queued) {
+    await generationQueue.cancel(queued.ownerId, queued.id);
+    return res.json({ ok: true });
+  }
   const entry = [...jobs].find(
     ([, job]) =>
       job.kind === "upscale" &&

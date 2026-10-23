@@ -10,6 +10,12 @@ import { SessionIteration } from "./SessionIteration";
 
 import { MediaViewer } from "../gallery/MediaViewer";
 import { ChatWorkspace } from "./ChatWorkspace";
+import { useChatMessages } from "./ChatProvider";
+import { ChatTurn } from "./ChatTurn";
+export function ChatPage() {
+  const { id } = useParams();
+  return id ? <SessionPage /> : <SessionsPage />;
+}
 export function SessionsPage() {
   const { setDraft } = useGeneration();
   useEffect(() => {
@@ -25,11 +31,11 @@ export function SessionsPage() {
           Where should we take it?
         </Title>
         <Text c="dimmed" ta="center" maw={420}>
-          Create an image, refine the details and bring it to life. Your prompts and results stay
-          together as the idea evolves.
+          Talk through an idea, create an image, then refine it together. Your conversation,
+          generation inputs and results stay together as it evolves.
         </Text>
       </Stack>
-      <ComposerDock />
+      <ComposerDock chat />
     </ChatWorkspace>
   );
 }
@@ -37,6 +43,8 @@ export function SessionPage() {
   const { id } = useParams();
   const { draft, setDraft } = useGeneration();
   const thread = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const chat = useChatMessages(id);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const session = useQuery({
     queryKey: ["session", id],
@@ -44,12 +52,21 @@ export function SessionPage() {
     refetchInterval: 1500,
   });
   useLayoutEffect(() => {
-    if (thread.current) thread.current.scrollTop = thread.current.scrollHeight;
-  }, [session.data?.jobs.length]);
+    if (thread.current && atBottom.current) thread.current.scrollTop = thread.current.scrollHeight;
+  }, [
+    session.data?.jobs.length,
+    chat.data?.messages?.length,
+    chat.data?.messages?.at(-1)?.content,
+  ]);
+  useEffect(() => {
+    atBottom.current = true;
+  }, [id]);
   useEffect(() => {
     if (!session.data || draft.sessionId === id) return;
     const jobs = session.data.jobs,
-      latest = jobs.at(-1)?.input || session.data.session.inputs;
+      latest =
+        [...jobs].reverse().find((job) => job.operation !== "upscale")?.input ||
+        session.data.session.inputs;
     const references = Array.isArray(latest.referenceDetails) ? latest.referenceDetails : [];
     setDraft({
       input: { ...initialInput, ...latest },
@@ -61,6 +78,20 @@ export function SessionPage() {
   if (session.isPending) return <Loader aria-label="Loading Session" />;
   if (session.error) return <Alert color="red">{session.error.message}</Alert>;
   const jobs = session.data.jobs;
+  const messages = chat.data?.messages || [];
+  const timeline = [
+    ...messages.map((message) => ({
+      type: "chat" as const,
+      message,
+      createdAt: message.createdAt,
+    })),
+    ...jobs.map((job, index) => ({
+      type: "generation" as const,
+      job,
+      index,
+      createdAt: job.createdAt,
+    })),
+  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   return (
     <ChatWorkspace>
       <Stack gap="xl" className="studio-session-page">
@@ -75,23 +106,34 @@ export function SessionPage() {
             </Text>
           </Stack>
         </Group>
-        <div className="studio-thread" ref={thread}>
-          {jobs.map((job, index) => (
-            <SessionIteration
-              key={job.id}
-              job={job}
-              index={index}
-              parentIndex={jobs.findIndex((parent) => parent.id === job.parentJobId)}
-              open={setSelected}
-            />
-          ))}
-          {jobs.length === 0 && (
+        <div
+          className="studio-thread"
+          ref={thread}
+          onScroll={() => {
+            const element = thread.current!;
+            atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 64;
+          }}
+        >
+          {timeline.map((entry) =>
+            entry.type === "chat" ? (
+              <ChatTurn key={entry.message.id} message={entry.message} />
+            ) : (
+              <SessionIteration
+                key={entry.job.id}
+                job={entry.job}
+                index={entry.index}
+                parentIndex={jobs.findIndex((parent) => parent.id === entry.job.parentJobId)}
+                open={setSelected}
+              />
+            ),
+          )}
+          {timeline.length === 0 && (
             <Text c="dimmed">
-              Start with a prompt below. Your iterations will stay together here.
+              Start a conversation below. Ask Studio to create when you’re ready.
             </Text>
           )}
         </div>
-        <ComposerDock />
+        <ComposerDock chat />
         {selected && <MediaViewer item={selected} sessionId={id} close={() => setSelected(null)} />}
       </Stack>
     </ChatWorkspace>

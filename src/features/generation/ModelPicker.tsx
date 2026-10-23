@@ -1,4 +1,4 @@
-import { Select, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Accordion, Group, Select, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useGeneration } from "./GenerationProvider";
 import type { Profile } from "../../types";
 const family = (profile: Profile) => profile.familyName || profile.family;
@@ -17,76 +17,103 @@ export function ModelPicker() {
   const workers = catalogue.data?.workers || [];
   const worker = workers.find((value) => value.id === input.backendId);
   return (
-    <Stack gap="sm">
-      <SimpleGrid cols={{ base: 1, sm: 3 }}>
-        <Select
-          comboboxProps={{ withinPortal: false }}
-          label="Family"
-          placeholder="Choose a family"
-          searchable
-          data={families}
-          value={profile ? family(profile) : null}
-          allowDeselect={false}
-          onChange={(value) => {
-            const next = available.find((p) => family(p) === value);
-            if (next) selectProfile(next);
-          }}
-        />
-        <Select
-          comboboxProps={{ withinPortal: false }}
-          label="Model & Finetune"
-          searchable
-          data={models}
-          value={profile ? model(profile) : null}
-          allowDeselect={false}
-          onChange={(value) => {
-            const next = inFamily.find((p) => model(p) === value);
-            if (next) selectProfile(next);
-          }}
-        />
-        <Select
-          comboboxProps={{ withinPortal: false }}
-          label="Fast, Quality & Workflow Preset"
-          data={inModel.map((p) => ({ value: p.id, label: preset(p) }))}
-          value={profile?.id || null}
-          allowDeselect={false}
-          onChange={(value) => {
-            const next = inModel.find((p) => p.id === value);
-            if (next) selectProfile(next);
-          }}
-        />
-      </SimpleGrid>
-      {!!profile?.workerIds?.length && (
-        <Select
-          label="Worker"
-          comboboxProps={{ withinPortal: false }}
-          data={profile.workerIds.map((id) => {
-            const worker = workers.find((value) => value.id === id);
-            return {
-              value: id,
-              label: worker ? `${worker.name} · ${worker.available ? "Available" : "Offline"}` : id,
-            };
-          })}
-          value={String(input.backendId || profile.workerIds[0])}
-          allowDeselect={false}
-          onChange={(backendId) => update({ backendId })}
-        />
-      )}
-      {worker?.gpuDevices?.length && (
-        <Text size="xs" c="dimmed">
-          GPU placement: {worker.gpuDevices.join(", ")}
-        </Text>
-      )}
-      {profile?.provider && (
-        <Text size="xs" c="dimmed">
-          Provider: {profile.provider === "cliproxyapi" ? "CLIProxyAPI" : profile.provider}
-        </Text>
-      )}
-      {profile?.description && (
-        <Text c="dimmed" size="xs">
-          {profile.description}
-        </Text>
-      )}
-    </Stack>
+    <Accordion variant="contained" radius="md" className="studio-model-picker">
+      <Accordion.Item value="model">
+        <Accordion.Control aria-label="Choose Model" data-model-picker>
+          <Stack gap={2}>
+            <Text size="sm" fw={500} truncate>
+              {profile ? model(profile) : "Choose a Model"}
+            </Text>
+            <Group gap="xs" wrap="nowrap">
+              <Text size="xs" c="dimmed" truncate>
+                {profile
+                  ? `${family(profile)} · ${preset(profile)}`
+                  : "Family, model and workflow preset"}
+              </Text>
+              {worker && (
+                <Text size="xs" c={worker.available ? "green" : "dimmed"} style={{ flexShrink: 0 }}>
+                  {worker.available ? "Available" : "Offline"}
+                </Text>
+              )}
+            </Group>
+          </Stack>
+        </Accordion.Control>
+        <Accordion.Panel>
+          <Stack gap="sm">
+            <SimpleGrid cols={{ base: 1, sm: 3 }}>
+              <Select
+                comboboxProps={{ withinPortal: false }}
+                label="Family"
+                placeholder="Choose a family"
+                searchable
+                data={families}
+                value={profile ? family(profile) : null}
+                allowDeselect={false}
+                onChange={(value) => {
+                  const next = available.find((p) => family(p) === value);
+                  if (next) selectProfile(next);
+                }}
+              />
+              <Select
+                comboboxProps={{ withinPortal: false }}
+                label="Model & Finetune"
+                searchable
+                data={models}
+                value={profile ? model(profile) : null}
+                allowDeselect={false}
+                onChange={(value) => {
+                  const next = inFamily.find((p) => model(p) === value);
+                  if (next) selectProfile(next);
+                }}
+              />
+              <Select
+                comboboxProps={{ withinPortal: false }}
+                label="Fast, Quality & Workflow Preset"
+                data={inModel.map((p) => ({ value: p.id, label: preset(p) }))}
+                value={profile?.id || null}
+                allowDeselect={false}
+                onChange={(value) => {
+                  const next = inModel.find((p) => p.id === value);
+                  if (next) selectProfile(next);
+                }}
+              />
+            </SimpleGrid>
+            {!!profile?.workerIds?.length && (
+              <Select
+                label="Worker"
+                comboboxProps={{ withinPortal: false }}
+                data={profile.workerIds.map((id) => {
+                  const worker = workers.find((value) => value.id === id);
+                  return {
+                    value: id,
+                    label: worker
+                      ? `${worker.name} · ${worker.available ? "Available" : "Offline"}`
+                      : id,
+                  };
+                })}
+                value={String(input.backendId || profile.workerIds[0])}
+                allowDeselect={false}
+                onChange={(backendId) => update({ backendId })}
+              />
+            )}
+            {worker?.gpuDevices?.length && (
+              <Text size="xs" c="dimmed">
+                GPU placement: {worker.gpuDevices.join(", ")}
+              </Text>
+            )}
+            {profile?.provider && (
+              <Text size="xs" c="dimmed">
+                Provider: {profile.provider === "cliproxyapi" ? "CLIProxyAPI" : profile.provider}
+              </Text>
+            )}
+            {profile?.description && (
+              <Text c="dimmed" size="xs">
+                {profile.description}
+              </Text>
+            )}
+          </Stack>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
   );
 }

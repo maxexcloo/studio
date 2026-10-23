@@ -1,21 +1,11 @@
 import { useState } from "react";
-import {
-  Alert,
-  Badge,
-  Button,
-  Group,
-  Paper,
-  Select,
-  Stack,
-  Text,
-  Title,
-  useMantineColorScheme,
-} from "@mantine/core";
+import { Alert, Badge, Button, Group, Paper, Stack, Text, Title } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
 import { OwnAccount } from "./OwnAccount";
 import { AccountAdmin } from "./AccountAdmin";
 import { useAccount } from "../auth/AccountGate";
+import { AppearanceControls } from "../../ui/Appearance";
 interface Worker {
   id: string;
   name?: string;
@@ -24,7 +14,6 @@ interface Worker {
   capabilities?: string[];
 }
 export function SettingsPage() {
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
   const account = useAccount();
   const client = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
@@ -38,23 +27,12 @@ export function SettingsPage() {
   return (
     <Stack gap="xl">
       <div>
-        <Title order={1}>Settings</Title>
         <Text c="dimmed">Your workspace, connections and account.</Text>
       </div>
       <Paper>
         <Stack>
           <Title order={3}>Appearance</Title>
-          <Select
-            label="Colour Scheme"
-            value={colorScheme}
-            onChange={(value) => setColorScheme(value as "dark" | "light" | "auto")}
-            data={[
-              { value: "dark", label: "Dark" },
-              { value: "light", label: "Light" },
-              { value: "auto", label: "System" },
-            ]}
-            maw={320}
-          />
+          <AppearanceControls />
         </Stack>
       </Paper>
       <Paper component="section" aria-label="Your Account">

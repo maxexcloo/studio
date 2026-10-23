@@ -127,7 +127,8 @@ export function createJobRecovery({
     const untracked = new Set(
       visible(
         getGallery().filter(
-          (item) => !item.url && item.status === "pending" && !jobs.has(item.jobId),
+          (item) =>
+            !item.url && ["pending", "error"].includes(item.status) && !jobs.has(item.jobId),
         ),
       )
         .map((item) => item.jobId)
@@ -309,7 +310,7 @@ export function createJobRecovery({
       if (
         jobs.has(id) ||
         !visible(getGallery()).some(
-          (item) => item.jobId === id && !item.url && item.status === "pending",
+          (item) => item.jobId === id && !item.url && ["pending", "error"].includes(item.status),
         )
       ) {
         missing.delete(id);
@@ -325,7 +326,7 @@ export function createJobRecovery({
       const error = "ComfyUI no longer has this generation.";
       setGallery(
         getGallery().map((item) =>
-          item.jobId === id && !item.url && item.status === "pending"
+          item.jobId === id && !item.url && ["pending", "error"].includes(item.status)
             ? { ...item, status: "error", error, progress: null }
             : item,
         ),

@@ -1,8 +1,6 @@
-import crypto from "node:crypto";
 import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy.js";
-import { currentComfyBackend } from "./comfy-backends.js";
 import { cancelPrompt, promptTracker } from "./comfy-queue.js";
-import { flushGallery, gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
+import { flushGalleryStrict, gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
@@ -95,13 +93,22 @@ function watchUpscaleProgress(clientId, target, run) {
   return socket;
 }
 
-export async function runUpscaleJob(jobId, body, info, target = galleryTarget(body.galleryItemId)) {
+export async function runUpscaleJob(
+  jobId,
+  body,
+  info,
+  target = galleryTarget(body.galleryItemId),
+  recorded = {},
+) {
   let socket = null;
   let clock = null;
+  let cancelSent = false;
   try {
-    const { graph: built, plan } = upscaleGraph(body, info);
+    const { graph: built, plan } = recorded.promptId
+      ? { graph: null, plan: recorded.plan }
+      : upscaleGraph(body, info);
     // An account's upscale is saved beside its other outputs, in the owner's folder.
-    const graph = body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built;
+    const graph = built && body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built;
     target.patch({
       status: "running",
       jobId,
@@ -130,34 +137,41 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
     run.clock = clock;
     socket = watchUpscaleProgress(jobId, target, run);
     await waitForOpen(socket);
-    const queued = await comfy("/prompt", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        prompt: graph,
-        client_id: jobId,
-        extra_data: { preview_method: "none" },
-      }),
+    if (!recorded.promptId) recorded.onSubmitting?.();
+    const queued = recorded.promptId
+      ? { prompt_id: recorded.promptId }
+      : await comfy("/prompt", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            prompt: graph,
+            client_id: jobId,
+            extra_data: { preview_method: "none" },
+          }),
+        }).catch((error) => {
+          if (error.status >= 400 && error.status < 500) error.providerRejected = true;
+          throw error;
+        });
+    if (typeof queued?.prompt_id !== "string" || !queued.prompt_id)
+      throw new Error(
+        "The worker did not acknowledge the upscale with a prompt ID; checking before any retry.",
+      );
+    // SQLite records the acknowledged prompt before tracking it or acknowledging any further work.
+    recorded.onAccepted?.(queued.prompt_id);
+    const cancelling = ["canceling", "canceled"].includes(jobs.get(jobId)?.status);
+    jobs.set(jobId, {
+      ...jobs.get(jobId),
+      status: cancelling ? "canceling" : "running",
+      promptId: queued.prompt_id,
     });
-    // Canceled while ComfyUI was taking the prompt: take it back out instead of running it.
-    if (jobs.get(jobId)?.terminalAt) {
-      await cancelPrompt(queued.prompt_id).catch(() => null);
-      target.patch({ status: "canceled", progress: null });
-      socket?.close();
-      return;
-    }
-    jobs.set(jobId, { ...jobs.get(jobId), status: "running", promptId: queued.prompt_id });
     run.promptId = queued.prompt_id;
     const tracker = promptTracker(queued.prompt_id);
     run.alive = tracker.alive;
     while (true) {
       const state = jobs.get(jobId)?.status;
-      if (state === "canceling" || state === "canceled") {
-        await cancelPrompt(queued.prompt_id).catch(() => null);
-        target.patch({ status: "canceled", progress: null });
-        setTerminalJob(jobId, { status: "canceled" });
-        socket?.close();
-        return;
+      if ((state === "canceling" || state === "canceled") && !cancelSent) {
+        await cancelPrompt(queued.prompt_id);
+        cancelSent = true;
       }
       // A blip in the connection is waited out; a minute of silence or a dropped run ends it.
       const checked = await tracker.check();
@@ -168,11 +182,20 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
       if (checked.state === "done") {
         const outputs = outputsFrom({ outputs: { 9: checked.entry?.outputs?.["9"] || {} } });
         let output = outputs.find((item) => item.type === (body.mediaType || "image"));
-        if (!output) throw new Error("The upscale ended without a saved result.");
+        if (!output) {
+          if (cancelSent) {
+            target.patch({ status: "canceled", progress: null });
+            setTerminalJob(jobId, { status: "canceled" });
+            return;
+          }
+          throw Object.assign(new Error("The upscale ended without a saved result."), {
+            providerFailed: true,
+          });
+        }
         // ComfyUI as a worker: the upscale moves into Studio media beside its source.
         let comfyCopies = [];
         if (mediaStorageEnabled) {
-          const moved = await ingestRunResults([{ output }], body.ownerId || "");
+          const moved = await ingestRunResults([{ output }], body.ownerId || "", { strict: true });
           output = moved.results[0].output;
           comfyCopies = moved.comfyFiles;
         }
@@ -183,7 +206,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         await target.finish(output, plan);
         setTerminalJob(jobId, { status: "done", outputs: [output] });
         if (comfyCopies.length) {
-          await flushGallery();
+          await flushGalleryStrict();
           await removeComfyFiles(comfyCopies);
           await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
         }
@@ -192,12 +215,8 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
       }
       await new Promise((resolve) => setTimeout(resolve, 1600));
     }
-  } catch (error) {
-    const message = normalizeComfyError(error.message);
-    target.patch({ status: "error", progress: null, error: message });
-    setTerminalJob(jobId, { status: "error", error: message });
-    socket?.close();
   } finally {
+    socket?.close();
     clock?.end();
   }
 }
@@ -212,11 +231,11 @@ function waitForOpen(socket) {
 }
 
 /**
- * Queues one image's upscale, already staged in ComfyUI as `imageName`: the
+ * Plans one image's upscale, already staged in ComfyUI as `imageName`: the
  * upscale arrow on a finished image. Smart upscale as part of a run is
  * run-upscale.js.
  */
-export function startUpscale({
+export function prepareUpscale({
   item,
   imageName,
   quality,
@@ -224,7 +243,6 @@ export function startUpscale({
   info,
   customWorkflow = null,
 }) {
-  const jobId = crypto.randomUUID();
   const body = {
     galleryItemId: item.id,
     mediaType: item.type,
@@ -238,17 +256,7 @@ export function startUpscale({
     ...faceDetailSource(item, customWorkflow),
   };
   const plan = upscalePlan(body);
-  jobs.set(jobId, {
-    status: "queued",
-    kind: "upscale",
-    comfyBackend: currentComfyBackend(),
-    ...(item.ownerId ? { ownerId: item.ownerId } : {}),
-    galleryItemId: item.id,
-    startedAt: Date.now(),
-    outputs: [],
-  });
-  setTimeout(() => runUpscaleJob(jobId, body, info), 0);
-  return { jobId, plan };
+  return { body, plan };
 }
 
 export function toggleUpscaleView(itemId, active) {

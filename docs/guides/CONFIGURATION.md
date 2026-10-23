@@ -137,7 +137,9 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Mounted ai definitions are read-only, so catalogue/profile/guide mutation tools return that ownership response; in-app editing and approval are deferred. Personal MCP tokens remain distinct from browser administrator credentials.
 
-The retained external-chat handover contracts use `STUDIO_CHAT_URL`, `chat-handovers.json` and account-owned job relationships. They remain available for existing LibreChat consumers. Studio's Chat tab is its own visual generation session, with media iterations and generation inputs; it does not introduce a general-purpose chat backend.
+The retained external-chat handover contracts use `STUDIO_CHAT_URL`, `chat-handovers.json` and account-owned job relationships. They remain available for existing LibreChat consumers.
+
+Studio's Chat tab streams conversation through the same configured text gateway as prompt assistance. It uses the Prompt Assistant account permission and preserves the selected media model and backend. Explicit requests to create, refine or animate media use the normal generation admission path; discussion alone does not generate media. Each iteration retains the assistant's text, a generation-input snapshot and its linked results. Text messages are persisted with the session. Interrupted text responses retain their partial content, and recorded media actions are not automatically resubmitted.
 
 MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account. Existing gateway settings remain supported while the separate Bifrost migration is pending.
 
@@ -192,7 +194,7 @@ Before enabling this mount on an existing deployment, reconcile live Studio prof
 
 ## SQLite Migration & Rollback
 
-Native Node SQLite stores the persistent queue, sessions and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. Media files and runtime directory names do not move.
+Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. Media files and runtime directory names do not move.
 
 Stop Studio and run a dry run against a copy of the intended data directory:
 
@@ -201,7 +203,7 @@ node scripts/migrate-runtime.mjs --data-dir /copy/of/studio-data
 node scripts/migrate-runtime.mjs --data-dir /copy/of/studio-data --apply
 ```
 
-The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata under `.backups/sqlite-*`, commits all documents and its migration marker atomically, and leaves the source JSON untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
+The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
 
 Rehearse restoration into a separate empty directory:
 

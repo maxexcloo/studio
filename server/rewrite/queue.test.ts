@@ -101,6 +101,17 @@ test("failed output persistence retains saving state and blocks conflicting work
     assert.match(store.job("alice", first.id)?.reason || "", /Disk full/);
     assert.deepEqual(submitted, [first.id]);
     assert.equal(store.job("alice", next.id)?.status, "waiting");
+    adapter.saveOutputs = async () => ({
+      status: "completed",
+      outputs: [{ url: "/comfy/view?filename=saved.png&type=media" }],
+    });
+    await queue.tick();
+    assert.equal(store.job("alice", first.id)?.status, "completed");
+    assert.equal(
+      store.job("alice", first.id)?.outputs[0].url,
+      "/comfy/view?filename=saved.png&type=media",
+    );
+    assert.deepEqual(submitted, [first.id, next.id]);
   } finally {
     store.close();
   }

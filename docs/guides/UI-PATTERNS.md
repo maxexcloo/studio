@@ -8,22 +8,28 @@ components. Do not introduce another primitive or styling framework.
 ## Theme & Layout
 
 - `src/theme.ts` owns the MantineHub Shadcn-inspired theme: neutral surfaces,
-  modest radii, amber accent, dark by default and optional light or system mode.
+  shared radii and an amber accent. Follow the system colour scheme by default.
+  Header and Settings share the same persisted colour, radius and width controls.
 - Use Mantine spacing, typography, colours and breakpoints. Custom media CSS
   uses the same tokens. No hover movement or decorative animation. Honour
   reduced motion; essential behaviour must not depend on animation completion.
-- Image and Video are immersive gallery modes with little chrome. Their bottom
-  generation box expands upward on desktop, with the same full-height Mantine
-  Drawer on phones. Media remains the focus while inputs stay available.
+- Images and Videos are immersive gallery modes with little chrome. Their bottom
+  compact generation box expands upward on interaction on desktop, with a
+  full-height Mantine Drawer on phones. Clicking outside collapses controls;
+  nested Mantine pickers and dialogs remain part of the active composer.
 - Chat is the iterative media workflow: prompts and results form a continuous
   visual conversation, with sessions beside it on desktop and in a Drawer on
   phones. Refine and Animate change the shared composer in place and retain
-  the session, source result and all generation inputs. General text chat is
-  deferred; do not add placeholder chat infrastructure.
-- Library and Settings are secondary navigation. The generation form and its
+  the session, source result and all generation inputs. Text replies stream into
+  persisted history. Discussion stays text-only; explicit media requests queue
+  work using the selected model and inputs, without a confirmation step or model
+  fallback. Each generation has its own recorded input card followed by results.
+  Editing and rerunning creates a new branch and leaves the original intact.
+- Library and Settings are route-backed Mantine modals with blurred overlays;
+  the media viewer fills the viewport. The generation form and its
   state are shared across all modes, using Mantine forms. Keep expert controls
   available, retain drafts across view changes and honour the phone keyboard.
-- Models are selected through Family, Model & Finetune, then Fast, Quality &
+- The model summary expands with Mantine Accordion to select Family, Model & Finetune, then Fast, Quality &
   Workflow Preset. Group only by explicit metadata and preserve the profile ID.
   LoRAs are grouped by the current family and their catalogue type (slider,
   style, character or concept); unknown types stay unclassified.
@@ -37,6 +43,9 @@ components. Do not introduce another primitive or styling framework.
   remain read-only and owned by ai. Runtime presets support updates and copies.
 - Sessions retain inputs, job relationships and outputs. Gallery contains every
   saved result. Refine and Animate preserve the source job relationship.
+- References share a Gallery & Upload picker. Gallery drag-and-drop passes an
+  owned item identifier to the server; the client does not adopt arbitrary media
+  URLs or worker history as references.
 - Preserve profile identifiers and actual model information. Wait for the
   selected backend unless the user explicitly permits fallback.
 - Show queued, waiting, starting, running, saving and terminal states with the
@@ -54,6 +63,11 @@ components. Do not introduce another primitive or styling framework.
   player, and hiding the tab pauses it. Heavy domain tools load only when opened.
 - Use semantic buttons and links, labels for every input and accessible names
   for icon actions. Keep Mantine's keyboard focus and Escape behaviour.
+- Composer controls preserve the working draft and return focus on collapse.
+  Use Mantine Collapse for desktop expansion and Drawer on phones; reduced
+  motion also disables JavaScript-driven transitions. Focus must work without
+  waiting for an animation to finish. Touch feedback must not leave hover
+  overlays covering media.
 - Handle failed image loads without exposing a broken-image icon. Keep empty,
   loading and failed data states distinct. Never display fixture data as a
   production fallback.

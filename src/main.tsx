@@ -3,27 +3,23 @@ import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "./styles.css";
 import { createRoot } from "react-dom/client";
-import { MantineProvider } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router";
 import { App } from "./App";
-import { cssVariablesResolver, theme } from "./theme";
+import { AppearanceProvider } from "./ui/Appearance";
 
 const client = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
 });
 createRoot(document.getElementById("root")!).render(
-  <MantineProvider
-    theme={theme}
-    cssVariablesResolver={cssVariablesResolver}
-    defaultColorScheme="dark"
-  >
+  <AppearanceProvider>
     <QueryClientProvider client={client}>
-      <BrowserRouter>
+      {/* Stream updates must not keep declarative route changes in a pending transition. */}
+      <BrowserRouter useTransitions={false}>
         <App />
       </BrowserRouter>
       <Notifications position="top-right" />
     </QueryClientProvider>
-  </MantineProvider>,
+  </AppearanceProvider>,
 );

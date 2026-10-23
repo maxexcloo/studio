@@ -30,7 +30,15 @@ interface Draft {
   presetId?: string;
   presetTitle?: string;
 }
-const empty: Draft = { input: initialInput, references: [], sessionId: "", operation: "image" };
+const empty: Draft = {
+  input: initialInput,
+  references: [],
+  sessionId: "",
+  operation: "image",
+  parentJobId: undefined,
+  presetId: undefined,
+  presetTitle: undefined,
+};
 function useGenerationState() {
   const form = useForm<Draft>({
     mode: "controlled",
@@ -42,7 +50,10 @@ function useGenerationState() {
   const draft = form.values;
   const setDraft = useCallback(
     (value: Draft | ((previous: Draft) => Draft)) => {
-      form.setValues(typeof value === "function" ? value(form.getValues()) : value);
+      form.setValues({
+        ...empty,
+        ...(typeof value === "function" ? value(form.getValues()) : value),
+      });
     },
     [form.getValues, form.setValues],
   );

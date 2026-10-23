@@ -3,6 +3,8 @@ import {
   Button,
   createTheme,
   Input,
+  Modal,
+  Drawer,
   Paper,
   Select,
   Switch,
@@ -17,7 +19,8 @@ export const theme = createTheme({
   // Match both schemes so contrast resolves against the displayed amber shade.
   primaryShade: 5,
   autoContrast: true,
-  luminanceThreshold: 0.3,
+  respectReducedMotion: true,
+  luminanceThreshold: 0.179,
   focusRing: "auto",
   colors: {
     studio: [
@@ -57,7 +60,6 @@ export const theme = createTheme({
     },
   },
   defaultRadius: "sm",
-  radius: { xs: ".375rem", sm: ".5rem", md: ".75rem", lg: "1rem", xl: "1.5rem" },
   spacing: { xs: ".625rem", sm: ".75rem", md: "1rem", lg: "1.25rem", xl: "1.5rem" },
   shadows: {
     xs: "0 1px 2px rgb(0 0 0 / .05)",
@@ -66,6 +68,19 @@ export const theme = createTheme({
   },
   cursorType: "pointer",
   components: {
+    Modal: Modal.extend({
+      defaultProps: {
+        overlayProps: { blur: 6, backgroundOpacity: 0.4 },
+        transitionProps: { transition: "fade", duration: 180 },
+        radius: "lg",
+      },
+    }),
+    Drawer: Drawer.extend({
+      defaultProps: {
+        overlayProps: { blur: 6, backgroundOpacity: 0.4 },
+        transitionProps: { duration: 180 },
+      },
+    }),
     Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
     Input: Input.extend({ defaultProps: { size: "md" } }),
     Paper: Paper.extend({ defaultProps: { withBorder: true, p: "lg" } }),
@@ -81,6 +96,20 @@ export const theme = createTheme({
     }),
   },
 });
+export function studioTheme(primaryColor: string, rounding: "square" | "soft" | "round") {
+  const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
+  return createTheme({
+    ...theme,
+    primaryColor,
+    radius: {
+      xs: `${radius / 2}rem`,
+      sm: `${radius}rem`,
+      md: `${radius * 1.5}rem`,
+      lg: `${radius * 2}rem`,
+      xl: `${radius * 3}rem`,
+    },
+  });
+}
 export const cssVariablesResolver: CSSVariablesResolver = () => ({
   variables: {
     "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),

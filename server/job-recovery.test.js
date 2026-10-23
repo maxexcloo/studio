@@ -130,6 +130,21 @@ test("an untracked pending tile fails only after two complete backend scans", as
   assert.equal(s.jobs.get("lost").status, "error");
 });
 
+test("an old error tile becomes terminal only after every backend confirms absence twice", async () => {
+  const s = fixture();
+  s.gallery = [tile("old-error")];
+  s.snapshots.video.error = true;
+  await s.recover();
+  await s.recover();
+  assert.equal(s.jobs.has("old-error"), false);
+  s.snapshots.video.error = false;
+  await s.recover();
+  assert.equal(s.jobs.has("old-error"), false);
+  await s.recover();
+  assert.equal(s.jobs.get("old-error").status, "error");
+  assert.equal(s.jobs.get("old-error").terminalAt, 1);
+});
+
 test("an offline backend resets untracked absence and can later recover the job", async () => {
   const s = fixture();
   s.gallery = [tile("lost", "pending")];

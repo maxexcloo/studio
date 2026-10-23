@@ -24,6 +24,7 @@ import { mimeExtension, referenceInputName } from "./reference-names.js";
 import {
   ownerIdForRequest,
   recordBelongsToRequest,
+  recordBelongsToAccount,
   recordsForRequest,
 } from "./account-ownership.js";
 
@@ -377,10 +378,14 @@ function decodeGalleryReference(id = "") {
 }
 
 function findGalleryItem(id = "", req = null) {
+  return findGalleryItemForAccount(id, req?.studioAccount);
+}
+
+function findGalleryItemForAccount(id, account) {
   const decoded = decodeGalleryReference(id);
   const wanted = decoded || String(id || "");
   return (
-    filterVisibleGallery(recordsForRequest(gallery, req)).find(
+    filterVisibleGallery(gallery.filter((item) => recordBelongsToAccount(item, account))).find(
       (item) => galleryKey(item) === wanted || item.id === wanted || item.url === wanted,
     ) || null
   );
@@ -432,10 +437,12 @@ const lastFrameSuffix = ":last-frame";
  * Nothing is stored: the id carries the video's own reference and the frame
  * is cut when used.
  */
-function lastFrameAsset(req, galleryItemId) {
+function lastFrameAssetForAccount(account, galleryItemId) {
   const finishedVideo = (item) =>
     item.type === "video" && item.status === "done" && item.url && !item.library;
-  const item = filterVisibleGallery(recordsForRequest(gallery, req)).find(
+  const item = filterVisibleGallery(
+    gallery.filter((item) => recordBelongsToAccount(item, account)),
+  ).find(
     (candidate) =>
       finishedVideo(candidate) &&
       (candidate.id === galleryItemId || galleryKey(candidate) === galleryItemId),
@@ -453,8 +460,8 @@ function lastFrameAsset(req, galleryItemId) {
   };
 }
 
-async function lastFrameBytes(req, videoId) {
-  const item = findGalleryItem(videoId, req);
+async function lastFrameBytes(account, videoId) {
+  const item = findGalleryItemForAccount(videoId, account);
   if (!item || item.type !== "video" || item.status !== "done" || item.library)
     throw new Error("That video is no longer in the gallery.");
   const video = {
@@ -469,9 +476,15 @@ async function lastFrameBytes(req, videoId) {
 }
 
 export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {}) {
-  if (frame === "last") return lastFrameAsset(req, galleryItemId);
+  return referenceAssetForAccount(req?.studioAccount, galleryItemId, { frame });
+}
+
+export function referenceAssetForAccount(account, galleryItemId, { frame = "" } = {}) {
+  if (frame === "last") return lastFrameAssetForAccount(account, galleryItemId);
   // Images added from another folder are shown in place, not ComfyUI outputs it can read back.
-  const publicItem = filterVisibleGallery(recordsForRequest(gallery, req)).find(
+  const publicItem = filterVisibleGallery(
+    gallery.filter((item) => recordBelongsToAccount(item, account)),
+  ).find(
     (item) =>
       item.type === "image" &&
       item.status === "done" &&
@@ -517,10 +530,14 @@ async function preferUpscale(original, readUpscale) {
 
 /** The bytes a run gets for a reference (exported for tests). */
 export async function bytesForReference(req, id) {
-  if (String(id).endsWith(lastFrameSuffix))
-    return lastFrameBytes(req, String(id).slice(0, -lastFrameSuffix.length));
+  return bytesForReferenceAccount(req?.studioAccount, id);
+}
 
-  const ownerId = ownerIdForRequest(req);
+export async function bytesForReferenceAccount(account, id) {
+  if (String(id).endsWith(lastFrameSuffix))
+    return lastFrameBytes(account, String(id).slice(0, -lastFrameSuffix.length));
+
+  const ownerId = account?.userId || "";
   const upload = loadManifest().find(
     (item) => item.id === id && item.source === "upload" && String(item.ownerId || "") === ownerId,
   );
@@ -530,7 +547,7 @@ export async function bytesForReference(req, id) {
       throw new Error("That reference image is gone.");
     return { buffer: fs.readFileSync(file), mime: upload.mime, name: upload.name };
   }
-  const item = findGalleryItem(id, req);
+  const item = findGalleryItemForAccount(id, account);
   if (!item || item.type !== "image" || item.status !== "done")
     throw new Error("That image is no longer in the gallery.");
   const original = await publicGalleryBuffer(item);

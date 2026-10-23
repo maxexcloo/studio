@@ -9,6 +9,7 @@ interface LegacyAdapterOptions {
   gallery(): RecordValue[];
   accountForOwner(ownerId: string): RecordValue | null;
   flushGallery(): Promise<unknown>;
+  durableSave?(job: OwnedJob): Promise<unknown>;
   cancelPrompt(job: { promptId: string; backend?: string }): Promise<unknown>;
   recover?(job: OwnedJob): Promise<unknown>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
@@ -109,7 +110,9 @@ export function createLegacyQueueAdapter(options: LegacyAdapterOptions): QueueAd
       // An unknown provider outcome stays recorded until recovery confirms cancellation.
     },
     async saveOutputs(job) {
+      await options.durableSave?.(job);
       await options.flushGallery();
+      return observation(job);
     },
     settled: options.settled,
   } as QueueAdapter;

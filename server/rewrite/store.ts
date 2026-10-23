@@ -137,7 +137,7 @@ export class RewriteStore {
       this.db
         .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
         .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
-      this.updateSession(ownerId, sessionId, { inputs: input });
+      this.updateSession(ownerId, sessionId, operation === "upscale" ? {} : { inputs: input });
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");

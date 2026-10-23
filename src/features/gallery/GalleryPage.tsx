@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   Title,
+  VisuallyHidden,
 } from "@mantine/core";
 import { Search } from "lucide-react";
 import { useDebouncedValue, useDisclosure } from "@mantine/hooks";
@@ -56,6 +57,7 @@ export function GalleryPage() {
   const items = gallery.data?.pages.flatMap((page) => page.items) || [];
   return (
     <Stack gap="xl" className="studio-gallery-page">
+      <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
       <Group>
         <ActionIcon
           aria-label="Search Gallery"

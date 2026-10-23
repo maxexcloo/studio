@@ -127,7 +127,6 @@ export function LibraryPage() {
   return (
     <Stack gap="xl">
       <div>
-        <Title order={1}>Library</Title>
         <Text c="dimmed">Models, LoRAs and inspiration, with their original settings.</Text>
       </div>
       <Paper>
