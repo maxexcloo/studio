@@ -33,17 +33,24 @@ export function useQueueAction(jobId?: string) {
       ]),
     onError: failure,
   });
+  function matching(value: QueueAction) {
+    return client.isMutating({
+      mutationKey: queueActionKey,
+      predicate: (mutation) => {
+        const pending = mutation.state.variables as QueueAction;
+        return pending?.id === value.id && pending.action === value.action;
+      },
+    });
+  }
   return {
     isPending: action.isPending || pending > 0,
     mutate: (value: QueueAction) => {
-      const matching = client.isMutating({
-        mutationKey: queueActionKey,
-        predicate: (mutation) => {
-          const pending = mutation.state.variables as QueueAction;
-          return pending?.id === value.id && pending.action === value.action;
-        },
-      });
-      if (!matching) action.mutate(value);
+      if (!matching(value)) action.mutate(value);
+    },
+    mutateAsync: async (value: QueueAction) => {
+      if (matching(value)) return false;
+      await action.mutateAsync(value);
+      return true;
     },
   };
 }

@@ -177,3 +177,84 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
+
+test("Retry Selected deduplicates owned jobs and retains partial failures for another attempt", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  for (const id of ["batch-a", "batch-b"])
+    state.jobs.push({
+      id,
+      sessionId: "batch-session",
+      status: "failed",
+      operation: "image",
+      input: { kind: "image", profileId: "image:test", prompt: id },
+      items: [],
+      outputs: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+  state.gallery.push(
+    ...["first", "second", "third"].map((name, index) => ({
+      ...results(1)[0],
+      id: name,
+      prompt: `Failed ${name}`,
+      jobId: index < 2 ? "batch-a" : "batch-b",
+      status: "error",
+      url: "",
+    })),
+    { ...results(1)[0], id: "ready", prompt: "Ready result" },
+  );
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const attempts: string[] = [];
+  let failSecond = true;
+  await page.route("**/api/queue/*/retry", async (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[3];
+    attempts.push(id);
+    if (id === "batch-a") await held;
+    if (id === "batch-b" && failSecond) {
+      await route.fulfill({ status: 503, json: { error: "Second worker remains offline" } });
+      return;
+    }
+    const job = {
+      ...state.jobs.find((job) => job.id === id),
+      id: `retried-${id}`,
+      status: "queued",
+    };
+    state.jobs.push(job);
+    await route.fulfill({ json: { job } });
+  });
+  try {
+    await page.goto("/images");
+    await page.getByRole("button", { name: "Select Items", exact: true }).click();
+    await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
+    const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
+    await expect(selection.getByRole("status")).toHaveText("4 Selected");
+    const retry = page.getByRole("button", { name: "Retry Selected", exact: true });
+    await retry.click();
+    await expect(retry).toBeDisabled();
+    await retry.dispatchEvent("click");
+    expect(attempts).toEqual(["batch-a"]);
+    release();
+    await expect(selection.getByRole("status")).toHaveText("2 Selected");
+    expect(attempts).toEqual(["batch-a", "batch-b"]);
+    await expect(
+      page.getByRole("checkbox", { name: "Select Failed third", exact: true }),
+    ).toBeChecked();
+    await expect(
+      page.getByRole("checkbox", { name: "Select Failed first", exact: true }),
+    ).not.toBeChecked();
+    failSecond = false;
+    await retry.click();
+    await expect(selection.getByRole("status")).toHaveText("1 Selected");
+    expect(attempts).toEqual(["batch-a", "batch-b", "batch-b"]);
+    await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+    await expect.poll(() => state.gallery.find((item) => item.id === "ready")?.favorite).toBe(true);
+    expect(state.gallery.filter((item) => item.favorite)).toHaveLength(1);
+  } finally {
+    release();
+  }
+});

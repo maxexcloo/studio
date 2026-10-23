@@ -105,6 +105,7 @@ primary component reference and verify APIs against the installed version.
   catalogue filters hide them; suggested strength ranges remain visible hints.
   Saved LoRA stacks reuse the account-owned library and preserve exact family
   keys, order, strengths and disabled entries; legacy profile groups remain explicit.
+  Trigger words use copy controls and source links use the published catalogue URL.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 
 ## Data & Feedback
@@ -123,6 +124,8 @@ primary component reference and verify APIs against the installed version.
   completed/cancelled work leaves the list, failed work retains Retry. Cancel
   All requests cancellation of owned active jobs; accepted work may remain
   active until the provider confirms cancellation or outputs are safely saved.
+- Retry actions share the owned queue command. Bulk retry deduplicates job IDs
+  and keeps unsuccessful items selected, preserving unrelated selections.
 - Gallery search expands into a full-width focused input; Escape closes it
   while preserving the query. Supported filters use icon-triggered Mantine
   popovers with scrollable controls. Normal, search, filters and selection
