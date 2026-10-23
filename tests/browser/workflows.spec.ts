@@ -1037,7 +1037,9 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   await viewerAction(page, "Recreate");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  const expert = page.getByRole("button", { name: "Expert Controls", exact: true });
+  await expert.press("Enter");
+  await expect(expert).toHaveAttribute("aria-expanded", "true");
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await enabled.check();
