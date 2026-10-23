@@ -1,0 +1,105 @@
+name: Worker
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/worker.yaml
+      - comfyui/**
+      - worker/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/worker.yaml
+      - comfyui/**
+      - worker/**
+    tags: [v*]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: worker-${{ github.ref }}
+
+env:
+  PUBLISH: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+
+jobs:
+  image:
+    name: Worker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check Bridge
+        env:
+          PYTHONPATH: comfyui
+        run: python3 -m unittest discover -s comfyui/radiance -p 'test_*.py'
+      - name: Check GPU Leases
+        run: python3 -m unittest discover -s worker -p 'test_*.py'
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          flavor: latest=false
+          images: ghcr.io/${{ github.repository }}-worker
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - name: Build Worker For Verification
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=worker
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=worker,ignore-error=true' || '' }}
+          context: .
+          file: worker/Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: studio-worker:test
+      - name: Smoke-Test Packaged Runtime
+        run: |
+          docker run --rm --entrypoint /bin/bash studio-worker:test -c '
+            command -v flock
+            test -x /opt/radiance/runtime/ld-linux-x86-64.so.2
+            test -x /opt/radiance/bin/radiance
+            python3 -m compileall -q /root/ComfyUI/custom_nodes/radiance /root/ComfyUI/custom_nodes/studio_worker
+            bash -n /opt/studio/entrypoint.sh
+            sh -n /opt/studio/gpu-lease.sh
+          '
+      - name: Scan Worker Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          exit-code: "1"
+          ignore-unfixed: true
+          image-ref: studio-worker:test
+          severity: CRITICAL,HIGH
+      - name: Log In to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v4
+        with:
+          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+      - name: Publish Verified Worker
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          cache-from: type=gha,scope=worker
+          context: .
+          file: worker/Dockerfile
+          labels: ${{ steps.metadata.outputs.labels }}
+          platforms: linux/amd64
+          provenance: mode=max
+          push: true
+          sbom: true
+          tags: ${{ steps.metadata.outputs.tags }}
