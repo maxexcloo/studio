@@ -64,6 +64,9 @@ primary component reference and verify APIs against the installed version.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer upward with a short
   transition and the standard accessible close action.
+- Keep expanded generation actions reachable while fields scroll. Desktop
+  panels bound the fields above their action row; the phone Drawer owns scrolling
+  with a sticky action row at the safe bottom. Avoid nested form scroll owners.
 - The Chat composer is one quiet inline row: compact reference picker,
   growing writing area, compact actual text model/provider selector and one
   Send/Stop action. Media settings belong

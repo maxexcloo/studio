@@ -403,3 +403,72 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   expect(state.jobs).toHaveLength(1);
   expect(state.chatRequests).toHaveLength(0);
 });
+
+test("Generation actions stay reachable while expert fields and references scroll", async ({
+  page,
+  isMobile,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "footer-reference",
+    jobId: "footer-source",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A reference for the pinned generation actions",
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await create(page);
+  await page
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("Keep the actions in reach");
+  const generate = page.getByRole("button", { name: "Generate Image", exact: true });
+  if (isMobile) {
+    await expect
+      .poll(async () => {
+        const button = await generate.boundingBox();
+        return button!.y + button!.height;
+      })
+      .toBeGreaterThan(page.viewportSize()!.height - 48);
+  }
+  await page.getByRole("button", { name: "Expert Controls", exact: true }).press("Enter");
+  const fields = page.getByLabel(
+    isMobile ? "Generation Controls Scroll Area" : "Generation Fields",
+    { exact: true },
+  );
+  await expect
+    .poll(() => fields.evaluate((node) => node.scrollHeight > node.clientHeight))
+    .toBe(true);
+  await expect(generate).toBeInViewport();
+  const initial = await generate.boundingBox();
+  if (isMobile)
+    expect(initial!.y + initial!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
+  await fields.evaluate((node) => node.scrollTo({ top: node.scrollHeight }));
+  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toBeInViewport();
+  await expect(generate).toBeInViewport();
+  expect(Math.abs((await generate.boundingBox())!.y - initial!.y)).toBeLessThan(1);
+  await page.setViewportSize({ ...page.viewportSize()!, height: 600 });
+  await expect(generate).toBeInViewport();
+  expect((await generate.boundingBox())!.y + initial!.height).toBeLessThanOrEqual(600);
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  const useReferences = page.getByRole("button", { name: "Use References", exact: true });
+  await page
+    .getByRole("button", {
+      name: "Use reference: A reference for the pinned generation actions",
+      exact: true,
+    })
+    .click();
+  await expect(useReferences).toBeInViewport();
+  if (isMobile) {
+    const footer = await useReferences.boundingBox();
+    expect(footer!.y + footer!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
+  }
+  await useReferences.click();
+  await generate.click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
+  expect(state.jobs[0].input.prompt).toBe("Keep the actions in reach");
+});

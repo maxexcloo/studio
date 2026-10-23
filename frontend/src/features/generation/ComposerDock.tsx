@@ -1,12 +1,21 @@
 import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState } from "react";
-import { Transition, Drawer, Paper, ScrollArea } from "@mantine/core";
+import { Transition, Drawer, Paper, ScrollArea, type ScrollAreaProps } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
 import { ChatComposer, ChatComposerStatus } from "../sessions/ChatComposer";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { failure } from "../../api";
+function GenerationScrollArea(props: ScrollAreaProps) {
+  return (
+    <ScrollArea
+      {...props}
+      viewportProps={{ "aria-label": "Generation Controls Scroll Area" }}
+      styles={{ content: { display: "flex", flexDirection: "column", minHeight: "100%" } }}
+    />
+  );
+}
 const composerLayers =
   '[role="dialog"], [data-composer-layer], .mantine-Combobox-dropdown, .mantine-Popover-dropdown';
 export function ComposerDock({ chat = false }: { chat?: boolean }) {
@@ -211,7 +220,6 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
                 style={{ ...styles, position: "absolute", bottom: 0, width: "100%" }}
               >
                 <div
-                  className="studio-expanded-composer"
                   id={controlsId}
                   role="region"
                   aria-label="Generation Controls"
@@ -231,7 +239,15 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
           onPaste={pasteReferences}
           onDragOver={dragReferences}
           onDrop={dropReferences}
-          scrollAreaComponent={ScrollArea.Autosize}
+          scrollAreaComponent={GenerationScrollArea}
+          styles={{
+            body: {
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              paddingBottom: "max(var(--mantine-spacing-md), env(safe-area-inset-bottom))",
+            },
+          }}
           opened={opened}
           onClose={collapse}
           title="Generation Controls"
@@ -242,7 +258,7 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
           returnFocus={false}
           onExitTransitionEnd={focusCompact}
         >
-          <div aria-hidden={!opened} inert={!opened}>
+          <div className="studio-generation-panel" aria-hidden={!opened} inert={!opened}>
             <GenerationForm
               onSubmitted={collapse}
               autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}

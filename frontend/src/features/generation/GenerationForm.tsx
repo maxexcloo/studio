@@ -9,6 +9,7 @@ import {
   Group,
   Image,
   Paper,
+  Box,
   Stack,
   Text,
   Textarea,
@@ -201,155 +202,160 @@ export function GenerationForm({
   if (models.isPending) return <LoadingState label="Loading Profiles" />;
   return (
     <form
+      className="studio-generation-form"
       onKeyDown={keyboardSubmit}
       onSubmit={(event) => {
         event.preventDefault();
         submit.mutate();
       }}
     >
-      <Stack gap="md">
-        {profile?.ready === false && (
-          <Alert color="yellow">
-            This model needs additional files or worker nodes before it can run.
-          </Alert>
-        )}
-        {!models.isPending && !profile && (
-          <Alert color="yellow">
-            {input.profileId && profiles.length
-              ? "The selected profile is unavailable. Choose another model explicitly."
-              : "No models are available. Check your worker and mounted configuration."}
-          </Alert>
-        )}
-        {models.error && <Alert color="red">{models.error.message}</Alert>}
-        <Textarea
-          data-expanded-prompt
-          variant="unstyled"
-          rightSection={
-            <PromptHistory
-              kind="positive"
-              value={input.prompt}
-              onPick={(prompt) => update({ prompt })}
-            />
-          }
-          rightSectionPointerEvents="all"
-          rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 8 } }}
-          data-autofocus={autoFocusPrompt || undefined}
-          label="Prompt"
-          placeholder={
-            input.kind === "image"
-              ? "Describe the image you want to create…"
-              : "Describe the motion and camera…"
-          }
-          autosize
-          minRows={3}
-          maxRows={10}
-          value={input.prompt}
-          onChange={(event) => update({ prompt: event.currentTarget.value })}
-          required
-        />
-        <GenerationInputControls
-          input={input}
-          profile={profile}
-          onChange={update}
-          references={
-            supportsReferences ? (
-              <ReferencePicker opened={referenceOpen} onOpenedChange={setReferenceOpen} />
-            ) : undefined
-          }
-        />
-        <PromptAssistant
-          scopeKey={JSON.stringify([
-            input.kind,
-            draft.sessionId,
-            draft.parentJobId,
-            draft.presetId,
-            draft.operation,
-          ])}
-          input={input}
-          profile={profile}
-          references={draft.references}
-          onChange={update}
-        />
-        {supportsReferences && (draft.references.length > 0 || requiredReference) ? (
-          <Stack gap="xs">
-            {!!draft.references.length && (
-              <ReferenceRoleControl
-                locked={Boolean(input.inpaint)}
-                value={input.referenceRole}
-                onChange={(referenceRole) => update({ referenceRole })}
+      <Box className="studio-generation-fields" aria-label="Generation Fields">
+        <Stack gap="md" pr={4}>
+          {profile?.ready === false && (
+            <Alert color="yellow">
+              This model needs additional files or worker nodes before it can run.
+            </Alert>
+          )}
+          {!models.isPending && !profile && (
+            <Alert color="yellow">
+              {input.profileId && profiles.length
+                ? "The selected profile is unavailable. Choose another model explicitly."
+                : "No models are available. Check your worker and mounted configuration."}
+            </Alert>
+          )}
+          {models.error && <Alert color="red">{models.error.message}</Alert>}
+          <Textarea
+            data-expanded-prompt
+            variant="unstyled"
+            rightSection={
+              <PromptHistory
+                kind="positive"
+                value={input.prompt}
+                onPick={(prompt) => update({ prompt })}
               />
-            )}
-            {draft.references.map((asset, index) => (
-              <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
-                <Group wrap="nowrap">
-                  <AspectRatio ratio={1} w={52}>
-                    <Image
-                      src={asset.thumbnailUrl}
-                      alt={referenceLabel(asset, index, profile)}
-                      fallbackSrc=""
-                    />
-                  </AspectRatio>
-                  <Text size="sm" lineClamp={1} flex={1}>
-                    {referenceLabel(asset, index, profile)}
-                  </Text>
-                  <Button
-                    variant="subtle"
-                    size="compact-xs"
-                    onClick={() =>
-                      setDraft((value) => {
-                        const references = value.references.filter(
-                          (a) => a.id !== asset.id || a.slot !== asset.slot,
-                        );
-                        return {
-                          ...value,
-                          references,
-                          input: {
-                            ...value.input,
-                            ...referencePatch(value.input, value.references, references, profile),
-                          },
-                        };
-                      })
-                    }
-                  >
-                    Remove
+            }
+            rightSectionPointerEvents="all"
+            rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 8 } }}
+            data-autofocus={autoFocusPrompt || undefined}
+            label="Prompt"
+            placeholder={
+              input.kind === "image"
+                ? "Describe the image you want to create…"
+                : "Describe the motion and camera…"
+            }
+            autosize
+            minRows={3}
+            maxRows={10}
+            value={input.prompt}
+            onChange={(event) => update({ prompt: event.currentTarget.value })}
+            required
+          />
+          <GenerationInputControls
+            input={input}
+            profile={profile}
+            onChange={update}
+            references={
+              supportsReferences ? (
+                <ReferencePicker opened={referenceOpen} onOpenedChange={setReferenceOpen} />
+              ) : undefined
+            }
+          />
+          <PromptAssistant
+            scopeKey={JSON.stringify([
+              input.kind,
+              draft.sessionId,
+              draft.parentJobId,
+              draft.presetId,
+              draft.operation,
+            ])}
+            input={input}
+            profile={profile}
+            references={draft.references}
+            onChange={update}
+          />
+          {supportsReferences && (draft.references.length > 0 || requiredReference) ? (
+            <Stack gap="xs">
+              {!!draft.references.length && (
+                <ReferenceRoleControl
+                  locked={Boolean(input.inpaint)}
+                  value={input.referenceRole}
+                  onChange={(referenceRole) => update({ referenceRole })}
+                />
+              )}
+              {draft.references.map((asset, index) => (
+                <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
+                  <Group wrap="nowrap">
+                    <AspectRatio ratio={1} w={52}>
+                      <Image
+                        src={asset.thumbnailUrl}
+                        alt={referenceLabel(asset, index, profile)}
+                        fallbackSrc=""
+                      />
+                    </AspectRatio>
+                    <Text size="sm" lineClamp={1} flex={1}>
+                      {referenceLabel(asset, index, profile)}
+                    </Text>
+                    <Button
+                      variant="subtle"
+                      size="compact-xs"
+                      onClick={() =>
+                        setDraft((value) => {
+                          const references = value.references.filter(
+                            (a) => a.id !== asset.id || a.slot !== asset.slot,
+                          );
+                          return {
+                            ...value,
+                            references,
+                            input: {
+                              ...value.input,
+                              ...referencePatch(value.input, value.references, references, profile),
+                            },
+                          };
+                        })
+                      }
+                    >
+                      Remove
+                    </Button>
+                  </Group>
+                </Paper>
+              ))}
+              {requiredReference && (
+                <Text size="xs" c="dimmed">
+                  This workflow requires a reference image.
+                </Text>
+              )}
+              {primary && profile?.capabilities?.inpaint && (
+                <Group>
+                  <Button variant="default" size="compact-sm" onClick={() => setMaskOpen(true)}>
+                    {input.inpaint ? "Edit Mask" : "Paint Mask"}
                   </Button>
+                  {!!input.inpaint && (
+                    <Button
+                      variant="subtle"
+                      size="compact-sm"
+                      onClick={() => update({ inpaint: null })}
+                    >
+                      Remove Mask
+                    </Button>
+                  )}
                 </Group>
-              </Paper>
-            ))}
-            {requiredReference && (
-              <Text size="xs" c="dimmed">
-                This workflow requires a reference image.
-              </Text>
-            )}
-            {primary && profile?.capabilities?.inpaint && (
-              <Group>
-                <Button variant="default" size="compact-sm" onClick={() => setMaskOpen(true)}>
-                  {input.inpaint ? "Edit Mask" : "Paint Mask"}
-                </Button>
-                {!!input.inpaint && (
-                  <Button
-                    variant="subtle"
-                    size="compact-sm"
-                    onClick={() => update({ inpaint: null })}
-                  >
-                    Remove Mask
-                  </Button>
-                )}
-              </Group>
-            )}
-          </Stack>
-        ) : null}
-        <GenerationSettingsFields
-          input={input}
-          profile={profile}
-          onChange={update}
-          presets={<PresetEditor />}
-        />
-        {!!submit.error && (
-          <Alert color="red">
-            {submit.error instanceof Error ? submit.error.message : String(submit.error)}
-          </Alert>
-        )}
+              )}
+            </Stack>
+          ) : null}
+          <GenerationSettingsFields
+            input={input}
+            profile={profile}
+            onChange={update}
+            presets={<PresetEditor />}
+          />
+          {!!submit.error && (
+            <Alert color="red">
+              {submit.error instanceof Error ? submit.error.message : String(submit.error)}
+            </Alert>
+          )}
+        </Stack>
+      </Box>
+      <Box className="studio-generation-footer">
         <GenerationFooter
           kind={input.kind}
           onKindChange={(kind) => {
@@ -394,30 +400,30 @@ export function GenerationForm({
                 : "Generate Image"}
           </Button>
         </GenerationFooter>
-        {maskOpen && primary && (
-          <Suspense fallback={null}>
-            <MaskEditor
-              key={primary.id}
-              asset={primary}
-              initialMask={
-                !inpaint?.assetId || inpaint.assetId === primary.id ? inpaint?.mask : undefined
-              }
-              close={() => setMaskOpen(false)}
-              save={(mask) =>
-                update({
-                  inpaint: {
-                    ...inpaint,
-                    mask,
-                    assetId: primary.id,
-                    strength: inpaint?.strength ?? 1,
-                    feather: inpaint?.feather ?? 0.4,
-                  },
-                })
-              }
-            />
-          </Suspense>
-        )}
-      </Stack>
+      </Box>
+      {maskOpen && primary && (
+        <Suspense fallback={null}>
+          <MaskEditor
+            key={primary.id}
+            asset={primary}
+            initialMask={
+              !inpaint?.assetId || inpaint.assetId === primary.id ? inpaint?.mask : undefined
+            }
+            close={() => setMaskOpen(false)}
+            save={(mask) =>
+              update({
+                inpaint: {
+                  ...inpaint,
+                  mask,
+                  assetId: primary.id,
+                  strength: inpaint?.strength ?? 1,
+                  feather: inpaint?.feather ?? 0.4,
+                },
+              })
+            }
+          />
+        </Suspense>
+      )}
     </form>
   );
 }
