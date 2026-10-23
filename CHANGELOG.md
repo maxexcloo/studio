@@ -23,6 +23,18 @@ version opens with a `> ` summary line.
 - Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
 - Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
 
+## [0.48.2] - 2026-10-23
+
+> Saved results stay complete while worker cleanup finishes
+
+### Fixed
+
+- **Generation status:** late worker progress, preview and cancellation messages can no longer change completed results back to Saving or an error while worker cleanup is still running.
+
+### Changed
+
+- **Browser checks:** use the official Playwright image matching the installed test version, avoiding stalled system-package downloads before tests start.
+
 ## [0.48.1] - 2026-10-22
 
 > The CLIProxyAPI and Radiance ComfyUI nodes ship with Studio
@@ -1995,7 +2007,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.1...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.2...HEAD
+[0.48.2]: https://github.com/maxexcloo/studio/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/maxexcloo/studio/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/maxexcloo/studio/compare/v0.46.0...v0.47.0
