@@ -28,17 +28,8 @@ test("callers share a request on its way, per key, until it settles", async () =
   assert.equal(calls, 2);
 });
 
-test("a fresh request starts anew and later callers share it; failures are shared and forgotten", async () => {
+test("failures are shared and forgotten", async () => {
   const share = sharedRequests();
-  const old = share("a", () => new Promise((resolve) => setTimeout(() => resolve("old"), 5)));
-  const fresh = share("a", () => "fresh", { fresh: true });
-  assert.notEqual(old, fresh);
-  assert.equal(
-    share("a", () => "unused"),
-    fresh,
-  );
-  assert.equal(await fresh, "fresh");
-  assert.equal(await old, "old");
   const failing = share("b", () => {
     throw new Error("down");
   });

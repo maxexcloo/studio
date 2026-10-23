@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { fork } from "node:child_process";
+import { once } from "node:events";
+import { createServer, request as forward } from "node:http";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -53,7 +55,12 @@ fs.writeFileSync(
 let server;
 let base;
 
-async function start(useVideo = true, enableGrok = true, restrictModels = false) {
+async function start(
+  useVideo = true,
+  enableGrok = true,
+  restrictModels = false,
+  runtimeDir = dataDir,
+) {
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
     env: {
@@ -65,7 +72,7 @@ async function start(useVideo = true, enableGrok = true, restrictModels = false)
       STUDIO_ENABLE_GROK: enableGrok ? "1" : "0",
       STUDIO_ENABLE_TESSERA: restrictModels ? "0" : "1",
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
-      STUDIO_DATA_DIR: dataDir,
+      STUDIO_DATA_DIR: runtimeDir,
       COMFY_OUTPUT_DIR: "",
       STUDIO_LAN: "0",
       npm_lifecycle_event: "",
@@ -88,10 +95,10 @@ async function stop() {
   server.kill("SIGTERM");
   await exited;
 }
-async function api(route, body) {
+async function api(route, body, method = body === undefined ? "GET" : "POST") {
   const response = await fetch(base + route, {
-    method: body === undefined ? "GET" : "POST",
-    headers: { "content-type": "application/json" },
+    method,
+    headers: { "content-type": "application/json", "X-Studio": "1" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, body: await response.json() };
@@ -225,7 +232,7 @@ test("a model type choice shows in the cached catalogue straight away", async ()
   const put = (type) =>
     fetch(base + "/api/models/types", {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "X-Studio": "1" },
       body: JSON.stringify({ source: "checkpoint", name: "sd_xl_base_1.0.safetensors", type }),
     });
   try {
@@ -449,5 +456,165 @@ test(
     assert.equal(video.requests.filter((request) => request.pathname === "/prompt").length, before);
     await api(`/api/jobs/${first.body.jobId}/cancel`, {});
     video.drop(queued.id);
+  },
+);
+
+test("cached catalogue reads reflect profile creation, editing, approval and deletion without worker rescans", async () => {
+  await api("/api/models");
+  const before = primary.requests.filter((item) => item.pathname === "/object_info").length;
+  const workflow = {
+    heissUi: {
+      id: "cache-readback",
+      name: "Cached First",
+      kind: "image",
+      family: "tessera",
+      controls: { prompt: { node: "2", input: "text" } },
+    },
+    graph: {
+      1: {
+        class_type: "UNETLoader",
+        inputs: { unet_name: "tessera-v0.3.1-turbo-opd-W8A8.safetensors" },
+      },
+      2: { class_type: "CLIPTextEncode", inputs: { text: "" } },
+    },
+  };
+  const created = await api("/api/workflows/import", { workflow });
+  assert.equal(created.status, 200);
+  const selected = async () =>
+    (await api("/api/models?cached=1")).body.profiles.find(
+      (item) => item.id === "custom:cache-readback",
+    );
+  assert.equal((await selected()).label, "Cached First");
+  const current = (await api("/api/profiles/editable/cache-readback")).body;
+  const raw = JSON.parse(current.text);
+  raw.heissUi.name = "Cached Edited";
+  assert.equal(
+    (
+      await api(
+        "/api/profiles/editable/cache-readback",
+        { text: JSON.stringify(raw), baseHash: current.hash },
+        "PUT",
+      )
+    ).status,
+    200,
+  );
+  assert.equal((await selected()).label, "Cached Edited");
+  const approved = await api("/api/profiles/editable/cache-readback/approve", {});
+  assert.equal(approved.status, 200);
+  assert.equal(approved.body.meta.aiDrafted, false);
+  assert.equal((await selected()).label, "Cached Edited");
+  assert.equal((await api("/api/workflows/cache-readback", undefined, "DELETE")).status, 200);
+  assert.equal(await selected(), undefined);
+  assert.equal(primary.requests.filter((item) => item.pathname === "/object_info").length, before);
+});
+
+test(
+  "hung worker schema and metadata reads abort while retained profiles and pinned queued work remain available",
+  { timeout: 40_000 },
+  async () => {
+    const actual = video.url;
+    const isolatedData = fs.mkdtempSync(path.join(os.tmpdir(), "studio-held-catalogue-"));
+    let holdSchema = false,
+      holdMetadata = false,
+      schemaRequests = 0,
+      schemaAborted = 0,
+      metadataRequests = 0;
+    const closed = [];
+    const proxy = createServer((request, response) => {
+      const url = new URL(request.url, actual);
+      const held =
+        (holdSchema && url.pathname === "/object_info") ||
+        (holdMetadata && url.pathname.startsWith("/view_metadata/"));
+      if (held) {
+        if (url.pathname === "/object_info") schemaRequests++;
+        else metadataRequests++;
+        response.on("close", () => {
+          if (url.pathname === "/object_info") schemaAborted++;
+          for (const wake of closed.splice(0)) wake();
+        });
+        return;
+      }
+      const upstream = forward(
+        url,
+        { method: request.method, headers: request.headers },
+        (source) => {
+          response.writeHead(source.statusCode, source.headers);
+          source.pipe(response);
+        },
+      );
+      upstream.on("error", () => response.destroy());
+      response.on("close", () => upstream.destroy());
+      request.pipe(upstream);
+    });
+    proxy.listen(0, "127.0.0.1");
+    await once(proxy, "listening");
+    await stop();
+    video.url = `http://127.0.0.1:${proxy.address().port}`;
+    let jobId;
+    try {
+      await start(true, false, false, isolatedData);
+      const original = (await api("/api/models")).body;
+      const h3 = original.profiles.find((item) => item.family === "minimax_h3");
+      assert.ok(h3);
+      holdSchema = true;
+      const catalogues = await Promise.all([
+        api("/api/models"),
+        api("/api/models"),
+        api("/api/models"),
+      ]);
+      assert.equal(schemaRequests, 1, "concurrent explicit refreshes share one worker request");
+      if (!schemaAborted) await new Promise((resolve) => closed.push(resolve));
+      assert.equal(schemaAborted, 1, "the worker connection is aborted, not left behind");
+      for (const { body } of catalogues) {
+        assert.ok(body.profiles.some((item) => item.kind === "image"));
+        const retained = body.profiles.find((item) => item.id === h3.id);
+        assert.equal(retained.availability, "offline");
+        assert.equal(retained.ready, undefined);
+        assert.equal(body.workers.find((item) => item.id === "primary").available, true);
+        assert.equal(body.workers.find((item) => item.id === "video").available, false);
+      }
+      const submitted = primary.prompts.length;
+      const accepted = await api("/api/generate", {
+        ...generation(h3),
+        backendId: "video",
+        allowFallback: false,
+      });
+      assert.equal(accepted.status, 200);
+      jobId = accepted.body.jobId;
+      let waiting;
+      for (let attempt = 0; attempt < 250; attempt++) {
+        waiting = (await api("/api/queue")).body.jobs.find((job) => job.id === jobId);
+        if (waiting.status === "waiting") break;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      assert.equal(waiting.status, "waiting");
+      assert.equal(schemaRequests, 1, "admission and eligibility reuse the failed read");
+      assert.equal(waiting.backend, "video");
+      assert.equal(waiting.input.profileId, h3.id);
+      assert.equal(primary.prompts.length, submitted);
+      await api(`/api/jobs/${jobId}/cancel`, {});
+      jobId = undefined;
+      holdSchema = false;
+      await api("/api/models");
+      videoInfo.UNETLoader.input.required.unet_name[0].push("new-metadata-fixture.safetensors");
+      holdMetadata = true;
+      const refreshed = await Promise.all([api("/api/models"), api("/api/models")]);
+      assert.equal(metadataRequests, 1, "metadata priming shares the context deadline and refresh");
+      for (const { body } of refreshed) assert.ok(body.profiles.some((item) => item.id === h3.id));
+    } finally {
+      if (jobId) await api(`/api/jobs/${jobId}/cancel`, {});
+      await stop();
+      holdSchema = false;
+      holdMetadata = false;
+      videoInfo.UNETLoader.input.required.unet_name[0] =
+        videoInfo.UNETLoader.input.required.unet_name[0].filter(
+          (name) => name !== "new-metadata-fixture.safetensors",
+        );
+      video.url = actual;
+      proxy.closeAllConnections();
+      await new Promise((resolve) => proxy.close(resolve));
+      fs.rmSync(isolatedData, { recursive: true, force: true });
+      await start();
+    }
   },
 );

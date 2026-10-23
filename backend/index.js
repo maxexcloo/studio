@@ -459,12 +459,10 @@ const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyCon
 // The default worker is always asked: its absence is what the studio's offline screen shows.
 const workerUnreachableForMs = 30_000;
 const workerUnreachableUntil = new Map();
-// Model detection for each worker's latest ComfyUI answer, reused until ComfyUI is asked again.
-const inferredModels = new Map();
 /** Forgets what Studio knew about a worker whose address or capabilities changed, or that was removed. */
 function forgetWorker(id) {
   contextCaches.delete(id);
-  inferredModels.delete(id);
+  contextFailures.delete(id);
   workerUnreachableUntil.delete(id);
   backendAnswers.delete(id);
   forgetWorkerState(id);
@@ -474,36 +472,55 @@ const backendUnreachable = (error) =>
 
 // One fetch of a worker's context at a time: callers that arrive meanwhile share it.
 const shareContextRequest = sharedRequests();
+const catalogueReadTimeoutMs = 5000;
+// Each worker's latest failed context read, reused briefly so admission, routing and
+// eligibility do not each wait out the deadline of a hung worker in turn.
+const contextFailures = new Map();
 
 /**
  * A worker's node list, stats and model folders, cached for 30 seconds. A
  * request already on its way is shared, so a burst of callers (a page load's
  * models, workflows and upscale status) asks ComfyUI once. `force` always
- * asks again, since something changed after any request already sent.
+ * skips the cache and a recent failure; callers still share a request already in flight.
  */
 function loadComfyContext({ force = false } = {}) {
   const backend = currentComfyBackend();
   const cached = contextFor(backend);
   const fresh = !force && cached.info && Date.now() - cached.fetchedAt < 30000;
   if (fresh) return Promise.resolve(cached);
-  return shareContextRequest(backend, () => fetchComfyContext(backend), { fresh: force });
+  const failure = contextFailures.get(backend);
+  if (!force && failure && Date.now() - failure.at < catalogueReadTimeoutMs)
+    return Promise.reject(failure.error);
+  return shareContextRequest(backend, () => fetchComfyContext(backend));
 }
 
 async function fetchComfyContext(backend) {
+  const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
   const [info, stats, folderPaths] = await Promise.all([
-    comfy("/object_info"),
-    comfy("/system_stats").catch(() => ({})),
+    comfy("/object_info", { signal }),
+    comfy("/system_stats", { signal }).catch(() => ({})),
     // Where ComfyUI keeps models, extra_model_paths.yaml included, so headers can be read there too.
-    comfy("/internal/folder_paths").catch(() => ({})),
-  ]);
+    comfy("/internal/folder_paths", { signal }).catch(() => ({})),
+  ]).catch((error) => {
+    contextFailures.set(backend, { error, at: Date.now() });
+    throw error;
+  });
+  contextFailures.delete(backend);
   setComfyFolderPaths(folderPaths);
   // Model-type detection is synchronous; fetch what it needs from a remote ComfyUI first.
-  await primeModelMetadata({
-    unet: optionsFor(info, "UNETLoader", "unet_name"),
-    checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
-  }).catch(() => null);
+  await primeModelMetadata(
+    {
+      unet: optionsFor(info, "UNETLoader", "unet_name"),
+      checkpoint: optionsFor(info, "CheckpointLoaderSimple", "ckpt_name"),
+    },
+    { signal },
+  ).catch(() => null);
   const result = { info, stats, fetchedAt: Date.now() };
-  if (workerById(backend)) contextCaches.set(backend, result);
+  const worker = workerById(backend);
+  if (worker) {
+    contextCaches.set(backend, result);
+    rewriteStore.saveWorkerModels(backend, worker.url, { info, stats });
+  }
   return result;
 }
 
@@ -1200,14 +1217,7 @@ async function backendModels(backend, force = false) {
   return withComfyBackend(backend, async () => {
     try {
       const context = await loadComfyContext({ force });
-      const known = inferredModels.get(backend);
-      if (known?.fetchedAt === context.fetchedAt) return { ...context, models: known.models };
       const models = inferModels(context.info, context.stats);
-      inferredModels.set(backend, { fetchedAt: context.fetchedAt, models });
-      rewriteStore.saveWorkerModels(backend, workerById(backend).url, {
-        info: context.info,
-        stats: context.stats,
-      });
       // What this worker has, so a job for one of its profiles goes to it (routeJob).
       noteWorkerProfiles(backend, models.profiles || []);
       return { ...context, models };
@@ -1409,7 +1419,6 @@ app.put("/api/models/types", async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
     setModelChoice(req.body?.source, req.body?.name, req.body?.type);
-    inferredModels.clear();
     const { info, stats } = await loadComfyContext();
     res.json(inferModels(info, stats));
   } catch (error) {
@@ -1659,13 +1668,8 @@ const profileObjectInfo = async (kind) =>
       () => loadComfyContext(),
     )
   ).info;
-// A saved, drafted, reverted or approved profile is seen on the next models read.
-const profilesChanged = () => {
-  inferredModels.clear();
-};
 registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
-  onSaved: profilesChanged,
   accountName: (req) => req.studioAccount?.userId || "",
 });
 // Settings › Profiles: versions, revert, approve, guides and the export bundle (profile-routes.js).
@@ -1673,7 +1677,6 @@ registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),
   objectInfo: profileObjectInfo,
-  onSaved: profilesChanged,
   accountName: (req) => req.studioAccount?.userId || "",
   exportOptions: () => ({
     dataDir,
@@ -1719,7 +1722,6 @@ async function draftCheckpointProfile(record, options) {
         note: `Drafted from import ${record.id}`,
       }),
     guides: guideStore(),
-    onSaved: profilesChanged,
   });
 }
 
