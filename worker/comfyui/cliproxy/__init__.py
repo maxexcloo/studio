@@ -29,6 +29,7 @@ RESOLUTIONS = {
 }
 _model_cache = None
 _model_lock = threading.Lock()
+_schema_refresh = None
 
 
 def available_models():
@@ -61,6 +62,44 @@ def available_models():
         }
         _model_cache = (identity, time.monotonic() + 60, models)
         return models
+
+
+def schema_models():
+    """Never wait for provider discovery on ComfyUI's HTTP event loop."""
+    global _schema_refresh
+    proxy = Proxy()
+    identity = (proxy.base, proxy.key)
+    cached = _model_cache
+    models = (
+        cached[2]
+        if cached is not None and cached[0] == identity
+        else {kind: () for kind in MODEL_PREFIXES}
+    )
+    if not _model_lock.acquire(blocking=False):
+        return models
+    try:
+        now = time.monotonic()
+        if cached is not None and cached[0] == identity and now < cached[1]:
+            return models
+        if (
+            _schema_refresh is not None
+            and _schema_refresh[0] == identity
+            and now < _schema_refresh[1]
+        ):
+            return models
+        # Failed discovery also backs off, rather than blocking every /object_info.
+        _schema_refresh = (identity, now + 60)
+
+        def refresh():
+            try:
+                available_models()
+            except (OSError, RuntimeError, TypeError, ValueError):
+                pass
+
+        threading.Thread(target=refresh, daemon=True, name="cliproxy-models").start()
+        return models
+    finally:
+        _model_lock.release()
 
 
 def media_model(kind, model=""):
@@ -347,7 +386,7 @@ class GrokMedia:
             if Path(name).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
         )
         try:
-            models = available_models()
+            models = schema_models()
         except (OSError, RuntimeError, TypeError, ValueError):
             # Provider outages must not prevent ComfyUI from listing other nodes.
             models = {kind: () for kind in MODEL_PREFIXES}
