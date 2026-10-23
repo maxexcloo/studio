@@ -6,16 +6,17 @@ _.path = ["node_modules/.bin"]
 run = "npm run build"
 
 [tasks.check]
+depends = ["check:app", "check:python", "test:python"]
+
+[tasks."check:app"]
 depends = [
   "check:actions",
   "check:mise",
   "check:oxfmt",
-  "check:python",
   "check:typescript",
   "check:updates",
   "check:whitespace",
   "test",
-  "test:python",
 ]
 
 [tasks.dev]
