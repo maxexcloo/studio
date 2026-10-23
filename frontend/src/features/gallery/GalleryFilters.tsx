@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Alert, Badge, Button, Group, Tooltip } from "@mantine/core";
+import { useHotkeys } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -72,12 +73,31 @@ export function GalleryFilterToolbar({
   const selectedCount =
     Number(props.starred) +
     Object.values(props.value).reduce((count, values) => count + values.length, 0);
+  const toolbar = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
   const filtersButton = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (searchOpen) searchInput.current?.focus();
   }, [searchOpen]);
+  function openSearch(event: KeyboardEvent) {
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || !toolbar.current)
+      return;
+    const selector =
+      '[role="dialog"], [role="alertdialog"], .mantine-Popover-dropdown, .mantine-Combobox-dropdown';
+    const owner = toolbar.current.closest(selector);
+    const layers = [...document.querySelectorAll<HTMLElement>(selector)].filter(
+      (layer) => layer.getClientRects().length && !layer.closest("[inert]"),
+    );
+    if (owner ? !owner.contains(event.target as Node) : layers.length) return;
+    event.preventDefault();
+    if (searchOpen) searchInput.current?.focus();
+    else setMode("search");
+  }
+  useHotkeys([
+    ["/", openSearch, { preventDefault: false }],
+    ["mod+f", openSearch, { preventDefault: false }],
+  ]);
   function dismiss() {
     setMode("normal");
     const trigger = mode === "filters" ? filtersButton : searchButton;
@@ -85,7 +105,7 @@ export function GalleryFilterToolbar({
   }
   if (mode === "search")
     return (
-      <Group mih={44} w="100%">
+      <Group ref={toolbar} mih={44} w="100%">
         <SearchInput
           ref={searchInput}
           aria-label="Search Gallery"
@@ -107,7 +127,7 @@ export function GalleryFilterToolbar({
     );
   if (mode === "filters")
     return (
-      <Group gap={4} mih={44} wrap="nowrap">
+      <Group ref={toolbar} gap={4} mih={44} wrap="nowrap">
         <Tooltip label="Close Filters">
           <ActionIcon
             aria-label="Close Filters"
@@ -123,7 +143,7 @@ export function GalleryFilterToolbar({
       </Group>
     );
   return (
-    <Group gap="xs" mih={44} wrap="nowrap">
+    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap">
       <Tooltip label="Search Gallery">
         <ActionIcon
           ref={searchButton}

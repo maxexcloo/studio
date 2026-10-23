@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { useMediaQuery } from "@mantine/hooks";
+import { useLongPress, useMediaQuery } from "@mantine/hooks";
 import { Badge, Box, Checkbox, Group, Text, UnstyledButton } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { galleryReferenceType } from "../generation/references";
@@ -30,6 +30,25 @@ export function MediaGrid({
     [width, setWidth] = useState(0);
   const pendingFocus = useRef<string | null>(null);
   const [contextItemId, setContextItemId] = useState<string | null>(null);
+  const heldItem = useRef<string | null>(null);
+  const longPress = useLongPress(
+    (event) => {
+      if (!phone || !selection) return;
+      const id = (event.target as Element).closest<HTMLElement>("[data-media-id]")?.dataset.mediaId;
+      const item = items.find((item) => item.id === id);
+      if (!item || !["done", "error"].includes(item.status)) return;
+      heldItem.current = item.id;
+      setContextItemId(null);
+      selection.toggle(item);
+    },
+    {
+      events: ["touch"],
+      cancelOnMove: true,
+      onStart: () => {
+        heldItem.current = null;
+      },
+    },
+  );
   useLayoutEffect(() => {
     if (!pendingFocus.current) return;
     const button = host.current?.querySelector<HTMLButtonElement>(
@@ -79,7 +98,7 @@ export function MediaGrid({
     }
   }, [focusItem, width, virtual]);
   return (
-    <div ref={host} style={{ height: virtual.getTotalSize(), position: "relative" }}>
+    <div ref={host} {...longPress} style={{ height: virtual.getTotalSize(), position: "relative" }}>
       {virtual.getVirtualItems().map((placement) => {
         const item = items[placement.index],
           media = mediaSource(item),
@@ -89,6 +108,10 @@ export function MediaGrid({
             key={item.id}
             className="studio-media-tile"
             onContextMenu={(event) => {
+              if (heldItem.current === item.id) {
+                event.preventDefault();
+                return;
+              }
               if (!renderActions || selection?.selecting) return;
               event.preventDefault();
               setContextItemId(item.id);
@@ -146,6 +169,11 @@ export function MediaGrid({
                 );
               }}
               onClick={(event) => {
+                if (heldItem.current === item.id) {
+                  heldItem.current = null;
+                  event.preventDefault();
+                  return;
+                }
                 if (selection?.click(item, event)) return;
                 event.currentTarget.focus({ preventScroll: true });
                 open(item);

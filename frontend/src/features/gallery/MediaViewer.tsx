@@ -8,6 +8,7 @@ import { MediaDetails } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
+import { useMediaFavorite } from "./useMediaFavorite";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );
@@ -33,6 +34,7 @@ export function MediaViewer({
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
+  const favorite = useMediaFavorite(displayed);
   const viewable = items.filter((candidate) => candidate.url);
   const currentIndex = viewable.findIndex((candidate) => candidate.id === item.id);
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
@@ -90,18 +92,25 @@ export function MediaViewer({
         classNames={{ content: classes.content, body: classes.body, header: classes.header }}
         onKeyDown={(event) => {
           if (
-            !canNavigate ||
+            deleting ||
             event.defaultPrevented ||
+            event.nativeEvent.isComposing ||
             event.altKey ||
             event.ctrlKey ||
             event.metaKey ||
             event.shiftKey ||
             (event.target as Element).closest(
-              'input,textarea,select,video,[contenteditable="true"],[role="slider"]',
+              'input,textarea,select,video,[contenteditable="true"],[role="slider"],[role="menu"],[role="listbox"]',
             )
           )
             return;
-          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
+            event.preventDefault();
+            if (!favorite.isPending && !event.repeat) favorite.mutate();
+          } else if (event.key === "Delete") {
+            event.preventDefault();
+            setDeleting(true);
+          } else if (canNavigate && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
             event.preventDefault();
             move(event.key === "ArrowLeft" ? -1 : 1);
           }

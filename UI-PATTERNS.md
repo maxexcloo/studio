@@ -163,6 +163,11 @@ primary component reference and verify APIs against the installed version.
 - Use semantic buttons/links and accessible names for icons. Preserve drafts
   and keyboard focus through expansion. Honour the phone keyboard and safe
   areas. Failed images must not expose broken-image icons.
+- The shared gallery toolbar opens search with `/` or Ctrl/Cmd+F only in its
+  active surface, without capturing typing, composition or another overlay.
+  Viewer F toggles Star and Delete opens the standard confirmation, including
+  single-item viewers. Phone hold-to-select uses Mantine's touch gesture with
+  movement cancellation; its release must not also open the viewer.
 - Prefer transform/opacity for interaction motion, no decorative hover movement
   or layout animation in hot paths. Respect reduced motion in CSS and Mantine
   transitions. Persist Off/Fast/Standard/Relaxed through one motion token; reduced
