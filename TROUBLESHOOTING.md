@@ -8,7 +8,7 @@ Check the interface status and Queue for the affected job's state and reason. Wh
 
 Check the configured addresses in **Settings › Workers**, then inspect that worker's container logs and network access. Worker addresses must be reachable from the Studio server. A waiting job keeps its selected backend; it does not silently switch providers.
 
-Deployment configuration owns worker placements, profiles and model paths. See [Configuration](CONFIGURATION.md) and [Worker Operations](worker/README.md). Lifecycle switching remains disabled until the required ownership and text-admission cutover is complete.
+Deployment configuration owns worker placements and model paths; Studio owns editable runtime profiles. See [Configuration](CONFIGURATION.md) and [Worker Operations](worker/README.md). Lifecycle switching remains disabled until the required ownership and text-admission cutover is complete.
 
 ### Studio Does Not Start
 
@@ -16,7 +16,7 @@ Read the startup error for the missing setting, occupied port or invalid mounted
 
 ### Profiles or Models Are Missing
 
-Check that `STUDIO_CONFIG_DIR` mounts the intended `ai` configuration and that its profile and catalogue files parse correctly. Check worker model mounts separately. Profiles group by family, model and preset; model files and required custom nodes must exist on the selected worker. Studio does not edit mounted definitions.
+Check the live profile and catalogue definitions in Library, and confirm that `STUDIO_CONFIG_DIR` mounts the intended ai seed and workload configuration. Existing runtime edits take precedence over seeds. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
 
 ### Chat Is Unavailable
 
@@ -76,7 +76,7 @@ Check that the workflow ends in an output node such as Save Image. If the provid
 
 ### Needs a separate part
 
-The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in `ai`.
+The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in **Library › Profiles**.
 
 ### Generation failed
 

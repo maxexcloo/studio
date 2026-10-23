@@ -58,6 +58,6 @@ not settings exposed to app users. Runtime status is administrator-only at
 
 CPU checks: `node --test backend/runtime/*.test.ts` and
 `python3 -m unittest discover -s worker -p 'test_*.py'`. Lease tests require Linux
-`flock`; no GPU is needed. The worker workflow performs packaging smoke checks
-and image scanning before publication. A GPU startup and actual inference remain
+`flock`; no GPU is needed. The worker workflow performs bridge, lease and packaging
+smoke checks before publication. A GPU startup and actual inference remain
 separate deployment verification.
