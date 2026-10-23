@@ -13,7 +13,7 @@ mise run setup
 mise run dev
 ```
 
-Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data stays in `data/development`, separate from existing runtime data. When the sibling `ai` checkout exists, development reads its definitions and worker addresses. Automatic worker lifecycle control is disabled.
+Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. When the sibling `ai` checkout exists, development reads its definitions and worker addresses. Automatic worker lifecycle control is disabled.
 
 `npm run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference. `npm run dev -- --lan` exposes the preview to the local network.
 
