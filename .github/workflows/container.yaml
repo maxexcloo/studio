@@ -185,5 +185,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node scripts/changelog.mjs notes "$GITHUB_REF_NAME" > /tmp/release-notes.md
+          node .github/changelog.mjs notes "$GITHUB_REF_NAME" > /tmp/release-notes.md
           gh release create "$GITHUB_REF_NAME" --notes-file /tmp/release-notes.md --repo "$GITHUB_REPOSITORY" --title "Studio $GITHUB_REF_NAME" --verify-tag

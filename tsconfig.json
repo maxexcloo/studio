@@ -18,12 +18,12 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "server/persistence",
-    "server/providers",
-    "server/rewrite",
-    "server/runtime",
+    "backend/domain",
+    "backend/persistence",
+    "backend/providers",
+    "backend/runtime",
+    "frontend/src",
     "shared",
-    "src",
     "tests/browser"
   ]
 }

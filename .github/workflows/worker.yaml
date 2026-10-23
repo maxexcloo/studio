@@ -6,7 +6,6 @@ on:
       - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
-      - comfyui/**
       - worker/**
   push:
     branches: [main]
@@ -14,7 +13,6 @@ on:
       - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
-      - comfyui/**
       - worker/**
   workflow_call:
   workflow_dispatch:

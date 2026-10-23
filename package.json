@@ -13,14 +13,14 @@
   },
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "node scripts/dev.mjs",
-    "dev:demo": "node scripts/dev.mjs --demo",
-    "dev:lan": "node scripts/dev.mjs --lan",
-    "preview": "vite preview --host 127.0.0.1 --port 5173",
-    "release": "node scripts/release.mjs",
-    "start": "node server/index.js",
-    "test": "node --test server/*.test.js server/rewrite/*.test.ts server/runtime/*.test.ts server/persistence/*.test.ts server/providers/*.test.ts scripts/*.test.js",
+    "build": "vite build --config frontend/vite.config.ts",
+    "dev": "node dev.mjs",
+    "dev:demo": "node dev.mjs --demo",
+    "dev:lan": "node dev.mjs --lan",
+    "preview": "vite preview --config frontend/vite.config.ts --host 127.0.0.1 --port 5173",
+    "release": "node .github/release.mjs",
+    "start": "node backend/index.js",
+    "test": "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts .github/*.test.js",
     "test:browser": "playwright test"
   },
   "dependencies": {
@@ -33,6 +33,9 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@dnd-kit/dom": "^0.5.1",
+    "@dnd-kit/helpers": "^0.5.1",
+    "@dnd-kit/react": "^0.5.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@mantine/core": "latest",
     "@mantine/form": "latest",
@@ -51,6 +54,7 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "react-router": "latest",
+    "react-zoom-pan-pinch": "^4.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.0"
   },

@@ -1,478 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-const stamp = "2026-10-23T00:00:00.000Z";
-const image =
-  "data:image/svg+xml," +
-  encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#303036"/><circle cx="512" cy="512" r="190" fill="#ffb31a"/></svg>',
-  );
-import type { Profile } from "../../src/types";
-const profiles: Profile[] = [
-  {
-    familyName: "Studio Images",
-    baseModel: "image.safetensors",
-    recipe: { modelLabel: "Studio Image", label: "Quality" },
-    workerIds: ["worker-a", "worker-b"],
-    id: "image:test",
-    label: "Image Quality",
-    kind: "image",
-    model: "image.safetensors",
-    workflow: "family:test",
-    family: "test",
-    ready: true,
-    defaults: { width: 1024, height: 1024, steps: 20, cfg: 5 },
-    capabilities: { negativePrompt: true, cfg: true, lora: true, inpaint: true },
-    mediaInputs: [{ id: "image", role: "start" }],
-    options: { loras: ["detail.safetensors", "soft-style.safetensors"] },
-  },
-  {
-    id: "video:test",
-    label: "Motion Quality",
-    kind: "video",
-    model: "video.safetensors",
-    workflow: "family:motion",
-    family: "motion",
-    ready: true,
-    defaults: { width: 1024, height: 1024, frames: 81, fps: 24 },
-    capabilities: { imageInput: true },
-    mediaInputs: [{ id: "start", required: true }],
-  },
-];
-profiles.push({
-  ...profiles[0],
-  id: "image:fast",
-  label: "Image Fast",
-  recipe: { modelLabel: "Studio Image", label: "Fast" },
-  defaults: { width: 1024, height: 1024, steps: 4, cfg: 1 },
-});
-
-async function fixtures(page: Page) {
-  const sessions: any[] = [];
-  const jobs: any[] = [];
-  const presets: any[] = [];
-  const gallery: any[] = [];
-  const messages: any[] = [];
-  const chatRequests: any[] = [];
-  const referenceRequests: any[] = [];
-  const galleryRequests: string[] = [];
-  let clock = Date.parse(stamp);
-  const nextStamp = () => new Date((clock += 1000)).toISOString();
-  function recordGeneration(body: any, sessionId: string) {
-    const id = `job-${jobs.length + 1}`,
-      createdAt = nextStamp();
-    const item = {
-      id: `${id}:0`,
-      jobId: id,
-      status: "done",
-      type: body.kind,
-      url: image,
-      thumbnailUrl: image,
-      prompt: body.prompt,
-      width: 1024,
-      height: 1024,
-      createdAt,
-      settings: { ...body },
-    };
-    const job = {
-      id,
-      jobId: id,
-      sessionId,
-      input: body,
-      operation: body.operation,
-      parentJobId: body.parentJobId,
-      status: "completed",
-      items: [item],
-      outputs: [item],
-      createdAt,
-      updatedAt: createdAt,
-    };
-    jobs.push(job);
-    gallery.unshift(item);
-    return job;
-  }
-  const ownAccount = {
-    id: "admin",
-    displayName: "Administrator",
-    username: "admin@example.test",
-    provider: "local",
-    canChangeEmail: true,
-    canChangePassword: true,
-  };
-
-  const administration = {
-    accounts: [
-      {
-        id: "admin",
-        username: "admin@example.test",
-        displayName: "Administrator",
-        role: "administrator",
-        disabled: false,
-      },
-      {
-        id: "member",
-        username: "member@example.test",
-        displayName: "Member",
-        role: "user",
-        accessProfileId: "users",
-        disabled: false,
-      },
-    ],
-    accessProfiles: [
-      {
-        id: "users",
-        name: "Users",
-        allModels: true,
-        generationProfiles: ["image:test"],
-        features: {
-          imageGeneration: true,
-          videoGeneration: true,
-          gallery: true,
-          cloudModels: false,
-          nsfwModels: false,
-        },
-      },
-    ],
-    availableProfiles: ["image:test", "image:fast", "video:test"],
-    defaultAccessProfileId: "users",
-    requireApproval: true,
-    lockedFeatures: {},
-  };
-
-  await page.route("**/api/**", async (route) => {
-    const request = route.request(),
-      url = new URL(request.url()),
-      path = url.pathname,
-      method = request.method();
-    let body: any = {};
-    try {
-      body = request.postDataJSON() || {};
-    } catch {}
-    const respond = (value: unknown, status = 200) => route.fulfill({ status, json: value });
-    if (path === "/api/access/status")
-      return respond({ signedIn: true, canAdmin: true, studioPassword: { set: false } });
-    if (path === "/api/accounts/me") {
-      if (method === "PATCH") {
-        if (body.displayName) ownAccount.displayName = body.displayName;
-        if (body.username) ownAccount.username = body.username;
-      }
-      return respond({ account: ownAccount });
-    }
-    if (path === "/api/accounts/admin") return respond(administration);
-    if (path === "/api/accounts/profiles") {
-      administration.accessProfiles = administration.accessProfiles.filter(
-        (group) => group.id !== body.id,
-      );
-      administration.accessProfiles.push(body);
-      return respond({ profile: body });
-    }
-    if (path.match(/^\/api\/accounts\/users\/[^/]+$/) && method === "PATCH") {
-      const account = administration.accounts.find((account) => account.id === path.split("/")[4]);
-      Object.assign(account!, body);
-      return respond({ account });
-    }
-    if (path === "/api/accounts/status") return respond({ mode: "single-user" });
-    if (path === "/api/models") return respond({ profiles });
-    if (path === "/api/chat/status")
-      return respond({
-        available: true,
-        models: [{ id: "text:test", label: "Studio Assistant", provider: "Fixture Gateway" }],
-        defaultModelId: "text:test",
-      });
-    if (path.match(/^\/api\/sessions\/[^/]+\/chat$/)) {
-      const sessionId = path.split("/")[3];
-      if (method === "GET")
-        return respond({
-          available: true,
-          messages: messages.filter((message) => message.sessionId === sessionId),
-        });
-      chatRequests.push(body);
-      const user = {
-        id: `message-${messages.length + 1}`,
-        sessionId,
-        role: "user",
-        content: body.content,
-        status: "completed",
-        createdAt: nextStamp(),
-      };
-      const assistant: any = {
-        id: `message-${messages.length + 2}`,
-        sessionId,
-        role: "assistant",
-        content: "",
-        status: "streaming",
-        createdAt: nextStamp(),
-      };
-      const events: any[] = [
-        { event: "message", data: user },
-        { event: "message", data: { ...assistant } },
-        {
-          event: "delta",
-          data: {
-            id: assistant.id,
-            text: "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)",
-          },
-        },
-      ];
-      assistant.content =
-        "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)";
-      if (
-        body.content === "Create a blue bird" ||
-        body.revision ||
-        body.content.startsWith("Generate a variation:")
-      ) {
-        assistant.content = body.revision
-          ? "I’ll use your revised settings for this variation."
-          : "I’ll create a blue bird with your selected settings.";
-        const input = {
-          ...(body.revision?.input || body.generation.input),
-          prompt:
-            body.revision?.input.prompt ||
-            (body.content === "Create a blue bird"
-              ? "A blue bird in soft daylight"
-              : body.generation.input.prompt),
-          operation: body.revision?.operation || body.generation.operation || "image",
-          parentJobId: body.revision?.sourceJobId || body.generation?.parentJobId,
-        };
-        const job = recordGeneration(input, sessionId);
-        assistant.jobId = job.id;
-        assistant.draft = { operation: "image", input };
-        events.push({ event: "generation", data: { job } });
-      }
-      assistant.status = "completed";
-      messages.push(user, assistant);
-      events.push({ event: "message", data: assistant }, { event: "done", data: {} });
-      return route.fulfill({
-        contentType: "text/event-stream",
-        body: events
-          .map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-          .join(""),
-      });
-    }
-    if (path === "/api/loras/info")
-      return respond({
-        loras: {
-          "detail.safetensors": {
-            title: "Detail Slider",
-            families: ["test"],
-            type: "slider",
-            strengthRange: { min: -3, max: 10, step: 0.05, default: 0.8 },
-          },
-          "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
-        },
-      });
-    if (path === "/api/assistant")
-      return respond({
-        available: true,
-        defaultPreset: "improve",
-        presets: [{ id: "improve", label: "Improve" }],
-      });
-    if (path === "/api/assistant/rewrite")
-      return respond({ prompt: "A cinematic amber bird", source: "model" });
-    if (path === "/api/queue") return respond({ jobs });
-    if (path === "/api/queue/cancel-all") {
-      const active = jobs.filter(
-        (job) => !["completed", "cancelled", "failed"].includes(job.status),
-      );
-      active.forEach((job) => (job.status = "cancelled"));
-      return respond({ outcomes: active.map((job) => ({ job, cancelRequested: false })) });
-    }
-    if (path === "/api/queue/cancel-pending") {
-      jobs
-        .filter((j) => ["queued", "waiting"].includes(j.status))
-        .forEach((j) => (j.status = "cancelled"));
-      return respond({ cancelled: jobs.length });
-    }
-    if (path.match(/^\/api\/queue\/[^/]+\/cancel$/)) {
-      const job = jobs.find((j) => j.id === path.split("/")[3]);
-      job.status = "cancelled";
-      return respond({ job });
-    }
-    if (path === "/api/sessions" && method === "GET") return respond({ sessions });
-    if (path === "/api/sessions" && method === "POST") {
-      const session = {
-        id: `session-${sessions.length + 1}`,
-        title: body.title,
-        inputs: body.inputs,
-        createdAt: stamp,
-        updatedAt: stamp,
-      };
-      sessions.push(session);
-      return respond({ session });
-    }
-    if (path.match(/^\/api\/sessions\/[^/]+\/generations$/)) {
-      const sessionId = path.split("/")[3];
-      const job = recordGeneration(body, sessionId);
-      return respond({ jobId: job.id, sessionId, status: "queued" });
-    }
-    if (path.match(/^\/api\/sessions\/[^/]+$/)) {
-      const session = sessions.find((s) => s.id === path.split("/")[3]);
-      return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
-    }
-    if (path === "/api/gallery/favorite" && method === "POST") {
-      gallery
-        .filter((item) => body.ids.includes(item.id))
-        .forEach((item) => (item.favorite = body.favorite));
-      return respond({ ok: true });
-    }
-    if (path.startsWith("/api/gallery/") && method === "DELETE") {
-      const index = gallery.findIndex((item) => item.id === decodeURIComponent(path.split("/")[3]));
-      if (index >= 0) gallery.splice(index, 1);
-      return respond({ ok: true });
-    }
-    if (path === "/api/gallery/filters")
-      return respond({
-        models: ["image.safetensors", "video.safetensors"],
-        loras: ["detail.safetensors", "soft-style.safetensors"],
-        sizes: [{ value: "up-to-1k", label: "Up to 1K", description: "1024 px or less" }],
-        aspects: [
-          { value: "1:1", label: "1:1" },
-          { value: "other", label: "Other" },
-        ],
-      });
-    if (path === "/api/gallery") {
-      galleryRequests.push(url.search);
-      return respond({
-        items: gallery.filter(
-          (i) => !url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q")),
-        ),
-        hasMore: false,
-        nextCursor: "",
-      });
-    }
-    if (method === "GET" && path.startsWith("/api/reference-assets/")) {
-      const id = decodeURIComponent(path.split("/")[3]);
-      return respond({
-        asset: {
-          id,
-          name: "Saved Reference",
-          thumbnailUrl: image,
-          url: image,
-          width: 1024,
-          height: 1024,
-        },
-      });
-    }
-    if (path === "/api/reference-assets/from-gallery") {
-      referenceRequests.push(body);
-      return respond({
-        asset: {
-          id: `asset-${body.galleryItemId}`,
-          name: "Generated Reference",
-          thumbnailUrl: image,
-          url: image,
-          width: 1024,
-          height: 1024,
-        },
-      });
-    }
-    if (path === "/api/reference-assets/upload")
-      return respond({
-        asset: {
-          id: "asset-upload",
-          name: "reference.png",
-          thumbnailUrl: image,
-          url: image,
-          width: 1024,
-          height: 1024,
-        },
-      });
-    if (path.match(/^\/api\/user-presets\/[^/]+$/) && method === "PATCH") {
-      const preset = presets.find((preset) => preset.id === path.split("/")[3]);
-      Object.assign(preset, body);
-      return respond({ preset });
-    }
-    if (path === "/api/user-presets" && method === "GET") return respond({ presets });
-    if (path === "/api/user-presets" && method === "POST") {
-      const preset = { id: "preset-1", ...body };
-      presets.push(preset);
-      return respond({ preset });
-    }
-    if (path === "/api/library/imports")
-      return method === "GET"
-        ? respond({
-            imports: [
-              {
-                id: "import-1",
-                name: "Watercolour Inspiration",
-                state: "needs-files",
-                grade: { value: "partial", reasons: ["Watercolour LoRA is missing"] },
-                resources: [{ name: "watercolour.safetensors", status: "missing" }],
-              },
-            ],
-          })
-        : respond({ import: { id: "import-2" } });
-    if (path === "/api/library/items")
-      return respond({ items: [{ key: "detail", title: "Detail LoRA", installed: true }] });
-    if (path === "/api/presets")
-      return respond({
-        presets: [
-          {
-            id: "1",
-            name: "Amber Study",
-            prompt: "Amber bird study",
-            negative: "blur",
-            thumbnailUrl: image,
-            settings: { steps: 24 },
-            resources: [{ profileId: "image:test" }],
-          },
-        ],
-      });
-    if (path === "/api/workers")
-      return respond({
-        workers: [{ id: "gpu", label: "Media Worker", capabilities: ["image", "video"] }],
-      });
-    return respond({ ok: true });
-  });
-  return {
-    sessions,
-    jobs,
-    presets,
-    gallery,
-    administration,
-    ownAccount,
-    messages,
-    chatRequests,
-    referenceRequests,
-    galleryRequests,
-  };
-}
-async function create(page: Page) {
-  await page.goto("/images?compose=1");
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
-}
-async function openNav(page: Page, label: string) {
-  const more = page.getByRole("button", { name: "More Options" });
-  if (["Library", "Settings"].includes(label) && (await more.isVisible())) {
-    await more.click();
-    await page.getByRole("menuitem", { name: label, exact: true }).click();
-    return;
-  }
-  await page.getByRole("link", { name: label, exact: true }).first().click();
-}
-
-async function openTheme(page: Page) {
-  const theme = page.getByRole("button", { name: "Change Theme", exact: true });
-  await expect(
-    theme.or(page.getByRole("button", { name: "More Options", exact: true })),
-  ).toBeVisible();
-  if (await theme.isVisible()) await theme.click();
-  else {
-    await page.getByRole("button", { name: "More Options", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Theme", exact: true }).click();
-  }
-}
-
-async function section(page: Page, workspace: "Library" | "Settings", label: string) {
-  const select = page.getByRole("combobox", { name: `${workspace} Section`, exact: true });
-  if ((page.viewportSize()?.width || 1440) < 768) {
-    await select.click();
-    await page.getByRole("option", { name: label, exact: true }).click();
-  } else
-    await page
-      .getByRole("navigation", { name: `${workspace} Sections`, exact: true })
-      .getByRole("link", { name: label, exact: true })
-      .click();
-}
+import { expect, test } from "@playwright/test";
+import { create, fixtures, image, openNav, openTheme, profiles, section, stamp } from "./fixtures";
 
 test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
   const state = await fixtures(page);
@@ -561,6 +88,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   await expect.poll(() => state.presets.length).toBe(1);
   expect(state.presets[0].input.seed).toBe("42");
   expect(state.presets[0].input.inpaint.mask).toMatch(/^data:image\/png/);
+  expect(state.presets[0].input.inpaint.feather).toBe(0.4);
   expect(state.presets[0].input.allowFallback).toBe(true);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
   await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Updated Bird Study");
@@ -641,7 +169,7 @@ test("The compact composer expands on interaction and keeps picked or dragged re
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Preserve the working direction");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Choose Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Picked Study", exact: true }).click();
   await page.getByRole("button", { name: "Use References", exact: true }).click();
@@ -653,7 +181,7 @@ test("The compact composer expands on interaction and keeps picked or dragged re
   expect(state.referenceRequests[0].galleryItemId).toBe("reference-0");
   if (testInfo.project.use.isMobile) await page.keyboard.press("Escape");
   else await page.getByRole("link", { name: "Images", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: "Generation Inputs", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
   if (!testInfo.project.use.isMobile) {
     const transfer = await page.evaluateHandle(() => new DataTransfer());
     await page
@@ -703,7 +231,8 @@ test("Prompt assistance finishes before a generation is submitted", async ({ pag
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("bird");
-  await page.getByRole("button", { name: "Improve Prompt", exact: true }).click();
+  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Improve Prompt", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A cinematic amber bird",
   );
@@ -836,18 +365,9 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await expect(
     page.getByRole("button", { name: "Open image: An amber bird", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Generation Inputs", exact: true }).click();
-  await page.getByRole("button", { name: "Choose Profile", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Family", exact: true })).toHaveValue(
-    "Studio Images",
-  );
-  await expect(page.getByRole("combobox", { name: "Model & Finetune", exact: true })).toHaveValue(
-    "Studio Image",
-  );
-  await page
-    .getByRole("combobox", { name: "Fast, Quality & Workflow Preset", exact: true })
-    .click();
-  await page.getByRole("option", { name: "Fast", exact: true }).click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await page.getByRole("option", { name: "Image Fast", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.profileId).toBe("image:fast");
@@ -876,7 +396,7 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Keep this direction");
-  await page.getByRole("button", { name: "Generation Inputs", exact: true }).click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("Keep this direction");
   await prompt.fill("Keep this direction, in soft daylight");
@@ -885,13 +405,13 @@ test("Generation controls preserve the draft and return keyboard focus with redu
     await expect(
       page.getByRole("dialog", { name: "Generation Controls", exact: true }),
     ).toBeHidden();
-  const controls = page.getByRole("button", { name: "Generation Inputs", exact: true });
+  const controls = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(controls).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Keep this direction, in soft daylight",
   );
   await controls.press("Enter");
-  await expect(page.getByRole("button", { name: "Choose Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Keep this direction, in soft daylight",
   );
@@ -955,15 +475,17 @@ test("Administrator accounts retain worker visibility and attribution", async ({
     page.getByRole("region", { name: "Your Account" }).getByText("Administrator", { exact: true }),
   ).toBeVisible();
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("heading", { name: "Workers", exact: true })).toBeVisible();
-  await expect(page.getByText("Media Worker", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
+    "Image Worker",
+  );
   await section(page, "Settings", "About");
   await expect(page.getByText(/MantineHub theme includes MIT/)).toBeVisible();
 });
 
 test("Upscale comparison uses one bounded slider and preserves the original result", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "original",
@@ -980,7 +502,8 @@ test("Upscale comparison uses one bounded slider and preserves the original resu
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Comparison Study", exact: true }).click();
-  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
   await page.getByRole("button", { name: "Compare", exact: true }).click();
   const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
   await expect(slider).toBeVisible();
@@ -1085,7 +608,7 @@ test("Account menu opens the account workspace and reflects the saved name", asy
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "viewer",
@@ -1106,17 +629,61 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     prompt: "Next Viewer Study",
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: Viewer Study", exact: true }).click();
+  const firstTile = page.getByRole("button", { name: "Open image: Viewer Study", exact: true });
+  await firstTile.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.getByRole("button", { name: "Open image: Next Viewer Study", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(firstTile).toBeFocused();
+  await firstTile.click();
   const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(dialog).toBeVisible();
   const bounds = await dialog.boundingBox(),
     viewport = page.viewportSize()!;
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
+  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  await expect(download).toHaveAttribute("href", image);
+  await expect(download).toHaveAttribute("download", "studio-viewer.png");
   await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
   await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
   await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
+  if (testInfo.project.use.browserName !== "webkit") {
+    const picture = await dialog
+      .getByRole("img", { name: "Viewer Study", exact: true })
+      .boundingBox();
+    const touch = await page.context().newCDPSession(page);
+    const y = picture!.y + picture!.height / 2;
+    const start = picture!.x + picture!.width * 0.8;
+    const end = picture!.x + picture!.width * 0.2;
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: start, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: end, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+    await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
+    await page.keyboard.press("ArrowLeft");
+    await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
+  }
+  const zoom = dialog.locator("[data-zoom-mode]");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeGreaterThan(0);
+  const fitScale = Number(await zoom.getAttribute("data-zoom-scale"));
+  await page.keyboard.press("Equal");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeGreaterThan(fitScale);
+  await page.keyboard.press("Digit0");
+  await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
   await dialog.getByRole("img", { name: "Viewer Study", exact: true }).click();
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Zoom: Fill", exact: true })).toBeVisible();
@@ -1124,10 +691,22 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   await expect(
     dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }),
   ).toBeVisible();
-  await dialog.getByRole("button", { name: "Fit Image", exact: true }).click();
+  await dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Zoom: Fit", exact: true })).toBeVisible();
-  await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
+  if (testInfo.project.use.isMobile)
+    await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
   await expect(dialog.getByText("Prompt", { exact: true })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const picture = await dialog
+        .getByRole("img", { name: "Viewer Study", exact: true })
+        .boundingBox();
+      const viewport = await zoom.boundingBox();
+      return picture && viewport
+        ? picture.width <= viewport.width + 1 && picture.height <= viewport.height + 1
+        : false;
+    })
+    .toBe(true);
   await dialog.click({ position: { x: 2, y: 2 } });
   await expect(dialog).toBeHidden();
   await expect(
@@ -1230,16 +809,11 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   await earlier.focus();
   await earlier.press("Enter");
   if (!testInfo.project.use.isMobile) {
-    const transfer = await page.evaluateHandle(() => new DataTransfer());
-    await page
-      .getByRole("button", { name: "Drag Detail Slider", exact: true })
-      .dispatchEvent("dragstart", { dataTransfer: transfer });
-    await page
-      .getByRole("listitem", { name: "loras Soft Style", exact: true })
-      .dispatchEvent("dragover", { dataTransfer: transfer });
-    await page
-      .getByRole("listitem", { name: "loras Soft Style", exact: true })
-      .dispatchEvent("drop", { dataTransfer: transfer });
+    const drag = page.getByRole("button", { name: "Drag Detail Slider", exact: true });
+    await drag.focus();
+    await drag.press("Space");
+    await drag.press("ArrowUp");
+    await drag.press("Space");
   }
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -1285,7 +859,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-slot-source", slot: "end" },
   ]);
-  await page.getByRole("button", { name: "Generation Inputs", exact: true }).click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
   await page.getByRole("option", { name: "Start · Optional · Up to 1", exact: true }).click();
@@ -1390,7 +964,7 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
 
 test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile settings", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "legacy-item",
@@ -1411,9 +985,10 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
   await page.getByRole("button", { name: "Recreate", exact: true }).click();
-  await page.getByRole("button", { name: "Generation Inputs", exact: true }).click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Saved Reference", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
@@ -1458,4 +1033,277 @@ test("Generation size presets and custom dimensions preserve profile constraints
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.width).toBe(1600);
   expect(state.jobs[0].input.height).toBe(1024);
+});
+
+test("Retry pending state is shared while unrelated jobs remain cancellable", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  const input = {
+    ...profiles[0].defaults,
+    kind: "image",
+    profileId: "image:test",
+    prompt: "Retry Study",
+    referenceAssets: [],
+  };
+  state.sessions.push({
+    id: "retry-session",
+    title: "Retry Session",
+    inputs: input,
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.jobs.push(
+    ...["failed", "running"].map((status, index) => ({
+      id: `retry-${index}`,
+      sessionId: "retry-session",
+      operation: "image",
+      input,
+      status,
+      items: [],
+      outputs: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    })),
+  );
+  let calls = 0;
+  let release!: () => void;
+  const accepted = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/queue/retry-0/retry", async (route) => {
+    calls++;
+    await accepted;
+    await route.fulfill({ json: { job: state.jobs[0] } });
+  });
+  try {
+    await page.goto("/chat/retry-session");
+    const retry = page
+      .getByRole("article", { name: "Iteration 1", exact: true })
+      .getByRole("button", { name: "Retry", exact: true });
+    await retry.click();
+    await expect.poll(() => calls).toBe(1);
+    await expect(retry).toBeDisabled();
+    if (!testInfo.project.use.isMobile) {
+      await page.getByRole("button", { name: "Open Queue", exact: true }).click();
+      const queue = page.getByRole("dialog", { name: "Queue", exact: true });
+      await expect(queue.getByRole("button", { name: "Retry", exact: true })).toBeDisabled();
+      await expect(queue.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
+      await queue.getByRole("button", { name: "Cancel", exact: true }).click();
+    } else {
+      await page
+        .getByRole("article", { name: "Iteration 2", exact: true })
+        .getByRole("button", { name: "Cancel", exact: true })
+        .click();
+    }
+    await expect.poll(() => state.jobs[1].status).toBe("cancelled");
+    expect(calls).toBe(1);
+    release();
+    await expect(retry).toBeEnabled();
+  } finally {
+    release();
+  }
+});
+
+test("Viewer deletion retains failed media and waits for confirmed removal", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "delete-study",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Delete Study",
+    width: 1024,
+    height: 1024,
+  });
+  let attempts = 0;
+  let release!: () => void;
+  const removed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/gallery/delete-study", async (route) => {
+    if (++attempts === 1)
+      return route.fulfill({ status: 503, json: { error: "Storage is temporarily unavailable." } });
+    await removed;
+    return route.fallback();
+  });
+  try {
+    await page.goto("/images");
+    await page.getByRole("button", { name: "Open image: Delete Study", exact: true }).click();
+    const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+    if (testInfo.project.use.isMobile)
+      await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    await viewer.getByRole("button", { name: "Delete", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete Item", exact: true });
+    await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(confirmation.getByText("Some Items Remain", { exact: true })).toBeVisible();
+    await expect(viewer).toBeVisible();
+    expect(state.gallery).toHaveLength(1);
+    await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(confirmation.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(confirmation).toBeVisible();
+    await expect(viewer).toBeVisible();
+    release();
+    await expect(viewer).toBeHidden();
+    await expect(confirmation).toBeHidden();
+    await expect(page.getByText("No Images", { exact: true })).toBeVisible();
+    expect(state.gallery).toHaveLength(0);
+  } finally {
+    release();
+  }
+});
+
+test("Desktop status inspects endpoint health without changing the queue", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Desktop runtime interaction");
+  await fixtures(page);
+  await page.goto("/images");
+  const status = page.getByRole("button", { name: "Runtime Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "unknown");
+  await status.click();
+  const panel = page.getByRole("dialog", { name: "Runtime Status", exact: true });
+  await expect(panel.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
+    "Image Worker",
+  );
+  await expect(panel.getByText("Fixture GPU", { exact: false })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await status.click();
+  await expect(panel.getByText("Automatic Control Off", { exact: true })).toBeVisible();
+});
+
+test("Owned uploaded references can be reused without another upload", async ({ page }) => {
+  const state = await fixtures(page);
+  const requests: string[] = [];
+  await page.route("**/api/reference-assets?*", (route) => {
+    requests.push(route.request().url());
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            id: "past-upload",
+            name: "Past Upload",
+            source: "upload",
+            type: "image",
+            url: image,
+            thumbnailUrl: image,
+            width: 1024,
+            height: 1024,
+          },
+        ],
+        hasMore: false,
+        nextCursor: "",
+      },
+    });
+  });
+  await create(page);
+  await page
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("Reuse an earlier photograph");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByText("Uploads", { exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Past Upload", exact: true }).click();
+  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "past-upload", slot: "image" }]);
+  expect(state.referenceRequests).toHaveLength(0);
+  expect(new URL(requests[0]).searchParams.get("source")).toBe("upload");
+});
+
+test("Images and Videos retain independent prompts and expert settings", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Image draft");
+  await page
+    .getByRole("textbox", { name: "Negative Prompt", exact: true })
+    .fill("Image exclusions");
+  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("textbox", { name: "Seed", exact: true }).fill("777");
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
+    ).toBeHidden();
+  }
+  await page.getByRole("link", { name: "Videos", exact: true }).first().click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Video draft");
+  await page.getByRole("link", { name: "Images", exact: true }).first().click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Image draft",
+  );
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
+    "Image exclusions",
+  );
+  const expert = page.getByRole("button", { name: "Expert Controls", exact: true });
+  if ((await expert.getAttribute("aria-expanded")) !== "true") await expert.click();
+  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("777");
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
+    ).toBeHidden();
+  }
+  await page.getByRole("link", { name: "Videos", exact: true }).first().click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Video draft",
+  );
+});
+
+test("Prompt history reuses positive and negative prompts independently and persists pinning", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const histories = {
+    positive: [{ text: "Earlier landscape", at: stamp, uses: 2, pinned: false }],
+    negative: [{ text: "Earlier exclusions", at: stamp, uses: 1, pinned: false }],
+  };
+  await page.route("**/api/prompts**", (route) => {
+    const request = route.request(),
+      url = new URL(request.url());
+    const body = request.method() === "POST" ? request.postDataJSON() : {};
+    const kind = (body.kind ||
+      url.searchParams.get("kind") ||
+      "positive") as keyof typeof histories;
+    if (url.pathname.endsWith("/pin")) {
+      const entry = histories[kind].find((entry) => entry.text === body.text);
+      if (entry) entry.pinned = body.pinned;
+    }
+    if (url.pathname.endsWith("/forget"))
+      histories[kind] = histories[kind].filter((entry) => entry.text !== body.text);
+    return route.fulfill({ json: { prompts: histories[kind], enabled: true } });
+  });
+  await create(page);
+  await page
+    .getByRole("textbox", { name: "Negative Prompt", exact: true })
+    .fill("Keep these exclusions");
+  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
+  await panel.getByRole("button", { name: "Use Prompt: Earlier landscape", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Earlier landscape",
+  );
+  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
+    "Keep these exclusions",
+  );
+  await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
+  panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
+  await panel.getByRole("button", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Earlier landscape",
+  );
+  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
+    "Earlier exclusions",
+  );
+  expect(histories.positive[0].pinned).toBe(true);
 });
