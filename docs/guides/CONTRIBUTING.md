@@ -82,7 +82,7 @@ npm run release -- minor             # bump, date the changelog, commit "Release
 git push --atomic origin main vX.Y.Z # publishes the image and the GitHub release
 ```
 
-`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, the lockfile and the previous tag match `package.json`, and the **Unreleased** notes open with a `> ` summary line, then moves those notes into the new version and commits and tags it. It runs no test suites; run `mise run check` while working. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the full CI checks, builds, smoke-tests and scans the container image, publishes it as `ghcr.io/maxexcloo/studio:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
+`patch`, `minor` or an exact version like `1.0.0` all work; `--push` pushes for you. The script checks the tree is clean and in sync, the lockfile and the previous tag match `package.json`, and the **Unreleased** notes open with a `> ` summary line, then moves those notes into the new version and commits and tags it. It runs no test suites; run `mise run check` while working. Pushing the tag runs the Release workflow: it checks the tag matches `package.json`, runs the full CI checks, builds and smoke-tests the container image, publishes it as `ghcr.io/maxexcloo/studio:X.Y.Z` and `:X.Y`, and creates the GitHub release with that changelog section and the image digest as its notes. There are no downloads to package or sign.
 
 Between releases a source checkout shows how far it is past its tag in **Settings › About**, for example `v0.2.0 + 3`.
 
