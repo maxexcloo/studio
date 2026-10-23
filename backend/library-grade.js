@@ -13,8 +13,6 @@
  * Any missing prompt field caps the grade at Partial and is named in the reasons.
  */
 
-export const gradeValues = Object.freeze(["exact", "close", "partial"]);
-
 /** The prompt fields Exact and Close need, in the order they are reported. */
 export const promptFields = Object.freeze([
   ["prompt", "No prompt recorded"],
