@@ -39,6 +39,14 @@ export const assistantSettingKeys = Object.freeze([assistantModelKey, assistantS
 const allowed = (req, feature) => !req.studioAccount || mayUseFeature(req.studioAccount, feature);
 const isAdministrator = (req) => !req.studioAccount || req.studioAccount.role === "administrator";
 
+const disconnectSignal = (res) => {
+  const controller = new AbortController();
+  res.once("close", () => {
+    if (!res.writableFinished) controller.abort();
+  });
+  return controller.signal;
+};
+
 /** A pasted image as { mime, data } (base64), or null. */
 export function imageFromDataUrl(value) {
   const match = /^data:(image\/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/.exec(
@@ -259,17 +267,14 @@ export function registerAssistantRoutes(
   });
 
   app.post("/api/assistant/rewrite", async (req, res) => {
+    const signal = disconnectSignal(res);
     const context = await ready(req, res);
-    if (!context) return;
+    if (!context || signal.aborted) return;
     const preset = String(req.body?.preset || defaultPreset);
     if (preset === "spicy" && !allowed(req, "nsfwModels"))
       return res
         .status(403)
         .json({ ok: false, error: "Spicy needs NSFW Models for this account." });
-    const controller = new AbortController();
-    res.on("close", () => {
-      if (!res.writableFinished) controller.abort();
-    });
     const streaming =
       req.body?.stream === true || /text\/event-stream/i.test(String(req.headers.accept || ""));
     try {
@@ -302,7 +307,7 @@ export function registerAssistantRoutes(
         stack,
         examples,
         negative: context.profile.capabilities?.negativePrompt !== false,
-        signal: controller.signal,
+        signal,
         onDelta: streaming ? (text) => send("delta", { text }) : undefined,
       });
       if (streaming) {
@@ -310,7 +315,7 @@ export function registerAssistantRoutes(
         res.end();
       } else res.json({ ok: true, ...result });
     } catch (error) {
-      if (controller.signal.aborted) return res.end();
+      if (signal.aborted) return res.end();
       if (res.headersSent) {
         res.write(`event: error\ndata: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();
@@ -321,14 +326,16 @@ export function registerAssistantRoutes(
   });
 
   app.post("/api/assistant/negative", async (req, res) => {
+    const signal = disconnectSignal(res);
     const context = await ready(req, res);
-    if (!context) return;
+    if (!context || signal.aborted) return;
     try {
       const { stack, infos } = await stackFrom(req, req.body?.loras);
       const cfg = Number(req.body?.cfg);
       res.json({
         ok: true,
         ...(await engine.negative({
+          signal,
           profile: context.profile,
           guide: context.guide,
           prompt: req.body?.prompt,
@@ -338,13 +345,15 @@ export function registerAssistantRoutes(
         })),
       });
     } catch (error) {
+      if (signal.aborted) return res.end();
       fail(res, error);
     }
   });
 
   app.post("/api/assistant/loras", async (req, res) => {
+    const signal = disconnectSignal(res);
     const context = await ready(req, res);
-    if (!context) return;
+    if (!context || signal.aborted) return;
     if (!allowed(req, "loras"))
       return res.status(403).json({ ok: false, error: "LoRAs are off for this account." });
     try {
@@ -352,6 +361,7 @@ export function registerAssistantRoutes(
       res.json({
         ok: true,
         ...(await engine.matchLoras({
+          signal,
           profile: context.profile,
           prompt: req.body?.prompt,
           loras: await loras(req),
@@ -359,6 +369,7 @@ export function registerAssistantRoutes(
         })),
       });
     } catch (error) {
+      if (signal.aborted) return res.end();
       fail(res, error);
     }
   });

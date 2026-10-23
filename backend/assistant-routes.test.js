@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
+import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -375,4 +377,123 @@ test("a generation records the preset, model, source and only the chosen LoRAs i
   assert.equal(assistantRecord({ preset: "nonsense" }), null);
   assert.equal(assistantRecord("enhance"), null);
   assert.equal(assistantRecord(null), null);
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function listen(t, app) {
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test("stopping prompt assistance disconnects the actual gateway request without falling back", async (t) => {
+  for (const operation of ["rewrite", "negative", "loras"])
+    await t.test(operation, async (t) => {
+      const started = deferred();
+      const disconnected = deferred();
+      const warnings = [];
+      const upstream = http.createServer(async (req, res) => {
+        const chunks = [];
+        for await (const chunk of req) chunks.push(chunk);
+        const body = JSON.parse(Buffer.concat(chunks));
+        assert.equal(body.stream, operation === "rewrite");
+        res.once("close", disconnected.resolve);
+        if (body.stream) {
+          res.writeHead(200, { "Content-Type": "text/event-stream" });
+          res.write('data: {"choices":[{"delta":{"content":"First words"}}]}\n\n');
+        }
+        started.resolve();
+      });
+      const gatewayUrl = await listen(t, upstream);
+      const app = express();
+      app.use(express.json());
+      registerAssistantRoutes(app, {
+        engine: createAssistant(
+          { ...environment, STUDIO_PROMPT_WRITER_URL: gatewayUrl },
+          { log: { warn: (message) => warnings.push(message) } },
+        ),
+        profiles: async () => [
+          { ...sfw, capabilities: { negativePrompt: true }, defaults: { cfg: 3 } },
+        ],
+        loras: async () => loras,
+      });
+      const url = await listen(t, app);
+      const controller = new AbortController();
+      const response = fetch(`${url}/api/assistant/${operation}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          profileId: sfw.id,
+          prompt: "A cabin",
+          preset: "enhance",
+          stream: operation === "rewrite",
+        }),
+      }).then((reply) => reply.text());
+      const cancelled = assert.rejects(response, (error) => error.name === "AbortError");
+      await started.promise;
+      controller.abort();
+      await cancelled;
+      await disconnected.promise;
+      assert.deepEqual(
+        warnings,
+        [],
+        "cancellation must not produce a fallback prompt or LoRA suggestion",
+      );
+    });
+});
+
+test("stopping during profile discovery does not start a rewrite after discovery finishes", async (t) => {
+  const discovering = deferred();
+  const discovery = deferred();
+  const closed = deferred();
+  let completions = 0;
+  const app = express();
+  app.use(express.json());
+  app.use((_req, res, next) => {
+    res.once("close", closed.resolve);
+    next();
+  });
+  registerAssistantRoutes(app, {
+    engine: createAssistant(environment, {
+      fetchImpl: async () => {
+        completions++;
+        return Response.json({});
+      },
+      log: {},
+    }),
+    profiles: async () => {
+      discovering.resolve();
+      await discovery.promise;
+      return [sfw];
+    },
+  });
+  const url = await listen(t, app);
+  const controller = new AbortController();
+  const request = fetch(`${url}/api/assistant/rewrite`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: controller.signal,
+    body: JSON.stringify({ profileId: sfw.id, prompt: "A cabin" }),
+  });
+  const cancelled = assert.rejects(request, (error) => error.name === "AbortError");
+  await discovering.promise;
+  controller.abort();
+  await cancelled;
+  await closed.promise;
+  discovery.resolve();
+  // Drain the already-started route's asynchronous continuation, without timing an animation or poll.
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completions, 0);
 });

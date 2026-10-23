@@ -1,5 +1,5 @@
 import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { finished } from "node:stream/promises";
 import { Router } from "express";
 import type { RuntimeController } from "./controller.ts";
 
@@ -21,13 +21,10 @@ export function createTextAdmissionRouter({
 }: AdmissionOptions) {
   const router = Router();
   router.post("/v1/chat/completions", async (request, response, next) => {
-    const abort = new AbortController();
-    response.once("close", () => {
-      if (!response.writableFinished) abort.abort();
-    });
     let lease: Awaited<ReturnType<RuntimeController["acquire"]>> | undefined;
     try {
       lease = await controller.acquire(workloadId);
+      if (response.destroyed) return;
       if (lease.workload.kind !== "text")
         throw new Error("Text admission requires a text workload.");
       const upstream = await fetchImpl(
@@ -36,7 +33,6 @@ export function createTextAdmissionRouter({
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(request.body),
-          signal: abort.signal,
           redirect: "error",
         },
       );
@@ -46,12 +42,23 @@ export function createTextAdmissionRouter({
         upstream.headers.get("Content-Type") ?? "application/json",
       );
       response.setHeader("Cache-Control", "no-cache");
-      if (upstream.body)
-        await pipeline(
-          Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream),
-          response,
-        );
-      else response.end();
+      if (upstream.body) {
+        const source = Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream);
+        // A closed caller cannot prove Radiance stopped. Keep consuming its response before switching GPUs.
+        const drain = () => {
+          source.unpipe(response);
+          source.resume();
+        };
+        response.once("close", drain);
+        const completion = finished(source, { cleanup: true });
+        if (response.destroyed) drain();
+        else source.pipe(response);
+        try {
+          await completion;
+        } finally {
+          response.off("close", drain);
+        }
+      } else response.end();
     } catch (error) {
       if (response.headersSent) response.destroy(error instanceof Error ? error : undefined);
       else next(error);
