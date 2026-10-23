@@ -35,11 +35,6 @@ const api: ProxyOptions = {
 
 export default defineConfig({
   plugins: [react(), precompress()],
-  resolve: {
-    alias: {
-      "@": "/src",
-    },
-  },
   server: {
     host: "127.0.0.1",
     port: 5173,
