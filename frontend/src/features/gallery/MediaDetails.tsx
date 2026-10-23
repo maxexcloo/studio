@@ -1,6 +1,10 @@
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import {
+  ActionIcon,
   Button,
+  Menu,
+  Popover,
+  Tooltip,
   Collapse,
   Group,
   Paper,
@@ -12,15 +16,17 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Ellipsis, SlidersHorizontal } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { api, failure } from "../../api";
+import { failure, post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { useMotionDuration } from "../../ui/Appearance";
 import { useMediaAction } from "./useMediaAction";
 import { mediaDownload } from "./download";
+import { useMediaFavorite } from "./useMediaFavorite";
+import { UpscaleControls } from "./UpscaleControls";
 import {
   canCopyMediaImage,
   canShareMedia,
@@ -49,6 +55,7 @@ export function MediaDetails({
   onAction,
   onCompare,
   onDelete,
+  onVersionChange,
 }: {
   item: MediaItem;
   sessionId?: string;
@@ -56,6 +63,7 @@ export function MediaDetails({
   onAction: () => void;
   onCompare: () => void;
   onDelete: () => void;
+  onVersionChange: (id: string, active: boolean) => void;
 }) {
   const narrow = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
   const motionDuration = useMotionDuration();
@@ -132,14 +140,16 @@ ${download.download}`;
   const [details, setDetails] = useState(false);
   const detailsId = useId();
   const swipe = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const client = useQueryClient();
   const action = useMediaAction(item, sessionId, onAction);
-  const mutate = useMutation({
-    mutationFn: ({ path, body }: { path: string; body: unknown }) =>
-      api(path, { method: "POST", body: JSON.stringify(body) }),
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: ["gallery"] });
-      void client.invalidateQueries({ queryKey: ["session"] });
+  const favorite = useMediaFavorite(item);
+  const cache = useQueryClient();
+  const version = useMutation({
+    mutationFn: (body: { galleryItemId: string; active: boolean }) =>
+      post<{ upscaleActive: boolean }>("/api/upscale/toggle", body),
+    onSuccess: (result, body) => {
+      onVersionChange(body.galleryItemId, result.upscaleActive);
+      void cache.invalidateQueries({ queryKey: ["gallery"] });
+      void cache.invalidateQueries({ queryKey: ["session"] });
     },
     onError: failure,
   });
@@ -151,7 +161,7 @@ ${download.download}`;
       className={classes.rail}
       onClick={(event) => event.stopPropagation()}
     >
-      <Stack gap="xs">
+      <Stack gap="xs" className={classes.railContent}>
         <UnstyledButton
           component={narrow ? "button" : "div"}
           className={classes.handle}
@@ -197,121 +207,13 @@ ${download.download}`;
             {narrow && (details ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
           </Group>
         </UnstyledButton>
-        {item.url && (
-          <Group gap="xs">
-            <Button component="a" {...download} variant="default" size="compact-sm">
-              Download
-            </Button>
-            <Button
-              size="compact-sm"
-              loading={action.isPending}
-              onClick={() => action.mutate(item.type === "video" ? "extend" : "refine")}
-            >
-              {item.type === "video" ? "Extend" : "Refine"}
-            </Button>
-            {item.type === "image" && (
-              <Button
-                size="compact-sm"
-                variant="light"
-                loading={action.isPending}
-                onClick={() => action.mutate("animate")}
-              >
-                Animate
-              </Button>
-            )}
-          </Group>
-        )}
-        <Collapse expanded={!narrow || details} id={detailsId} transitionDuration={motionDuration}>
+        <Collapse
+          expanded={!narrow || details}
+          id={detailsId}
+          transitionDuration={motionDuration}
+          className={classes.detailsCollapse}
+        >
           <Stack className={classes.details} gap="md">
-            <Switch
-              label="Share Without Settings"
-              description="Leave the prompt, seed and workflow out of downloaded or shared files."
-              checked={withoutSettings}
-              onChange={(event) => setWithoutSettings(event.currentTarget.checked)}
-            />
-            <Group gap="xs">
-              {item.url && item.type === "image" && canCopyMediaImage() && (
-                <Button
-                  variant="default"
-                  size="compact-sm"
-                  loading={copying}
-                  onClick={() => void copyImage()}
-                >
-                  Copy Image
-                </Button>
-              )}
-              {item.url && narrow && shareSupported && (
-                <Button
-                  variant="default"
-                  size="compact-sm"
-                  loading={preparingShare || sharing}
-                  onClick={() => void share()}
-                >
-                  {shareFile ? "Share" : "Prepare Share"}
-                </Button>
-              )}
-
-              <Button
-                variant="default"
-                size="compact-sm"
-                onClick={() => {
-                  void copyText(item.prompt || "")
-                    .then(() => notifications.show({ message: "Prompt copied" }))
-                    .catch(failure);
-                }}
-              >
-                Copy Prompt
-              </Button>
-              <Button
-                variant="default"
-                size="compact-sm"
-                loading={action.isPending}
-                onClick={() => action.mutate("image")}
-              >
-                Recreate
-              </Button>
-              <Button
-                variant="subtle"
-                size="compact-sm"
-                onClick={() =>
-                  mutate.mutate({
-                    path: "/api/gallery/favorite",
-                    body: { ids: [item.id], favorite: !item.favorite },
-                  })
-                }
-              >
-                {item.favorite ? "Unstar" : "Star"}
-              </Button>
-              {item.url && item.type === "image" && (
-                <Button
-                  variant="subtle"
-                  size="compact-sm"
-                  onClick={() =>
-                    mutate.mutate({
-                      path: "/api/upscale",
-                      body: { galleryItemId: item.id, quality: "balanced" },
-                    })
-                  }
-                >
-                  Upscale
-                </Button>
-              )}
-              {item.upscale?.url && (
-                <Button
-                  variant="subtle"
-                  size="compact-sm"
-                  onClick={() => {
-                    onCompare();
-                  }}
-                >
-                  {compare ? "Close Comparison" : "Compare"}
-                </Button>
-              )}
-              <Button color="red" variant="subtle" size="compact-sm" onClick={onDelete}>
-                Delete
-              </Button>
-            </Group>
-
             <Stack gap="sm">
               <Title order={5}>Prompt</Title>
               <Text style={{ whiteSpace: "pre-wrap" }}>{item.prompt}</Text>
@@ -358,6 +260,117 @@ ${download.download}`;
             </Stack>
           </Stack>
         </Collapse>
+        <Group gap={4} className={classes.actions} role="group" aria-label="Generation Actions">
+          {item.url && (
+            <>
+              <Tooltip label="Download">
+                <ActionIcon
+                  component="a"
+                  {...download}
+                  aria-label="Download"
+                  variant="default"
+                  size={36}
+                >
+                  <Download size={17} />
+                </ActionIcon>
+              </Tooltip>
+              <Button
+                size="sm"
+                px="sm"
+                loading={action.isPending}
+                onClick={() => action.mutate(item.type === "video" ? "extend" : "refine")}
+              >
+                {item.type === "video" ? "Extend" : "Refine"}
+              </Button>
+              {item.type === "image" && (
+                <Button
+                  size="sm"
+                  px="sm"
+                  variant="light"
+                  loading={action.isPending}
+                  onClick={() => action.mutate("animate")}
+                >
+                  Animate
+                </Button>
+              )}
+            </>
+          )}
+          {item.url && item.status === "done" && <UpscaleControls key={item.id} item={item} />}
+          <Menu position="top-end" width={220}>
+            <Menu.Target>
+              <ActionIcon aria-label="More Viewer Actions" variant="default" size={36}>
+                <Ellipsis size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {item.url && item.type === "image" && canCopyMediaImage() && (
+                <Menu.Item h={36} disabled={copying} onClick={() => void copyImage()}>
+                  Copy Image
+                </Menu.Item>
+              )}
+              {item.url && narrow && shareSupported && (
+                <Menu.Item h={36} disabled={preparingShare || sharing} onClick={() => void share()}>
+                  {shareFile ? "Share" : "Prepare Share"}
+                </Menu.Item>
+              )}
+              <Menu.Item
+                h={36}
+                onClick={() => {
+                  void copyText(item.prompt || "")
+                    .then(() => notifications.show({ message: "Prompt copied" }))
+                    .catch(failure);
+                }}
+              >
+                Copy Prompt
+              </Menu.Item>
+              <Menu.Item h={36} disabled={action.isPending} onClick={() => action.mutate("image")}>
+                Recreate
+              </Menu.Item>
+              <Menu.Item h={36} disabled={favorite.isPending} onClick={() => favorite.mutate()}>
+                {item.favorite ? "Unstar" : "Star"}
+              </Menu.Item>
+              {item.type === "image" && item.upscale?.url && !item.upscale.withRun && (
+                <Menu.Item h={36} onClick={onCompare}>
+                  {compare ? "Close Comparison" : "Compare"}
+                </Menu.Item>
+              )}
+              <Menu.Divider />
+              <Menu.Item h={36} color="red" onClick={onDelete}>
+                Delete
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+          <Popover position="top-end" width={280} trapFocus>
+            <Popover.Target>
+              <ActionIcon aria-label="Viewer Options" variant="default" size={36}>
+                <SlidersHorizontal size={17} />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="md">
+                {item.upscale?.url && !item.upscale.withRun && (
+                  <Switch
+                    label="Show Upscale"
+                    checked={Boolean(item.upscaleActive)}
+                    disabled={version.isPending}
+                    onChange={(event) =>
+                      version.mutate({
+                        galleryItemId: item.id,
+                        active: event.currentTarget.checked,
+                      })
+                    }
+                  />
+                )}
+                <Switch
+                  label="Share Without Settings"
+                  description="Leave the prompt, seed and workflow out of downloaded or shared files."
+                  checked={withoutSettings}
+                  onChange={(event) => setWithoutSettings(event.currentTarget.checked)}
+                />
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        </Group>
       </Stack>
     </Paper>
   );

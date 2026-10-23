@@ -126,7 +126,7 @@ function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
 
 export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
   const navigate = useNavigate();
-  const { profiles, setDraft, update } = useGeneration();
+  const { profiles, setDraft, changeKind } = useGeneration();
   const [selection, setSelection] = useState<GenerationInput | null>(null);
   const kind = preset.type || "image";
   const exact = profiles.find(
@@ -169,7 +169,14 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
             variant="default"
             size="sm"
             onClick={() => {
-              update({ prompt: preset.prompt });
+              changeKind(kind, "gallery");
+              setDraft(
+                (previous) => ({
+                  ...previous,
+                  input: { ...previous.input, prompt: preset.prompt },
+                }),
+                "gallery",
+              );
               navigate(kind === "video" ? "/video?compose=1" : "/images?compose=1");
             }}
           >
@@ -180,23 +187,26 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
             disabled={!!fit.blockers.length}
             onClick={() => {
               if (!profile) return;
-              setDraft((previous) => ({
-                ...previous,
-                input: {
-                  ...inputForProfile(previous.input, profile),
-                  ...fit.settings,
-                  backendId: input.backendId,
-                  prompt: preset.prompt,
-                  negative: profile.capabilities.negativePrompt === false ? "" : preset.negative,
-                  referenceAssets: [],
-                  referenceDetails: undefined,
-                },
-                references: [],
-                operation: kind === "video" ? "animate" : "image",
-                parentJobId: undefined,
-                presetId: undefined,
-                presetTitle: undefined,
-              }));
+              setDraft(
+                (previous) => ({
+                  ...previous,
+                  input: {
+                    ...inputForProfile(previous.input, profile),
+                    ...fit.settings,
+                    backendId: input.backendId,
+                    prompt: preset.prompt,
+                    negative: profile.capabilities.negativePrompt === false ? "" : preset.negative,
+                    referenceAssets: [],
+                    referenceDetails: undefined,
+                  },
+                  references: [],
+                  operation: kind === "video" ? "animate" : "image",
+                  parentJobId: undefined,
+                  presetId: undefined,
+                  presetTitle: undefined,
+                }),
+                "gallery",
+              );
               navigate(kind === "video" ? "/video?compose=1" : "/images?compose=1");
             }}
           >

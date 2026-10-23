@@ -1,6 +1,15 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { ActionIcon, Button, Group, Loader, Text, Transition, VisuallyHidden } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  Group,
+  Loader,
+  Stack,
+  Text,
+  Transition,
+  VisuallyHidden,
+} from "@mantine/core";
 import { useFocusWithin } from "@mantine/hooks";
 import { Minus, Plus } from "lucide-react";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
@@ -33,6 +42,10 @@ export function ZoomImage({
   const [mode, setMode] = useState<Mode>("Fit");
   const modeRef = useRef<Mode>("Fit");
   const [loading, setLoading] = useState(true);
+  const [displayedSrc, setDisplayedSrc] = useState(src);
+  const [switching, setSwitching] = useState(false);
+  const [versionFailed, setVersionFailed] = useState(false);
+  const [versionRetry, setVersionRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [recent, setRecent] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -47,6 +60,37 @@ export function ZoomImage({
     fit: boolean;
     multiple: boolean;
   } | null>(null);
+
+  useEffect(() => {
+    if (src === displayedSrc) {
+      setSwitching(false);
+      setVersionFailed(false);
+      if (picture.current?.querySelector("img")?.naturalWidth) setFailed(false);
+      return;
+    }
+    let current = true;
+    const replacement = new window.Image();
+    setSwitching(true);
+    setVersionFailed(false);
+    replacement.src = src;
+    void replacement
+      .decode()
+      .then(() => {
+        if (current) {
+          setDisplayedSrc(src);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (current) setVersionFailed(true);
+      })
+      .finally(() => {
+        if (current) setSwitching(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [src, displayedSrc, versionRetry]);
 
   function revealControls() {
     setRecent(true);
@@ -75,7 +119,7 @@ export function ZoomImage({
     changeMode("Custom");
     revealControls();
   }
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (loading) return;
     // Refit named views when the responsive viewer changes its available area.
     const observer = new ResizeObserver(() => layout(modeRef.current));
@@ -206,7 +250,8 @@ export function ZoomImage({
         }}
       >
         <TransformComponent
-          wrapperStyle={{ width: "100%", height: "100%" }}
+          // Native focus scrolling must not shift the library's transformed viewport.
+          wrapperStyle={{ width: "100%", height: "100%", overflow: "clip" }}
           contentStyle={{ width: size.width, height: size.height }}
         >
           <button
@@ -227,12 +272,13 @@ export function ZoomImage({
             }}
           >
             <img
-              src={src}
+              src={displayedSrc}
               alt={alt}
               draggable={false}
               width={size.width}
               height={size.height}
               onLoad={(event) => {
+                setFailed(false);
                 setSize({
                   width: event.currentTarget.naturalWidth,
                   height: event.currentTarget.naturalHeight,
@@ -247,11 +293,35 @@ export function ZoomImage({
           </button>
         </TransformComponent>
       </TransformWrapper>
-      {loading && <Loader className={classes.loading} aria-label="Loading Image" />}
-      {failed && (
+      {(loading || switching) && (
+        <Loader
+          className={classes.loading}
+          aria-label={switching ? "Loading Selected Version" : "Loading Image"}
+        />
+      )}
+      {failed && !switching && (
         <Text className={classes.loading} c="dimmed" role="alert">
           This image is unavailable.
         </Text>
+      )}
+      {versionFailed && !switching && (
+        <Stack
+          className={classes.loading}
+          gap="xs"
+          align="center"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Text size="sm" role="alert">
+            The selected version could not be loaded. The previous image is still shown.
+          </Text>
+          <Button
+            size="compact-sm"
+            variant="default"
+            onClick={() => setVersionRetry((value) => value + 1)}
+          >
+            Retry Selected Version
+          </Button>
+        </Stack>
       )}
       <Transition mounted={recent || focused} transition="fade" duration={duration} keepMounted>
         {(style) => (

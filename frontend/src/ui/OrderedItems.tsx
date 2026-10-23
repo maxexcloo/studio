@@ -1,41 +1,44 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode, type Ref } from "react";
 import { ActionIcon, Group, Stack, Tooltip } from "@mantine/core";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
-import { DragDropProvider } from "@dnd-kit/react";
-import { isSortable, useSortable } from "@dnd-kit/react/sortable";
-import { Feedback } from "@dnd-kit/dom";
-import { arrayMove } from "@dnd-kit/helpers";
-import { useMotionDuration } from "./Appearance";
 
-function OrderedItem({
-  id,
+export type OrderedItemsProps<T> = {
+  items: T[];
+  identity: (item: T) => string;
+  label: (item: T) => string;
+  onChange: (items: T[]) => void;
+  children: (item: T, index: number) => ReactNode;
+  kind: "references" | "loras";
+};
+
+const SortableOrderedItems = lazy(() => import("./SortableOrderedItems")) as <T>(
+  props: OrderedItemsProps<T>,
+) => ReactNode;
+
+export function OrderedItemRow({
+  elementRef,
+  handleRef,
+  isDragging = false,
   index,
   label,
   kind,
   count,
   move,
-  duration,
   children,
 }: {
-  id: string;
+  elementRef?: Ref<HTMLDivElement>;
+  handleRef?: Ref<HTMLButtonElement>;
+  isDragging?: boolean;
   index: number;
   label: string;
   kind: "references" | "loras";
   count: number;
   move: (from: number, to: number) => void;
-  duration: number;
   children: ReactNode;
 }) {
-  const { ref, handleRef, isDragging } = useSortable({
-    id,
-    index,
-    type: kind,
-    accept: kind,
-    transition: { duration },
-  });
   return (
     <Group
-      ref={ref}
+      ref={elementRef}
       role="listitem"
       aria-label={`${kind} ${label}`}
       wrap="nowrap"
@@ -47,6 +50,7 @@ function OrderedItem({
           <Tooltip label={`Drag ${label}`}>
             <ActionIcon
               ref={handleRef}
+              disabled={!handleRef}
               aria-label={`Drag ${label}`}
               variant="subtle"
               color="gray"
@@ -80,72 +84,43 @@ function OrderedItem({
   );
 }
 
-/** References and adapter stacks share handle-only pointer, touch and keyboard ordering. */
-export function OrderedItems<T>({
-  items,
-  identity,
-  label,
-  onChange,
-  children,
-  kind,
-}: {
-  items: T[];
-  identity: (item: T) => string;
-  label: (item: T) => string;
-  onChange: (items: T[]) => void;
-  children: (item: T, index: number) => ReactNode;
-  kind: "references" | "loras";
-}) {
-  const duration = useMotionDuration();
-  if (items.length < 2)
-    return (
-      <Stack gap="xs" role="list">
-        {items.map((item, index) => (
+function PlainOrderedItems<T>(props: OrderedItemsProps<T>) {
+  const { items, identity, label, onChange, children, kind } = props;
+  return (
+    <Stack gap="xs" role="list">
+      {items.map((item, index) =>
+        items.length < 2 ? (
           <div key={identity(item)} role="listitem" aria-label={`${kind} ${label(item)}`}>
             {children(item, index)}
           </div>
-        ))}
-      </Stack>
-    );
-  function move(from: number, to: number) {
-    if (from === to || from < 0 || to < 0 || to >= items.length) return;
-    onChange(arrayMove(items, from, to));
-  }
-  return (
-    <DragDropProvider
-      plugins={(defaults) =>
-        defaults.map((plugin) =>
-          plugin === Feedback
-            ? Feedback.configure({
-                dropAnimation: duration ? { duration } : null,
-                keyboardTransition: duration ? { duration } : null,
-              })
-            : plugin,
-        )
-      }
-      onDragEnd={(event) => {
-        if (event.canceled) return;
-        const { source } = event.operation;
-        // Optimistic sorting updates the source's index before React receives the drop.
-        if (isSortable(source)) move(source.initialIndex, source.index);
-      }}
-    >
-      <Stack gap="xs" role="list">
-        {items.map((item, index) => (
-          <OrderedItem
+        ) : (
+          <OrderedItemRow
             key={identity(item)}
-            id={identity(item)}
             index={index}
             label={label(item)}
             kind={kind}
             count={items.length}
-            move={move}
-            duration={duration}
+            move={(from, to) => {
+              const next = [...items];
+              const [moved] = next.splice(from, 1);
+              next.splice(to, 0, moved);
+              onChange(next);
+            }}
           >
             {children(item, index)}
-          </OrderedItem>
-        ))}
-      </Stack>
-    </DragDropProvider>
+          </OrderedItemRow>
+        ),
+      )}
+    </Stack>
+  );
+}
+
+/** References and adapter stacks share handle-only pointer, touch and keyboard ordering. */
+export function OrderedItems<T>(props: OrderedItemsProps<T>) {
+  if (props.items.length < 2) return <PlainOrderedItems {...props} />;
+  return (
+    <Suspense fallback={<PlainOrderedItems {...props} />}>
+      <SortableOrderedItems {...props} />
+    </Suspense>
   );
 }

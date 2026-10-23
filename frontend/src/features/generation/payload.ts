@@ -25,12 +25,17 @@ export function addReference(
   const limit =
     profile?.mediaInputs?.find((input) => input.id === slot)?.max ||
     (profile?.mediaInputs?.length ? 1 : 8);
-  const same = references.filter(
-    (reference) => reference.slot === slot && reference.id !== asset.id,
+  const existing = references.findIndex(
+    (reference) => reference.slot === slot && reference.id === asset.id,
   );
-  const keep = references.filter((reference) => reference.slot !== slot);
-  if (limit > 1 && same.length >= limit) return references;
-  return [...keep, ...(limit > 1 ? same.slice(-(limit - 1)) : []), { ...asset, slot }];
+  const replaced =
+    limit === 1 ? references.findIndex((reference) => reference.slot === slot) : existing;
+  if (replaced >= 0)
+    return references.map((reference, index) =>
+      index === replaced ? { ...asset, slot } : reference,
+    );
+  if (references.filter((reference) => reference.slot === slot).length >= limit) return references;
+  return [...references, { ...asset, slot }];
 }
 
 export function generationInput(

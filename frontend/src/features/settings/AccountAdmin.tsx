@@ -22,7 +22,7 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useGenerationActions } from "../generation/GenerationProvider";
 const featureLabels = {
   cloudModels: "Cloud Models",
   gallery: "Gallery",
@@ -70,7 +70,7 @@ function GroupEditor({
   admin: Administration;
   saved: (group: AccessGroup) => void;
 }) {
-  const { profiles } = useGeneration();
+  const { profiles } = useGenerationActions();
   const form = useForm<AccessGroup>({
     initialValues: initial || {
       id: "",

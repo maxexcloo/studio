@@ -147,7 +147,7 @@ function ServiceEndpointRow({ label, service }: { label: string; service: Servic
           value={endpoint?.id || null}
           onChange={setSelection}
           allowDeselect={false}
-          comboboxProps={{ withinPortal: true }}
+          comboboxProps={{ withinPortal: false }}
           style={{ flex: 1, minWidth: 0 }}
         />
         <Badge variant="light" color={healthColour(state)} mb={8}>

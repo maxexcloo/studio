@@ -2,9 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, failure, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
-import { initialInput, useGeneration } from "../generation/GenerationProvider";
+import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: () => void) {
-  const { setDraft, profiles, setPrepared } = useGeneration();
+  const { setDraft, profiles, setPrepared } = useGenerationActions();
   const navigate = useNavigate();
   const location = useLocation();
   return useMutation({

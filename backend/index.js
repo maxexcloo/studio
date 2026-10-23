@@ -261,6 +261,7 @@ import {
   startModelInstall,
   upscalePlan,
   upscaleQualities,
+  upscaleTargets,
   upscaleStatus,
   uploadUpscaleVideoSource,
 } from "./upscale.js";
@@ -2892,7 +2893,11 @@ app.get(
   onUpscaleWorker(async (req, res) => {
     const info = await upscaleContext(res, { force: req.query.fresh === "1" });
     if (!info) return;
-    const status = upscaleStatus(info, req.query.quality);
+    const status = {
+      ...upscaleStatus(info, req.query.quality),
+      qualities: upscaleQualities,
+      targets: upscaleTargets,
+    };
     // Install plans name server paths: they are for administrators only.
     if (req.studioAccount && !canAdmin(req)) return res.json({ ok: true, ...status });
     // Only worth the extra round trips while the nodes still need installing.
@@ -2947,6 +2952,13 @@ app.post("/api/upscale/install/cancel", (req, res) => {
 app.post(
   "/api/upscale",
   onUpscaleWorker(async (req, res) => {
+    const target = req.body?.target === undefined ? 0 : Number(req.body.target);
+    if (target !== 0 && !upscaleTargets.includes(target)) {
+      return res.status(400).json({
+        ok: false,
+        error: "Choose an upscale target of 2048 or 4096, or 0 for automatic sizing.",
+      });
+    }
     const info = await upscaleContext(res);
     if (!info) return;
     const quality = normalizeQuality(req.body?.quality);
@@ -3063,6 +3075,7 @@ app.post(
       item: upscaleItem,
       imageName,
       quality,
+      target,
       faceDetail,
       info,
       customWorkflow,

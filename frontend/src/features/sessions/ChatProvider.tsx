@@ -1,4 +1,13 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import type { ChatEvent, ChatInput, ChatMessage, ChatStatus } from "../../../../shared/chat";
@@ -96,7 +105,7 @@ function useChatState() {
         signal: controller.signal,
         headers: { Accept: "text/event-stream" },
       });
-      if (!override?.content) setText("");
+      if (!override?.content) setText((current) => (current.trim() === content ? "" : current));
       await readChat(response, (event) => {
         if (event.event === "message" || event.event === "delta") {
           void client.cancelQueries({ queryKey: ["chat", sessionId] });
@@ -148,14 +157,47 @@ function useChatState() {
   };
 }
 const Context = createContext<ReturnType<typeof useChatState> | null>(null);
+type ChatState = ReturnType<typeof useChatState>;
+const ChatControllerContext = createContext<{
+  send: ChatState["send"];
+  sendingSession: string;
+  status: Pick<ChatState["status"], "data" | "isPending" | "isError">;
+} | null>(null);
+
 export function ChatProvider({ children }: { children: ReactNode }) {
-  return <Context.Provider value={useChatState()}>{children}</Context.Provider>;
+  const value = useChatState();
+  const latestStateRef = useRef(value);
+  latestStateRef.current = value;
+  const send = useCallback<ChatState["send"]>(
+    (override, targetSessionId) => latestStateRef.current.send(override, targetSessionId),
+    [],
+  );
+  const status = useMemo(
+    () => ({
+      data: value.status.data,
+      isPending: value.status.isPending,
+      isError: value.status.isError,
+    }),
+    [value.status.data, value.status.isPending, value.status.isError],
+  );
+  const controller = useMemo(
+    () => ({ send, sendingSession: value.sendingSession, status }),
+    [send, value.sendingSession, status],
+  );
+  return (
+    <ChatControllerContext.Provider value={controller}>
+      <Context.Provider value={value}>{children}</Context.Provider>
+    </ChatControllerContext.Provider>
+  );
+}
+export function useChatController() {
+  return useContext(ChatControllerContext)!;
 }
 export function useChat() {
   return useContext(Context)!;
 }
 export function useChatMessages(id?: string) {
-  const { sendingSession } = useChat();
+  const { sendingSession } = useChatController();
   return useQuery({
     queryKey: ["chat", id],
     queryFn: () => api<ChatHistory>(`/api/sessions/${id}/chat`),

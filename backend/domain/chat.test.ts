@@ -130,6 +130,85 @@ test("explicit media tool preserves selected settings and records stable admissi
   assert.equal(fixture.admissions.length, 1);
   fixture.db.close();
 });
+
+test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
+  const fixture = setup([
+    frame({
+      choices: [
+        {
+          delta: {
+            content: "Using all ten references.",
+            tool_calls: [
+              {
+                index: 0,
+                function: {
+                  name: "request_media",
+                  arguments: '{"operation":"image","prompt":"Combine the references"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    "data: [DONE]\n\n",
+  ]);
+  const references = Array.from({ length: 10 }, (_, index) => ({
+    assetId: `owned-${index + 1}`,
+    slot: "images",
+  }));
+  const resolved: string[] = [];
+  fixture.service.options.reference = async (owner, id) => {
+    assert.equal(owner, "alice");
+    resolved.push(id);
+    return "data:image/png;base64,fixture";
+  };
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    {
+      content: "Combine all ten references",
+      references: references.map((reference) => reference.assetId),
+      generation: {
+        operation: "image",
+        input: { profileId: "ten-reference-profile", referenceAssets: references },
+      },
+    },
+    new AbortController().signal,
+    () => {},
+  );
+  assert.deepEqual(
+    resolved,
+    references.map((reference) => reference.assetId),
+  );
+  const first = fixture.requests[0].messages as { role: string; content: any }[];
+  assert.equal(first.at(-1)!.content.filter((part: any) => part.type === "image_url").length, 10);
+  for (const reference of references)
+    assert.ok(first[0].content.includes(JSON.stringify(reference)));
+  assert.deepEqual(
+    fixture.service.messages("alice", fixture.session.id)[1].draft!.input.referenceAssets,
+    references,
+  );
+  fixture.service.options.fetchImpl = async (_url, options) => {
+    fixture.requests.push(JSON.parse(String(options?.body)));
+    return new Response(
+      frame({ choices: [{ delta: { content: "The references work together." } }] }) +
+        "data: [DONE]\n\n",
+    );
+  };
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    { content: "Explain the composition" },
+    new AbortController().signal,
+    () => {},
+  );
+  const later = fixture.requests[1].messages as { role: string; content: string }[];
+  const previous = later.find((message) => message.role === "assistant")!.content;
+  for (const reference of references) assert.ok(previous.includes(JSON.stringify(reference)));
+  assert.equal(fixture.admissions.length, 1, "discussion does not create a second generation");
+  fixture.db.close();
+});
 test("truncated gateway response keeps partial text failed and never submits an incomplete action", async () => {
   const fixture = setup([frame({ choices: [{ delta: { content: "Partial answer" } }] })]);
   await assert.rejects(

@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Modal, Tooltip, VisuallyHidden } from "@mantine/core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { MediaComparison } from "./MediaComparison";
-import { ZoomImage } from "./ZoomImage";
+import { LoadingState } from "../../ui/LoadingState";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
+import { mediaSource } from "./mediaSource";
+const ZoomImage = lazy(() =>
+  import("./ZoomImage").then((module) => ({ default: module.ZoomImage })),
+);
 
 export function MediaViewer({
   item,
@@ -15,13 +19,18 @@ export function MediaViewer({
   sessionId,
   items = [item],
   navigate,
+  onReturnFocus,
 }: {
   item: MediaItem;
   close: () => void;
   sessionId?: string;
   items?: MediaItem[];
   navigate?: (item: MediaItem) => void;
+  onReturnFocus?: (item: MediaItem) => void;
 }) {
+  const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
+  const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
+  const source = mediaSource(displayed);
   const viewable = items.filter((candidate) => candidate.url);
   const currentIndex = viewable.findIndex((candidate) => candidate.id === item.id);
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
@@ -33,11 +42,16 @@ export function MediaViewer({
   }
   const returnTarget = useRef(document.activeElement as HTMLElement | null);
   const restoreFocus = useRef(true);
+  const currentReturn = useRef({ item, onReturnFocus });
+  currentReturn.current = { item, onReturnFocus };
   useEffect(
     () => () => {
       const target = returnTarget.current;
       requestAnimationFrame(() => {
-        if (restoreFocus.current && target?.isConnected) target.focus({ preventScroll: true });
+        if (!restoreFocus.current) return;
+        const current = currentReturn.current;
+        if (current.onReturnFocus) current.onReturnFocus(current.item);
+        else if (target?.isConnected) target.focus({ preventScroll: true });
       });
     },
     [],
@@ -58,7 +72,7 @@ export function MediaViewer({
         media.load();
       }
     };
-  }, [item.id, item.type]);
+  }, [item.id, item.type, source.url]);
   const [compare, setCompare] = useState(false);
   return (
     <>
@@ -139,10 +153,10 @@ export function MediaViewer({
             ) : item.type === "video" ? (
               <video
                 ref={video}
-                key={item.id}
-                src={item.url}
-                width={item.width}
-                height={item.height}
+                key={`${item.id}:${source.url}`}
+                src={source.url}
+                width={source.width}
+                height={source.height}
                 controls
                 autoPlay={false}
                 playsInline
@@ -159,33 +173,36 @@ export function MediaViewer({
                 />
               </div>
             ) : (
-              <ZoomImage
-                key={item.id}
-                src={item.upscale?.url || item.url}
-                alt={item.prompt || "Generated Image"}
-                width={item.width}
-                height={item.height}
-                navigate={
-                  canNavigate
-                    ? (direction) => {
-                        // A swipe replaces the image before its compatibility click arrives.
-                        gestureClick.current = true;
-                        requestAnimationFrame(() => {
-                          gestureClick.current = false;
-                        });
-                        move(direction);
-                      }
-                    : undefined
-                }
-              />
+              <Suspense fallback={<LoadingState label="Loading Image" fill />}>
+                <ZoomImage
+                  key={item.id}
+                  src={source.url}
+                  alt={item.prompt || "Generated Image"}
+                  width={source.width}
+                  height={source.height}
+                  navigate={
+                    canNavigate
+                      ? (direction) => {
+                          // A swipe replaces the image before its compatibility click arrives.
+                          gestureClick.current = true;
+                          requestAnimationFrame(() => {
+                            gestureClick.current = false;
+                          });
+                          move(direction);
+                        }
+                      : undefined
+                  }
+                />
+              </Suspense>
             )}
           </div>
           <MediaDetails
-            item={item}
+            item={displayed}
             sessionId={sessionId}
             compare={compare}
             onCompare={() => setCompare((value) => !value)}
             onDelete={() => setDeleting(true)}
+            onVersionChange={(id, active) => setVersion({ id, active })}
             onAction={() => {
               restoreFocus.current = false;
               close();

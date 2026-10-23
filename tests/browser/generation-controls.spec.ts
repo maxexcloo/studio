@@ -191,3 +191,61 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   expect(state.jobs[0].input.referenceDetails).toHaveLength(1);
   expect(state.jobs[0].input.referenceDetails[0].slot).toBe("end");
 });
+
+test("Saved family LoRA stacks retain order and disabled entries through update and reload", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const original = [
+    { name: "detail.safetensors", strength: 0.35, enabled: false },
+    { name: "soft-style.safetensors", strength: 0.65, enabled: true },
+  ];
+  state.loraLibrary.snapshots["family:test"] = [
+    { id: "copper-stack", name: "Copper Detail", loras: original },
+  ];
+  state.loraLibrary.snapshots["family:other"] = [
+    { id: "other-stack", name: "Other Family Stack", loras: [] },
+  ];
+  await create(page);
+  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
+  await page.getByRole("combobox", { name: "Saved LoRA Stack", exact: true }).click();
+  await page.getByRole("option", { name: "Copper Detail", exact: true }).click();
+  await page.getByRole("button", { name: "Load LoRA Stack", exact: true }).click();
+  const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
+  await expect(enabled).not.toBeChecked();
+  await expect(page.getByRole("textbox", { name: "Detail Slider", exact: true })).toHaveValue(
+    "0.35",
+  );
+  await enabled.check();
+  await page.getByRole("textbox", { name: "Detail Slider", exact: true }).fill("1.25");
+  await page
+    .getByRole("textbox", { name: "LoRA Stack Name", exact: true })
+    .fill("Copper Detail Refined");
+  await page.getByRole("textbox", { name: "LoRA Stack Name", exact: true }).press("Enter");
+  await expect
+    .poll(() => state.loraLibrary.snapshots["family:test"][0].name)
+    .toBe("Copper Detail Refined");
+  expect(state.jobs).toHaveLength(0);
+  expect(state.loraOperations.map((operation) => operation.op)).toEqual([
+    "stack.update",
+    "stack.rename",
+  ]);
+  expect(state.loraOperations.every((operation) => operation.key === "family:test")).toBe(true);
+  expect(state.loraLibrary.snapshots["family:other"][0].name).toBe("Other Family Stack");
+  await page.reload();
+  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
+  await page.getByRole("combobox", { name: "Saved LoRA Stack", exact: true }).click();
+  await page.getByRole("option", { name: "Copper Detail Refined", exact: true }).click();
+  await page.getByRole("button", { name: "Load LoRA Stack", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("Reuse the refined LoRA stack");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.loras).toEqual([
+    { ...original[0], strength: 1.25, enabled: true },
+    original[1],
+  ]);
+});

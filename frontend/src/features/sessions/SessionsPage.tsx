@@ -12,7 +12,7 @@ import { SessionIteration } from "./SessionIteration";
 
 import { MediaViewer } from "../gallery/MediaViewer";
 import { ChatWorkspace } from "./ChatWorkspace";
-import { useChat, useChatMessages } from "./ChatProvider";
+import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
 import { GenerationCard } from "./GenerationCard";
 import { generationInput } from "../generation/payload";
@@ -38,13 +38,19 @@ export function SessionPage() {
   const { draft, setDraft, profile, prepared, setPrepared } = useGeneration();
   const thread = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
+  const followedScrollHeight = useRef(0);
+  function followLatest() {
+    if (!thread.current || !atBottom.current) return;
+    thread.current.scrollTop = thread.current.scrollHeight;
+    followedScrollHeight.current = thread.current.scrollHeight;
+  }
   const feed = useRef<HTMLDivElement>(null);
   const chat = useChatMessages(id);
-  const { sendingSession } = useChat();
+  const { sendingSession } = useChatController();
   useLayoutEffect(() => {
     if (sendingSession === id) {
       atBottom.current = true;
-      if (thread.current) thread.current.scrollTop = thread.current.scrollHeight;
+      followLatest();
     }
   }, [sendingSession, id]);
   const [selected, setSelected] = useState<MediaItem | null>(null);
@@ -59,8 +65,7 @@ export function SessionPage() {
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        if (thread.current && atBottom.current)
-          thread.current.scrollTop = thread.current.scrollHeight;
+        followLatest();
       });
     });
     observer.observe(feed.current);
@@ -70,7 +75,7 @@ export function SessionPage() {
     };
   }, [id, session.isPending]);
   useLayoutEffect(() => {
-    if (thread.current && atBottom.current) thread.current.scrollTop = thread.current.scrollHeight;
+    followLatest();
   }, [
     session.data?.jobs
       .map((job) => `${job.id}:${job.status}:${job.items?.length || job.outputs?.length || 0}`)
@@ -137,6 +142,8 @@ export function SessionPage() {
           }}
           onScroll={() => {
             const element = thread.current!;
+            // Image layout can trigger native anchoring before ResizeObserver follows the new bottom.
+            if (atBottom.current && element.scrollHeight !== followedScrollHeight.current) return;
             atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 64;
           }}
         >

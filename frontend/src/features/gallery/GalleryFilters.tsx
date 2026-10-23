@@ -15,7 +15,7 @@ import {
 import { api } from "../../api";
 import { SearchInput } from "../../ui/SearchInput";
 import type { MediaKind } from "../../types";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useGenerationActions } from "../generation/GenerationProvider";
 import { GalleryFilterPicker, type GalleryFilterOption } from "./GalleryFilterPicker";
 
 export interface GalleryFilterValues {
@@ -171,7 +171,7 @@ function GalleryFilters({
   onStarredChange,
   withinPortal,
 }: GalleryFiltersProps) {
-  const { profiles } = useGeneration();
+  const { profiles } = useGenerationActions();
   const facets = useQuery({
     queryKey: ["gallery-filters", kind || ""],
     queryFn: () => api<GalleryFacets>(`/api/gallery/filters?type=${kind || ""}`),

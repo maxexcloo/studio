@@ -77,7 +77,20 @@ export interface MediaItem {
   filename?: string;
   startImageId?: string;
   referenceImage?: string;
-  upscale?: { url?: string; status?: string };
+  upscaleActive?: boolean;
+  upscale?: {
+    withRun?: boolean;
+    url?: string;
+    thumbnailUrl?: string;
+    width?: number;
+    height?: number;
+    status?: string;
+    outputName?: string;
+    quality?: "fast" | "balanced" | "high";
+    faceDetail?: boolean;
+    scale?: number;
+    jobId?: string;
+  };
 }
 export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "progress"> & {
   input: GenerationInput;

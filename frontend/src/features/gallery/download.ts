@@ -1,4 +1,5 @@
 import type { MediaItem } from "../../types";
+import { mediaSource } from "./mediaSource";
 
 /** Single-result actions save the displayed media; only bulk selection uses ZIP. */
 export function mediaDownload(item: MediaItem, withoutSettings = false) {
@@ -9,7 +10,8 @@ export function mediaDownload(item: MediaItem, withoutSettings = false) {
       .trim()
       .slice(0, 80) || "studio";
   const filename = /\.[a-z0-9]{2,5}$/i.test(base) ? base : `${base}.${extension}`;
-  const source = item.upscale?.url || item.url || "";
+  const selected = mediaSource(item);
+  const source = selected.url || "";
   let href = source;
   if (withoutSettings && source) {
     const url = new URL(source, window.location.origin);
@@ -23,6 +25,6 @@ export function mediaDownload(item: MediaItem, withoutSettings = false) {
   }
   return {
     href,
-    download: item.upscale?.url ? filename.replace(/\.[^.]+$/, ".png") : filename,
+    download: selected.upscaled ? filename.replace(/\.[^.]+$/, `.${extension}`) : filename,
   };
 }

@@ -3,7 +3,7 @@ import { Badge, Button, Group, Image, Paper, Stack, Text, Textarea } from "@mant
 import { useMediaQuery } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
 import type { GenerationInput, QueueJob, ReferenceAsset } from "../../types";
-import { initialInput, useGeneration } from "../generation/GenerationProvider";
+import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 import { ProfilePicker } from "../generation/ProfilePicker";
 import { ReferenceRoleControl } from "../generation/ReferenceRoleControl";
 import { ReferencePicker } from "../generation/ReferencePicker";
@@ -12,8 +12,9 @@ import { PromptHistory } from "../generation/PromptHistory";
 import { GenerationFooter } from "../generation/GenerationFooter";
 import { SizePicker } from "../generation/SizePicker";
 import { generationInput, referencePatch } from "../generation/payload";
+import { referenceLabel } from "../generation/references";
 import type { ChatDraft } from "../../../../shared/chat";
-import { useChat } from "./ChatProvider";
+import { useChatController } from "./ChatProvider";
 
 export function GenerationCard({
   job,
@@ -38,14 +39,24 @@ export function GenerationCard({
     prompt.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [editing, referenceOpen]);
   const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
-  const { profiles } = useGeneration();
-  const { send, sendingSession, status } = useChat();
+  const { profiles } = useGenerationActions();
+  const { send, sendingSession, status } = useChatController();
   const form = useForm<GenerationInput>({
     initialValues: { ...initialInput, ...snapshot } as GenerationInput,
   });
   const profile = profiles.find(
     (profile) => profile.id === form.values.profileId && profile.kind === form.values.kind,
   );
+  const recordedProfile = profiles.find(
+    (candidate) => candidate.id === snapshot.profileId && candidate.kind === snapshot.kind,
+  );
+  const recordedProfileLabel = String(
+    snapshot.profileName ||
+      recordedProfile?.displayName ||
+      recordedProfile?.label ||
+      "Saved Profile",
+  );
+  const recordedSettings = `${snapshot.width || ""} × ${snapshot.height || ""}${snapshot.steps ? ` · ${snapshot.steps} steps` : ""}${snapshot.seed !== undefined && snapshot.seed !== "" ? ` · Seed ${snapshot.seed}` : ""}`;
   const references = Array.isArray(form.values.referenceDetails)
     ? (form.values.referenceDetails as ReferenceAsset[])
     : [];
@@ -103,14 +114,16 @@ export function GenerationCard({
   return (
     <Paper withBorder radius="lg" p="md" className="studio-generation-card">
       <Stack gap="sm">
-        <Group justify="space-between" wrap="nowrap">
-          <Text size="xs" fw={600} c="dimmed">
-            {editing ? "New Variation" : "Prompt"}
-          </Text>
-          <Badge variant="light" color={snapshot.kind === "video" ? "violet" : "gray"}>
-            {operation === "upscale" ? "Upscale" : snapshot.kind === "video" ? "Video" : "Image"}
-          </Badge>
-        </Group>
+        {editing && (
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="xs" fw={600} c="dimmed">
+              New Variation
+            </Text>
+            <Badge variant="light" color={snapshot.kind === "video" ? "violet" : "gray"}>
+              {operation === "upscale" ? "Upscale" : snapshot.kind === "video" ? "Video" : "Image"}
+            </Badge>
+          </Group>
+        )}
         {editing ? (
           <form
             data-generation-editor
@@ -140,11 +153,11 @@ export function GenerationCard({
                   value={references}
                   onChange={changeReferences}
                 />
-                {references.map((asset) => (
+                {references.map((asset, index) => (
                   <Image
                     key={`${asset.slot}:${asset.id}`}
                     src={asset.thumbnailUrl || asset.url}
-                    alt={asset.name}
+                    alt={referenceLabel(asset, index, profile)}
                     h={36}
                     w={36}
                     radius="sm"
@@ -205,34 +218,45 @@ export function GenerationCard({
         ) : (
           <>
             <Text style={{ whiteSpace: "pre-wrap" }}>{String(snapshot.prompt || "")}</Text>
-            <Group gap="xs">
-              {references.map((asset) => (
-                <Image
-                  key={`${asset.slot}:${asset.id}`}
-                  src={asset.thumbnailUrl || asset.url}
-                  alt={asset.name || "Reference"}
-                  h={40}
-                  w={40}
-                  radius="sm"
-                />
-              ))}
-            </Group>
-            <Group justify="space-between" align="end">
-              <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
-                <Text size="xs" fw={500} truncate>
-                  {String(
-                    snapshot.profileName ||
-                      snapshot.profileId ||
-                      snapshot.model ||
-                      "Selected Model",
-                  )}
-                </Text>
-                <Text size="xs" c="dimmed">
-                  {String(snapshot.width || "")} × {String(snapshot.height || "")}
-                  {snapshot.steps ? ` · ${snapshot.steps} steps` : ""}
-                  {snapshot.seed ? ` · Seed ${snapshot.seed}` : ""}
-                </Text>
-              </Stack>
+            {!!references.length && (
+              <Group gap="xs">
+                {references.map((asset, index) => (
+                  <Image
+                    key={`${asset.slot}:${asset.id}`}
+                    src={asset.thumbnailUrl || asset.url}
+                    alt={referenceLabel(asset, index, profile)}
+                    h={40}
+                    w={40}
+                    radius="sm"
+                  />
+                ))}
+              </Group>
+            )}
+            <Group gap="xs" wrap="nowrap">
+              <Badge
+                size="xs"
+                variant="light"
+                color={snapshot.kind === "video" ? "violet" : "gray"}
+                style={{ flexShrink: 0 }}
+              >
+                {operation === "upscale"
+                  ? "Upscale"
+                  : snapshot.kind === "video"
+                    ? "Video"
+                    : "Image"}
+              </Badge>
+              <Text
+                size="xs"
+                c="dimmed"
+                truncate
+                flex={1}
+                miw={0}
+                title={[recordedProfileLabel, snapshot.profileId, recordedSettings]
+                  .filter(Boolean)
+                  .join(" · ")}
+              >
+                {recordedProfileLabel} · {recordedSettings}
+              </Text>
               {operation !== "upscale" && (
                 <Button variant="subtle" size="compact-sm" onClick={() => setEditing(true)}>
                   Edit & Rerun

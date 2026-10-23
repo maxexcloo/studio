@@ -55,6 +55,13 @@ export async function fixtures(page: Page) {
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
   const galleryRequests: string[] = [];
+  const loraLibrary = {
+    strengths: {},
+    snapshots: {} as Record<string, any[]>,
+    favorites: [],
+    recents: [],
+  };
+  const loraOperations: any[] = [];
   let clock = Date.parse(stamp);
   const nextStamp = () => new Date((clock += 1000)).toISOString();
   function recordGeneration(body: any, sessionId: string) {
@@ -248,6 +255,36 @@ export async function fixtures(page: Page) {
           .map(({ event, data }) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
           .join(""),
       });
+    }
+    if (path === "/api/loras/library") return respond({ found: true, library: loraLibrary });
+    if (path === "/api/loras/library/ops" && method === "POST") {
+      for (const operation of body.ops) {
+        loraOperations.push(operation);
+        const stacks = loraLibrary.snapshots[operation.key] || [];
+        switch (operation.op) {
+          case "stack.add":
+            loraLibrary.snapshots[operation.key] = [...stacks, operation.stack];
+            break;
+          case "stack.update":
+            loraLibrary.snapshots[operation.key] = stacks.map((stack) =>
+              stack.id === operation.id ? { ...stack, loras: operation.loras } : stack,
+            );
+            break;
+          case "stack.rename":
+            loraLibrary.snapshots[operation.key] = stacks.map((stack) =>
+              stack.id === operation.id ? { ...stack, name: operation.name } : stack,
+            );
+            break;
+          case "stack.delete":
+            loraLibrary.snapshots[operation.key] = stacks.filter(
+              (stack) => stack.id !== operation.id,
+            );
+            break;
+          default:
+            throw new Error(`Unsupported fixture LoRA operation: ${operation.op}`);
+        }
+      }
+      return respond({ ok: true, library: loraLibrary });
     }
     if (path === "/api/loras/info")
       return respond({
@@ -491,6 +528,8 @@ export async function fixtures(page: Page) {
     chatRequests,
     referenceRequests,
     galleryRequests,
+    loraLibrary,
+    loraOperations,
   };
 }
 export async function create(page: Page) {
@@ -499,6 +538,10 @@ export async function create(page: Page) {
 }
 export async function openNav(page: Page, label: string) {
   const more = page.getByRole("button", { name: "More Options" });
+  if (["Library", "Settings"].includes(label))
+    await expect(
+      more.or(page.getByRole("link", { name: label, exact: true }).first()),
+    ).toBeVisible();
   if (["Library", "Settings"].includes(label) && (await more.isVisible())) {
     await more.click();
     await page.getByRole("menuitem", { name: label, exact: true }).click();
@@ -517,6 +560,19 @@ export async function openTheme(page: Page) {
     await page.getByRole("button", { name: "More Options", exact: true }).click();
     await page.getByRole("menuitem", { name: "Theme", exact: true }).click();
   }
+}
+
+export async function viewerAction(page: Page, label: string) {
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: label, exact: true }).click();
+}
+
+export async function viewerOptions(page: Page) {
+  await page
+    .getByRole("dialog", { name: "Generation", exact: true })
+    .getByRole("button", { name: "Viewer Options", exact: true })
+    .click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {

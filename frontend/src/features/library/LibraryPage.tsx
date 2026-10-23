@@ -1,4 +1,4 @@
-import { useAccount } from "../auth/AccountGate";
+import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { CatalogueEditor } from "./CatalogueEditor";
 import { LibraryDefinitions } from "./LibraryDefinitions";
 import { SectionHeading } from "../../ui/SectionHeading";
@@ -19,7 +19,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, failure, post } from "../../api";
-import { WorkspaceSections, WorkspaceSectionSelect } from "../../ui/WorkspaceSections";
+import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { EmptyState } from "../../ui/EmptyState";
 import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
 import { LoadingState } from "../../ui/LoadingState";
@@ -30,30 +30,6 @@ import {
 } from "./LibraryCatalogueTable";
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
-const librarySections = {
-  imports: { value: "imports", label: "Imports" },
-  presets: { value: "presets", label: "Inspiration" },
-  models: { value: "models", label: "Models" },
-  loras: { value: "loras", label: "LoRAs" },
-  profiles: { value: "profiles", label: "Profiles" },
-  guides: { value: "guides", label: "Guides" },
-};
-function useLibraryNavigation() {
-  const account = useAccount();
-  const admin =
-    !!account.data &&
-    (account.data.mode !== "multi-user" || account.data.account?.role === "administrator");
-  return {
-    admin,
-    options: Object.values(librarySections).filter(
-      (section) => admin || !["profiles", "guides"].includes(section.value),
-    ),
-  };
-}
-export function LibraryTitle() {
-  const { options } = useLibraryNavigation();
-  return <WorkspaceSectionSelect label="Library" sections={options} />;
-}
 export function LibraryPage() {
   const { admin } = useLibraryNavigation();
   const [editingCatalogue, setEditingCatalogue] = useState<"models" | "loras" | null>(null);

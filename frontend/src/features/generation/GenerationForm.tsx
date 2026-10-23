@@ -18,7 +18,7 @@ import { ArrowUp } from "lucide-react";
 import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { failure, post } from "../../api";
-import type { GenerationInput, Session } from "../../types";
+import type { Session } from "../../types";
 import { useGeneration } from "./GenerationProvider";
 import { LoadingState } from "../../ui/LoadingState";
 import { ProfilePicker } from "./ProfilePicker";
@@ -31,6 +31,7 @@ import { SizePicker } from "./SizePicker";
 import { generationInput, referenceDetails, primaryReference, referencePatch } from "./payload";
 import { ReferenceRoleControl } from "./ReferenceRoleControl";
 import { ReferencePicker } from "./ReferencePicker";
+import { referenceLabel } from "./references";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
 export function GenerationForm({
@@ -144,11 +145,11 @@ export function GenerationForm({
           />
           {!!draft.references.length && (
             <Avatar.Group aria-label="Selected References" spacing={8}>
-              {draft.references.slice(0, 3).map((asset) => (
+              {draft.references.slice(0, 3).map((asset, index) => (
                 <Avatar
                   key={`${asset.slot}:${asset.id}`}
                   src={asset.thumbnailUrl || asset.url}
-                  alt={asset.name || "Reference"}
+                  alt={referenceLabel(asset, index, profile)}
                   size={28}
                   radius="sm"
                 />
@@ -265,17 +266,18 @@ export function GenerationForm({
                 onChange={(referenceRole) => update({ referenceRole })}
               />
             )}
-            {draft.references.map((asset) => (
+            {draft.references.map((asset, index) => (
               <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
                 <Group wrap="nowrap">
                   <AspectRatio ratio={1} w={52}>
-                    <Image src={asset.thumbnailUrl} alt={asset.name} fallbackSrc="" />
+                    <Image
+                      src={asset.thumbnailUrl}
+                      alt={referenceLabel(asset, index, profile)}
+                      fallbackSrc=""
+                    />
                   </AspectRatio>
                   <Text size="sm" lineClamp={1} flex={1}>
-                    {asset.name}
-                    {asset.slot
-                      ? ` · ${profile?.mediaInputs?.find((slot) => slot.id === asset.slot)?.label || asset.slot}`
-                      : ""}
+                    {referenceLabel(asset, index, profile)}
                   </Text>
                   <Button
                     variant="subtle"
