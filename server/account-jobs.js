@@ -14,7 +14,8 @@ export function reserveAccountJob(ownerId, jobs, reservations, limit) {
     return { accepted: false, release() {} };
   }
   const pending = reservations.get(ownerId) || 0;
-  if (accountOutstandingJobs(ownerId, jobs) + pending >= limit) return { accepted: false, release() {} };
+  if (accountOutstandingJobs(ownerId, jobs) + pending >= limit)
+    return { accepted: false, release() {} };
 
   reservations.set(ownerId, pending + 1);
   let released = false;
@@ -26,13 +27,14 @@ export function reserveAccountJob(ownerId, jobs, reservations, limit) {
       const remaining = (reservations.get(ownerId) || 1) - 1;
       if (remaining > 0) reservations.set(ownerId, remaining);
       else reservations.delete(ownerId);
-    }
+    },
   };
 }
 
 export function configuredAccountJobLimit(value = process.env.STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS) {
   if (value === undefined || value === "") return 2;
   const limit = Number(value);
-  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS must be a positive whole number.");
+  if (!Number.isSafeInteger(limit) || limit < 1)
+    throw new Error("STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS must be a positive whole number.");
   return limit;
 }

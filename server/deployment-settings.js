@@ -14,7 +14,14 @@ export function settingSource(key) {
   return { source: "deployment", locked: true };
 }
 
-const flag = (key, label, description, { defaultOn = true, applies = "now" } = {}) => ({ key, label, description, kind: "flag", defaultOn, applies });
+const flag = (key, label, description, { defaultOn = true, applies = "now" } = {}) => ({
+  key,
+  label,
+  description,
+  kind: "flag",
+  defaultOn,
+  applies,
+});
 
 /**
  * Catalogue switches: what the generation catalogue offers. Some are read once,
@@ -25,10 +32,13 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
  * deployment variables that switch one off for everyone (feature-options.js).
  */
 export const catalogueFlags = [
-  flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", { applies: "restart" })
+  flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", {
+    applies: "restart",
+  }),
 ];
 
-const flagOn = (item) => (item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1");
+const flagOn = (item) =>
+  item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1";
 
 export function describeFlag(item) {
   return { ...item, value: flagOn(item), ...settingSource(item.key) };
@@ -36,7 +46,8 @@ export function describeFlag(item) {
 
 /** Writes one deployment setting to Studio's .env, unless the deployment owns it. */
 export function saveDeploymentSetting(key, value) {
-  if (settingSource(key).locked) throw new Error("This setting comes from the deployment configuration. Change it there.");
+  if (settingSource(key).locked)
+    throw new Error("This setting comes from the deployment configuration. Change it there.");
   if (value === "" || value === null || value === undefined) removeLocalEnvValue(key);
   else writeLocalEnvValue(key, String(value));
   return settingSource(key);

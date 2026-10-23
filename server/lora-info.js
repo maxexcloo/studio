@@ -1,14 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
-import { comfy, modelFolders } from './comfy.js';
-import { families as modelFamilies } from './family-catalog.js';
+import { comfy, modelFolders } from "./comfy.js";
+import { families as modelFamilies } from "./family-catalog.js";
 
-import { enrichLocalLoraInfo, enrichLoraInfo } from './lora-catalogue.js';
-import { catalogueStore } from './library-catalogue.js';
-import { readSafetensorsHeader } from './model-families.js';
+import { enrichLocalLoraInfo, enrichLoraInfo } from "./lora-catalogue.js";
+import { catalogueStore } from "./library-catalogue.js";
+import { readSafetensorsHeader } from "./model-families.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
-const families = { ...modelFamilies, boogu: { label: 'Boogu' }, moss_image: { label: 'MOSS Image' } };
+const families = {
+  ...modelFamilies,
+  boogu: { label: "Boogu" },
+  moss_image: { label: "MOSS Image" },
+};
 
 /**
  * What a LoRA was trained for and how to trigger it, read the same way model
@@ -55,20 +59,33 @@ const metadataFamilies = [
   [/sd[-_ ]?3|stable-diffusion-v3|stable-diffusion-3/, ["sd3"]],
   [/sdxl|stable-diffusion-xl|xl[-_]base|pony|illustrious|noob/, ["sdxl"]],
   [/sd[-_ ]?v?2|stable-diffusion-v2/, ["sd2"]],
-  [/sd[-_ ]?v?1|stable-diffusion-v1|sd[-_ ]?1\.5/, ["sd15"]]
+  [/sd[-_ ]?v?1|stable-diffusion-v1|sd[-_ ]?1\.5/, ["sd15"]],
 ];
 
 /** Families from what a LoRA's metadata says it was trained on, or []. */
 export function familiesFromMetadata(metadata = {}) {
-  const text = ["modelspec.architecture", "ss_base_model_version", "ss_architecture", "base_model", "modelspec.base_model"]
-    .map((key) => metadata?.[key]).filter((value) => typeof value === "string").join(" ").toLowerCase();
+  const text = [
+    "modelspec.architecture",
+    "ss_base_model_version",
+    "ss_architecture",
+    "base_model",
+    "modelspec.base_model",
+  ]
+    .map((key) => metadata?.[key])
+    .filter((value) => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
   if (!text) return [];
   return metadataFamilies.find(([test]) => test.test(text))?.[1] || [];
 }
 
 const parseJson = (value) => {
   if (typeof value !== "string") return value && typeof value === "object" ? value : null;
-  try { return JSON.parse(value); } catch { return null; }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -76,10 +93,22 @@ const parseJson = (value) => {
  * ai-toolkit's trigger word), else the tags kohya saw on every training image.
  */
 export function triggersFromMetadata(metadata = {}) {
-  const explicit = [metadata?.["modelspec.trigger_phrase"], metadata?.trigger_phrase, metadata?.trigger_word, metadata?.trigger_words, metadata?.["ss_trigger_words"]]
-    .filter((value) => typeof value === "string" && value.trim());
+  const explicit = [
+    metadata?.["modelspec.trigger_phrase"],
+    metadata?.trigger_phrase,
+    metadata?.trigger_word,
+    metadata?.trigger_words,
+    metadata?.["ss_trigger_words"],
+  ].filter((value) => typeof value === "string" && value.trim());
   if (explicit.length) {
-    return [...new Set(explicit.flatMap((value) => value.split(/[,\n]/)).map((word) => word.trim()).filter(Boolean))].slice(0, 6);
+    return [
+      ...new Set(
+        explicit
+          .flatMap((value) => value.split(/[,\n]/))
+          .map((word) => word.trim())
+          .filter(Boolean),
+      ),
+    ].slice(0, 6);
   }
   const frequency = parseJson(metadata?.ss_tag_frequency);
   if (!frequency || typeof frequency !== "object") return [];
@@ -95,24 +124,33 @@ export function triggersFromMetadata(metadata = {}) {
   }
   // Datasets that give their image count; otherwise the most frequent tag stands in for it.
   const datasets = parseJson(metadata?.ss_dataset_dirs);
-  if (datasets && typeof datasets === "object") images = Object.values(datasets).reduce((sum, item) => sum + (Number(item?.img_count) || 0), 0);
+  if (datasets && typeof datasets === "object")
+    images = Object.values(datasets).reduce((sum, item) => sum + (Number(item?.img_count) || 0), 0);
   const top = Math.max(0, ...counts.values());
   const every = images || top;
   if (!every) return [];
-  return [...counts.entries()]
-    .filter(([, count]) => count >= every * 0.9)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([tag]) => tag)
-    // A caption-long "tag" is a whole sentence, not something to type.
-    .filter((tag) => tag.length <= 48)
-    .slice(0, 5);
+  return (
+    [...counts.entries()]
+      .filter(([, count]) => count >= every * 0.9)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([tag]) => tag)
+      // A caption-long "tag" is a whole sentence, not something to type.
+      .filter((tag) => tag.length <= 48)
+      .slice(0, 5)
+  );
 }
 
 /* ------------------------------------------------------------ Tensor keys */
 
 // Weight suffixes the LoRA formats add to a module's name.
-const loraSuffix = /\.(lora_down|lora_up|lora_A|lora_B|lora_mid|down|up)(\.default)?\.weight$|\.(alpha|dora_scale|diff|diff_b)$|\.(hada|lokr)_\w+$/;
-const kind = (key) => (/lora_(up|B)\.|\.up\.weight$/.test(key) ? "up" : /lora_(down|A)\.|\.down\.weight$/.test(key) ? "down" : "");
+const loraSuffix =
+  /\.(lora_down|lora_up|lora_A|lora_B|lora_mid|down|up)(\.default)?\.weight$|\.(alpha|dora_scale|diff|diff_b)$|\.(hada|lokr)_\w+$/;
+const kind = (key) =>
+  /lora_(up|B)\.|\.up\.weight$/.test(key)
+    ? "up"
+    : /lora_(down|A)\.|\.down\.weight$/.test(key)
+      ? "down"
+      : "";
 
 /** Every down-projection's input width and up-projection's output width, by module path. */
 function shapes(header) {
@@ -122,7 +160,11 @@ function shapes(header) {
     const role = kind(key);
     if (!role) continue;
     const module = key.replace(loraSuffix, "");
-    found.push({ module, role, width: role === "down" ? Number(value.shape[1]) : Number(value.shape[0]) });
+    found.push({
+      module,
+      role,
+      width: role === "down" ? Number(value.shape[1]) : Number(value.shape[0]),
+    });
   }
   return found;
 }
@@ -153,7 +195,9 @@ export function familiesFromKeys(header) {
   const list = shapes(header);
   const has = (pattern) => keys.some((key) => pattern.test(key));
 
-  if (has(/(^|[._])(input_blocks|output_blocks|middle_block|down_blocks|up_blocks|mid_block)[._]\d/)) {
+  if (
+    has(/(^|[._])(input_blocks|output_blocks|middle_block|down_blocks|up_blocks|mid_block)[._]\d/)
+  ) {
     const context = widthOf(list, /attn2[._]to_k/, "down");
     if (context === 2048 || has(/^lora_te2_/)) return ["sdxl"];
     if (context === 768) return ["sd15"];
@@ -163,7 +207,8 @@ export function familiesFromKeys(header) {
   if (has(/joint_blocks[._]\d/)) return ["sd3"];
   // FLUX.3's text, image and reference mode blocks; MOSS-Image's single stream of q/k/v and fused feed-forward.
   if (has(/(content|txt)_mode_blocks[._]/)) return ["flux3"];
-  if (has(/(^|[._])layers[._]\d+[._]proj[._](q|k|v|o|qkv|ffn_up_gate|ffn_down)[._]/)) return ["moss_image"];
+  if (has(/(^|[._])layers[._]\d+[._]proj[._](q|k|v|o|qkv|ffn_up_gate|ffn_down)[._]/))
+    return ["moss_image"];
   if (has(/double_layers[._]\d|single_layers[._]\d/)) return ["auraflow"];
   if (has(/double_stream_blocks[._]\d|single_stream_blocks[._]\d/)) return ["hidream"];
   if (has(/(^|[._])blocks[._]\d+[._](self_attn|cross_attn|ffn)[._]/)) {
@@ -185,7 +230,11 @@ export function familiesFromKeys(header) {
   const diffusersFlux = has(/single_transformer_blocks[._]\d/);
   if (doubles || diffusersFlux) {
     // HunyuanVideo shares Flux's block names; its 20 double blocks (1.0) or 2048 width (1.5) give it away.
-    const hidden = widthOf(list, /double_blocks[._]\d+[._]img_attn[._]qkv$|transformer_blocks[._]\d+[._]attn[._]to_q$/, "down");
+    const hidden = widthOf(
+      list,
+      /double_blocks[._]\d+[._]img_attn[._]qkv$|transformer_blocks[._]\d+[._]attn[._]to_q$/,
+      "down",
+    );
     if (hidden === 2048) return ["hunyuan15"];
     if (doubles === 20) return [];
     const linear1 = widthOf(list, /single_blocks[._]\d+[._]linear1$/, "up");
@@ -206,15 +255,21 @@ export function familiesFromKeys(header) {
 
 function localLoraFile(name) {
   const parts = String(name).split(/[\\/]/).filter(Boolean);
-  if (!parts.length || parts.some((part) => part === "..") || !/\.safetensors$/i.test(name)) return "";
+  if (!parts.length || parts.some((part) => part === "..") || !/\.safetensors$/i.test(name))
+    return "";
   for (const dir of modelFolders("loras", ["loras"])) {
     const file = path.join(dir, ...parts);
-    try { if (fs.statSync(file).isFile()) return file; } catch { /* next folder */ }
+    try {
+      if (fs.statSync(file).isFile()) return file;
+    } catch {
+      /* next folder */
+    }
   }
   return "";
 }
 
-const label = (ids) => [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(" / ");
+const label = (ids) =>
+  [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(" / ");
 
 /**
  * The families a LoRA fits, with the ones that only narrow them by name
@@ -225,7 +280,10 @@ function withRefinements(ids) {
   for (let grew = true; grew;) {
     grew = false;
     for (const [id, spec] of Object.entries(families)) {
-      if (spec.refines && all.has(spec.refines.family) && !all.has(id)) { all.add(id); grew = true; }
+      if (spec.refines && all.has(spec.refines.family) && !all.has(id)) {
+        all.add(id);
+        grew = true;
+      }
     }
   }
   return [...all];
@@ -235,15 +293,30 @@ function describe(header, metadata) {
   const fromKeys = familiesFromKeys(header);
   const fromMeta = familiesFromMetadata(metadata);
   // The keys are the stronger witness; metadata narrows a key reading that fits several.
-  const narrowed = fromKeys.length && fromMeta.length ? fromKeys.filter((id) => fromMeta.includes(id)) : [];
+  const narrowed =
+    fromKeys.length && fromMeta.length ? fromKeys.filter((id) => fromMeta.includes(id)) : [];
   const found = narrowed.length ? narrowed : fromKeys.length ? fromKeys : fromMeta;
   // The label names what it was made for; the list also holds the models that share its layout.
   const base = label(found);
   const ids = withRefinements(found);
-  const about = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).filter((value) => typeof value === "string").join(" ");
-  const title = ["modelspec.title", "ss_output_name", "name"].map((key) => metadata?.[key]).find((value) => typeof value === "string" && value.trim())?.trim().slice(0, 200);
+  const about = ["modelspec.title", "ss_output_name", "name"]
+    .map((key) => metadata?.[key])
+    .filter((value) => typeof value === "string")
+    .join(" ");
+  const title = ["modelspec.title", "ss_output_name", "name"]
+    .map((key) => metadata?.[key])
+    .find((value) => typeof value === "string" && value.trim())
+    ?.trim()
+    .slice(0, 200);
   const description = metadata?.["modelspec.description"];
-  return { ...(typeof description === "string" ? { description: description.trim().slice(0, 10000) } : {}), ...(title ? { title } : {}), families: ids, base, triggers: triggersFromMetadata(metadata || {}), ...(about ? { about: about.slice(0, 200) } : {}) };
+  return {
+    ...(typeof description === "string" ? { description: description.trim().slice(0, 10000) } : {}),
+    ...(title ? { title } : {}),
+    families: ids,
+    base,
+    triggers: triggersFromMetadata(metadata || {}),
+    ...(about ? { about: about.slice(0, 200) } : {}),
+  };
 }
 
 /** What one LoRA file on this computer is, cached by size and date; null when out of reach. */
@@ -251,11 +324,19 @@ export function loraInfo(name) {
   const file = localLoraFile(name);
   if (!file) return remoteCache.get(name) || null;
   let stat;
-  try { stat = fs.statSync(file); } catch { return null; }
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return null;
+  }
   const key = `${file}:${stat.size}:${stat.mtimeMs}`;
   if (!cache.has(key)) {
     let header = null;
-    try { header = readSafetensorsHeader(file); } catch { header = null; }
+    try {
+      header = readSafetensorsHeader(file);
+    } catch {
+      header = null;
+    }
     cache.set(key, header ? describe(header, header.__metadata__ || {}) : null);
   }
   const info = cache.get(key);
@@ -279,14 +360,20 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   for (const name of names) {
     const info = loraInfo(name);
     if (info) result[name] = info;
-    else if (/\.safetensors$/i.test(name) && !remoteCache.has(name) && !localLoraFile(name)) remote.push(name);
+    else if (/\.safetensors$/i.test(name) && !remoteCache.has(name) && !localLoraFile(name))
+      remote.push(name);
   }
   async function worker() {
     while (remote.length) {
       const name = remote.shift();
       try {
-        const metadata = await comfy(`/view_metadata/loras?filename=${encodeURIComponent(name)}`, { timeout: 10_000 });
-        remoteCache.set(name, describe(null, metadata && typeof metadata === "object" ? metadata : {}));
+        const metadata = await comfy(`/view_metadata/loras?filename=${encodeURIComponent(name)}`, {
+          timeout: 10_000,
+        });
+        remoteCache.set(
+          name,
+          describe(null, metadata && typeof metadata === "object" ? metadata : {}),
+        );
       } catch (error) {
         // No metadata block is an answer worth keeping; anything else is tried again next time.
         if (Number(error?.status) === 404) remoteCache.set(name, describe(null, {}));
@@ -305,7 +392,6 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   return result;
 }
 
-
 /** The catalogue store (library-catalogue.js), with entry families read the way LoRA metadata is. */
 export const loraCatalogue = () => catalogueStore({ familiesFromMetadata });
 
@@ -314,5 +400,11 @@ export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [],
   // One catalogue (library/catalogue.json) holds provider downloads, the synced and hand-installed
   // lora-catalogue.json files and Studio's edits; this view keeps the shapes those files had.
   const { sources, catalogue } = loraCatalogue().loraView();
-  return enrichLocalLoraInfo(enrichLoraInfo(info, name, sources, familiesFromMetadata, families), name, catalogue, familiesFromMetadata, families);
+  return enrichLocalLoraInfo(
+    enrichLoraInfo(info, name, sources, familiesFromMetadata, families),
+    name,
+    catalogue,
+    familiesFromMetadata,
+    families,
+  );
 }

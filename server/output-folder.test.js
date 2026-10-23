@@ -11,7 +11,7 @@ const item = (filename, subfolder = "") => ({
   id: filename,
   url: `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`,
   status: "done",
-  createdAt: new Date().toISOString()
+  createdAt: new Date().toISOString(),
 });
 
 test("folder input tolerates quotes, file URLs and ~", () => {
@@ -43,7 +43,10 @@ test("inspection tells the right output folder from a merely existing one", asyn
     assert.equal((await inspectOutputDir(wrong, samples)).state, "mismatch");
     assert.equal((await inspectOutputDir(wrong, [])).state, "ok");
     assert.equal((await inspectOutputDir(path.join(base, "nope"), samples)).state, "missing");
-    assert.equal((await inspectOutputDir(path.join(right, "ComfyUI_00001_.png"), samples)).state, "not-folder");
+    assert.equal(
+      (await inspectOutputDir(path.join(right, "ComfyUI_00001_.png"), samples)).state,
+      "not-folder",
+    );
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }
@@ -64,14 +67,34 @@ test("only a folder ComfyUI writes to can become the output folder", async () =>
   fs.writeFileSync(path.join(random, "taxes.pdf"), "");
   const options = { current: "", comfyDirs: [], samples: [] };
   try {
-    assert.equal((await outputDirChoice(comfyOutput, options)).ok, true, "next to ComfyUI’s models");
-    assert.equal((await outputDirChoice(empty, options)).ok, true, "a fresh, empty one next to models too");
-    assert.equal((await outputDirChoice(renders, options)).ok, true, "one Studio already saved into");
+    assert.equal(
+      (await outputDirChoice(comfyOutput, options)).ok,
+      true,
+      "next to ComfyUI’s models",
+    );
+    assert.equal(
+      (await outputDirChoice(empty, options)).ok,
+      true,
+      "a fresh, empty one next to models too",
+    );
+    assert.equal(
+      (await outputDirChoice(renders, options)).ok,
+      true,
+      "one Studio already saved into",
+    );
     const refused = await outputDirChoice(random, options);
     assert.equal(refused.ok, false);
     assert.match(refused.error, /doesn’t look like a ComfyUI output folder/);
-    assert.equal((await outputDirChoice(random, { ...options, comfyDirs: [random] })).ok, true, "ComfyUI says it saves there");
-    assert.equal((await outputDirChoice(random, { ...options, current: random })).ok, true, "the folder already set keeps working");
+    assert.equal(
+      (await outputDirChoice(random, { ...options, comfyDirs: [random] })).ok,
+      true,
+      "ComfyUI says it saves there",
+    );
+    assert.equal(
+      (await outputDirChoice(random, { ...options, current: random })).ok,
+      true,
+      "the folder already set keeps working",
+    );
     assert.equal((await outputDirChoice(os.homedir(), options)).ok, false);
     assert.equal((await outputDirChoice(path.parse(base).root, options)).ok, false);
     assert.equal((await outputDirChoice(path.join(base, "nope"), options)).ok, false);

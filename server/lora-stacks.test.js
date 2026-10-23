@@ -6,7 +6,8 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-loras-"));
 process.env.STUDIO_DATA_DIR = dir;
-const { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary } = await import("./lora-stacks.js");
+const { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary } =
+  await import("./lora-stacks.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const stack = (id, name, loras = [{ name: "a.safetensors", strength: 1 }]) => ({ id, name, loras });
@@ -16,14 +17,23 @@ test("two devices adding stacks both keep theirs", () => {
   clearLoraState();
   applyLoraOps([{ op: "stack.add", key, stack: stack("mac", "Krea") }]);
   const library = applyLoraOps([{ op: "stack.add", key, stack: stack("phone", "Portraits") }]);
-  assert.deepEqual(library.snapshots[key].map((item) => item.id), ["mac", "phone"]);
+  assert.deepEqual(
+    library.snapshots[key].map((item) => item.id),
+    ["mac", "phone"],
+  );
 });
 
 test("account LoRA stacks and library state use separate files from each other and legacy state", () => {
   clearLoraState("account-a");
   clearLoraState("account-b");
-  saveLoraLibrary({ favorites: ["private-a.safetensors"], snapshots: { [key]: [stack("a", "A")] } }, "account-a");
-  saveLoraLibrary({ favorites: ["private-b.safetensors"], snapshots: { [key]: [stack("b", "B")] } }, "account-b");
+  saveLoraLibrary(
+    { favorites: ["private-a.safetensors"], snapshots: { [key]: [stack("a", "A")] } },
+    "account-a",
+  );
+  saveLoraLibrary(
+    { favorites: ["private-b.safetensors"], snapshots: { [key]: [stack("b", "B")] } },
+    "account-b",
+  );
   assert.deepEqual(loadLoraLibrary("account-a").favorites, ["private-a.safetensors"]);
   assert.deepEqual(loadLoraLibrary("account-b").favorites, ["private-b.safetensors"]);
   assert.equal(loadLoraLibrary().favorites.includes("private-a.safetensors"), false);
@@ -33,17 +43,31 @@ test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () 
   clearLoraState();
   const add = { op: "stack.add", key, stack: stack("x", "Krea") };
   applyLoraOps([add, add]);
-  applyLoraOps([{ op: "stack.delete", key, id: "x" }, { op: "stack.delete", key, id: "x" }]);
+  applyLoraOps([
+    { op: "stack.delete", key, id: "x" },
+    { op: "stack.delete", key, id: "x" },
+  ]);
   assert.deepEqual(loadLoraLibrary().snapshots[key], []);
-  applyLoraOps([{ op: "favorite", name: "a", on: true }, { op: "favorite", name: "a", on: true }]);
+  applyLoraOps([
+    { op: "favorite", name: "a", on: true },
+    { op: "favorite", name: "a", on: true },
+  ]);
   assert.deepEqual(loadLoraLibrary().favorites, ["a"]);
 });
 
 test("a stale whole-library save merges instead of wiping newer stacks", () => {
   clearLoraState();
   applyLoraOps([{ op: "stack.add", key, stack: stack("new", "Saved on the Mac") }]);
-  const library = saveLoraLibrary({ snapshots: { [key]: [stack("old", "From an old tab")] }, favorites: ["b"], strengths: {}, recents: [] });
-  assert.deepEqual(library.snapshots[key].map((item) => item.name), ["Saved on the Mac", "From an old tab"]);
+  const library = saveLoraLibrary({
+    snapshots: { [key]: [stack("old", "From an old tab")] },
+    favorites: ["b"],
+    strengths: {},
+    recents: [],
+  });
+  assert.deepEqual(
+    library.snapshots[key].map((item) => item.name),
+    ["Saved on the Mac", "From an old tab"],
+  );
   assert.deepEqual(library.favorites, ["b"]);
 });
 
@@ -56,7 +80,7 @@ test("rename, update, strengths, recents and the active stack all apply", () => 
     { op: "strengths", workflowId: "krea2", values: { "b.safetensors": 0.9 } },
     { op: "strengths", workflowId: "krea2", values: { "c.safetensors": 1.1 } },
     { op: "recents", names: ["b.safetensors"] },
-    { op: "active", workflowId: "krea2", loras: [{ name: "b.safetensors", strength: 0.9 }] }
+    { op: "active", workflowId: "krea2", loras: [{ name: "b.safetensors", strength: 0.9 }] },
   ]);
   const library = loadLoraLibrary();
   assert.equal(library.snapshots[key][0].name, "Krea");
@@ -68,7 +92,10 @@ test("rename, update, strengths, recents and the active stack all apply", () => 
 
 test("stacks saved per workflow by older builds move to the family", () => {
   clearLoraState();
-  applyLoraOps([{ op: "stack.add", key: "krea2-workflow", stack: stack("legacy", "Old") }, { op: "stack.move", key, from: "krea2-workflow" }]);
+  applyLoraOps([
+    { op: "stack.add", key: "krea2-workflow", stack: stack("legacy", "Old") },
+    { op: "stack.move", key, from: "krea2-workflow" },
+  ]);
   const library = loadLoraLibrary();
   assert.equal(library.snapshots["krea2-workflow"], undefined);
   assert.equal(library.snapshots[key][0].id, "legacy");

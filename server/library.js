@@ -2,7 +2,21 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir, localOutputFile, normalizeFolderInput, root } from "./comfy.js";
-import { dataDir, dedupeGallery, describeComfyGraph, gallery, galleryKey, galleryLimit, isGalleryHidden, listedInFolder, markGalleryReset, promptTitle, setGallery, setLibraryFileCheck, invalidateVisibleCache } from "./gallery-store.js";
+import {
+  dataDir,
+  dedupeGallery,
+  describeComfyGraph,
+  gallery,
+  galleryKey,
+  galleryLimit,
+  isGalleryHidden,
+  listedInFolder,
+  markGalleryReset,
+  promptTitle,
+  setGallery,
+  setLibraryFileCheck,
+  invalidateVisibleCache,
+} from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { isInside, samePath } from "./paths.js";
 import { parseA1111Parameters, readPngInfo } from "./png-text.js";
@@ -36,10 +50,20 @@ const scanDepth = 8;
 // Studio's output folder (data-names.js), under either name. Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in
 // the gallery already or deleted on purpose.
-const skippedNames = new Set(["node_modules", "__pycache__", "$RECYCLE.BIN", "System Volume Information", ...outputFolderNames]);
+const skippedNames = new Set([
+  "node_modules",
+  "__pycache__",
+  "$RECYCLE.BIN",
+  "System Volume Information",
+  ...outputFolderNames,
+]);
 
 function realPath(dir) {
-  try { return fs.realpathSync(dir); } catch { return path.resolve(dir); }
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return path.resolve(dir);
+  }
 }
 
 let folders = loadFolders();
@@ -47,7 +71,9 @@ let folders = loadFolders();
 function loadFolders() {
   try {
     const value = readJsonFile(foldersPath);
-    return (Array.isArray(value?.folders) ? value.folders : []).filter((folder) => folder?.id && folder?.path);
+    return (Array.isArray(value?.folders) ? value.folders : []).filter(
+      (folder) => folder?.id && folder?.path,
+    );
   } catch {
     return [];
   }
@@ -71,7 +97,8 @@ function isOwnFolder(dir) {
 let outputReal = { dir: null, real: "" };
 function isOutputFolder(dir) {
   if (!comfyOutputDir) return false;
-  if (outputReal.dir !== comfyOutputDir) outputReal = { dir: comfyOutputDir, real: realPath(comfyOutputDir) };
+  if (outputReal.dir !== comfyOutputDir)
+    outputReal = { dir: comfyOutputDir, real: realPath(comfyOutputDir) };
   return isInside(outputReal.real, dir, { orSame: true });
 }
 
@@ -80,7 +107,11 @@ function folderAvailable(folder) {
   const cached = availability.get(folder.id);
   if (cached && Date.now() - cached.at < 5000) return cached.ok;
   let ok = false;
-  try { ok = fs.statSync(folder.path).isDirectory(); } catch { ok = false; }
+  try {
+    ok = fs.statSync(folder.path).isDirectory();
+  } catch {
+    ok = false;
+  }
   availability.set(folder.id, { at: Date.now(), ok });
   return ok;
 }
@@ -96,13 +127,16 @@ export async function readMediaInfo(file) {
       info.width = png.width;
       info.height = png.height;
       const a1111 = png.text.parameters ? parseA1111Parameters(png.text.parameters) : null;
-      if (a1111?.prompt) Object.assign(info, { prompt: a1111.prompt, negative: a1111.negative, model: a1111.model });
+      if (a1111?.prompt)
+        Object.assign(info, { prompt: a1111.prompt, negative: a1111.negative, model: a1111.model });
       else if (png.text.prompt) {
         // The size in the graph is what was asked for; the PNG's own is truer, so only the words are taken.
         try {
           const { prompt, negative, model } = describeComfyGraph(JSON.parse(png.text.prompt));
           Object.assign(info, { prompt, negative, model });
-        } catch { /* not ComfyUI's graph */ }
+        } catch {
+          /* not ComfyUI's graph */
+        }
       }
       return info;
     }
@@ -114,7 +148,9 @@ export async function readMediaInfo(file) {
         const meta = await sharp(file).metadata();
         info.width = Number(meta.width || 0);
         info.height = Number(meta.height || 0);
-      } catch { /* unreadable: shown without its size */ }
+      } catch {
+        /* unreadable: shown without its size */
+      }
     }
   }
   return info;
@@ -133,14 +169,24 @@ async function walk(base, skip) {
   const seen = new Set();
   let capped = false;
   const visit = async (dir, depth) => {
-    if (files.length >= scanFileLimit) { capped = true; return; }
+    if (files.length >= scanFileLimit) {
+      capped = true;
+      return;
+    }
     const real = realPath(dir);
     if (seen.has(real) || !isInside(base, real, { orSame: true }) || skip(real)) return;
     seen.add(real);
     let entries = [];
-    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
-      if (files.length >= scanFileLimit) { capped = true; return; }
+      if (files.length >= scanFileLimit) {
+        capped = true;
+        return;
+      }
       if (entry.name.startsWith(".") || skippedNames.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
       let isDir = entry.isDirectory();
@@ -150,7 +196,9 @@ async function walk(base, skip) {
           const stat = fs.statSync(full);
           isDir = stat.isDirectory();
           isFile = stat.isFile();
-        } catch { continue; }
+        } catch {
+          continue;
+        }
       }
       if (isDir && depth < scanDepth) await visit(full, depth + 1);
       else if (isFile && mediaPattern.test(entry.name)) {
@@ -166,11 +214,18 @@ async function walk(base, skip) {
 
 async function recordFor(file, { url, thumbnailUrl, library }) {
   let stat;
-  try { stat = await fs.promises.stat(file); } catch { return null; }
+  try {
+    stat = await fs.promises.stat(file);
+  } catch {
+    return null;
+  }
   const type = videoPattern.test(file) ? "video" : "image";
   // A video carries no prompt we read, but its size is in the file: without it the tile can't take its shape.
   const size = type === "video" ? await probeVideo(file) : null;
-  const meta = type === "image" ? await readMediaInfo(file) : { width: size?.width || 0, height: size?.height || 0, prompt: "", negative: "", model: "" };
+  const meta =
+    type === "image"
+      ? await readMediaInfo(file)
+      : { width: size?.width || 0, height: size?.height || 0, prompt: "", negative: "", model: "" };
   const name = path.basename(file);
   return {
     id: url,
@@ -187,14 +242,16 @@ async function recordFor(file, { url, thumbnailUrl, library }) {
     height: meta.height,
     model: meta.model,
     settings: {},
-    ...(library ? { library } : {})
+    ...(library ? { library } : {}),
   };
 }
 
 /** Adds records the gallery does not have yet, and leaves out anything once deleted from it. */
 function addRecords(records) {
   const known = new Set(gallery.map(galleryKey));
-  const fresh = records.filter((record) => record && !known.has(galleryKey(record)) && !isGalleryHidden(record));
+  const fresh = records.filter(
+    (record) => record && !known.has(galleryKey(record)) && !isGalleryHidden(record),
+  );
   if (!fresh.length) return 0;
   // Thousands at once: browsers reload the page rather than take them as a delta.
   setGallery(dedupeGallery([...gallery, ...fresh]).slice(0, galleryLimit), { track: false });
@@ -220,7 +277,11 @@ function videoFileOf(item) {
   if (item.library) return libraryFile(item.library.folder, item.library.path);
   if (typeof item.url !== "string" || !item.url.startsWith("/comfy/view?")) return null;
   const params = new URLSearchParams(item.url.slice(item.url.indexOf("?") + 1));
-  return localOutputFile(params.get("filename") || "", params.get("subfolder") || "", params.get("type") || "output");
+  return localOutputFile(
+    params.get("filename") || "",
+    params.get("subfolder") || "",
+    params.get("type") || "output",
+  );
 }
 
 let filling = null;
@@ -233,25 +294,39 @@ let filling = null;
 export function fillVideoSizes() {
   if (filling) return filling;
   filling = (async () => {
-    const missing = gallery.filter((item) => item.type === "video" && item.status === "done" && !(Number(item.width) > 0 && Number(item.height) > 0));
+    const missing = gallery.filter(
+      (item) =>
+        item.type === "video" &&
+        item.status === "done" &&
+        !(Number(item.width) > 0 && Number(item.height) > 0),
+    );
     let filled = 0;
     let batch = new Map();
     const flush = () => {
       if (!batch.size) return;
       const sizes = batch;
       batch = new Map();
-      setGallery(gallery.map((item) => (sizes.has(galleryKey(item)) ? { ...item, ...sizes.get(galleryKey(item)) } : item)));
+      setGallery(
+        gallery.map((item) =>
+          sizes.has(galleryKey(item)) ? { ...item, ...sizes.get(galleryKey(item)) } : item,
+        ),
+      );
     };
     for (const item of missing) {
       const file = videoFileOf(item);
       const info = file ? await probeVideo(file) : null;
-      if (info) { batch.set(galleryKey(item), { width: info.width, height: info.height }); filled += 1; }
+      if (info) {
+        batch.set(galleryKey(item), { width: info.width, height: info.height });
+        filled += 1;
+      }
       if (batch.size >= 25) flush();
       await yieldToServer();
     }
     flush();
     return filled;
-  })().finally(() => { filling = null; });
+  })().finally(() => {
+    filling = null;
+  });
   return filling;
 }
 
@@ -264,9 +339,16 @@ export function fillVideoSizes() {
 export async function importOutputFolder() {
   if (!comfyOutputDir) throw new Error("Set ComfyUI’s output folder first (Settings › Library).");
   const base = realPath(comfyOutputDir);
-  try { if (!fs.statSync(base).isDirectory()) throw new Error("missing"); } catch { throw new Error("The output folder can’t be found."); }
+  try {
+    if (!fs.statSync(base).isDirectory()) throw new Error("missing");
+  } catch {
+    throw new Error("The output folder can’t be found.");
+  }
   const own = outputFolderNames.map((name) => path.join(base, name));
-  const { files, capped } = await walk(base, (dir) => own.some((folder) => isInside(folder, dir, { orSame: true })) || isOwnFolder(dir));
+  const { files, capped } = await walk(
+    base,
+    (dir) => own.some((folder) => isInside(folder, dir, { orSame: true })) || isOwnFolder(dir),
+  );
   const records = await toRecords(files, (file) => {
     const rel = path.relative(base, realPath(file));
     const subfolder = path.dirname(rel) === "." ? "" : path.dirname(rel);
@@ -292,12 +374,17 @@ export function scanLibraryFolder(id) {
   const folder = folders.find((entry) => entry.id === id);
   if (!folder) return Promise.reject(new Error("That folder is no longer added."));
   const run = (async () => {
-    if (!folderAvailable(folder)) throw new Error(`Can’t reach ${folder.name}. Check that its drive is connected.`);
+    if (!folderAvailable(folder))
+      throw new Error(`Can’t reach ${folder.name}. Check that its drive is connected.`);
     const base = folder.path;
     const { files, capped } = await walk(base, (dir) => isOwnFolder(dir) || isOutputFolder(dir));
     const records = await toRecords(files, (file) => {
       const rel = path.relative(base, realPath(file));
-      return { url: libraryUrl("file", folder.id, rel), thumbnailUrl: libraryUrl("thumb", folder.id, rel), library: { folder: folder.id, path: rel.split(path.sep).join("/") } };
+      return {
+        url: libraryUrl("file", folder.id, rel),
+        thumbnailUrl: libraryUrl("thumb", folder.id, rel),
+        library: { folder: folder.id, path: rel.split(path.sep).join("/") },
+      };
     });
     const added = addRecords(records);
     fillVideoSizes().catch(() => 0);
@@ -318,10 +405,15 @@ export async function addLibraryFolder(input) {
   const dir = normalizeFolderInput(input);
   if (!dir) throw new Error("Choose a folder.");
   let stat;
-  try { stat = fs.statSync(dir); } catch { throw new Error("That folder doesn’t exist on this computer."); }
+  try {
+    stat = fs.statSync(dir);
+  } catch {
+    throw new Error("That folder doesn’t exist on this computer.");
+  }
   if (!stat.isDirectory()) throw new Error("That’s a file. Choose a folder.");
   const real = realPath(dir);
-  if (isOwnFolder(real)) throw new Error("That’s the Studio folder. Choose the folder with your earlier images.");
+  if (isOwnFolder(real))
+    throw new Error("That’s the Studio folder. Choose the folder with your earlier images.");
   if (isOutputFolder(real)) return { output: true, ...(await importOutputFolder()) };
   const existing = folders.find((folder) => samePath(folder.path, real));
   if (existing) return scanLibraryFolder(existing.id);
@@ -331,7 +423,7 @@ export async function addLibraryFolder(input) {
     name: path.basename(real) || real,
     addedAt: new Date().toISOString(),
     scannedAt: "",
-    count: 0
+    count: 0,
   };
   folders = [...folders, folder];
   saveFolders();
@@ -345,7 +437,10 @@ export function removeLibraryFolder(id) {
   folders = folders.filter((entry) => entry.id !== id);
   saveFolders();
   const before = gallery.length;
-  setGallery(gallery.filter((item) => item.library?.folder !== id), { track: false });
+  setGallery(
+    gallery.filter((item) => item.library?.folder !== id),
+    { track: false },
+  );
   markGalleryReset();
   return { removed: before - gallery.length };
 }
@@ -366,13 +461,32 @@ export function libraryFile(folderId, rel) {
   const folder = folders.find((entry) => entry.id === String(folderId || ""));
   const relative = String(rel || "");
   if (!folder || !relative || !mediaPattern.test(relative)) return null;
-  if (relative.split(/[\\/]/).some((part) => !part || part.startsWith(".") || part === ".." || outputFolderNames.includes(part.toLowerCase()))) return null;
+  if (
+    relative
+      .split(/[\\/]/)
+      .some(
+        (part) =>
+          !part ||
+          part.startsWith(".") ||
+          part === ".." ||
+          outputFolderNames.includes(part.toLowerCase()),
+      )
+  )
+    return null;
   const candidate = path.resolve(folder.path, relative);
   if (!isInside(folder.path, candidate)) return null;
   let real;
-  try { real = fs.realpathSync(candidate); } catch { return null; }
+  try {
+    real = fs.realpathSync(candidate);
+  } catch {
+    return null;
+  }
   if (!isInside(folder.path, real) || isOwnFolder(real) || isOutputFolder(real)) return null;
-  try { return fs.statSync(real).isFile() ? real : null; } catch { return null; }
+  try {
+    return fs.statSync(real).isFile() ? real : null;
+  } catch {
+    return null;
+  }
 }
 
 // A library image shows while its file is there; a folder on a drive that is

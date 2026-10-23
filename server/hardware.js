@@ -24,7 +24,7 @@ const GiB = 1024 ** 3;
  */
 export const APPLE_UNIFIED_SHARE = 0.7;
 
-const gigabytes = (bytes) => Math.round((Number(bytes) || 0) / GiB * 10) / 10;
+const gigabytes = (bytes) => Math.round(((Number(bytes) || 0) / GiB) * 10) / 10;
 
 /** "cuda:0 NVIDIA GeForce RTX 4090 : cudaMallocAsync" → "NVIDIA GeForce RTX 4090". */
 export function cleanDeviceName(name = "") {
@@ -59,7 +59,11 @@ export function hardwareFromStats(stats = {}, local = {}) {
 
 /** GB figures for the UI to show as they are, next to the raw bytes. */
 function withSizes(hardware) {
-  return { ...hardware, vramGB: hardware.unified ? 0 : gigabytes(hardware.vramTotal), ramGB: gigabytes(hardware.ramTotal) };
+  return {
+    ...hardware,
+    vramGB: hardware.unified ? 0 : gigabytes(hardware.vramTotal),
+    ramGB: gigabytes(hardware.ramTotal),
+  };
 }
 
 function readStats(stats, local) {
@@ -73,42 +77,103 @@ function readStats(stats, local) {
   const vramTotal = Number(device.vram_total) || 0;
   const vramFree = Number(device.vram_free) || 0;
   const name = unified ? "Apple Silicon" : kind === "cpu" ? "CPU" : cleanDeviceName(device.name);
-  const base = { known: true, source: "comfyui", kind, name, unified, os: String(system.os || ""), vramTotal, vramFree, ramTotal, ramFree };
+  const base = {
+    known: true,
+    source: "comfyui",
+    kind,
+    name,
+    unified,
+    os: String(system.os || ""),
+    vramTotal,
+    vramFree,
+    ramTotal,
+    ramFree,
+  };
   if (unified) return { ...base, ...appleBudget(ramTotal || vramTotal, local.wiredLimitMb) };
   // DirectML reports a placeholder 1 GB; a CPU has no graphics memory to budget.
-  if (kind === "cpu" || vramTotal <= 1.1 * 1024 ** 3) return { ...base, budgetGB: null, budgetSource: "" };
+  if (kind === "cpu" || vramTotal <= 1.1 * 1024 ** 3)
+    return { ...base, budgetGB: null, budgetSource: "" };
   return { ...base, budgetGB: gigabytes(vramTotal), budgetSource: "vram" };
 }
 
 /** A Mac's budget: the GPU wired limit when someone set one, else a share of its memory. */
 export function appleBudget(ramBytes, wiredLimitMb = 0) {
   const limit = Number(wiredLimitMb) * 1024 * 1024;
-  if (limit > 0 && ramBytes > 0) return { budgetGB: gigabytes(Math.min(limit, ramBytes)), budgetSource: "wired-limit" };
+  if (limit > 0 && ramBytes > 0)
+    return { budgetGB: gigabytes(Math.min(limit, ramBytes)), budgetSource: "wired-limit" };
   if (limit > 0) return { budgetGB: gigabytes(limit), budgetSource: "wired-limit" };
   if (!ramBytes) return { budgetGB: null, budgetSource: "" };
   return { budgetGB: gigabytes(ramBytes * APPLE_UNIFIED_SHARE), budgetSource: "unified-share" };
 }
 
 function unknownHardware(extra = {}) {
-  return { known: false, source: "", kind: "", name: "", unified: false, vramTotal: 0, vramFree: 0, ramTotal: 0, ramFree: 0, budgetGB: null, budgetSource: "", ...extra };
+  return {
+    known: false,
+    source: "",
+    kind: "",
+    name: "",
+    unified: false,
+    vramTotal: 0,
+    vramFree: 0,
+    ramTotal: 0,
+    ramFree: 0,
+    budgetGB: null,
+    budgetSource: "",
+    ...extra,
+  };
 }
 
 /**
  * This computer, for when ComfyUI does not answer but runs here: an Apple
  * Silicon Mac from its memory, an NVIDIA card from nvidia-smi, else only RAM.
  */
-export async function localHardware({ platform = process.platform, arch = process.arch, run = runQuiet } = {}) {
+export async function localHardware({
+  platform = process.platform,
+  arch = process.arch,
+  run = runQuiet,
+} = {}) {
   const ramTotal = os.totalmem();
   const ramFree = os.freemem();
   if (platform === "darwin" && arch === "arm64") {
     const wiredLimitMb = await macWiredLimitMb(run);
-    return withSizes({ known: true, source: "this-computer", kind: "apple", name: "Apple Silicon", unified: true, os: platform, vramTotal: ramTotal, vramFree: ramFree, ramTotal, ramFree, ...appleBudget(ramTotal, wiredLimitMb) });
+    return withSizes({
+      known: true,
+      source: "this-computer",
+      kind: "apple",
+      name: "Apple Silicon",
+      unified: true,
+      os: platform,
+      vramTotal: ramTotal,
+      vramFree: ramFree,
+      ramTotal,
+      ramFree,
+      ...appleBudget(ramTotal, wiredLimitMb),
+    });
   }
-  const smi = await run("nvidia-smi", ["--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"]);
-  const [name, total, free] = String(smi || "").split(/\r?\n/)[0].split(",").map((part) => part.trim());
+  const smi = await run("nvidia-smi", [
+    "--query-gpu=name,memory.total,memory.free",
+    "--format=csv,noheader,nounits",
+  ]);
+  const [name, total, free] = String(smi || "")
+    .split(/\r?\n/)[0]
+    .split(",")
+    .map((part) => part.trim());
   if (name && Number(total) > 0) {
     const vramTotal = Number(total) * 1024 * 1024;
-    return withSizes({ known: true, source: "this-computer", kind: "nvidia", name, unified: false, os: platform, vramTotal, vramFree: Number(free) * 1024 * 1024 || 0, ramTotal, ramFree, budgetGB: gigabytes(vramTotal), budgetSource: "vram" });
+    return withSizes({
+      known: true,
+      source: "this-computer",
+      kind: "nvidia",
+      name,
+      unified: false,
+      os: platform,
+      vramTotal,
+      vramFree: Number(free) * 1024 * 1024 || 0,
+      ramTotal,
+      ramFree,
+      budgetGB: gigabytes(vramTotal),
+      budgetSource: "vram",
+    });
   }
   return withSizes(unknownHardware({ source: "this-computer", os: platform, ramTotal, ramFree }));
 }
@@ -118,14 +183,17 @@ let wiredLimitCache = null;
 export async function macWiredLimitMb(run = runQuiet) {
   if (process.platform !== "darwin") return 0;
   if (wiredLimitCache && Date.now() - wiredLimitCache.at < 60_000) return wiredLimitCache.value;
-  const value = Number(String(await run("sysctl", ["-n", "iogpu.wired_limit_mb"]) || "").trim()) || 0;
+  const value =
+    Number(String((await run("sysctl", ["-n", "iogpu.wired_limit_mb"])) || "").trim()) || 0;
   wiredLimitCache = { value, at: Date.now() };
   return value;
 }
 
 function runQuiet(command, args) {
   return new Promise((resolve) => {
-    execFile(command, args, { timeout: 2500, windowsHide: true }, (error, stdout) => resolve(error ? "" : String(stdout || "")));
+    execFile(command, args, { timeout: 2500, windowsHide: true }, (error, stdout) =>
+      resolve(error ? "" : String(stdout || "")),
+    );
   });
 }
 
@@ -133,7 +201,10 @@ function runQuiet(command, args) {
 export function isThisComputer(url = "") {
   try {
     const { hostname } = new URL(url);
-    return ["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"].includes(hostname) || hostname.endsWith(".localhost");
+    return (
+      ["127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"].includes(hostname) ||
+      hostname.endsWith(".localhost")
+    );
   } catch {
     return false;
   }
@@ -144,7 +215,11 @@ export function isThisComputer(url = "") {
  * Mac's wired limit added when that Mac is this one), else this computer's own
  * view when ComfyUI is meant to run here, else unknown.
  */
-export async function describeHardware({ stats = null, comfyUrl = "", platform = process.platform } = {}) {
+export async function describeHardware({
+  stats = null,
+  comfyUrl = "",
+  platform = process.platform,
+} = {}) {
   const here = isThisComputer(comfyUrl);
   if (stats?.devices?.length) {
     const apple = stats.devices[0]?.type === "mps";

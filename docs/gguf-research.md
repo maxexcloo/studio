@@ -24,14 +24,14 @@ Upstream sources were read through the GitHub API and the Hugging Face API.
 
 **Nodes** ([nodes.py](https://github.com/city96/ComfyUI-GGUF/blob/main/nodes.py)):
 
-| Node | Required inputs | Differs from core |
-| --- | --- | --- |
-| `UnetLoaderGGUF` | `unet_name` (list of `unet_gguf` files, `.gguf` only) | no `weight_dtype` |
-| `UnetLoaderGGUFAdvanced` | `unet_name`, `dequant_dtype`, `patch_dtype` (default/target/float32/float16/bfloat16), `patch_on_device` (BOOLEAN) | tuning only |
-| `CLIPLoaderGGUF` | `clip_name`, `type` (copied from core `CLIPLoader`) | no `device` |
-| `DualCLIPLoaderGGUF` | `clip_name1`, `clip_name2`, `type` (copied from core `DualCLIPLoader`) | no `device` |
-| `TripleCLIPLoaderGGUF` | `clip_name1..3` | none (type fixed to sd3) |
-| `QuadrupleCLIPLoaderGGUF` | `clip_name1..4` | none |
+| Node                      | Required inputs                                                                                                    | Differs from core        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| `UnetLoaderGGUF`          | `unet_name` (list of `unet_gguf` files, `.gguf` only)                                                              | no `weight_dtype`        |
+| `UnetLoaderGGUFAdvanced`  | `unet_name`, `dequant_dtype`, `patch_dtype` (default/target/float32/float16/bfloat16), `patch_on_device` (BOOLEAN) | tuning only              |
+| `CLIPLoaderGGUF`          | `clip_name`, `type` (copied from core `CLIPLoader`)                                                                | no `device`              |
+| `DualCLIPLoaderGGUF`      | `clip_name1`, `clip_name2`, `type` (copied from core `DualCLIPLoader`)                                             | no `device`              |
+| `TripleCLIPLoaderGGUF`    | `clip_name1..3`                                                                                                    | none (type fixed to sd3) |
+| `QuadrupleCLIPLoaderGGUF` | `clip_name1..4`                                                                                                    | none                     |
 
 - **Folder kinds.** At import time the pack sets `unet_gguf` to the
   `diffusion_models` folders (`{".gguf"}` only) and `clip_gguf` to the
@@ -70,7 +70,7 @@ Upstream sources were read through the GitHub API and the Hugging Face API.
   - LTX 2.5 BF16 parameters ([#477](https://github.com/city96/ComfyUI-GGUF/issues/477)).
   - Qwen3-VL vision towers ([#478](https://github.com/city96/ComfyUI-GGUF/pull/478)). Without it a Qwen3-VL GGUF loads as plain Qwen3, so Krea 2 and Qwen-Image 2.1 get the wrong encoder.
   - Ministral 3 (mistral3) and Gemma 4.
-  The m8rr fork's [Dynamic-VRAM branch](https://github.com/m8rr/ComfyUI-GGUF/tree/Dynamic-VRAM) carries several of these.
+    The m8rr fork's [Dynamic-VRAM branch](https://github.com/m8rr/ComfyUI-GGUF/tree/Dynamic-VRAM) carries several of these.
 - **Maintenance.**
   - Last commit 2026-01-12 ([commits](https://github.com/city96/ComfyUI-GGUF/commits/main)).
   - About 247 open issues and PRs, 4.1k stars, and 2.6M registry downloads ([api.comfy.org/nodes/ComfyUI-GGUF](https://api.comfy.org/nodes/ComfyUI-GGUF)).
@@ -134,30 +134,30 @@ tensor_count x { string name | u32 n_dims | u64 dims[n_dims] | u32 ggml_type | u
 Range request and read it with `readGgufHeader`. The results went through
 HEISS's unchanged detectors:
 
-| File | general.architecture | HEISS detection |
-| --- | --- | --- |
-| city96 flux1-dev-Q4_K_S | flux | flux1 (dev) |
-| city96 flux2-dev-Q4_K_M | flux | flux2_dev |
-| unsloth flux-2-klein-9b-Q4_K_M | flux | flux2_klein_9b |
-| silveroxides Chroma1-HD-Q4_K_M | flux | chroma |
-| unsloth z-image-turbo-Q4_K_M | lumina2 | zimage |
-| leejet z_image_turbo-Q4_0 (sd.cpp) | (none) | zimage |
-| city96 qwen-image-Q4_K_M | qwen_image | qwen_image |
-| unsloth qwen-image-2.1-Q4_K_M | (none, prefixed) | qwen_image_21 |
-| realrebelai Krea-2-Turbo-Q4_K_M | krea2 | krea2 |
-| molbal ideogram4-transformer-q8_0 | (none) | ideogram4 |
-| unsloth minimax_h3_fl2va_pruned-Q6_K | (none) | minimax_h3 |
-| QuantStack Wan2.2-TI2V-5B-Q4_K_M | wan | wan22_5b (5D patch_embedding read correctly) |
-| QuantStack Wan2.2-T2V-A14B-HighNoise-Q4_K_M | wan | wan21, then wan22_14b by name |
-| jayn7 hunyuanvideo1.5_720p_t2v-Q4_K_M | hyvid | hunyuan15 |
-| QuantStack LTX-2.3-dev-Q4_K_M | ltxv | ltx |
-| city96 sd3.5_large-Q4_0 | sd3 | sd3 |
-| city96 t5-v1_1-xxl-encoder-Q4_K_M | t5encoder | encoder t5xxl |
-| city96 umt5-xxl-encoder-Q4_K_M | t5encoder | encoder umt5xxl |
-| unsloth Qwen2.5-VL-7B-Instruct-Q4_K_M | qwen2vl | encoder qwen25vl_7b |
-| unsloth Qwen3-4B-Q4_K_M | qwen3 | encoder qwen3_4b |
-| unsloth gemma-3-12b-it-Q4_K_M | gemma3 | encoder gemma3_12b |
-| unsloth Qwen3-VL-4B-Instruct-Q4_K_M | qwen3vl | encoder qwen3_4b (matches what ComfyUI-GGUF main hands ComfyUI, see #478) |
+| File                                        | general.architecture | HEISS detection                                                           |
+| ------------------------------------------- | -------------------- | ------------------------------------------------------------------------- |
+| city96 flux1-dev-Q4_K_S                     | flux                 | flux1 (dev)                                                               |
+| city96 flux2-dev-Q4_K_M                     | flux                 | flux2_dev                                                                 |
+| unsloth flux-2-klein-9b-Q4_K_M              | flux                 | flux2_klein_9b                                                            |
+| silveroxides Chroma1-HD-Q4_K_M              | flux                 | chroma                                                                    |
+| unsloth z-image-turbo-Q4_K_M                | lumina2              | zimage                                                                    |
+| leejet z_image_turbo-Q4_0 (sd.cpp)          | (none)               | zimage                                                                    |
+| city96 qwen-image-Q4_K_M                    | qwen_image           | qwen_image                                                                |
+| unsloth qwen-image-2.1-Q4_K_M               | (none, prefixed)     | qwen_image_21                                                             |
+| realrebelai Krea-2-Turbo-Q4_K_M             | krea2                | krea2                                                                     |
+| molbal ideogram4-transformer-q8_0           | (none)               | ideogram4                                                                 |
+| unsloth minimax_h3_fl2va_pruned-Q6_K        | (none)               | minimax_h3                                                                |
+| QuantStack Wan2.2-TI2V-5B-Q4_K_M            | wan                  | wan22_5b (5D patch_embedding read correctly)                              |
+| QuantStack Wan2.2-T2V-A14B-HighNoise-Q4_K_M | wan                  | wan21, then wan22_14b by name                                             |
+| jayn7 hunyuanvideo1.5_720p_t2v-Q4_K_M       | hyvid                | hunyuan15                                                                 |
+| QuantStack LTX-2.3-dev-Q4_K_M               | ltxv                 | ltx                                                                       |
+| city96 sd3.5_large-Q4_0                     | sd3                  | sd3                                                                       |
+| city96 t5-v1_1-xxl-encoder-Q4_K_M           | t5encoder            | encoder t5xxl                                                             |
+| city96 umt5-xxl-encoder-Q4_K_M              | t5encoder            | encoder umt5xxl                                                           |
+| unsloth Qwen2.5-VL-7B-Instruct-Q4_K_M       | qwen2vl              | encoder qwen25vl_7b                                                       |
+| unsloth Qwen3-4B-Q4_K_M                     | qwen3                | encoder qwen3_4b                                                          |
+| unsloth gemma-3-12b-it-Q4_K_M               | gemma3               | encoder gemma3_12b                                                        |
+| unsloth Qwen3-VL-4B-Instruct-Q4_K_M         | qwen3vl              | encoder qwen3_4b (matches what ComfyUI-GGUF main hands ComfyUI, see #478) |
 
 HEISS recognises Krea 2, Ideogram 4, MiniMax H3 and Qwen-Image 2.1 GGUFs
 correctly, but ComfyUI-GGUF main would refuse them at run time (section 1).
@@ -172,24 +172,24 @@ original key names. HEISS does the same: `readGgufHeader` applies the same
 ordered replacements for the architectures in `TXT_ARCH_LIST`, and
 `encoderKindFromHeader` runs unchanged.
 
-| GGUF arch | HEISS kind |
-| --- | --- |
-| t5, t5encoder | t5xxl, or umt5xxl when the vocabulary is 256k or there is a per-block relative bias |
-| qwen2vl | qwen25vl_7b (the `k_proj.bias` width is 512) |
-| qwen3 | qwen3_4b, qwen3_8b or qwen3_06b by width |
-| qwen3vl | qwen3_* (the vision tower is in a separate mmproj that main does not load; honest until #478 or #485 lands) |
-| gemma3 | gemma3_12b |
-| llama | llama31_8b, or mistral3_24b at width 5120 |
+| GGUF arch     | HEISS kind                                                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| t5, t5encoder | t5xxl, or umt5xxl when the vocabulary is 256k or there is a per-block relative bias                         |
+| qwen2vl       | qwen25vl_7b (the `k_proj.bias` width is 512)                                                                |
+| qwen3         | qwen3_4b, qwen3_8b or qwen3_06b by width                                                                    |
+| qwen3vl       | qwen3_* (the vision tower is in a separate mmproj that main does not load; honest until #478 or #485 lands) |
+| gemma3        | gemma3_12b                                                                                                  |
+| llama         | llama31_8b, or mistral3_24b at width 5120                                                                   |
 
 ## 4. Graph changes
 
-| Core node | GGUF twin | Drop |
-| --- | --- | --- |
-| UNETLoader | UnetLoaderGGUF | `weight_dtype` |
-| CLIPLoader | CLIPLoaderGGUF | `device` |
-| DualCLIPLoader | DualCLIPLoaderGGUF | `device` |
-| TripleCLIPLoader | TripleCLIPLoaderGGUF | (none) |
-| QuadrupleCLIPLoader | QuadrupleCLIPLoaderGGUF | (none) |
+| Core node           | GGUF twin               | Drop           |
+| ------------------- | ----------------------- | -------------- |
+| UNETLoader          | UnetLoaderGGUF          | `weight_dtype` |
+| CLIPLoader          | CLIPLoaderGGUF          | `device`       |
+| DualCLIPLoader      | DualCLIPLoaderGGUF      | `device`       |
+| TripleCLIPLoader    | TripleCLIPLoaderGGUF    | (none)         |
+| QuadrupleCLIPLoader | QuadrupleCLIPLoaderGGUF | (none)         |
 
 - The swap applies whenever any file input of the node is a `.gguf`. The CLIP
   twins read safetensors too, so a mixed Flux pair (CLIP-L safetensors plus T5
@@ -201,13 +201,13 @@ ordered replacements for the architectures in `TXT_ARCH_LIST`, and
 
 ## 5. The node pack
 
-| Field | Value |
-| --- | --- |
-| Repository | `https://github.com/city96/ComfyUI-GGUF.git` |
-| Folder | `ComfyUI-GGUF` |
+| Field              | Value                                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Repository         | `https://github.com/city96/ComfyUI-GGUF.git`                                                                                |
+| Folder             | `ComfyUI-GGUF`                                                                                                              |
 | ComfyUI-Manager id | `comfyui-gguf` (from [custom-node-list.json](https://github.com/Comfy-Org/ComfyUI-Manager/blob/main/custom-node-list.json)) |
-| Registry id | `ComfyUI-GGUF` |
-| Requirements | `gguf>=0.13.0`; `sentencepiece` and `protobuf` are needed for GGUF text encoders |
+| Registry id        | `ComfyUI-GGUF`                                                                                                              |
+| Requirements       | `gguf>=0.13.0`; `sentencepiece` and `protobuf` are needed for GGUF text encoders                                            |
 
 - Both install routes work with the existing `pack-installer.js`: Manager
   queue, or a local clone plus pip with ComfyUI's Python.
@@ -222,26 +222,26 @@ ordered replacements for the architectures in `TXT_ARCH_LIST`, and
 
 Sizes in GB, from the Hugging Face API:
 
-| Family | Repo | Q4_K_M | Q5_K_M | Q8_0 |
-| --- | --- | --- | --- | --- |
-| Flux.1 dev | [city96/FLUX.1-dev-gguf](https://huggingface.co/city96/FLUX.1-dev-gguf) | 6.8 (Q4_K_S) | n/a | 12.7 |
-| Flux.2 dev | [city96/FLUX.2-dev-gguf](https://huggingface.co/city96/FLUX.2-dev-gguf) | 20.1 | 24.1 | 35.0 |
-| Flux.2 Klein 9B | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF) | 5.9 | 7.0 | 10.0 |
-| Qwen-Image | [city96/Qwen-Image-gguf](https://huggingface.co/city96/Qwen-Image-gguf) | 13.1 | 14.9 | 21.8 |
-| Qwen-Image 2.1 | [unsloth/Qwen-Image-2.1-GGUF](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF) | 4.2 | 5.4 | 7.6 |
-| Z-Image Turbo | [unsloth/Z-Image-Turbo-GGUF](https://huggingface.co/unsloth/Z-Image-Turbo-GGUF) | 5.0 | 5.6 | 7.2 |
-| Krea 2 Turbo | [realrebelai/KREA-2_GGUFs](https://huggingface.co/realrebelai/KREA-2_GGUFs) | 7.2 | n/a | 13.6 |
-| Chroma1-HD | [silveroxides/Chroma1-HD-GGUF](https://huggingface.co/silveroxides/Chroma1-HD-GGUF) | 5.6 | 6.7 | 9.7 |
-| Wan 2.2 T2V A14B (each half) | [QuantStack/Wan2.2-T2V-A14B-GGUF](https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF) | 9.7 | 10.8 | 15.4 |
-| Wan 2.2 TI2V 5B | [QuantStack/Wan2.2-TI2V-5B-GGUF](https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF) | 3.4 | 3.8 | 5.4 |
-| HunyuanVideo 1.5 720p | [jayn7/HunyuanVideo-1.5_T2V_720p-GGUF](https://huggingface.co/jayn7/HunyuanVideo-1.5_T2V_720p-GGUF) | 5.1 | 6.1 | 9.0 |
-| LTX-2.3 dev | [QuantStack/LTX-2.3-GGUF](https://huggingface.co/QuantStack/LTX-2.3-GGUF) | 17.8 | 19.4 | 25.5 |
-| MiniMax H3 | [unsloth/MiniMax-H3-GGUF](https://huggingface.co/unsloth/MiniMax-H3-GGUF) | n/a | n/a | 21.4 (Q6_K 16.6) |
-| Ideogram 4 | [molbal/ideogram-4-gguf](https://huggingface.co/molbal/ideogram-4-gguf) | n/a | n/a | 10.1 |
-| T5-XXL encoder | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf) | 2.9 | 3.4 | 5.1 |
-| UMT5-XXL encoder | [city96/umt5-xxl-encoder-gguf](https://huggingface.co/city96/umt5-xxl-encoder-gguf) | 3.7 | 4.2 | 6.0 |
-| Qwen2.5-VL 7B | [unsloth/Qwen2.5-VL-7B-Instruct-GGUF](https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF) (abliterated: [mradermacher](https://huggingface.co/mradermacher/Qwen2.5-VL-7B-Instruct-abliterated-GGUF)) | 4.7 | 5.4 | 8.1 |
-| Qwen3 4B | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF) | 2.5 | 2.9 | 4.3 |
+| Family                       | Repo                                                                                                                                                                                                         | Q4_K_M       | Q5_K_M | Q8_0             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | ------ | ---------------- |
+| Flux.1 dev                   | [city96/FLUX.1-dev-gguf](https://huggingface.co/city96/FLUX.1-dev-gguf)                                                                                                                                      | 6.8 (Q4_K_S) | n/a    | 12.7             |
+| Flux.2 dev                   | [city96/FLUX.2-dev-gguf](https://huggingface.co/city96/FLUX.2-dev-gguf)                                                                                                                                      | 20.1         | 24.1   | 35.0             |
+| Flux.2 Klein 9B              | [unsloth/FLUX.2-klein-9B-GGUF](https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF)                                                                                                                          | 5.9          | 7.0    | 10.0             |
+| Qwen-Image                   | [city96/Qwen-Image-gguf](https://huggingface.co/city96/Qwen-Image-gguf)                                                                                                                                      | 13.1         | 14.9   | 21.8             |
+| Qwen-Image 2.1               | [unsloth/Qwen-Image-2.1-GGUF](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF)                                                                                                                            | 4.2          | 5.4    | 7.6              |
+| Z-Image Turbo                | [unsloth/Z-Image-Turbo-GGUF](https://huggingface.co/unsloth/Z-Image-Turbo-GGUF)                                                                                                                              | 5.0          | 5.6    | 7.2              |
+| Krea 2 Turbo                 | [realrebelai/KREA-2_GGUFs](https://huggingface.co/realrebelai/KREA-2_GGUFs)                                                                                                                                  | 7.2          | n/a    | 13.6             |
+| Chroma1-HD                   | [silveroxides/Chroma1-HD-GGUF](https://huggingface.co/silveroxides/Chroma1-HD-GGUF)                                                                                                                          | 5.6          | 6.7    | 9.7              |
+| Wan 2.2 T2V A14B (each half) | [QuantStack/Wan2.2-T2V-A14B-GGUF](https://huggingface.co/QuantStack/Wan2.2-T2V-A14B-GGUF)                                                                                                                    | 9.7          | 10.8   | 15.4             |
+| Wan 2.2 TI2V 5B              | [QuantStack/Wan2.2-TI2V-5B-GGUF](https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF)                                                                                                                      | 3.4          | 3.8    | 5.4              |
+| HunyuanVideo 1.5 720p        | [jayn7/HunyuanVideo-1.5_T2V_720p-GGUF](https://huggingface.co/jayn7/HunyuanVideo-1.5_T2V_720p-GGUF)                                                                                                          | 5.1          | 6.1    | 9.0              |
+| LTX-2.3 dev                  | [QuantStack/LTX-2.3-GGUF](https://huggingface.co/QuantStack/LTX-2.3-GGUF)                                                                                                                                    | 17.8         | 19.4   | 25.5             |
+| MiniMax H3                   | [unsloth/MiniMax-H3-GGUF](https://huggingface.co/unsloth/MiniMax-H3-GGUF)                                                                                                                                    | n/a          | n/a    | 21.4 (Q6_K 16.6) |
+| Ideogram 4                   | [molbal/ideogram-4-gguf](https://huggingface.co/molbal/ideogram-4-gguf)                                                                                                                                      | n/a          | n/a    | 10.1             |
+| T5-XXL encoder               | [city96/t5-v1_1-xxl-encoder-gguf](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf)                                                                                                                    | 2.9          | 3.4    | 5.1              |
+| UMT5-XXL encoder             | [city96/umt5-xxl-encoder-gguf](https://huggingface.co/city96/umt5-xxl-encoder-gguf)                                                                                                                          | 3.7          | 4.2    | 6.0              |
+| Qwen2.5-VL 7B                | [unsloth/Qwen2.5-VL-7B-Instruct-GGUF](https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF) (abliterated: [mradermacher](https://huggingface.co/mradermacher/Qwen2.5-VL-7B-Instruct-abliterated-GGUF)) | 4.7          | 5.4    | 8.1              |
+| Qwen3 4B                     | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF)                                                                                                                                        | 2.5          | 2.9    | 4.3              |
 
 - As a rule of thumb, Q8_0 is about 53% of BF16, Q5_K_M about 36% and Q4_K_M
   about 30%.

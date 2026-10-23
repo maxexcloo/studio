@@ -16,7 +16,9 @@ function samePlace(a, b) {
   const key = (value) => {
     try {
       const url = new URL(normalizeComfyUrl(value));
-      const host = ["localhost", "::1", "[::1]"].includes(url.hostname) ? "127.0.0.1" : url.hostname;
+      const host = ["localhost", "::1", "[::1]"].includes(url.hostname)
+        ? "127.0.0.1"
+        : url.hostname;
       return `${host}:${url.port || (url.protocol === "https:" ? "443" : "80")}${url.pathname}`;
     } catch {
       return String(value);
@@ -33,7 +35,9 @@ export function nearbyAddresses(current, candidates = usualComfyAddresses) {
 
 /** Whether a /system_stats answer came from ComfyUI, not some other server on that port. */
 export function looksLikeComfy(stats) {
-  return Boolean(stats && typeof stats === "object" && stats.system && Array.isArray(stats.devices));
+  return Boolean(
+    stats && typeof stats === "object" && stats.system && Array.isArray(stats.devices),
+  );
 }
 
 async function probeComfy(url) {
@@ -55,7 +59,11 @@ export function comfySearchEnabled() {
 }
 
 /** The first usual address that answers as ComfyUI, or "". */
-export async function findComfy({ current, candidates = usualComfyAddresses, probe = probeComfy } = {}) {
+export async function findComfy({
+  current,
+  candidates = usualComfyAddresses,
+  probe = probeComfy,
+} = {}) {
   if (!comfySearchEnabled()) return "";
   for (const candidate of nearbyAddresses(current, candidates)) {
     if (await probe(candidate)) return candidate;
@@ -74,6 +82,8 @@ export function findComfyNow(current, { now = Date.now(), probe } = {}) {
   if (running) return running;
   if (now - lastSearch < SEARCH_EVERY_MS) return Promise.resolve("");
   lastSearch = now;
-  running = findComfy({ current, probe }).finally(() => { running = null; });
+  running = findComfy({ current, probe }).finally(() => {
+    running = null;
+  });
   return running;
 }

@@ -20,7 +20,13 @@ export function galleryTime(item) {
 }
 
 export function galleryOrderKey(item) {
-  return { bucket: galleryBucket(item), time: parsedTime(item), id: String(item.id || ""), jobId: item.jobId || "", index: Number(item.index) || 0 };
+  return {
+    bucket: galleryBucket(item),
+    time: parsedTime(item),
+    id: String(item.id || ""),
+    jobId: item.jobId || "",
+    index: Number(item.index) || 0,
+  };
 }
 
 export function compareGalleryKeys(a, b) {

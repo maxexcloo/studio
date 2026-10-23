@@ -53,8 +53,10 @@ export function galleryStats(items = [], now = new Date()) {
     }
   }
 
-  const [busiestDay = "", busiestCount = 0] = [...days.entries()].sort((a, b) => b[1] - a[1])[0] || [];
-  const [topWorkflow = "", topWorkflowCount = 0] = [...workflows.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  const [busiestDay = "", busiestCount = 0] =
+    [...days.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  const [topWorkflow = "", topWorkflowCount = 0] =
+    [...workflows.entries()].sort((a, b) => b[1] - a[1])[0] || [];
   return {
     outputs: done.length,
     images: done.filter((item) => item.type !== "video").length,
@@ -70,6 +72,6 @@ export function galleryStats(items = [], now = new Date()) {
     busiestDay,
     busiestCount,
     topWorkflow,
-    topWorkflowCount
+    topWorkflowCount,
   };
 }

@@ -10,14 +10,38 @@ const { setGallery } = await import("./gallery-store.js");
 const history = await import("./prompt-history.js");
 
 test("the first list starts from the gallery's finished runs", () => {
-  setGallery([
-    { id: "a", url: "a", status: "done", prompt: "a red fox", createdAt: "2026-01-01T00:00:00Z" },
-    { id: "b", url: "b", status: "done", prompt: "A  red fox", createdAt: "2026-01-03T00:00:00Z" },
-    { id: "d", url: "d", status: "pending", prompt: "still running", createdAt: "2026-01-05T00:00:00Z" },
-    { id: "e", url: "e", status: "done", prompt: "a blue owl", createdAt: "2026-01-02T00:00:00Z" }
-  ], { persist: false });
+  setGallery(
+    [
+      { id: "a", url: "a", status: "done", prompt: "a red fox", createdAt: "2026-01-01T00:00:00Z" },
+      {
+        id: "b",
+        url: "b",
+        status: "done",
+        prompt: "A  red fox",
+        createdAt: "2026-01-03T00:00:00Z",
+      },
+      {
+        id: "d",
+        url: "d",
+        status: "pending",
+        prompt: "still running",
+        createdAt: "2026-01-05T00:00:00Z",
+      },
+      {
+        id: "e",
+        url: "e",
+        status: "done",
+        prompt: "a blue owl",
+        createdAt: "2026-01-02T00:00:00Z",
+      },
+    ],
+    { persist: false },
+  );
   const list = history.listPrompts();
-  assert.deepEqual(list.map((entry) => entry.text), ["A  red fox", "a blue owl"]);
+  assert.deepEqual(
+    list.map((entry) => entry.text),
+    ["A  red fox", "a blue owl"],
+  );
   assert.equal(list[0].uses, 2, "spacing and case do not make a new prompt");
   assert.ok(fs.existsSync(history.promptHistoryPath));
 });
@@ -25,16 +49,28 @@ test("the first list starts from the gallery's finished runs", () => {
 test("account prompt histories are stored separately from each other and legacy history", () => {
   history.recordPrompt("account a secret", "positive", "account-a");
   history.recordPrompt("account b secret", "positive", "account-b");
-  assert.deepEqual(history.listPrompts("positive", "account-a").map((entry) => entry.text), ["account a secret"]);
-  assert.deepEqual(history.listPrompts("positive", "account-b").map((entry) => entry.text), ["account b secret"]);
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["A  red fox", "a blue owl"]);
+  assert.deepEqual(
+    history.listPrompts("positive", "account-a").map((entry) => entry.text),
+    ["account a secret"],
+  );
+  assert.deepEqual(
+    history.listPrompts("positive", "account-b").map((entry) => entry.text),
+    ["account b secret"],
+  );
+  assert.deepEqual(
+    history.listPrompts().map((entry) => entry.text),
+    ["A  red fox", "a blue owl"],
+  );
 });
 
 test("using a prompt again moves it to the top instead of repeating it", () => {
   history.recordPrompt("a blue owl ");
   history.recordPrompt("a green frog");
   const list = history.listPrompts();
-  assert.deepEqual(list.map((entry) => entry.text), ["a green frog", "a blue owl", "A  red fox"]);
+  assert.deepEqual(
+    list.map((entry) => entry.text),
+    ["a green frog", "a blue owl", "A  red fox"],
+  );
   assert.equal(list[1].uses, 2);
   history.recordPrompt("   ");
   assert.equal(history.listPrompts().length, 3, "an empty prompt is not kept");
@@ -44,7 +80,8 @@ test("pinned prompts outlive the cap; the rest keep the newest", () => {
   history.setPromptPinned("A red fox", true);
   let entries = history.listPrompts();
   const start = Date.now();
-  for (let index = 0; index < history.historyLimit + 20; index += 1) entries = history.addPrompt(entries, `prompt ${index}`, start + index * 1000);
+  for (let index = 0; index < history.historyLimit + 20; index += 1)
+    entries = history.addPrompt(entries, `prompt ${index}`, start + index * 1000);
   assert.equal(entries.filter((entry) => !entry.pinned).length, history.historyLimit);
   assert.ok(entries.some((entry) => entry.pinned && entry.text === "A  red fox"));
   assert.equal(entries[0].text, `prompt ${history.historyLimit + 19}`);
@@ -61,12 +98,22 @@ test("forgetting spares prompts the gallery still shows", () => {
 
 test("clearing keeps pinned prompts unless asked not to", () => {
   history.clearPromptHistory();
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["A  red fox"]);
+  assert.deepEqual(
+    history.listPrompts().map((entry) => entry.text),
+    ["A  red fox"],
+  );
   history.clearPromptHistory({ keepPinned: false });
   assert.deepEqual(history.listPrompts(), []);
   history.resetPromptHistoryCache();
-  assert.deepEqual(history.listPrompts(), [], "the saved file is read back, and an empty list is not re-seeded");
-  assert.ok(!fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("red fox"), "cleared from the backup too");
+  assert.deepEqual(
+    history.listPrompts(),
+    [],
+    "the saved file is read back, and an empty list is not re-seeded",
+  );
+  assert.ok(
+    !fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("red fox"),
+    "cleared from the backup too",
+  );
 });
 
 test("turned off, nothing new is kept and the recent prompts go; starred ones stay, and it survives a restart", () => {
@@ -76,36 +123,66 @@ test("turned off, nothing new is kept and the recent prompts go; starred ones st
   history.recordPrompt("a passing thought");
   history.setPromptHistoryEnabled(false);
   assert.equal(history.promptHistoryEnabled(), false);
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["a kept star"]);
+  assert.deepEqual(
+    history.listPrompts().map((entry) => entry.text),
+    ["a kept star"],
+  );
   history.recordPrompt("not remembered");
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["a kept star"]);
-  assert.equal(fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("a passing thought"), false, "gone from the backup too");
+  assert.deepEqual(
+    history.listPrompts().map((entry) => entry.text),
+    ["a kept star"],
+  );
+  assert.equal(
+    fs.readFileSync(`${history.promptHistoryPath}.bak`, "utf8").includes("a passing thought"),
+    false,
+    "gone from the backup too",
+  );
 
   history.resetPromptHistoryCache();
   assert.equal(history.promptHistoryEnabled(), false, "still off after a restart");
   history.setPromptHistoryEnabled(true);
   history.recordPrompt("remembered again");
-  assert.deepEqual(history.listPrompts().map((entry) => entry.text), ["remembered again", "a kept star"]);
+  assert.deepEqual(
+    history.listPrompts().map((entry) => entry.text),
+    ["remembered again", "a kept star"],
+  );
 });
 
 test("negative history is independent of the positive one", () => {
-  setGallery([
-    { id: "normal", status: "done", prompt: "A landscape", negative: "Blur and noise", createdAt: "2026-01-01T00:00:00Z" },
-    { id: "pending", status: "pending", negative: "Still running" }
-  ], { persist: false });
+  setGallery(
+    [
+      {
+        id: "normal",
+        status: "done",
+        prompt: "A landscape",
+        negative: "Blur and noise",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+      { id: "pending", status: "pending", negative: "Still running" },
+    ],
+    { persist: false },
+  );
   fs.rmSync(history.negativePromptHistoryPath, { force: true });
   fs.rmSync(`${history.negativePromptHistoryPath}.bak`, { force: true });
   history.resetPromptHistoryCache();
   const positives = history.listPrompts();
-  assert.deepEqual(history.listPrompts("negative").map((entry) => entry.text), ["Blur and noise"]);
+  assert.deepEqual(
+    history.listPrompts("negative").map((entry) => entry.text),
+    ["Blur and noise"],
+  );
   history.recordPrompt("Extra fingers", "negative");
   history.setPromptPinned("Extra fingers", true, "negative");
   assert.deepEqual(history.listPrompts(), positives);
   history.forgetPrompts(["Blur and noise"], new Set(), "negative");
-  assert.ok(!fs.readFileSync(`${history.negativePromptHistoryPath}.bak`, "utf8").includes("Blur and noise"));
+  assert.ok(
+    !fs.readFileSync(`${history.negativePromptHistoryPath}.bak`, "utf8").includes("Blur and noise"),
+  );
   history.setPromptHistoryEnabled(false);
   history.recordPrompt("Do not save", "negative");
-  assert.deepEqual(history.listPrompts("negative").map((entry) => entry.text), ["Extra fingers"]);
+  assert.deepEqual(
+    history.listPrompts("negative").map((entry) => entry.text),
+    ["Extra fingers"],
+  );
   history.resetPromptHistoryCache();
   assert.equal(history.promptHistoryEnabled("negative"), false);
   history.setPromptHistoryEnabled(true);

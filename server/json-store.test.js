@@ -3,7 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { readJsonFile, removeJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from "./json-store.js";
+import {
+  readJsonFile,
+  removeJsonFile,
+  removeStaleTemporaries,
+  writeJsonFile,
+  writeJsonFileAsync,
+} from "./json-store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -14,7 +20,10 @@ test("writes land whole and keep the previous copy as a backup", () => {
   writeJsonFile(file, { version: 2 });
   assert.deepEqual(readJsonFile(file), { version: 2 });
   assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.bak`, "utf8")), { version: 1 });
-  assert.deepEqual(fs.readdirSync(dir).filter((name) => name.includes(".tmp-")), []);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
+    [],
+  );
 });
 
 test("a half-written file falls back to the backup and is set aside, not lost", () => {
@@ -23,7 +32,10 @@ test("a half-written file falls back to the backup and is set aside, not lost", 
   writeJsonFile(file, { stacks: ["a", "b"] });
   fs.writeFileSync(file, '{"stacks": ["a", "b"');
   assert.deepEqual(readJsonFile(file), { stacks: ["a"] });
-  assert.equal(fs.readdirSync(dir).some((name) => name.startsWith("torn.json.corrupt-")), true);
+  assert.equal(
+    fs.readdirSync(dir).some((name) => name.startsWith("torn.json.corrupt-")),
+    true,
+  );
 });
 
 test("a crash between backup and rename still reads the backup", () => {
@@ -40,7 +52,10 @@ test("missing with no backup still throws, so callers use their defaults", () =>
 
 test("a background write is exactly compact JSON, with the same backup", async () => {
   const file = path.join(dir, "gallery.json");
-  const items = Array.from({ length: 1234 }, (_, index) => ({ id: `item-${index}`, prompt: `a "quoted" prompt\n${index}` }));
+  const items = Array.from({ length: 1234 }, (_, index) => ({
+    id: `item-${index}`,
+    prompt: `a "quoted" prompt\n${index}`,
+  }));
   items[7] = undefined;
   assert.equal(await writeJsonFileAsync(file, items, { sliceSize: 100 }), true);
   assert.equal(fs.readFileSync(file, "utf8"), JSON.stringify(items));
@@ -49,7 +64,10 @@ test("a background write is exactly compact JSON, with the same backup", async (
   assert.equal(fs.readFileSync(`${file}.bak`, "utf8"), JSON.stringify(items));
   await writeJsonFileAsync(file, { plain: true });
   assert.deepEqual(readJsonFile(file), { plain: true });
-  assert.deepEqual(fs.readdirSync(dir).filter((name) => name.includes(".tmp-")), []);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
+    [],
+  );
 });
 
 test("a background write that is no longer the newest leaves the file alone", async () => {
@@ -58,7 +76,10 @@ test("a background write that is no longer the newest leaves the file alone", as
   assert.equal(fs.readFileSync(file, "utf8"), '["newer"]');
   assert.equal(await writeJsonFileAsync(file, ["older"], { shouldCommit: () => false }), false);
   assert.deepEqual(readJsonFile(file), ["newer"]);
-  assert.deepEqual(fs.readdirSync(dir).filter((name) => name.includes(".tmp-")), []);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
+    [],
+  );
 });
 
 test("a synchronous write during a background write's backup keeps its own clean backup", async () => {
@@ -72,19 +93,27 @@ test("a synchronous write during a background write's backup keeps its own clean
     const old = fs.readFileSync(from);
     for (let i = 0; i < 2; i += 1) {
       writeJsonFile(file, ["clean"], { compact: true });
-      committed = (sequence += 1);
+      committed = sequence += 1;
     }
     fs.writeFileSync(to, old);
   };
   try {
     const mine = 1;
-    assert.equal(await writeJsonFileAsync(file, ["secret prompt", "more"], { shouldCommit: () => mine > committed }), false);
+    assert.equal(
+      await writeJsonFileAsync(file, ["secret prompt", "more"], {
+        shouldCommit: () => mine > committed,
+      }),
+      false,
+    );
   } finally {
     fs.promises.copyFile = copyFile;
   }
   assert.deepEqual(readJsonFile(file), ["clean"]);
   assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.bak`, "utf8")), ["clean"]);
-  assert.deepEqual(fs.readdirSync(dir).filter((name) => name.includes(".tmp-")), []);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
+    [],
+  );
 });
 
 test("temporary files a killed process left behind are cleared, not ones still being written", () => {
@@ -93,7 +122,10 @@ test("temporary files a killed process left behind are cleared, not ones still b
   fs.writeFileSync(`${file}.tmp-99999-3`, "[");
   fs.writeFileSync(`${file}.tmp-${process.pid}-1`, "[");
   removeStaleTemporaries(file);
-  assert.deepEqual(fs.readdirSync(dir).filter((name) => name.startsWith("stale.json")), [`stale.json.tmp-${process.pid}-1`]);
+  assert.deepEqual(
+    fs.readdirSync(dir).filter((name) => name.startsWith("stale.json")),
+    [`stale.json.tmp-${process.pid}-1`],
+  );
   fs.rmSync(`${file}.tmp-${process.pid}-1`);
 });
 

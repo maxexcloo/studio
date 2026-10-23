@@ -13,7 +13,14 @@
  * `attempt(key, local, check)` runs `check()` (which resolves true for a
  * right password) or answers why it will not: { ok, value, retryAfterMs, reason }.
  */
-export function createGuessLimiter({ freeTries = 5, baseMs = 1000, maxMs = 15 * 60 * 1000, forgetMs = 60 * 60 * 1000, maxRemoteInFlight = 4, now = () => Date.now() } = {}) {
+export function createGuessLimiter({
+  freeTries = 5,
+  baseMs = 1000,
+  maxMs = 15 * 60 * 1000,
+  forgetMs = 60 * 60 * 1000,
+  maxRemoteInFlight = 4,
+  now = () => Date.now(),
+} = {}) {
   const entries = new Map();
   const busy = new Set();
   let remoteInFlight = 0;
@@ -29,7 +36,8 @@ export function createGuessLimiter({ freeTries = 5, baseMs = 1000, maxMs = 15 * 
 
   function prune() {
     if (entries.size < 1000) return;
-    for (const [key, value] of entries) if (now() - value.lastFailure > forgetMs) entries.delete(key);
+    for (const [key, value] of entries)
+      if (now() - value.lastFailure > forgetMs) entries.delete(key);
   }
 
   function lockedFor(key) {
@@ -43,7 +51,8 @@ export function createGuessLimiter({ freeTries = 5, baseMs = 1000, maxMs = 15 * 
     if (!local) {
       const wait = lockedFor(lane);
       if (wait) return { ok: false, reason: "locked", retryAfterMs: wait };
-      if (remoteInFlight >= maxRemoteInFlight) return { ok: false, reason: "busy", retryAfterMs: 1000 };
+      if (remoteInFlight >= maxRemoteInFlight)
+        return { ok: false, reason: "busy", retryAfterMs: 1000 };
     }
     busy.add(lane);
     if (!local) remoteInFlight += 1;
@@ -58,7 +67,8 @@ export function createGuessLimiter({ freeTries = 5, baseMs = 1000, maxMs = 15 * 
         const found = entry(lane) || { failures: 0, lockedUntil: 0, lastFailure: 0 };
         found.failures += 1;
         found.lastFailure = now();
-        if (found.failures >= freeTries) found.lockedUntil = now() + Math.min(maxMs, baseMs * 2 ** (found.failures - freeTries));
+        if (found.failures >= freeTries)
+          found.lockedUntil = now() + Math.min(maxMs, baseMs * 2 ** (found.failures - freeTries));
         entries.set(lane, found);
       }
       return { ok: false, reason: "wrong", retryAfterMs: local ? 0 : lockedFor(lane) };

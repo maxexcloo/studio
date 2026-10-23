@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { releaseIdentity, repositoryUrl as repoUrl } from '../server/release-identity.js';
+import { releaseIdentity, repositoryUrl as repoUrl } from "../server/release-identity.js";
 
 const { repository } = releaseIdentity;
 
@@ -32,7 +32,9 @@ export function section(text, name) {
  */
 export const SUMMARY_MAX = 60;
 export function summaryOf(notes) {
-  const first = String(notes || "").split(/\r?\n/).find((line) => line.trim());
+  const first = String(notes || "")
+    .split(/\r?\n/)
+    .find((line) => line.trim());
   return first && /^> /.test(first) ? first.slice(2).trim() : "";
 }
 
@@ -42,15 +44,21 @@ export function summaryOf(notes) {
  */
 export function cutRelease(text, version, date) {
   const notes = section(text, "Unreleased");
-  if (!notes) throw new Error("CHANGELOG.md has nothing under Unreleased. Write the release notes first.");
-  if (section(text, version) !== null) throw new Error(`CHANGELOG.md already has a ${version} section.`);
+  if (!notes)
+    throw new Error("CHANGELOG.md has nothing under Unreleased. Write the release notes first.");
+  if (section(text, version) !== null)
+    throw new Error(`CHANGELOG.md already has a ${version} section.`);
   // The newest version that was actually tagged (it has a link); 0.1.0 never was.
-  const previous = [...text.matchAll(heading)].map((match) => match[1])
+  const previous = [...text.matchAll(heading)]
+    .map((match) => match[1])
     .find((name) => /^\d+\.\d+\.\d+$/.test(name) && text.includes(`\n[${name}]: ${repoUrl}/`));
-  let next = text.replace(/^## \[Unreleased\][^\n]*$/m, `## [Unreleased]\n\n## [${version}] - ${date}`);
+  let next = text.replace(
+    /^## \[Unreleased\][^\n]*$/m,
+    `## [Unreleased]\n\n## [${version}] - ${date}`,
+  );
   const links = [
     `[Unreleased]: ${repoUrl}/compare/v${version}...HEAD`,
-    `[${version}]: ${previous ? `${repoUrl}/compare/v${previous}...v${version}` : `${repoUrl}/releases/tag/v${version}`}`
+    `[${version}]: ${previous ? `${repoUrl}/compare/v${previous}...v${version}` : `${repoUrl}/releases/tag/v${version}`}`,
   ];
   next = next.replace(/^\[Unreleased\]: .*$/m, links.join("\n"));
   if (!next.includes(links[0])) next = `${next.trimEnd()}\n\n${links.join("\n")}\n`;
@@ -71,10 +79,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   // Where the version's container image is, below the notes.
   const version = tag.replace(/^v/, "");
   const image = `ghcr.io/${repository.toLowerCase()}`;
-  const digest = /^sha256:[a-f0-9]{64}$/.test(process.env.STUDIO_IMAGE_DIGEST || "") ? process.env.STUDIO_IMAGE_DIGEST : "";
-  process.stdout.write(`${notes}\n\n### Container image\n\n`
-    + "```text\n"
-    + `${image}:${version}\n`
-    + (digest ? `${image}@${digest}\n` : "")
-    + "```\n");
+  const digest = /^sha256:[a-f0-9]{64}$/.test(process.env.STUDIO_IMAGE_DIGEST || "")
+    ? process.env.STUDIO_IMAGE_DIGEST
+    : "";
+  process.stdout.write(
+    `${notes}\n\n### Container image\n\n` +
+      "```text\n" +
+      `${image}:${version}\n` +
+      (digest ? `${image}@${digest}\n` : "") +
+      "```\n",
+  );
 }

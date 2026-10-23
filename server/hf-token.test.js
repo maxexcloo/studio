@@ -24,7 +24,12 @@ test("a token read from .env says so, without the token", () => {
 
 test("a token set outside .env reads as the environment's", () => {
   const status = hfTokenStatus({ HUGGING_FACE_HUB_TOKEN: `hf_${"s".repeat(20)}4321` });
-  assert.deepEqual(status, { set: true, source: "environment", key: "HUGGING_FACE_HUB_TOKEN", hint: "hf_…4321" });
+  assert.deepEqual(status, {
+    set: true,
+    source: "environment",
+    key: "HUGGING_FACE_HUB_TOKEN",
+    hint: "hf_…4321",
+  });
 });
 
 test("nothing in Studio can save or clear a token", () => {

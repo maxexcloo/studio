@@ -34,12 +34,24 @@ function accountOutputSubfolders(ownerId) {
 export function outputSubfolderBelongsToRequest(subfolder, req) {
   const ownerId = ownerIdForRequest(req);
   if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
-  return typeof subfolder === "string" && accountOutputSubfolders(ownerId).some((folder) => subfolder.startsWith(`${folder}/`));
+  return (
+    typeof subfolder === "string" &&
+    accountOutputSubfolders(ownerId).some((folder) => subfolder.startsWith(`${folder}/`))
+  );
 }
 
 export function outputFilenameBelongsToRequest(filename, subfolder, req) {
-  if (typeof filename !== "string" || !filename || filename !== path.basename(filename) || /[\\/]/.test(filename)) return false;
+  if (
+    typeof filename !== "string" ||
+    !filename ||
+    filename !== path.basename(filename) ||
+    /[\\/]/.test(filename)
+  )
+    return false;
   const ownerId = ownerIdForRequest(req);
   if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
-  return accountOutputSubfolders(ownerId).includes(subfolder) || outputSubfolderBelongsToRequest(subfolder, req);
+  return (
+    accountOutputSubfolders(ownerId).includes(subfolder) ||
+    outputSubfolderBelongsToRequest(subfolder, req)
+  );
 }

@@ -3,10 +3,25 @@ import assert from "node:assert/strict";
 import { galleryStats } from "./stats.js";
 
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).toISOString();
-const done = (createdAt, extra = {}) => ({ status: "done", type: "image", createdAt, durationMs: 1000, width: 1000, height: 1000, ...extra });
+const done = (createdAt, extra = {}) => ({
+  status: "done",
+  type: "image",
+  createdAt,
+  durationMs: 1000,
+  width: 1000,
+  height: 1000,
+  ...extra,
+});
 
 test("counts outputs, render time and megapixels, ignoring unfinished items", () => {
-  const stats = galleryStats([done(at(2026, 9, 1)), done(at(2026, 9, 1), { type: "video" }), { status: "error", createdAt: at(2026, 9, 1) }], new Date(2026, 8, 1));
+  const stats = galleryStats(
+    [
+      done(at(2026, 9, 1)),
+      done(at(2026, 9, 1), { type: "video" }),
+      { status: "error", createdAt: at(2026, 9, 1) },
+    ],
+    new Date(2026, 8, 1),
+  );
   assert.equal(stats.outputs, 2);
   assert.equal(stats.images, 1);
   assert.equal(stats.videos, 1);
@@ -15,7 +30,10 @@ test("counts outputs, render time and megapixels, ignoring unfinished items", ()
 });
 
 test("earlier images shown from another folder are not counted as made here", () => {
-  const stats = galleryStats([done(at(2026, 9, 1)), done(at(2020, 1, 1), { library: { folder: "f", path: "old.png" } })], new Date(2026, 8, 1));
+  const stats = galleryStats(
+    [done(at(2026, 9, 1)), done(at(2020, 1, 1), { library: { folder: "f", path: "old.png" } })],
+    new Date(2026, 8, 1),
+  );
   assert.equal(stats.outputs, 1);
   assert.equal(stats.megapixels, 1);
 });
@@ -35,7 +53,11 @@ test("streaks cross month boundaries", () => {
 });
 
 test("reports the most used workflow and busiest day", () => {
-  const items = [done(at(2026, 9, 2), { settings: { profileId: "a" } }), done(at(2026, 9, 2), { settings: { profileId: "b" } }), done(at(2026, 9, 3), { settings: { profileId: "a" } })];
+  const items = [
+    done(at(2026, 9, 2), { settings: { profileId: "a" } }),
+    done(at(2026, 9, 2), { settings: { profileId: "b" } }),
+    done(at(2026, 9, 3), { settings: { profileId: "a" } }),
+  ];
   const stats = galleryStats(items, new Date(2026, 8, 3));
   assert.equal(stats.topWorkflow, "a");
   assert.equal(stats.topWorkflowCount, 2);

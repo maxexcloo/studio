@@ -21,7 +21,7 @@ const phases = [
   [/Upscale/i, "Upscaling"],
   [/Scale|Resize|Crop/i, "Resizing"],
   [/Face|Detailer/i, "Fixing faces"],
-  [/Save|Preview/i, "Saving"]
+  [/Save|Preview/i, "Saving"],
 ];
 
 /** What a node is doing, in a word or two. */
@@ -55,7 +55,8 @@ function namedPhase(graph, node) {
  */
 export function nextProgress(graph, message, current = null) {
   const data = message?.data || {};
-  if (message?.type === "execution_start") return { value: 0, max: 0, node: "", phase: "Starting", steps: false };
+  if (message?.type === "execution_start")
+    return { value: 0, max: 0, node: "", phase: "Starting", steps: false };
   if (message?.type === "executing") {
     const node = data.display_node ?? data.node;
     if (node === null || node === undefined) return null;
@@ -64,7 +65,13 @@ export function nextProgress(graph, message, current = null) {
     const classType = classOf(graph, node);
     // A sampler loads its model before the first step; keep a count it already has.
     if (isSampler(classType) && current?.steps && current.node === String(node)) return null;
-    return { value: 0, max: 0, node: String(node), phase: classType ? phaseOf(classType) : "Working", steps: false };
+    return {
+      value: 0,
+      max: 0,
+      node: String(node),
+      phase: classType ? phaseOf(classType) : "Working",
+      steps: false,
+    };
   }
   if (message?.type === "progress") {
     const node = String(data.node ?? "");

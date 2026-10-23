@@ -25,10 +25,7 @@
       "class_type": "CLIPTextEncode",
       "inputs": {
         "text": "",
-        "clip": [
-          "2",
-          0
-        ]
+        "clip": ["2", 0]
       }
     },
     "5": {
@@ -43,10 +40,7 @@
       "class_type": "CLIPTextEncode",
       "inputs": {
         "text": "",
-        "clip": [
-          "2",
-          0
-        ]
+        "clip": ["2", 0]
       }
     },
     "7": {
@@ -58,35 +52,17 @@
         "scheduler": "simple",
         "seed": 23001,
         "steps": 50,
-        "latent_image": [
-          "5",
-          0
-        ],
-        "model": [
-          "91",
-          0
-        ],
-        "negative": [
-          "81",
-          1
-        ],
-        "positive": [
-          "81",
-          0
-        ]
+        "latent_image": ["5", 0],
+        "model": ["91", 0],
+        "negative": ["81", 1],
+        "positive": ["81", 0]
       }
     },
     "8": {
       "class_type": "VAEDecode",
       "inputs": {
-        "samples": [
-          "7",
-          0
-        ],
-        "vae": [
-          "3",
-          0
-        ]
+        "samples": ["7", 0],
+        "vae": ["3", 0]
       }
     },
     "80": {
@@ -100,58 +76,19 @@
       "inputs": {
         "resolution": "resize",
         "resolution.megapixels": 1,
-        "images.image0": [
-          "80",
-          0
-        ],
-        "images.image1": [
-          "82",
-          0
-        ],
-        "images.image2": [
-          "83",
-          0
-        ],
-        "images.image3": [
-          "84",
-          0
-        ],
-        "images.image4": [
-          "85",
-          0
-        ],
-        "images.image5": [
-          "86",
-          0
-        ],
-        "images.image6": [
-          "87",
-          0
-        ],
-        "images.image7": [
-          "88",
-          0
-        ],
-        "images.image8": [
-          "89",
-          0
-        ],
-        "images.image9": [
-          "90",
-          0
-        ],
-        "negative": [
-          "6",
-          0
-        ],
-        "positive": [
-          "4",
-          0
-        ],
-        "vae": [
-          "3",
-          0
-        ]
+        "images.image0": ["80", 0],
+        "images.image1": ["82", 0],
+        "images.image2": ["83", 0],
+        "images.image3": ["84", 0],
+        "images.image4": ["85", 0],
+        "images.image5": ["86", 0],
+        "images.image6": ["87", 0],
+        "images.image7": ["88", 0],
+        "images.image8": ["89", 0],
+        "images.image9": ["90", 0],
+        "negative": ["6", 0],
+        "positive": ["4", 0],
+        "vae": ["3", 0]
       }
     },
     "82": {
@@ -212,19 +149,13 @@
       "class_type": "SaveImage",
       "inputs": {
         "filename_prefix": "bento/bento-image-flux3-klein-distilled-int8",
-        "images": [
-          "8",
-          0
-        ]
+        "images": ["8", 0]
       }
     },
     "91": {
       "class_type": "Power Lora Loader (rgthree)",
       "inputs": {
-        "model": [
-          "1",
-          0
-        ]
+        "model": ["1", 0]
       }
     }
   },
@@ -236,31 +167,11 @@
     "kind": "image",
     "name": "FLUX.3 [klein] Base · Quality · 50 Steps · Optional 10 References · INT8 ConvRot",
     "aspectRatios": [
-      [
-        "1:1",
-        1,
-        1
-      ],
-      [
-        "16:9",
-        16,
-        9
-      ],
-      [
-        "9:16",
-        9,
-        16
-      ],
-      [
-        "4:3",
-        4,
-        3
-      ],
-      [
-        "3:4",
-        3,
-        4
-      ]
+      ["1:1", 1, 1],
+      ["16:9", 16, 9],
+      ["9:16", 9, 16],
+      ["4:3", 4, 3],
+      ["3:4", 3, 4]
     ],
     "capabilities": {
       "cfg": true,
@@ -390,10 +301,7 @@
             "class_type": "CLIPTextEncode",
             "inputs": {
               "text": "",
-              "clip": [
-                "2",
-                0
-              ]
+              "clip": ["2", 0]
             }
           },
           "5": {
@@ -408,10 +316,7 @@
             "class_type": "CLIPTextEncode",
             "inputs": {
               "text": "",
-              "clip": [
-                "2",
-                0
-              ]
+              "clip": ["2", 0]
             }
           },
           "7": {
@@ -423,54 +328,30 @@
               "scheduler": "simple",
               "seed": 23001,
               "steps": 50,
-              "latent_image": [
-                "5",
-                0
-              ],
-              "model": [
-                "91",
-                0
-              ],
-              "negative": [
-                "6",
-                0
-              ],
-              "positive": [
-                "4",
-                0
-              ]
+              "latent_image": ["5", 0],
+              "model": ["91", 0],
+              "negative": ["6", 0],
+              "positive": ["4", 0]
             }
           },
           "8": {
             "class_type": "VAEDecode",
             "inputs": {
-              "samples": [
-                "7",
-                0
-              ],
-              "vae": [
-                "3",
-                0
-              ]
+              "samples": ["7", 0],
+              "vae": ["3", 0]
             }
           },
           "9": {
             "class_type": "SaveImage",
             "inputs": {
               "filename_prefix": "bento/bento-image-flux3-klein-distilled-int8",
-              "images": [
-                "8",
-                0
-              ]
+              "images": ["8", 0]
             }
           },
           "91": {
             "class_type": "Power Lora Loader (rgthree)",
             "inputs": {
-              "model": [
-                "1",
-                0
-              ]
+              "model": ["1", 0]
             }
           }
         },

@@ -35,7 +35,11 @@ export function exitRecordDataDir(env = process.env, fileValues = null) {
   applyLegacyEnvNames(shell);
   let file = fileValues;
   if (!file) {
-    try { file = readEnvFile(projectRoot).values; } catch { file = {}; }
+    try {
+      file = readEnvFile(projectRoot).values;
+    } catch {
+      file = {};
+    }
   }
   return currentDataDir({ ...file, ...shell });
 }
@@ -45,33 +49,64 @@ const exitFile = () => path.join(logDir(), "last-exit.json");
 
 // Plain reads, never the .bak copy: a record removed on purpose must stay gone.
 function read(file) {
-  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
 }
 function writeSync(file, value) {
   // Synchronous: this runs on the way out, where nothing async finishes.
-  try { writeJsonFile(file, value); } catch { /* writing down a stop must never be what fails */ }
+  try {
+    writeJsonFile(file, value);
+  } catch {
+    /* writing down a stop must never be what fails */
+  }
 }
 
 /**
  * Writes down a stop. `clean` is a stop someone meant (Ctrl+C, closing the
  * window, the launcher's stop); anything else is reported next start.
  */
-export function recordExit({ who, reason, code = null, signal = null, clean = false, detail = "" }) {
+export function recordExit({
+  who,
+  reason,
+  code = null,
+  signal = null,
+  clean = false,
+  detail = "",
+}) {
   const session = read(sessionFile());
   const existing = read(exitFile());
   const sameRun = existing && session && existing.at >= session.startedAt;
   if (sameRun && !existing.clean) return existing;
-  const record = { at: Date.now(), who, reason, code, signal, clean, ...(detail ? { detail: String(detail).slice(-4000) } : {}) };
+  const record = {
+    at: Date.now(),
+    who,
+    reason,
+    code,
+    signal,
+    clean,
+    ...(detail ? { detail: String(detail).slice(-4000) } : {}),
+  };
   writeSync(exitFile(), record);
   return record;
 }
 
 /** The server's run begins: returns how the last one ended when that's worth saying, and starts a new record. */
-export function startSession({ pid = process.pid, now = Date.now(), bootedAt = now - os.uptime() * 1000 } = {}) {
+export function startSession({
+  pid = process.pid,
+  now = Date.now(),
+  bootedAt = now - os.uptime() * 1000,
+} = {}) {
   const previous = read(sessionFile());
   const exit = read(exitFile());
   // Read once: this run's stop is written afresh, so last run's can't pass for it.
-  try { removeJsonFile(exitFile()); } catch { /* nothing to clear */ }
+  try {
+    removeJsonFile(exitFile());
+  } catch {
+    /* nothing to clear */
+  }
   writeSync(sessionFile(), { pid, startedAt: now, lastSeen: now });
   if (!previous) return null;
   const lastSeen = previous.lastSeen || previous.startedAt;
@@ -81,18 +116,20 @@ export function startSession({ pid = process.pid, now = Date.now(), bootedAt = n
   return {
     at: lastSeen,
     who: "unknown",
-    reason: "Studio was ended from outside, without a crash of its own: the process was closed, or the window it ran in.",
+    reason:
+      "Studio was ended from outside, without a crash of its own: the process was closed, or the window it ran in.",
     code: null,
     signal: null,
     clean: false,
-    lastSeen
+    lastSeen,
   };
 }
 
 /** Once a minute while running, so an unexplained stop can say when Studio was last alive. */
 export function noteAlive(now = Date.now()) {
   const session = read(sessionFile());
-  if (session && session.pid === process.pid) writeSync(sessionFile(), { ...session, lastSeen: now });
+  if (session && session.pid === process.pid)
+    writeSync(sessionFile(), { ...session, lastSeen: now });
 }
 
 /** The last lines a child printed to stderr, kept so its stop can say why. */
@@ -111,6 +148,8 @@ export function tailKeeper(limit = 30) {
       }
       while (lines.length > limit) lines.shift();
     },
-    text() { return [...lines, partial].filter(Boolean).join("\n"); }
+    text() {
+      return [...lines, partial].filter(Boolean).join("\n");
+    },
   };
 }

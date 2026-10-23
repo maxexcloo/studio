@@ -40,7 +40,8 @@ const tailLimit = 4000;
 const stepTimeoutMs = 15 * 60 * 1000;
 
 // What to do about it, since Manager itself only says "not allowed" (docs/guides/TROUBLESHOOTING.md has the steps).
-export const managerRefusedMessage = "ComfyUI-Manager’s security level blocks this install. Set security_level = normal in Manager’s config.ini (ComfyUI/user/__manager/config.ini, or user/default/ComfyUI-Manager/config.ini in older versions), restart ComfyUI and try again, or use the terminal command.";
+export const managerRefusedMessage =
+  "ComfyUI-Manager’s security level blocks this install. Set security_level = normal in Manager’s config.ini (ComfyUI/user/__manager/config.ini, or user/default/ComfyUI-Manager/config.ini in older versions), restart ComfyUI and try again, or use the terminal command.";
 
 function snapshot(state) {
   if (!state) return null;
@@ -60,7 +61,10 @@ export function packInstallRoutes(id, root = comfyRootDir()) {
 
 /** Which ComfyUI-Manager answers: 4 (built into ComfyUI, /v2 routes), 3 (the custom node), or 0. */
 async function managerGeneration() {
-  for (const [route, generation] of [["/v2/manager/version", 4], ["/manager/version", 3]]) {
+  for (const [route, generation] of [
+    ["/v2/manager/version", 4],
+    ["/manager/version", 3],
+  ]) {
     try {
       await comfy(route, { signal: AbortSignal.timeout(5000) });
       return generation;
@@ -75,7 +79,11 @@ async function managerGeneration() {
 function run(state, command, args, cwd, env = process.env) {
   return new Promise((resolve, reject) => {
     // UTF-8 output from Python whatever the Windows code page, so names in the log stay readable.
-    const child = spawn(command, args, { cwd, env: { ...env, GIT_TERMINAL_PROMPT: "0", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" }, windowsHide: true });
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...env, GIT_TERMINAL_PROMPT: "0", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
+      windowsHide: true,
+    });
     state.child = child;
     const timer = setTimeout(() => child.kill(), stepTimeoutMs);
     let stdout = "";
@@ -92,7 +100,13 @@ function run(state, command, args, cwd, env = process.env) {
     child.stderr.on("data", collector(false));
     child.on("error", (error) => {
       clearTimeout(timer);
-      reject(new Error(error.code === "ENOENT" ? `${path.basename(command)} is not installed on this computer.` : error.message));
+      reject(
+        new Error(
+          error.code === "ENOENT"
+            ? `${path.basename(command)} is not installed on this computer.`
+            : error.message,
+        ),
+      );
     });
     child.on("close", (code) => {
       clearTimeout(timer);
@@ -113,10 +127,14 @@ export const heldPackages = ["torch", "torchvision", "torchaudio", "numpy"];
  */
 export function constraintsFrom(freeze = "") {
   const wanted = new Set(heldPackages);
-  return String(freeze).split(/\r?\n/)
+  return String(freeze)
+    .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => {
-      const name = line.split(/[=<>!~ @]/)[0].toLowerCase().replace(/_/g, "-");
+      const name = line
+        .split(/[=<>!~ @]/)[0]
+        .toLowerCase()
+        .replace(/_/g, "-");
       return wanted.has(name) && /==/.test(line);
     })
     .join("\n");
@@ -125,20 +143,33 @@ export function constraintsFrom(freeze = "") {
 async function installLocally(state, pack) {
   const root = comfyRootDir();
   const python = comfyPython(root);
-  if (!root || !python) throw new Error("ComfyUI isn't on this computer. Use the terminal steps instead.");
+  if (!root || !python)
+    throw new Error("ComfyUI isn't on this computer. Use the terminal steps instead.");
   const customNodes = path.join(root, "custom_nodes");
   const target = path.join(customNodes, pack.folder);
   if (!fs.existsSync(target)) {
     state.step = "Downloading the nodes";
     // A pack inside a bigger repository is checked out outside custom_nodes (ComfyUI
     // would try to import the whole checkout), and only its own folder is copied in.
-    const checkoutDir = pack.subdir ? fs.mkdtempSync(path.join(os.tmpdir(), "studio-pack-")) : target;
+    const checkoutDir = pack.subdir
+      ? fs.mkdtempSync(path.join(os.tmpdir(), "studio-pack-"))
+      : target;
     const checkoutTarget = pack.subdir ? path.join(checkoutDir, "repo") : target;
     try {
       // Exactly the reviewed commit, never whatever the branch says today.
-      await run(state, "git", ["clone", "--no-checkout", pack.repository, checkoutTarget], pack.subdir ? checkoutDir : customNodes);
+      await run(
+        state,
+        "git",
+        ["clone", "--no-checkout", pack.repository, checkoutTarget],
+        pack.subdir ? checkoutDir : customNodes,
+      );
       if (pack.commit) {
-        await run(state, "git", ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit], checkoutTarget);
+        await run(
+          state,
+          "git",
+          ["-c", "advice.detachedHead=false", "checkout", "--detach", pack.commit],
+          checkoutTarget,
+        );
         const head = (await run(state, "git", ["rev-parse", "HEAD"], checkoutTarget)).trim();
         if (head !== pack.commit) throw new Error("The download isn’t the reviewed version.");
       } else {
@@ -146,7 +177,11 @@ async function installLocally(state, pack) {
       }
       if (pack.subdir) {
         const inner = path.resolve(checkoutTarget, ...pack.subdir.split("/"));
-        if (!inner.startsWith(`${checkoutTarget}${path.sep}`) || !fs.existsSync(path.join(inner, "__init__.py"))) throw new Error(`${pack.name} isn’t where it was in the reviewed version.`);
+        if (
+          !inner.startsWith(`${checkoutTarget}${path.sep}`) ||
+          !fs.existsSync(path.join(inner, "__init__.py"))
+        )
+          throw new Error(`${pack.name} isn’t where it was in the reviewed version.`);
         fs.cpSync(inner, target, { recursive: true });
         fs.rmSync(checkoutDir, { recursive: true, force: true });
       }
@@ -154,26 +189,55 @@ async function installLocally(state, pack) {
       // Only what this install created goes; a folder that was already there is never touched.
       fs.rmSync(target, { recursive: true, force: true });
       if (pack.subdir) fs.rmSync(checkoutDir, { recursive: true, force: true });
-      throw new Error(/reviewed|did not match|reference is not a tree|pathspec/i.test(`${error.message}\n${state.log}`)
-        ? `The reviewed version of ${pack.name} (${pack.ref || pack.commit}) is no longer on GitHub, so it wasn’t installed.`
-        : error.message);
+      throw new Error(
+        /reviewed|did not match|reference is not a tree|pathspec/i.test(
+          `${error.message}\n${state.log}`,
+        )
+          ? `The reviewed version of ${pack.name} (${pack.ref || pack.commit}) is no longer on GitHub, so it wasn’t installed.`
+          : error.message,
+      );
     }
   }
   if (fs.existsSync(path.join(target, "requirements.txt"))) {
     state.step = "Checking ComfyUI’s PyTorch";
     let freeze;
     try {
-      freeze = await run(state, python, [...pipArgs(python), "list", "--format=freeze", "--disable-pip-version-check"], target, pythonEnv(python));
+      freeze = await run(
+        state,
+        python,
+        [...pipArgs(python), "list", "--format=freeze", "--disable-pip-version-check"],
+        target,
+        pythonEnv(python),
+      );
     } catch {
-      throw new Error("Couldn’t check ComfyUI’s PyTorch version, so the pack’s packages weren’t installed. Use the terminal steps instead.");
+      throw new Error(
+        "Couldn’t check ComfyUI’s PyTorch version, so the pack’s packages weren’t installed. Use the terminal steps instead.",
+      );
     }
     const constraints = path.join(os.tmpdir(), `studio-constraints-${crypto.randomUUID()}.txt`);
     fs.writeFileSync(constraints, `${constraintsFrom(freeze)}\n`);
     state.step = "Installing what they need";
     try {
-      await run(state, python, [...pipArgs(python), "install", "-r", "requirements.txt", "-c", constraints, "--disable-pip-version-check"], target, pythonEnv(python));
+      await run(
+        state,
+        python,
+        [
+          ...pipArgs(python),
+          "install",
+          "-r",
+          "requirements.txt",
+          "-c",
+          constraints,
+          "--disable-pip-version-check",
+        ],
+        target,
+        pythonEnv(python),
+      );
     } catch (error) {
-      if (/ResolutionImpossible|conflict/i.test(state.log)) throw new Error(`${pack.name} needs a different PyTorch or NumPy than ComfyUI has, so its packages weren’t installed. Check its page for a version that fits.`);
+      if (/ResolutionImpossible|conflict/i.test(state.log))
+        throw new Error(
+          `${pack.name} needs a different PyTorch or NumPy than ComfyUI has, so its packages weren’t installed. Check its page for a version that fits.`,
+        );
       throw error;
     } finally {
       fs.rmSync(constraints, { force: true });
@@ -197,12 +261,21 @@ async function installWithManager(state, pack) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ui_id: uiId, client_id: "studio", kind: "install",
-        params: { id: pack.manager, version: "latest", selected_version: "latest", mode: "remote", channel: "default" }
-      })
+        ui_id: uiId,
+        client_id: "studio",
+        kind: "install",
+        params: {
+          id: pack.manager,
+          version: "latest",
+          selected_version: "latest",
+          mode: "remote",
+          channel: "default",
+        },
+      }),
     });
   } catch (error) {
-    if (/\b403\b/.test(error.message) || securityWords.test(error.message)) throw managerRefused(new Error("ComfyUI-Manager’s security level blocks this install."));
+    if (/\b403\b/.test(error.message) || securityWords.test(error.message))
+      throw managerRefused(new Error("ComfyUI-Manager’s security level blocks this install."));
     throw error;
   }
   await comfy("/v2/manager/queue/start", { method: "POST" }).catch(() => null);
@@ -210,12 +283,18 @@ async function installWithManager(state, pack) {
   const deadline = Date.now() + stepTimeoutMs;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    const answer = await comfy(`/v2/manager/queue/history?ui_id=${encodeURIComponent(uiId)}`).catch(() => null);
-    const item = answer?.history?.[uiId] || (answer?.history?.ui_id === uiId ? answer.history : null);
+    const answer = await comfy(`/v2/manager/queue/history?ui_id=${encodeURIComponent(uiId)}`).catch(
+      () => null,
+    );
+    const item =
+      answer?.history?.[uiId] || (answer?.history?.ui_id === uiId ? answer.history : null);
     if (!item) continue;
     if (item.status?.status_str === "success" || item.result === "success") return;
-    const message = [item.result, ...(item.status?.messages || [])].filter((text) => text && text !== "failed").join(" ");
-    if (!message || securityWords.test(message) || /not allowed/i.test(message)) throw managerRefused(new Error(managerRefusedMessage));
+    const message = [item.result, ...(item.status?.messages || [])]
+      .filter((text) => text && text !== "failed")
+      .join(" ");
+    if (!message || securityWords.test(message) || /not allowed/i.test(message))
+      throw managerRefused(new Error(managerRefusedMessage));
     throw new Error(message || "ComfyUI-Manager couldn’t install it.");
   }
   throw new Error("ComfyUI-Manager didn’t finish in time.");
@@ -233,16 +312,24 @@ async function installWithManager3(state, pack) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ui_id: `studio-${crypto.randomUUID()}`, id: pack.manager, version: "latest", selected_version: "latest",
-        mode: "remote", channel: "default", skip_post_install: false
-      })
+        ui_id: `studio-${crypto.randomUUID()}`,
+        id: pack.manager,
+        version: "latest",
+        selected_version: "latest",
+        mode: "remote",
+        channel: "default",
+        skip_post_install: false,
+      }),
     });
   } catch (error) {
-    if (/\b403\b/.test(error.message) || securityWords.test(error.message)) throw managerRefused(new Error(managerRefusedMessage));
+    if (/\b403\b/.test(error.message) || securityWords.test(error.message))
+      throw managerRefused(new Error(managerRefusedMessage));
     throw error;
   }
   // Bodyless POST: Manager rejects form content types here. Older versions took a GET.
-  await comfy("/manager/queue/start", { method: "POST" }).catch(() => comfy("/manager/queue/start").catch(() => null));
+  await comfy("/manager/queue/start", { method: "POST" }).catch(() =>
+    comfy("/manager/queue/start").catch(() => null),
+  );
   state.step = "ComfyUI-Manager is installing";
   const deadline = Date.now() + stepTimeoutMs;
   let quiet = 0;
@@ -254,7 +341,13 @@ async function installWithManager3(state, pack) {
     if (quiet < 2) continue;
     const installed = await comfy("/customnode/installed").catch(() => null);
     const packs = Object.entries(installed || {});
-    if (packs.some(([name, info]) => name === pack.manager || info?.cnr_id === pack.manager || info?.aux_id === pack.manager)) return;
+    if (
+      packs.some(
+        ([name, info]) =>
+          name === pack.manager || info?.cnr_id === pack.manager || info?.aux_id === pack.manager,
+      )
+    )
+      return;
     throw new Error("ComfyUI-Manager didn’t install it. The ComfyUI log shows why.");
   }
   throw new Error("ComfyUI-Manager didn’t finish in time.");
@@ -270,13 +363,26 @@ export async function startPackInstall(id, { overrideManager = false } = {}) {
   const current = installs.get(id);
   if (current?.status === "running") return snapshot(current);
   const routes = packInstallRoutes(id);
-  if (overrideManager && !routes.local) throw new Error("ComfyUI isn't on this computer, so only ComfyUI-Manager can install this.");
+  if (overrideManager && !routes.local)
+    throw new Error("ComfyUI isn't on this computer, so only ComfyUI-Manager can install this.");
   const generation = routes.manager && !overrideManager ? await managerGeneration() : 0;
   const viaManager = generation > 0;
   if (!viaManager && !routes.local) {
-    throw new Error("ComfyUI runs on another computer and ComfyUI-Manager can’t install this pack. Use the steps below.");
+    throw new Error(
+      "ComfyUI runs on another computer and ComfyUI-Manager can’t install this pack. Use the steps below.",
+    );
   }
-  const state = { id, name: pack.name, route: viaManager ? "manager" : "local", status: "running", step: "Starting", log: "", error: "", startedAt: Date.now(), finishedAt: 0 };
+  const state = {
+    id,
+    name: pack.name,
+    route: viaManager ? "manager" : "local",
+    status: "running",
+    step: "Starting",
+    log: "",
+    error: "",
+    startedAt: Date.now(),
+    finishedAt: 0,
+  };
   installs.set(id, state);
   (async () => {
     try {
@@ -284,11 +390,19 @@ export async function startPackInstall(id, { overrideManager = false } = {}) {
         await transport(state, pack);
       } else if (viaManager) {
         try {
-          await (generation === 4 ? installWithManager(state, pack) : installWithManager3(state, pack));
+          await (generation === 4
+            ? installWithManager(state, pack)
+            : installWithManager3(state, pack));
         } catch (error) {
           // Refused on purpose (its security level): stop and ask, never go around it silently.
           if (error.security) {
-            Object.assign(state, { status: "blocked", step: "", error: error.message, canOverride: routes.local, finishedAt: Date.now() });
+            Object.assign(state, {
+              status: "blocked",
+              step: "",
+              error: error.message,
+              canOverride: routes.local,
+              finishedAt: Date.now(),
+            });
             return;
           }
           // Failed for another reason: do it ourselves when we can.
@@ -300,9 +414,18 @@ export async function startPackInstall(id, { overrideManager = false } = {}) {
       } else {
         await installLocally(state, pack);
       }
-      Object.assign(state, { status: "done", step: "Installed. Restart ComfyUI to load it.", finishedAt: Date.now() });
+      Object.assign(state, {
+        status: "done",
+        step: "Installed. Restart ComfyUI to load it.",
+        finishedAt: Date.now(),
+      });
     } catch (error) {
-      Object.assign(state, { status: "error", error: error.message, step: "", finishedAt: Date.now() });
+      Object.assign(state, {
+        status: "error",
+        error: error.message,
+        step: "",
+        finishedAt: Date.now(),
+      });
     }
   })();
   return snapshot(state);

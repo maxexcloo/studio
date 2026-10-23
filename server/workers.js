@@ -24,7 +24,7 @@ export const workerCapabilities = [
   { id: "image", label: "Image", description: "Image generation, and provider-backed cloud runs." },
   { id: "video", label: "Video", description: "Local video generation." },
   { id: "upscale", label: "Upscale", description: "Upscaling finished images and videos." },
-  { id: "models", label: "Model Library", description: "Receives model and LoRA downloads." }
+  { id: "models", label: "Model Library", description: "Receives model and LoRA downloads." },
 ];
 const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
 
@@ -46,14 +46,28 @@ export function normalizeWorkerUrl(value = "") {
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) text = `http://${text}`;
   try {
     const url = new URL(text);
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || !url.hostname) return "";
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      !url.hostname
+    )
+      return "";
     return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
   } catch {
     return "";
   }
 }
 
-const slug = (text) => String(text || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+const slug = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
 const validId = (id) => /^[a-z0-9][a-z0-9_-]{0,39}$/.test(id);
 
 /**
@@ -61,22 +75,50 @@ const validId = (id) => /^[a-z0-9][a-z0-9_-]{0,39}$/.test(id);
  * tidied: `taken` holds ids already in use, so a new one gets its own.
  */
 export function normalizeWorker(raw, { taken = new Set(), where = "Worker" } = {}) {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new WorkerConfigError(`${where} must be an object with a name, url and capabilities.`);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    throw new WorkerConfigError(`${where} must be an object with a name, url and capabilities.`);
   const url = normalizeWorkerUrl(raw.url);
-  if (!url) throw new WorkerConfigError(`${where} needs a plain HTTP(S) address, such as http://127.0.0.1:8188.`);
-  const name = String(raw.name || "").replace(/\s+/g, " ").trim().slice(0, 60);
-  const list = Array.isArray(raw.capabilities) ? raw.capabilities : typeof raw.capabilities === "string" ? raw.capabilities.split(/[\s,]+/) : [];
-  const capabilities = workerCapabilities.map((item) => item.id).filter((id) => list.map((entry) => String(entry).trim().toLowerCase()).includes(id));
-  const unknown = list.map((entry) => String(entry).trim().toLowerCase()).filter((entry) => entry && !capabilityIds.has(entry));
-  if (unknown.length) throw new WorkerConfigError(`${where} has an unknown capability: ${unknown.join(", ")}. Use ${[...capabilityIds].join(", ")}.`);
-  if (!capabilities.length) throw new WorkerConfigError(`${where} needs at least one capability (${[...capabilityIds].join(", ")}).`);
-  let id = String(raw.id || "").trim().toLowerCase();
-  if (id && !validId(id)) throw new WorkerConfigError(`${where} has an invalid id: use up to 40 lower-case letters, digits, - and _.`);
-  if (id && taken.has(id)) throw new WorkerConfigError(`${where} reuses the id “${id}”. Each worker needs its own.`);
+  if (!url)
+    throw new WorkerConfigError(
+      `${where} needs a plain HTTP(S) address, such as http://127.0.0.1:8188.`,
+    );
+  const name = String(raw.name || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+  const list = Array.isArray(raw.capabilities)
+    ? raw.capabilities
+    : typeof raw.capabilities === "string"
+      ? raw.capabilities.split(/[\s,]+/)
+      : [];
+  const capabilities = workerCapabilities
+    .map((item) => item.id)
+    .filter((id) => list.map((entry) => String(entry).trim().toLowerCase()).includes(id));
+  const unknown = list
+    .map((entry) => String(entry).trim().toLowerCase())
+    .filter((entry) => entry && !capabilityIds.has(entry));
+  if (unknown.length)
+    throw new WorkerConfigError(
+      `${where} has an unknown capability: ${unknown.join(", ")}. Use ${[...capabilityIds].join(", ")}.`,
+    );
+  if (!capabilities.length)
+    throw new WorkerConfigError(
+      `${where} needs at least one capability (${[...capabilityIds].join(", ")}).`,
+    );
+  let id = String(raw.id || "")
+    .trim()
+    .toLowerCase();
+  if (id && !validId(id))
+    throw new WorkerConfigError(
+      `${where} has an invalid id: use up to 40 lower-case letters, digits, - and _.`,
+    );
+  if (id && taken.has(id))
+    throw new WorkerConfigError(`${where} reuses the id “${id}”. Each worker needs its own.`);
   if (!id) {
     const base = slug(name) || "worker";
     id = base;
-    while (taken.has(id) || !validId(id)) id = `${base.slice(0, 33)}-${crypto.randomBytes(3).toString("hex")}`;
+    while (taken.has(id) || !validId(id))
+      id = `${base.slice(0, 33)}-${crypto.randomBytes(3).toString("hex")}`;
   }
   taken.add(id);
   return { id, name: name || defaultName(capabilities), url, capabilities };
@@ -91,15 +133,31 @@ function defaultName(capabilities) {
 }
 
 /** Whether a variable was set by the deployment (the real environment), not saved to Studio's .env. */
-const fromDeployment = (environment, key) => Boolean(environment[key]) && !(environment === process.env && envFileKeys.has(key));
+const fromDeployment = (environment, key) =>
+  Boolean(environment[key]) && !(environment === process.env && envFileKeys.has(key));
 
 /** The legacy pair as workers: COMFY_URL runs images, upscales and model downloads (and video unless a video worker exists). */
 export function legacyWorkers({ imageUrl = "", videoUrl = "", videoElsewhere = false } = {}) {
   const workers = [];
   const image = normalizeWorkerUrl(imageUrl);
   const video = normalizeWorkerUrl(videoUrl);
-  if (image) workers.push({ id: LEGACY_IMAGE_ID, name: "Image Worker", url: image, capabilities: video || videoElsewhere ? ["image", "upscale", "models"] : ["image", "video", "upscale", "models"] });
-  if (video) workers.push({ id: LEGACY_VIDEO_ID, name: "Video Worker", url: video, capabilities: ["video"] });
+  if (image)
+    workers.push({
+      id: LEGACY_IMAGE_ID,
+      name: "Image Worker",
+      url: image,
+      capabilities:
+        video || videoElsewhere
+          ? ["image", "upscale", "models"]
+          : ["image", "video", "upscale", "models"],
+    });
+  if (video)
+    workers.push({
+      id: LEGACY_VIDEO_ID,
+      name: "Video Worker",
+      url: video,
+      capabilities: ["video"],
+    });
   return workers;
 }
 
@@ -112,16 +170,35 @@ export function deploymentWorkers(environment = process.env) {
   const text = String(environment.STUDIO_WORKERS || "").trim();
   if (text) {
     let parsed;
-    try { parsed = JSON.parse(text); } catch { throw new WorkerConfigError("STUDIO_WORKERS must be a JSON list of workers, such as [{\"name\":\"Images\",\"url\":\"http://comfy:8188\",\"capabilities\":[\"image\",\"upscale\"]}]."); }
-    if (!Array.isArray(parsed)) throw new WorkerConfigError("STUDIO_WORKERS must be a JSON list of workers.");
-    if (parsed.length > maxWorkers) throw new WorkerConfigError(`STUDIO_WORKERS lists more than ${maxWorkers} workers.`);
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new WorkerConfigError(
+        'STUDIO_WORKERS must be a JSON list of workers, such as [{"name":"Images","url":"http://comfy:8188","capabilities":["image","upscale"]}].',
+      );
+    }
+    if (!Array.isArray(parsed))
+      throw new WorkerConfigError("STUDIO_WORKERS must be a JSON list of workers.");
+    if (parsed.length > maxWorkers)
+      throw new WorkerConfigError(`STUDIO_WORKERS lists more than ${maxWorkers} workers.`);
     const taken = new Set();
-    return { variable: "STUDIO_WORKERS", workers: parsed.map((raw, index) => normalizeWorker(raw, { taken, where: `STUDIO_WORKERS item ${index + 1}` })) };
+    return {
+      variable: "STUDIO_WORKERS",
+      workers: parsed.map((raw, index) =>
+        normalizeWorker(raw, { taken, where: `STUDIO_WORKERS item ${index + 1}` }),
+      ),
+    };
   }
   const imageUrl = fromDeployment(environment, "COMFY_URL") ? environment.COMFY_URL : "";
-  const videoUrl = fromDeployment(environment, "COMFY_VIDEO_URL") ? environment.COMFY_VIDEO_URL : "";
+  const videoUrl = fromDeployment(environment, "COMFY_VIDEO_URL")
+    ? environment.COMFY_VIDEO_URL
+    : "";
   // A video address from .env still takes video off a deployment's image worker, as it did before.
-  const workers = legacyWorkers({ imageUrl, videoUrl, videoElsewhere: Boolean(normalizeWorkerUrl(environment.COMFY_VIDEO_URL)) });
+  const workers = legacyWorkers({
+    imageUrl,
+    videoUrl,
+    videoElsewhere: Boolean(normalizeWorkerUrl(environment.COMFY_VIDEO_URL)),
+  });
   return { variable: workers.length ? "COMFY_URL" : "", workers };
 }
 
@@ -130,14 +207,25 @@ export function deploymentWorkers(environment = process.env) {
  * deployment leaves out, from .env, or the usual local ComfyUI address when
  * nothing defines a worker at all (a fresh local install).
  */
-export function seedWorkers(environment = process.env, deployment = deploymentWorkers(environment)) {
+export function seedWorkers(
+  environment = process.env,
+  deployment = deploymentWorkers(environment),
+) {
   if (deployment.variable === "STUDIO_WORKERS") return [];
   const has = new Set(deployment.workers.map((worker) => worker.id));
   const videoUrl = has.has(LEGACY_VIDEO_ID) ? "" : environment.COMFY_VIDEO_URL || "";
-  const fallback = deployment.workers.length ? "" : environment.STUDIO_DEFAULT_COMFY_URL || "http://127.0.0.1:8188";
+  const fallback = deployment.workers.length
+    ? ""
+    : environment.STUDIO_DEFAULT_COMFY_URL || "http://127.0.0.1:8188";
   const imageUrl = has.has(LEGACY_IMAGE_ID) ? "" : environment.COMFY_URL || fallback;
-  return legacyWorkers({ imageUrl, videoUrl, videoElsewhere: has.has(LEGACY_VIDEO_ID) })
-    .map((worker) => ({ ...worker, source: (worker.id === LEGACY_IMAGE_ID ? environment.COMFY_URL : environment.COMFY_VIDEO_URL) ? "studio" : "default" }));
+  return legacyWorkers({ imageUrl, videoUrl, videoElsewhere: has.has(LEGACY_VIDEO_ID) }).map(
+    (worker) => ({
+      ...worker,
+      source: (worker.id === LEGACY_IMAGE_ID ? environment.COMFY_URL : environment.COMFY_VIDEO_URL)
+        ? "studio"
+        : "default",
+    }),
+  );
 }
 
 let cache = null;
@@ -151,8 +239,11 @@ function readSaved() {
     const taken = new Set();
     const workers = [];
     for (const [index, item] of raw.workers.entries()) {
-      try { workers.push(normalizeWorker(item, { taken, where: `Saved worker ${index + 1}` })); }
-      catch (error) { console.warn(`[Studio] Skipped a saved worker: ${error.message}`); }
+      try {
+        workers.push(normalizeWorker(item, { taken, where: `Saved worker ${index + 1}` }));
+      } catch (error) {
+        console.warn(`[Studio] Skipped a saved worker: ${error.message}`);
+      }
     }
     return workers;
   } catch {
@@ -164,14 +255,18 @@ function build(environment = process.env) {
   const deployment = deploymentWorkers(environment);
   const saved = readSaved();
   const locked = new Set(deployment.workers.map((worker) => worker.id));
-  const own = (saved ? saved.map((worker) => ({ ...worker, source: "studio" })) : seedWorkers(environment, deployment)).filter((worker) => !locked.has(worker.id));
+  const own = (
+    saved
+      ? saved.map((worker) => ({ ...worker, source: "studio" }))
+      : seedWorkers(environment, deployment)
+  ).filter((worker) => !locked.has(worker.id));
   return {
     variable: deployment.variable,
     saved: saved !== null,
     workers: [
       ...deployment.workers.map((worker) => ({ ...worker, source: "deployment", locked: true })),
-      ...own.map((worker) => ({ ...worker, locked: false }))
-    ]
+      ...own.map((worker) => ({ ...worker, locked: false })),
+    ],
   };
 }
 
@@ -183,8 +278,10 @@ function state() {
 /** Every worker in list order, each with its source and whether the deployment locks it. */
 export const listWorkers = () => state().workers;
 export const workerById = (id) => state().workers.find((worker) => worker.id === id) || null;
-export const workerHas = (id, capability) => Boolean(workerById(id)?.capabilities.includes(capability));
-export const workersWith = (capability) => state().workers.filter((worker) => worker.capabilities.includes(capability));
+export const workerHas = (id, capability) =>
+  Boolean(workerById(id)?.capabilities.includes(capability));
+export const workersWith = (capability) =>
+  state().workers.filter((worker) => worker.capabilities.includes(capability));
 /** The variable the deployment defines workers with, if any. */
 export const workersVariable = () => state().variable;
 
@@ -214,7 +311,11 @@ function changed() {
   cache = null;
   const workers = listWorkers();
   for (const listener of listeners) {
-    try { listener(workers); } catch { /* one listener never blocks another */ }
+    try {
+      listener(workers);
+    } catch {
+      /* one listener never blocks another */
+    }
   }
 }
 
@@ -234,14 +335,25 @@ export function saveWorkers(list) {
   const lockedIds = new Set(locked.map((worker) => worker.id));
   const editable = list.filter((item) => !lockedIds.has(String(item?.id || "").toLowerCase()));
   for (const item of list) {
-    const lockedWorker = locked.find((worker) => worker.id === String(item?.id || "").toLowerCase());
-    if (lockedWorker && (normalizeWorkerUrl(item.url) !== lockedWorker.url || (item.name !== undefined && String(item.name).trim() !== lockedWorker.name))) {
-      throw new WorkerConfigError(`${lockedWorker.name} comes from the deployment configuration. Change it there.`);
+    const lockedWorker = locked.find(
+      (worker) => worker.id === String(item?.id || "").toLowerCase(),
+    );
+    if (
+      lockedWorker &&
+      (normalizeWorkerUrl(item.url) !== lockedWorker.url ||
+        (item.name !== undefined && String(item.name).trim() !== lockedWorker.name))
+    ) {
+      throw new WorkerConfigError(
+        `${lockedWorker.name} comes from the deployment configuration. Change it there.`,
+      );
     }
   }
-  if (locked.length + editable.length > maxWorkers) throw new WorkerConfigError(`Studio supports up to ${maxWorkers} workers.`);
+  if (locked.length + editable.length > maxWorkers)
+    throw new WorkerConfigError(`Studio supports up to ${maxWorkers} workers.`);
   const taken = new Set(lockedIds);
-  const workers = editable.map((raw, index) => normalizeWorker(raw, { taken, where: `Worker ${index + 1}` }));
+  const workers = editable.map((raw, index) =>
+    normalizeWorker(raw, { taken, where: `Worker ${index + 1}` }),
+  );
   writeJsonFile(workersFile(), { version: 1, workers });
   changed();
   return listWorkers();
@@ -254,12 +366,22 @@ export function saveWorkers(list) {
  */
 export function saveDefaultWorkerUrl(url) {
   const next = normalizeWorkerUrl(url);
-  if (!next) throw new WorkerConfigError("That doesn’t look like an address. Try something like 127.0.0.1:8188.");
+  if (!next)
+    throw new WorkerConfigError(
+      "That doesn’t look like an address. Try something like 127.0.0.1:8188.",
+    );
   const current = defaultWorker();
   if (!current) throw new WorkerConfigError("No worker is set up. Add one in Settings › Workers.");
-  if (current.locked) throw new WorkerConfigError("This address comes from the deployment configuration. Change it there.");
+  if (current.locked)
+    throw new WorkerConfigError(
+      "This address comes from the deployment configuration. Change it there.",
+    );
   if (state().saved) {
-    saveWorkers(listWorkers().filter((worker) => !worker.locked).map((worker) => (worker.id === current.id ? { ...worker, url: next } : worker)));
+    saveWorkers(
+      listWorkers()
+        .filter((worker) => !worker.locked)
+        .map((worker) => (worker.id === current.id ? { ...worker, url: next } : worker)),
+    );
   } else {
     writeLocalEnvValue("COMFY_URL", next);
     changed();
@@ -281,26 +403,42 @@ export function capabilityForProfile(profile) {
  *
  * `online(id)` and `hasModel(id)` answer true, false or null (not known yet).
  */
-export function pickWorker(capability, { workers = listWorkers(), prefers = [], online = () => null, hasModel = () => null } = {}) {
+export function pickWorker(
+  capability,
+  { workers = listWorkers(), prefers = [], online = () => null, hasModel = () => null } = {},
+) {
   const capable = workers.filter((worker) => worker.capabilities.includes(capability));
   if (!capable.length) return null;
   const score = (worker) => {
     const up = online(worker.id);
-    return [up === false ? 0 : up === true ? 2 : 1, hasModel(worker.id) === true ? 1 : 0, prefers.filter((item) => worker.capabilities.includes(item)).length];
+    return [
+      up === false ? 0 : up === true ? 2 : 1,
+      hasModel(worker.id) === true ? 1 : 0,
+      prefers.filter((item) => worker.capabilities.includes(item)).length,
+    ];
   };
   let best = capable[0];
   let bestScore = score(best);
   for (const worker of capable.slice(1)) {
     const next = score(worker);
     const better = next.findIndex((value, index) => value !== bestScore[index]);
-    if (better >= 0 && next[better] > bestScore[better]) { best = worker; bestScore = next; }
+    if (better >= 0 && next[better] > bestScore[better]) {
+      best = worker;
+      bestScore = next;
+    }
   }
   return best;
 }
 
 /** "No worker can run videos": what a refused job says, with where to add one. */
 export function noWorkerMessage(capability) {
-  const what = { image: "run images", video: "run videos", upscale: "upscale", models: "receive model downloads" }[capability] || "run this";
+  const what =
+    {
+      image: "run images",
+      video: "run videos",
+      upscale: "upscale",
+      models: "receive model downloads",
+    }[capability] || "run this";
   return listWorkers().length
     ? `No worker can ${what}. An administrator can add the capability in Settings › Workers.`
     : "No workers are set up. An administrator can add one in Settings › Workers.";

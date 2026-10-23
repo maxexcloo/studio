@@ -18,15 +18,27 @@ import crypto from "node:crypto";
 
 /** Headers a proxy adds. Any one of them means the socket's address is not the client's. */
 export const proxyHeaders = [
-  "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-real-ip", "via",
-  "cf-connecting-ip", "true-client-ip", "fastly-client-ip", "x-client-ip", "x-cluster-client-ip"
+  "forwarded",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-real-ip",
+  "via",
+  "cf-connecting-ip",
+  "true-client-ip",
+  "fastly-client-ip",
+  "x-client-ip",
+  "x-cluster-client-ip",
 ];
 
 const loopback = new Set(["127.0.0.1", "::1"]);
 
 /** "::ffff:192.168.1.4" and "192.168.1.4" are the same client. */
 export function plainAddress(value = "") {
-  return String(value || "").trim().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "").toLowerCase();
+  return String(value || "")
+    .trim()
+    .replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "")
+    .toLowerCase();
 }
 
 export function isLoopbackAddress(value = "") {
@@ -44,7 +56,12 @@ export function isPrivateAddress(value = "") {
   const v4 = address.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
-    return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    return (
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
   }
   return /^f[cd][0-9a-f]{2}:/.test(address) || /^fe[89ab][0-9a-f]:/.test(address);
 }
@@ -71,13 +88,15 @@ export function classifyClient(req, { lanActions = false, devToken = "", hostOnl
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
   // Vite in `npm run dev`, vouched for by the token scripts/dev.mjs made.
-  const viaDevProxy = isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
+  const viaDevProxy =
+    isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
   if (viaDevProxy) address = plainAddress(headers["x-studio-dev-client"] || "");
   const proxied = hasProxyHeaders(headers);
   // hostOnly: a container whose port is published on the host's 127.0.0.1 only
   // (STUDIO_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker
   // address (the bridge gateway, 192.168.65.1 on Docker Desktop), never loopback.
-  const thisComputer = !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
+  const thisComputer =
+    !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
   // Behind a proxy the real address is unknown (its header can be forged), so
   // it counts as another device, and only when devices are let in at all.
   const network = !thisComputer && lanActions && (proxied || isPrivateAddress(address));

@@ -33,7 +33,9 @@ const median = (values) => {
  * estimate at all rather than a misleading one.
  */
 export function restartEstimate(history = []) {
-  const values = history.map((sample) => Number(sample?.ms)).filter((ms) => Number.isFinite(ms) && ms > 0);
+  const values = history
+    .map((sample) => Number(sample?.ms))
+    .filter((ms) => Number.isFinite(ms) && ms > 0);
   if (values.length < MIN_SAMPLES) return null;
   const typical = median(values);
   const near = values.filter((ms) => ms >= typical * 0.6 && ms <= typical * 1.6);
@@ -58,8 +60,13 @@ export function loadedPacks(objectInfo) {
 export function failedPacks(logText) {
   const failed = new Set();
   // ComfyUI's startup tables: "   0.4 seconds (IMPORT FAILED): /path/to/custom_nodes/Pack"
-  for (const match of String(logText || "").matchAll(/\((?:IMPORT|PRESTARTUP) FAILED\):\s*(.+?)\s*$/gm)) {
-    const folder = match[1].replace(/[\\/]+$/, "").split(/[\\/]/).pop();
+  for (const match of String(logText || "").matchAll(
+    /\((?:IMPORT|PRESTARTUP) FAILED\):\s*(.+?)\s*$/gm,
+  )) {
+    const folder = match[1]
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop();
     if (folder && folder !== "custom_nodes") failed.add(folder.replace(/\.py$/i, ""));
   }
   return [...failed].sort();
@@ -71,7 +78,9 @@ export function logTextFromRaw(raw) {
   return entries.map((entry) => String(entry?.m ?? "")).join("");
 }
 
-const knownNames = new Map(Object.values(nodePacks).map((pack) => [String(pack.folder).toLowerCase(), pack.name]));
+const knownNames = new Map(
+  Object.values(nodePacks).map((pack) => [String(pack.folder).toLowerCase(), pack.name]),
+);
 
 /**
  * A pack's name for people: Studio's own name when it knows the pack, else the
@@ -80,11 +89,17 @@ const knownNames = new Map(Object.values(nodePacks).map((pack) => [String(pack.f
 export function packLabel(folder) {
   const known = knownNames.get(String(folder).toLowerCase());
   if (known) return known;
-  const trimmed = String(folder).replace(/^comfy(?:ui)?[-_ ]+/i, "").replace(/[-_ ]+comfy(?:ui)?$/i, "");
+  const trimmed = String(folder)
+    .replace(/^comfy(?:ui)?[-_ ]+/i, "")
+    .replace(/[-_ ]+comfy(?:ui)?$/i, "");
   const words = (trimmed || String(folder)).split(/[-_]+/).filter(Boolean);
   // A single word is kept as its author wrote it ("rgthree"); several read as a title.
   if (words.length < 2) return words[0] || String(folder);
-  return words.map((word) => (word === word.toLowerCase() && word.length > 2 ? word[0].toUpperCase() + word.slice(1) : word)).join(" ");
+  return words
+    .map((word) =>
+      word === word.toLowerCase() && word.length > 2 ? word[0].toUpperCase() + word.slice(1) : word,
+    )
+    .join(" ");
 }
 
 /**
@@ -92,10 +107,19 @@ export function packLabel(folder) {
  * a pack is not a plain one, so it does not count toward the usual time.
  */
 export function restartChanges(before, after, failed = []) {
-  if (!before || !after) return { newPacks: [], failedPacks: failed, plain: failed.length === 0 && Boolean(before && after) };
+  if (!before || !after)
+    return {
+      newPacks: [],
+      failedPacks: failed,
+      plain: failed.length === 0 && Boolean(before && after),
+    };
   const had = new Set(before);
   const has = new Set(after);
   const newPacks = after.filter((pack) => !had.has(pack) && !failed.includes(pack));
   const gone = before.filter((pack) => !has.has(pack));
-  return { newPacks, failedPacks: failed, plain: newPacks.length === 0 && gone.length === 0 && failed.length === 0 };
+  return {
+    newPacks,
+    failedPacks: failed,
+    plain: newPacks.length === 0 && gone.length === 0 && failed.length === 0,
+  };
 }

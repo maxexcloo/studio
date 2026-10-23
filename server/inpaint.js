@@ -12,7 +12,15 @@ import { loadSharp } from "./sharp-loader.js";
  */
 
 // The nodes every inpaint graph needs on top of the family's own; all are ComfyUI core.
-export const inpaintNodes = ["SetLatentNoiseMask", "LoadImageMask", "ImageScale", "ImageCompositeMasked", "RepeatImageBatch", "RepeatLatentBatch", "SplitSigmasDenoise"];
+export const inpaintNodes = [
+  "SetLatentNoiseMask",
+  "LoadImageMask",
+  "ImageScale",
+  "ImageCompositeMasked",
+  "RepeatImageBatch",
+  "RepeatLatentBatch",
+  "SplitSigmasDenoise",
+];
 
 const maxMaskBytes = 16 * 1024 * 1024;
 // Below this a painted pixel is a stray brush edge, not part of the mask.
@@ -67,11 +75,13 @@ export function inpaintGeometry({ imageWidth, imageHeight, bounds, targetPixels 
   const centerX = bounds.x + bounds.width / 2;
   const centerY = bounds.y + bounds.height / 2;
   const x = whole ? 0 : Math.round(Math.min(Math.max(0, centerX - width / 2), imageWidth - width));
-  const y = whole ? 0 : Math.round(Math.min(Math.max(0, centerY - height / 2), imageHeight - height));
+  const y = whole
+    ? 0
+    : Math.round(Math.min(Math.max(0, centerY - height / 2), imageHeight - height));
   const pixels = Math.max(256 * 256, Number(targetPixels) || 1024 * 1024);
   const scale = Math.sqrt(pixels / (width * height));
-  const workWidth = Math.max(snap * 16, Math.round(width * scale / snap) * snap);
-  const workHeight = Math.max(snap * 16, Math.round(height * scale / snap) * snap);
+  const workWidth = Math.max(snap * 16, Math.round((width * scale) / snap) * snap);
+  const workHeight = Math.max(snap * 16, Math.round((height * scale) / snap) * snap);
   return { box: { x, y, width, height }, work: { width: workWidth, height: workHeight } };
 }
 
@@ -86,7 +96,8 @@ export function maskBufferFromDataUrl(dataUrl) {
   const match = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
   if (!match) throw new Error("The painted mask didn’t come through. Paint it again.");
   const buffer = Buffer.from(match[1], "base64");
-  if (!buffer.length || buffer.length > maxMaskBytes) throw new Error("The painted mask is too large.");
+  if (!buffer.length || buffer.length > maxMaskBytes)
+    throw new Error("The painted mask is too large.");
   return buffer;
 }
 
@@ -99,7 +110,11 @@ export function maskBufferFromDataUrl(dataUrl) {
  */
 export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixels, feather }) {
   // ComfyUI's LoadImage applies EXIF orientation, and so did the browser the mask was painted in.
-  const { data: rgb, info } = await sharp(sourceBuffer, { limitInputPixels: 80_000_000 }).rotate().removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data: rgb, info } = await sharp(sourceBuffer, { limitInputPixels: 80_000_000 })
+    .rotate()
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const imageWidth = info.width;
   const imageHeight = info.height;
   const mask = await sharp(maskBuffer)
@@ -116,7 +131,9 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
   const rawGray = (pipeline) => pipeline.extractChannel(0).raw().toBuffer();
   const pngGray = (pipeline) => pipeline.toColourspace("b-w").png().toBuffer();
 
-  const crop = await sharp(rgb, { raw: { width: imageWidth, height: imageHeight, channels: info.channels } })
+  const crop = await sharp(rgb, {
+    raw: { width: imageWidth, height: imageHeight, channels: info.channels },
+  })
     .extract(region)
     .resize(work.width, work.height, { fit: "fill", kernel: "lanczos3" })
     .png()
@@ -125,13 +142,32 @@ export async function inpaintFiles(sharp, sourceBuffer, maskBuffer, { targetPixe
   // Sampling: hard and grown a little past the paint. A soft sampling mask (differential
   // diffusion) gives its edge only the last step or two, which few-step and edit models
   // leave half-denoised: grey grain and a ghost of the original. Softness belongs to the stitch.
-  const workMask = await rawGray(gray(boxMask, box.width, box.height).resize(work.width, work.height, { fit: "fill" }));
-  const grown = await rawGray(gray(workMask, work.width, work.height).blur(Math.max(1, Math.min(work.width, work.height) * 0.012)));
+  const workMask = await rawGray(
+    gray(boxMask, box.width, box.height).resize(work.width, work.height, { fit: "fill" }),
+  );
+  const grown = await rawGray(
+    gray(workMask, work.width, work.height).blur(
+      Math.max(1, Math.min(work.width, work.height) * 0.012),
+    ),
+  );
   const samplingMask = await pngGray(gray(grown, work.width, work.height).threshold(12));
   // Stitching: at the box's own size, feathered by the edge-softness setting.
   // The solid core grows a little past the paint, so the soft band sits on repainted pixels (the sampling mask is grown too).
-  const compositeMask = await pngGray(gray(await rawGray(gray(boxMask, box.width, box.height).blur(featherSigma(feather, box))), box.width, box.height).linear(1.6, 0));
-  return { box, work, crop, samplingMask, compositeMask, image: { width: imageWidth, height: imageHeight } };
+  const compositeMask = await pngGray(
+    gray(
+      await rawGray(gray(boxMask, box.width, box.height).blur(featherSigma(feather, box))),
+      box.width,
+      box.height,
+    ).linear(1.6, 0),
+  );
+  return {
+    box,
+    work,
+    crop,
+    samplingMask,
+    compositeMask,
+    image: { width: imageWidth, height: imageHeight },
+  };
 }
 
 /**
@@ -143,11 +179,14 @@ export async function prepareInpaint(req, body) {
   const reference = body.referenceAssets?.[0];
   if (!body.inpaint?.mask || !reference?.assetId || !reference.comfyName) return null;
   const sharp = await loadSharp();
-  if (!sharp) throw new Error("Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the Studio folder, then restart.");
+  if (!sharp)
+    throw new Error(
+      "Inpainting needs image resizing, which is off: sharp could not load. Run `npm install --omit=dev` in the Studio folder, then restart.",
+    );
   const source = await bytesForReference(req, reference.assetId);
   const files = await inpaintFiles(sharp, source.buffer, maskBufferFromDataUrl(body.inpaint.mask), {
     targetPixels: Number(body.width) * Number(body.height),
-    feather: body.inpaint.feather
+    feather: body.inpaint.feather,
   });
   if (!files) return null;
   const upload = (buffer, name) => uploadBufferToComfy({ buffer, mime: "image/png", name });
@@ -165,7 +204,7 @@ export async function prepareInpaint(req, body) {
     image: files.image,
     referenceId: String(reference.assetId),
     strength: body.inpaint.strength,
-    feather: body.inpaint.feather
+    feather: body.inpaint.feather,
   };
 }
 

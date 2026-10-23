@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { accountOutstandingJobs, configuredAccountJobLimit, reserveAccountJob } from "./account-jobs.js";
+import {
+  accountOutstandingJobs,
+  configuredAccountJobLimit,
+  reserveAccountJob,
+} from "./account-jobs.js";
 
 test("outstanding job counts include only active work owned by that account", () => {
   const jobs = new Map([
@@ -8,7 +12,7 @@ test("outstanding job counts include only active work owned by that account", ()
     ["running", { ownerId: "artist-a", status: "running" }],
     ["canceling", { ownerId: "artist-a", status: "canceling" }],
     ["done", { ownerId: "artist-a", status: "done" }],
-    ["other", { ownerId: "artist-b", status: "running" }]
+    ["other", { ownerId: "artist-b", status: "running" }],
   ]);
   assert.equal(accountOutstandingJobs("artist-a", jobs), 3);
   assert.equal(accountOutstandingJobs("artist-b", jobs), 1);
@@ -34,5 +38,6 @@ test("the account job cap defaults to two and refuses anything but a positive in
   assert.equal(configuredAccountJobLimit(undefined), 2);
   assert.equal(configuredAccountJobLimit(""), 2);
   assert.equal(configuredAccountJobLimit("4"), 4);
-  for (const value of ["0", "-1", "1.5", "many"]) assert.throws(() => configuredAccountJobLimit(value), /STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS/);
+  for (const value of ["0", "-1", "1.5", "many"])
+    assert.throws(() => configuredAccountJobLimit(value), /STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS/);
 });

@@ -1,10 +1,14 @@
 // Keep validation and graph construction on the same image mode.
 export function hasReferenceImage(body) {
-  return Boolean(body.startImage || body.startImageId || (body.referenceAssets || []).some((item) => item?.assetId || item?.comfyName));
+  return Boolean(
+    body.startImage ||
+    body.startImageId ||
+    (body.referenceAssets || []).some((item) => item?.assetId || item?.comfyName),
+  );
 }
 
 export function resolveImageMode(workflow, body) {
-  return workflow.imageModes?.[hasReferenceImage(body) ? 'reference' : 'generate'] || workflow;
+  return workflow.imageModes?.[hasReferenceImage(body) ? "reference" : "generate"] || workflow;
 }
 
 export function selectImageMode(workflow, body) {
@@ -17,10 +21,14 @@ export function selectImageMode(workflow, body) {
 
   const slots = selected.mediaInputs || [];
   if (references.length && slots.length && !references.some((item) => item.slot === slots[0].id)) {
-    throw new Error('Add the first reference image before additional references.');
+    throw new Error("Add the first reference image before additional references.");
   }
   for (const [index, slot] of slots.entries()) {
-    if (references.some((item) => item.slot === slot.id) || index === 0 && (body.startImage || body.startImageId)) continue;
+    if (
+      references.some((item) => item.slot === slot.id) ||
+      (index === 0 && (body.startImage || body.startImageId))
+    )
+      continue;
     omitReference(selected.graph, slot.control?.node);
   }
   return selected;
@@ -37,9 +45,11 @@ function omitReference(graph, loader) {
   while (removed.length) {
     const missing = removed.shift();
     for (const [id, node] of Object.entries(graph)) {
-      const affected = Object.entries(node.inputs || {}).filter(([, value]) => linkedTo(value, missing));
+      const affected = Object.entries(node.inputs || {}).filter(([, value]) =>
+        linkedTo(value, missing),
+      );
       if (!affected.length) continue;
-      if (node.class_type === 'ReferenceLatent' && affected.every(([name]) => name === 'latent')) {
+      if (node.class_type === "ReferenceLatent" && affected.every(([name]) => name === "latent")) {
         const replacement = node.inputs.conditioning;
         for (const consumer of Object.values(graph)) {
           for (const [name, value] of Object.entries(consumer.inputs || {})) {
@@ -47,13 +57,19 @@ function omitReference(graph, loader) {
           }
         }
         delete graph[id];
-      } else if (['ImageScaleToTotalPixels', 'VAEEncode', 'GetImageSize'].includes(node.class_type)) {
+      } else if (
+        ["ImageScaleToTotalPixels", "VAEEncode", "GetImageSize"].includes(node.class_type)
+      ) {
         delete graph[id];
         removed.push(id);
-      } else if (affected.every(([name]) => name.startsWith('images.') || name.startsWith('ref_images.'))) {
+      } else if (
+        affected.every(([name]) => name.startsWith("images.") || name.startsWith("ref_images."))
+      ) {
         for (const [name] of affected) delete node.inputs[name];
       } else {
-        throw new Error(`Cannot omit optional reference from ${node.class_type}.${affected[0][0]}.`);
+        throw new Error(
+          `Cannot omit optional reference from ${node.class_type}.${affected[0][0]}.`,
+        );
       }
     }
   }

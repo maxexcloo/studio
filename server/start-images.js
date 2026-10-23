@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir } from './gallery-store.js';
+import { dataDir } from "./gallery-store.js";
 
 const startImageDir = path.join(dataDir, "start-images");
 const memoryCache = new Map();
@@ -22,7 +22,9 @@ function parseDataUrl(dataUrl = "") {
 export function saveStartImage({ dataUrl = "", name = "" } = {}) {
   const { mime, buffer } = parseDataUrl(dataUrl);
   const id = crypto.randomUUID();
-  const safeName = path.basename(String(name || `start-image.${extensionForMime(mime)}`)).replace(/[^\w.-]+/g, "-");
+  const safeName = path
+    .basename(String(name || `start-image.${extensionForMime(mime)}`))
+    .replace(/[^\w.-]+/g, "-");
   const filename = `${id}-${safeName || `start-image.${extensionForMime(mime)}`}`;
   fs.mkdirSync(startImageDir, { recursive: true });
   const filePath = path.join(startImageDir, filename);
@@ -42,8 +44,15 @@ export function resolveStartImage(id = "") {
   if (!match) return null;
   const filePath = path.join(startImageDir, match);
   const ext = path.extname(match).toLowerCase();
-  const mime = ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : "image/png";
-  const record = { id: key, name: match.slice(key.length + 1), mime, size: fs.statSync(filePath).size, filePath };
+  const mime =
+    ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : ext === ".webp" ? "image/webp" : "image/png";
+  const record = {
+    id: key,
+    name: match.slice(key.length + 1),
+    mime,
+    size: fs.statSync(filePath).size,
+    filePath,
+  };
   memoryCache.set(key, record);
   return record;
 }

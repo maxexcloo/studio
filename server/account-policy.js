@@ -29,7 +29,7 @@ export const accessFeatures = Object.freeze([
   "cloudModels",
   "nsfwModels",
   "presets",
-  "promptAssistant"
+  "promptAssistant",
 ]);
 
 /**
@@ -46,20 +46,40 @@ export function validAccountKey(value) {
 
 /** Without an availability list, keep the stored grants: discovery and execution recheck each profile. */
 export function normaliseAccessProfile(profile, availableProfiles = null) {
-  const names = Array.isArray(availableProfiles) ? new Set(availableProfiles.filter((name) => typeof name === "string" && name.trim())) : null;
-  const usable = (name) => typeof name === "string" && name.trim() && name.length <= 256 && (!names || names.has(name));
+  const names = Array.isArray(availableProfiles)
+    ? new Set(availableProfiles.filter((name) => typeof name === "string" && name.trim()))
+    : null;
+  const usable = (name) =>
+    typeof name === "string" && name.trim() && name.length <= 256 && (!names || names.has(name));
   const selected = Array.isArray(profile?.generationProfiles)
     ? [...new Set(profile.generationProfiles.filter(usable))]
     : [];
-  const features = Object.fromEntries(accessFeatures.map((feature) => [feature, onUnlessStored.has(feature) ? profile?.features?.[feature] !== false : profile?.features?.[feature] === true]));
-  const retired = Array.isArray(profile?.retiredCloudGrants) ? [...new Set(profile.retiredCloudGrants.filter((name) => typeof name === "string" && name.trim() && name.length <= 256))] : [];
+  const features = Object.fromEntries(
+    accessFeatures.map((feature) => [
+      feature,
+      onUnlessStored.has(feature)
+        ? profile?.features?.[feature] !== false
+        : profile?.features?.[feature] === true,
+    ]),
+  );
+  const retired = Array.isArray(profile?.retiredCloudGrants)
+    ? [
+        ...new Set(
+          profile.retiredCloudGrants.filter(
+            (name) => typeof name === "string" && name.trim() && name.length <= 256,
+          ),
+        ),
+      ]
+    : [];
   return {
     id: validAccountKey(profile?.id) ? profile.id : "",
-    name: String(profile?.name || "").trim().slice(0, 80),
+    name: String(profile?.name || "")
+      .trim()
+      .slice(0, 80),
     generationProfiles: selected,
     allModels: profile?.allModels === true,
     features,
-    ...(retired.length ? { retiredCloudGrants: retired } : {})
+    ...(retired.length ? { retiredCloudGrants: retired } : {}),
   };
 }
 
@@ -81,24 +101,30 @@ export function migrateCloudModels(profile, cloudProfiles = []) {
     ...profile,
     generationProfiles: grants.filter((id) => !cloud.has(id)),
     features: { ...(profile?.features || {}), cloudModels: retired.length > 0 },
-    ...(retired.length ? { retiredCloudGrants: [...new Set([...(profile.retiredCloudGrants || []), ...retired])] } : {})
+    ...(retired.length
+      ? { retiredCloudGrants: [...new Set([...(profile.retiredCloudGrants || []), ...retired])] }
+      : {}),
   };
 }
 
 export function effectiveAccountAccess(account, profiles, availableProfiles = null) {
-  if (!account || account.disabled === true) return { authenticated: false, reason: account ? "disabled" : "anonymous" };
+  if (!account || account.disabled === true)
+    return { authenticated: false, reason: account ? "disabled" : "anonymous" };
   if (account.role === accountRoles.administrator) {
     return {
       authenticated: true,
       userId: account.id,
       role: accountRoles.administrator,
       generationProfiles: [...new Set(availableProfiles || [])],
-      features: Object.fromEntries(accessFeatures.map((feature) => [feature, true]))
+      features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
     };
   }
   const profile = profiles?.[account.accessProfileId];
   if (!profile) return { authenticated: false, reason: "profile-unassigned" };
-  const safe = normaliseAccessProfile({ ...profile, id: account.accessProfileId }, availableProfiles);
+  const safe = normaliseAccessProfile(
+    { ...profile, id: account.accessProfileId },
+    availableProfiles,
+  );
   return {
     authenticated: true,
     userId: account.id,
@@ -107,7 +133,7 @@ export function effectiveAccountAccess(account, profiles, availableProfiles = nu
     allModels: safe.allModels,
     features: safe.features,
     // Not yet settled: a cloud profile still needs its own grant, as before.
-    ...(predatesCloudModels(profile) ? { legacyCloudGrants: true } : {})
+    ...(predatesCloudModels(profile) ? { legacyCloudGrants: true } : {}),
   };
 }
 
@@ -119,17 +145,23 @@ export function mayUseGenerationProfile(access, profile) {
   if (!access?.authenticated) return false;
   if (access.role === accountRoles.administrator) return true;
   const id = typeof profile === "string" ? profile : profile?.id;
-  if (typeof profile === "object" && profile?.nsfw === true && access.features.nsfwModels !== true) return false;
+  if (typeof profile === "object" && profile?.nsfw === true && access.features.nsfwModels !== true)
+    return false;
   // An AI-drafted profile is live for administrators only until one approves it.
   if (typeof profile === "object" && profile?.aiDrafted === true) return false;
   if (isCloudProfile(typeof profile === "string" ? { id: profile } : profile)) {
-    return access.legacyCloudGrants ? access.generationProfiles.includes(id) : access.features.cloudModels === true;
+    return access.legacyCloudGrants
+      ? access.generationProfiles.includes(id)
+      : access.features.cloudModels === true;
   }
   return access.allModels === true || access.generationProfiles.includes(id);
 }
 
 export function mayUseFeature(access, feature) {
-  return Boolean(access?.authenticated && (access.role === accountRoles.administrator || access.features[feature] === true));
+  return Boolean(
+    access?.authenticated &&
+    (access.role === accountRoles.administrator || access.features[feature] === true),
+  );
 }
 
 export function visibleGenerationProfiles(profiles, access) {
@@ -144,8 +176,25 @@ export function visibleGenerationProfiles(profiles, access) {
  * models, no LoRAs and no presets. Once added they are ordinary access profiles.
  */
 export const builtInAccessProfiles = Object.freeze([
-  { id: "administrator", name: "Administrator", generationProfiles: [], allModels: true, features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])) },
-  { id: "user", name: "User", generationProfiles: [], allModels: true, features: Object.fromEntries(accessFeatures.map((feature) => [feature, !["loras", "cloudModels", "nsfwModels", "presets"].includes(feature)])) }
+  {
+    id: "administrator",
+    name: "Administrator",
+    generationProfiles: [],
+    allModels: true,
+    features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
+  },
+  {
+    id: "user",
+    name: "User",
+    generationProfiles: [],
+    allModels: true,
+    features: Object.fromEntries(
+      accessFeatures.map((feature) => [
+        feature,
+        !["loras", "cloudModels", "nsfwModels", "presets"].includes(feature),
+      ]),
+    ),
+  },
 ]);
 
 /**
@@ -156,8 +205,14 @@ export const builtInAccessProfiles = Object.freeze([
 export function migrateFeatureOptions(profile, globals = {}) {
   const features = { ...(profile?.features || {}) };
   let changed = false;
-  if (globals.loras === false && features.loras !== false) { features.loras = false; changed = true; }
+  if (globals.loras === false && features.loras !== false) {
+    features.loras = false;
+    changed = true;
+  }
   // With cloud models switched off nobody had a cloud grant to keep, so this also settles the profile.
-  if (globals.cloudModels === false && features.cloudModels !== false) { features.cloudModels = false; changed = true; }
+  if (globals.cloudModels === false && features.cloudModels !== false) {
+    features.cloudModels = false;
+    changed = true;
+  }
   return changed ? { ...profile, features } : profile;
 }

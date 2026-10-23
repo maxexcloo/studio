@@ -5,4 +5,5 @@
  * profiles grant these through their Cloud Models feature rather than one by one, and nothing
  * ever picks one by itself.
  */
-export const isCloudProfile = (profile) => profile?.family === 'grok' || /^grok/i.test(String(profile?.id || ''));
+export const isCloudProfile = (profile) =>
+  profile?.family === "grok" || /^grok/i.test(String(profile?.id || ""));

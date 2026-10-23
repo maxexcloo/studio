@@ -11,7 +11,10 @@ import { precompressDir } from "../scripts/precompress.mjs";
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dist-"));
 const script = `console.log(${JSON.stringify("heiss ".repeat(2000))});`;
 fs.mkdirSync(path.join(dist, "assets"));
-fs.writeFileSync(path.join(dist, "index.html"), `<!doctype html><title>Studio</title>${"<!-- page -->".repeat(200)}`);
+fs.writeFileSync(
+  path.join(dist, "index.html"),
+  `<!doctype html><title>Studio</title>${"<!-- page -->".repeat(200)}`,
+);
 fs.writeFileSync(path.join(dist, "assets", "index-abc123.js"), script);
 fs.writeFileSync(path.join(dist, "assets", "tiny-abc.css"), "a{}");
 fs.writeFileSync(path.join(dist, "favicon.svg"), "<svg/>");
@@ -22,10 +25,19 @@ test.before(async () => {
   assert.equal(precompressDir(dist), 2, "the page and the script; tiny files are left alone");
   const app = express();
   app.use(compressJson({ skip: (req) => req.headers["x-local"] === "1" }));
-  app.get("/api/big", (_req, res) => res.json({ items: Array.from({ length: 400 }, (_, index) => ({ id: index, prompt: "a lighthouse in fog" })) }));
+  app.get("/api/big", (_req, res) =>
+    res.json({
+      items: Array.from({ length: 400 }, (_, index) => ({
+        id: index,
+        prompt: "a lighthouse in fog",
+      })),
+    }),
+  );
   app.get("/api/small", (_req, res) => res.json({ ok: true }));
   serveApp(app, dist);
-  await new Promise((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });
+  await new Promise((resolve) => {
+    server = app.listen(0, "127.0.0.1", resolve);
+  });
   base = `http://127.0.0.1:${server.address().port}`;
 });
 test.after(() => {
@@ -37,11 +49,15 @@ test.after(() => {
 async function raw(pathname, headers = {}) {
   const http = await import("node:http");
   return new Promise((resolve, reject) => {
-    http.get(`${base}${pathname}`, { headers }, (res) => {
-      const chunks = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
-    }).on("error", reject);
+    http
+      .get(`${base}${pathname}`, { headers }, (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () =>
+          resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }),
+        );
+      })
+      .on("error", reject);
   });
 }
 

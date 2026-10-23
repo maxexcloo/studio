@@ -14,12 +14,30 @@ const access = await import("./access.js");
 const { createGuessLimiter } = await import("./guess-limit.js");
 
 function response() {
-  return { headers: {}, setHeader(name, value) { this.headers[name] = value; }, getHeader(name) { return this.headers[name]; } };
+  return {
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    getHeader(name) {
+      return this.headers[name];
+    },
+  };
 }
 /** A request from `address` carrying the cookies a response set (and any given). */
 function request(address, res = null, extra = "") {
-  const cookies = [].concat(res?.headers["Set-Cookie"] || []).map((line) => line.split(";")[0]).filter((pair) => !/=$/.test(pair));
-  return { socket: { remoteAddress: address }, headers: { cookie: [...cookies, extra].filter(Boolean).join("; "), "user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1" } };
+  const cookies = []
+    .concat(res?.headers["Set-Cookie"] || [])
+    .map((line) => line.split(";")[0])
+    .filter((pair) => !/=$/.test(pair));
+  return {
+    socket: { remoteAddress: address },
+    headers: {
+      cookie: [...cookies, extra].filter(Boolean).join("; "),
+      "user-agent":
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1",
+    },
+  };
 }
 
 test("the studio password is its own, and setting it signs every device out", async () => {
@@ -58,27 +76,47 @@ test("a device session lives in an HttpOnly cookie, a week at most, and only its
   assert.equal(access.deviceSession(request("192.168.1.40", null, "studio_device=forged")), null);
 
   const secure = response();
-  access.startDeviceSession({ ...request("192.168.1.41"), socket: { remoteAddress: "192.168.1.41", encrypted: true } }, secure);
+  access.startDeviceSession(
+    { ...request("192.168.1.41"), socket: { remoteAddress: "192.168.1.41", encrypted: true } },
+    secure,
+  );
   assert.match([].concat(secure.headers["Set-Cookie"]).join("\n"), /Secure/);
 });
 
 test("a device signed in under the old HEISS UI cookie stays signed in and moves to the new cookie", () => {
   const res = response();
   const session = access.startDeviceSession(request("192.168.1.42"), res);
-  const token = [].concat(res.headers["Set-Cookie"]).join("\n").match(/studio_device=([^;]+)/)[1];
+  const token = []
+    .concat(res.headers["Set-Cookie"])
+    .join("\n")
+    .match(/studio_device=([^;]+)/)[1];
   const old = request("192.168.1.42", null, `heiss_device=${token}`);
   assert.equal(access.deviceSession(old)?.id, session.id, "the old cookie still signs in");
   const moved = response();
   assert.equal(access.migrateDeviceCookie(old, moved), true);
   const cookies = [].concat(moved.headers["Set-Cookie"]);
-  assert.ok(cookies.some((line) => line.startsWith(`studio_device=${token};`) && /HttpOnly/.test(line) && !/Max-Age=0\b/.test(line)), "the same session under the new name");
-  assert.ok(cookies.some((line) => line.startsWith("heiss_device=;") && /Max-Age=0\b/.test(line)), "the old name cleared");
+  assert.ok(
+    cookies.some(
+      (line) =>
+        line.startsWith(`studio_device=${token};`) &&
+        /HttpOnly/.test(line) &&
+        !/Max-Age=0\b/.test(line),
+    ),
+    "the same session under the new name",
+  );
+  assert.ok(
+    cookies.some((line) => line.startsWith("heiss_device=;") && /Max-Age=0\b/.test(line)),
+    "the old name cleared",
+  );
   // With the new cookie there is nothing left to move.
   const fresh = request("192.168.1.42", null, `studio_device=${token}`);
   assert.equal(access.deviceSession(fresh)?.id, session.id);
   assert.equal(access.migrateDeviceCookie(fresh, response()), false);
   // A forged old cookie gets nothing.
-  assert.equal(access.migrateDeviceCookie(request("192.168.1.42", null, "heiss_device=forged"), response()), false);
+  assert.equal(
+    access.migrateDeviceCookie(request("192.168.1.42", null, "heiss_device=forged"), response()),
+    false,
+  );
 });
 
 test("sign out all devices ends every session, and nothing brings them back", () => {
@@ -113,9 +151,26 @@ test("admin: always this computer, a signed-in device only when trusted, a proxy
 test("the Connection settings are for signed-in devices only, though /api/access/ is open before signing in", async () => {
   const { registerAccessRoutes } = await import("./access-routes.js");
   const routes = {};
-  registerAccessRoutes({ get: (route, handler) => { routes[route] = handler; }, post: () => {} });
+  registerAccessRoutes({
+    get: (route, handler) => {
+      routes[route] = handler;
+    },
+    post: () => {},
+  });
   const call = (req) => {
-    const res = { ...response(), statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+    const res = {
+      ...response(),
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      },
+    };
     routes["/api/access/devices"](req, res);
     return res;
   };
@@ -132,18 +187,30 @@ test("guessing: a few free tries, then doubling lockouts, one try at a time, and
   let clock = 0;
   const limiter = createGuessLimiter({ freeTries: 3, baseMs: 1000, now: () => clock });
   const wrong = () => Promise.resolve(false);
-  for (let index = 0; index < 2; index += 1) assert.equal((await limiter.attempt("192.168.1.40", false, wrong)).retryAfterMs, 0);
+  for (let index = 0; index < 2; index += 1)
+    assert.equal((await limiter.attempt("192.168.1.40", false, wrong)).retryAfterMs, 0);
   assert.equal((await limiter.attempt("192.168.1.40", false, wrong)).retryAfterMs, 1000);
   assert.equal((await limiter.attempt("192.168.1.40", false, wrong)).reason, "locked");
   clock += 1000;
   assert.equal((await limiter.attempt("192.168.1.40", false, wrong)).retryAfterMs, 2000);
   // Another address and this computer are not held up by it.
   assert.equal((await limiter.attempt("192.168.1.41", false, wrong)).reason, "wrong");
-  for (let index = 0; index < 20; index += 1) assert.equal((await limiter.attempt("127.0.0.1", true, wrong)).retryAfterMs, 0);
-  assert.equal((await limiter.attempt("127.0.0.1", true, () => Promise.resolve("key"))).value, "key");
+  for (let index = 0; index < 20; index += 1)
+    assert.equal((await limiter.attempt("127.0.0.1", true, wrong)).retryAfterMs, 0);
+  assert.equal(
+    (await limiter.attempt("127.0.0.1", true, () => Promise.resolve("key"))).value,
+    "key",
+  );
   // Parallel guesses from one address: only one is checked.
   let release;
-  const slow = limiter.attempt("192.168.1.60", false, () => new Promise((resolve) => { release = resolve; }));
+  const slow = limiter.attempt(
+    "192.168.1.60",
+    false,
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
   assert.equal((await limiter.attempt("192.168.1.60", false, wrong)).reason, "busy");
   release(true);
   assert.equal((await slow).ok, true);

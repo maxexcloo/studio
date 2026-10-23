@@ -6,13 +6,23 @@ import test from "node:test";
 
 // A ComfyUI of our own, a home with a shared models folder in it, and ComfyUI's API answered by hand.
 // .native, like Studio: Windows temp paths can be 8.3 short names (RUNNER~1).
-const scratch = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-folders-")));
+const scratch = fs.realpathSync.native(
+  fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-folders-")),
+);
 const comfyRoot = path.join(scratch, "ComfyUI");
 const home = path.join(scratch, "home");
 const shared = path.join(home, "AI", "ComfyUI-Shared", "models");
-const mk = (...parts) => { const dir = path.join(...parts); fs.mkdirSync(dir, { recursive: true }); return dir; };
-const touch = (file) => { mk(path.dirname(file)); fs.writeFileSync(file, "x".repeat(10)); };
-for (const kind of ["checkpoints", "loras", "diffusion_models", "vae", "text_encoders"]) mk(comfyRoot, "models", kind);
+const mk = (...parts) => {
+  const dir = path.join(...parts);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
+const touch = (file) => {
+  mk(path.dirname(file));
+  fs.writeFileSync(file, "x".repeat(10));
+};
+for (const kind of ["checkpoints", "loras", "diffusion_models", "vae", "text_encoders"])
+  mk(comfyRoot, "models", kind);
 mk(comfyRoot, "custom_nodes");
 fs.writeFileSync(path.join(comfyRoot, "main.py"), "");
 touch(path.join(shared, "diffusion_models", "krea2-finetune.safetensors"));
@@ -28,25 +38,55 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 let folderPaths = {};
 const resetFolderPaths = () => {
-  folderPaths = Object.fromEntries(["checkpoints", "loras", "diffusion_models", "vae", "text_encoders", "controlnet", "upscale_models", "embeddings"]
-    .map((kind) => [kind, [[path.join(comfyRoot, "models", kind)], [".safetensors"]]]));
+  folderPaths = Object.fromEntries(
+    [
+      "checkpoints",
+      "loras",
+      "diffusion_models",
+      "vae",
+      "text_encoders",
+      "controlnet",
+      "upscale_models",
+      "embeddings",
+    ].map((kind) => [kind, [[path.join(comfyRoot, "models", kind)], [".safetensors"]]]),
+  );
   folderPaths.custom_nodes = [[path.join(comfyRoot, "custom_nodes")], []];
 };
 resetFolderPaths();
 globalThis.fetch = async (url) => {
   const pathname = new URL(url).pathname;
-  const body = pathname === "/internal/folder_paths" ? folderPaths : pathname === "/system_stats" ? { system: { argv: ["main.py", "--listen", "127.0.0.1"] } } : null;
-  return new Response(JSON.stringify(body), { status: body ? 200 : 404, headers: { "content-type": "application/json" } });
+  const body =
+    pathname === "/internal/folder_paths"
+      ? folderPaths
+      : pathname === "/system_stats"
+        ? { system: { argv: ["main.py", "--listen", "127.0.0.1"] } }
+        : null;
+  return new Response(JSON.stringify(body), {
+    status: body ? 200 : 404,
+    headers: { "content-type": "application/json" },
+  });
 };
 
-const { studioModelSections, linkModelFolders, modelFolderReport, readLayout, sectionDirs, sectionFor, tildePath, unlinkModelFolder } = await import("./model-folders.js");
+const {
+  studioModelSections,
+  linkModelFolders,
+  modelFolderReport,
+  readLayout,
+  sectionDirs,
+  sectionFor,
+  tildePath,
+  unlinkModelFolder,
+} = await import("./model-folders.js");
 const scan = { home, drives: false };
 const config = path.join(comfyRoot, "extra_model_paths.yaml");
 
 test("a models folder is told by its shape, in ComfyUI's names or another app's", () => {
   const kinds = ["checkpoints", "loras", "diffusion_models", "vae", "text_encoders"];
   assert.equal(readLayout(shared, kinds).layout, "comfy");
-  assert.deepEqual(readLayout(shared, kinds).map.find((item) => item.name === "unet"), { name: "unet", kind: "diffusion_models" });
+  assert.deepEqual(
+    readLayout(shared, kinds).map.find((item) => item.name === "unet"),
+    { name: "unet", kind: "diffusion_models" },
+  );
   assert.equal(readLayout(path.join(home, "StabilityMatrix", "Models"), kinds).layout, "stability");
   assert.equal(readLayout(path.join(home, "Downloads"), kinds), null);
 });
@@ -54,9 +94,16 @@ test("a models folder is told by its shape, in ComfyUI's names or another app's"
 test("the report lists folders with models ComfyUI does not read, and only those", async () => {
   const report = await modelFolderReport({ scan });
   assert.equal(report.configPath, config);
-  assert.deepEqual(report.folders.map((folder) => [folder.name, folder.count]).sort(), [["ComfyUI-Shared", 3], ["Stability Matrix", 2]]);
+  assert.deepEqual(report.folders.map((folder) => [folder.name, folder.count]).sort(), [
+    ["ComfyUI-Shared", 3],
+    ["Stability Matrix", 2],
+  ]);
   const sharedFolder = report.folders.find((folder) => folder.name === "ComfyUI-Shared");
-  assert.deepEqual(sharedFolder.kinds.map((item) => item.kind).sort(), ["diffusion_models", "diffusion_models", "loras"], "empty vae folder left out");
+  assert.deepEqual(
+    sharedFolder.kinds.map((item) => item.kind).sort(),
+    ["diffusion_models", "diffusion_models", "loras"],
+    "empty vae folder left out",
+  );
 });
 
 test("adding writes a marked, backed-up section ComfyUI can read, and removing takes exactly that out", async () => {
@@ -66,27 +113,47 @@ test("adding writes a marked, backed-up section ComfyUI can read, and removing t
   assert.deepEqual(result.added, [shared]);
   assert.equal(fs.readFileSync(`${config}.heiss-backup`, "utf8").startsWith("# mine"), true);
   const text = fs.readFileSync(config, "utf8");
-  assert.match(text, /^other:\n    base_path: \/elsewhere\n    loras: loras\n\n# >>> Added by Studio: /m, "the person's own section stays as it was");
+  assert.match(
+    text,
+    /^other:\n    base_path: \/elsewhere\n    loras: loras\n\n# >>> Added by Studio: /m,
+    "the person's own section stays as it was",
+  );
   assert.match(text, /    diffusion_models: \|\n        diffusion_models\n        unet\n/);
   assert.equal(studioModelSections(text).length, 1);
 
   // Once ComfyUI reads it, the folder is no longer reported, and shows as read.
-  folderPaths.diffusion_models[0].push(path.join(shared, "diffusion_models"), path.join(shared, "unet"));
+  folderPaths.diffusion_models[0].push(
+    path.join(shared, "diffusion_models"),
+    path.join(shared, "unet"),
+  );
   folderPaths.loras[0].push(path.join(shared, "loras"));
   const after = await modelFolderReport({ scan });
-  assert.equal(after.folders.some((folder) => folder.path === shared), false);
+  assert.equal(
+    after.folders.some((folder) => folder.path === shared),
+    false,
+  );
   assert.deepEqual(after.linked, [{ path: shared, label: shared, read: true }]);
 
   await unlinkModelFolder(shared);
-  assert.equal(fs.readFileSync(config, "utf8").trim(), "# mine\nother:\n    base_path: /elsewhere\n    loras: loras");
+  assert.equal(
+    fs.readFileSync(config, "utf8").trim(),
+    "# mine\nother:\n    base_path: /elsewhere\n    loras: loras",
+  );
   resetFolderPaths();
 });
 
 test("a section counts as read only once ComfyUI reads every folder it adds", async () => {
   // ComfyUI's own models folder: checkpoints is read from the start, the added unet folder is not.
   const models = path.join(comfyRoot, "models");
-  const text = sectionFor(models, [{ kind: "diffusion_models", name: "unet" }, { kind: "loras", name: "a" }, { kind: "loras", name: "b's" }]);
-  assert.deepEqual(sectionDirs(studioModelSections(text)[0]), ["unet", "a", "b's"].map((name) => path.resolve(models, name)));
+  const text = sectionFor(models, [
+    { kind: "diffusion_models", name: "unet" },
+    { kind: "loras", name: "a" },
+    { kind: "loras", name: "b's" },
+  ]);
+  assert.deepEqual(
+    sectionDirs(studioModelSections(text)[0]),
+    ["unet", "a", "b's"].map((name) => path.resolve(models, name)),
+  );
   fs.writeFileSync(config, text);
   const before = await modelFolderReport({ scan });
   assert.equal(before.linked[0].read, false, "checkpoints being read says nothing about unet");
@@ -101,9 +168,15 @@ test("a section counts as read only once ComfyUI reads every folder it adds", as
 test("only folders the scan found, or a picked models folder, can be added", async () => {
   await modelFolderReport({ scan });
   await assert.rejects(() => linkModelFolders(["/etc"], { scan }), /Nothing to add/);
-  await assert.rejects(() => linkModelFolders([], { picked: path.join(home, "Downloads"), scan }), /doesn’t look like a models folder/);
+  await assert.rejects(
+    () => linkModelFolders([], { picked: path.join(home, "Downloads"), scan }),
+    /doesn’t look like a models folder/,
+  );
   fs.rmSync(config, { force: true });
-  const picked = await linkModelFolders([], { picked: path.join(home, "StabilityMatrix", "Models"), scan });
+  const picked = await linkModelFolders([], {
+    picked: path.join(home, "StabilityMatrix", "Models"),
+    scan,
+  });
   assert.equal(picked.added.length, 1);
   assert.match(fs.readFileSync(config, "utf8"), /checkpoints: 'StableDiffusion'/);
   await unlinkModelFolder(picked.added[0]);
@@ -117,8 +190,14 @@ test("a section's quoting survives odd folder names", () => {
 });
 
 test("sections survive a CRLF save, and adding and removing keep CRLF", async () => {
-  const crlf = sectionFor("D:\\AI\\models", [{ kind: "loras", name: "loras" }, { kind: "vae", name: "vae" }]).replace(/\n/g, "\r\n");
-  assert.deepEqual(studioModelSections(`# mine\r\n\r\n${crlf}`).map((section) => section.path), ["D:\\AI\\models"]);
+  const crlf = sectionFor("D:\\AI\\models", [
+    { kind: "loras", name: "loras" },
+    { kind: "vae", name: "vae" },
+  ]).replace(/\n/g, "\r\n");
+  assert.deepEqual(
+    studioModelSections(`# mine\r\n\r\n${crlf}`).map((section) => section.path),
+    ["D:\\AI\\models"],
+  );
 
   fs.writeFileSync(config, "# mine\r\nother:\r\n    base_path: /elsewhere\r\n    loras: loras\r\n");
   await modelFolderReport({ scan });
@@ -127,7 +206,10 @@ test("sections survive a CRLF save, and adding and removing keep CRLF", async ()
   assert.equal(studioModelSections(text).length, 1);
   assert.doesNotMatch(text, /[^\r]\n/, "every line ends in CRLF");
   await unlinkModelFolder(shared);
-  assert.equal(fs.readFileSync(config, "utf8"), "# mine\r\nother:\r\n    base_path: /elsewhere\r\n    loras: loras\r\n");
+  assert.equal(
+    fs.readFileSync(config, "utf8"),
+    "# mine\r\nother:\r\n    base_path: /elsewhere\r\n    loras: loras\r\n",
+  );
   fs.rmSync(config, { force: true });
 });
 

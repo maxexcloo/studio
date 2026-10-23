@@ -3,7 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { comfy, comfyOutputDir, normalizeFolderInput, root, setComfyOutputDir } from "./comfy.js";
-import { dataDir, gallery, isComfyOutputItem, outputFolderMatch, outputsFrom } from "./gallery-store.js";
+import {
+  dataDir,
+  gallery,
+  isComfyOutputItem,
+  outputFolderMatch,
+  outputsFrom,
+} from "./gallery-store.js";
 import { isInside, samePath } from "./paths.js";
 import { outputFolderNames } from "./data-names.js";
 
@@ -17,7 +23,11 @@ function countMedia(dir) {
   let comfyNamed = false;
   const visit = (folder, depth) => {
     let entries = [];
-    try { entries = fs.readdirSync(folder, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       if (seen >= scanLimit) return;
       seen += 1;
@@ -36,7 +46,9 @@ function countMedia(dir) {
 function hasComfySiblings(dir) {
   const parent = path.dirname(dir);
   try {
-    return ["models", "custom_nodes"].some((name) => fs.statSync(path.join(parent, name)).isDirectory());
+    return ["models", "custom_nodes"].some((name) =>
+      fs.statSync(path.join(parent, name)).isDirectory(),
+    );
   } catch {
     return false;
   }
@@ -48,7 +60,9 @@ async function sampleOutputs() {
   if (known.length) return known;
   const history = await comfy("/history?max_items=12").catch(() => ({}));
   const createdAt = new Date().toISOString();
-  return Object.values(history || {}).flatMap((entry) => outputsFrom(entry).map((output) => ({ ...output, id: output.url, status: "done", createdAt })));
+  return Object.values(history || {}).flatMap((entry) =>
+    outputsFrom(entry).map((output) => ({ ...output, id: output.url, status: "done", createdAt })),
+  );
 }
 
 /**
@@ -59,12 +73,24 @@ export async function inspectOutputDir(value, samples) {
   const dir = normalizeFolderInput(value);
   if (!dir) return { path: "", state: "empty" };
   let stat;
-  try { stat = fs.statSync(dir); } catch { return { path: dir, state: "missing" }; }
+  try {
+    stat = fs.statSync(dir);
+  } catch {
+    return { path: dir, state: "missing" };
+  }
   if (!stat.isDirectory()) return { path: dir, state: "not-folder" };
   const { media, capped, comfyNamed } = countMedia(dir);
-  const { checked, found } = outputFolderMatch(dir, samples || await sampleOutputs());
+  const { checked, found } = outputFolderMatch(dir, samples || (await sampleOutputs()));
   const state = !checked ? "ok" : found ? "match" : "mismatch";
-  return { path: dir, state, media, capped, checked, found, looksLikeComfy: comfyNamed || hasComfySiblings(dir) };
+  return {
+    path: dir,
+    state,
+    media,
+    capped,
+    checked,
+    found,
+    looksLikeComfy: comfyNamed || hasComfySiblings(dir),
+  };
 }
 
 /**
@@ -76,22 +102,47 @@ export async function inspectOutputDir(value, samples) {
  * is locked out of a setup that works. Never a whole disk, a home folder,
  * or anything that holds Studio itself.
  */
-export async function outputDirChoice(value, { current = comfyOutputDir, comfyDirs = null, samples = undefined } = {}) {
+export async function outputDirChoice(
+  value,
+  { current = comfyOutputDir, comfyDirs = null, samples = undefined } = {},
+) {
   const dir = normalizeFolderInput(value);
   if (!dir) return { ok: false, error: "Choose an existing ComfyUI output folder." };
   const report = await inspectOutputDir(dir, samples);
-  if (report.state === "missing") return { ok: false, error: "That folder doesn’t exist on this computer.", report };
-  if (report.state === "not-folder") return { ok: false, error: "That’s a file. Choose a folder.", report };
+  if (report.state === "missing")
+    return { ok: false, error: "That folder doesn’t exist on this computer.", report };
+  if (report.state === "not-folder")
+    return { ok: false, error: "That’s a file. Choose a folder.", report };
   if (current && samePath(dir, current)) return { ok: true, dir, report };
   const resolved = path.resolve(dir);
-  const guarded = [path.parse(resolved).root, os.homedir(), path.dirname(os.homedir())].filter(Boolean);
-  if (guarded.some((item) => samePath(item, resolved)) || isInside(resolved, root, { orSame: true }) || isInside(resolved, dataDir, { orSame: true })) {
-    return { ok: false, error: "That folder is too broad. Choose the output folder inside the ComfyUI folder.", report };
+  const guarded = [path.parse(resolved).root, os.homedir(), path.dirname(os.homedir())].filter(
+    Boolean,
+  );
+  if (
+    guarded.some((item) => samePath(item, resolved)) ||
+    isInside(resolved, root, { orSame: true }) ||
+    isInside(resolved, dataDir, { orSame: true })
+  ) {
+    return {
+      ok: false,
+      error: "That folder is too broad. Choose the output folder inside the ComfyUI folder.",
+      report,
+    };
   }
-  if (report.looksLikeComfy || report.state === "match" || outputFolderNames.some((name) => fs.existsSync(path.join(resolved, name)))) return { ok: true, dir, report };
-  const told = comfyDirs || await comfyOutputDirs().catch(() => []);
+  if (
+    report.looksLikeComfy ||
+    report.state === "match" ||
+    outputFolderNames.some((name) => fs.existsSync(path.join(resolved, name)))
+  )
+    return { ok: true, dir, report };
+  const told = comfyDirs || (await comfyOutputDirs().catch(() => []));
   if (told.some((item) => samePath(item, resolved))) return { ok: true, dir, report };
-  return { ok: false, error: "That doesn’t look like a ComfyUI output folder. Choose the output folder inside the ComfyUI folder.", report };
+  return {
+    ok: false,
+    error:
+      "That doesn’t look like a ComfyUI output folder. Choose the output folder inside the ComfyUI folder.",
+    report,
+  };
 }
 
 /** Where ComfyUI itself says it saves: --output-directory, --base-directory, or next to its models. */
@@ -104,7 +155,8 @@ async function comfyOutputDirs() {
   const baseDir = argValue(argv, "--base-directory");
   if (baseDir) dirs.push(path.join(baseDir, "output"));
   const folders = await comfy("/internal/folder_paths").catch(() => null);
-  for (const comfyRoot of new Set(flattenStrings(folders).map(rootFromComfyPath).filter(Boolean))) dirs.push(path.join(comfyRoot, "output"));
+  for (const comfyRoot of new Set(flattenStrings(folders).map(rootFromComfyPath).filter(Boolean)))
+    dirs.push(path.join(comfyRoot, "output"));
   return dirs.map((dir) => normalizeFolderInput(dir)).filter(Boolean);
 }
 
@@ -127,7 +179,8 @@ function rootFromComfyPath(value) {
 function flattenStrings(value, out = []) {
   if (typeof value === "string") out.push(value);
   else if (Array.isArray(value)) value.forEach((item) => flattenStrings(item, out));
-  else if (value && typeof value === "object") Object.values(value).forEach((item) => flattenStrings(item, out));
+  else if (value && typeof value === "object")
+    Object.values(value).forEach((item) => flattenStrings(item, out));
   return out;
 }
 
@@ -152,13 +205,16 @@ export async function detectOutputDirs() {
   for (const comfyRoot of roots) add(path.join(comfyRoot, "output"), "comfy");
   const home = os.homedir();
   for (const dir of [
-    ...(process.platform === "win32" ? ["C:\\ComfyUI_windows_portable\\ComfyUI\\output", "C:\\ComfyUI\\output"] : []),
+    ...(process.platform === "win32"
+      ? ["C:\\ComfyUI_windows_portable\\ComfyUI\\output", "C:\\ComfyUI\\output"]
+      : []),
     path.join(home, "ComfyUI", "output"),
     path.join(home, "Documents", "ComfyUI", "output"),
     path.join(home, "ComfyUI_windows_portable", "ComfyUI", "output"),
     path.join(path.dirname(root), "ComfyUI", "output"),
-    path.join(path.dirname(root), "ComfyUI_windows_portable", "ComfyUI", "output")
-  ]) add(dir, "common");
+    path.join(path.dirname(root), "ComfyUI_windows_portable", "ComfyUI", "output"),
+  ])
+    add(dir, "common");
   const samples = await sampleOutputs();
   const candidates = [];
   for (const [dir, source] of found) {
@@ -166,8 +222,12 @@ export async function detectOutputDirs() {
     if (report.state === "missing" || report.state === "not-folder") continue;
     candidates.push({ ...report, source });
   }
-  const rank = (item) => (item.state === "match" ? 0 : item.state === "mismatch" ? 3 : item.source === "comfy" ? 1 : 2);
-  candidates.sort((a, b) => rank(a) - rank(b) || (b.found || 0) - (a.found || 0) || (b.media || 0) - (a.media || 0));
+  const rank = (item) =>
+    item.state === "match" ? 0 : item.state === "mismatch" ? 3 : item.source === "comfy" ? 1 : 2;
+  candidates.sort(
+    (a, b) =>
+      rank(a) - rank(b) || (b.found || 0) - (a.found || 0) || (b.media || 0) - (a.media || 0),
+  );
   return candidates;
 }
 
@@ -177,20 +237,32 @@ export function autoDetectOutputDir() {
   if (comfyOutputDir) return Promise.resolve(comfyOutputDir);
   autoDetect ||= detectOutputDirs()
     .then((candidates) => {
-      const best = candidates.find((item) => item.state === "match") || candidates.find((item) => item.source === "comfy" && item.state === "ok");
+      const best =
+        candidates.find((item) => item.state === "match") ||
+        candidates.find((item) => item.source === "comfy" && item.state === "ok");
       return best ? setComfyOutputDir(best.path) : "";
     })
     .catch(() => "")
-    .finally(() => { autoDetect = null; });
+    .finally(() => {
+      autoDetect = null;
+    });
   return autoDetect;
 }
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    execFile(command, args, { windowsHide: true, maxBuffer: 1024 * 64, ...options }, (error, stdout, stderr) => {
-      if (error) reject(Object.assign(error, { stdout: String(stdout || ""), stderr: String(stderr || "") }));
-      else resolve(String(stdout || ""));
-    });
+    execFile(
+      command,
+      args,
+      { windowsHide: true, maxBuffer: 1024 * 64, ...options },
+      (error, stdout, stderr) => {
+        if (error)
+          reject(
+            Object.assign(error, { stdout: String(stdout || ""), stderr: String(stderr || "") }),
+          );
+        else resolve(String(stdout || ""));
+      },
+    );
   });
 }
 
@@ -203,7 +275,11 @@ const defaultPickPrompt = "Choose the ComfyUI output folder";
 export async function pickFolder(start = "", pickPrompt = defaultPickPrompt) {
   const startDir = (() => {
     const dir = normalizeFolderInput(start);
-    try { return dir && fs.statSync(dir).isDirectory() ? dir : ""; } catch { return ""; }
+    try {
+      return dir && fs.statSync(dir).isDirectory() ? dir : "";
+    } catch {
+      return "";
+    }
   })();
   if (process.platform === "darwin") {
     const script = [
@@ -214,10 +290,15 @@ export async function pickFolder(start = "", pickPrompt = defaultPickPrompt) {
       "return POSIX path of (choose folder with prompt promptText default location (POSIX file (item 1 of argv)))",
       "end if",
       "return POSIX path of (choose folder with prompt promptText)",
-      "end run"
+      "end run",
     ];
     try {
-      return (await run("osascript", [...script.flatMap((line) => ["-e", line]), ...(startDir ? [startDir] : [])])).trim();
+      return (
+        await run("osascript", [
+          ...script.flatMap((line) => ["-e", line]),
+          ...(startDir ? [startDir] : []),
+        ])
+      ).trim();
     } catch (error) {
       if (/-128|cancel/i.test(error.stderr)) return "";
       throw new Error("The folder picker didn’t open. Paste the path instead.");
@@ -233,17 +314,29 @@ export async function pickFolder(start = "", pickPrompt = defaultPickPrompt) {
       "$dialog.ShowNewFolderButton = $false",
       "if ($env:STUDIO_PICK_START) { $dialog.SelectedPath = $env:STUDIO_PICK_START }",
       "if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.SelectedPath) }",
-      "$owner.Dispose()"
+      "$owner.Dispose()",
     ].join("; ");
     try {
-      return (await run("powershell.exe", ["-NoProfile", "-STA", "-Command", script], { env: { ...process.env, STUDIO_PICK_START: startDir } })).trim();
+      return (
+        await run("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
+          env: { ...process.env, STUDIO_PICK_START: startDir },
+        })
+      ).trim();
     } catch {
       throw new Error("The folder picker didn’t open. Paste the path instead.");
     }
   }
   const attempts = [
-    ["zenity", ["--file-selection", "--directory", `--title=${pickPrompt}`, ...(startDir ? [`--filename=${startDir}${path.sep}`] : [])]],
-    ["kdialog", ["--getexistingdirectory", startDir || os.homedir(), "--title", pickPrompt]]
+    [
+      "zenity",
+      [
+        "--file-selection",
+        "--directory",
+        `--title=${pickPrompt}`,
+        ...(startDir ? [`--filename=${startDir}${path.sep}`] : []),
+      ],
+    ],
+    ["kdialog", ["--getexistingdirectory", startDir || os.homedir(), "--title", pickPrompt]],
   ];
   for (const [command, args] of attempts) {
     try {

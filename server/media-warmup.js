@@ -1,7 +1,12 @@
-import { mediaType } from './media-paths.js';
-import { gallery, galleryRevisionValue, isGalleryHidden } from './gallery-store.js';
-import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from './thumbnails.js';
-import { encoderIdle, getComfyVideoPoster, getComfyVideoPreview, maxCacheBytes } from './video-previews.js';
+import { mediaType } from "./media-paths.js";
+import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery-store.js";
+import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
+import {
+  encoderIdle,
+  getComfyVideoPoster,
+  getComfyVideoPreview,
+  maxCacheBytes,
+} from "./video-previews.js";
 
 /*
  * Builds the gallery's thumbnails, video posters and grid previews ahead of
@@ -27,9 +32,14 @@ let shown = new Set();
 
 /** The Studio media files an item shows: its original and its upscale. */
 function itemMedia(item) {
-  if (item?.status !== 'done' || isGalleryHidden(item)) return [];
-  return [item.url, item.upscale?.url].map(viewParams)
-    .filter((params) => params?.type === mediaType && (videoPattern.test(params.filename) || imagePattern.test(params.filename)))
+  if (item?.status !== "done" || isGalleryHidden(item)) return [];
+  return [item.url, item.upscale?.url]
+    .map(viewParams)
+    .filter(
+      (params) =>
+        params?.type === mediaType &&
+        (videoPattern.test(params.filename) || imagePattern.test(params.filename)),
+    )
     .map((params) => ({ ...params, video: videoPattern.test(params.filename) }));
 }
 
@@ -37,7 +47,11 @@ function itemMedia(item) {
 function stillShown({ filename, subfolder, type }) {
   if (shownRevision !== galleryRevisionValue()) {
     shownRevision = galleryRevisionValue();
-    shown = new Set(gallery.flatMap((item) => itemMedia(item).map((media) => `${media.type}:${media.subfolder}:${media.filename}`)));
+    shown = new Set(
+      gallery.flatMap((item) =>
+        itemMedia(item).map((media) => `${media.type}:${media.subfolder}:${media.filename}`),
+      ),
+    );
   }
   return shown.has(`${type}:${subfolder}:${filename}`);
 }
@@ -50,7 +64,11 @@ async function quietly(key, media, build) {
   while (!idle()) await sleep(250);
   if (!stillShown(media)) return;
   const started = performance.now();
-  try { await build(); } catch { /* Unreadable or gone: its first view reports it. */ }
+  try {
+    await build();
+  } catch {
+    /* Unreadable or gone: its first view reports it. */
+  }
   settled.add(key);
   const took = performance.now() - started;
   // An existing file is found in a millisecond or two; only real work rests.
@@ -77,7 +95,9 @@ export async function warmGallery({ items = gallery } = {}) {
         await quietly(`thumb:${key}`, media, () => warmThumbnail(filename, subfolder, type));
         if (displays < displayBudget) {
           displays += 1;
-          await quietly(`display:${key}`, media, () => warmThumbnail(filename, subfolder, type, 'display'));
+          await quietly(`display:${key}`, media, () =>
+            warmThumbnail(filename, subfolder, type, "display"),
+          );
         }
       }
     }
@@ -85,7 +105,9 @@ export async function warmGallery({ items = gallery } = {}) {
   // Posters first for every video: a grid shows those before any preview plays.
   for (const media of previews) {
     const { filename, subfolder, type } = media;
-    await quietly(`preview:${type}:${subfolder}:${filename}`, media, () => getComfyVideoPreview(filename, subfolder, type));
+    await quietly(`preview:${type}:${subfolder}:${filename}`, media, () =>
+      getComfyVideoPreview(filename, subfolder, type),
+    );
   }
   return images + videos;
 }
@@ -96,7 +118,9 @@ export function warmGalleryNow() {
   warmedRevision = galleryRevisionValue();
   warming = warmGallery()
     .catch((error) => console.warn(`[Studio] Media warm-up stopped: ${error.message}`))
-    .finally(() => { warming = null; });
+    .finally(() => {
+      warming = null;
+    });
   return warming;
 }
 
@@ -107,7 +131,9 @@ export function warmGalleryNow() {
  */
 export function startMediaWarmup({ delayMs = 10_000, everyMs = 15_000 } = {}) {
   setTimeout(warmGalleryNow, delayMs).unref?.();
-  setInterval(() => { if (galleryRevisionValue() !== warmedRevision) void warmGalleryNow(); }, everyMs).unref?.();
+  setInterval(() => {
+    if (galleryRevisionValue() !== warmedRevision) void warmGalleryNow();
+  }, everyMs).unref?.();
 }
 
 /**
@@ -119,8 +145,13 @@ export function warmNewOutputs(outputs = []) {
     const params = viewParams(output?.url);
     if (!params) continue;
     const { filename, subfolder, type } = params;
-    const build = videoPattern.test(filename) ? getComfyVideoPoster(filename, subfolder, type)
-      : imagePattern.test(filename) ? warmThumbnail(filename, subfolder, type).then(() => warmThumbnail(filename, subfolder, type, 'display')) : null;
+    const build = videoPattern.test(filename)
+      ? getComfyVideoPoster(filename, subfolder, type)
+      : imagePattern.test(filename)
+        ? warmThumbnail(filename, subfolder, type).then(() =>
+            warmThumbnail(filename, subfolder, type, "display"),
+          )
+        : null;
     build?.catch(() => {});
   }
 }

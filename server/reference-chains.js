@@ -11,11 +11,21 @@
  * own slots.
  */
 export function chainReferenceSlots(inputs) {
-  const base = (label) => String(label || "").trim().toLowerCase().replace(/\s*\d+$/, "").replace(/\s+image$/, "");
+  const base = (label) =>
+    String(label || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s*\d+$/, "")
+      .replace(/\s+image$/, "");
   inputs.forEach((input, index) => {
     const previous = inputs[index - 1];
     if (!previous || input.follows || input.role === "start" || input.role === "end") return;
-    if (previous.kind === input.kind && previous.role === input.role && base(previous.label) === base(input.label)) input.follows = previous.id;
+    if (
+      previous.kind === input.kind &&
+      previous.role === input.role &&
+      base(previous.label) === base(input.label)
+    )
+      input.follows = previous.id;
   });
   return inputs;
 }
@@ -23,5 +33,8 @@ export function chainReferenceSlots(inputs) {
 /** A profile with its reference stack chained, the original left untouched. */
 export function withReferenceChains(profile) {
   if (!Array.isArray(profile?.mediaInputs) || profile.mediaInputs.length < 2) return profile;
-  return { ...profile, mediaInputs: chainReferenceSlots(profile.mediaInputs.map((input) => ({ ...input }))) };
+  return {
+    ...profile,
+    mediaInputs: chainReferenceSlots(profile.mediaInputs.map((input) => ({ ...input }))),
+  };
 }

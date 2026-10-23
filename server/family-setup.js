@@ -1,7 +1,13 @@
 import { hasNode, optionsFor } from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { preferredDownload } from "./family-profiles.js";
-import { classifyEncoder, classifyVae, rankEncoders, rankVaes, vaeKinds } from "./model-components.js";
+import {
+  classifyEncoder,
+  classifyVae,
+  rankEncoders,
+  rankVaes,
+  vaeKinds,
+} from "./model-components.js";
 import { existingCopy } from "./model-downloads.js";
 import { missingPackPart } from "./node-install.js";
 import { nodePack } from "./node-packs.js";
@@ -24,8 +30,8 @@ export const guidedSetups = {
     license: "Apache 2.0",
     page: "https://github.com/OpenMOSS/MOSS-Image",
     filesPage: "https://huggingface.co/Comfy-Org/MOSS-Image",
-    packSource: "moss_diffusers"
-  }
+    packSource: "moss_diffusers",
+  },
 };
 
 /**
@@ -35,7 +41,17 @@ export const guidedSetups = {
  *
  * profiles: inferModels' profiles. device: { apple } orders the encoder builds.
  */
-export function familySetupPlan(familyId, { info = null, profiles = [], profileId = "", device = {}, onDisk = existingCopy, comfyVersion = "" } = {}) {
+export function familySetupPlan(
+  familyId,
+  {
+    info = null,
+    profiles = [],
+    profileId = "",
+    device = {},
+    onDisk = existingCopy,
+    comfyVersion = "",
+  } = {},
+) {
   const setup = guidedSetups[familyId];
   const family = families[familyId];
   if (!setup || !family) return null;
@@ -47,35 +63,83 @@ export function familySetupPlan(familyId, { info = null, profiles = [], profileI
   const packRunner = family.runners?.[setup.packSource];
   const pack = packRunner ? nodePack(packRunner.pack) : null;
   const loader = family.slots.length === 2 ? "DualCLIPLoader" : "CLIPLoader";
-  const native = online && (!family.clipType || optionsFor(info, loader, "type").includes(family.clipType))
-    && (family.requiredNodes || []).every((node) => hasNode(info, node));
-  const packPart = online && pack ? missingPackPart(info, packRunner.pack, { detail: packRunner.note }) : null;
+  const native =
+    online &&
+    (!family.clipType || optionsFor(info, loader, "type").includes(family.clipType)) &&
+    (family.requiredNodes || []).every((node) => hasNode(info, node));
+  const packPart =
+    online && pack ? missingPackPart(info, packRunner.pack, { detail: packRunner.note }) : null;
   const packLoaded = Boolean(online && pack && !packPart);
-  const packReady = packLoaded && (packRunner.requiredNodes || []).every((node) => hasNode(info, node));
+  const packReady =
+    packLoaded && (packRunner.requiredNodes || []).every((node) => hasNode(info, node));
 
   // The encoder and VAE only matter on ComfyUI's own nodes; the makers' folder carries both.
   const parts = [];
   if (route === "native" && online) {
     const encoders = optionsFor(info, "CLIPLoader", "clip_name").map(classifyEncoder);
     const vaes = optionsFor(info, "VAELoader", "vae_name").map(classifyVae);
-    const withDisk = (spec, part) => spec && ({ id: spec.id, file: spec.file, folder: spec.folder, label: spec.label, bytes: spec.bytes || 0, url: spec.url, part, onDisk: Boolean(onDisk(spec)) });
+    const withDisk = (spec, part) =>
+      spec && {
+        id: spec.id,
+        file: spec.file,
+        folder: spec.folder,
+        label: spec.label,
+        bytes: spec.bytes || 0,
+        url: spec.url,
+        part,
+        onDisk: Boolean(onDisk(spec)),
+      };
     for (const slot of family.slots) {
       const have = rankEncoders(encoders, slot);
-      parts.push({ part: "encoder", label: `${slot.label} text encoder`, have: have[0] || "", download: have.length ? null : withDisk(preferredDownload("encoder", slot.download || slot.kinds[0], device), "encoder") });
+      parts.push({
+        part: "encoder",
+        label: `${slot.label} text encoder`,
+        have: have[0] || "",
+        download: have.length
+          ? null
+          : withDisk(
+              preferredDownload("encoder", slot.download || slot.kinds[0], device),
+              "encoder",
+            ),
+      });
     }
     const haveVae = rankVaes(vaes, family.vae);
-    parts.push({ part: "vae", label: vaeKinds[family.vae[0]]?.label || "VAE", have: haveVae[0] || "", download: haveVae.length ? null : withDisk(preferredDownload("vae", family.vae[0], device), "vae") });
+    parts.push({
+      part: "vae",
+      label: vaeKinds[family.vae[0]]?.label || "VAE",
+      have: haveVae[0] || "",
+      download: haveVae.length
+        ? null
+        : withDisk(preferredDownload("vae", family.vae[0], device), "vae"),
+    });
   }
 
   return {
     family: familyId,
-    title: setup.title, maker: setup.maker, blurb: setup.blurb, license: setup.license, page: setup.page, filesPage: setup.filesPage,
-    profile: profile ? { id: profile.id, model: profile.model, displayName: profile.displayName, variant: profile.variantLabel || profile.variant, ready: Boolean(profile.ready) } : null,
+    title: setup.title,
+    maker: setup.maker,
+    blurb: setup.blurb,
+    license: setup.license,
+    page: setup.page,
+    filesPage: setup.filesPage,
+    profile: profile
+      ? {
+          id: profile.id,
+          model: profile.model,
+          displayName: profile.displayName,
+          variant: profile.variantLabel || profile.variant,
+          ready: Boolean(profile.ready),
+        }
+      : null,
     route,
     parts,
     comfy: {
-      online, version: comfyVersion, native,
-      pack: pack ? { id: pack.id, name: pack.name, loaded: packLoaded, ready: packReady, part: packPart } : null
-    }
+      online,
+      version: comfyVersion,
+      native,
+      pack: pack
+        ? { id: pack.id, name: pack.name, loaded: packLoaded, ready: packReady, part: packPart }
+        : null,
+    },
   };
 }

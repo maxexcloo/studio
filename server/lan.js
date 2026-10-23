@@ -19,7 +19,11 @@ export function resolveLan({ argv = [], env = {}, fileKeys = new Set() } = {}) {
   if (flag) return { host: "0.0.0.0", source: "flag", saved };
   if (shellHost) return { host: shellHost, source: "shell", saved };
   if (saved) return { host: "0.0.0.0", source: "setting", saved };
-  return { host: fileHost && !wildcard(fileHost) ? fileHost : "127.0.0.1", source: "setting", saved };
+  return {
+    host: fileHost && !wildcard(fileHost) ? fileHost : "127.0.0.1",
+    source: "setting",
+    saved,
+  };
 }
 
 /** Whether a server on this host answers other devices, not only this computer. */
@@ -33,7 +37,8 @@ export function readEnvFile(root) {
   try {
     for (const line of fs.readFileSync(path.join(root, ".env"), "utf8").split(/\r?\n/)) {
       const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-      if (match && !(match[1] in values)) values[match[1]] = match[2].replace(/^(["'])(.*)\1$/, "$2");
+      if (match && !(match[1] in values))
+        values[match[1]] = match[2].replace(/^(["'])(.*)\1$/, "$2");
     }
   } catch {
     // .env is optional.

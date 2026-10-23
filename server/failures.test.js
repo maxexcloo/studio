@@ -4,21 +4,46 @@ import fs from "node:fs";
 import { describeFailure, failureTitles, troubleshootingAnchor } from "./failures.js";
 
 test("every failure headline has its own section in docs/guides/TROUBLESHOOTING.md, which the card links to", () => {
-  const doc = fs.readFileSync(new URL("../docs/guides/TROUBLESHOOTING.md", import.meta.url), "utf8");
+  const doc = fs.readFileSync(
+    new URL("../docs/guides/TROUBLESHOOTING.md", import.meta.url),
+    "utf8",
+  );
   // Windows checkouts can bring the file with \r\n line ends.
-  const headings = doc.split(/\r?\n/).filter((line) => line.startsWith("#")).map((line) => line.replace(/^#+\s*/, ""));
-  for (const title of failureTitles) assert.ok(headings.includes(title), `docs/guides/TROUBLESHOOTING.md has no "### ${title}"`);
-  assert.equal(describeFailure({ message: "CUDA error: out of memory" }).help, "the-gpu-ran-out-of-memory");
-  assert.equal(describeFailure({ message: "Error while deserializing header: header is too large", nodeType: "VAELoader" }).help, "a-model-file-is-damaged-or-incomplete");
-  assert.equal(describeFailure({ message: "saved nothing", noOutput: true }).help, "no-image-was-saved");
+  const headings = doc
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("#"))
+    .map((line) => line.replace(/^#+\s*/, ""));
+  for (const title of failureTitles)
+    assert.ok(headings.includes(title), `docs/guides/TROUBLESHOOTING.md has no "### ${title}"`);
+  assert.equal(
+    describeFailure({ message: "CUDA error: out of memory" }).help,
+    "the-gpu-ran-out-of-memory",
+  );
+  assert.equal(
+    describeFailure({
+      message: "Error while deserializing header: header is too large",
+      nodeType: "VAELoader",
+    }).help,
+    "a-model-file-is-damaged-or-incomplete",
+  );
+  assert.equal(
+    describeFailure({ message: "saved nothing", noOutput: true }).help,
+    "no-image-was-saved",
+  );
   assert.equal(describeFailure({ message: "RuntimeError: odd" }).help, "generation-failed");
   // Links inside the document point at headings that exist.
   const anchors = new Set(headings.map(troubleshootingAnchor));
-  for (const [, anchor] of doc.matchAll(/\]\(#([^)]+)\)/g)) assert.ok(anchors.has(anchor), `#${anchor} has no heading`);
+  for (const [, anchor] of doc.matchAll(/\]\(#([^)]+)\)/g))
+    assert.ok(anchors.has(anchor), `#${anchor} has no heading`);
 });
 
 test("a damaged safetensors file gets a plain title and hint, with the raw text kept", () => {
-  const failure = describeFailure({ message: "Error while deserializing header: header is too large. File path: D:\\ComfyUI\\models\\vae\\x.safetensors", nodeType: "VAELoader", nodeId: "8" });
+  const failure = describeFailure({
+    message:
+      "Error while deserializing header: header is too large. File path: D:\\ComfyUI\\models\\vae\\x.safetensors",
+    nodeType: "VAELoader",
+    nodeId: "8",
+  });
   assert.equal(failure.title, "The VAE file is damaged");
   assert.equal(failure.file, "x.safetensors");
   assert.match(failure.summary, /^x\.safetensors couldn't be read/);
@@ -28,7 +53,10 @@ test("a damaged safetensors file gets a plain title and hint, with the raw text 
 });
 
 test("the traceback keeps its last lines and unknown errors stay generic", () => {
-  const failure = describeFailure({ message: "RuntimeError: something odd\nmore", traceback: Array.from({ length: 60 }, (_, i) => `line ${i}\n`) });
+  const failure = describeFailure({
+    message: "RuntimeError: something odd\nmore",
+    traceback: Array.from({ length: 60 }, (_, i) => `line ${i}\n`),
+  });
   assert.equal(failure.title, "Generation failed");
   assert.equal(failure.summary, "something odd");
   assert.equal(failure.traceback.split("\n").length, 40);
@@ -36,21 +64,48 @@ test("the traceback keeps its last lines and unknown errors stay generic", () =>
 });
 
 test("a run with no saved image becomes a visible failure", () => {
-  const failure = describeFailure({ message: "ComfyUI finished the run but saved no image.", noOutput: true });
+  const failure = describeFailure({
+    message: "ComfyUI finished the run but saved no image.",
+    noOutput: true,
+  });
   assert.equal(failure.title, "No image was saved");
   assert.match(failure.hint, /Save Image/);
 });
 
 test("each fixable failure names its one-click fix", () => {
-  assert.equal(describeFailure({ message: "torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2 GiB" }).fix, "memory");
-  assert.equal(describeFailure({ message: "Error while deserializing header: invalid header", nodeType: "VAELoader" }).fix, "redownload");
-  assert.equal(describeFailure({ message: "Prompt outputs failed validation: Value not in list: ckpt_name" }).fix, "rescan");
-  assert.equal(describeFailure({ message: "ComfyUI no longer has this run. It may have restarted." }).title, "ComfyUI dropped this run");
-  assert.equal(describeFailure({ message: "The operation was aborted due to timeout" }).title, "Lost the connection to ComfyUI");
+  assert.equal(
+    describeFailure({
+      message: "torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2 GiB",
+    }).fix,
+    "memory",
+  );
+  assert.equal(
+    describeFailure({
+      message: "Error while deserializing header: invalid header",
+      nodeType: "VAELoader",
+    }).fix,
+    "redownload",
+  );
+  assert.equal(
+    describeFailure({ message: "Prompt outputs failed validation: Value not in list: ckpt_name" })
+      .fix,
+    "rescan",
+  );
+  assert.equal(
+    describeFailure({ message: "ComfyUI no longer has this run. It may have restarted." }).title,
+    "ComfyUI dropped this run",
+  );
+  assert.equal(
+    describeFailure({ message: "The operation was aborted due to timeout" }).title,
+    "Lost the connection to ComfyUI",
+  );
 });
 
 test("an unrelated memory message is not called out of memory", () => {
-  assert.notEqual(describeFailure({ message: "CUDA error: an illegal memory access was encountered" }).fix, "memory");
+  assert.notEqual(
+    describeFailure({ message: "CUDA error: an illegal memory access was encountered" }).fix,
+    "memory",
+  );
 });
 
 test("a missing node names its class from ComfyUI's validation answer", () => {
@@ -61,27 +116,42 @@ test("a missing node names its class from ComfyUI's validation answer", () => {
 });
 
 test("the plain summary leads while ComfyUI's own words stay in the detail", () => {
-  const failure = describeFailure({ message: "ModuleNotFoundError: No module named 'sageattention'", friendly: "ComfyUI failed inside Python. Check that the selected model, custom nodes, and PyTorch version are compatible." });
+  const failure = describeFailure({
+    message: "ModuleNotFoundError: No module named 'sageattention'",
+    friendly:
+      "ComfyUI failed inside Python. Check that the selected model, custom nodes, and PyTorch version are compatible.",
+  });
   assert.match(failure.summary, /^ComfyUI failed inside Python/);
   assert.match(failure.detail, /sageattention/);
 });
 
 test("a damaged file from a node that is not a loader keeps the general title", () => {
-  const failure = describeFailure({ message: "safetensors_rust.SafetensorError: Error while deserializing header: header is too large", nodeType: "KSampler" });
+  const failure = describeFailure({
+    message:
+      "safetensors_rust.SafetensorError: Error while deserializing header: header is too large",
+    nodeType: "KSampler",
+  });
   assert.equal(failure.title, "A model file is damaged or incomplete");
   assert.match(failure.summary, /^A model file couldn't be read/);
 });
 
 test("a GGUF model type ComfyUI-GGUF doesn't know says so plainly", () => {
-  const failure = describeFailure({ message: "ValueError: Unexpected architecture type in GGUF file: 'krea2'", nodeType: "UnetLoaderGGUF" });
+  const failure = describeFailure({
+    message: "ValueError: Unexpected architecture type in GGUF file: 'krea2'",
+    nodeType: "UnetLoaderGGUF",
+  });
   assert.equal(failure.title, "ComfyUI-GGUF can't load this model yet");
   assert.match(failure.hint, /safetensors/);
 });
 
 test("a Radiance LoRA refusal shows its own sentence, not a generic failure", () => {
-  const message = "RadianceError: run failed\nloras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)";
+  const message =
+    "RadianceError: run failed\nloras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)";
   const failure = describeFailure({ message, nodeType: "RadianceSampler" });
   assert.equal(failure.title, "A LoRA doesn't fit this model");
-  assert.equal(failure.summary, "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)");
+  assert.equal(
+    failure.summary,
+    "loras: none of the adapters' modules is a module of this model (zimage_style.safetensors on krea2)",
+  );
   assert.equal(failure.help, "a-lora-doesnt-fit-this-model");
 });

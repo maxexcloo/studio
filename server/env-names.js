@@ -6,12 +6,36 @@
  * new names. No side effects: the dev launcher reads .env through it too.
  */
 export const renamedSettings = Object.freeze([
-  "ALLOW_LAN", "ALLOWED_HOSTS", "COMFY_LOST_AFTER_MS", "COMFY_ROOT", "COMFY_SEARCH", "DATA_DIR",
-  "DEFAULT_COMFY_URL", "DEMO", "DEV_PROXY_TOKEN", "DEVICE_SESSION_DAYS", "DOCKER_HOST_ONLY",
-  "ENABLE_INPAINT", "ENV_FILE", "FFMPEG_PATH", "GALLERY_CHANGELOG_LIMIT", "GALLERY_LIMIT",
-  "GALLERY_SAVE_MS", "HTTPS_PORT", "LAN", "PREVIEW_INTERVAL_MS", "REFERENCE_MAX_BYTES",
-  "REFERENCE_MAX_PIXELS", "SEEDVR2_HF_REPO", "SEEDVR2_MODEL_DIR", "TERMINAL_JOB_TTL_MS",
-  "THUMBNAIL_CACHE_MB", "TLS_CERT", "TLS_KEY", "TRASH_DAYS", "VIDEO_PREVIEW_CACHE_MB"
+  "ALLOW_LAN",
+  "ALLOWED_HOSTS",
+  "COMFY_LOST_AFTER_MS",
+  "COMFY_ROOT",
+  "COMFY_SEARCH",
+  "DATA_DIR",
+  "DEFAULT_COMFY_URL",
+  "DEMO",
+  "DEV_PROXY_TOKEN",
+  "DEVICE_SESSION_DAYS",
+  "DOCKER_HOST_ONLY",
+  "ENABLE_INPAINT",
+  "ENV_FILE",
+  "FFMPEG_PATH",
+  "GALLERY_CHANGELOG_LIMIT",
+  "GALLERY_LIMIT",
+  "GALLERY_SAVE_MS",
+  "HTTPS_PORT",
+  "LAN",
+  "PREVIEW_INTERVAL_MS",
+  "REFERENCE_MAX_BYTES",
+  "REFERENCE_MAX_PIXELS",
+  "SEEDVR2_HF_REPO",
+  "SEEDVR2_MODEL_DIR",
+  "TERMINAL_JOB_TTL_MS",
+  "THUMBNAIL_CACHE_MB",
+  "TLS_CERT",
+  "TLS_KEY",
+  "TRASH_DAYS",
+  "VIDEO_PREVIEW_CACHE_MB",
 ]);
 
 const renamed = new Set(renamedSettings);
@@ -48,13 +72,22 @@ export function applyLegacyEnvNames(env, only = null) {
 
 /** Old names set beside a different value under the new name, which wins (e.g. an image default). */
 export function shadowedLegacyEnvNames(env) {
-  return renamedSettings.map((name) => `HEISS_${name}`).filter((legacy) => legacy in env && currentEnvName(legacy) in env && env[legacy] !== env[currentEnvName(legacy)]);
+  return renamedSettings
+    .map((name) => `HEISS_${name}`)
+    .filter(
+      (legacy) =>
+        legacy in env &&
+        currentEnvName(legacy) in env &&
+        env[legacy] !== env[currentEnvName(legacy)],
+    );
 }
 
 /** The one-line notice for old names in use (and old names the new ones override), or "" when there are none. */
 export function legacyEnvNotice(used = [], shadowed = []) {
   if (!used.length && !shadowed.length) return "";
   const pairs = [...new Set(used)].sort().map((legacy) => `${legacy} → ${currentEnvName(legacy)}`);
-  const ignored = [...new Set(shadowed)].sort().map((legacy) => `${legacy} (ignored: ${currentEnvName(legacy)} is set)`);
+  const ignored = [...new Set(shadowed)]
+    .sort()
+    .map((legacy) => `${legacy} (ignored: ${currentEnvName(legacy)} is set)`);
   return `Deprecated settings in use; rename them (the old names stop working in a later release): ${[...pairs, ...ignored].join(", ")}.`;
 }

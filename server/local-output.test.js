@@ -20,7 +20,10 @@ test("outputs open from the output folder while ComfyUI is down", () => {
 test("nothing outside the output folder, and only outputs", () => {
   assert.equal(localOutputFile("outside.png", "..", "output"), null);
   assert.equal(localOutputFile("../outside.png", "", "output"), null);
-  assert.equal(localOutputFile(path.join(path.dirname(outputDir), "outside.png"), "", "output"), null);
+  assert.equal(
+    localOutputFile(path.join(path.dirname(outputDir), "outside.png"), "", "output"),
+    null,
+  );
   assert.equal(localOutputFile("a.png", "run", "input"), null);
   assert.equal(localOutputFile("run", "", "output"), null, "a folder is not a file");
 });

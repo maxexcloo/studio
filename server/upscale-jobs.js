@@ -11,7 +11,6 @@ import { saveIntoStudioFolder } from "./graphs.js";
 import { ingestRunResults, mediaStorageEnabled, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 
-
 export function findUpscaleTarget(id) {
   return gallery.find((item) => item.id === id || item.url === id) || null;
 }
@@ -37,10 +36,10 @@ function galleryTarget(itemId) {
         height: plan.estimatedHeight,
         scale: plan.scale,
         completedAt: new Date().toISOString(),
-        error: ""
+        error: "",
       });
       updateGalleryJob(itemId, { upscaleActive: true });
-    }
+    },
   };
 }
 
@@ -52,7 +51,9 @@ function galleryTarget(itemId) {
 function watchUpscaleProgress(clientId, target, run) {
   let socket;
   try {
-    socket = new WebSocket(`${activeComfyUrl().replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`);
+    socket = new WebSocket(
+      `${activeComfyUrl().replace(/^http/i, "ws")}/ws?clientId=${encodeURIComponent(clientId)}`,
+    );
   } catch {
     return null;
   }
@@ -63,17 +64,29 @@ function watchUpscaleProgress(clientId, target, run) {
       const data = message.data || {};
       if (data.prompt_id && run.promptId && data.prompt_id !== run.promptId) return;
       run.alive?.();
-      if (message.type === "execution_start" || message.type === "executing" || message.type === "progress") run.clock.start();
+      if (
+        message.type === "execution_start" ||
+        message.type === "executing" ||
+        message.type === "progress"
+      )
+        run.clock.start();
       if (message.type === "execution_success") run.endAt ??= Date.now();
       if (message.type === "progress") {
         run.progress = { value: Number(data.value || 0), max: Number(data.max || 0) };
-        target.patch({ status: "running", progress: { ...run.progress, ...run.clock.eta() } }, { persist: false });
+        target.patch(
+          { status: "running", progress: { ...run.progress, ...run.clock.eta() } },
+          { persist: false },
+        );
       }
       if (message.type === "execution_interrupted") {
         target.patch({ status: "canceled", progress: null });
       }
       if (message.type === "execution_error") {
-        target.patch({ status: "error", progress: null, error: normalizeComfyError(data.exception_message || "Upscale failed") });
+        target.patch({
+          status: "error",
+          progress: null,
+          error: normalizeComfyError(data.exception_message || "Upscale failed"),
+        });
       }
     } catch {
       // Ignore malformed frames from Comfy extensions.
@@ -89,14 +102,30 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
     const { graph: built, plan } = upscaleGraph(body, info);
     // An account's upscale is saved beside its other outputs, in the owner's folder.
     const graph = body.ownerId ? saveIntoStudioFolder(built, body.ownerId) : built;
-    target.patch({ status: "running", jobId, quality: plan.quality, faceDetail: Boolean(body.faceDetail), scale: plan.scale, startedAt: new Date().toISOString(), error: "" });
+    target.patch({
+      status: "running",
+      jobId,
+      quality: plan.quality,
+      faceDetail: Boolean(body.faceDetail),
+      scale: plan.scale,
+      startedAt: new Date().toISOString(),
+      error: "",
+    });
     // How long it should take, from every SeedVR2 upscale here before (upscale-timing.js).
-    const learn = { quality: plan.quality, model: plan.model || "", faceDetail: Boolean(body.faceDetail), work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight }) };
+    const learn = {
+      quality: plan.quality,
+      model: plan.model || "",
+      faceDetail: Boolean(body.faceDetail),
+      work: upscaleWork({ width: plan.estimatedWidth, height: plan.estimatedHeight }),
+    };
     const estimate = upscaleEstimate(learn);
     const run = { promptId: "", alive: null, progress: { value: 0, max: 0 }, endAt: null };
     clock = trackUpscale(jobId, estimate, (eta) => {
       if (jobs.get(jobId)?.terminalAt) return;
-      target.patch({ status: "running", progress: { ...run.progress, ...eta } }, { persist: false });
+      target.patch(
+        { status: "running", progress: { ...run.progress, ...eta } },
+        { persist: false },
+      );
     });
     run.clock = clock;
     socket = watchUpscaleProgress(jobId, target, run);
@@ -104,7 +133,11 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt: graph, client_id: jobId, extra_data: { preview_method: "none" } })
+      body: JSON.stringify({
+        prompt: graph,
+        client_id: jobId,
+        extra_data: { preview_method: "none" },
+      }),
     });
     // Canceled while ComfyUI was taking the prompt: take it back out instead of running it.
     if (jobs.get(jobId)?.terminalAt) {
@@ -133,7 +166,7 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         continue;
       }
       if (checked.state === "done") {
-        const outputs = outputsFrom({ outputs: { "9": checked.entry?.outputs?.["9"] || {} } });
+        const outputs = outputsFrom({ outputs: { 9: checked.entry?.outputs?.["9"] || {} } });
         let output = outputs.find((item) => item.type === (body.mediaType || "image"));
         if (!output) throw new Error("The upscale ended without a saved result.");
         // ComfyUI as a worker: the upscale moves into Studio media beside its source.
@@ -145,7 +178,8 @@ export async function runUpscaleJob(jobId, body, info, target = galleryTarget(bo
         }
         // Learned from, unless its start was never heard.
         const startAt = clock.startAt();
-        if (startAt) recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
+        if (startAt)
+          recordUpscale({ ...learn, ms: (run.endAt ?? Date.now()) - startAt, predicted: estimate });
         await target.finish(output, plan);
         setTerminalJob(jobId, { status: "done", outputs: [output] });
         if (comfyCopies.length) {
@@ -182,7 +216,14 @@ function waitForOpen(socket) {
  * upscale arrow on a finished image. Smart upscale as part of a run is
  * run-upscale.js.
  */
-export function startUpscale({ item, imageName, quality, faceDetail = false, info, customWorkflow = null }) {
+export function startUpscale({
+  item,
+  imageName,
+  quality,
+  faceDetail = false,
+  info,
+  customWorkflow = null,
+}) {
   const jobId = crypto.randomUUID();
   const body = {
     galleryItemId: item.id,
@@ -194,10 +235,18 @@ export function startUpscale({ item, imageName, quality, faceDetail = false, inf
     height: Number(item.height || 0),
     prompt: item.prompt || "",
     ...(item.ownerId ? { ownerId: item.ownerId } : {}),
-    ...faceDetailSource(item, customWorkflow)
+    ...faceDetailSource(item, customWorkflow),
   };
   const plan = upscalePlan(body);
-  jobs.set(jobId, { status: "queued", kind: "upscale", comfyBackend: currentComfyBackend(), ...(item.ownerId ? { ownerId: item.ownerId } : {}), galleryItemId: item.id, startedAt: Date.now(), outputs: [] });
+  jobs.set(jobId, {
+    status: "queued",
+    kind: "upscale",
+    comfyBackend: currentComfyBackend(),
+    ...(item.ownerId ? { ownerId: item.ownerId } : {}),
+    galleryItemId: item.id,
+    startedAt: Date.now(),
+    outputs: [],
+  });
   setTimeout(() => runUpscaleJob(jobId, body, info), 0);
   return { jobId, plan };
 }

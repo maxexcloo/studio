@@ -1,4 +1,4 @@
-import { comfy, isComfyTimeout } from './comfy.js';
+import { comfy, isComfyTimeout } from "./comfy.js";
 
 /**
  * Studio's side of ComfyUI's queue: stopping only its own runs, and following a
@@ -10,7 +10,10 @@ import { comfy, isComfyTimeout } from './comfy.js';
 const json = { "content-type": "application/json" };
 
 /** A queue entry is [number, prompt_id, prompt, extra_data, outputs]; only the id matters here. */
-const idsIn = (list) => (Array.isArray(list) ? list.map((item) => (Array.isArray(item) ? item[1] : item?.prompt_id)).filter(Boolean) : []);
+const idsIn = (list) =>
+  Array.isArray(list)
+    ? list.map((item) => (Array.isArray(item) ? item[1] : item?.prompt_id)).filter(Boolean)
+    : [];
 
 /** Where a prompt stands in ComfyUI's queue: "running", "pending" or "" when it is in neither. */
 export function queuePlace(queue, promptId) {
@@ -31,23 +34,39 @@ export function queuePlace(queue, promptId) {
 export async function cancelPrompt(promptId, request = comfy) {
   if (!promptId) return "";
   try {
-    const answer = await request(`/api/jobs/${encodeURIComponent(promptId)}/cancel`, { method: "POST", headers: json, body: "{}", timeout: 10_000 });
+    const answer = await request(`/api/jobs/${encodeURIComponent(promptId)}/cancel`, {
+      method: "POST",
+      headers: json,
+      body: "{}",
+      timeout: 10_000,
+    });
     // Anything but its JSON answer (an older ComfyUI's 404/405, a front end catching the route) falls through.
-    if (answer && typeof answer === "object" && typeof answer.cancelled === "boolean") return answer.cancelled ? "canceled" : "";
+    if (answer && typeof answer === "object" && typeof answer.cancelled === "boolean")
+      return answer.cancelled ? "canceled" : "";
   } catch {
     // Not there on this ComfyUI: do it the older way.
   }
   const queue = await request("/queue", { timeout: 10_000 });
   const place = queuePlace(queue, promptId);
   if (place === "pending") {
-    await request("/queue", { method: "POST", headers: json, body: JSON.stringify({ delete: [promptId] }), timeout: 10_000 });
+    await request("/queue", {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ delete: [promptId] }),
+      timeout: 10_000,
+    });
     // It may have started between the two calls; if so it is running now.
     const after = await request("/queue", { timeout: 10_000 }).catch(() => null);
     if (queuePlace(after, promptId) !== "running") return "pending";
   } else if (place !== "running") {
     return "";
   }
-  await request("/interrupt", { method: "POST", headers: json, body: JSON.stringify({ prompt_id: promptId }), timeout: 10_000 });
+  await request("/interrupt", {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ prompt_id: promptId }),
+    timeout: 10_000,
+  });
   return "running";
 }
 
@@ -67,21 +86,32 @@ export function isTransientComfyError(error) {
   if (Number(error.status) >= 500) return true;
   if (Number(error.status)) return false;
   const code = error.code || error.cause?.code || "";
-  return error instanceof TypeError
-    || error.name === "TimeoutError" || error.name === "AbortError"
-    || /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|UND_ERR_\w+)$/.test(code)
-    || /fetch failed|socket hang up|terminated|other side closed/i.test(error.message || "");
+  return (
+    error instanceof TypeError ||
+    error.name === "TimeoutError" ||
+    error.name === "AbortError" ||
+    /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|UND_ERR_\w+)$/.test(
+      code,
+    ) ||
+    /fetch failed|socket hang up|terminated|other side closed/i.test(error.message || "")
+  );
 }
 
 // How long ComfyUI may stay silent before a run is given up on (shorter in tests).
-const defaultLostAfterMs = Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) : 60_000;
+const defaultLostAfterMs =
+  Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0
+    ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS)
+    : 60_000;
 
 // A worker that takes the connection but answers slowly is busy (decoding and saving a long video), not gone.
 const defaultBusyLostAfterMs = 20 * 60_000;
 
-export const lostConnectionMessage = "ComfyUI stopped answering for over a minute, so this run was given up.";
-export const busyLostMessage = "ComfyUI stayed too busy to answer for over 20 minutes, so this run was given up.";
-export const droppedRunMessage = "ComfyUI no longer has this run. It may have restarted, or the run was removed from its queue.";
+export const lostConnectionMessage =
+  "ComfyUI stopped answering for over a minute, so this run was given up.";
+export const busyLostMessage =
+  "ComfyUI stayed too busy to answer for over 20 minutes, so this run was given up.";
+export const droppedRunMessage =
+  "ComfyUI no longer has this run. It may have restarted, or the run was removed from its queue.";
 
 /**
  * Follows one queued prompt until ComfyUI has its result. Each `check()` asks
@@ -96,7 +126,17 @@ export const droppedRunMessage = "ComfyUI no longer has this run. It may have re
  * or removed from ComfyUI's own queue). Any sign of life (a request that
  * answered, a progress message on the socket via `alive()`) resets the clock.
  */
-export function promptTracker(promptId, { request = comfy, now = Date.now, lostAfterMs = defaultLostAfterMs, busyLostAfterMs = defaultBusyLostAfterMs, verifyEvery = 10, pollTimeoutMs = 15_000 } = {}) {
+export function promptTracker(
+  promptId,
+  {
+    request = comfy,
+    now = Date.now,
+    lostAfterMs = defaultLostAfterMs,
+    busyLostAfterMs = defaultBusyLostAfterMs,
+    verifyEvery = 10,
+    pollTimeoutMs = 15_000,
+  } = {},
+) {
   let lastAlive = now();
   let downSince = null;
   let failures = 0;
@@ -104,7 +144,9 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
   let missingChecks = 0;
   let verifyNext = false;
 
-  const noteAlive = () => { lastAlive = now(); };
+  const noteAlive = () => {
+    lastAlive = now();
+  };
   const reconnecting = () => {
     failures += 1;
     if (downSince === null) downSince = now();
@@ -112,7 +154,11 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
       throw Object.assign(new Error(lostConnectionMessage), { lostConnection: true });
     }
     // 1 s, 2 s, 4 s, then every 5 s: quick for a blip, calm for a restart.
-    return { state: "reconnecting", delayMs: Math.min(5000, 1000 * 2 ** Math.min(failures - 1, 3)), sinceMs: now() - downSince };
+    return {
+      state: "reconnecting",
+      delayMs: Math.min(5000, 1000 * 2 ** Math.min(failures - 1, 3)),
+      sinceMs: now() - downSince,
+    };
   };
   const ask = async (pathname) => {
     try {
@@ -126,7 +172,8 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
       if (isComfyTimeout(error)) {
         downSince = null;
         failures = 0;
-        if (now() - lastAlive >= busyLostAfterMs) throw Object.assign(new Error(busyLostMessage), { lostConnection: true });
+        if (now() - lastAlive >= busyLostAfterMs)
+          throw Object.assign(new Error(busyLostMessage), { lostConnection: true });
         return { down: { state: "waiting", busy: true, reconnected: false } };
       }
       return { down: reconnecting() };
@@ -146,7 +193,8 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
       if (entry) return { state: "done", entry, reconnected: wasDown };
       polls += 1;
       // After a gap, and now and then anyway: is the prompt still somewhere?
-      if (!verifyNext && polls % verifyEvery !== 0 && !missingChecks) return { state: "waiting", reconnected: wasDown };
+      if (!verifyNext && polls % verifyEvery !== 0 && !missingChecks)
+        return { state: "waiting", reconnected: wasDown };
       verifyNext = false;
       const queue = await ask("/queue");
       if (queue.down) return queue.down;
@@ -157,11 +205,13 @@ export function promptTracker(promptId, { request = comfy, now = Date.now, lostA
       // It may have finished between the two requests: history is written before the queue lets go.
       const again = await ask(`/history/${encodeURIComponent(promptId)}`);
       if (again.down) return again.down;
-      if (again.answer?.[promptId]) return { state: "done", entry: again.answer[promptId], reconnected: wasDown };
+      if (again.answer?.[promptId])
+        return { state: "done", entry: again.answer[promptId], reconnected: wasDown };
       // ComfyUI's queue listing is read without a lock; only a second miss in a row counts.
       missingChecks += 1;
-      if (missingChecks >= 2) throw Object.assign(new Error(droppedRunMessage), { droppedRun: true });
+      if (missingChecks >= 2)
+        throw Object.assign(new Error(droppedRunMessage), { droppedRun: true });
       return { state: "waiting", reconnected: wasDown };
-    }
+    },
   };
 }

@@ -8,9 +8,17 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-downloads-"));
 process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 fs.mkdirSync(path.join(scratch, "ComfyUI", "models", "vae"), { recursive: true });
 
-const { downloadState, isNetworkError, repositoryPage, setDownloadTransport, startDownload } = await import("./model-downloads.js");
+const { downloadState, isNetworkError, repositoryPage, setDownloadTransport, startDownload } =
+  await import("./model-downloads.js");
 
-const spec = (file) => ({ id: `vae:test:${file}`, file, folder: "vae", label: "Test VAE", url: "https://huggingface.co/x/resolve/main/a.safetensors", bytes: 10 });
+const spec = (file) => ({
+  id: `vae:test:${file}`,
+  file,
+  folder: "vae",
+  label: "Test VAE",
+  url: "https://huggingface.co/x/resolve/main/a.safetensors",
+  bytes: 10,
+});
 
 async function settle(file) {
   for (let i = 0; i < 200; i += 1) {
@@ -57,17 +65,27 @@ test("a file gone from its address says to update, and where to look by hand", a
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response("Entry not found", { status: 404 });
   try {
-    startDownload({ ...spec("moved.safetensors"), url: "https://huggingface.co/Comfy-Org/some_repo/resolve/main/split_files/vae/moved.safetensors" });
+    startDownload({
+      ...spec("moved.safetensors"),
+      url: "https://huggingface.co/Comfy-Org/some_repo/resolve/main/split_files/vae/moved.safetensors",
+    });
     const failed = await settle("moved.safetensors");
     assert.equal(failed.status, "error");
     assert.equal(failed.retryable, false);
     const message = JSON.stringify(failed);
     assert.match(message, /Update Studio in Settings › About/);
-    assert.match(message, /https:\/\/huggingface\.co\/Comfy-Org\/some_repo and put it in ComfyUI’s vae folder/);
+    assert.match(
+      message,
+      /https:\/\/huggingface\.co\/Comfy-Org\/some_repo and put it in ComfyUI’s vae folder/,
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
-  assert.equal(repositoryPage("https://huggingface.co/x/resolve/main/a.safetensors"), "", "not a repository address");
+  assert.equal(
+    repositoryPage("https://huggingface.co/x/resolve/main/a.safetensors"),
+    "",
+    "not a repository address",
+  );
 });
 
 test("a file fetched before a restart reads as on disk, not as a new download", async () => {

@@ -27,7 +27,10 @@ test("the first release takes the Unreleased notes and links to its tag", () => 
 });
 
 test("later releases compare against the previous tag", () => {
-  const first = cutRelease(base, "0.2.0", "2026-09-23").replace("## [Unreleased]\n", "## [Unreleased]\n\n### Fixed\n- A bug.\n");
+  const first = cutRelease(base, "0.2.0", "2026-09-23").replace(
+    "## [Unreleased]\n",
+    "## [Unreleased]\n\n### Fixed\n- A bug.\n",
+  );
   const second = cutRelease(first, "0.2.1", "2026-10-01");
   assert.equal(section(second, "0.2.1"), "### Fixed\n- A bug.");
   assert.match(second, /^\[0\.2\.1\]: .*compare\/v0\.2\.0\.\.\.v0\.2\.1$/m);
@@ -41,15 +44,23 @@ test("no notes, no release", () => {
 });
 
 test("the summary is the notes' opening > line, and only that", () => {
-  assert.equal(summaryOf("> Smoother setup, calmer errors\n\n### Added\n- **A thing.**"), "Smoother setup, calmer errors");
+  assert.equal(
+    summaryOf("> Smoother setup, calmer errors\n\n### Added\n- **A thing.**"),
+    "Smoother setup, calmer errors",
+  );
   assert.equal(summaryOf("### Added\n- **A thing.**\n> not a summary"), "");
   assert.ok(SUMMARY_MAX >= 40 && SUMMARY_MAX <= 72);
 });
 
-
-test('the first fork release does not compare against an upstream tag as a fork release', () => {
+test("the first fork release does not compare against an upstream tag as a fork release", () => {
   const upstream = `${base}\n[0.1.0]: https://github.com/tristmeister/HEISS-UI/releases/tag/v0.1.0\n`;
-  const next = cutRelease(upstream, '0.19.0', '2026-10-18');
-  assert.match(next, /\[0\.19\.0\]: https:\/\/github\.com\/maxexcloo\/studio\/releases\/tag\/v0\.19\.0/);
-  assert.match(next, /\[0\.1\.0\]: https:\/\/github\.com\/tristmeister\/HEISS-UI\/releases\/tag\/v0\.1\.0/);
+  const next = cutRelease(upstream, "0.19.0", "2026-10-18");
+  assert.match(
+    next,
+    /\[0\.19\.0\]: https:\/\/github\.com\/maxexcloo\/studio\/releases\/tag\/v0\.19\.0/,
+  );
+  assert.match(
+    next,
+    /\[0\.1\.0\]: https:\/\/github\.com\/tristmeister\/HEISS-UI\/releases\/tag\/v0\.1\.0/,
+  );
 });

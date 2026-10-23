@@ -1,12 +1,12 @@
-import { defaultGenerationCount } from './generation-defaults.js';
-import { catalogueLoraInfo } from './lora-info.js';
-import { optionalLoraPolicyIssue } from './lora-catalogue.js';
-import { missingNodes, nodeRange, optionsFor } from './comfy.js';
-import { inferModels } from './models.js';
-import { workflowFor, workflowIds } from './workflow-registry.js';
-import { getCustomWorkflow } from './custom-workflows.js';
-import { inpaintingEnabled } from './features.js';
-import { hasReferenceImage, resolveImageMode } from './workflow-modes.js';
+import { defaultGenerationCount } from "./generation-defaults.js";
+import { catalogueLoraInfo } from "./lora-info.js";
+import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
+import { missingNodes, nodeRange, optionsFor } from "./comfy.js";
+import { inferModels } from "./models.js";
+import { workflowFor, workflowIds } from "./workflow-registry.js";
+import { getCustomWorkflow } from "./custom-workflows.js";
+import { inpaintingEnabled } from "./features.js";
+import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 export function clampNumber(value, fallback, min, max) {
   const number = Number(value);
@@ -48,7 +48,12 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
   if (!profile?.capabilities?.lora) return [];
   const installed = optionsFor(info, "LoraLoader", "lora_name");
   if (!installed.length) return [];
-  const strengthRange = nodeRange(info, "LoraLoader", "strength_model", { default: 0.7, min: -100, max: 100, step: 0.01 });
+  const strengthRange = nodeRange(info, "LoraLoader", "strength_model", {
+    default: 0.7,
+    min: -100,
+    max: 100,
+    step: 0.01,
+  });
   const raw = Array.isArray(input.loras) ? input.loras : [];
   const sanitized = [];
   // Disabled entries don't take a slot: apply the workflow's limit to enabled LoRAs only.
@@ -62,7 +67,7 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
     sanitized.push({
       name,
       enabled: true,
-      strength
+      strength,
     });
   }
   return sanitized;
@@ -75,15 +80,19 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
  */
 function sanitizeInpaint(input, profile, referenceAssets) {
   const mask = String(input.inpaint?.mask || "");
-  if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length) return null;
-  if (!mask.startsWith("data:image/png;base64,")) throw new Error("The painted mask didn’t come through. Paint it again.");
+  if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length)
+    return null;
+  if (!mask.startsWith("data:image/png;base64,"))
+    throw new Error("The painted mask didn’t come through. Paint it again.");
   const fallback = profile.defaults.inpaintStrength ?? 1;
   const strength = Number(input.inpaint.strength);
   const feather = Number(input.inpaint.feather);
   return {
     mask,
-    strength: Number.isFinite(strength) ? Math.round(Math.min(1, Math.max(0.05, strength)) * 100) / 100 : fallback,
-    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4
+    strength: Number.isFinite(strength)
+      ? Math.round(Math.min(1, Math.max(0.05, strength)) * 100) / 100
+      : fallback,
+    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4,
   };
 }
 
@@ -97,38 +106,58 @@ function sanitizeFamilyBody(input, info, stats) {
   const prompt = String(input.prompt || "").trim();
   if (!prompt) throw new Error("Enter a prompt.");
   const profiles = inferModels(info, stats).profiles || [];
-  const profile = profiles.find((item) => item.id === input.profileId)
-    || profiles.find((item) => item.workflow === input.workflow && item.model === input.model);
+  const profile =
+    profiles.find((item) => item.id === input.profileId) ||
+    profiles.find((item) => item.workflow === input.workflow && item.model === input.model);
   if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
   if (profile.kind !== kind) throw new Error(`The selected model isn’t a ${kind} model.`);
   if (!profile.ready) {
-    throw new Error(`${profile.displayName} still needs: ${profile.missing.map((item) => item.label).join(", ")}.`);
+    throw new Error(
+      `${profile.displayName} still needs: ${profile.missing.map((item) => item.label).join(", ")}.`,
+    );
   }
   const requested = Array.isArray(input.textEncoders) ? input.textEncoders : [input.textEncoder];
   const encoders = profile.encoderSlots.map((slot, index) => {
     const wanted = String(requested[index] || "");
-    if (wanted && !slot.options.includes(wanted)) throw new Error(`${wanted} doesn’t fit this model’s ${slot.label} slot.`);
+    if (wanted && !slot.options.includes(wanted))
+      throw new Error(`${wanted} doesn’t fit this model’s ${slot.label} slot.`);
     return wanted || slot.default;
   });
   const vae = String(input.vae || "");
-  if (vae && !profile.options.vaes.includes(vae)) throw new Error(`${vae} isn’t a VAE this model can use.`);
+  if (vae && !profile.options.vaes.includes(vae))
+    throw new Error(`${vae} isn’t a VAE this model can use.`);
   const resolvedVae = vae || (profile.vaeBuiltIn ? "" : profile.defaults.vae);
   if (input.sampler) ensureOption(info, "KSampler", "sampler_name", input.sampler, "Sampler");
   if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
   const c = profile.constraints || {};
   // Only asset IDs come from the client; ComfyUI input names are always staged by the server.
-  const supplied = Array.isArray(input.referenceAssets) ? input.referenceAssets.slice(0, 8).map((item) => ({
-    slot: String(item?.slot || "reference").replace(/[^a-z0-9._-]/gi, "").slice(0, 80) || "reference",
-    assetId: String(item?.assetId || "").slice(0, 2048),
-    source: String(item?.source || "").slice(0, 40)
-  })).filter((item) => item.assetId) : [];
+  const supplied = Array.isArray(input.referenceAssets)
+    ? input.referenceAssets
+        .slice(0, 8)
+        .map((item) => ({
+          slot:
+            String(item?.slot || "reference")
+              .replace(/[^a-z0-9._-]/gi, "")
+              .slice(0, 80) || "reference",
+          assetId: String(item?.assetId || "").slice(0, 2048),
+          source: String(item?.source || "").slice(0, 40),
+        }))
+        .filter((item) => item.assetId)
+    : [];
   const slots = (profile.mediaInputs || []).map((item) => item.id);
   // A model with reference slots takes an image per slot, in slot order; others keep the first as a start image.
   const referenceAssets = slots.length
     ? slots.map((slot) => supplied.find((item) => item?.slot === slot)).filter(Boolean)
     : supplied;
-  if (profile.capabilities.startImageRequired && !referenceAssets.length && !input.startImage && !input.startImageId) {
-    throw new Error(`${profile.displayName} makes a video from a picture. Add a start image first.`);
+  if (
+    profile.capabilities.startImageRequired &&
+    !referenceAssets.length &&
+    !input.startImage &&
+    !input.startImageId
+  ) {
+    throw new Error(
+      `${profile.displayName} makes a video from a picture. Add a start image first.`,
+    );
   }
   return {
     kind,
@@ -138,7 +167,10 @@ function sanitizeFamilyBody(input, info, stats) {
     variant: profile.variant,
     source: profile.source,
     model: profile.model,
-    bundled: profile.source === "checkpoint" ? { encoder: profile.encoderBuiltIn, vae: profile.vaeBuiltIn } : null,
+    bundled:
+      profile.source === "checkpoint"
+        ? { encoder: profile.encoderBuiltIn, vae: profile.vaeBuiltIn }
+        : null,
     // A quantized checkpoint (NF4) loads through its format's node, with the same inputs.
     checkpointLoader: profile.checkpointLoader || "",
     encoders,
@@ -166,8 +198,18 @@ function sanitizeFamilyBody(input, info, stats) {
     sampler: String(input.sampler || profile.defaults.sampler || ""),
     scheduler: String(input.scheduler || profile.defaults.scheduler || ""),
     seed: String(input.seed || ""),
-    count: profile.capabilities.variations === false ? 1 : snapInteger(input.count, defaultGenerationCount, c.count),
-    ...(input.variationCount !== undefined ? { variationCount: kind === "image" && profile.capabilities.variations !== false ? clampInteger(input.variationCount, 1, 1, 8) : 1 } : {}),
+    count:
+      profile.capabilities.variations === false
+        ? 1
+        : snapInteger(input.count, defaultGenerationCount, c.count),
+    ...(input.variationCount !== undefined
+      ? {
+          variationCount:
+            kind === "image" && profile.capabilities.variations !== false
+              ? clampInteger(input.variationCount, 1, 1, 8)
+              : 1,
+        }
+      : {}),
     frames: kind === "video" ? snapInteger(input.frames, c.frames?.default, c.frames) : 0,
     fps: kind === "video" ? snapInteger(input.fps, c.fps?.default, c.fps) : 0,
     startImage: profile.capabilities.startImage ? String(input.startImage || "") : "",
@@ -182,13 +224,15 @@ function sanitizeFamilyBody(input, info, stats) {
     promptPolicy: null,
     loras: sanitizeLoras(input, info, profile, kind, 8),
     // A retry after the GPU ran out of memory while decoding; only where this ComfyUI has the node.
-    tiledDecode: Boolean(input.tiledDecode) && Boolean(info.VAEDecodeTiled) && profile.family !== "sana",
-    profileLabel: profile.displayName
+    tiledDecode:
+      Boolean(input.tiledDecode) && Boolean(info.VAEDecodeTiled) && profile.family !== "sana",
+    profileLabel: profile.displayName,
   };
 }
 
 export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
-  if (String(input.workflow || "").startsWith("family:")) return sanitizeFamilyBody(input, info, stats);
+  if (String(input.workflow || "").startsWith("family:"))
+    return sanitizeFamilyBody(input, info, stats);
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
   const installed = workflow.startsWith("custom:") ? getCustomWorkflow(workflow) : null;
@@ -198,40 +242,72 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (!prompt) throw new Error("Enter a prompt.");
   if (!String(input.model || "").trim()) throw new Error("Choose a supported model first.");
   if (!workflowInfo) throw new Error("There’s no workflow for this model.");
-  if (!customWorkflow && !workflowIds().includes(workflow)) throw new Error("There’s no workflow for this model.");
+  if (!customWorkflow && !workflowIds().includes(workflow))
+    throw new Error("There’s no workflow for this model.");
   if (kind !== workflowInfo.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
   const referenceAssets = Array.isArray(input.referenceAssets)
-    ? input.referenceAssets.slice(0, 8).map((item) => ({
-      slot: String(item?.slot || "reference").replace(/[^a-z0-9._-]/gi, "").slice(0, 80) || "reference",
-      assetId: String(item?.assetId || "").slice(0, 2048),
-      source: String(item?.source || "").slice(0, 40)
-    })).filter((item) => item.assetId)
+    ? input.referenceAssets
+        .slice(0, 8)
+        .map((item) => ({
+          slot:
+            String(item?.slot || "reference")
+              .replace(/[^a-z0-9._-]/gi, "")
+              .slice(0, 80) || "reference",
+          assetId: String(item?.assetId || "").slice(0, 2048),
+          source: String(item?.source || "").slice(0, 40),
+        }))
+        .filter((item) => item.assetId)
     : [];
   for (const mediaInput of workflowInfo.mediaInputs || []) {
     const supplied = referenceAssets.filter((item) => item.slot === mediaInput.id).length;
-    const legacySupplied = mediaInput.id === (workflowInfo.mediaInputs?.[0]?.id || "reference") && Boolean(input.startImage || input.startImageId);
-    if ((mediaInput.required || Number(mediaInput.min || 0) > 0) && supplied < Number(mediaInput.min || 1) && !legacySupplied) {
+    const legacySupplied =
+      mediaInput.id === (workflowInfo.mediaInputs?.[0]?.id || "reference") &&
+      Boolean(input.startImage || input.startImageId);
+    if (
+      (mediaInput.required || Number(mediaInput.min || 0) > 0) &&
+      supplied < Number(mediaInput.min || 1) &&
+      !legacySupplied
+    ) {
       throw new Error(`${mediaInput.label || "Reference image"} is required for this workflow.`);
     }
-    if (supplied > Number(mediaInput.max || 1)) throw new Error(`${mediaInput.label || "Reference image"} accepts at most ${mediaInput.max || 1} image.`);
+    if (supplied > Number(mediaInput.max || 1))
+      throw new Error(
+        `${mediaInput.label || "Reference image"} accepts at most ${mediaInput.max || 1} image.`,
+      );
   }
   const missing = missingNodes(info, workflowInfo.requiredNodes);
-  if (missing.length) throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
+  if (missing.length)
+    throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
   const profiles = inferModels(info, stats).profiles || [];
-  const available = profiles.find((item) => item.kind === kind && item.workflow === workflow && item.model === input.model);
+  const available = profiles.find(
+    (item) => item.kind === kind && item.workflow === workflow && item.model === input.model,
+  );
   const selected = available?.imageModes?.[hasReferenceImage(input) ? "reference" : "generate"];
   const profile = available && { ...available, ...selected };
   if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
-  if ((workflowInfo.needsTextEncoder && !input.textEncoder) || (workflowInfo.needsVae && !input.vae)) {
+  if (
+    (workflowInfo.needsTextEncoder && !input.textEncoder) ||
+    (workflowInfo.needsVae && !input.vae)
+  ) {
     throw new Error("This workflow needs a text encoder and VAE.");
   }
 
   if (workflowInfo.modelNode && workflowInfo.modelKey) {
     ensureOption(info, workflowInfo.modelNode, workflowInfo.modelKey, input.model, "Model");
   }
-  if (customWorkflow?.controls?.model?.node && customWorkflow?.controls?.model?.input && (input.modelName || customWorkflow.defaults?.model)) {
+  if (
+    customWorkflow?.controls?.model?.node &&
+    customWorkflow?.controls?.model?.input &&
+    (input.modelName || customWorkflow.defaults?.model)
+  ) {
     const classType = customWorkflow.graph?.[customWorkflow.controls.model.node]?.class_type;
-    ensureOption(info, classType, customWorkflow.controls.model.input, input.modelName || customWorkflow.defaults.model, "Model");
+    ensureOption(
+      info,
+      classType,
+      customWorkflow.controls.model.input,
+      input.modelName || customWorkflow.defaults.model,
+      "Model",
+    );
   }
   if (workflowInfo.needsTextEncoder || workflowInfo.capabilities?.textEncoder) {
     ensureOption(info, "CLIPLoader", "clip_name", input.textEncoder, "Text encoder");
@@ -243,19 +319,42 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
 
   const latentNode = workflowInfo.latentNode || "EmptyLatentImage";
-  const widthRange = nodeRange(info, latentNode, "width", { default: kind === "video" ? 512 : 1024, min: 16, max: 16384 });
-  const heightRange = nodeRange(info, latentNode, "height", { default: kind === "video" ? 288 : 1024, min: 16, max: 16384 });
+  const widthRange = nodeRange(info, latentNode, "width", {
+    default: kind === "video" ? 512 : 1024,
+    min: 16,
+    max: 16384,
+  });
+  const heightRange = nodeRange(info, latentNode, "height", {
+    default: kind === "video" ? 288 : 1024,
+    min: 16,
+    max: 16384,
+  });
   const countRange = nodeRange(info, latentNode, "batch_size", { default: 1, min: 1, max: 8 });
   // Imported workflows can bind these controls to different nodes or fix their frame rate.
-  const frameRange = customWorkflow ? profile.constraints.frames : nodeRange(info, latentNode, "length", { default: 33, min: 1, max: 16384 });
-  const fpsRange = customWorkflow ? { default: profile.defaults.fps || 16, ...profile.constraints.fps } : nodeRange(info, "CreateVideo", "fps", { default: 16, min: 1, max: 120 });
-  const stepsRange = nodeRange(info, "KSampler", "steps", { default: kind === "video" ? 12 : 8, min: 1, max: 10000 });
-  const cfgRange = nodeRange(info, "KSampler", "cfg", { default: kind === "video" ? 5 : 1, min: 0, max: 100 });
+  const frameRange = customWorkflow
+    ? profile.constraints.frames
+    : nodeRange(info, latentNode, "length", { default: 33, min: 1, max: 16384 });
+  const fpsRange = customWorkflow
+    ? { default: profile.defaults.fps || 16, ...profile.constraints.fps }
+    : nodeRange(info, "CreateVideo", "fps", { default: 16, min: 1, max: 120 });
+  const stepsRange = nodeRange(info, "KSampler", "steps", {
+    default: kind === "video" ? 12 : 8,
+    min: 1,
+    max: 10000,
+  });
+  const cfgRange = nodeRange(info, "KSampler", "cfg", {
+    default: kind === "video" ? 5 : 1,
+    min: 0,
+    max: 100,
+  });
   const denoiseRange = nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1 });
 
   const resolutions = profile.options.resolutions || [];
-  const resolution = profile.capabilities.resolution ? String(input.resolution || profile.defaults.resolution || "") : "";
-  if (profile.capabilities.resolution && !resolutions.includes(resolution)) throw new Error("Choose a supported resolution for this model.");
+  const resolution = profile.capabilities.resolution
+    ? String(input.resolution || profile.defaults.resolution || "")
+    : "";
+  if (profile.capabilities.resolution && !resolutions.includes(resolution))
+    throw new Error("Choose a supported resolution for this model.");
   const loras = sanitizeLoras(input, info, profile, kind, customWorkflow?.loraStack?.max || 8);
   return {
     ...input,
@@ -273,14 +372,29 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     height: snapInteger(input.height, heightRange.default, heightRange),
     steps: snapInteger(input.steps, stepsRange.default, stepsRange),
     // A profile without CFG (distilled; capabilities.cfg false) keeps its graph's own guidance, so none is taken or recorded.
-    cfg: profile.capabilities?.cfg === false ? undefined : snapNumber(input.cfg, cfgRange.default, cfgRange),
+    cfg:
+      profile.capabilities?.cfg === false
+        ? undefined
+        : snapNumber(input.cfg, cfgRange.default, cfgRange),
     denoise: snapNumber(input.denoise, denoiseRange.default, denoiseRange),
     sampler: String(input.sampler || ""),
     scheduler: String(input.scheduler || ""),
     seed: String(input.seed || ""),
-    count: workflowInfo.capabilities?.variations === false ? 1 : snapInteger(input.count, countRange.default, countRange),
-    ...(input.variationCount !== undefined ? { variationCount: kind === "image" && workflowInfo.capabilities?.variations !== false ? clampInteger(input.variationCount, 1, 1, 8) : 1 } : {}),
-    duration: profile.capabilities.duration ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration) : 0,
+    count:
+      workflowInfo.capabilities?.variations === false
+        ? 1
+        : snapInteger(input.count, countRange.default, countRange),
+    ...(input.variationCount !== undefined
+      ? {
+          variationCount:
+            kind === "image" && workflowInfo.capabilities?.variations !== false
+              ? clampInteger(input.variationCount, 1, 1, 8)
+              : 1,
+        }
+      : {}),
+    duration: profile.capabilities.duration
+      ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration)
+      : 0,
     resolution,
     frames: snapInteger(input.frames, frameRange.default, frameRange),
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
@@ -289,10 +403,12 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     startImageName: String(input.startImageName || ""),
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
-    promptPolicy: workflowInfo.promptComposition ? {
-      policy: workflowInfo.promptComposition.policy,
-      version: workflowInfo.promptComposition.version
-    } : null,
-    loras
+    promptPolicy: workflowInfo.promptComposition
+      ? {
+          policy: workflowInfo.promptComposition.policy,
+          version: workflowInfo.promptComposition.version,
+        }
+      : null,
+    loras,
   };
 }

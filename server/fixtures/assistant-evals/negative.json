@@ -56,13 +56,8 @@
       "prompt": "a portrait of a woman with red hair",
       "cfg": 4,
       "expect": {
-        "include": [
-          "blurry"
-        ],
-        "avoid": [
-          "red hair",
-          "woman"
-        ]
+        "include": ["blurry"],
+        "avoid": ["red hair", "woman"]
       },
       "recorded": "lowres, blurry, extra fingers, deformed hands, watermark"
     },
@@ -82,13 +77,8 @@
       },
       "prompt": "a dog in a park",
       "expect": {
-        "include": [
-          "watermark"
-        ],
-        "avoid": [
-          "dog",
-          "park"
-        ]
+        "include": ["watermark"],
+        "avoid": ["dog", "park"]
       },
       "recorded": "Negative prompt: blurry, jpeg artifacts, text, watermark"
     },
@@ -110,9 +100,7 @@
       "prompt": "a cabin",
       "cfg": 4,
       "expect": {
-        "include": [
-          "lowres"
-        ]
+        "include": ["lowres"]
       },
       "recorded": ""
     }

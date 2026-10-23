@@ -37,7 +37,12 @@ export function noteComfyRestart(connected, now = Date.now()) {
   if (connected && (restart.sawDown || elapsed > QUICK_RESTART_MS)) {
     restart.back = true;
     // Seen going down, the time is real; a restart too quick to see has no honest duration.
-    return { phase: "back", startedAt: restart.startedAt, durationMs: restart.sawDown ? elapsed : null, packs: restart.packs };
+    return {
+      phase: "back",
+      startedAt: restart.startedAt,
+      durationMs: restart.sawDown ? elapsed : null,
+      packs: restart.packs,
+    };
   }
   if (elapsed > RESTART_WINDOW_MS) {
     const startedAt = restart.startedAt;

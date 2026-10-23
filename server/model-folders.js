@@ -36,11 +36,17 @@ function derivedKinds() {
 /** Rewrites derived kinds in Studio's own sections to their core kind; other text is left alone. */
 export function migrateDerivedKinds(text = "") {
   let changed = [];
-  const next = text.replace(/# >>> Added by Studio: ([^\r\n]*)([\s\S]*?)# <<< Studio/g, (block, dir, body) => {
-    const fixed = body.replace(/^(    )(unet_gguf|clip_gguf):/gm, (_m, indent, kind) => `${indent}${derivedKinds()[kind]}:`);
-    if (fixed !== body) changed.push(dir.trim());
-    return `# >>> Added by Studio: ${dir}${fixed}# <<< Studio`;
-  });
+  const next = text.replace(
+    /# >>> Added by Studio: ([^\r\n]*)([\s\S]*?)# <<< Studio/g,
+    (block, dir, body) => {
+      const fixed = body.replace(
+        /^(    )(unet_gguf|clip_gguf):/gm,
+        (_m, indent, kind) => `${indent}${derivedKinds()[kind]}:`,
+      );
+      if (fixed !== body) changed.push(dir.trim());
+      return `# >>> Added by Studio: ${dir}${fixed}# <<< Studio`;
+    },
+  );
   return { text: next, changed };
 }
 
@@ -49,33 +55,68 @@ const layouts = {
   stability: {
     label: "Stability Matrix",
     folders: {
-      StableDiffusion: "checkpoints", DiffusionModels: "diffusion_models", Unet: "diffusion_models", Lora: "loras", LyCORIS: "loras",
-      VAE: "vae", TextEncoders: "text_encoders", CLIP: "text_encoders", ClipVision: "clip_vision", ControlNet: "controlnet",
-      ESRGAN: "upscale_models", RealESRGAN: "upscale_models", SwinIR: "upscale_models", TextualInversion: "embeddings",
-      Embeddings: "embeddings", Hypernetwork: "hypernetworks", GLIGEN: "gligen", ApproxVAE: "vae_approx"
-    }
+      StableDiffusion: "checkpoints",
+      DiffusionModels: "diffusion_models",
+      Unet: "diffusion_models",
+      Lora: "loras",
+      LyCORIS: "loras",
+      VAE: "vae",
+      TextEncoders: "text_encoders",
+      CLIP: "text_encoders",
+      ClipVision: "clip_vision",
+      ControlNet: "controlnet",
+      ESRGAN: "upscale_models",
+      RealESRGAN: "upscale_models",
+      SwinIR: "upscale_models",
+      TextualInversion: "embeddings",
+      Embeddings: "embeddings",
+      Hypernetwork: "hypernetworks",
+      GLIGEN: "gligen",
+      ApproxVAE: "vae_approx",
+    },
   },
   a1111: {
     label: "Stable Diffusion WebUI",
-    folders: { "Stable-diffusion": "checkpoints", Lora: "loras", LyCORIS: "loras", VAE: "vae", ESRGAN: "upscale_models", RealESRGAN: "upscale_models", ControlNet: "controlnet", hypernetworks: "hypernetworks", "VAE-approx": "vae_approx" }
-  }
+    folders: {
+      "Stable-diffusion": "checkpoints",
+      Lora: "loras",
+      LyCORIS: "loras",
+      VAE: "vae",
+      ESRGAN: "upscale_models",
+      RealESRGAN: "upscale_models",
+      ControlNet: "controlnet",
+      hypernetworks: "hypernetworks",
+      "VAE-approx": "vae_approx",
+    },
+  },
 };
 
 /* ------------------------------------------------------------ helpers */
 
 // .native: on Windows it resolves mapped and subst drives the way Python's realpath does.
 function realpath(dir) {
-  try { return fs.realpathSync.native(dir); } catch { return path.resolve(dir); }
+  try {
+    return fs.realpathSync.native(dir);
+  } catch {
+    return path.resolve(dir);
+  }
 }
 
 function isDir(dir) {
-  try { return fs.statSync(dir).isDirectory(); } catch { return false; }
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 function subdirs(dir) {
   try {
-    return fs.readdirSync(dir, { withFileTypes: true })
-      .filter((entry) => (entry.isDirectory() || entry.isSymbolicLink()) && !entry.name.startsWith("."))
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter(
+        (entry) => (entry.isDirectory() || entry.isSymbolicLink()) && !entry.name.startsWith("."),
+      )
       .map((entry) => entry.name)
       .filter((name) => isDir(path.join(dir, name)));
   } catch {
@@ -92,17 +133,28 @@ async function subdirsAsync(dir, timeout = 1500) {
       if (entry.name.startsWith(".")) continue;
       if (entry.isDirectory()) names.push(entry.name);
       else if (entry.isSymbolicLink()) {
-        try { if ((await fs.promises.stat(path.join(dir, entry.name))).isDirectory()) names.push(entry.name); } catch { /* dangling */ }
+        try {
+          if ((await fs.promises.stat(path.join(dir, entry.name))).isDirectory())
+            names.push(entry.name);
+        } catch {
+          /* dangling */
+        }
       }
     }
     return names;
   };
-  return withTimeout(list().catch(() => []), timeout, []);
+  return withTimeout(
+    list().catch(() => []),
+    timeout,
+    [],
+  );
 }
 
 function withTimeout(promise, ms, fallback) {
   let timer;
-  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), ms); });
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
   return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 
@@ -112,13 +164,21 @@ function modelFiles(dir, limit = 400) {
   let bytes = 0;
   const visit = (folder, depth) => {
     let entries = [];
-    try { entries = fs.readdirSync(folder, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       if (found.length >= limit || entry.name.startsWith(".")) continue;
       const full = path.join(folder, entry.name);
       if (entry.isFile() && modelFile.test(entry.name) && !entry.name.endsWith(".part")) {
         found.push(path.relative(dir, full));
-        try { bytes += fs.statSync(full).size; } catch { /* gone meanwhile */ }
+        try {
+          bytes += fs.statSync(full).size;
+        } catch {
+          /* gone meanwhile */
+        }
       } else if (entry.isDirectory() && depth < 3) {
         visit(full, depth + 1);
       }
@@ -160,7 +220,7 @@ function argValues(argv, flag) {
 export async function comfyModelSetup() {
   const [folders, stats] = await Promise.all([
     comfy("/internal/folder_paths").catch(() => null),
-    comfy("/system_stats").catch(() => null)
+    comfy("/system_stats").catch(() => null),
   ]);
   if (!folders) return null;
   const kinds = {};
@@ -170,16 +230,26 @@ export async function comfyModelSetup() {
   const nodesDirs = flatten(folders.custom_nodes);
   const argv = Array.isArray(stats?.system?.argv) ? stats.system.argv : [];
   // ComfyUI's own folder: the one whose custom_nodes it loads and that holds main.py.
-  const root = nodesDirs.map((dir) => path.dirname(dir)).find((dir) => fs.existsSync(path.join(dir, "main.py"))) || "";
+  const root =
+    nodesDirs
+      .map((dir) => path.dirname(dir))
+      .find((dir) => fs.existsSync(path.join(dir, "main.py"))) || "";
   const baseDir = argValues(argv, "--base-directory")[0] || "";
   // ComfyUI opens a relative config from its working folder. The portable build's
   // launcher runs it from the folder above ComfyUI, next to python_embeded.
-  const portable = root && ["python_embeded", "python_embedded"].some((name) => isDir(path.join(path.dirname(root), name)));
+  const portable =
+    root &&
+    ["python_embeded", "python_embedded"].some((name) =>
+      isDir(path.join(path.dirname(root), name)),
+    );
   const workingDir = portable ? path.dirname(root) : root || baseDir || ".";
-  const configs = argValues(argv, "--extra-model-paths-config").map((file) => path.resolve(workingDir, file));
+  const configs = argValues(argv, "--extra-model-paths-config").map((file) =>
+    path.resolve(workingDir, file),
+  );
   const rootConfig = root ? path.join(root, "extra_model_paths.yaml") : "";
   // Prefer a file ComfyUI was pointed at (the Desktop app's own), then its folder's, if we may write there.
-  const configPath = [...configs, rootConfig].find((file) => file && canWrite(file)) || configs[0] || rootConfig;
+  const configPath =
+    [...configs, rootConfig].find((file) => file && canWrite(file)) || configs[0] || rootConfig;
   return { kinds, root, configPath, reachable: Boolean(root || configs.length) };
 }
 
@@ -219,20 +289,31 @@ function layoutFromNames(names, knownKinds) {
     .map((name) => ({ name, kind: legacy[name] || name }))
     .filter(({ kind }) => valid.has(kind));
   // Two of ComfyUI's model folder names, one of them a core one, is a models folder.
-  const core = comfyKinds.some(({ kind }) => ["checkpoints", "diffusion_models", "loras", "vae", "text_encoders"].includes(kind));
-  if (comfyKinds.length >= 2 && core) return { layout: "comfy", label: "", map: comfyKinds.map(({ name, kind }) => ({ name, kind })) };
+  const core = comfyKinds.some(({ kind }) =>
+    ["checkpoints", "diffusion_models", "loras", "vae", "text_encoders"].includes(kind),
+  );
+  if (comfyKinds.length >= 2 && core)
+    return {
+      layout: "comfy",
+      label: "",
+      map: comfyKinds.map(({ name, kind }) => ({ name, kind })),
+    };
   for (const [id, spec] of Object.entries(layouts)) {
-    const map = names.filter((name) => spec.folders[name] && valid.has(spec.folders[name])).map((name) => ({ name, kind: spec.folders[name] }));
+    const map = names
+      .filter((name) => spec.folders[name] && valid.has(spec.folders[name]))
+      .map((name) => ({ name, kind: spec.folders[name] }));
     if (map.length >= 2) return { layout: id, label: spec.label, map };
   }
   return null;
 }
 
-const skipNames = /^(Library|Applications|System|node_modules|Pictures|Music|Movies|Photos Library\.photoslibrary|AppData|\$Recycle\.Bin|Windows|Program Files.*|ProgramData|proc|sys|dev|snap|venv|\.venv|site-packages|__pycache__)$/i;
+const skipNames =
+  /^(Library|Applications|System|node_modules|Pictures|Music|Movies|Photos Library\.photoslibrary|AppData|\$Recycle\.Bin|Windows|Program Files.*|ProgramData|proc|sys|dev|snap|venv|\.venv|site-packages|__pycache__)$/i;
 
 // Below C:\'s second level only folders named like an AI install are opened, so
 // C:\ComfyUI_windows_portable\ComfyUI\models is found without walking all of C:.
-const aiNames = /comfy|stable|diffusion|models?$|^ai$|^sd|forge|webui|matrix|invoke|fooocus|swarm|a1111|automatic/i;
+const aiNames =
+  /comfy|stable|diffusion|models?$|^ai$|^sd|forge|webui|matrix|invoke|fooocus|swarm|a1111|automatic/i;
 
 /**
  * Drive letters other than C: that are local disks. Network drives (DriveType 4)
@@ -243,9 +324,15 @@ const aiNames = /comfy|stable|diffusion|models?$|^ai$|^sd|forge|webui|matrix|inv
 let driveCache = null;
 async function localDrives() {
   if (driveCache && Date.now() - driveCache.at < 60000) return driveCache.letters;
-  const script = "Get-CimInstance Win32_LogicalDisk | ForEach-Object { \"$($_.DeviceID) $($_.DriveType)\" }";
+  const script =
+    'Get-CimInstance Win32_LogicalDisk | ForEach-Object { "$($_.DeviceID) $($_.DriveType)" }';
   const answer = await new Promise((resolve) => {
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { timeout: 5000, windowsHide: true }, (error, stdout) => resolve(error ? null : String(stdout)));
+    execFile(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", script],
+      { timeout: 5000, windowsHide: true },
+      (error, stdout) => resolve(error ? null : String(stdout)),
+    );
   });
   let letters;
   if (answer) {
@@ -254,7 +341,14 @@ async function localDrives() {
       .map(([, letter]) => letter.toUpperCase());
   } else {
     const probes = [..."DEFGHIJKLMNOPQRSTUVWXYZ"].map(async (letter) => {
-      const ok = await withTimeout(fs.promises.stat(`${letter}:\\`).then((stat) => stat.isDirectory(), () => false), 1000, false);
+      const ok = await withTimeout(
+        fs.promises.stat(`${letter}:\\`).then(
+          (stat) => stat.isDirectory(),
+          () => false,
+        ),
+        1000,
+        false,
+      );
       return ok ? letter : "";
     });
     letters = (await Promise.all(probes)).filter(Boolean);
@@ -267,28 +361,48 @@ async function localDrives() {
 /** Folders worth a look: shared spots other apps use, then a shallow walk of home and the other drives. */
 async function candidateRoots(home, drivesToo = true) {
   const explicit = [];
-  const add = (dir, source) => { if (dir) explicit.push({ dir, source }); };
+  const add = (dir, source) => {
+    if (dir) explicit.push({ dir, source });
+  };
   if (process.platform === "darwin") {
     const support = path.join(home, "Library", "Application Support");
     add(path.join(support, "StabilityMatrix", "Models"), "stability");
     add(path.join(support, "StabilityMatrix", "Data", "Models"), "stability");
     try {
       // The ComfyUI Desktop app keeps its models under a base_path of its own choosing.
-      const text = fs.readFileSync(path.join(support, "ComfyUI", "extra_models_config.yaml"), "utf8");
-      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm)) add(path.join(match[1], "models"), "desktop");
-    } catch { /* no Desktop app */ }
+      const text = fs.readFileSync(
+        path.join(support, "ComfyUI", "extra_models_config.yaml"),
+        "utf8",
+      );
+      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm))
+        add(path.join(match[1], "models"), "desktop");
+    } catch {
+      /* no Desktop app */
+    }
   } else if (process.platform === "win32") {
     const appData = process.env.APPDATA || path.join(home, "AppData", "Roaming");
     add(path.join(appData, "StabilityMatrix", "Models"), "stability");
     try {
-      const text = fs.readFileSync(path.join(appData, "ComfyUI", "extra_models_config.yaml"), "utf8");
-      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm)) add(path.join(match[1], "models"), "desktop");
-    } catch { /* no Desktop app */ }
+      const text = fs.readFileSync(
+        path.join(appData, "ComfyUI", "extra_models_config.yaml"),
+        "utf8",
+      );
+      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm))
+        add(path.join(match[1], "models"), "desktop");
+    } catch {
+      /* no Desktop app */
+    }
   } else {
     add(path.join(home, ".config", "StabilityMatrix", "Models"), "stability");
   }
   const walkRoots = [{ dir: home, depth: 4, source: "home" }];
-  const drives = !drivesToo ? "" : process.platform === "darwin" ? "/Volumes" : process.platform === "linux" ? path.join("/media", os.userInfo().username) : "";
+  const drives = !drivesToo
+    ? ""
+    : process.platform === "darwin"
+      ? "/Volumes"
+      : process.platform === "linux"
+        ? path.join("/media", os.userInfo().username)
+        : "";
   if (drives) {
     for (const name of await subdirsAsync(drives)) {
       const dir = path.join(drives, name);
@@ -296,7 +410,8 @@ async function candidateRoots(home, drivesToo = true) {
     }
   }
   if (process.platform === "win32" && drivesToo) {
-    for (const letter of await localDrives()) walkRoots.push({ dir: `${letter}:\\`, depth: 3, source: "drive" });
+    for (const letter of await localDrives())
+      walkRoots.push({ dir: `${letter}:\\`, depth: 3, source: "drive" });
     walkRoots.push({ dir: "C:\\", depth: 3, narrowFrom: 3, source: "drive" });
   }
   return { explicit, walkRoots };
@@ -308,7 +423,10 @@ async function candidateRoots(home, drivesToo = true) {
  * asynchronous with a time limit per folder, so a slow drive never blocks the
  * server while it looks.
  */
-export async function findModelFolders(knownKinds, { home = os.homedir(), drives = true, budget = 6000, deadline } = {}) {
+export async function findModelFolders(
+  knownKinds,
+  { home = os.homedir(), drives = true, budget = 6000, deadline } = {},
+) {
   const { explicit, walkRoots } = await candidateRoots(home, drives);
   // Counted from here, so asking Windows for its drives does not use up the walk's time.
   const until = deadline ?? Date.now() + 4000;
@@ -352,7 +470,8 @@ export function studioModelSections(text = "") {
   const sections = [];
   // \r?: Notepad and other Windows editors save CRLF.
   const pattern = /^# >>> Added by Studio: (.+?)\r?\n([\s\S]*?)^# <<< Studio\s*$/gm;
-  for (const match of text.matchAll(pattern)) sections.push({ path: match[1].trim(), block: match[0] });
+  for (const match of text.matchAll(pattern))
+    sections.push({ path: match[1].trim(), block: match[0] });
   return sections;
 }
 
@@ -376,7 +495,9 @@ export function sectionDirs(section) {
 }
 
 function unquote(value) {
-  return value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1).replace(/''/g, "'") : value;
+  return value.startsWith("'") && value.endsWith("'")
+    ? value.slice(1, -1).replace(/''/g, "'")
+    : value;
 }
 
 function yamlString(value) {
@@ -388,8 +509,14 @@ export function sectionFor(dir, kinds, existingText = "") {
   const byKind = new Map();
   for (const { kind, name } of kinds) byKind.set(kind, [...(byKind.get(kind) || []), name]);
   const slug = path.basename(path.dirname(dir)) + "_" + path.basename(dir);
-  let key = `heiss_${slug.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "models"}`;
-  for (let n = 2; new RegExp(`^${key}:`, "m").test(existingText); n += 1) key = `${key.replace(/_\d+$/, "")}_${n}`;
+  let key = `heiss_${
+    slug
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "") || "models"
+  }`;
+  for (let n = 2; new RegExp(`^${key}:`, "m").test(existingText); n += 1)
+    key = `${key.replace(/_\d+$/, "")}_${n}`;
   const lines = [`${startMark} ${dir}`, `${key}:`, `    base_path: ${yamlString(dir)}`];
   for (const [kind, names] of byKind) {
     if (names.length === 1) lines.push(`    ${kind}: ${yamlString(names[0])}`);
@@ -415,16 +542,26 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
   }
   const knownKinds = Object.keys(setup.kinds);
   // Keyed without case on Windows: the yaml may say d:\ai\models for D:\AI\Models.
-  const read = new Set(Object.values(setup.kinds).flat().map((dir) => pathKey(dir)));
+  const read = new Set(
+    Object.values(setup.kinds)
+      .flat()
+      .map((dir) => pathKey(dir)),
+  );
   let configText = "";
-  try { configText = fs.readFileSync(setup.configPath, "utf8"); } catch { /* not made yet */ }
+  try {
+    configText = fs.readFileSync(setup.configPath, "utf8");
+  } catch {
+    /* not made yet */
+  }
   // `read`: ComfyUI has picked the folder up, which only happens once it restarted after Studio added it.
   const readDirs = Object.values(setup.kinds).flat();
   // Read only when ComfyUI reads every folder the section adds, not just any folder
   // inside it: a ComfyUI's own models folder has read subfolders from the start.
   const linked = studioModelSections(configText).map((section) => {
     const dirs = sectionDirs(section).map(realpath);
-    const allRead = dirs.length ? dirs.every((dir) => read.has(pathKey(dir))) : readDirs.some((dir) => isInside(realpath(section.path), dir, { orSame: true }));
+    const allRead = dirs.length
+      ? dirs.every((dir) => read.has(pathKey(dir)))
+      : readDirs.some((dir) => isInside(realpath(section.path), dir, { orSame: true }));
     return { path: section.path, label: tildePath(section.path), read: allRead };
   });
   const folders = [];
@@ -435,7 +572,14 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
       if (read.has(pathKey(dir))) continue;
       const { files, bytes } = modelFiles(dir);
       if (!files.length) continue;
-      kinds.push({ kind, name, dir, count: files.length, bytes, examples: files.slice(0, 3).map((file) => path.basename(file)) });
+      kinds.push({
+        kind,
+        name,
+        dir,
+        count: files.length,
+        bytes,
+        examples: files.slice(0, 3).map((file) => path.basename(file)),
+      });
     }
     if (!kinds.length) continue;
     const parent = path.basename(path.dirname(folder.dir));
@@ -443,7 +587,9 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
       path: folder.dir,
       label: tildePath(folder.dir),
       // "ComfyUI-Shared", or the app it belongs to.
-      name: folder.label || (path.basename(folder.dir).toLowerCase() === "models" ? parent : path.basename(folder.dir)),
+      name:
+        folder.label ||
+        (path.basename(folder.dir).toLowerCase() === "models" ? parent : path.basename(folder.dir)),
       layout: folder.layout,
       app: folder.label,
       // ComfyUI already reads some of this folder (its own models folder, say):
@@ -452,11 +598,21 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
       source: folder.source,
       kinds,
       count: kinds.reduce((sum, item) => sum + item.count, 0),
-      bytes: kinds.reduce((sum, item) => sum + item.bytes, 0)
+      bytes: kinds.reduce((sum, item) => sum + item.bytes, 0),
     });
   }
   folders.sort((a, b) => b.count - a.count);
-  lastReport = { ok: true, local: true, root: setup.root, configPath: setup.configPath, configLabel: tildePath(setup.configPath), writable: canWrite(setup.configPath), folders, linked, scannedAt: Date.now() };
+  lastReport = {
+    ok: true,
+    local: true,
+    root: setup.root,
+    configPath: setup.configPath,
+    configLabel: tildePath(setup.configPath),
+    writable: canWrite(setup.configPath),
+    folders,
+    linked,
+    scannedAt: Date.now(),
+  };
   return lastReport;
 }
 
@@ -467,18 +623,26 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
  */
 export async function linkModelFolders(paths = [], { picked = "", scan = {} } = {}) {
   const report = lastReport?.ok ? lastReport : await modelFolderReport({ scan });
-  if (!report.local) throw new Error("ComfyUI runs on another computer, so its settings can’t be changed from here.");
+  if (!report.local)
+    throw new Error(
+      "ComfyUI runs on another computer, so its settings can’t be changed from here.",
+    );
   const chosen = [];
   for (const wanted of paths.map(String)) {
     // The same folder can come back spelled differently (case, 8.3 short names on Windows).
-    const folder = report.folders.find((item) => item.path === wanted || samePath(item.path, realpath(wanted)));
+    const folder = report.folders.find(
+      (item) => item.path === wanted || samePath(item.path, realpath(wanted)),
+    );
     if (folder) chosen.push(folder);
   }
   if (picked) {
     const setup = await comfyModelSetup();
     const dir = realpath(picked);
     const layout = readLayout(dir, Object.keys(setup?.kinds || {}));
-    if (!layout) throw new Error("That doesn’t look like a models folder. Choose the one with checkpoints, loras or diffusion_models in it.");
+    if (!layout)
+      throw new Error(
+        "That doesn’t look like a models folder. Choose the one with checkpoints, loras or diffusion_models in it.",
+      );
     chosen.push({ path: dir, kinds: layout.map.map(({ name, kind }) => ({ name, kind })) });
   }
   if (!chosen.length) throw new Error("Nothing to add. Scan again and pick a folder.");
@@ -486,14 +650,19 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   const file = report.configPath;
   if (!file) throw new Error("Couldn’t find where ComfyUI keeps its settings.");
   let text = "";
-  try { text = fs.readFileSync(file, "utf8"); } catch { /* a new file */ }
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    /* a new file */
+  }
   // Keep the file's own line endings (a Windows editor saves CRLF).
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const already = new Set(studioModelSections(text).map((section) => pathKey(section.path)));
   const backup = text ? `${file}.heiss-backup` : "";
   // Sections an older HEISS wrote under a derived kind never took; fix them in place.
   const migrated = migrateDerivedKinds(text);
-  let next = migrated.text && !migrated.text.endsWith("\n") ? `${migrated.text}${eol}` : migrated.text;
+  let next =
+    migrated.text && !migrated.text.endsWith("\n") ? `${migrated.text}${eol}` : migrated.text;
   const added = [...migrated.changed];
   for (const folder of chosen) {
     if (already.has(pathKey(folder.path))) continue;
@@ -518,16 +687,26 @@ export async function unlinkModelFolder(dir) {
   const setup = await comfyModelSetup();
   if (!setup?.configPath) throw new Error("Can’t reach ComfyUI.");
   const text = fs.readFileSync(setup.configPath, "utf8");
-  const section = studioModelSections(text).find((item) => item.path === String(dir)) || studioModelSections(text).find((item) => samePath(item.path, String(dir)) || samePath(item.path, realpath(String(dir))));
+  const section =
+    studioModelSections(text).find((item) => item.path === String(dir)) ||
+    studioModelSections(text).find(
+      (item) => samePath(item.path, String(dir)) || samePath(item.path, realpath(String(dir))),
+    );
   if (!section) throw new Error("Only folders added here can be removed here.");
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   // The blank line that went in before the section goes out with it.
-  let next = text.replace(section.block, "").replace(/(\r?\n){3,}/g, eol + eol).replace(/(\r?\n)+$/, eol);
+  let next = text
+    .replace(section.block, "")
+    .replace(/(\r?\n){3,}/g, eol + eol)
+    .replace(/(\r?\n)+$/, eol);
   // ComfyUI's loader walks the file as a mapping and fails on one that is only
   // comments, so a file with nothing left in it goes, and a comments-only one gets `{}`.
   if (!next.trim()) fs.rmSync(setup.configPath);
-  else fs.writeFileSync(setup.configPath, /^[^#\s]/m.test(next) ? next : `${next.trimEnd()}${eol}{}${eol}`);
+  else
+    fs.writeFileSync(
+      setup.configPath,
+      /^[^#\s]/m.test(next) ? next : `${next.trimEnd()}${eol}{}${eol}`,
+    );
   lastReport = null;
   return { ok: true, removed: section.path };
 }
-

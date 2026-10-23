@@ -26,11 +26,17 @@ test("a ComfyUI that answers late reads as a timeout, one that has stopped does 
   const closedPort = closed.address().port;
   await new Promise((resolve) => closed.close(resolve));
   try {
-    assert.equal(isComfyTimeout(await checkError(`http://127.0.0.1:${busy.address().port}/system_stats`, 200)), true);
+    assert.equal(
+      isComfyTimeout(await checkError(`http://127.0.0.1:${busy.address().port}/system_stats`, 200)),
+      true,
+    );
     const refused = await checkError(`http://127.0.0.1:${closedPort}/system_stats`, 2000);
     assert.ok(refused);
     assert.equal(isComfyTimeout(refused), false);
-    assert.equal(isComfyTimeout(Object.assign(new Error("The operation timed out"), { name: "TimeoutError" })), true);
+    assert.equal(
+      isComfyTimeout(Object.assign(new Error("The operation timed out"), { name: "TimeoutError" })),
+      true,
+    );
   } finally {
     busy.closeAllConnections();
     await new Promise((resolve) => busy.close(resolve));
@@ -45,7 +51,10 @@ test("busy lasts as long as a run would wait, from when ComfyUI went quiet", () 
   // Later checks count from the first unanswered one, not from their own.
   const later = noteComfySilent(start + comfyBusyGraceMs - 5000, start + comfyBusyGraceMs - 1);
   assert.deepEqual({ busy: later.busy, first: later.first }, { busy: true, first: false });
-  assert.equal(noteComfySilent(start + comfyBusyGraceMs, start + comfyBusyGraceMs + 8000).busy, false);
+  assert.equal(
+    noteComfySilent(start + comfyBusyGraceMs, start + comfyBusyGraceMs + 8000).busy,
+    false,
+  );
 });
 
 test("any answer, including a run's progress, starts the quiet clock over", () => {
@@ -53,25 +62,34 @@ test("any answer, including a run's progress, starts the quiet clock over", () =
   const start = 2_000_000;
   noteComfySilent(start, start + 8000);
   noteComfyReachable();
-  const again = noteComfySilent(start + comfyBusyGraceMs + 10_000, start + comfyBusyGraceMs + 18_000);
+  const again = noteComfySilent(
+    start + comfyBusyGraceMs + 10_000,
+    start + comfyBusyGraceMs + 18_000,
+  );
   assert.deepEqual({ busy: again.busy, first: again.first }, { busy: true, first: true });
   noteComfyReachable();
 });
 
 test("a bug report tells a busy ComfyUI from one that is not answering", () => {
-  assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null, comfyBusy: true })), /ComfyUI: busy, no answer within 10 s \(on this computer\)/);
-  assert.match(diagnosticsText(diagnostics({ version: "0.18.0", stats: null })), /ComfyUI: not answering \(on this computer\)/);
+  assert.match(
+    diagnosticsText(diagnostics({ version: "0.18.0", stats: null, comfyBusy: true })),
+    /ComfyUI: busy, no answer within 10 s \(on this computer\)/,
+  );
+  assert.match(
+    diagnosticsText(diagnostics({ version: "0.18.0", stats: null })),
+    /ComfyUI: not answering \(on this computer\)/,
+  );
 });
 
 test("one backend answering does not reset another backend's busy grace", async () => {
-  const { withComfyBackend } = await import('./comfy-backends.js');
+  const { withComfyBackend } = await import("./comfy-backends.js");
   const at = 3_000_000;
-  withComfyBackend('video', () => {
+  withComfyBackend("video", () => {
     noteComfyReachable();
     assert.equal(noteComfySilent(at, at + 100).first, true);
   });
-  withComfyBackend('primary', () => noteComfyReachable());
-  withComfyBackend('video', () => {
+  withComfyBackend("primary", () => noteComfyReachable());
+  withComfyBackend("video", () => {
     assert.equal(noteComfySilent(at + 1000, at + comfyBusyGraceMs).busy, false);
     noteComfyReachable();
   });

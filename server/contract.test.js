@@ -21,54 +21,90 @@ import { nodePacks } from "./node-packs.js";
  */
 
 const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
-const snapshots = fs.readdirSync(fixtures).filter((name) => /^object_info-comfyui-.+\.json$/.test(name)).sort();
+const snapshots = fs
+  .readdirSync(fixtures)
+  .filter((name) => /^object_info-comfyui-.+\.json$/.test(name))
+  .sort();
 const packNodes = new Set(Object.values(nodePacks).flatMap((pack) => pack.nodes));
-for (const runner of Object.values(sanaRunners)) for (const list of Object.values(runner.variantNodes || {})) list.forEach((node) => packNodes.add(node));
+for (const runner of Object.values(sanaRunners))
+  for (const list of Object.values(runner.variantNodes || {}))
+    list.forEach((node) => packNodes.add(node));
 
 // Samplers a node pack adds to ComfyUI's own lists when it is installed
 // (ExtraModels registers Sana Sprint's "scm"); only graphs on that pack use them.
 const packSamplers = new Set(["scm"]);
 
-const specsOf = (info, classType) => ({ ...(info[classType]?.input?.required || {}), ...(info[classType]?.input?.optional || {}) });
-const isLink = (value) => Array.isArray(value) && value.length === 2 && typeof value[0] === "string" && Number.isInteger(value[1]);
+const specsOf = (info, classType) => ({
+  ...(info[classType]?.input?.required || {}),
+  ...(info[classType]?.input?.optional || {}),
+});
+const isLink = (value) =>
+  Array.isArray(value) &&
+  value.length === 2 &&
+  typeof value[0] === "string" &&
+  Number.isInteger(value[1]);
 const optionKey = (option) => (option && typeof option === "object" ? option.key : option);
 
 // Inputs that name a file on the user's disk. A fresh ComfyUI lists none (or
 // only built-ins such as VAELoader's "pixel_space"), so any file name passes.
-const fileInputs = /^(ckpt_name|unet_name|clip_name\d?|vae_name|lora_name|image|model_name|audio_vae_name)$/;
+const fileInputs =
+  /^(ckpt_name|unet_name|clip_name\d?|vae_name|lora_name|image|model_name|audio_vae_name)$/;
 
 /** What went wrong with one value against its input spec, or "". */
 function valueProblem(spec, value, graph, info, name = "") {
   const [type, options = {}] = spec;
-  if (fileInputs.test(name) && typeof value === "string" && /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|png|jpe?g|webp)$/i.test(value)) return "";
+  if (
+    fileInputs.test(name) &&
+    typeof value === "string" &&
+    /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|png|jpe?g|webp)$/i.test(value)
+  )
+    return "";
   if (isLink(value)) {
     const source = graph[value[0]];
     if (!source) return `links to missing node ${value[0]}`;
     const outputs = info[source.class_type]?.output;
     if (!outputs) return "";
     const produced = outputs[value[1]];
-    if (produced === undefined) return `links to output ${value[1]} of ${source.class_type}, which has ${outputs.length}`;
+    if (produced === undefined)
+      return `links to output ${value[1]} of ${source.class_type}, which has ${outputs.length}`;
     if (Array.isArray(type)) return "";
     const accepted = String(type).split(",");
-    if (type === "*" || produced === "*" || accepted.includes(produced) || String(produced).split(",").some((kind) => accepted.includes(kind))) return "";
-    if (type === "COMBO" || type === "COMFY_DYNAMICCOMBO_V3" || type === "COMFY_MATCHTYPE_V3") return "";
+    if (
+      type === "*" ||
+      produced === "*" ||
+      accepted.includes(produced) ||
+      String(produced)
+        .split(",")
+        .some((kind) => accepted.includes(kind))
+    )
+      return "";
+    if (type === "COMBO" || type === "COMFY_DYNAMICCOMBO_V3" || type === "COMFY_MATCHTYPE_V3")
+      return "";
     return `gets ${produced} from ${source.class_type}, needs ${type}`;
   }
   const list = Array.isArray(type) ? type : type === "COMBO" ? options.options : null;
   if (list) {
     if (!list.length) return typeof value === "string" && value ? "" : "needs a file name";
-    return list.map(optionKey).includes(value) ? "" : `${JSON.stringify(value)} is not one of ${JSON.stringify(list.map(optionKey).slice(0, 12))}`;
+    return list.map(optionKey).includes(value)
+      ? ""
+      : `${JSON.stringify(value)} is not one of ${JSON.stringify(list.map(optionKey).slice(0, 12))}`;
   }
-  if (type === "COMFY_DYNAMICCOMBO_V3") return options.options.some((option) => option.key === value) ? "" : `${JSON.stringify(value)} is not one of ${options.options.map((option) => option.key)}`;
+  if (type === "COMFY_DYNAMICCOMBO_V3")
+    return options.options.some((option) => option.key === value)
+      ? ""
+      : `${JSON.stringify(value)} is not one of ${options.options.map((option) => option.key)}`;
   if (type === "INT" || type === "FLOAT") {
-    if (typeof value !== "number" || !Number.isFinite(value)) return `${JSON.stringify(value)} is not a number`;
+    if (typeof value !== "number" || !Number.isFinite(value))
+      return `${JSON.stringify(value)} is not a number`;
     if (type === "INT" && !Number.isInteger(value)) return `${value} is not a whole number`;
     if (options.min !== undefined && value < options.min) return `${value} is below ${options.min}`;
     if (options.max !== undefined && value > options.max) return `${value} is above ${options.max}`;
     return "";
   }
-  if (type === "STRING") return typeof value === "string" ? "" : `${JSON.stringify(value)} is not text`;
-  if (type === "BOOLEAN") return typeof value === "boolean" ? "" : `${JSON.stringify(value)} is not true or false`;
+  if (type === "STRING")
+    return typeof value === "string" ? "" : `${JSON.stringify(value)} is not text`;
+  if (type === "BOOLEAN")
+    return typeof value === "boolean" ? "" : `${JSON.stringify(value)} is not true or false`;
   return `a ${type} input needs a link, got ${JSON.stringify(value)}`;
 }
 
@@ -83,13 +119,29 @@ function nestedSpec(specs, key, inputs) {
     const names = template.names || [];
     const child = rest.join(".");
     const known = names.includes(child) || (template.prefix && child.startsWith(template.prefix));
-    const inner = Object.values({ ...(template.input?.required || {}), ...(template.input?.optional || {}) })[0];
+    const inner = Object.values({
+      ...(template.input?.required || {}),
+      ...(template.input?.optional || {}),
+    })[0];
     return known ? inner || ["*"] : null;
   }
   if (type === "COMFY_DYNAMICCOMBO_V3") {
     const selected = options.options.find((option) => option.key === inputs[parent]);
-    const childSpecs = { ...(selected?.inputs?.required || {}), ...(selected?.inputs?.optional || {}) };
-    return rest.length === 1 ? childSpecs[rest[0]] || null : nestedSpec(childSpecs, rest.join("."), Object.fromEntries(Object.entries(inputs).filter(([name]) => name.startsWith(`${parent}.`)).map(([name, value]) => [name.slice(parent.length + 1), value])));
+    const childSpecs = {
+      ...(selected?.inputs?.required || {}),
+      ...(selected?.inputs?.optional || {}),
+    };
+    return rest.length === 1
+      ? childSpecs[rest[0]] || null
+      : nestedSpec(
+          childSpecs,
+          rest.join("."),
+          Object.fromEntries(
+            Object.entries(inputs)
+              .filter(([name]) => name.startsWith(`${parent}.`))
+              .map(([name, value]) => [name.slice(parent.length + 1), value]),
+          ),
+        );
   }
   return null;
 }
@@ -101,7 +153,8 @@ function graphProblems(graph, info, declared) {
   for (const [id, node] of Object.entries(graph)) {
     const label = `${node.class_type} (#${id})`;
     if (!info[node.class_type]) {
-      if (!declared.has(node.class_type) && !packNodes.has(node.class_type)) problems.push(`${label} is not in this ComfyUI, and nothing checks for it before a run`);
+      if (!declared.has(node.class_type) && !packNodes.has(node.class_type))
+        problems.push(`${label} is not in this ComfyUI, and nothing checks for it before a run`);
       continue;
     }
     const specs = specsOf(info, node.class_type);
@@ -135,7 +188,9 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
     source,
     model: source === "checkpoint" ? "checkpoints/model.safetensors" : "model.safetensors",
     bundled: source === "checkpoint" ? { encoder: true, vae: true } : undefined,
-    encoders: bundledEncoder ? [] : family.slots.map((_, index) => `encoder-${index + 1}.safetensors`),
+    encoders: bundledEncoder
+      ? []
+      : family.slots.map((_, index) => `encoder-${index + 1}.safetensors`),
     vae: source === "checkpoint" ? "" : "vae.safetensors",
     audioVae: family.audioVae ? "audio-vae.safetensors" : "",
     pairModel: family.pair ? "partner.safetensors" : "",
@@ -158,7 +213,7 @@ function requestFor(familyId, family, variant, source, info, extra = {}) {
     vpredPatch: Boolean(variant.vpred),
     // validation.js turns the enhancer on only when that node is installed.
     krea2Enhancer: Boolean(family.enhancer && info["ComfyUI-Krea2T-Enhancer"]),
-    ...extra
+    ...extra,
   };
 }
 
@@ -180,9 +235,35 @@ function* cases(info) {
       for (const source of family.sources) {
         const name = `${familyId}/${variant.id} from ${source}`;
         // A video made from a picture has no run without one; it is checked below with its start image.
-        if (family.startImage !== "required" && !variant.referenceRequired) yield { name, family, variant, source, body: requestFor(familyId, family, variant, source, info) };
-        if (family.references) yield { name: `${name}, with references`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { referenceImages: ["ref-1.png", "ref-2.png"] }) };
-        if (family.img2img || family.startImage || family.sampling === "h3") yield { name: `${name}, from a start image`, family, variant, source, body: requestFor(familyId, family, variant, source, info, { startImageComfy: "start.png", denoise: 0.6 }) };
+        if (family.startImage !== "required" && !variant.referenceRequired)
+          yield {
+            name,
+            family,
+            variant,
+            source,
+            body: requestFor(familyId, family, variant, source, info),
+          };
+        if (family.references)
+          yield {
+            name: `${name}, with references`,
+            family,
+            variant,
+            source,
+            body: requestFor(familyId, family, variant, source, info, {
+              referenceImages: ["ref-1.png", "ref-2.png"],
+            }),
+          };
+        if (family.img2img || family.startImage || family.sampling === "h3")
+          yield {
+            name: `${name}, from a start image`,
+            family,
+            variant,
+            source,
+            body: requestFor(familyId, family, variant, source, info, {
+              startImageComfy: "start.png",
+              denoise: 0.6,
+            }),
+          };
       }
     }
   }
@@ -196,7 +277,9 @@ for (const snapshot of snapshots) {
     const failures = [];
     let checked = 0;
     for (const { name, family, variant, source, body } of cases(info)) {
-      const declared = new Set(nodesFor(family, variant, body.encoders.length > 0, !body.bundled?.vae));
+      const declared = new Set(
+        nodesFor(family, variant, body.encoders.length > 0, !body.bundled?.vae),
+      );
       let graph;
       try {
         graph = familyGraph(body);
@@ -205,7 +288,8 @@ for (const snapshot of snapshots) {
         continue;
       }
       checked += 1;
-      for (const problem of graphProblems(graph, info, declared)) failures.push(`${name}: ${problem}`);
+      for (const problem of graphProblems(graph, info, declared))
+        failures.push(`${name}: ${problem}`);
     }
     assert.ok(checked > 100, `only ${checked} graphs were built`);
     assert.deepEqual(failures, []);
@@ -217,9 +301,12 @@ for (const snapshot of snapshots) {
     const missing = [];
     for (const [familyId, family] of Object.entries(families)) {
       for (const variant of family.variants) {
-        const packSampler = family.sampling === "sana" && packSamplers.has(variant.defaults.sampler);
-        if (!samplers.includes(variant.defaults.sampler) && !packSampler) missing.push(`${familyId}/${variant.id} sampler ${variant.defaults.sampler}`);
-        if (!schedulers.includes(variant.defaults.scheduler)) missing.push(`${familyId}/${variant.id} scheduler ${variant.defaults.scheduler}`);
+        const packSampler =
+          family.sampling === "sana" && packSamplers.has(variant.defaults.sampler);
+        if (!samplers.includes(variant.defaults.sampler) && !packSampler)
+          missing.push(`${familyId}/${variant.id} sampler ${variant.defaults.sampler}`);
+        if (!schedulers.includes(variant.defaults.scheduler))
+          missing.push(`${familyId}/${variant.id} scheduler ${variant.defaults.scheduler}`);
       }
     }
     assert.deepEqual(missing, []);
@@ -227,16 +314,42 @@ for (const snapshot of snapshots) {
 
   test(`the checker itself catches a wrong graph (ComfyUI ${version})`, () => {
     const graph = {
-      1: { class_type: "KSampler", inputs: { model: ["2", 0], seed: 1, steps: 0, cfg: 7, sampler_name: "not-a-sampler", scheduler: "karras", positive: ["2", 1], negative: ["3", 0], latent_image: ["3", 0], denoise: 1, surprise: 1 } },
+      1: {
+        class_type: "KSampler",
+        inputs: {
+          model: ["2", 0],
+          seed: 1,
+          steps: 0,
+          cfg: 7,
+          sampler_name: "not-a-sampler",
+          scheduler: "karras",
+          positive: ["2", 1],
+          negative: ["3", 0],
+          latent_image: ["3", 0],
+          denoise: 1,
+          surprise: 1,
+        },
+      },
       2: { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "model.safetensors" } },
       3: { class_type: "EmptyLatentImage", inputs: { width: 1024, height: 1024, batch_size: 1 } },
-      4: { class_type: "NotARealNode", inputs: {} }
+      4: { class_type: "NotARealNode", inputs: {} },
     };
     const problems = graphProblems(graph, info, new Set());
-    assert.ok(problems.some((problem) => /steps: 0 is below 1/.test(problem)), problems.join("\n"));
+    assert.ok(
+      problems.some((problem) => /steps: 0 is below 1/.test(problem)),
+      problems.join("\n"),
+    );
     assert.ok(problems.some((problem) => /sampler_name: "not-a-sampler"/.test(problem)));
-    assert.ok(problems.some((problem) => /positive: gets CLIP from CheckpointLoaderSimple, needs CONDITIONING/.test(problem)));
-    assert.ok(problems.some((problem) => /negative: gets LATENT from EmptyLatentImage, needs CONDITIONING/.test(problem)));
+    assert.ok(
+      problems.some((problem) =>
+        /positive: gets CLIP from CheckpointLoaderSimple, needs CONDITIONING/.test(problem),
+      ),
+    );
+    assert.ok(
+      problems.some((problem) =>
+        /negative: gets LATENT from EmptyLatentImage, needs CONDITIONING/.test(problem),
+      ),
+    );
     assert.ok(problems.some((problem) => /has no input surprise/.test(problem)));
     assert.ok(problems.some((problem) => /NotARealNode .* nothing checks for it/.test(problem)));
   });
@@ -247,8 +360,12 @@ test("there is at least one ComfyUI snapshot to check against", () => {
 });
 
 test("every family's graphs are checked against at least one ComfyUI snapshot", () => {
-  const infos = snapshots.map((snapshot) => JSON.parse(fs.readFileSync(path.join(fixtures, snapshot), "utf8")));
-  const unchecked = Object.entries(families).filter(([, family]) => !infos.some((info) => runsOn(family, info))).map(([id]) => id);
+  const infos = snapshots.map((snapshot) =>
+    JSON.parse(fs.readFileSync(path.join(fixtures, snapshot), "utf8")),
+  );
+  const unchecked = Object.entries(families)
+    .filter(([, family]) => !infos.some((info) => runsOn(family, info)))
+    .map(([id]) => id);
   assert.deepEqual(unchecked, []);
 });
 
@@ -256,7 +373,11 @@ test("every image family says which sizes it draws itself, and SD 1.5/2 draw nei
   for (const [id, family] of Object.entries(families)) {
     if (family.kind !== "image") continue;
     assert.equal(typeof family.native, "object", `${id} states native`);
-    for (const [size, level] of Object.entries(family.native)) assert.ok(["2k", "4k"].includes(size) && ["yes", "maybe"].includes(level), `${id}: ${size} ${level}`);
+    for (const [size, level] of Object.entries(family.native))
+      assert.ok(
+        ["2k", "4k"].includes(size) && ["yes", "maybe"].includes(level),
+        `${id}: ${size} ${level}`,
+      );
   }
   assert.deepEqual(families.sd15.native, {});
   assert.deepEqual(families.sd2.native, {});

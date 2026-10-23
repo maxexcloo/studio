@@ -13,11 +13,15 @@ const cloudNodeTypes = new Set(["GrokMedia"]);
 // Past this, the provider has given up (the Grok node polls for 15 minutes) and
 // a run ComfyUI no longer reports cannot come back.
 export const cloudJobExpiryMs = 20 * 60 * 1000;
-export const cloudJobFailedMessage = "Couldn’t finish this cloud generation; the provider job failed or expired";
-export const cloudJobLostMessage = "Couldn’t resume this cloud generation after the restart; ComfyUI no longer has it";
+export const cloudJobFailedMessage =
+  "Couldn’t finish this cloud generation; the provider job failed or expired";
+export const cloudJobLostMessage =
+  "Couldn’t resume this cloud generation after the restart; ComfyUI no longer has it";
 
-export const cloudJobExpired = (job, now = Date.now()) => now - (Number(job?.submittedAt) || 0) > cloudJobExpiryMs;
-export const isCloudGraph = (graph) => Object.values(graph || {}).some((node) => cloudNodeTypes.has(node?.class_type));
+export const cloudJobExpired = (job, now = Date.now()) =>
+  now - (Number(job?.submittedAt) || 0) > cloudJobExpiryMs;
+export const isCloudGraph = (graph) =>
+  Object.values(graph || {}).some((node) => cloudNodeTypes.has(node?.class_type));
 
 export function createCloudJobStore(file) {
   let records = null;

@@ -2,13 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { addUpscale, estimateUpscale, upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
 
-const sample = (history, work, ms, extra = {}) => addUpscale(history, { quality: "balanced", model: "seedvr2_7b.safetensors", work, ms, ...extra });
+const sample = (history, work, ms, extra = {}) =>
+  addUpscale(history, { quality: "balanced", model: "seedvr2_7b.safetensors", work, ms, ...extra });
 
 test("quiet until two upscales of the weight or effort", () => {
   const one = sample([], 4, 30_000);
-  assert.equal(estimateUpscale(one, { quality: "balanced", model: "seedvr2_7b.safetensors", work: 4 }), null);
+  assert.equal(
+    estimateUpscale(one, { quality: "balanced", model: "seedvr2_7b.safetensors", work: 4 }),
+    null,
+  );
   const two = sample(one, 4, 34_000);
-  assert.equal(estimateUpscale(two, { quality: "balanced", model: "seedvr2_7b.safetensors", work: 4 }).totalMs, 32_000);
+  assert.equal(
+    estimateUpscale(two, { quality: "balanced", model: "seedvr2_7b.safetensors", work: 4 }).totalMs,
+    32_000,
+  );
   // The composer only knows the effort; the same history speaks for it.
   assert.equal(estimateUpscale(two, { quality: "balanced", work: 4 }).totalMs, 32_000);
   // A face pass is a different job.
@@ -26,7 +33,8 @@ test("sizes far enough apart split the fixed loading time from the per-megapixel
 
 test("predictions that keep missing are not trusted", () => {
   let history = sample(sample([], 4, 30_000), 4, 30_000);
-  for (const ms of [60_000, 70_000, 80_000]) history = sample(history, 4, ms, { predicted: { totalMs: 30_000 } });
+  for (const ms of [60_000, 70_000, 80_000])
+    history = sample(history, 4, ms, { predicted: { totalMs: 30_000 } });
   assert.equal(estimateUpscale(history, { quality: "balanced", work: 4 }).trusted, false);
 });
 

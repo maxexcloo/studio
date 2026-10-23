@@ -19,11 +19,16 @@ const maxPromptLength = 8000;
 
 /** Two prompts are the same when they only differ in spacing or case. */
 export function promptKey(text = "") {
-  return String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function cleanText(text = "") {
-  return String(text || "").trim().slice(0, maxPromptLength);
+  return String(text || "")
+    .trim()
+    .slice(0, maxPromptLength);
 }
 
 function cleanEntries(value) {
@@ -37,9 +42,11 @@ function cleanEntries(value) {
     seen.add(key);
     entries.push({
       text,
-      at: Number.isFinite(Date.parse(raw?.at || "")) ? new Date(raw.at).toISOString() : new Date(0).toISOString(),
+      at: Number.isFinite(Date.parse(raw?.at || ""))
+        ? new Date(raw.at).toISOString()
+        : new Date(0).toISOString(),
       uses: Math.max(0, Math.floor(Number(raw?.uses) || 0)),
-      ...(raw?.pinned ? { pinned: true } : {})
+      ...(raw?.pinned ? { pinned: true } : {}),
     });
   }
   return capEntries(entries);
@@ -50,7 +57,9 @@ export function capEntries(entries) {
   const sorted = [...entries].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   let pinned = 0;
   let recent = 0;
-  return sorted.filter((entry) => (entry.pinned ? (pinned += 1) <= pinnedLimit : (recent += 1) <= historyLimit));
+  return sorted.filter((entry) =>
+    entry.pinned ? (pinned += 1) <= pinnedLimit : (recent += 1) <= historyLimit,
+  );
 }
 
 /** The list with `text` used once more at `at`. */
@@ -63,14 +72,19 @@ export function addPrompt(entries, text, at = new Date()) {
     text: clean,
     at: new Date(at).toISOString(),
     uses: (previous?.uses || 0) + 1,
-    ...(previous?.pinned ? { pinned: true } : {})
+    ...(previous?.pinned ? { pinned: true } : {}),
   };
   return capEntries([next, ...entries.filter((entry) => entry !== previous)]);
 }
 
 export const negativePromptHistoryPath = path.join(dataDir, "negative-prompt-history.json");
 
-function createHistory(field, historyPath, initiallyEnabled = () => true, initialSeedItems = () => gallery) {
+function createHistory(
+  field,
+  historyPath,
+  initiallyEnabled = () => true,
+  initialSeedItems = () => gallery,
+) {
   let cache = null;
   let enabled = true;
 
@@ -90,7 +104,8 @@ function createHistory(field, historyPath, initiallyEnabled = () => true, initia
       const seeds = (enabled ? (seedItems ?? initialSeedItems()) : [])
         .filter((item) => item?.[field] && item.status === "done")
         .sort((a, b) => Date.parse(a.createdAt || 0) - Date.parse(b.createdAt || 0));
-      for (const item of seeds) entries = addPrompt(entries, item[field], Date.parse(item.createdAt || "") || Date.now());
+      for (const item of seeds)
+        entries = addPrompt(entries, item[field], Date.parse(item.createdAt || "") || Date.now());
       cache = entries;
       if (entries.length) save();
     }
@@ -141,13 +156,15 @@ function createHistory(field, historyPath, initiallyEnabled = () => true, initia
     if (!found && !pinned) return entries;
     const clean = cleanText(text);
     if (!found && !promptKey(clean)) return entries;
-    cache = capEntries(found
-      ? entries.map((entry) => {
-        if (entry !== found) return entry;
-        const { pinned: _pinned, ...rest } = entry;
-        return pinned ? { ...rest, pinned: true } : rest;
-      })
-      : [{ text: clean, at: new Date().toISOString(), uses: 0, pinned: true }, ...entries]);
+    cache = capEntries(
+      found
+        ? entries.map((entry) => {
+            if (entry !== found) return entry;
+            const { pinned: _pinned, ...rest } = entry;
+            return pinned ? { ...rest, pinned: true } : rest;
+          })
+        : [{ text: clean, at: new Date().toISOString(), uses: 0, pinned: true }, ...entries],
+    );
     save();
     return cache;
   }
@@ -174,35 +191,68 @@ function createHistory(field, historyPath, initiallyEnabled = () => true, initia
   function resetPromptHistoryCache() {
     cache = null;
   }
-  return { clearPromptHistory, forgetPrompts, listPrompts, loadPromptHistory, promptHistoryEnabled, recordPrompt, resetPromptHistoryCache, setPromptHistoryEnabled, setPromptPinned };
+  return {
+    clearPromptHistory,
+    forgetPrompts,
+    listPrompts,
+    loadPromptHistory,
+    promptHistoryEnabled,
+    recordPrompt,
+    resetPromptHistoryCache,
+    setPromptHistoryEnabled,
+    setPromptPinned,
+  };
 }
 
 const historySets = new Map();
-function historiesFor(ownerId = '') {
-  const key = String(ownerId || '');
+function historiesFor(ownerId = "") {
+  const key = String(ownerId || "");
   if (!historySets.has(key)) {
-    const directory = key ? path.join(dataDir, 'accounts', crypto.createHash('sha256').update(key).digest('hex')) : dataDir;
-    const paths = key ? { negative: path.join(directory, 'negative-prompt-history.json'), positive: path.join(directory, 'prompt-history.json') } : { negative: negativePromptHistoryPath, positive: promptHistoryPath };
+    const directory = key
+      ? path.join(dataDir, "accounts", crypto.createHash("sha256").update(key).digest("hex"))
+      : dataDir;
+    const paths = key
+      ? {
+          negative: path.join(directory, "negative-prompt-history.json"),
+          positive: path.join(directory, "prompt-history.json"),
+        }
+      : { negative: negativePromptHistoryPath, positive: promptHistoryPath };
     const histories = {};
     const seeds = key ? () => [] : () => gallery;
-    histories.negative = createHistory('negative', paths.negative, () => histories.positive.promptHistoryEnabled(), seeds);
-    histories.positive = createHistory('prompt', paths.positive, () => true, seeds);
+    histories.negative = createHistory(
+      "negative",
+      paths.negative,
+      () => histories.positive.promptHistoryEnabled(),
+      seeds,
+    );
+    histories.positive = createHistory("prompt", paths.positive, () => true, seeds);
     historySets.set(key, histories);
   }
   return historySets.get(key);
 }
-const historyFor = (kind, ownerId) => historiesFor(ownerId)[kind === 'negative' ? 'negative' : 'positive'];
+const historyFor = (kind, ownerId) =>
+  historiesFor(ownerId)[kind === "negative" ? "negative" : "positive"];
 
-export const loadPromptHistory = (seedItems, kind = 'positive', ownerId = '') => historyFor(kind, ownerId).loadPromptHistory(ownerId ? [] : seedItems);
-export const listPrompts = (kind = 'positive', ownerId = '') => historyFor(kind, ownerId).listPrompts();
-export const promptHistoryEnabled = (kind = 'positive', ownerId = '') => historyFor(kind, ownerId).promptHistoryEnabled();
-export const recordPrompt = (text, kind = 'positive', ownerId = '') => historyFor(kind, ownerId).recordPrompt(text);
-export const setPromptPinned = (text, pinned, kind = 'positive', ownerId = '') => historyFor(kind, ownerId).setPromptPinned(text, pinned);
-export const forgetPrompts = (texts, keep = new Set(), kind = 'positive', ownerId = '') => historyFor(kind, ownerId).forgetPrompts(texts, keep);
-export const clearPromptHistory = (options = {}, kind = 'positive', ownerId = '') => historyFor(kind, ownerId).clearPromptHistory(options);
-export const setPromptHistoryEnabled = (on, ownerId = '') => {
+export const loadPromptHistory = (seedItems, kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).loadPromptHistory(ownerId ? [] : seedItems);
+export const listPrompts = (kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).listPrompts();
+export const promptHistoryEnabled = (kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).promptHistoryEnabled();
+export const recordPrompt = (text, kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).recordPrompt(text);
+export const setPromptPinned = (text, pinned, kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).setPromptPinned(text, pinned);
+export const forgetPrompts = (texts, keep = new Set(), kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).forgetPrompts(texts, keep);
+export const clearPromptHistory = (options = {}, kind = "positive", ownerId = "") =>
+  historyFor(kind, ownerId).clearPromptHistory(options);
+export const setPromptHistoryEnabled = (on, ownerId = "") => {
   const histories = historiesFor(ownerId);
   histories.negative.setPromptHistoryEnabled(on);
   return histories.positive.setPromptHistoryEnabled(on);
 };
-export const resetPromptHistoryCache = () => { for (const histories of historySets.values()) Object.values(histories).forEach((history) => history.resetPromptHistoryCache()); };
+export const resetPromptHistoryCache = () => {
+  for (const histories of historySets.values())
+    Object.values(histories).forEach((history) => history.resetPromptHistoryCache());
+};

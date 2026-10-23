@@ -36,7 +36,12 @@ function stripPng(input) {
 }
 
 function stripWebp(input) {
-  if (input.length < 12 || input.toString("latin1", 0, 4) !== "RIFF" || input.toString("latin1", 8, 12) !== "WEBP") return null;
+  if (
+    input.length < 12 ||
+    input.toString("latin1", 0, 4) !== "RIFF" ||
+    input.toString("latin1", 8, 12) !== "WEBP"
+  )
+    return null;
   const kept = [];
   let offset = 12;
   let removed = false;
@@ -88,7 +93,18 @@ function stripJpeg(input) {
 }
 
 // Boxes that only ever hold other boxes, walked to find udta and meta inside.
-const mp4Containers = new Set(["moov", "trak", "mdia", "minf", "stbl", "edts", "dinf", "mvex", "moof", "traf"]);
+const mp4Containers = new Set([
+  "moov",
+  "trak",
+  "mdia",
+  "minf",
+  "stbl",
+  "edts",
+  "dinf",
+  "mvex",
+  "moof",
+  "traf",
+]);
 const xmpUuid = "be7acfcb97a942e89c71999491e3afac";
 
 function stripMp4(input) {
@@ -109,7 +125,10 @@ function stripMp4(input) {
         size = end - offset;
       }
       if (size < header || offset + size > end) return false;
-      const isXmp = type === "uuid" && size >= header + 16 && output.toString("hex", offset + header, offset + header + 16) === xmpUuid;
+      const isXmp =
+        type === "uuid" &&
+        size >= header + 16 &&
+        output.toString("hex", offset + header, offset + header + 16) === xmpUuid;
       if (type === "udta" || type === "meta" || isXmp) {
         // Same size, new name, nothing inside: offsets elsewhere in the file stay valid.
         output.write("free", offset + 4, "latin1");
@@ -129,8 +148,14 @@ function stripMp4(input) {
 /** The kind of file from its first bytes, whatever its name says. */
 function sniff(buffer) {
   if (buffer.length >= 8 && buffer.subarray(0, 8).equals(pngSignature)) return "png";
-  if (buffer.length >= 12 && buffer.toString("latin1", 0, 4) === "RIFF" && buffer.toString("latin1", 8, 12) === "WEBP") return "webp";
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "jpeg";
+  if (
+    buffer.length >= 12 &&
+    buffer.toString("latin1", 0, 4) === "RIFF" &&
+    buffer.toString("latin1", 8, 12) === "WEBP"
+  )
+    return "webp";
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff)
+    return "jpeg";
   if (buffer.length >= 12 && buffer.toString("latin1", 4, 8) === "ftyp") return "mp4";
   return "";
 }
@@ -142,5 +167,7 @@ export function stripMetadata(buffer) {
   const strip = { png: stripPng, webp: stripWebp, jpeg: stripJpeg, mp4: stripMp4 }[kind];
   if (!strip) return { buffer: input, stripped: false, supported: false };
   const result = strip(input);
-  return result ? { buffer: result, stripped: result !== input, supported: true } : { buffer: input, stripped: false, supported: false };
+  return result
+    ? { buffer: result, stripped: result !== input, supported: true }
+    : { buffer: input, stripped: false, supported: false };
 }
