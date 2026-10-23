@@ -7,8 +7,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
 COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
 COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
-RUN zypper --non-interactive install util-linux \
-    && zypper clean --all \
+RUN command -v flock \
     && python3 -m pip install --no-cache-dir fsspec==2026.9.0 peft==0.21.2 rotary_embedding_torch==0.9.1 \
     && rm -rf /root/ComfyUI
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
