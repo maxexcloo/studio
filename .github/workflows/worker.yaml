@@ -59,8 +59,7 @@ jobs:
       - name: Build Worker For Verification
         uses: docker/build-push-action@v7
         with:
-          cache-from: type=gha,scope=worker
-          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=worker,ignore-error=true' || '' }}
+          # Reuse this job's BuildKit cache for publication without exporting the GPU image to GHA.
           context: .
           file: worker/Dockerfile
           load: true
@@ -94,7 +93,6 @@ jobs:
         if: env.PUBLISH == 'true'
         uses: docker/build-push-action@v7
         with:
-          cache-from: type=gha,scope=worker
           context: .
           file: worker/Dockerfile
           labels: ${{ steps.metadata.outputs.labels }}
