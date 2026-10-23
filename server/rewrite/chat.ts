@@ -151,7 +151,7 @@ export class ChatService {
             ...(models.length ? {} : { reason: "No text models are available for this account." }),
             defaultModelId: models.some((model) => model.id === settings.model)
               ? settings.model
-              : undefined,
+              : models[0]?.id,
           }
         : {
             available: false,
@@ -159,11 +159,12 @@ export class ChatService {
             reason:
               "Chat is not connected to a text assistant. An administrator can configure the text gateway.",
           };
-    } catch {
+    } catch (error) {
       return {
         available: false,
         models: [],
-        reason: "The text gateway configuration is incomplete.",
+        reason:
+          error instanceof Error ? error.message : "The text gateway configuration is incomplete.",
       };
     }
   }
@@ -236,7 +237,7 @@ export class ChatService {
         };
       }
       const models = await this.models(ownerId, settings);
-      const modelId = input.modelId || settings.model;
+      const modelId = input.modelId || settings.model || models[0]?.id;
       const selected = models.find((model) => model.id === modelId);
       if (!selected) throw failure("Choose a text model approved for this account.", 403);
       const images = [];

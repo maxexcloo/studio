@@ -385,8 +385,11 @@ function findGalleryItemForAccount(id, account) {
   const decoded = decodeGalleryReference(id);
   const wanted = decoded || String(id || "");
   return (
-    filterVisibleGallery(gallery.filter((item) => recordBelongsToAccount(item, account))).find(
-      (item) => galleryKey(item) === wanted || item.id === wanted || item.url === wanted,
+    gallery.find(
+      (item) =>
+        recordBelongsToAccount(item, account) &&
+        (galleryKey(item) === wanted || item.id === wanted || item.url === wanted) &&
+        filterVisibleGallery([item]).length,
     ) || null
   );
 }
@@ -438,16 +441,9 @@ const lastFrameSuffix = ":last-frame";
  * is cut when used.
  */
 function lastFrameAssetForAccount(account, galleryItemId) {
-  const finishedVideo = (item) =>
-    item.type === "video" && item.status === "done" && item.url && !item.library;
-  const item = filterVisibleGallery(
-    gallery.filter((item) => recordBelongsToAccount(item, account)),
-  ).find(
-    (candidate) =>
-      finishedVideo(candidate) &&
-      (candidate.id === galleryItemId || galleryKey(candidate) === galleryItemId),
-  );
-  if (!item) throw new Error("That video is no longer in the gallery.");
+  const item = findGalleryItemForAccount(galleryItemId, account);
+  if (!item || item.type !== "video" || item.status !== "done" || !item.url || item.library)
+    throw new Error("That video is no longer in the gallery.");
   const asset = galleryAsset(item);
   return {
     ...asset,
@@ -482,19 +478,40 @@ export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {
 export function referenceAssetForAccount(account, galleryItemId, { frame = "" } = {}) {
   if (frame === "last") return lastFrameAssetForAccount(account, galleryItemId);
   // Images added from another folder are shown in place, not ComfyUI outputs it can read back.
-  const publicItem = filterVisibleGallery(
-    gallery.filter((item) => recordBelongsToAccount(item, account)),
-  ).find(
-    (item) =>
-      item.type === "image" &&
-      item.status === "done" &&
-      !item.library &&
-      (item.id === galleryItemId ||
-        item.url === galleryItemId ||
-        galleryKey(item) === galleryItemId),
-  );
-  if (publicItem) return galleryAsset(publicItem);
+  const publicItem = findGalleryItemForAccount(galleryItemId, account);
+  if (
+    publicItem &&
+    publicItem.type === "image" &&
+    publicItem.status === "done" &&
+    !publicItem.library &&
+    publicItem.url
+  )
+    return galleryAsset(publicItem);
   throw new Error("That image is no longer in the gallery.");
+}
+
+/** Reopen one saved reference without enumerating the catalogue or reading worker media. */
+export function referenceAssetMetadataForAccount(account, id) {
+  const upload = loadManifest().find(
+    (item) => item.id === id && item.source === "upload" && recordBelongsToAccount(item, account),
+  );
+  if (upload && readUploadedReference(id, "media", account?.userId || ""))
+    return publicUploadAsset(upload);
+  const lastFrame = String(id).endsWith(lastFrameSuffix);
+  const item = findGalleryItemForAccount(
+    lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
+    account,
+  );
+  if (
+    !item ||
+    item.library ||
+    item.status !== "done" ||
+    !item.url ||
+    item.type !== (lastFrame ? "video" : "image")
+  )
+    throw new Error("That reference image is gone.");
+  const asset = lastFrame ? lastFrameAssetForAccount(account, item.id) : galleryAsset(item);
+  return { ...asset, id };
 }
 
 /**

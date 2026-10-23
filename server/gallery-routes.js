@@ -21,6 +21,7 @@ import {
   recordsForRequest,
 } from "./account-ownership.js";
 import { mayUseFeature } from "./account-policy.js";
+import { galleryAspects, gallerySizeBands, otherAspect } from "./gallery-filters.js";
 
 function requireGalleryAccess(req, res) {
   if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;
@@ -83,6 +84,37 @@ export function registerGalleryReadRoutes(app) {
   app.get("/api/gallery/jobs/:id", (req, res) => {
     const result = galleryJobResponse(req.studioAccount, req.params.id, req.query.settings === "1");
     res.status(result.status).json(result.payload);
+  });
+
+  app.get("/api/gallery/filters", (req, res) => {
+    if (!requireGalleryAccess(req, res)) return;
+    const type = String(req.query.type || "");
+    const items = filterVisibleGallery(recordsForRequest(gallery, req)).filter(
+      (item) => !type || item.type === type,
+    );
+    const unique = (values) =>
+      [...new Set(values.filter((value) => typeof value === "string" && value.trim()))].sort(
+        (a, b) => a.localeCompare(b),
+      );
+    res.json({
+      models: unique(items.flatMap((item) => [item.model, item.settings?.modelName])),
+      loras: unique(
+        items.flatMap((item) =>
+          (Array.isArray(item.settings?.loras) ? item.settings.loras : []).map(
+            (lora) => lora?.name,
+          ),
+        ),
+      ),
+      sizes: gallerySizeBands.map((band) => ({
+        value: band.id,
+        label: band.label,
+        description: band.detail,
+      })),
+      aspects: [
+        ...galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.id })),
+        { value: otherAspect, label: "Other" },
+      ],
+    });
   });
 
   app.get("/api/gallery", (req, res) => {

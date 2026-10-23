@@ -55,9 +55,18 @@ export function gatewaySettings(environment = process.env) {
     throw new Error(
       `Prompt writing needs ${missing.join(", ")}; set all three of ${gatewayKeys.join(", ")} or none.`,
     );
+  return {
+    ...gatewayAddress(values.STUDIO_PROMPT_WRITER_URL, "STUDIO_PROMPT_WRITER_URL"),
+    key: values.STUDIO_PROMPT_WRITER_KEY,
+    model: values.STUDIO_PROMPT_WRITER_MODEL,
+  };
+}
+
+/** Both text consumers accept a gateway root, /v1 base or full completion endpoint. */
+export function gatewayAddress(value, setting) {
   let url;
   try {
-    url = new URL(values.STUDIO_PROMPT_WRITER_URL);
+    url = new URL(value);
   } catch {
     url = null;
   }
@@ -70,7 +79,7 @@ export function gatewaySettings(environment = process.env) {
     url.hash
   )
     throw new Error(
-      "STUDIO_PROMPT_WRITER_URL must be an absolute HTTP(S) URL without credentials, query or fragment.",
+      `${setting} must be an absolute HTTP(S) URL without credentials, query or fragment.`,
     );
   const base = url.href.replace(/\/+$/, "");
   const endpoint = /\/chat\/completions$/.test(base)
@@ -80,12 +89,7 @@ export function gatewaySettings(environment = process.env) {
       : `${base}/v1/chat/completions`;
   // LiteLLM's management routes (/model/info) sit beside /v1, at the gateway's root.
   const root = endpoint.replace(/\/(?:v1\/)?chat\/completions$/, "");
-  return {
-    endpoint,
-    root,
-    key: values.STUDIO_PROMPT_WRITER_KEY,
-    model: values.STUDIO_PROMPT_WRITER_MODEL,
-  };
+  return { endpoint, root };
 }
 
 /** The gateway plus the assistant's models, or null while the gateway is unset. */
@@ -415,12 +419,13 @@ export function createAssistant(
     streamTimeoutMs = 90_000,
     log = console,
     now = Date.now,
+    resolveSettings = () => assistantSettings(environment),
   } = {},
 ) {
-  if (!gatewaySettings(environment)) return null;
+  if (!resolveSettings()) return null;
   const lookups = new Map();
   const settings = () => {
-    const resolved = assistantSettings(environment);
+    const resolved = resolveSettings();
     if (!resolved)
       throw new AssistantError("The prompt assistant is not configured.", { status: 503 });
     return resolved;

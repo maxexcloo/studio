@@ -50,7 +50,8 @@ import {
 import { registerProfileRoutes } from "./profile-routes.js";
 import { draftProfileFromImport } from "./profile-drafts.js";
 import { seedDirectory, seedMissing } from "./profile-seed.js";
-import { draftedProfile, gatewaySettings } from "./assistant.js";
+import { createAssistant, draftedProfile } from "./assistant.js";
+import { chatModelAllowed, chatSettings } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./family-profiles.js";
 import { familyFromName } from "./family-catalog.js";
 import {
@@ -219,6 +220,7 @@ import {
   readUploadedReference,
   referenceAssetFromGallery,
   referenceAssetForAccount,
+  referenceAssetMetadataForAccount,
   referenceExistsForAccount,
   saveUploadedReference,
   stageReferenceAssets,
@@ -1217,6 +1219,8 @@ async function mediaModels(force = false) {
       result: settled[index].status === "fulfilled" ? settled[index].value : null,
     }))
     .filter((entry) => entry.result);
+  if (demoMode && !answered.length && !direct.length)
+    throw settled[0]?.reason || new Error("No worker is available.");
   const configured = inferModels({}, {}, { configuredOnly: true });
   const catalogues = workers
     .map((worker) => {
@@ -2107,6 +2111,24 @@ app.post("/api/reference-assets/from-gallery", (req, res) => {
   }
 });
 
+app.get("/api/reference-assets/:id", (req, res) => {
+  try {
+    const account = req.studioAccount;
+    if (
+      account &&
+      !mayUseFeature(account, "imageReferences") &&
+      !mayUseFeature(account, "videoReferences")
+    )
+      return res.status(404).json({ ok: false, error: "That reference image is gone." });
+    const asset = referenceAssetMetadataForAccount(account, req.params.id);
+    if (account && asset.source === "generation" && !mayUseFeature(account, "gallery"))
+      return res.status(404).json({ ok: false, error: "That reference image is gone." });
+    return res.json({ asset });
+  } catch {
+    return res.status(404).json({ ok: false, error: "That reference image is gone." });
+  }
+});
+
 app.get("/api/reference-assets/:id/media", (req, res) => {
   if (
     req.studioAccount &&
@@ -2600,23 +2622,23 @@ async function selectedChatMediaProfile(input, operation) {
     reject("Choose a model that supports image references for this action.");
   return profile;
 }
+let chatGateway;
 const sessionChat = new ChatService({
   store: new ChatStore(rewriteStore.db),
-  settings: gatewaySettings,
+  settings: chatSettings,
   session: (ownerId, id) => rewriteStore.session(ownerId, id),
   models: async (ownerId) => {
-    const settings = gatewaySettings();
+    const settings = chatSettings();
     if (!settings) return [];
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated) return [];
-    const spicyModel = assistantEngine?.settings().spicyModel;
+    const spicyModel = String(process.env.STUDIO_ASSISTANT_SPICY_MODEL || "").trim();
     const permitted = (id) =>
       !spicyModel || id !== spicyModel || !account || mayUseFeature(account, "nsfwModels");
-    const models = ((await assistantEngine?.listModelDetails()) || []).filter((model) =>
-      permitted(model.id),
+    chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
+    const models = ((await chatGateway?.listModelDetails()) || []).filter(
+      (model) => chatModelAllowed(model.id, settings.patterns) && permitted(model.id),
     );
-    if (permitted(settings.model) && !models.some((model) => model.id === settings.model))
-      models.push({ id: settings.model, label: settings.model });
     return models;
   },
   revision: async (ownerId, sessionId, revision) => {
