@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
-  Anchor,
   Button,
   Container,
+  Divider,
   Loader,
   Paper,
   PasswordInput,
@@ -30,18 +30,24 @@ export function useAccount() {
     retry: false,
   });
 }
+export function useAccess(enabled: boolean) {
+  return useQuery({
+    queryKey: ["access"],
+    queryFn: () =>
+      api<{
+        signedIn: boolean;
+        thisComputer: boolean;
+        canAdmin: boolean;
+        studioPassword: { set: boolean };
+      }>("/api/access/status"),
+    enabled,
+    retry: false,
+  });
+}
 export function AccountGate({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const status = useAccount();
-  const access = useQuery({
-    queryKey: ["access"],
-    queryFn: () =>
-      api<{ signedIn: boolean; canAdmin: boolean; studioPassword: { set: boolean } }>(
-        "/api/access/status",
-      ),
-    enabled: status.data?.mode === "single-user",
-    retry: false,
-  });
+  const access = useAccess(status.data?.mode === "single-user");
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [setupToken, setSetupToken] = useState(""),
@@ -92,95 +98,121 @@ export function AccountGate({ children }: { children: ReactNode }) {
     bootstrap = !!status.data?.needsRecoveryAdmin;
   if (multi ? status.data?.signedIn : access.data?.signedIn) return children;
   return (
-    <Container size="xs" py="xl">
-      <Paper>
-        <Stack>
-          <Title order={1}>Studio</Title>
-          <Text c="dimmed">
-            {bootstrap
-              ? "Create the recovery administrator for your workspace."
-              : "Sign in to your creative workspace."}
-          </Text>
-          {outcome && <Alert>{outcome}</Alert>}
-          {!multi && !access.data?.studioPassword.set ? (
-            <Alert>
-              Set a Studio password on the computer running Studio before opening it on other
-              devices.
-            </Alert>
-          ) : (
-            <form
-              onSubmit={async (event) => {
-                event.preventDefault();
-                setPending(true);
-                try {
-                  await post(
-                    multi
-                      ? bootstrap
-                        ? "/api/accounts/bootstrap"
-                        : "/api/accounts/sign-in"
-                      : "/api/access/sign-in",
-                    multi
-                      ? { username, password, ...(bootstrap ? { setupToken, displayName } : {}) }
-                      : { password },
-                  );
-                  setPassword("");
-                  setSetupToken("");
-                  client.clear();
-                  await status.refetch();
-                  if (!multi) await access.refetch();
-                } catch (error) {
-                  failure(error);
-                } finally {
-                  setPending(false);
-                }
-              }}
-            >
-              <Stack>
-                {multi && (
-                  <TextInput
-                    label="Email"
-                    type={bootstrap ? "email" : "text"}
-                    autoComplete="username"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.currentTarget.value)}
+    <Stack mih="100dvh" justify="center" py="xl" px="md">
+      <Container size={420} w="100%" px={0}>
+        <Stack gap="xl">
+          <Stack gap="xs" align="center">
+            <Title order={1}>
+              Studio<span style={{ color: "var(--mantine-primary-color-filled)" }}>.</span>
+            </Title>
+            <Text c="dimmed" ta="center">
+              Your creative workspace.
+            </Text>
+          </Stack>
+          <Paper withBorder shadow="md" p="xl" radius="md">
+            <Stack gap="lg">
+              <Title order={2} size="h3">
+                {bootstrap ? "Set Up Studio" : "Welcome Back"}
+              </Title>
+              {bootstrap && (
+                <Text size="sm" c="dimmed">
+                  Create the recovery administrator for your workspace.
+                </Text>
+              )}
+              {outcome && <Alert>{outcome}</Alert>}
+              {status.data?.oidc && (
+                <>
+                  <Button component="a" href="/api/accounts/oidc/start" variant="default" fullWidth>
+                    Sign In With {status.data.oidc.label}
+                  </Button>
+                  <Divider
+                    label={multi ? "Or Continue With Email" : "Or Continue With Password"}
+                    labelPosition="center"
                   />
-                )}
-                {bootstrap && (
-                  <TextInput
-                    label="Display Name"
-                    autoComplete="name"
-                    required
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.currentTarget.value)}
-                  />
-                )}
-                <PasswordInput
-                  label="Password"
-                  autoComplete={bootstrap ? "new-password" : "current-password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.currentTarget.value)}
-                />
-                {bootstrap && status.data?.setupTokenAccepted && (
-                  <PasswordInput
-                    label="Setup Token"
-                    autoComplete="off"
-                    value={setupToken}
-                    onChange={(e) => setSetupToken(e.currentTarget.value)}
-                  />
-                )}
-                <Button type="submit" loading={pending}>
-                  {bootstrap ? "Create Administrator" : "Sign In"}
-                </Button>
-              </Stack>
-            </form>
-          )}
-          {status.data?.oidc && (
-            <Anchor href="/api/accounts/oidc/start">Sign In With {status.data.oidc.label}</Anchor>
-          )}
+                </>
+              )}
+              {!multi && !access.data?.studioPassword.set ? (
+                <Alert>
+                  Set a Studio password on the computer running Studio before opening it on other
+                  devices.
+                </Alert>
+              ) : (
+                <form
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    setPending(true);
+                    try {
+                      await post(
+                        multi
+                          ? bootstrap
+                            ? "/api/accounts/bootstrap"
+                            : "/api/accounts/sign-in"
+                          : "/api/access/sign-in",
+                        multi
+                          ? {
+                              username,
+                              password,
+                              ...(bootstrap ? { setupToken, displayName } : {}),
+                            }
+                          : { password },
+                      );
+                      setPassword("");
+                      setSetupToken("");
+                      client.clear();
+                      await status.refetch();
+                      if (!multi) await access.refetch();
+                    } catch (error) {
+                      failure(error);
+                    } finally {
+                      setPending(false);
+                    }
+                  }}
+                >
+                  <Stack>
+                    {multi && (
+                      <TextInput
+                        label="Email"
+                        type={bootstrap ? "email" : "text"}
+                        autoComplete="username"
+                        required
+                        value={username}
+                        onChange={(e) => setUsername(e.currentTarget.value)}
+                      />
+                    )}
+                    {bootstrap && (
+                      <TextInput
+                        label="Display Name"
+                        autoComplete="name"
+                        required
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.currentTarget.value)}
+                      />
+                    )}
+                    <PasswordInput
+                      label="Password"
+                      autoComplete={bootstrap ? "new-password" : "current-password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.currentTarget.value)}
+                    />
+                    {bootstrap && status.data?.setupTokenAccepted && (
+                      <PasswordInput
+                        label="Setup Token"
+                        autoComplete="off"
+                        value={setupToken}
+                        onChange={(e) => setSetupToken(e.currentTarget.value)}
+                      />
+                    )}
+                    <Button type="submit" loading={pending} fullWidth mt="sm">
+                      {bootstrap ? "Create Administrator" : "Sign In"}
+                    </Button>
+                  </Stack>
+                </form>
+              )}
+            </Stack>
+          </Paper>
         </Stack>
-      </Paper>
-    </Container>
+      </Container>
+    </Stack>
   );
 }
