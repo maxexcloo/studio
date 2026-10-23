@@ -214,7 +214,9 @@ A new family states its own `native`; leaving it out means none.
 
 ## Supported families
 
-Mounted ai profiles define the supported catalogue for a deployment. The retained native family detectors and graph builders are defined in `backend/family-catalog.js`; only offer a profile after its required nodes and files are verified on its worker.
+Studio's runtime profiles define the supported catalogue for a deployment; the ai mount seeds missing definitions. The retained native family detectors and graph builders are defined in `backend/family-catalog.js`; only offer a profile after its required nodes and files are verified on its worker.
+
+Administrators edit profiles in **Library › Profiles**. The Connections tab maps existing controls and reference inputs to separate node and input choices, preserving the saved graph and other metadata. Use Advanced JSON to add mappings or change the graph; Check validates the edited definition before saving.
 
 ## Formats
 
@@ -222,7 +224,7 @@ Mounted ai profiles define the supported catalogue for a deployment. The retaine
 
 GGUF workflows require the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack on the selected worker. Studio reads GGUF headers through `backend/gguf.js`, keeps the existing tensor-family detectors and substitutes the matching GGUF loader nodes. Mixed encoder slots are supported when the worker's loader advertises them.
 
-Architecture support depends on the pinned worker node revision, not the file extension. Verify the worker's node catalogue and required encoder/vision components before offering a GGUF profile. Unsupported loader formats can use a reviewed [custom workflow](backend/workflows/README.md) defined in ai.
+Architecture support depends on the pinned worker node revision, not the file extension. Verify the worker's node catalogue and required encoder/vision components before offering a GGUF profile. Unsupported loader formats can use a reviewed [custom workflow](backend/workflows/README.md) imported into Studio.
 
 ### Worker Memory
 
@@ -232,4 +234,4 @@ For local MPS development the retained estimator uses a configured wired-memory 
 
 ## Downloads
 
-Library imports show matching files, their grade and missing parts before downloads begin. Downloads keep progress across restarts, verify file integrity and retain server-side provider credentials. Mounted catalogue definitions are managed in `ai`; importing files does not grant Studio permission to edit those definitions.
+Library imports show matching files, their grade and missing parts before downloads begin. Downloads keep progress across restarts, verify file integrity and retain server-side provider credentials. Administrators manage live catalogue definitions in Studio; the ai mount provides missing-definition seeds and backups.
