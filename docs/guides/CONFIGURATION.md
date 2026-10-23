@@ -2,7 +2,7 @@
 
 Copy `.env.example` to `.env` when you need different ports or paths.
 
-Set `STUDIO_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hides detected model profiles and bundled workflow templates from the generation catalogue; their definitions and model files remain intact. Built-in profiles are enabled by default.
+Set `STUDIO_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hides detected model profiles and bundled workflow templates from the generation catalogue; their definitions and model files remain intact. Mounted configuration uses only ai profiles by default; standalone legacy configuration keeps built-in profiles enabled. Set the switch explicitly to opt into detected model profiles.
 
 ```bash
 COMFY_URL=http://127.0.0.1:8188
@@ -23,16 +23,14 @@ With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) workers n
 Studio runs on zero, one or many ComfyUI workers. Each has a stable id, a name,
 an address and what it can do:
 
-| Capability | Runs |
-| --- | --- |
-| `image` | Image generation, and provider-backed cloud runs (Grok), which go through a worker's provider node |
-| `video` | Local video generation |
-| `upscale` | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too |
-| `models` | Receives model and LoRA downloads with `STUDIO_MODEL_STORAGE=worker` |
+| Capability | Runs                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------- |
+| `image`    | Image generation, and provider-backed cloud runs (Grok), which go through a worker's provider node |
+| `video`    | Local video generation                                                                             |
+| `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too  |
+| `models`   | Receives model and LoRA downloads with `STUDIO_MODEL_STORAGE=worker`                               |
 
-Administrators add, edit, test, restart and remove workers in **Settings ›
-Workers**. Studio keeps its own list in `workers.json` in the data folder and
-never writes over it except when an administrator saves.
+The rewrite shows configured workers in **Settings › Workers**. Deployment configuration owns their placement and connection details. The retained `/api/workers` contract can still maintain a local `workers.json` list for standalone instances.
 
 A deployment can define the workers itself. They show as locked in Settings
 and are changed only in the deployment:
@@ -57,14 +55,15 @@ model downloads, plus video when there is no video worker) and
 `COMFY_URL` in `.env`, or the default local address, only seeds Studio's own
 list until it is first saved.
 
-**Routing:** a job goes to a worker with the capability it needs. With several,
-Studio prefers one that answered and already has the model, then the first
-that answered, in list order (Smart upscale also prefers one with `upscale`).
-It never sends work to a worker without the capability, never falls back to
-the cloud and never changes GPU allocation; switching what a GPU runs stays in
-AI Control's own UI and Mise. The first worker with `image` is the default
-worker: single-worker conveniences (the output folder, finding ComfyUI on its own,
-restart progress) belong to it.
+**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly. Worker capability checks apply before submission. Automatic GPU lifecycle control remains disabled unless the separate ownership and traffic acknowledgements are configured.
+
+## Cloud Models
+
+Set `STUDIO_CLIPROXYAPI_URL` to the direct CLIProxyAPI base URL and `STUDIO_CLIPROXYAPI_KEY` to its server-side credential. Existing `CLIPROXYAPI_URL`/`CLIPROXYAPI_KEY` names remain readable for compatibility with worker configuration. The mounted ai profiles keep their identifiers; direct generation supports single `GrokMedia` workflows whose models are advertised by the provider. Other custom provider graphs can use the existing worker bridge.
+
+Direct cloud work is independent of GPU admission. Studio records asynchronous video request IDs and recovers them before resubmitting. A synchronous image request has no resumable provider ID: an interrupted response remains visible as unknown and is never retried automatically. Cancelling that operation ends Studio's wait; the provider may still finish or charge for work already accepted. Saved results retain the actual provider/model and the existing media result-link shape.
+
+Cloud Models and NSFW access remain per-user permissions. Credentials never reach the browser or media-download URLs.
 
 ## Model Manifest
 
@@ -134,35 +133,27 @@ MCP clients connect in one of three ways in multi-user mode:
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
-### MCP Admin Tools
+### MCP Admin Tools & External Chat
 
-An administrator's chat can manage the Library, downloads, the catalogue, profiles and guides with eleven more tools (see the README's MCP section). They call the same routes as the UI with the administrator's credential, so the same checks, Undo and versions apply, and every import, catalogue edit and version they make records `chat` as its origin.
+Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Mounted ai definitions are read-only, so catalogue/profile/guide mutation tools return that ownership response; in-app editing and approval are deferred. Personal MCP tokens remain distinct from browser administrator credentials.
 
-- **Who gets them:** an administrator account's own MCP token. A chat user linked through the trusted gateway to an administrator account gets them only while **Settings › Users › Chat Gateway › Chat Gateway Admin Tools** is on; it is off by default and stored with the accounts. Ordinary accounts, unlinked or anonymous gateway users, AI Control's key and the single-user shared key never get them.
-- **What they reach:** only the Library, model download, catalogue, profile, guide and export routes. A personal token is otherwise still no administrator credential. Nothing deletes a file or replaces a download, Cancel only stops one (its partial file stays for Resume), and no tool touches a GPU.
-- **Export links** are signed with `MCP_SIGNING_KEY`, last an hour and serve the bundle Export wrote under `exports/`.
+The retained external-chat handover contracts use `STUDIO_CHAT_URL`, `chat-handovers.json` and account-owned job relationships. They remain available for existing LibreChat consumers. Studio's Chat tab is its own visual generation session, with media iterations and generation inputs; it does not introduce a general-purpose chat backend.
 
-### Refine in Chat
-
-`STUDIO_CHAT_URL` is the chat's base address, such as `https://chat.example.com` for LibreChat. With it, **Refine** in a result's Details opens `<STUDIO_CHAT_URL>/c/new?prompt=…`, which LibreChat (v0.8.8 and later) fills into a new chat's message box without sending: the result's prompt, profile, how the prompt was written and its stable job ID, in the Handover summary's form. Without it, Refine copies the same message for pasting. The handover is kept for 30 days in `chat-handovers.json`; when that account's chat names the job, MCP takes it into the account's chat jobs, so Review, Reuse and Result work on it. Only the account that owns a result can hand it over.
-
-What the chat's RewritePrompt and SuggestLoras did is kept for six hours in `mcp-assistant.json` beside `mcp-ownership.json`, so a later Generate still records it on its results after a restart. Each result's record also travels in its ComfyUI run (`extra_data.studio_generation.assistant`), so results rebuilt from ComfyUI's history keep it.
-
-`Status` and `Result` wait at most 20 seconds for a job, so a chat model that waits in the foreground cannot block its chat. A `Result` with `delivery=notification`, which hosts run in the background, waits up to 1500 seconds, below LibreChat's 1800-second background deadline. MCP keeps each account's model list for up to a minute; rescanning models in the studio refreshes it at once.
+MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account. Existing gateway settings remain supported while the separate Bifrost migration is pending.
 
 `STUDIO_ENABLE_GROK=0`, `STUDIO_ENABLE_TESSERA=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. All three are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
-Also optional: `STUDIO_COMFY_SEARCH=0` keeps Studio on the default worker's address (by default, when that doesn't answer, Studio looks on 8188 and 8000 and switches to whatever ComfyUI answers there), and `STUDIO_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
+`STUDIO_COMFY_SEARCH=0` keeps the legacy standalone worker-discovery path on its configured address. Development sets it to 0. Also, `STUDIO_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
 
-Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` (or a token saved in **Settings › Models**) opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy.
+Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy. Existing administrator credential APIs remain available; the rewritten settings page does not expose provider credentials.
 
 ## Civitai Images & Downloads
 
 Imports into the **Library** are disabled by default. Set `STUDIO_ENABLE_PRESETS=1` only on instances that should offer them; keep it unset or `0` everywhere else. The server enforces this switch for saved images, thumbnails, imports, provider downloads and Civitai token settings, and the Library's Import and Images pages follow the server’s feature flag. The Library itself (LoRAs, Models and Downloads) is always there for administrators, and existing catalogue downloads remain available independently.
 
-Open the **Library** from the desktop dock or the phone Menu. **Import** accepts a Civitai image or model link or a Hugging Face file or repository link and records each import in `library/imports/<id>.json` with its grade (Exact, Close or Partial) and reasons. A Civitai image lands in **Images** and in this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations; a LoRA writes its catalogue entry; a checkpoint is recorded. Missing files wait for **Download Missing**, which queues them through the configured downloader; paid, early-access and restricted Civitai files are never downloaded and show why. Filename conflicts stay explicit. Existing saved presets migrate to gallery images when the Library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models.
+Open the **Library** from the navigation. **Import** accepts a Civitai image or model link or a Hugging Face file or repository link and records each import in `library/imports/<id>.json` with its grade (Exact, Close or Partial) and reasons. A Civitai image lands in **Images** and in this studio’s gallery with its prompt, generation settings, checkpoint and LoRA associations; a LoRA writes its catalogue entry; a checkpoint is recorded. Missing files wait for **Download Missing**, which queues them through the configured downloader; paid, early-access and restricted Civitai files are never downloaded and show why. Filename conflicts stay explicit. Existing saved presets migrate to gallery images when the Library opens. Imported images use the normal viewer, settings reuse, reference selection and deletion behaviour. Deleting an image keeps downloaded models.
 
 **Use Settings** applies the image’s recipe to its installed image workflow without starting a generation. Exact resource matches use SHA-256, including renamed files. Missing LoRAs, unknown weights and unsupported resource types require attention; **Use Prompt** is available independently. Civitai metadata is optional, and additional processing such as ControlNet, high-resolution passes and CLIP skip needs a matching workflow. Imported settings cannot guarantee an identical image.
 
@@ -172,35 +163,65 @@ Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server env
 
 ## Prompt Assistant
 
-The prompt assistant uses the MCP prompt writer's LiteLLM gateway: `STUDIO_PROMPT_WRITER_URL`, `STUDIO_PROMPT_WRITER_KEY` and `STUDIO_PROMPT_WRITER_MODEL` (see the README's MCP section). It adds no provider key, and LiteLLM budgets are its only limit. Without the gateway, the assistant is off.
+The prompt assistant uses the MCP prompt writer's OpenAI-compatible gateway: `STUDIO_PROMPT_WRITER_URL`, `STUDIO_PROMPT_WRITER_KEY` and `STUDIO_PROMPT_WRITER_MODEL`. Credentials remain server-side. Without the gateway, the assistant is off. Bifrost fixture compatibility is separate from live gateway verification.
 
 - `STUDIO_ASSISTANT_MODEL`: the model that rewrites prompts, writes negatives, suggests LoRAs and describes images. Unset, it is `STUDIO_PROMPT_WRITER_MODEL`. MCP Generate keeps `STUDIO_PROMPT_WRITER_MODEL` either way.
 - `STUDIO_ASSISTANT_SPICY_MODEL`: an uncensored model for the Spicy preset. Unset, Spicy is hidden and refused.
 
-Administrators choose both in **Settings › Models › Integrations**, which lists the gateway's models (`GET /v1/models`) and shows whether each one reads reference images (`supports_vision` from LiteLLM's `GET /model/info`; unknown counts as text-only). A deployment that sets either variable locks its row. Choices apply at once.
+Configure these in the deployment. The retained administrator integration APIs list gateway models (`GET /v1/models`) and optional vision metadata (`supports_vision` from `GET /model/info`; unknown counts as text-only). The rewritten settings page does not expose integration editing.
 
 The **Prompt Assistant** group feature (an access profile on the server) gates every assistant route. It is on for the built-in groups and for groups stored before it existed; turn it off per group in Settings › Groups. Spicy also needs **NSFW Models**. LoRA suggestions need **LoRAs**, and drafting guides and profiles is for administrators. Replies are never logged; logs carry only the operation, profile, timing and a short failure reason. Each call times out (30 s, 90 s for a streamed rewrite) and falls back: a rewrite returns the original prompt, a negative the guide's default, LoRA suggestions the word-matched candidates.
 
 `mise run eval:assistant` replays the recorded cases in `server/fixtures/assistant-evals/` against the live gateway, using the variables above, and scores them; `--record` writes the live replies back for review. CI only scores the recorded replies.
 
-## Studio-Owned Catalogue, Profiles & Guides
+## Mounted Profiles, Guides & Catalogue
 
-These files live in the data folder (`STUDIO_DATA_DIR`, `/data` in Kubelab). Each one is written atomically by a single module. The first start of a new version snapshots the small state files first (`.backups/`), and every migration below is safe to run again.
+`ai` owns generation profiles, prompting guides and catalogue definitions, including NSFW content. Set `STUDIO_CONFIG_DIR` to its read-only mount. The expected layout is:
 
-- **`library/catalogue.json`:** one entry per model file, keyed by `folder/file`, with hash, size, title, triggers, strength, licence, links and provenance (`origin`, `source`, `by`, the last 20 changes). It takes in `config/lora-catalogue.json` (seed), `lora-catalogue.json` (installed by hand, wins over the seed), `model-download-sources.json` (provider links and hashes), `model-hashes.json` (hashes of unchanged files) and the restore manifest. Those files are never written or removed: a changed file refreshes its layer, and a removed one keeps its last copy. Studio's own catalogue edits sit above all of them.
-- **`guides/prompting.json`:** the prompting guides, in `prompting.json`'s schema plus `meta.<packId>` (version, origin, AI-Drafted). The first start copies the seed in as version 1. After that the seed only adds packs and bindings the store doesn't have: a pack Studio holds is never replaced, whoever last changed it. The guide loader reads this file first, falling back to the seed.
-- **`history/profiles/<id>/<n>.json` and `history/guides/<packId>/<n>.json`:** immutable versions, recording who saved each one (an account, `assistant`, `chat` or `seed`). The first start records each profile's `backups/profile-edits` copies and current file as versions: the oldest is `seed`, and later ones are `studio` when `.studio-edits.json` lists the profile. A revert saves an earlier version as a new one.
-- **`workflows/.studio-meta.json`:** each profile's current version, origin, AI-Drafted marker, editor, seed hash and last exported hash. `workflows/.studio-edits.json` is still written for every profile Studio changed or drafted.
-- **`exports/studio-profiles-<time>.zip`:** the 20 newest exports (see [Seed, Export & the Retired Deploy](#seed-export--the-retired-deploy)).
+```text
+profiles/*.json
+lora-catalogue.json
+models.json
+prompting.json
+workloads.json
+```
 
-### Seed, Export & the Retired Deploy
+Studio reads profiles directly and preserves their existing identifiers and `studio`/`heissUi` mapping format. Guide and catalogue mutations return a read-only response. User presets remain editable runtime data. In-app definition editing, draft approval and synchronisation are deferred.
 
-Studio is the only writer of live profiles and prompting guides. The profiles repository (`ai/profiles/`) is their **seed and backup**, and `mise run profiles:deploy` is **retired**: do not run it against a Studio data folder. Changes flow one way, Studio → **Settings › Profiles › Export** → a reviewed commit in `ai/profiles/`.
+Before enabling this mount on an existing deployment, reconcile live Studio profile, guide and catalogue edits into `ai`, with a reviewed mapping and protected backup. Studio does not overwrite or move those runtime files. The old seed/export path remains readable for deployments awaiting this explicit ownership cutover; it is superseded by the mounted configuration.
 
-- **`STUDIO_SEED_DIR`** names a directory in the seed's layout: `config/studio/workflows/*.json`, `config/prompting.json`, `config/lora-catalogue.json` and `config/models.json` (an unpacked export has the same layout). It is read-only and optional. At each start Studio copies only what is missing: a profile file it has never held (one removed in Studio is not brought back) and a `config/` file the data folder lacks. Nothing Studio holds is overwritten. Without the variable nothing is copied.
-- **Guides' seed:** `MCP_PROMPTING_PATH`, else (with `STUDIO_SEED_DIR`) the data folder's `config/prompting.json`. It fills a new install and adds missing packs only.
-- **Export** (`GET /api/profiles/export`, administrators) is a zip in the seed's layout: every profile file exactly as on disk, `config/prompting.json` (the guide store without `meta`), `config/lora-catalogue.json` (the LoRA catalogue by file name, with Studio's edits), `config/models.json` (the restore manifest, when there is one) and `EXPORT.json`, which lists each profile's and guide's version, origin and AI-Drafted state, what changed since the last export, and the AI drafts nobody has approved yet.
-- **AI drafts:** a checkpoint or diffusion model imported in the Library drafts a profile from the nearest same-family profile and the page's recommended settings, and a guide from the page. It is checked against ComfyUI's `object_info` before it is written (nothing is activated while ComfyUI can't be asked, or when it doesn't know a node type), marked NSFW unless the source says otherwise, and the parts it needs (VAE, text encoders) join the import's files for Download Missing. It is **AI-Drafted**: live for administrators only, and hidden from every other account (even with an explicit grant) until an administrator approves it or edits it in Settings › Profiles.
+## SQLite Migration & Rollback
+
+Native Node SQLite stores the persistent queue, sessions and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. Media files and runtime directory names do not move.
+
+Stop Studio and run a dry run against a copy of the intended data directory:
+
+```sh
+node scripts/migrate-runtime.mjs --data-dir /copy/of/studio-data
+node scripts/migrate-runtime.mjs --data-dir /copy/of/studio-data --apply
+```
+
+The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata under `.backups/sqlite-*`, commits all documents and its migration marker atomically, and leaves the source JSON untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
+
+Rehearse restoration into a separate empty directory:
+
+```sh
+node scripts/migrate-runtime.mjs --restore /copy/of/studio-data/.backups/sqlite-STAMP --destination /empty/restore-rehearsal
+```
+
+Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, restore the verified pre-migration metadata beside the unchanged media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
+
+Development uses `data/development` with SQLite migration applied only to that isolated directory. Recovery follows recorded job IDs and never scans or adopts a shared worker's full history.
+
+## Queue, Sessions & Runtime Control
+
+`/api/sessions` stores generation inputs and result relationships; `/api/queue` exposes queued, waiting, starting, running, saving, completed, failed and cancelled operations. Users can cancel their pending jobs and retry failed jobs. Recorded provider jobs are recovered before any resubmission. Ambiguous submission outcomes stay visible for investigation rather than creating duplicate generations.
+
+Work waits for the selected worker by default. Independent resources can run concurrently. A worker's admission remains held until results are safely saved; text admission remains held until its response stream drains. Runtime status is administrator-only.
+
+The `studio` mapping in each `ai/workloads.json` entry names an existing container, one fixed GPU placement and a direct worker URL. Configure the forwarded Docker Engine and text-admission credentials only on the server; see [worker operations](../../worker/README.md) for their single configuration reference. Automatic control is disabled by default and requires explicit ownership and traffic acknowledgements before enabling it.
+
+Bifrost remains a separate text gateway. It calls `/api/local-text/v1/chat/completions` for managed local text; that endpoint calls Radiance directly. Live Bifrost verification and the separate LiteLLM migration remain pending. Existing assistant gateway settings continue to work during that migration.
 
 ## Hidden Removal
 
@@ -216,47 +237,48 @@ Studio no longer has Hidden. The first start of a version without it backs up an
 
 Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STUDIO_*`. The old names still work as deprecated aliases: Studio reads the new name first and falls back to the old one, and the log gets one line naming the old ones still in use. Saving a setting from Settings writes the new name to Studio's settings file and drops the old line. Compose also still reads `HEISS_DOCKER_COMFY_URL` when `STUDIO_DOCKER_COMFY_URL` is unset. Rename them in your deployment when convenient; a later release removes the aliases.
 
-| Old | New |
-| --- | --- |
-| `HEISS_ALLOW_LAN` | `STUDIO_ALLOW_LAN` |
-| `HEISS_ALLOWED_HOSTS` | `STUDIO_ALLOWED_HOSTS` |
-| `HEISS_COMFY_LOST_AFTER_MS` | `STUDIO_COMFY_LOST_AFTER_MS` |
-| `HEISS_COMFY_ROOT` | `STUDIO_COMFY_ROOT` |
-| `HEISS_COMFY_SEARCH` | `STUDIO_COMFY_SEARCH` |
-| `HEISS_DATA_DIR` | `STUDIO_DATA_DIR` |
-| `HEISS_DEFAULT_COMFY_URL` | `STUDIO_DEFAULT_COMFY_URL` |
-| `HEISS_DEMO` | `STUDIO_DEMO` |
-| `HEISS_DEV_PROXY_TOKEN` | `STUDIO_DEV_PROXY_TOKEN` |
-| `HEISS_DEVICE_SESSION_DAYS` | `STUDIO_DEVICE_SESSION_DAYS` |
-| `HEISS_DOCKER_HOST_ONLY` | `STUDIO_DOCKER_HOST_ONLY` |
-| `HEISS_ENABLE_INPAINT` | `STUDIO_ENABLE_INPAINT` |
-| `HEISS_ENV_FILE` | `STUDIO_ENV_FILE` |
-| `HEISS_FFMPEG_PATH` | `STUDIO_FFMPEG_PATH` |
+| Old                             | New                              |
+| ------------------------------- | -------------------------------- |
+| `HEISS_ALLOW_LAN`               | `STUDIO_ALLOW_LAN`               |
+| `HEISS_ALLOWED_HOSTS`           | `STUDIO_ALLOWED_HOSTS`           |
+| `HEISS_COMFY_LOST_AFTER_MS`     | `STUDIO_COMFY_LOST_AFTER_MS`     |
+| `HEISS_COMFY_ROOT`              | `STUDIO_COMFY_ROOT`              |
+| `HEISS_COMFY_SEARCH`            | `STUDIO_COMFY_SEARCH`            |
+| `HEISS_DATA_DIR`                | `STUDIO_DATA_DIR`                |
+| `HEISS_DEFAULT_COMFY_URL`       | `STUDIO_DEFAULT_COMFY_URL`       |
+| `HEISS_DEMO`                    | `STUDIO_DEMO`                    |
+| `HEISS_DEV_PROXY_TOKEN`         | `STUDIO_DEV_PROXY_TOKEN`         |
+| `HEISS_DEVICE_SESSION_DAYS`     | `STUDIO_DEVICE_SESSION_DAYS`     |
+| `HEISS_DOCKER_HOST_ONLY`        | `STUDIO_DOCKER_HOST_ONLY`        |
+| `HEISS_ENABLE_INPAINT`          | `STUDIO_ENABLE_INPAINT`          |
+| `HEISS_ENV_FILE`                | `STUDIO_ENV_FILE`                |
+| `HEISS_FFMPEG_PATH`             | `STUDIO_FFMPEG_PATH`             |
 | `HEISS_GALLERY_CHANGELOG_LIMIT` | `STUDIO_GALLERY_CHANGELOG_LIMIT` |
-| `HEISS_GALLERY_LIMIT` | `STUDIO_GALLERY_LIMIT` |
-| `HEISS_GALLERY_SAVE_MS` | `STUDIO_GALLERY_SAVE_MS` |
-| `HEISS_HTTPS_PORT` | `STUDIO_HTTPS_PORT` |
-| `HEISS_LAN` | `STUDIO_LAN` |
-| `HEISS_PREVIEW_INTERVAL_MS` | `STUDIO_PREVIEW_INTERVAL_MS` |
-| `HEISS_REFERENCE_MAX_BYTES` | `STUDIO_REFERENCE_MAX_BYTES` |
-| `HEISS_REFERENCE_MAX_PIXELS` | `STUDIO_REFERENCE_MAX_PIXELS` |
-| `HEISS_SEEDVR2_HF_REPO` | `STUDIO_SEEDVR2_HF_REPO` |
-| `HEISS_SEEDVR2_MODEL_DIR` | `STUDIO_SEEDVR2_MODEL_DIR` |
-| `HEISS_TERMINAL_JOB_TTL_MS` | `STUDIO_TERMINAL_JOB_TTL_MS` |
-| `HEISS_THUMBNAIL_CACHE_MB` | `STUDIO_THUMBNAIL_CACHE_MB` |
-| `HEISS_TLS_CERT` | `STUDIO_TLS_CERT` |
-| `HEISS_TLS_KEY` | `STUDIO_TLS_KEY` |
-| `HEISS_TRASH_DAYS` | `STUDIO_TRASH_DAYS` |
-| `HEISS_VIDEO_PREVIEW_CACHE_MB` | `STUDIO_VIDEO_PREVIEW_CACHE_MB` |
+| `HEISS_GALLERY_LIMIT`           | `STUDIO_GALLERY_LIMIT`           |
+| `HEISS_GALLERY_SAVE_MS`         | `STUDIO_GALLERY_SAVE_MS`         |
+| `HEISS_HTTPS_PORT`              | `STUDIO_HTTPS_PORT`              |
+| `HEISS_LAN`                     | `STUDIO_LAN`                     |
+| `HEISS_PREVIEW_INTERVAL_MS`     | `STUDIO_PREVIEW_INTERVAL_MS`     |
+| `HEISS_REFERENCE_MAX_BYTES`     | `STUDIO_REFERENCE_MAX_BYTES`     |
+| `HEISS_REFERENCE_MAX_PIXELS`    | `STUDIO_REFERENCE_MAX_PIXELS`    |
+| `HEISS_SEEDVR2_HF_REPO`         | `STUDIO_SEEDVR2_HF_REPO`         |
+| `HEISS_SEEDVR2_MODEL_DIR`       | `STUDIO_SEEDVR2_MODEL_DIR`       |
+| `HEISS_TERMINAL_JOB_TTL_MS`     | `STUDIO_TERMINAL_JOB_TTL_MS`     |
+| `HEISS_THUMBNAIL_CACHE_MB`      | `STUDIO_THUMBNAIL_CACHE_MB`      |
+| `HEISS_TLS_CERT`                | `STUDIO_TLS_CERT`                |
+| `HEISS_TLS_KEY`                 | `STUDIO_TLS_KEY`                 |
+| `HEISS_TRASH_DAYS`              | `STUDIO_TRASH_DAYS`              |
+| `HEISS_VIDEO_PREVIEW_CACHE_MB`  | `STUDIO_VIDEO_PREVIEW_CACHE_MB`  |
 
 The same goes for the names browsers and scripts see. Studio writes only the new ones and reads the old ones until a later release:
 
-| What | Old | New | Compatibility |
-| --- | --- | --- | --- |
-| Request header for changes from scripts | `X-HEISS` | `X-Studio` | Both accepted |
-| Sign-in needed (401 response) | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both |
-| Device sign-in cookie (single-user LAN mode) | `heiss_device` | `studio_device` | The old cookie still signs in and is moved to the new name on the next request |
-| Browser storage (preferences, drafts, LoRA favourites and the rest) | `heiss-ui-*`, `heiss-ui:*`, `heiss.*`, `heiss-grid-autoplay` | `studio-*`, `studio:*`, `studio.*`, `studio-grid-autoplay` | Moved to the new names when the page starts |
+| What                                         | Old               | New                | Compatibility                                                                  |
+| -------------------------------------------- | ----------------- | ------------------ | ------------------------------------------------------------------------------ |
+| Request header for changes from scripts      | `X-HEISS`         | `X-Studio`         | Both accepted                                                                  |
+| Sign-in needed (401 response)                | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both                                                            |
+| Device sign-in cookie (single-user LAN mode) | `heiss_device`    | `studio_device`    | The old cookie still signs in and is moved to the new name on the next request |
+
+The rewritten frontend uses Studio browser preferences. It does not import legacy browser drafts or LoRA favourites; saved gallery records and server-side sessions remain authoritative.
 
 Accounts already use `studio_account`, so account sessions are unaffected.
 
@@ -264,15 +286,15 @@ Accounts already use `studio_account`, so account sessions are unaffected.
 
 Some names on disk still come from HEISS UI. Gallery records, account media and ComfyUI's output folder hold these paths, so Studio keeps writing them and never moves or renames files by itself. It already recognises the Studio name beside each one (`server/data-names.js`), so files a migration has moved keep working.
 
-| Kept name | Where | Studio name it also reads |
-| --- | --- | --- |
-| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`) | `studio/` |
-| `.heiss-trash/` | Beside trashed files in the output and media folders | `.studio-trash/` (skipped by snapshots) |
-| `heiss_generation` | Run records in ComfyUI's queue and history | `studio_generation` (written now) |
-| `heissUi` | The mapping block in workflow and profile files (`/data/workflows`, the `ai/profiles/` seed) | `studio` (read; Studio still writes `heissUi`) |
-| `heiss_*` sections, `.heiss-backup` | ComfyUI's `extra_model_paths.yaml` (single-user mode) | Not renamed |
-| `heiss` text chunk | Metadata in PNGs Studio wrote | Not renamed |
-| `heiss-ui-reference-*`, `heiss-ui-upscale-*` | File names in ComfyUI's input folder | Not renamed |
+| Kept name                                     | Where                                                                                                 | Studio name it also reads                      |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`)                   | `studio/`                                      |
+| `.heiss-trash/`                               | Beside trashed files in the output and media folders                                                  | `.studio-trash/` (skipped by snapshots)        |
+| `heiss_generation`                            | Run records in ComfyUI's queue and history                                                            | `studio_generation` (written now)              |
+| `heissUi`                                     | The mapping block in workflow and profile files (`/data/workflows`, the `ai/profiles/` configuration) | `studio` (read; Studio still writes `heissUi`) |
+| `heiss_*` sections, `.heiss-backup`           | ComfyUI's `extra_model_paths.yaml` (single-user mode)                                                 | Not renamed                                    |
+| `heiss` text chunk                            | Metadata in PNGs Studio wrote                                                                         | Not renamed                                    |
+| `heiss-ui-reference-*`, `heiss-ui-upscale-*`  | File names in ComfyUI's input folder                                                                  | Not renamed                                    |
 
 Logs are now `studio-YYYY-MM-DD.log`; older `heiss-*.log` files are still pruned after a week.
 
@@ -289,4 +311,4 @@ A later release adds an explicit migration command. It is never run automaticall
 4. **Switch.** The release that ships the command changes `outputFolderName` and `trashFolderName` in `server/data-names.js` to the Studio names; the old names stay readable for one more release.
 5. **Recovery.** `--undo <manifest>` renames the folders back and restores the records from the backups the apply step made. If anything else is wrong, restore the snapshots from step 1 and redeploy the previous image.
 
-The profile block is a file format shared with the `ai/profiles/` seed. Studio reads both `studio` and `heissUi` (a file with both is refused by the profile check), and keeps writing `heissUi` (`writtenBlockName` in `server/profile-block.js`) until the seed and its checks are migrated to `studio`; that switch is its own change.
+The profile block is a file format shared with the `ai/profiles/` configuration. Studio reads both `studio` and `heissUi` (a file with both is refused by the profile check), and retains `heissUi` output for external format compatibility; changing that format requires an explicit migration.

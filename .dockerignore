@@ -9,7 +9,6 @@
 artifacts
 comfyui/*/test_*.py
 data
-dist
 docs
 node_modules
 outputs
@@ -20,3 +19,4 @@ release
 renovate.json5
 test-results
 tests
+**/*.test.ts

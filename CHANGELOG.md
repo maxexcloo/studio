@@ -3,13 +3,25 @@
 Every release of Studio, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/) as described in
-[docs/guides/CONTRIBUTING.md](docs/guides/CONTRIBUTING.md#versions-and-releases).
+[docs/guides/CONTRIBUTING.md](docs/guides/CONTRIBUTING.md).
 
 Add notes under **Unreleased** as changes land; `npm run release` turns that
 section into the next version and uses it as the GitHub release notes. Each
 version opens with a `> ` summary line.
 
 ## [Unreleased]
+
+> A media-first workspace with visual iteration sessions and a persistent generation queue
+
+### Changed
+
+- Replace the legacy frontend with Mantine, shared responsive generation controls and Image, Video and Chat views. Gallery generation stays at the bottom; Chat keeps media iterations and session history together.
+- Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
+- Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal.
+- Read profiles, guides and catalogue definitions from the ai-owned configuration mount. User presets remain editable; definition editing and approval are deferred.
+- Build a separate shared media/text worker image with GPU leases, Docker admission and authenticated local text streaming. Automatic lifecycle control remains disabled until ownership and traffic cutover are verified.
+- Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links.
+- Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
 
 ## [0.48.1] - 2026-10-22
 

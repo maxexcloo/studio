@@ -10,17 +10,17 @@ catalog, so a family that is described correctly needs no UI work.
 
 ## The pieces
 
-| What | Where | Holds |
-| --- | --- | --- |
-| Families | `server/family-catalog.js` → `families` | Label, kind, sources, encoder slots, VAE kinds, latent node, size step, negative mode, sampling style, variants with default settings |
-| Detection | `family-catalog.js` → `familyFromHeader`, `familyFromName`; `model-families.js` → `familyFromMetadata` | Tensor-key signatures (mirroring ComfyUI's `comfy/model_detection.py`), filename patterns, safetensors metadata |
-| Text encoders and VAEs | `server/model-components.js` → `encoderKinds`, `vaeKinds`, `encoderKindFromHeader`, `vaeLayoutFromHeader` | What each encoder or VAE file is, by shape first and name second |
-| Downloads | `family-catalog.js` → `encoderDownloads`, `vaeDownloads` | Hugging Face files the Download buttons fetch. Abliterated builds first wherever a ComfyUI-ready one exists |
-| Quantized files | `family-catalog.js` → `quantFormats`, `quantFromHeader` | Formats ComfyUI's own loaders cannot read (Nunchaku SVDQuant, bitsandbytes NF4): the loader node that reads each one instead, per model source, or why it cannot run |
-| Node packs | `server/node-packs.js` → `nodePacks` | Every custom node pack Studio may ask for: name, Git URL, folder, the node classes that prove it loaded |
-| Graph | `server/family-graph.js` → `familyGraph` | One builder for every family; special sampling styles branch off it |
-| Profiles | `server/family-profiles.js` | Turns every model file into a runnable profile and lists exactly what is missing |
-| GGUF | `server/gguf.js` | Reads GGUF headers as safetensors-style headers (so detection needs no GGUF rules), lists GGUF models and encoders, and swaps core loaders for ComfyUI-GGUF's twins in the graph. See `docs/gguf-research.md` |
+| What                   | Where                                                                                                     | Holds                                                                                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Families               | `server/family-catalog.js` → `families`                                                                   | Label, kind, sources, encoder slots, VAE kinds, latent node, size step, negative mode, sampling style, variants with default settings                                                               |
+| Detection              | `family-catalog.js` → `familyFromHeader`, `familyFromName`; `model-families.js` → `familyFromMetadata`    | Tensor-key signatures (mirroring ComfyUI's `comfy/model_detection.py`), filename patterns, safetensors metadata                                                                                     |
+| Text encoders and VAEs | `server/model-components.js` → `encoderKinds`, `vaeKinds`, `encoderKindFromHeader`, `vaeLayoutFromHeader` | What each encoder or VAE file is, by shape first and name second                                                                                                                                    |
+| Downloads              | `family-catalog.js` → `encoderDownloads`, `vaeDownloads`                                                  | Hugging Face files the Download buttons fetch. Abliterated builds first wherever a ComfyUI-ready one exists                                                                                         |
+| Quantized files        | `family-catalog.js` → `quantFormats`, `quantFromHeader`                                                   | Formats ComfyUI's own loaders cannot read (Nunchaku SVDQuant, bitsandbytes NF4): the loader node that reads each one instead, per model source, or why it cannot run                                |
+| Node packs             | `server/node-packs.js` → `nodePacks`                                                                      | Every custom node pack Studio may ask for: name, Git URL, folder, the node classes that prove it loaded                                                                                             |
+| Graph                  | `server/family-graph.js` → `familyGraph`                                                                  | One builder for every family; special sampling styles branch off it                                                                                                                                 |
+| Profiles               | `server/family-profiles.js`                                                                               | Turns every model file into a runnable profile and lists exactly what is missing                                                                                                                    |
+| GGUF                   | `server/gguf.js`                                                                                          | Reads GGUF headers as safetensors-style headers (so detection needs no GGUF rules), lists GGUF models and encoders, and swaps core loaders for ComfyUI-GGUF's twins in the graph. See [GGUF](#gguf) |
 
 ## Recipe
 
@@ -214,8 +214,22 @@ A new family states its own `native`; leaving it out means none.
 
 ## Supported families
 
-The table of supported families is in the [README](../../README.md#supported-models).
+Mounted ai profiles define the supported catalogue for a deployment. The retained native family detectors and graph builders are defined in `server/family-catalog.js`; only offer a profile after its required nodes and files are verified on its worker.
 
 ## Formats
 
-**GGUF** files run through the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack, which installs in one click. The current ComfyUI-GGUF doesn't load Krea 2, Ideogram 4, MiniMax H3 or Qwen-Image 2.1 GGUFs yet, so use their safetensors versions for now ([details](../gguf-research.md)). Nunchaku, NF4 and other formats that need their own loader nodes aren't supported. For those, get them running in ComfyUI first and bring them over as [your own workflow](../../README.md#bring-your-own-workflow).
+### GGUF
+
+GGUF workflows require the [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) node pack on the selected worker. Studio reads GGUF headers through `server/gguf.js`, keeps the existing tensor-family detectors and substitutes the matching GGUF loader nodes. Mixed encoder slots are supported when the worker's loader advertises them.
+
+Architecture support depends on the pinned worker node revision, not the file extension. Verify the worker's node catalogue and required encoder/vision components before offering a GGUF profile. Unsupported loader formats can use a reviewed [custom workflow](../../workflows/README.md) defined in ai.
+
+### Worker Memory
+
+`server/hardware.js` uses the selected worker's `/system_stats` response for its memory estimate; the application container's own RAM is not the GPU budget. CUDA-style device reports also include ROCm workers. CPU and placeholder device values do not establish a usable GPU budget. Memory estimates help present requirements; they do not replace a verified model run on the actual placement.
+
+For local MPS development the retained estimator uses a configured wired-memory limit where available, otherwise 70% of unified memory. It favours full-precision alternatives to scaled or mixed FP8 formats that MPS cannot execute. Worker deployments use the exact image, GPU placement and model paths owned in ai.
+
+## Downloads
+
+Library imports show matching files, their grade and missing parts before downloads begin. Downloads keep progress across restarts, verify file integrity and retain server-side provider credentials. Mounted catalogue definitions are managed in `ai`; importing files does not grant Studio permission to edit those definitions.
