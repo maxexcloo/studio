@@ -6,6 +6,23 @@ export interface ChatDraft {
   input: GenerationInput;
   parentJobId?: string;
 }
+export interface ChatRevision {
+  sourceJobId: string;
+  operation: ChatDraft["operation"];
+  input: GenerationInput;
+  changes?: Record<string, { before: unknown; after: unknown }>;
+}
+export interface ChatModel {
+  id: string;
+  label: string;
+  provider?: string;
+}
+export interface ChatStatus {
+  available: boolean;
+  reason?: string;
+  models: ChatModel[];
+  defaultModelId?: string;
+}
 export interface ChatMessage {
   id: string;
   sessionId: string;
@@ -17,11 +34,17 @@ export interface ChatMessage {
   draft?: ChatDraft;
   jobId?: string;
   actionError?: string;
+  revision?: ChatRevision;
+  modelId?: string;
+  actualModelId?: string;
+  provider?: string;
 }
 export interface ChatInput {
   content: string;
   references?: string[];
   generation?: ChatDraft;
+  revision?: ChatRevision;
+  modelId?: string;
 }
 export type ChatEvent =
   | { event: "message"; data: ChatMessage }

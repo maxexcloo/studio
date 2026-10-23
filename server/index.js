@@ -219,6 +219,7 @@ import {
   readUploadedReference,
   referenceAssetFromGallery,
   referenceAssetForAccount,
+  referenceExistsForAccount,
   saveUploadedReference,
   stageReferenceAssets,
 } from "./reference-assets.js";
@@ -2571,10 +2572,107 @@ generationRoutes.setAdmission(async (req, res) => {
   res.status(result.status).json(result.payload);
 });
 
+async function selectedChatMediaProfile(input, operation) {
+  const models = await mediaModels(false)
+    .then((result) => result.models)
+    .catch((error) => {
+      if (demoMode) return mockModelResult();
+      throw error;
+    });
+  const profile = models.profiles?.find((item) => item.id === input?.profileId);
+  const reject = (message) => {
+    throw Object.assign(new Error(message), { status: 400 });
+  };
+  if (!profile) reject("Choose an available generation model before asking Chat to create media.");
+  const kind = operation === "animate" ? "video" : "image";
+  if ((profile.kind || "image") !== kind)
+    reject(
+      `Choose a ${kind} model for this action; the selected model will not be changed automatically.`,
+    );
+  if (
+    operation !== "image" &&
+    !(
+      profile.capabilities?.startImage ||
+      profile.imageModes?.reference ||
+      profile.mediaInputs?.length
+    )
+  )
+    reject("Choose a model that supports image references for this action.");
+  return profile;
+}
 const sessionChat = new ChatService({
   store: new ChatStore(rewriteStore.db),
   settings: gatewaySettings,
   session: (ownerId, id) => rewriteStore.session(ownerId, id),
+  models: async (ownerId) => {
+    const settings = gatewaySettings();
+    if (!settings) return [];
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (ownerId && !account?.authenticated) return [];
+    const spicyModel = assistantEngine?.settings().spicyModel;
+    const permitted = (id) =>
+      !spicyModel || id !== spicyModel || !account || mayUseFeature(account, "nsfwModels");
+    const models = ((await assistantEngine?.listModelDetails()) || []).filter((model) =>
+      permitted(model.id),
+    );
+    if (permitted(settings.model) && !models.some((model) => model.id === settings.model))
+      models.push({ id: settings.model, label: settings.model });
+    return models;
+  },
+  revision: async (ownerId, sessionId, revision) => {
+    const source = rewriteStore.job(ownerId, revision.sourceJobId);
+    if (!source || source.sessionId !== sessionId)
+      throw Object.assign(new Error("Source generation not found."), { status: 404 });
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
+      throw Object.assign(new Error("The prompt assistant is off for this account."), {
+        status: 403,
+      });
+    const kind = revision.operation === "animate" ? "video" : "image";
+    if (revision.input.kind && revision.input.kind !== kind)
+      throw Object.assign(new Error("The selected operation does not match the media kind."), {
+        status: 400,
+      });
+    const input = { ...revision.input, kind };
+    const profile = await selectedChatMediaProfile(input, revision.operation);
+    const startImage = input.startImageId || input.startImage;
+    if (startImage && !referenceExistsForAccount(account, startImage))
+      throw Object.assign(new Error("The start image does not belong to this account."), {
+        status: 400,
+      });
+    if (!input.referenceAssets?.length && startImage)
+      input.referenceAssets = [
+        { assetId: startImage, slot: profile.mediaInputs?.[0]?.id || "reference" },
+      ];
+    if (revision.operation !== "image" && !input.referenceAssets?.length)
+      throw Object.assign(
+        new Error("Choose a reference image before submitting a refinement or animation."),
+        { status: 400 },
+      );
+    if (
+      input.referenceAssets !== undefined &&
+      (!Array.isArray(input.referenceAssets) || input.referenceAssets.length > 8)
+    )
+      throw Object.assign(new Error("Choose up to eight reference images."), { status: 400 });
+    for (const reference of input.referenceAssets || [])
+      if (
+        !reference ||
+        typeof reference.assetId !== "string" ||
+        !referenceExistsForAccount(account, reference.assetId)
+      )
+        throw Object.assign(new Error("Choose reference images belonging to this account."), {
+          status: 400,
+        });
+    const checked = await validateGenerationInput(input, account || undefined);
+    if (checked.status >= 400)
+      throw Object.assign(new Error(checked.payload.error), { status: checked.status });
+    return {
+      sourceJobId: source.id,
+      operation: revision.operation,
+      input,
+      previousInput: source.input,
+    };
+  },
   reference: async (ownerId, id) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated)
@@ -2589,26 +2687,14 @@ const sessionChat = new ChatService({
       });
     return `data:${image.mime};base64,${image.data}`;
   },
-  admit: async ({ ownerId, sessionId, turnId, draft }) => {
+  admit: async ({ ownerId, sessionId, turnId, draft, revision }) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
       throw Object.assign(new Error("The prompt assistant is off for this account."), {
         status: 403,
       });
-    const models = await mediaModels(false)
-      .then((result) => result.models)
-      .catch((error) => {
-        if (demoMode) return mockModelResult();
-        throw error;
-      });
-    const profile = models.profiles?.find((item) => item.id === draft.input?.profileId);
-    if (!profile)
-      throw new Error("Choose an available generation model before asking Chat to create media.");
+    const profile = await selectedChatMediaProfile(draft.input, draft.operation);
     const kind = draft.operation === "animate" ? "video" : "image";
-    if ((profile.kind || "image") !== kind)
-      throw new Error(
-        `Choose a ${kind} model for this action; the selected model will not be changed automatically.`,
-      );
     const input = {
       ...draft.input,
       kind,
@@ -2617,14 +2703,6 @@ const sessionChat = new ChatService({
     };
     let parentJobId = draft.parentJobId;
     if (draft.operation !== "image") {
-      if (
-        !(
-          profile.capabilities?.startImage ||
-          profile.imageModes?.reference ||
-          profile.mediaInputs?.length
-        )
-      )
-        throw new Error("Choose a model that supports image references for this action.");
       const parent = parentJobId
         ? rewriteStore.job(ownerId, parentJobId)
         : rewriteStore
@@ -2640,7 +2718,7 @@ const sessionChat = new ChatService({
       const replaceInherited = Boolean(
         inheritedPrimary && references[0]?.assetId === inheritedPrimary,
       );
-      if (!references.length || replaceInherited) {
+      if (!revision && (!references.length || replaceInherited)) {
         if (parent && parent.status !== "completed")
           throw new Error(
             "The selected result is still rendering. Wait for it to finish before refining it.",
@@ -2670,6 +2748,8 @@ const sessionChat = new ChatService({
         ];
         input.referenceRole = "edit";
       }
+      if (revision && !references.length)
+        throw new Error("Choose a reference image before submitting a refinement or animation.");
     }
     const result = await admitGeneration(input, account || undefined, {
       sessionId,

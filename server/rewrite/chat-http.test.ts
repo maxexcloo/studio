@@ -9,7 +9,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import type { QueueJob } from "../../shared/queue.ts";
+import type { GenerationInput, QueueJob } from "../../shared/queue.ts";
 
 test(
   "Chat streams into an owned media session and reopens after restart",
@@ -18,20 +18,35 @@ test(
     const dataDir = mkdtempSync(path.join(os.tmpdir(), "studio-chat-http-"));
     const requests: any[] = [];
     const gateway = createServer(async (request, response) => {
+      if (request.method === "GET" && request.url === "/v1/models") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            data: [
+              { id: "fixture-text-model", owned_by: "Fixture Gateway" },
+              { id: "alternate-text", name: "Alternate Text", provider: "Fixture Provider" },
+              { id: "restricted-text", owned_by: "Fixture Provider" },
+            ],
+          }),
+        );
+        return;
+      }
       let body = "";
       for await (const chunk of request) body += chunk;
       const input = JSON.parse(body);
       requests.push(input);
       response.writeHead(200, { "content-type": "text/event-stream" });
       const latest = input.messages.at(-1).content;
-      const content = typeof latest === "string" ? latest : latest[0].text;
+      const content = (typeof latest === "string" ? latest : latest[0].text).split(
+        "\n\nStudio context",
+      )[0];
       response.write(
-        `data: ${JSON.stringify({ choices: [{ delta: { content: "Here is my response." } }] })}\n\n`,
+        `data: ${JSON.stringify({ model: "actual-" + input.model, choices: [{ delta: { content: "Here is my response." } }] })}\n\n`,
       );
       const operation =
         content === "Create a landscape."
           ? "image"
-          : content === "Make it painterly."
+          : content === "Make it painterly." || content === "Submit edited card."
             ? "refine"
             : content === "Animate this."
               ? "animate"
@@ -67,6 +82,7 @@ test(
           STUDIO_PROMPT_WRITER_URL: gatewayUrl,
           STUDIO_PROMPT_WRITER_KEY: "fixture",
           STUDIO_PROMPT_WRITER_MODEL: "fixture-text-model",
+          STUDIO_ASSISTANT_SPICY_MODEL: "restricted-text",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });
@@ -109,11 +125,13 @@ test(
       content: string,
       generation: unknown,
       references?: string[],
+      extra?: object,
     ) {
       const response = await request(`/api/sessions/${sessionId}/chat`, "POST", {
         content,
         generation,
         references,
+        ...extra,
       });
       assert.equal(response.status, 200);
       assert.match(response.headers.get("content-type") || "", /text\/event-stream/);
@@ -150,6 +168,7 @@ test(
         gallery: true,
         promptAssistant: true,
         cloudModels: false,
+        nsfwModels: false,
       };
       await api("/api/accounts/profiles", "POST", {
         id: "artists",
@@ -180,7 +199,14 @@ test(
       });
       assert.equal(account.account.role, "user");
       const artistCookie = cookie;
-      assert.equal((await api("/api/chat/status")).available, true);
+      const chatStatus = await api("/api/chat/status");
+      assert.equal(chatStatus.available, true);
+      assert.equal(chatStatus.defaultModelId, "fixture-text-model");
+      assert.deepEqual(
+        chatStatus.models.map((model: any) => model.id),
+        ["alternate-text", "fixture-text-model"],
+      );
+      assert.equal(chatStatus.models[0].provider, "Fixture Provider");
       const { session } = await api("/api/sessions", "POST", { title: "Chat Landscape" });
       const input = {
         profileId: "mock-flux-schnell",
@@ -252,7 +278,92 @@ test(
         "third turn anchors the new parent rather than its inherited old source",
       );
       assert.deepEqual(thirdReferences[1], style, "a deliberate additional reference is retained");
+      const revisionInput: GenerationInput = {
+        ...third.input,
+        prompt: "Exact edited card prompt",
+        steps: 3,
+        seed: 123,
+      };
+      const revised = await chat(session.id, "Submit edited card.", undefined, undefined, {
+        modelId: "alternate-text",
+        revision: { sourceJobId: third.id, operation: "refine", input: revisionInput },
+      });
+      assert.equal(revised.filter((event) => event.event === "generation").length, 1);
+      const fourthId = revised.find((event) => event.event === "generation")!.data.job.id;
+      const fourth = await completed(fourthId);
+      assert.equal(
+        fourth.input.prompt,
+        revisionInput.prompt,
+        "tool prompt cannot replace explicit card edit",
+      );
+      assert.equal(fourth.input.seed, 123);
+      assert.equal(fourth.input.steps, 3);
+      assert.deepEqual(fourth.input.referenceAssets, revisionInput.referenceAssets);
+      assert.equal(fourth.parentJobId, third.id);
+      assert.equal(requests.at(-1).model, "alternate-text");
+      const revisionContext = requests.at(-1).messages.at(-1).content;
+      assert.match(revisionContext, /Exact edited card prompt/);
+      assert.match(revisionContext, /"steps":\{"before":2,"after":3\}/);
+      const savedRevision = (await api(`/api/sessions/${session.id}/chat`)).messages;
+      const editedReply = savedRevision.find((message: any) => message.jobId === fourthId);
+      assert.equal(editedReply.actualModelId, "actual-alternate-text");
+      assert.equal(editedReply.provider, "Fixture Provider");
+      const aliasJobIds: string[] = [];
+      for (const alias of ["startImage", "startImageId"]) {
+        const legacyInput = {
+          ...input,
+          prompt: "Keep the explicitly selected source",
+          [alias]: asset.id,
+        };
+        const legacyEvents = await chat(session.id, "Submit edited card.", undefined, undefined, {
+          revision: { sourceJobId: fourth.id, operation: "refine", input: legacyInput },
+        });
+        const legacyId = legacyEvents.find((event) => event.event === "generation")!.data.job.id;
+        aliasJobIds.push(legacyId);
+        const legacyJob = await completed(legacyId);
+        assert.equal(legacyJob.input[alias], asset.id);
+        assert.equal(
+          (legacyJob.input.referenceAssets as { assetId: string }[])[0]?.assetId,
+          asset.id,
+          "legacy alias preserves its own chosen primary rather than replacing it with the parent result",
+        );
+      }
+      const messageCount = (await api(`/api/sessions/${session.id}/chat`)).messages.length,
+        gatewayCount = requests.length;
+      for (const payload of [
+        { content: "Not allowed", modelId: "restricted-text" },
+        { content: "Unknown", modelId: "not-in-gateway" },
+        {
+          content: "Foreign revision",
+          revision: { sourceJobId: "missing", operation: "image", input },
+        },
+        {
+          content: "Wrong media model",
+          revision: { sourceJobId: third.id, operation: "animate", input },
+        },
+        {
+          content: "Foreign start image",
+          revision: {
+            sourceJobId: third.id,
+            operation: "refine",
+            input: { ...input, startImageId: "not-owned" },
+          },
+        },
+      ]) {
+        const denied = await request(`/api/sessions/${session.id}/chat`, "POST", payload);
+        assert.equal(
+          denied.status,
+          payload.revision ? (payload.revision.sourceJobId === "missing" ? 404 : 400) : 403,
+        );
+      }
+      assert.equal(requests.length, gatewayCount);
+      assert.equal((await api(`/api/sessions/${session.id}/chat`)).messages.length, messageCount);
       await chat(session.id, "Discuss this image.", { operation: "image", input }, [asset.id]);
+      assert.match(
+        JSON.stringify(requests.at(-1).messages.slice(1, -1)),
+        /Exact edited card prompt/,
+      );
+      assert.match(JSON.stringify(requests.at(-1).messages.slice(1, -1)), new RegExp(fourthId));
       assert.match(
         requests.at(-1).messages.at(-1).content[1].image_url.url,
         /^data:image\/jpeg;base64,/,
@@ -295,6 +406,8 @@ test(
           [firstId, "completed"],
           [secondId, "completed"],
           [thirdId, "completed"],
+          [fourthId, "completed"],
+          ...aliasJobIds.map((id) => [id, "completed"]),
         ],
       );
     } finally {
