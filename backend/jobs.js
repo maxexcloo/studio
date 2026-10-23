@@ -351,9 +351,16 @@ function sendSocketFeatureFlags(socket) {
  */
 function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
   if (!socket) return null;
+  const terminal = () => {
+    const job = jobs.get(id);
+    return !job || job.terminalAt || ["done", "error", "canceled"].includes(job.status);
+  };
   socket.addEventListener("message", async (event) => {
+    if (terminal()) return;
     try {
       const buffer = await previewBuffer(event.data);
+      // Delivery can finish while a binary frame is being decoded, before cleanup closes the socket.
+      if (terminal()) return;
       if (buffer) {
         queueLatestPreview(id, buffer);
         return;

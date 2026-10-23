@@ -55,6 +55,57 @@ const result = (id) => ({
   status: { status_str: "success" },
 });
 
+test("a stale queue snapshot cannot resurrect a job delivered while another recovery output is saving", async () => {
+  const jobs = new Map([
+    ["live", { status: "running", comfyBackend: "video", promptId: "live-prompt" }],
+  ]);
+  let gallery = [tile("recovered", "pending"), tile("live", "pending")];
+  let saving;
+  const savingStarted = new Promise((resolve) => {
+    saving = resolve;
+  });
+  let release;
+  const released = new Promise((resolve) => {
+    release = resolve;
+  });
+  const recover = createJobRecovery({
+    backends: () => ["video"],
+    jobs,
+    getGallery: () => gallery,
+    finishJob: (id, patch) => jobs.set(id, { ...jobs.get(id), ...patch, terminalAt: 1 }),
+    recordsFromHistory: (history) => Object.values(history).flatMap((entry) => entry.outputs),
+    request: async (path) =>
+      path === "/queue"
+        ? { queue_running: [queued("live")] }
+        : { "recovered-prompt": result("recovered") },
+    setGallery: (items) => {
+      gallery = items;
+    },
+    visible: (items) => items,
+    withBackend: async (_backend, run) => run(),
+    ingest: async (records) => {
+      saving();
+      await released;
+      return records;
+    },
+  });
+  const recovering = recover();
+  await savingStarted;
+  const completed = { ...result("live").outputs[0], index: 0 };
+  gallery = gallery.map((item) => (item.jobId === "live" ? completed : item));
+  jobs.set("live", { ...jobs.get("live"), status: "done", outputs: [completed], terminalAt: 123 });
+  release();
+  await recovering;
+  assert.equal(jobs.get("live").status, "done");
+  assert.equal(jobs.get("live").terminalAt, 123);
+  assert.equal(jobs.get("live").recovered, undefined);
+  assert.deepEqual(
+    gallery.find((item) => item.jobId === "live"),
+    completed,
+  );
+  assert.equal(jobs.get("recovered").status, "done");
+});
+
 test("restart reattaches failed tiles to running and queued video prompts without submission", async () => {
   const s = fixture();
   s.gallery = [tile("running"), tile("waiting")];
