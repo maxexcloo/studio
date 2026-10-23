@@ -30,6 +30,7 @@ MODELS = {
     "video": ("grok-imagine-video", "grok-imagine-video-1.5"),
 }
 discover_models = node.available_models
+discover_schema_models = node.schema_models
 
 
 class ProviderTests(unittest.TestCase):
@@ -56,6 +57,12 @@ class ProviderTests(unittest.TestCase):
         cache = patch.object(node, "_model_cache", None)
         cache.start()
         self.addCleanup(cache.stop)
+        schema = patch.object(node, "schema_models", return_value=MODELS)
+        schema.start()
+        self.addCleanup(schema.stop)
+        refresh = patch.object(node, "_schema_refresh", None)
+        refresh.start()
+        self.addCleanup(refresh.stop)
 
     def test_image_and_edit_contracts(self):
         proxy = node.Proxy()
@@ -457,6 +464,90 @@ class ProviderTests(unittest.TestCase):
             discover_models()
             self.assertEqual(call.call_count, 2)
 
+    def test_schema_returns_cached_choices_while_provider_discovery_is_blocked(self):
+        entered = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+        returned = threading.Event()
+        schemas = []
+
+        def provider(*args, **kwargs):
+            entered.set()
+            release.wait()
+            return {
+                "data": [{"id": name} for names in MODELS.values() for name in names]
+            }
+
+        def refresh():
+            try:
+                return discover_models()
+            finally:
+                finished.set()
+
+        def read_schema():
+            schemas.append(node.GrokMedia.INPUT_TYPES())
+            returned.set()
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(
+                node.folder_paths,
+                "get_input_directory",
+                return_value=directory,
+                create=True,
+            ),
+            patch.object(node, "schema_models", discover_schema_models),
+            patch.object(
+                node, "_model_cache", (("http://proxy.example", "test-key"), 0, MODELS)
+            ),
+            patch.object(node, "available_models", side_effect=refresh),
+            patch.object(node.Proxy, "call", side_effect=provider) as call,
+        ):
+            reader = threading.Thread(target=read_schema)
+            reader.start()
+            try:
+                self.assertTrue(entered.wait(2))
+                self.assertTrue(
+                    returned.wait(2), "Schema waited for provider discovery"
+                )
+                expected = [""] + list(MODELS["image"]) + list(MODELS["video"])
+                self.assertEqual(schemas[0]["optional"]["model"][0], expected)
+                self.assertEqual(
+                    node.GrokMedia.INPUT_TYPES()["optional"]["model"][0], expected
+                )
+                call.assert_called_once_with("/v1/models", timeout=5)
+            finally:
+                release.set()
+                reader.join(2)
+                self.assertTrue(finished.wait(2))
+            self.assertEqual(discover_schema_models(), MODELS)
+
+    def test_schema_provider_failure_backs_off_then_retries(self):
+        finished = threading.Event()
+
+        def refresh():
+            try:
+                return discover_models()
+            finally:
+                finished.set()
+
+        with (
+            patch.object(node.time, "monotonic", return_value=100) as clock,
+            patch.object(node, "available_models", side_effect=refresh),
+            patch.object(
+                node.Proxy, "call", side_effect=RuntimeError("offline")
+            ) as call,
+        ):
+            self.assertEqual(discover_schema_models(), {"image": (), "video": ()})
+            self.assertTrue(finished.wait(2))
+            self.assertEqual(discover_schema_models(), {"image": (), "video": ()})
+            call.assert_called_once_with("/v1/models", timeout=5)
+            finished.clear()
+            clock.return_value = 161
+            self.assertEqual(discover_schema_models(), {"image": (), "video": ()})
+            self.assertTrue(finished.wait(2))
+            self.assertEqual(call.call_count, 2)
+
     def test_discovery_failure_has_no_static_model_fallback(self):
         with (
             patch.object(node, "available_models", discover_models),
@@ -486,7 +577,7 @@ class ProviderTests(unittest.TestCase):
                 create=True,
             ),
             patch.object(
-                node, "available_models", side_effect=RuntimeError("provider offline")
+                node, "schema_models", side_effect=RuntimeError("provider offline")
             ),
         ):
             schema = node.GrokMedia.INPUT_TYPES()
