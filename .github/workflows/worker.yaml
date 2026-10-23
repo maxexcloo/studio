@@ -3,6 +3,7 @@ name: Worker
 on:
   pull_request:
     paths:
+      - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
       - comfyui/**
@@ -10,6 +11,7 @@ on:
   push:
     branches: [main]
     paths:
+      - .dockerignore
       - .github/workflows/worker.yaml
       - LICENSE
       - comfyui/**
