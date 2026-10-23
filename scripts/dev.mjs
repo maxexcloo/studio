@@ -16,6 +16,8 @@ const environment = {
   STUDIO_DEV_API_PORT: process.env.STUDIO_DEV_API_PORT || "18787",
   STUDIO_COMFY_SEARCH: "0",
   STUDIO_DATA_DIR: dataDir,
+  STUDIO_ENV_FILE: path.join(dataDir, ".env"),
+  STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
   STUDIO_DEV_PROXY_TOKEN: crypto.randomBytes(32).toString("base64url"),
   STUDIO_RUNTIME_AUTOMATIC: "0",
   STUDIO_MULTI_USER: "0",
