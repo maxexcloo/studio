@@ -21,6 +21,6 @@ npm run release -- minor
 
 Use `patch` for fixes, `minor` for new behaviour before 1.0, or an explicit newer version. The public 1.0 release requires an explicit version. Write user-visible changes under Unreleased in [CHANGELOG.md](../../CHANGELOG.md), beginning with a short `> ` summary.
 
-Push the resulting version tag to publish. The Studio workflow checks source and browser behaviour, builds the frontend once, verifies and scans the image, publishes its version tags, then creates a release from the changelog. The worker workflow independently checks and publishes the GPU image when worker sources change or a version tag is pushed.
+Push the resulting version tag to publish. The Studio workflow checks source and browser behaviour, builds the frontend once, verifies and scans the app image, and invokes the worker workflow before creating a release from the changelog. Both images must pass their checks and scans before the release is announced. Worker source changes also run its workflow independently; UI-only changes do not build the GPU image. CI runs application checks and worker Python tests separately; `mise run check` runs both locally.
 
 Batch related, verified changes. Do not release features still awaiting real-model verification. Publication and production deployment are separate actions; use the deployment repository's reviewed configuration for cutover.

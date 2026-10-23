@@ -30,14 +30,14 @@ jobs:
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
           # Renovate requires Node 24 in addition to the application runtime.
-          tools: actionlint node node@24 npm:renovate oxfmt python ruff uv
+          tools: actionlint node node@24 npm:renovate oxfmt
       - name: Check Release Tag
         if: startsWith(github.ref, 'refs/tags/')
         run: test "$GITHUB_REF_NAME" = "v$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json")).version')"
       - name: Install Dependencies
         run: mise run setup
       - name: Run Checks
-        run: mise run check
+        run: mise run check:app
       - name: Build Frontend
         run: mise run build
       - name: Save Frontend
@@ -157,10 +157,19 @@ jobs:
           sbom: true
           tags: ${{ steps.metadata.outputs.tags }}
 
+  worker:
+    name: Worker
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: image
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/worker.yaml
+
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: image
+    needs: [image, worker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
