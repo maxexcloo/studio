@@ -27,7 +27,9 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route("**/api/models", (route) => route.fulfill({ json: { profiles: [profile] } }));
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { profiles: [profile] } }),
+  );
   state.gallery.push({
     id: "shared",
     jobId: "saved",

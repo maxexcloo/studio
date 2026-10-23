@@ -228,7 +228,7 @@ test("Model classification saves and reads back while definition administration 
     "Original",
   );
   administrator = false;
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles, features: { library: false, presets: false } } }),
   );
   await page.goto("/library");

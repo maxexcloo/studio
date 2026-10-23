@@ -126,11 +126,15 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await assist(page, "Suggest LoRAs");
   await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
   await expect(prompt).toHaveValue("My later direction in warm light, inkbird");
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
   await page.getByRole("option", { name: "Soft Style", exact: true }).click();
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await undoAssistance(page, "LoRA applied");
   await expect(prompt).toHaveValue("My later direction in warm light");
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input).toMatchObject({

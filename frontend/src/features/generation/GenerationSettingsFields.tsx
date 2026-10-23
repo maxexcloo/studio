@@ -13,7 +13,6 @@ import {
 } from "@mantine/core";
 import type { GenerationInput, Profile } from "../../types";
 import { PromptHistory } from "./PromptHistory";
-import { LoraPicker } from "./LoraPicker";
 import { useGeneration } from "./GenerationProvider";
 
 const selections = [
@@ -213,7 +212,6 @@ export function GenerationSettingsFields({
                     }}
                   />
                 )}
-              {profile?.capabilities.lora && <LoraPicker value={input} onChange={onChange} />}
               {profile?.provider !== "cliproxyapi" && (
                 <Checkbox
                   label="Allow Fallback to Another Worker"

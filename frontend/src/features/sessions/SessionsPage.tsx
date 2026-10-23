@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import { api } from "../../api";
@@ -21,11 +21,8 @@ export function ChatPage() {
   return id ? <SessionPage /> : <SessionsPage />;
 }
 export function SessionsPage() {
-  const { setDraft, setPrepared } = useGeneration();
-  useEffect(() => {
-    setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
-    setPrepared(false);
-  }, [setDraft]);
+  const { draft } = useGeneration();
+  if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <ChatWorkspace>
       <EmptyState fill>No Chat Selected</EmptyState>

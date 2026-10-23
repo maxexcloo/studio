@@ -1,5 +1,5 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -18,6 +18,7 @@ import {
   Stack,
   Text,
   UnstyledButton,
+  getDefaultZIndex,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
@@ -28,12 +29,7 @@ import { OrderedItems } from "../../ui/OrderedItems";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
-import {
-  GalleryFilterToolbar,
-  emptyGalleryFilters,
-  appendGalleryFilters,
-  type GalleryFilterValues,
-} from "../gallery/GalleryFilters";
+import { GalleryFilterToolbar, appendGalleryFilters } from "../gallery/GalleryFilters";
 import {
   addReference,
   referenceDetails,
@@ -45,6 +41,7 @@ import {
 import { useGeneration } from "./GenerationProvider";
 import { referenceLabel, useGalleryReference } from "./references";
 import { useReferenceUpload } from "./useReferenceUpload";
+import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 
 export function ReferencePicker({
   compact = false,
@@ -53,15 +50,19 @@ export function ReferencePicker({
   profile: selectedProfile,
   input: selectedInput,
   inline = false,
+  embedded = false,
   opened: controlled,
   onOpenedChange,
+  browser: controlledBrowser,
 }: {
+  browser?: ReferenceBrowser;
   compact?: boolean;
   value?: ReferenceAsset[];
   onChange?: (references: ReferenceAsset[]) => void;
   profile?: Profile;
   input?: GenerationInput;
   inline?: boolean;
+  embedded?: boolean;
   opened?: boolean;
   onOpenedChange?: (opened: boolean) => void;
 }) {
@@ -84,20 +85,22 @@ export function ReferencePicker({
   );
   const currentReferences = useRef<ReferenceAsset[]>(references);
   currentReferences.current = references;
-  const [chosenSlot, setChosenSlot] = useState<string | null>(null);
+  const localBrowser = useReferenceBrowser();
+  const browser = controlledBrowser || localBrowser;
+  const { chosenSlot, query, source, filters, starred } = browser.state;
+  function browse(patch: Partial<ReferenceBrowser["state"]>) {
+    if (!("chosenSlot" in patch)) browser.scroll.current = 0;
+    browser.setState((previous) => ({ ...previous, ...patch }));
+  }
   const groups = referenceGroups(profile);
   const group = groups.find((items) => items.some((input) => input.id === chosenSlot)) || groups[0];
   const slot = group[0].id;
   const slotLimit = referenceCapacity(group);
   const selectedCount = referenceGroupAssets(references, group).length;
   const slotFull = slotLimit > 1 && selectedCount >= slotLimit;
-  const [query, setQuery] = useState("");
-  const [source, setSource] = useState<"gallery" | "uploads">("gallery");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search] = useDebouncedValue(query, 250);
   const client = useQueryClient();
-  const [filters, setFilters] = useState<GalleryFilterValues>(emptyGalleryFilters);
-  const [starred, setStarred] = useState(false);
   function setReferences(references: ReferenceAsset[]) {
     currentReferences.current = references;
     if (onChange) onChange(references);
@@ -131,6 +134,7 @@ export function ReferencePicker({
     <Modal
       opened={deleteId !== null}
       onClose={dismissDelete}
+      zIndex={getDefaultZIndex("overlay")}
       title="Delete Upload"
       centered
       closeOnClickOutside={!deletion.isPending}
@@ -209,6 +213,15 @@ export function ReferencePicker({
             thumbnailUrl: item.thumbnailUrl || item.url,
             choose: () => select.mutate(item),
           }));
+  const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
+  const restoreScroll = useRef(true);
+  useLayoutEffect(() => {
+    if (!viewport) restoreScroll.current = true;
+    else if (restoreScroll.current && choices.length) {
+      viewport.scrollTop = browser.scroll.current;
+      restoreScroll.current = false;
+    }
+  }, [viewport, choices.length, browser.scroll]);
   const content = (
     <Stack
       component="section"
@@ -232,8 +245,8 @@ export function ReferencePicker({
       gap="sm"
       style={{
         minHeight: 0,
-        flex: inline ? 1 : undefined,
-        height: inline ? undefined : "min(70dvh, 640px)",
+        // Inline fills the phone Drawer below its header so the listing owns its scroll position.
+        height: inline ? "calc(100dvh - 6rem)" : "min(70dvh, 640px)",
       }}
     >
       <Group justify="space-between" wrap="nowrap">
@@ -270,7 +283,7 @@ export function ReferencePicker({
           comboboxProps={{ withinPortal: false }}
           label="Reference Slot"
           value={slot}
-          onChange={setChosenSlot}
+          onChange={(chosenSlot) => browse({ chosenSlot })}
           allowDeselect={false}
           data={groups.map((items) => ({
             value: items[0].id,
@@ -324,7 +337,7 @@ export function ReferencePicker({
       <SegmentedControl
         aria-label="Reference Source"
         value={source}
-        onChange={(value) => setSource(value as "gallery" | "uploads")}
+        onChange={(value) => browse({ source: value as "gallery" | "uploads" })}
         fullWidth
         data={[
           { value: "gallery", label: "Gallery" },
@@ -335,23 +348,29 @@ export function ReferencePicker({
         <GalleryFilterToolbar
           withinPortal={false}
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={(query) => browse({ query })}
           kind="image"
           value={filters}
-          onChange={setFilters}
+          onChange={(filters) => browse({ filters })}
           starred={starred}
-          onStarredChange={setStarred}
+          onStarredChange={(starred) => browse({ starred })}
         />
       ) : (
         <SearchInput
           aria-label="Search Uploads"
           placeholder="Search uploads…"
           value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          onClear={() => setQuery("")}
+          onChange={(event) => browse({ query: event.currentTarget.value })}
+          onClear={() => browse({ query: "" })}
         />
       )}
-      <ScrollArea.Autosize style={{ flex: 1, minHeight: 0 }}>
+      <ScrollArea.Autosize
+        style={{ flex: 1, minHeight: 0 }}
+        viewportRef={setViewport}
+        onScrollPositionChange={({ y }) => {
+          if (!restoreScroll.current) browser.scroll.current = y;
+        }}
+      >
         {listing.isPending ? (
           <LoadingState label="Loading References" />
         ) : listing.error ? (
@@ -455,7 +474,7 @@ export function ReferencePicker({
       <>
         {trigger}
         <Drawer
-          opened={opened}
+          opened={opened && !embedded}
           onClose={close}
           title="References"
           position="bottom"

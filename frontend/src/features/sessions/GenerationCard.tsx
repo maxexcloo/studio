@@ -7,6 +7,8 @@ import { initialInput, useGenerationActions } from "../generation/GenerationProv
 import { GenerationInputControls } from "../generation/GenerationInputControls";
 import { ReferenceRoleControl } from "../generation/ReferenceRoleControl";
 import { ReferencePicker } from "../generation/ReferencePicker";
+import { useReferenceBrowser } from "../generation/useReferenceBrowser";
+import { LoraPicker, useLoraPicker } from "../generation/LoraPicker";
 import { GenerationSettingsFields } from "../generation/GenerationSettingsFields";
 import { PromptHistory } from "../generation/PromptHistory";
 import { GenerationFooter } from "../generation/GenerationFooter";
@@ -30,13 +32,15 @@ export function GenerationCard({
   const operation = job?.operation || draft!.operation;
   const [editing, setEditing] = useState(!job);
   const [referenceOpen, setReferenceOpen] = useState(false);
+  const referenceBrowser = useReferenceBrowser();
+  const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
   useLayoutEffect(() => {
-    if (!editing || referenceOpen) return;
+    if (!editing || referenceOpen || loraPicker.opened) return;
     prompt.current?.focus({ preventScroll: true });
     prompt.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
-  }, [editing, referenceOpen]);
+  }, [editing, referenceOpen, loraPicker.opened]);
   const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
   const { profiles } = useGenerationActions();
   const { send, sendingSession, status } = useChatController();
@@ -96,23 +100,30 @@ export function GenerationCard({
   }
   const changeReferences = (next: ReferenceAsset[]) =>
     form.setValues(referencePatch(form.getValues(), references, next, profile));
-  if (editing && narrow && referenceOpen)
-    return (
-      <Paper withBorder p="md">
-        <ReferencePicker
-          inline
-          opened
-          onOpenedChange={setReferenceOpen}
-          value={references}
-          onChange={changeReferences}
-          profile={profile}
-          input={form.values}
-        />
-      </Paper>
-    );
+  const inlinePanel =
+    editing && narrow && loraPicker.opened ? (
+      <LoraPicker
+        inline
+        value={form.values}
+        onChange={(input) => form.setValues(input)}
+        picker={loraPicker}
+      />
+    ) : editing && narrow && referenceOpen ? (
+      <ReferencePicker
+        inline
+        opened
+        browser={referenceBrowser}
+        onOpenedChange={setReferenceOpen}
+        value={references}
+        onChange={changeReferences}
+        profile={profile}
+        input={form.values}
+      />
+    ) : null;
   return (
     <Paper withBorder radius="lg" p="md" className="studio-generation-card">
-      <Stack gap="sm">
+      {inlinePanel}
+      <Stack gap="sm" display={inlinePanel ? "none" : undefined}>
         {editing && (
           <Group justify="space-between" wrap="nowrap">
             <Text size="xs" fw={600} c="dimmed">
@@ -160,11 +171,14 @@ export function GenerationCard({
                 {...form.getInputProps("prompt")}
               />
               <GenerationInputControls
+                loraPicker={loraPicker}
                 input={form.values}
                 profile={profile}
                 onChange={(patch) => form.setValues(patch)}
                 references={
                   <ReferencePicker
+                    embedded
+                    browser={referenceBrowser}
                     opened={referenceOpen}
                     onOpenedChange={setReferenceOpen}
                     profile={profile}

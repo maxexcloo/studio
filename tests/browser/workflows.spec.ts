@@ -278,10 +278,11 @@ test("Library shows import grades and reuses compatible inspiration settings", a
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).press("Escape");
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   const close = page.getByRole("button", { name: "Close Generation Controls", exact: true });
   if (await close.isVisible()) await close.click();
   else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
@@ -429,7 +430,7 @@ test("Generation controls preserve the draft and return keyboard focus with redu
 
 test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await fixtures(page);
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({
       json: {
         profiles: [
@@ -462,14 +463,16 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
     }),
   );
   await create(page);
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRA Type", exact: true }).click();
   await page.getByRole("option", { name: "Style", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
   await page.getByRole("option", { name: "Soft Style", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Soft Style", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: "Other Quality", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "LoRA Type", exact: true })).toHaveValue("");
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
   await page.getByRole("option", { name: "Other Detail", exact: true }).click();
@@ -848,7 +851,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   const state = await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An ordered adapter study");
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const picker = page.getByRole("combobox", { name: "LoRAs", exact: true });
   await picker.click();
   await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
@@ -864,6 +867,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
     await drag.press("ArrowUp");
     await drag.press("Space");
   }
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras.map((lora: { name: string }) => lora.name)).toEqual(
@@ -885,7 +889,9 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
       { id: "end", label: "End", required: false, max: 1 },
     ],
   };
-  await page.route("**/api/models", (route) => route.fulfill({ json: { profiles: [profile] } }));
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { profiles: [profile] } }),
+  );
   state.gallery.push({
     id: "slot-source",
     type: "image",
@@ -1037,12 +1043,12 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   await viewerAction(page, "Recreate");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
-  const expert = page.getByRole("button", { name: "Expert Controls", exact: true });
-  await expert.press("Enter");
-  await expect(expert).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
+  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await enabled.check();
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "owned-asset", slot: "image" }]);
@@ -1069,7 +1075,9 @@ test("Generation size presets and custom dimensions preserve profile constraints
       height: { min: 512, max: 2048, step: 64 },
     },
   };
-  await page.route("**/api/models", (route) => route.fulfill({ json: { profiles: [profile] } }));
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { profiles: [profile] } }),
+  );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
   await page.getByRole("button", { name: "Image Size", exact: true }).click();

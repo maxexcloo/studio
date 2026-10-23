@@ -112,7 +112,7 @@ function useGenerationState(workspace: Workspace) {
   );
   const models = useQuery({
     queryKey: ["models"],
-    queryFn: () => api<Models>("/api/models"),
+    queryFn: () => api<Models>("/api/models?cached=1"),
     refetchInterval: 15000,
   });
   const profiles = models.data?.profiles ?? emptyProfiles;

@@ -124,12 +124,13 @@ export function LoraStacks({
     });
   }
   return (
-    <Accordion value={opened} onChange={setOpened}>
+    <Accordion value={opened} onChange={setOpened} transitionDuration={0}>
       <Accordion.Item value="stacks">
         <Accordion.Control>Saved LoRA Stacks</Accordion.Control>
         <Accordion.Panel>
           <Stack gap="sm">
             <Select
+              comboboxProps={{ withinPortal: false }}
               label="Saved LoRA Stack"
               searchable
               clearable

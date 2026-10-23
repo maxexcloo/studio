@@ -13,7 +13,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
   );
   for (const id of ["first", "second", "third"])
@@ -129,7 +129,7 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
   );
   state.gallery.push({
