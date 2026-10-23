@@ -153,6 +153,7 @@ export class McpMedia {
     this.domainRequest = domainRequest;
     this.credentials = new Map();
     this.profileRequests = new Map();
+    this.enqueuePhase = Promise.resolve();
     this.file = path.join(dataDir, "mcp-ownership.json");
     try {
       this.state = readJsonFile(this.file);
@@ -550,74 +551,91 @@ export class McpMedia {
       (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)
     )
       body.tiledDecode = true;
-    const queued = [];
-    for (const prompt of prompts.map(styled))
-      for (let variant = 0; variant < runs; variant++) {
-        const id = crypto.randomUUID();
-        try {
-          // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
-          this.state.jobs[id] = owner;
-          this.save();
-          const result = await this.request(
-            "POST",
-            "/api/generate",
-            {
-              ...body,
-              clientJobId: id,
+    const preparedPrompts = prompts.map(styled);
+    // A call owns the enqueue phase until its whole set is acknowledged, even across MCP clients.
+    // Preparation and result waiting remain independent; a refused or uncertain set releases the next.
+    const previous = this.enqueuePhase;
+    let release;
+    this.enqueuePhase = new Promise((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const queued = [];
+      for (const prompt of preparedPrompts)
+        for (let variant = 0; variant < runs; variant++) {
+          const id = crypto.randomUUID();
+          try {
+            // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
+            this.state.jobs[id] = owner;
+            this.save();
+            const result = await this.request(
+              "POST",
+              "/api/generate",
+              {
+                ...body,
+                clientJobId: id,
+                prompt,
+                seed: seed === undefined ? "" : String(seed + queued.length),
+              },
+              owner,
+            );
+            if (!result.jobId) throw new Error("Studio did not return a job ID.");
+            if (
+              Object.hasOwn(this.state.jobs, result.jobId) &&
+              this.state.jobs[result.jobId] !== owner
+            )
+              throw new Error("Studio returned a job owned by another account.");
+            this.state.jobs[result.jobId] = owner;
+            if (cloud) {
+              if (this.cloudJobs.size >= 256)
+                this.cloudJobs.delete(this.cloudJobs.keys().next().value);
+              this.cloudJobs.set(result.jobId, { owner, at: Date.now(), ended: false });
+            }
+            // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
+            this.recordPrompt(result.jobId, {
               prompt,
-              seed: seed === undefined ? "" : String(seed + queued.length),
-            },
-            owner,
-          );
-          if (!result.jobId) throw new Error("Studio did not return a job ID.");
-          if (
-            Object.hasOwn(this.state.jobs, result.jobId) &&
-            this.state.jobs[result.jobId] !== owner
-          )
-            throw new Error("Studio returned a job owned by another account.");
-          this.state.jobs[result.jobId] = owner;
-          if (cloud) {
-            if (this.cloudJobs.size >= 256)
-              this.cloudJobs.delete(this.cloudJobs.keys().next().value);
-            this.cloudJobs.set(result.jobId, { owner, at: Date.now(), ended: false });
-          }
-          // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
-          this.recordPrompt(result.jobId, {
-            prompt,
-            ...(record.request ? { request: record.request } : {}),
-            ...(record.changes?.length ? { changes: record.changes } : {}),
-            ...(record.assistant ? { assistant: record.assistant } : {}),
-          });
-          this.save();
-          queued.push({ job_id: result.jobId, ...this.handle(owner, scope, result.jobId), prompt });
-        } catch (error) {
-          if (error.submissionUncertain) {
+              ...(record.request ? { request: record.request } : {}),
+              ...(record.changes?.length ? { changes: record.changes } : {}),
+              ...(record.assistant ? { assistant: record.assistant } : {}),
+            });
+            this.save();
             queued.push({
-              job_id: id,
-              ...this.handle(owner, scope, id),
-              status: "unknown",
+              job_id: result.jobId,
+              ...this.handle(owner, scope, result.jobId),
               prompt,
             });
-            return {
-              status: "partially_queued",
-              jobs: queued,
-              error:
-                "The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.",
-            };
+          } catch (error) {
+            if (error.submissionUncertain) {
+              queued.push({
+                job_id: id,
+                ...this.handle(owner, scope, id),
+                status: "unknown",
+                prompt,
+              });
+              return {
+                status: "partially_queued",
+                jobs: queued,
+                error:
+                  "The last submission could not be acknowledged. Use Status with its returned job ID; do not resubmit.",
+              };
+            }
+            if (cloud && this.noteCloudRefusal(error.message))
+              error.message = `${cloudQuotaMessage} ${error.message}`;
+            // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
+            if (queued.length)
+              return {
+                status: "partially_queued",
+                jobs: queued,
+                error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
+              };
+            throw error;
           }
-          if (cloud && this.noteCloudRefusal(error.message))
-            error.message = `${cloudQuotaMessage} ${error.message}`;
-          // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
-          if (queued.length)
-            return {
-              status: "partially_queued",
-              jobs: queued,
-              error: `Further submission failed; retain returned jobs before retrying. ${error.message}`,
-            };
-          throw error;
         }
-      }
-    return { status: "queued", jobs: queued };
+      return { status: "queued", jobs: queued };
+    } finally {
+      release();
+    }
   }
   recordPrompt(jobId, record) {
     const keys = Object.keys(this.state.prompts);

@@ -729,13 +729,15 @@ test("media and administrator credentials discover only their own friendly tools
   // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
   assert.match(
     media.getInstructions(),
-    /^Studio makes images and videos\. For each one the user asks for, follow their instructions: call Generate/,
+    /^Studio makes images and videos\. For each set sharing a profile and LoRAs/,
   );
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
   assert.match(
     media.getInstructions(),
-    /call Generate once with request \(the user's words, with anything they refer back to\), kind and tier/,
+    /OR prompts \(distinct exact prompts\), never both; use count for variants/,
   );
+  assert.match(media.getInstructions(), /Submit different sets serially/);
+  assert.match(media.getInstructions(), /call Generate once for the whole set/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(
     media.getInstructions(),
