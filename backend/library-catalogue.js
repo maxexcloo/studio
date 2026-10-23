@@ -36,14 +36,6 @@ export const catalogueKinds = Object.freeze({
   vae: "vae",
   clip_vision: "clip_vision",
 });
-export const catalogueOrigins = Object.freeze([
-  "seed",
-  "import",
-  "ai",
-  "admin",
-  "chat",
-  "manifest",
-]);
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
 const layerNames = ["seed", "definitions", "admin", "provider", "hashes", "manifest"];
 const historyLimit = 20;

@@ -1,7 +1,3 @@
-// Shared by the server (profiles from synced workflows) and the composer (any
-// profile, however its slots arrive), so a reference stack always shows as one
-// References button.
-
 /**
  * Synced workflows usually list a reference stack as separate slots
  * ("reference", "reference-2", … each "Reference Image") without saying they
@@ -28,13 +24,4 @@ export function chainReferenceSlots(inputs) {
       input.follows = previous.id;
   });
   return inputs;
-}
-
-/** A profile with its reference stack chained, the original left untouched. */
-export function withReferenceChains(profile) {
-  if (!Array.isArray(profile?.mediaInputs) || profile.mediaInputs.length < 2) return profile;
-  return {
-    ...profile,
-    mediaInputs: chainReferenceSlots(profile.mediaInputs.map((input) => ({ ...input }))),
-  };
 }
