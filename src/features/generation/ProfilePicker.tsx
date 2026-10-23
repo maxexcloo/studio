@@ -1,14 +1,26 @@
 import { Accordion, Group, Select, SimpleGrid, Stack, Text } from "@mantine/core";
-import { useGeneration } from "./GenerationProvider";
-import type { Profile } from "../../types";
+import { inputForProfile, useGeneration } from "./GenerationProvider";
+import type { GenerationInput, Profile } from "../../types";
 const family = (profile: Profile) => profile.familyName || profile.family;
 const model = (profile: Profile) =>
   profile.recipe?.modelLabel || profile.baseModel || profile.model;
 const preset = (profile: Profile) =>
   profile.recipe?.label || profile.variantLabel || profile.displayName || profile.label;
 const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
-export function ModelPicker() {
-  const { models: catalogue, profiles, profile, input, update, selectProfile } = useGeneration();
+export function ProfilePicker({
+  value,
+  onChange,
+}: { value?: GenerationInput; onChange?: (value: GenerationInput) => void } = {}) {
+  const context = useGeneration();
+  const { models: catalogue, profiles } = context;
+  const input = value || context.input;
+  const profile = value
+    ? profiles.find((profile) => profile.id === value.profileId && profile.kind === value.kind)
+    : context.profile;
+  const update = (patch: Partial<GenerationInput>) =>
+    onChange ? onChange({ ...input, ...patch }) : context.update(patch);
+  const selectProfile = (profile: Profile) =>
+    onChange ? onChange(inputForProfile(input, profile)) : context.selectProfile(profile);
   const available = profiles.filter((p) => p.kind === input.kind);
   const families = unique(available.map(family));
   const inFamily = available.filter((p) => family(p) === (profile ? family(profile) : families[0]));
@@ -17,12 +29,15 @@ export function ModelPicker() {
   const workers = catalogue.data?.workers || [];
   const worker = workers.find((value) => value.id === input.backendId);
   return (
-    <Accordion variant="contained" radius="md" className="studio-model-picker">
+    <Accordion variant="contained" radius="md" className="studio-profile-picker">
       <Accordion.Item value="model">
-        <Accordion.Control aria-label="Choose Model" data-model-picker>
+        <Accordion.Control aria-label="Choose Profile" data-profile-picker>
+          <Text size="xs" c="dimmed">
+            Profile
+          </Text>
           <Stack gap={2}>
             <Text size="sm" fw={500} truncate>
-              {profile ? model(profile) : "Choose a Model"}
+              {profile ? model(profile) : "Choose a Profile"}
             </Text>
             <Group gap="xs" wrap="nowrap">
               <Text size="xs" c="dimmed" truncate>
@@ -42,7 +57,7 @@ export function ModelPicker() {
           <Stack gap="sm">
             <SimpleGrid cols={{ base: 1, sm: 3 }}>
               <Select
-                comboboxProps={{ withinPortal: false }}
+                comboboxProps={{ withinPortal: true }}
                 label="Family"
                 placeholder="Choose a family"
                 searchable
@@ -55,7 +70,7 @@ export function ModelPicker() {
                 }}
               />
               <Select
-                comboboxProps={{ withinPortal: false }}
+                comboboxProps={{ withinPortal: true }}
                 label="Model & Finetune"
                 searchable
                 data={models}
@@ -67,8 +82,9 @@ export function ModelPicker() {
                 }}
               />
               <Select
-                comboboxProps={{ withinPortal: false }}
+                comboboxProps={{ withinPortal: true }}
                 label="Fast, Quality & Workflow Preset"
+                searchable
                 data={inModel.map((p) => ({ value: p.id, label: preset(p) }))}
                 value={profile?.id || null}
                 allowDeselect={false}
@@ -81,7 +97,7 @@ export function ModelPicker() {
             {!!profile?.workerIds?.length && (
               <Select
                 label="Worker"
-                comboboxProps={{ withinPortal: false }}
+                comboboxProps={{ withinPortal: true }}
                 data={profile.workerIds.map((id) => {
                   const worker = workers.find((value) => value.id === id);
                   return {

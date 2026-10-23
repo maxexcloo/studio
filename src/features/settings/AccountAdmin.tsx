@@ -13,6 +13,7 @@ import {
   Select,
   SimpleGrid,
   Stack,
+  Table,
   Text,
   TextInput,
   Title,
@@ -287,85 +288,114 @@ export function AccountAdmin() {
           Assign access groups to control each user’s local models, cloud models and NSFW access.
           Administrator accounts have all permissions.
         </Text>
-        <Stack gap="sm">
-          {data.accounts.map((account) => {
-            const group = data.accessProfiles.find((group) => group.id === account.accessProfileId);
-            return (
-              <Paper
-                key={account.id}
-                p="md"
-                component="section"
-                aria-label={`Account ${account.displayName || account.username}`}
-              >
-                <Stack gap="sm">
-                  <Group justify="space-between">
-                    <Stack gap={2}>
-                      <Text fw={500}>{account.displayName || account.username}</Text>
-                      <Text size="xs" c="dimmed">
-                        {account.username}
-                      </Text>
-                    </Stack>
-                    <Group gap="xs">
-                      <Badge color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}>
-                        {account.disabled
-                          ? "Disabled"
-                          : account.pending
-                            ? "Awaiting Approval"
-                            : account.role === "administrator"
-                              ? "Administrator"
-                              : "User"}
-                      </Badge>
-                      {account.signInLinked && <Badge variant="light">Single Sign-On</Badge>}
-                    </Group>
-                  </Group>
-                  {account.role === "user" && (
-                    <>
-                      <Select
-                        label={`Access Group for ${account.displayName || account.username}`}
-                        value={account.accessProfileId || null}
-                        placeholder="Assign a group to approve"
-                        data={data.accessProfiles.map((group) => ({
-                          value: group.id,
-                          label: group.name,
-                        }))}
-                        allowDeselect={false}
-                        onChange={(accessProfileId) =>
-                          change.mutate({ id: account.id, patch: { accessProfileId } })
-                        }
-                      />
-                      <Group gap="xs">
-                        <Badge
-                          variant="light"
-                          color={group?.features.cloudModels ? "green" : "gray"}
-                        >
-                          Cloud Models {group?.features.cloudModels ? "On" : "Off"}
-                        </Badge>
-                        <Badge
-                          variant="light"
-                          color={group?.features.nsfwModels ? "green" : "gray"}
-                        >
-                          NSFW Models {group?.features.nsfwModels ? "On" : "Off"}
-                        </Badge>
-                      </Group>
-                    </>
-                  )}
-                  <Button
-                    size="compact-sm"
-                    variant="subtle"
-                    color={account.disabled ? "green" : "red"}
-                    style={{ alignSelf: "start" }}
-                    loading={change.isPending}
-                    onClick={() =>
-                      change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
-                    }
+        <Table.ScrollContainer minWidth={760}>
+          <Table aria-label="User Accounts" verticalSpacing="sm" highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Account</Table.Th>
+                <Table.Th>Role & Status</Table.Th>
+                <Table.Th>Access Group</Table.Th>
+                <Table.Th>Permissions</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {data.accounts.map((account) => {
+                const group = data.accessProfiles.find(
+                  (group) => group.id === account.accessProfileId,
+                );
+                return (
+                  <Table.Tr
+                    key={account.id}
+                    aria-label={`Account ${account.displayName || account.username}`}
                   >
-                    {account.disabled ? "Enable Account" : "Disable Account"}
-                  </Button>
-                </Stack>
-              </Paper>
-            );
-          })}
-        </Stack>
+                    <Table.Td>
+                      <Stack gap={2}>
+                        <Text fw={500}>{account.displayName || account.username}</Text>
+                        <Text size="xs" c="dimmed">
+                          {account.username}
+                        </Text>
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      <Stack gap="xs" align="start">
+                        <Badge
+                          color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}
+                        >
+                          {account.disabled
+                            ? "Disabled"
+                            : account.pending
+                              ? "Awaiting Approval"
+                              : account.role === "administrator"
+                                ? "Administrator"
+                                : "User"}
+                        </Badge>
+                        {account.signInLinked && <Badge variant="light">Single Sign-On</Badge>}
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      {account.role === "user" ? (
+                        <Select
+                          label={`Access Group for ${account.displayName || account.username}`}
+                          value={account.accessProfileId || null}
+                          placeholder="Assign a group to approve"
+                          data={data.accessProfiles.map((group) => ({
+                            value: group.id,
+                            label: group.name,
+                          }))}
+                          allowDeselect={false}
+                          miw={180}
+                          onChange={(accessProfileId) =>
+                            change.mutate({ id: account.id, patch: { accessProfileId } })
+                          }
+                        />
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          All Groups
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      {account.role === "user" ? (
+                        <Stack gap="xs" align="start">
+                          <Badge
+                            variant="light"
+                            color={group?.features.cloudModels ? "green" : "gray"}
+                          >
+                            Cloud Models {group?.features.cloudModels ? "On" : "Off"}
+                          </Badge>
+                          <Badge
+                            variant="light"
+                            color={group?.features.nsfwModels ? "green" : "gray"}
+                          >
+                            NSFW Models {group?.features.nsfwModels ? "On" : "Off"}
+                          </Badge>
+                        </Stack>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          All Permissions
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
+                      <Button
+                        size="compact-sm"
+                        variant="subtle"
+                        color={account.disabled ? "green" : "red"}
+                        loading={change.isPending}
+                        onClick={() =>
+                          change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
+                        }
+                      >
+                        {account.disabled ? "Enable Account" : "Disable Account"}
+                      </Button>
+                    </Table.Td>
+                  </Table.Tr>
+                );
+              })}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
         <Accordion variant="separated" transitionDuration={0}>
           <Accordion.Item value="groups">
             <Accordion.Control>Access Groups</Accordion.Control>

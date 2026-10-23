@@ -1,0 +1,59 @@
+.content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: var(--mantine-line-height);
+}
+
+.content :where(p, ul, ol, pre, blockquote) {
+  margin-block: var(--mantine-spacing-sm);
+}
+
+.content :where(h1, h2, h3, h4, h5, h6) {
+  margin-top: var(--mantine-spacing-lg);
+  margin-bottom: var(--mantine-spacing-xs);
+  font-weight: 600;
+  line-height: var(--mantine-line-height-sm);
+}
+
+.content h1 {
+  font-size: var(--mantine-font-size-xl);
+}
+
+.content h2 {
+  font-size: var(--mantine-font-size-lg);
+}
+
+.content :where(h3, h4, h5, h6) {
+  font-size: var(--mantine-font-size-md);
+}
+
+.content li {
+  margin-block: var(--mantine-spacing-xs);
+}
+
+.content :where(ul, ol) {
+  padding-inline-start: var(--mantine-spacing-xl);
+}
+
+.content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default-hover);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.content code {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.content > :first-child {
+  margin-top: 0;
+}
+
+.content > :last-child {
+  margin-bottom: 0;
+}

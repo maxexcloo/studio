@@ -14,6 +14,7 @@ export interface Profile {
   variantLabel?: string;
   recipe?: { modelLabel?: string; label?: string };
   workerIds?: string[];
+  maxLoras?: number;
   provider?: string;
   ready?: boolean;
   nsfw?: boolean;
@@ -22,10 +23,11 @@ export interface Profile {
   mediaInputs?: { id: string; label?: string; required?: boolean; max?: number; role?: string }[];
   options?: Record<string, string[]>;
   constraints?: Record<string, { min?: number; max?: number; step?: number }>;
-  aspectPresets?: { label: string; width: number; height: number }[];
+  aspectPresets?: { label: string; w: number; h: number }[];
 }
 export interface ReferenceAsset {
   id: string;
+  slot?: string;
   name: string;
   thumbnailUrl: string;
   url?: string;
@@ -66,6 +68,8 @@ export interface MediaItem {
   settings?: Record<string, unknown>;
   model?: string;
   filename?: string;
+  startImageId?: string;
+  referenceImage?: string;
   upscale?: { url?: string; status?: string };
 }
 export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "progress"> & {

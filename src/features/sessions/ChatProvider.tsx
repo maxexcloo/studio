@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import type { ChatEvent, ChatInput, ChatMessage } from "../../../shared/chat";
+import type { ChatEvent, ChatInput, ChatMessage, ChatStatus } from "../../../shared/chat";
 import { api, post, request } from "../../api";
 import type { Session } from "../../types";
 import { useGeneration } from "../generation/GenerationProvider";
@@ -47,25 +47,29 @@ async function readChat(response: Response, receive: (event: ChatEvent) => void)
 function useChatState() {
   const client = useQueryClient(),
     navigate = useNavigate();
-  const { draft, setDraft, profile } = useGeneration();
+  const { draft, setDraft, profile, setPrepared } = useGeneration();
   const [text, setText] = useState("");
   const [sendingSession, setSendingSession] = useState("");
   const [error, setError] = useState("");
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const active = useRef<AbortController | null>(null);
   const status = useQuery({
     queryKey: ["chat-status"],
-    queryFn: () => api<{ available: boolean; reason?: string }>("/api/chat/status"),
+    queryFn: () => api<ChatStatus>("/api/chat/status"),
+    refetchInterval: 15000,
   });
   useEffect(() => () => active.current?.abort(), []);
 
-  async function send() {
-    const content = text.trim();
-    if (!content || active.current) return;
+  const modelId = selectedModel || status.data?.defaultModelId || status.data?.models?.[0]?.id;
+  async function send(override?: Partial<ChatInput>, targetSessionId?: string) {
+    const content = (override?.content ?? text).trim();
+    if (!content || active.current) return false;
+    let generated = false;
     const controller = new AbortController();
     active.current = controller;
     setSendingSession(draft.sessionId || "new");
     setError("");
-    let sessionId = draft.sessionId;
+    let sessionId = targetSessionId || draft.sessionId;
     try {
       const input = generationInput(draft.input, profile, draft.references);
       if (!sessionId) {
@@ -78,11 +82,13 @@ function useChatState() {
         void client.invalidateQueries({ queryKey: ["sessions"] });
       }
       setSendingSession(sessionId);
-      navigate(`/sessions/${sessionId}`);
+      navigate(`/chat/${sessionId}`);
       const body: ChatInput = {
         content,
         references: draft.references.map((asset) => asset.id),
         generation: { input, operation: draft.operation, parentJobId: draft.parentJobId },
+        modelId,
+        ...override,
       };
       const response = await request(`/api/sessions/${sessionId}/chat`, {
         method: "POST",
@@ -90,7 +96,7 @@ function useChatState() {
         signal: controller.signal,
         headers: { Accept: "text/event-stream" },
       });
-      setText("");
+      if (!override?.content) setText("");
       await readChat(response, (event) => {
         if (event.event === "message" || event.event === "delta") {
           void client.cancelQueries({ queryKey: ["chat", sessionId] });
@@ -108,6 +114,9 @@ function useChatState() {
             return { ...previous, available: true, messages };
           });
         } else if (event.event === "generation") {
+          generated = true;
+          setPrepared(false);
+          setDraft((previous) => ({ ...previous, parentJobId: event.data.job.id }));
           void client.invalidateQueries({ queryKey: ["session", sessionId] });
           void client.invalidateQueries({ queryKey: ["queue"] });
           void client.invalidateQueries({ queryKey: ["gallery"] });
@@ -124,6 +133,7 @@ function useChatState() {
         void client.invalidateQueries({ queryKey: ["session", sessionId] });
       }
     }
+    return generated;
   }
   return {
     text,
@@ -132,6 +142,8 @@ function useChatState() {
     sendingSession,
     error,
     status,
+    modelId,
+    selectModel: setSelectedModel,
     stop: () => active.current?.abort(),
   };
 }

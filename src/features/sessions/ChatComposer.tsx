@@ -1,13 +1,11 @@
-import { Alert, Button, Group, Image, Stack, Text, Textarea } from "@mantine/core";
+import { ActionIcon, Alert, Group, Select, Stack, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp, Square } from "lucide-react";
-import { useGeneration } from "../generation/GenerationProvider";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { useChat } from "./ChatProvider";
-
-export function ChatComposer({ onControls }: { onControls: () => void }) {
-  const { draft, profile } = useGeneration();
-  const { text, setText, send, sendingSession, stop, error, status } = useChat();
-  const unavailable = status.data?.available === false;
+export function ChatComposer() {
+  const { text, setText, send, sendingSession, stop, status, modelId, selectModel } = useChat();
+  const unavailable = status.isPending || status.isError || status.data?.available === false;
+  const models = status.data?.models || [];
   return (
     <form
       onSubmit={(event) => {
@@ -15,29 +13,17 @@ export function ChatComposer({ onControls }: { onControls: () => void }) {
         void send();
       }}
     >
-      <Stack gap="xs">
-        {draft.references.length > 0 && (
-          <Group gap="xs" wrap="nowrap" style={{ overflowX: "auto" }}>
-            {draft.references.map((asset) => (
-              <Image
-                key={asset.id}
-                src={asset.thumbnailUrl}
-                alt={asset.name}
-                h={36}
-                w={36}
-                radius="sm"
-                style={{ flexShrink: 0 }}
-              />
-            ))}
-          </Group>
-        )}
+      <Group wrap="nowrap" gap={4} align="center">
+        <ReferencePicker compact />
         <Textarea
           aria-label="Message"
-          placeholder="Talk it through, or ask Studio to create…"
+          placeholder="Message Studio…"
           variant="unstyled"
           autosize
           minRows={1}
           maxRows={5}
+          className="studio-chat-writing"
+          style={{ flex: 1, minWidth: 0 }}
           value={text}
           onChange={(event) => setText(event.currentTarget.value)}
           onKeyDown={(event) => {
@@ -47,41 +33,67 @@ export function ChatComposer({ onControls }: { onControls: () => void }) {
             }
           }}
         />
-        <Group justify="space-between" wrap="nowrap" className="studio-composer-actions">
-          <Group gap="xs" wrap="nowrap" className="studio-composer-tools">
-            <ReferencePicker compact />
-            <Button
-              data-generation-controls
+        <Select
+          aria-label="Chat Model"
+          placeholder="Model"
+          data={models.map((model) => ({ value: model.id, label: model.label }))}
+          value={modelId || null}
+          onChange={selectModel}
+          allowDeselect={false}
+          disabled={!models.length || !!sendingSession}
+          variant="unstyled"
+          size="xs"
+          searchable={models.length > 8}
+          w={{ base: 80, sm: 160 }}
+          miw={0}
+          className="studio-chat-model"
+          comboboxProps={{ withinPortal: true, width: 280, position: "top-end" }}
+          renderOption={({ option }) => (
+            <Stack gap={0}>
+              <Text size="sm">{option.label}</Text>
+              {models.find((model) => model.id === option.value)?.provider && (
+                <Text size="xs" c="dimmed">
+                  {models.find((model) => model.id === option.value)?.provider}
+                </Text>
+              )}
+            </Stack>
+          )}
+        />
+        {sendingSession ? (
+          <Tooltip label="Stop Response">
+            <ActionIcon
+              aria-label="Stop Response"
               variant="default"
-              size="compact-sm"
-              onClick={onControls}
+              size={44}
+              radius="xl"
+              onClick={stop}
             >
-              {profile?.displayName || profile?.label || "Generation Inputs"}
-            </Button>
-          </Group>
-          {sendingSession ? (
-            <Button aria-label="Stop Response" variant="default" onClick={stop} size="sm">
-              <Square size={16} />
-            </Button>
-          ) : (
-            <Button
+              <Square size={17} />
+            </ActionIcon>
+          </Tooltip>
+        ) : (
+          <Tooltip label="Send Message">
+            <ActionIcon
               type="submit"
               aria-label="Send Message"
               disabled={!text.trim() || unavailable}
-              size="sm"
+              size={44}
+              radius="xl"
+              variant="filled"
             >
-              <ArrowUp size={18} />
-            </Button>
-          )}
-        </Group>
-        {error && <Alert color="red">{error}</Alert>}
-        {unavailable && (
-          <Text size="xs" c="dimmed">
-            {status.data?.reason ||
-              "The text assistant is unavailable. You can still use generation controls."}
-          </Text>
+              <ArrowUp size={20} />
+            </ActionIcon>
+          </Tooltip>
         )}
-      </Stack>
+      </Group>
     </form>
   );
+}
+export function ChatComposerStatus() {
+  const { error } = useChat();
+  return error ? (
+    <Alert color="red" mt="xs">
+      {error}
+    </Alert>
+  ) : null;
 }

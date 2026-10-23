@@ -5,9 +5,12 @@ import {
   Input,
   Modal,
   Drawer,
-  Paper,
   Select,
   Switch,
+  Popover,
+  Menu,
+  Tooltip,
+  ActionBar,
   type CSSVariablesResolver,
 } from "@mantine/core";
 
@@ -67,6 +70,7 @@ export const theme = createTheme({
     md: "0 4px 6px rgb(0 0 0 / .1), 0 2px 4px rgb(0 0 0 / .06)",
   },
   cursorType: "pointer",
+  activeClassName: "",
   components: {
     Modal: Modal.extend({
       defaultProps: {
@@ -82,10 +86,7 @@ export const theme = createTheme({
       },
     }),
     Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
-    ModalContent: Modal.Content.extend({ defaultProps: { p: 0, style: { border: 0 } } }),
-    DrawerContent: Drawer.Content.extend({ defaultProps: { p: 0, style: { border: 0 } } }),
     Input: Input.extend({ defaultProps: { size: "md" } }),
-    Paper: Paper.extend({ defaultProps: { withBorder: true, p: "lg" } }),
     Select: Select.extend({ defaultProps: { checkIconPosition: "right" } }),
     Switch: Switch.extend({
       styles: {
@@ -98,11 +99,47 @@ export const theme = createTheme({
     }),
   },
 });
-export function studioTheme(primaryColor: string, rounding: "square" | "soft" | "round") {
+export const backgrounds = {
+  default: { label: "Default", light: "#ffffff", dark: "#09090b" },
+  neutral: { label: "Neutral", light: "#f4f4f5", dark: "#111113" },
+  warm: { label: "Warm", light: "#faf6ef", dark: "#17130f" },
+  cool: { label: "Cool", light: "#f1f5f9", dark: "#0f1720" },
+} as const;
+export type Background = keyof typeof backgrounds;
+export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
+export type MotionSpeed = keyof typeof motionSpeeds;
+export function studioTheme(
+  primaryColor: string,
+  rounding: "square" | "soft" | "round",
+  background: Background,
+  motionDuration: number,
+) {
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
   return createTheme({
     ...theme,
     primaryColor,
+    other: { studioBackground: background, studioMotionDuration: motionDuration },
+    components: {
+      ...theme.components,
+      Modal: Modal.extend({
+        defaultProps: {
+          ...theme.components?.Modal?.defaultProps,
+          transitionProps: { transition: "fade", duration: motionDuration },
+        },
+      }),
+      Drawer: Drawer.extend({
+        defaultProps: {
+          ...theme.components?.Drawer?.defaultProps,
+          transitionProps: { duration: motionDuration },
+        },
+      }),
+      Popover: Popover.extend({ defaultProps: { transitionProps: { duration: motionDuration } } }),
+      Menu: Menu.extend({ defaultProps: { transitionProps: { duration: motionDuration } } }),
+      Tooltip: Tooltip.extend({ defaultProps: { transitionProps: { duration: motionDuration } } }),
+      ActionBar: ActionBar.extend({
+        defaultProps: { transitionProps: { duration: motionDuration } },
+      }),
+    },
     radius: {
       xs: `${radius / 2}rem`,
       sm: `${radius}rem`,
@@ -112,18 +149,20 @@ export function studioTheme(primaryColor: string, rounding: "square" | "soft" | 
     },
   });
 }
-export const cssVariablesResolver: CSSVariablesResolver = () => ({
+export const cssVariablesResolver: CSSVariablesResolver = (theme) => ({
   variables: {
+    "--studio-workspace-width": "1600px",
+    "--studio-motion-duration": `${theme.other.studioMotionDuration}ms`,
     "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),
   },
   dark: {
-    "--mantine-color-body": "#09090b",
+    "--mantine-color-body": backgrounds[theme.other.studioBackground as Background].dark,
     "--mantine-color-default": "#18181b",
     "--mantine-color-default-hover": "#27272a",
     "--mantine-color-default-border": "#27272a",
   },
   light: {
-    "--mantine-color-body": "#ffffff",
+    "--mantine-color-body": backgrounds[theme.other.studioBackground as Background].light,
     "--mantine-color-default": "#ffffff",
     "--mantine-color-default-hover": "#f4f4f5",
     "--mantine-color-default-border": "#e4e4e7",

@@ -1,3 +1,7 @@
+:root {
+  --studio-composer-width: 780px;
+  --studio-composer-gap: 1rem;
+}
 :root[data-mantine-color-scheme="dark"] {
   color-scheme: dark;
 }
@@ -34,11 +38,12 @@ select {
 .studio-mode-tabs {
   border: 1px solid var(--mantine-color-default-border);
   padding: 0.25rem;
-  border-radius: 999px;
+  border-radius: var(--mantine-radius-xl);
   background: var(--mantine-color-default);
 }
 .studio-gallery-page {
-  padding-bottom: 15rem;
+  padding-bottom: 7rem;
+  min-height: calc(100dvh - var(--app-shell-header-height) - 2 * var(--app-shell-padding, 20px));
 }
 
 .studio-media-button {
@@ -72,7 +77,7 @@ select {
   color: white;
   text-align: left;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--studio-motion-duration) ease;
 }
 .studio-media-button:hover .studio-media-caption,
 .studio-media-button:focus-visible .studio-media-caption {
@@ -86,7 +91,7 @@ select {
 .studio-media-button .studio-preview,
 .studio-thread-media img,
 .studio-thread-media video {
-  transition: filter 160ms ease;
+  transition: filter var(--studio-motion-duration) ease;
 }
 .studio-media-button:active .studio-preview,
 .studio-thread-media:active img,
@@ -98,48 +103,12 @@ select {
   top: 0.75rem;
   left: 0.75rem;
 }
-.studio-viewer {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  object-fit: contain;
-}
-.studio-viewer-content {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-}
-.studio-viewer-body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-.studio-viewer-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: var(--mantine-spacing-lg);
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-}
-.studio-viewer-stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: 0;
-}
-.studio-viewer-controls {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  min-height: 0;
-}
 .studio-composer-dock {
   position: fixed;
   z-index: 90;
   left: 50%;
   transform: translateX(-50%);
-  width: min(780px, calc(100% - 2rem));
+  width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
 }
 .studio-composer-dock > .mantine-Paper-root {
   background: light-dark(rgb(255 255 255 / 0.94), rgb(24 24 27 / 0.94));
@@ -151,7 +120,7 @@ select {
   font-size: 1rem;
 }
 .studio-composer-surface {
-  transition: border-color 160ms ease;
+  transition: border-color var(--studio-motion-duration) ease;
 }
 .studio-composer-surface:focus-within {
   border-color: var(--mantine-color-dimmed);
@@ -164,7 +133,6 @@ select {
 .studio-assistant-turn,
 .studio-generation-card {
   width: 100%;
-  max-width: 680px;
 }
 .studio-expanded-composer {
   scrollbar-gutter: stable;
@@ -177,52 +145,73 @@ select {
 }
 .studio-chat-workspace {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 3rem;
-  height: calc(100dvh - var(--app-shell-header-height) - 2 * var(--app-shell-padding));
+  grid-template-columns: clamp(240px, 20vw, 300px) minmax(0, 1fr);
+  height: calc(100dvh - var(--app-shell-header-height));
+  width: 100%;
+  margin-inline: auto;
 }
 .studio-chat-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  padding: var(--mantine-spacing-lg);
+}
+.studio-chat-shell {
+  padding-top: var(--app-shell-header-height);
+  padding-inline: 0;
+  padding-bottom: 0;
 }
 .studio-session-sidebar {
-  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   max-height: 100%;
   overflow-y: auto;
+  padding: var(--mantine-spacing-md);
+  background: var(--mantine-color-default-hover);
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+.studio-compact-prompt {
+  flex: 1;
+  min-width: 0;
+}
+.studio-compact-prompt textarea {
+  min-height: 1.8rem;
+  line-height: 1.8rem;
+  padding-block: 0;
 }
 .studio-session-page {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   width: 100%;
-  max-width: 920px;
   margin-inline: auto;
 }
 .studio-thread {
   display: flex;
   flex-direction: column;
-  gap: 3rem;
+  gap: var(--mantine-spacing-xl);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 0.25rem 0.25rem 1rem;
+  width: 100%;
+  margin-inline: auto;
 }
 .studio-thread-iteration {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--mantine-spacing-sm);
 }
 .studio-thread-prompt {
   align-self: flex-end;
   max-width: 85%;
   border-radius: var(--mantine-radius-xl);
   padding: 1rem 1.25rem;
-  background: var(--mantine-color-default);
+  background: var(--mantine-color-default-hover);
 }
 .studio-thread-result {
-  max-width: 680px;
 }
 .studio-thread-media {
   display: block;
@@ -241,19 +230,16 @@ select {
   width: auto;
   max-width: 100%;
   height: auto;
-  max-height: 660px;
+  max-height: 480px;
   object-fit: contain;
 }
 .studio-chat-workspace .studio-composer-dock {
   position: static;
   transform: none;
   width: 100%;
+  max-width: var(--studio-composer-width);
+  margin-inline: auto;
   flex-shrink: 0;
-}
-.studio-chat-empty {
-  flex: 1;
-  min-height: 0;
-  padding-bottom: 1rem;
 }
 .studio-mask {
   display: block;
@@ -286,22 +272,11 @@ select {
   }
 }
 @media (max-width: 48em) {
-  .studio-viewer-layout {
-    display: flex;
-    flex-direction: column;
-  }
-  .studio-viewer-stage {
-    flex: 1;
-  }
-  .studio-viewer-controls {
-    max-height: 40%;
-    flex-shrink: 0;
+  :root {
+    --studio-composer-gap: 0.5rem;
   }
   .studio-home-link {
     display: none;
-  }
-  .studio-composer-dock {
-    width: calc(100% - 1rem);
   }
   .studio-composer-dock .mantine-Button-root {
     min-height: 44px;
@@ -316,19 +291,20 @@ select {
   }
   .studio-chat-main {
     flex: 1;
+    padding: var(--studio-composer-gap);
   }
   .studio-session-sidebar {
     display: none;
   }
   .studio-thread {
-    gap: 2rem;
+    gap: var(--mantine-spacing-lg);
   }
   .studio-thread-prompt {
     max-width: 94%;
   }
   .studio-thread-media img,
   .studio-thread-media video {
-    max-height: 50dvh;
+    max-height: min(42dvh, 360px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -374,32 +350,19 @@ select {
   pointer-events: none;
 }
 
-.studio-generation-label-narrow {
-  display: none;
+.studio-chat-writing textarea {
+  padding: 10px 0;
+  min-height: 44px;
+  line-height: 1.5;
 }
-.studio-composer-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
+.studio-chat-model input {
+  padding-inline: 0;
+  cursor: pointer;
+  text-overflow: ellipsis;
 }
-.studio-composer-tools {
-  min-width: 0;
+.studio-chat-model input:disabled {
+  background: transparent;
 }
-.studio-generate-button {
-  flex-shrink: 0;
-}
-@media (max-width: 48em) {
-  .studio-generation-label-wide {
-    display: none;
-  }
-  .studio-generation-label-narrow {
-    display: inline;
-  }
-  .studio-composer-tools {
-    gap: 0.25rem;
-  }
-  .studio-composer-tools [data-generation-controls] {
-    min-width: 0;
-    flex: 1;
-  }
+.studio-chat-workspace .studio-composer-surface {
+  box-shadow: var(--mantine-shadow-sm);
 }

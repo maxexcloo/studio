@@ -1,36 +1,24 @@
+import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState } from "react";
-import { Button, Collapse, Drawer, Group, Paper, SegmentedControl } from "@mantine/core";
-import {
-  useClickOutside,
-  useDisclosure,
-  useMediaQuery,
-  useMergedRef,
-  useReducedMotion,
-} from "@mantine/hooks";
-import { ChevronDown } from "lucide-react";
+import { Transition, Drawer, Paper, ScrollArea } from "@mantine/core";
+import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
-import { useGeneration } from "./GenerationProvider";
-import { ChatComposer } from "../sessions/ChatComposer";
+import { ChatComposer, ChatComposerStatus } from "../sessions/ChatComposer";
 import { galleryReferenceType, useGalleryReference } from "./references";
 import { failure } from "../../api";
 export function ComposerDock({ chat = false }: { chat?: boolean }) {
-  const { draft } = useGeneration();
-  const [manual, setManual] = useState(false);
   const [params, setParams] = useSearchParams();
-  const [opened, { open, close }] = useDisclosure(params.get("compose") === "1");
+  const [opened, { open, close }] = useDisclosure(!chat && params.get("compose") === "1");
   const narrow = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
-  const reducedMotion = useReducedMotion();
+  const motionDuration = useMotionDuration();
   const dock = useRef<HTMLDivElement>(null);
   const returningFocus = useRef(false);
-  const focusIntent = useRef("[data-model-picker]");
+  const focusIntent = useRef("[data-profile-picker]");
   const [dragging, setDragging] = useState(false);
   const reference = useGalleryReference();
   const controlsId = useId();
   const [keyboardInset, setKeyboardInset] = useState(0);
-  useEffect(() => {
-    if (chat && draft.parentJobId) setManual(true);
-  }, [chat, draft.parentJobId, draft.operation]);
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -44,8 +32,8 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
     };
   }, []);
   useEffect(() => {
-    if (params.get("compose") === "1") open();
-  }, [params, open]);
+    if (!chat && params.get("compose") === "1") open();
+  }, [params, open, chat]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
     close();
@@ -74,7 +62,7 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
     },
     ["mousedown", "touchstart"],
     undefined,
-    !narrow && opened,
+    !chat && !narrow && opened,
   );
   const dockRef = useMergedRef(dock, outside);
   useEffect(() => {
@@ -93,7 +81,7 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
       <div
         ref={dockRef}
         className="studio-composer-dock"
-        hidden={narrow && opened}
+        hidden={!chat && narrow && opened}
         data-reference-drop={dragging || undefined}
         onDragOver={(event) => {
           if (event.dataTransfer.types.includes(galleryReferenceType)) {
@@ -130,22 +118,57 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
           }
         }}
         style={{
-          bottom: `calc(${narrow ? ".5rem" : "1rem"} + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+          bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+          marginBottom: chat ? keyboardInset : undefined,
         }}
       >
-        {!(narrow && opened) && (
-          <Paper p="md" radius="xl" shadow="xl" className="studio-composer-surface">
-            {!narrow && (
-              <Collapse
-                expanded={opened}
-                keepMounted={false}
-                transitionDuration={reducedMotion ? 0 : 180}
-                onTransitionEnd={() => {
-                  if (opened)
-                    dock.current
-                      ?.querySelector<HTMLElement>(focusIntent.current)
-                      ?.focus({ preventScroll: true });
+        {(chat || !opened) && (
+          <Paper
+            withBorder
+            p={8}
+            radius="xl"
+            shadow="xl"
+            className="studio-composer-surface"
+            hidden={!chat && opened}
+            inert={!chat && opened}
+            onClick={(event) => {
+              if (
+                chat ||
+                (event.target as HTMLElement).closest('button,a,[role="radio"],input[type="radio"]')
+              )
+                return;
+              focusIntent.current = "[data-expanded-prompt]";
+              open();
+            }}
+          >
+            {chat ? (
+              <ChatComposer />
+            ) : (
+              <GenerationForm
+                compact
+                onControls={() => {
+                  focusIntent.current = "[data-profile-picker]";
+                  open();
                 }}
+              />
+            )}
+          </Paper>
+        )}
+        {!chat && !narrow && (
+          <Transition
+            mounted={opened}
+            transition="slide-up"
+            duration={motionDuration}
+            onExited={focusCompact}
+          >
+            {(styles) => (
+              <Paper
+                withBorder
+                p="md"
+                radius="xl"
+                shadow="xl"
+                className="studio-composer-surface"
+                style={{ ...styles, position: "absolute", bottom: 0, width: "100%" }}
               >
                 <div
                   className="studio-expanded-composer"
@@ -155,83 +178,23 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
                   aria-hidden={!opened}
                   inert={!opened}
                 >
-                  <Group justify="space-between" mb="md">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      size="compact-sm"
-                      onClick={() => collapse()}
-                      leftSection={<ChevronDown size={16} />}
-                    >
-                      Collapse Controls
-                    </Button>
-                  </Group>
                   <GenerationForm onSubmitted={collapse} />
                 </div>
-              </Collapse>
+              </Paper>
             )}
-            <Collapse
-              expanded={!opened}
-              keepMounted={false}
-              transitionDuration={reducedMotion ? 0 : 180}
-              onTransitionEnd={focusCompact}
-            >
-              <div
-                aria-hidden={opened}
-                inert={opened}
-                onClick={(event) => {
-                  if (
-                    (chat && !manual) ||
-                    (event.target as HTMLElement).closest(
-                      'button,a,[role="radio"],input[type="radio"]',
-                    )
-                  )
-                    return;
-                  focusIntent.current = "[data-expanded-prompt]";
-                  open();
-                }}
-              >
-                {chat && (
-                  <SegmentedControl
-                    aria-label="Composer Mode"
-                    size="xs"
-                    mb="xs"
-                    value={manual ? "generate" : "chat"}
-                    onChange={(value) => setManual(value === "generate")}
-                    data={[
-                      { value: "chat", label: "Chat" },
-                      { value: "generate", label: "Generate" },
-                    ]}
-                  />
-                )}
-                {chat && !manual ? (
-                  <ChatComposer
-                    onControls={() => {
-                      focusIntent.current = "[data-model-picker]";
-                      open();
-                    }}
-                  />
-                ) : (
-                  <GenerationForm
-                    compact
-                    onControls={() => {
-                      focusIntent.current = "[data-model-picker]";
-                      open();
-                    }}
-                  />
-                )}
-              </div>
-            </Collapse>
-          </Paper>
+          </Transition>
         )}
       </div>
-      {narrow && (
+      {chat && <ChatComposerStatus />}
+      {!chat && narrow && (
         <Drawer
+          scrollAreaComponent={ScrollArea.Autosize}
           opened={opened}
           onClose={collapse}
           title="Generation Controls"
           closeButtonProps={{ "aria-label": "Close Generation Controls" }}
-          position="right"
+          position="bottom"
+          transitionProps={{ duration: motionDuration }}
           size="100%"
           returnFocus={false}
           onExitTransitionEnd={focusCompact}
