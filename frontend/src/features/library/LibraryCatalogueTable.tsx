@@ -1,6 +1,16 @@
 import { useState } from "react";
-import { Badge, Group, Select, Stack, Table, Text, UnstyledButton } from "@mantine/core";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import {
+  ActionIcon,
+  Badge,
+  Group,
+  Menu,
+  Select,
+  Stack,
+  Table,
+  Text,
+  UnstyledButton,
+} from "@mantine/core";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Ellipsis } from "lucide-react";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
 import { modelFamilyLabel } from "../../ui/modelFamily";
@@ -18,6 +28,18 @@ export interface LibraryItem {
   kind?: string;
   folder?: string;
   modelType?: "original" | "finetune";
+  update?: {
+    state: string;
+    note?: string;
+    latest?: UpdateChoice;
+    freeAlternative?: UpdateChoice;
+  };
+  applied?: { state: string; note?: string };
+}
+interface UpdateChoice {
+  name: string;
+  downloadable?: boolean;
+  unavailable?: { reason: string; note?: string };
 }
 const modelKinds: Record<string, string> = {
   checkpoint: "Checkpoint",
@@ -47,6 +69,10 @@ export function libraryItemCategory(item: LibraryItem) {
   return kind && folder && kind !== folder ? "unclassified" : kind || folder || "unclassified";
 }
 const resourceName = (item: LibraryItem) => item.title || item.name || item.file || item.key;
+const canUpdate = (item: LibraryItem) =>
+  item.installed &&
+  item.update?.state === "available" &&
+  !["downloading", "kept", "removed"].includes(item.applied?.state || "");
 const familiesOf = (item: LibraryItem) =>
   item.families?.length ? item.families : ["Unclassified"];
 function resourceType(item: LibraryItem) {
@@ -75,9 +101,13 @@ const columns: { field: SortField; label: string }[] = [
 export function LibraryCatalogueTable({
   items,
   label,
+  onUpdate,
+  updatePending = false,
 }: {
   items: LibraryItem[];
   label: "Models" | "LoRAs";
+  onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
+  updatePending?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
@@ -114,7 +144,13 @@ export function LibraryCatalogueTable({
       if (label === "Models" && modelType && (item.modelType || "unclassified") !== modelType)
         return false;
       if (type && resourceType(item) !== type) return false;
-      if (installed && item.installed !== (installed === "installed")) return false;
+      if (
+        installed === "updates"
+          ? !canUpdate(item) &&
+            !(item.installed && item.applied && item.applied.state !== "removed")
+          : installed && item.installed !== (installed === "installed")
+      )
+        return false;
       const text = [
         resourceName(item),
         item.file,
@@ -190,6 +226,7 @@ export function LibraryCatalogueTable({
           data={[
             { value: "installed", label: "Installed" },
             { value: "not-installed", label: "Not Installed" },
+            { value: "updates", label: "Updates" },
           ]}
           value={installed}
           onChange={setInstalled}
@@ -238,6 +275,7 @@ export function LibraryCatalogueTable({
                   </Table.Th>
                 );
               })}
+              {onUpdate && <Table.Th>Actions</Table.Th>}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -259,6 +297,22 @@ export function LibraryCatalogueTable({
                           {item.note}
                         </Text>
                       )}
+                      {canUpdate(item) && (
+                        <Text size="xs">
+                          Update Available: {item.update?.latest?.name}
+                          {item.update?.note ? ` · ${item.update.note}` : ""}
+                        </Text>
+                      )}
+                      {item.update?.state === "error" && item.update.note && (
+                        <Text size="xs" c="red">
+                          {item.update.note}
+                        </Text>
+                      )}
+                      {item.applied?.note && (
+                        <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
+                          {item.applied.note}
+                        </Text>
+                      )}
                     </Stack>
                   </Table.Td>
                   <Table.Td>
@@ -274,14 +328,55 @@ export function LibraryCatalogueTable({
                   </Table.Td>
                   <Table.Td>
                     <Badge color={item.installed ? "green" : "gray"} size="sm">
-                      {item.installed ? "Installed" : "Not Installed"}
+                      {item.applied?.state === "downloading"
+                        ? "Updating"
+                        : canUpdate(item)
+                          ? "Update Available"
+                          : item.installed
+                            ? "Installed"
+                            : "Not Installed"}
                     </Badge>
                   </Table.Td>
+                  {onUpdate && (
+                    <Table.Td>
+                      {canUpdate(item) && (
+                        <Menu position="bottom-end">
+                          <Menu.Target>
+                            <ActionIcon
+                              variant="subtle"
+                              aria-label={`Update Actions for ${resourceName(item)}`}
+                              disabled={updatePending}
+                            >
+                              <Ellipsis size={18} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            {item.update?.latest?.downloadable &&
+                            !item.update.latest.unavailable ? (
+                              <Menu.Item onClick={() => onUpdate(item)}>
+                                Update to {item.update.latest.name}
+                              </Menu.Item>
+                            ) : item.update?.freeAlternative?.downloadable &&
+                              !item.update.freeAlternative.unavailable ? (
+                              <Menu.Item onClick={() => onUpdate(item, true)}>
+                                Update to {item.update.freeAlternative.name}
+                              </Menu.Item>
+                            ) : (
+                              <Menu.Item disabled>
+                                {item.update?.latest?.unavailable?.note ||
+                                  "This update cannot be downloaded."}
+                              </Menu.Item>
+                            )}
+                          </Menu.Dropdown>
+                        </Menu>
+                      )}
+                    </Table.Td>
+                  )}
                 </Table.Tr>
               ))
             ) : (
               <Table.Tr>
-                <Table.Td colSpan={visibleColumns.length}>
+                <Table.Td colSpan={visibleColumns.length + (onUpdate ? 1 : 0)}>
                   <EmptyState>
                     {items.length
                       ? `No ${label.toLowerCase()} match your filters.`

@@ -72,7 +72,7 @@ export interface ImportRecord {
     unavailable?: Availability;
     note?: string;
   }[];
-  results?: { presetId?: string };
+  results?: { presetId?: string; profileId?: string };
   image?: { name?: string; thumbnailUrl?: string };
   prompt?: string;
 }
@@ -86,12 +86,14 @@ export function LibraryImportReview({
   id,
   active,
   vision,
+  admin,
   onBack,
   onOpen,
 }: {
   id: string;
   active: boolean;
   vision?: ImportVision;
+  admin: boolean;
   onBack: () => void;
   onOpen: (id: string) => void;
 }) {
@@ -109,11 +111,16 @@ export function LibraryImportReview({
         `/api/library/imports/${encodeURIComponent(id)}/${action}`,
         body,
       ),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       client.setQueryData(["imports", result.import.id], { import: result.import });
       void client.invalidateQueries({ queryKey: ["imports"] });
       void client.invalidateQueries({ queryKey: ["library"] });
       void client.invalidateQueries({ queryKey: ["presets"] });
+      if (variables.action === "draft-profile") {
+        void client.invalidateQueries({ queryKey: ["models"] });
+        void client.invalidateQueries({ queryKey: ["definition-list", "profile"] });
+        notifications.show({ message: "Profile drafted. Review it in Library › Profiles." });
+      }
       if (result.failures?.length)
         notifications.show({
           color: "yellow",
@@ -127,6 +134,16 @@ export function LibraryImportReview({
   const record = query.data?.import;
   const run = (actionName: string, body?: unknown) => action.mutate({ action: actionName, body });
   const resources = record?.resources || [];
+  const canDraft =
+    admin &&
+    !!record &&
+    !record.results?.profileId &&
+    record.state !== "failed" &&
+    ["civitai-model", "hf-file"].includes(record.input?.kind || "") &&
+    resources.filter(
+      (resource) =>
+        ["checkpoint", "diffusion_model"].includes(resource.role || "") && !resource.optional,
+    ).length === 1;
   const missing = resources.some(
     (resource) =>
       !resource.optional &&
@@ -192,6 +209,21 @@ export function LibraryImportReview({
             </Text>
           </Group>
           {record.error && <Alert color="red">{record.error}</Alert>}
+          {canDraft && (
+            <Button
+              variant="default"
+              loading={action.isPending && action.variables?.action === "draft-profile"}
+              disabled={action.isPending}
+              onClick={() => run("draft-profile")}
+            >
+              Draft Profile
+            </Button>
+          )}
+          {record.results?.profileId && (
+            <Text size="sm" c="dimmed">
+              Profile drafted. Review it in Library › Profiles.
+            </Text>
+          )}
           {record.grade?.reasons.map((reason) => (
             <Text size="sm" key={reason}>
               {reason}

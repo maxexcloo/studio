@@ -1,6 +1,8 @@
 import { librarySections, useLibraryNavigation } from "./LibraryNavigation";
 import { CatalogueEditor } from "./CatalogueEditor";
 import { LibraryDefinitions } from "./LibraryDefinitions";
+import { LibraryDownloads } from "./LibraryDownloads";
+import { notifications } from "@mantine/notifications";
 import { SectionHeading } from "../../ui/SectionHeading";
 import { useState } from "react";
 import {
@@ -31,13 +33,16 @@ import {
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
 export function LibraryPage() {
-  const { admin } = useLibraryNavigation();
+  const { admin, imports: importsEnabled, options } = useLibraryNavigation();
   const [editingCatalogue, setEditingCatalogue] = useState<"models" | "loras" | null>(null);
   const [url, setUrl] = useState("");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const client = useQueryClient();
   const { hash } = useLocation();
-  const importsActive = !["#presets", "#models", "#loras", "#profiles", "#guides"].includes(hash);
+  const activeSection =
+    options.find((section) => `#${section.value}` === hash)?.value || options[0].value;
+  const importsActive = importsEnabled && activeSection === "imports";
+  const catalogueActive = ["models", "loras"].includes(activeSection);
   const imports = useQuery({
     queryKey: ["imports"],
     queryFn: () => api<{ imports: ImportRecord[]; vision?: ImportVision }>("/api/library/imports"),
@@ -46,11 +51,20 @@ export function LibraryPage() {
   });
   const catalogue = useQuery({
     queryKey: ["library"],
-    queryFn: () => api<{ items: LibraryItem[] }>("/api/library/items"),
+    queryFn: () =>
+      api<{ items: LibraryItem[]; updates?: { checkedAt?: string; available: number } }>(
+        "/api/library/items",
+      ),
+    refetchInterval: (query) =>
+      catalogueActive &&
+      query.state.data?.items.some((item) => item.applied?.state === "downloading")
+        ? 2000
+        : false,
   });
   const presets = useQuery({
     queryKey: ["presets"],
     queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),
+    enabled: importsEnabled,
   });
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["imports"] });
@@ -70,6 +84,28 @@ export function LibraryPage() {
     mutationFn: ({ id, action }: { id: string; action: string }) =>
       post(`/api/library/imports/${id}/${action}`),
     onSuccess: refresh,
+    onError: failure,
+  });
+  const update = useMutation({
+    mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
+      choice
+        ? post<{ available: number }>("/api/library/updates/apply", choice)
+        : post<{ available: number }>("/api/library/updates/check"),
+    onSuccess: (result, choice) => {
+      void client.invalidateQueries({ queryKey: ["library"] });
+      void client.invalidateQueries({ queryKey: ["library-downloads"] });
+      if (choice)
+        notifications.show({
+          message:
+            "Update queued. The existing file stays until the replacement is verified and no longer in use.",
+        });
+      else
+        notifications.show({
+          message: result.available
+            ? `${result.available} updates available.`
+            : "Everything is up to date.",
+        });
+    },
     onError: failure,
   });
   async function upload(file: File | null) {
@@ -103,6 +139,7 @@ export function LibraryPage() {
                 id={reviewId}
                 active={importsActive}
                 vision={imports.data?.vision}
+                admin={admin}
                 onBack={() => setReviewId(null)}
                 onOpen={setReviewId}
               />
@@ -265,6 +302,15 @@ export function LibraryPage() {
                     <Button
                       variant="default"
                       size="compact-sm"
+                      loading={update.isPending && !update.variables}
+                      disabled={update.isPending}
+                      onClick={() => update.mutate(undefined)}
+                    >
+                      Check Updates
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="compact-sm"
                       onClick={() => setEditingCatalogue(section)}
                     >
                       Edit Catalogue
@@ -278,17 +324,27 @@ export function LibraryPage() {
                       ? libraryItemCategory(item) === "loras"
                       : libraryItemCategory(item) !== "loras",
                   )}
+                  onUpdate={
+                    admin
+                      ? (item, alternative) => update.mutate({ key: item.key, alternative })
+                      : undefined
+                  }
+                  updatePending={update.isPending}
                 />
               </Stack>
             ),
           })),
           ...(admin
             ? [
+                {
+                  ...librarySections.downloads,
+                  content: <LibraryDownloads active={hash === "#downloads"} />,
+                },
                 { ...librarySections.profiles, content: <LibraryDefinitions kind="profile" /> },
                 { ...librarySections.guides, content: <LibraryDefinitions kind="guide" /> },
               ]
             : []),
-        ]}
+        ].filter((section) => options.some((option) => option.value === section.value))}
       />
       {editingCatalogue && (
         <CatalogueEditor
