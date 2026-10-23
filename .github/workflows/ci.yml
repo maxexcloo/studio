@@ -71,45 +71,12 @@ jobs:
           path: test-results
           retention-days: 7
 
-  # Builds, smoke-tests and scans a candidate image alongside the checks; publishing waits for all of them.
+  # Builds, smoke-tests and scans the image once every check passes, then publishes it.
   container:
     if: github.event_name != 'pull_request'
     name: Container
+    needs: [browser, build]
     uses: ./.github/workflows/container.yaml
     permissions:
       contents: read
       packages: write
-
-  publish:
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    name: Publish Image
-    runs-on: ubuntu-latest
-    needs: [browser, build, container]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Log In to GHCR
-        uses: docker/login-action@v4
-        with:
-          password: ${{ secrets.GITHUB_TOKEN }}
-          registry: ghcr.io
-          username: ${{ github.actor }}
-      - name: Publish Verified Image
-        env:
-          IMAGE_DIGEST: ${{ needs.container.outputs.image_digest }}
-          IMAGE_NAME: ghcr.io/${{ github.repository }}
-          IMAGE_TAGS: ${{ needs.container.outputs.image_tags }}
-        run: |
-          tags=()
-          while IFS= read -r tag; do
-            if [ -n "$tag" ]; then tags+=(--tag "$tag"); fi
-          done <<< "$IMAGE_TAGS"
-          docker buildx imagetools create --prefer-index=false "${tags[@]}" "$IMAGE_NAME@$IMAGE_DIGEST"
-          {
-            echo 'Published image tags:'
-            echo '```text'
-            echo "$IMAGE_TAGS"
-            echo '```'
-            echo "Digest: \`$IMAGE_DIGEST\`"
-          } >> "$GITHUB_STEP_SUMMARY"

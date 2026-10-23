@@ -96,6 +96,6 @@ Studio is a hard fork: it no longer merges HEISS UI and owns all of its code, so
 
 Use `mise run release:prepare` for a non-publishing minor-release rehearsal. It checks cleanliness, the configured fork origin, the lockfile and previous tag, an unused numeric tag and the Unreleased notes and their summary line, without fetching, running the test suites, changing versions, committing, tagging or publishing. Only the untracked local `todo.md` and `questions.md` are exempt from cleanliness checks. Do not create 1.0 implicitly or reuse upstream tags.
 
-Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions and the container smoke/security checks for that commit. The image is pushed as an untagged candidate, verified, and only then given its version tags.
+Publication requires a tag matching `package.json` and the lockfile, project checks, build, desktop/phone interactions and the container smoke/security checks for that commit. The image is built, smoke-tested and scanned before it is pushed with its version tags.
 
 Publication does not authorise deployment. Deployment configuration belongs in `../ai` and must pin a verified published fork image by digest. Account/data migration and retirement of old services require protected backups, explicit ownership mapping, a recovery procedure and live image/video and cross-account verification. Those gates have not been established by local demo tests.
