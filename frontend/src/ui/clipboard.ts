@@ -3,6 +3,7 @@ export function copyText(text: string): Promise<void> {
     const input = document.createElement("textarea");
     input.value = text;
     input.readOnly = true;
+    input.dataset.composerLayer = "";
     input.style.cssText = "position:fixed;left:-9999px;font-size:16px";
     (document.activeElement?.closest('[role="dialog"]') || document.body).appendChild(input);
     const previous = document.activeElement as HTMLElement | null;

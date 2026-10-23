@@ -1,14 +1,27 @@
-import { MultiSelect, NumberInput, Select, Stack, Switch, Text } from "@mantine/core";
+import {
+  Anchor,
+  Button,
+  Group,
+  MultiSelect,
+  NumberInput,
+  Select,
+  Stack,
+  Switch,
+  Text,
+} from "@mantine/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { api } from "../../api";
+import { notifications } from "@mantine/notifications";
+import { copyText } from "../../ui/clipboard";
+import { api, failure } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 interface LoraInfo {
   title?: string;
+  sourceUrl?: string;
   families?: string[];
   type?: string;
   description?: string;
@@ -163,9 +176,36 @@ export function LoraPicker({
               </Text>
             )}
             {metadata[lora.name]?.triggers?.length && (
-              <Text size="xs" c="dimmed">
-                Trigger words: {metadata[lora.name].triggers!.join(", ")}
-              </Text>
+              <Group gap={4}>
+                <Text size="xs" c="dimmed">
+                  Trigger words:
+                </Text>
+                {metadata[lora.name].triggers!.map((word) => (
+                  <Button
+                    key={word}
+                    size="compact-xs"
+                    variant="subtle"
+                    aria-label={`Copy Trigger Word: ${word}`}
+                    onClick={() =>
+                      void copyText(word)
+                        .then(() => notifications.show({ message: "Trigger word copied" }))
+                        .catch(failure)
+                    }
+                  >
+                    {word}
+                  </Button>
+                ))}
+              </Group>
+            )}
+            {metadata[lora.name]?.sourceUrl && (
+              <Anchor
+                size="xs"
+                href={metadata[lora.name].sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Source
+              </Anchor>
             )}
           </Stack>
         )}
