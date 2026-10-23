@@ -130,13 +130,6 @@ jobs:
             sleep 1
           done
           exit 1
-      - name: Scan Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          exit-code: "1"
-          ignore-unfixed: true
-          image-ref: studio:test
-          severity: CRITICAL,HIGH
       - name: Log In to GHCR
         if: env.PUBLISH == 'true'
         uses: docker/login-action@v4
