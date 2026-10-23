@@ -1,5 +1,9 @@
 import {
   Anchor,
+  Badge,
+  Box,
+  Popover,
+  ScrollArea,
   Button,
   Group,
   MultiSelect,
@@ -9,7 +13,9 @@ import {
   Switch,
   Text,
 } from "@mantine/core";
-import { useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useMediaQuery } from "@mantine/hooks";
+import { ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -36,10 +42,151 @@ const names: Record<string, string> = {
   concept: "Concept",
   unclassified: "Unclassified",
 };
-export function LoraPicker({
+export function useLoraPicker() {
+  const [opened, setOpened] = useState(false);
+  const [type, setType] = useState<string | null>(null);
+  const controlsId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const controls = useRef<HTMLDivElement>(null);
+  const wasOpened = useRef(false);
+  useLayoutEffect(() => {
+    if (
+      wasOpened.current &&
+      !opened &&
+      (document.activeElement === document.body ||
+        controls.current?.contains(document.activeElement))
+    ) {
+      trigger.current?.focus({ preventScroll: true });
+    }
+    wasOpened.current = opened;
+  }, [opened]);
+  return { opened, setOpened, type, setType, controlsId, trigger, controls };
+}
+export type LoraPickerState = ReturnType<typeof useLoraPicker>;
+interface LoraPickerProps {
+  value?: GenerationInput;
+  onChange?: (input: GenerationInput) => void;
+  picker: LoraPickerState;
+  inline?: boolean;
+}
+export function LoraPicker({ value, onChange, picker, inline = false }: LoraPickerProps) {
+  const context = useGeneration();
+  const input = value || context.input;
+  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const close = () => picker.setOpened(false);
+  const controls = (
+    <LoraControls
+      value={value}
+      onChange={onChange}
+      type={picker.type}
+      onTypeChange={picker.setType}
+    />
+  );
+  const content = (
+    <Stack
+      role="region"
+      id={picker.controlsId}
+      ref={picker.controls}
+      aria-label="LoRA Controls"
+      data-composer-layer
+      gap="sm"
+      flex={inline ? 1 : undefined}
+      mih={0}
+    >
+      <Group justify="space-between">
+        <Button
+          autoFocus={inline}
+          size="compact-sm"
+          variant="subtle"
+          color="gray"
+          leftSection={<ArrowLeft size={16} />}
+          onClick={close}
+        >
+          Back
+        </Button>
+        <Text size="sm" fw={500}>
+          LoRAs
+        </Text>
+      </Group>
+      {inline ? (
+        controls
+      ) : (
+        <ScrollArea.Autosize mah="min(65dvh, 600px)" offsetScrollbars="present">
+          {controls}
+        </ScrollArea.Autosize>
+      )}
+      <Box className="studio-generation-footer">
+        <Button fullWidth onClick={close}>
+          Use LoRAs
+        </Button>
+      </Box>
+    </Stack>
+  );
+  const trigger = (
+    <Button
+      ref={picker.trigger}
+      aria-label="Choose LoRAs"
+      aria-expanded={picker.opened}
+      aria-controls={picker.controlsId}
+      variant="default"
+      size="md"
+      rightSection={
+        input.loras.length ? (
+          <Badge size="sm" variant="light">
+            {input.loras.length}
+          </Badge>
+        ) : undefined
+      }
+      onClick={() => picker.setOpened(!picker.opened)}
+    >
+      LoRAs
+    </Button>
+  );
+  if (inline) return content;
+  // Phones show the controls inline in place of the form (see GenerationForm and GenerationCard).
+  if (narrow) return trigger;
+  return (
+    <Popover
+      opened={picker.opened}
+      onChange={picker.setOpened}
+      position="top-end"
+      width={420}
+      trapFocus
+      shadow="md"
+      keepMounted
+      returnFocus
+      closeOnEscape={false}
+    >
+      <Popover.Target>{trigger}</Popover.Target>
+      <Popover.Dropdown
+        data-composer-layer
+        onKeyDown={(event) => {
+          // Escape in an open nested combobox closes only that dropdown.
+          if (
+            event.key === "Escape" &&
+            !(event.target as HTMLElement).closest('[role="combobox"][aria-expanded="true"]')
+          ) {
+            event.stopPropagation();
+            close();
+          }
+        }}
+      >
+        {content}
+      </Popover.Dropdown>
+    </Popover>
+  );
+}
+function LoraControls({
   value,
   onChange,
-}: { value?: GenerationInput; onChange?: (input: GenerationInput) => void } = {}) {
+  type,
+  onTypeChange,
+}: {
+  value?: GenerationInput;
+  onChange?: (input: GenerationInput) => void;
+  type: string | null;
+  onTypeChange: (type: string | null) => void;
+}) {
   const context = useGeneration();
   const input = value || context.input;
   const profile = value
@@ -47,7 +194,6 @@ export function LoraPicker({
     : context.profile;
   const update = (patch: Partial<GenerationInput>) =>
     onChange ? onChange({ ...input, ...patch }) : context.update(patch);
-  const [type, setType] = useState<string | null>(null);
   const info = useQuery({
     queryKey: ["lora-info"],
     queryFn: () => api<{ loras: Record<string, LoraInfo> }>("/api/loras/info"),
@@ -79,17 +225,17 @@ export function LoraPicker({
         LoRAs · {modelFamilyLabel(family, profile?.familyName)}
       </Text>
       <Select
-        comboboxProps={{ withinPortal: true }}
+        comboboxProps={{ withinPortal: false }}
         label="LoRA Type"
         disabled={info.isPending}
         placeholder="All Types"
         clearable
         data={types.map((value) => ({ value, label: names[value] || value }))}
         value={activeType}
-        onChange={setType}
+        onChange={onTypeChange}
       />
       <MultiSelect
-        comboboxProps={{ withinPortal: true }}
+        comboboxProps={{ withinPortal: false }}
         label="LoRAs"
         disabled={info.isPending}
         searchable

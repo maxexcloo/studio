@@ -14,6 +14,7 @@ import {
 import { Ellipsis } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
+import type { Models } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 
@@ -78,7 +79,10 @@ export function LibraryDownloads({ active }: { active: boolean }) {
         .map((item) => `${item.id}:${item.finishedAt || ""}`),
     );
     if ([...completed].some((key) => !seenCompleted.current.has(key))) {
-      for (const queryKey of [["models"], ["library"], ["imports"]])
+      void api<Models>("/api/models")
+        .then((models) => client.setQueryData(["models"], models))
+        .catch(failure);
+      for (const queryKey of [["library"], ["imports"]])
         void client.invalidateQueries({ queryKey });
     }
     seenCompleted.current = completed;

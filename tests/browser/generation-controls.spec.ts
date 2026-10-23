@@ -29,7 +29,7 @@ test("Changing the second encoder and weight type preserves the first encoder in
     },
     options: { ...profiles[0].options, weightDtypes: ["default", "fp8_e4m3fn"] },
   };
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
   );
   await create(page);
@@ -65,7 +65,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     capabilities: { ...profiles[0].capabilities, inpaint: false },
     defaults: { ...profiles[0].defaults, referenceRole: "edit" },
   };
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
   );
   state.gallery.push({
@@ -148,7 +148,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
       { id: "end", role: "end", label: "End", required: false },
     ],
   };
-  await page.route("**/api/models", (route) =>
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
     route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
   );
   state.gallery.push({
@@ -207,7 +207,7 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
     { id: "other-stack", name: "Other Family Stack", loras: [] },
   ];
   await create(page);
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
   await page.getByRole("combobox", { name: "Saved LoRA Stack", exact: true }).click();
   await page.getByRole("option", { name: "Copper Detail", exact: true }).click();
@@ -234,11 +234,12 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   expect(state.loraOperations.every((operation) => operation.key === "family:test")).toBe(true);
   expect(state.loraLibrary.snapshots["family:other"][0].name).toBe("Other Family Stack");
   await page.reload();
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
   await page.getByRole("combobox", { name: "Saved LoRA Stack", exact: true }).click();
   await page.getByRole("option", { name: "Copper Detail Refined", exact: true }).click();
   await page.getByRole("button", { name: "Load LoRA Stack", exact: true }).click();
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Reuse the refined LoRA stack");
@@ -379,7 +380,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   await create(page);
   await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
   await page.getByRole("button", { name: "Trigger Study", exact: true }).click();
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const copy = page.getByRole("button", { name: "Copy Trigger Word: inkbird", exact: true });
   await copy.click();
   await expect.poll(() => page.evaluate(() => (window as any).copiedTrigger)).toBe("inkbird");
@@ -387,6 +388,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   await expect(source).toHaveAttribute("href", sourceUrl);
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
   expect(state.jobs).toHaveLength(0);
+  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A delicate bird inkbird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -396,7 +398,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   ]);
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   await page.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await copy.click();
   await expect.poll(() => page.evaluate(() => (window as any).copiedTrigger)).toBe("inkbird");
   await expect(source).toHaveAttribute("href", sourceUrl);

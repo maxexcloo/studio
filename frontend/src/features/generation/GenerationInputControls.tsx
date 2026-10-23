@@ -3,17 +3,20 @@ import { Box, Group } from "@mantine/core";
 import type { GenerationInput, Profile } from "../../types";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
+import { LoraPicker, type LoraPickerState } from "./LoraPicker";
 
 export function GenerationInputControls({
   input,
   profile,
   onChange,
   references,
+  loraPicker,
 }: {
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   references?: ReactNode;
+  loraPicker: LoraPickerState;
 }) {
   return (
     <Group gap="xs" align="end" aria-label="Generation Inputs">
@@ -22,6 +25,9 @@ export function GenerationInputControls({
       </Box>
       <SizePicker input={input} profile={profile} onChange={onChange} />
       {references}
+      {profile?.capabilities.lora && (
+        <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
+      )}
     </Group>
   );
 }

@@ -6,9 +6,23 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
 }) => {
   const studio = await fixtures(page);
   let modelReads = 0;
-  await page.route("**/api/models", (route) => {
+  let freshModelReads = 0;
+  const downloadedProfile = {
+    ...profiles[0],
+    id: "image:downloaded",
+    label: "Downloaded Model",
+    recipe: undefined,
+  };
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) => {
     modelReads++;
-    return route.fallback();
+    const fresh = !new URL(route.request().url()).searchParams.has("cached");
+    if (fresh) freshModelReads++;
+    return route.fulfill({
+      json: {
+        profiles: fresh ? [...profiles, downloadedProfile] : profiles,
+        features: { library: true, presets: true },
+      },
+    });
   });
   studio.jobs.push({
     id: "generation-kept",
@@ -120,6 +134,15 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     { path: "/api/models/downloads", id: failed.id },
   ]);
   expect(studio.jobs[0].status).toBe("running");
+  expect(freshModelReads).toBeGreaterThan(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Library", exact: true })).toBeHidden();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const profile = page.getByRole("combobox", { name: "Profile", exact: true });
+  await profile.click();
+  await page.getByRole("option", { name: "Downloaded Model", exact: true }).click();
+  await expect(profile).toHaveValue("Downloaded Model");
+  expect(studio.jobs).toHaveLength(1);
 });
 
 test("Catalogue checks updates and queues only the explicitly chosen available or free version", async ({
@@ -244,7 +267,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
     ],
     results: drafted ? { profileId: "custom:checkpoint" } : {},
   });
-  await page.route("**/api/models", (route) => {
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) => {
     modelReads++;
     return route.fulfill({
       json: {
@@ -302,7 +325,7 @@ for (const ordinary of [true, false])
             json: { mode: "multi-user", signedIn: true, account: { id: "member", role: "user" } },
           }),
         );
-      await page.route("**/api/models", (route) =>
+      await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
         route.fulfill({
           json: { profiles, features: { library: true, presets: !ordinary ? false : true } },
         }),
