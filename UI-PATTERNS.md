@@ -91,7 +91,10 @@ primary component reference and verify APIs against the installed version.
   used in several roles must work. Display numbered thumbnails and profile roles,
   never filenames; submission and Chat use owned asset IDs. Phones show the shared filtered gallery
   inside generation controls, desktop uses an anchored popover.
-- Profile and size controls share the gallery/card implementation. The footer
+- Profile and size controls share the gallery/card implementation. The prompt
+  comes first; `GenerationInputControls` owns the wrapping
+  Profile, Size and Reference rail in both gallery and timeline editors. Controls
+  share the standard input height; phones give Profile its own row. The footer
   places the Image/Video toggle left and Clear/Generate right. Size uses
   a vertical list of profile-provided aspect presets with their resolution,
   alongside constrained custom dimensions. Selected
@@ -140,6 +143,8 @@ primary component reference and verify APIs against the installed version.
   actions use More Viewer Actions and display/sharing switches use Viewer Options.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
+  Image viewing and original/upscale comparison share `MediaZoom` for named
+  zoom modes, native transforms, keyboard shortcuts and transient controls.
 - Display, thumbnails, copy, sharing and downloads use the saved original/upscale
   choice through `mediaSource`. Video upscales stay videos; comparison is an
   image action. Upscale quality, size and optional face detail use the worker’s

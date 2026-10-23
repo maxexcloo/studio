@@ -36,7 +36,7 @@ export function SizePicker({
   return (
     <Popover position="top-start" width={300} trapFocus shadow="md">
       <Popover.Target>
-        <Button variant="default" size="sm" aria-label="Image Size">
+        <Button variant="default" size="md" aria-label="Image Size">
           {framed ? `Reference · ${aspect}` : `${input.width} × ${input.height}`}
         </Button>
       </Popover.Target>

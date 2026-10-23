@@ -24,7 +24,7 @@ export function GenerationFooter({
           { value: "video", label: "Video" },
         ]}
       />
-      <Group gap="xs">
+      <Group gap="xs" flex={1} justify="flex-end">
         <Button variant="subtle" color="gray" size="sm" onClick={onClear}>
           Clear
         </Button>

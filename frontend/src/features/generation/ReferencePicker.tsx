@@ -432,7 +432,7 @@ export function ReferencePicker({
     <Button
       aria-label="Choose References"
       variant="default"
-      size="compact-sm"
+      size="md"
       onClick={() => setOpened(true)}
     >
       Add Reference

@@ -4,13 +4,12 @@ import { useMediaQuery } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
 import type { GenerationInput, QueueJob, ReferenceAsset } from "../../types";
 import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
-import { ProfilePicker } from "../generation/ProfilePicker";
+import { GenerationInputControls } from "../generation/GenerationInputControls";
 import { ReferenceRoleControl } from "../generation/ReferenceRoleControl";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { GenerationSettingsFields } from "../generation/GenerationSettingsFields";
 import { PromptHistory } from "../generation/PromptHistory";
 import { GenerationFooter } from "../generation/GenerationFooter";
-import { SizePicker } from "../generation/SizePicker";
 import { generationInput, referencePatch } from "../generation/payload";
 import { referenceLabel } from "../generation/references";
 import type { ChatDraft } from "../../../../shared/chat";
@@ -143,33 +142,6 @@ export function GenerationCard({
             }}
           >
             <Stack gap="sm">
-              <ProfilePicker value={form.values} onChange={(values) => form.setValues(values)} />
-              <Group>
-                <ReferencePicker
-                  opened={referenceOpen}
-                  onOpenedChange={setReferenceOpen}
-                  profile={profile}
-                  input={form.values}
-                  value={references}
-                  onChange={changeReferences}
-                />
-                {references.map((asset, index) => (
-                  <Image
-                    key={`${asset.slot}:${asset.id}`}
-                    src={asset.thumbnailUrl || asset.url}
-                    alt={referenceLabel(asset, index, profile)}
-                    h={36}
-                    w={36}
-                    radius="sm"
-                  />
-                ))}
-              </Group>
-              {!!references.length && (
-                <ReferenceRoleControl
-                  value={form.values.referenceRole}
-                  onChange={(referenceRole) => form.setValues({ referenceRole })}
-                />
-              )}
               <Textarea
                 ref={prompt}
                 label="Variation Prompt"
@@ -187,19 +159,46 @@ export function GenerationCard({
                 rightSectionPointerEvents="all"
                 {...form.getInputProps("prompt")}
               />
-              <SizePicker
+              <GenerationInputControls
                 input={form.values}
                 profile={profile}
                 onChange={(patch) => form.setValues(patch)}
+                references={
+                  <ReferencePicker
+                    opened={referenceOpen}
+                    onOpenedChange={setReferenceOpen}
+                    profile={profile}
+                    input={form.values}
+                    value={references}
+                    onChange={changeReferences}
+                  />
+                }
               />
+              {!!references.length && (
+                <>
+                  <Group gap="xs">
+                    {references.map((asset, index) => (
+                      <Image
+                        key={`${asset.slot}:${asset.id}`}
+                        src={asset.thumbnailUrl || asset.url}
+                        alt={referenceLabel(asset, index, profile)}
+                        h={36}
+                        w={36}
+                        radius="sm"
+                      />
+                    ))}
+                  </Group>
+                  <ReferenceRoleControl
+                    value={form.values.referenceRole}
+                    onChange={(referenceRole) => form.setValues({ referenceRole })}
+                  />
+                </>
+              )}
               <GenerationSettingsFields
                 input={form.values}
                 profile={profile}
                 onChange={(patch) => form.setValues(patch)}
               />
-              <Text size="xs" c="dimmed">
-                Your changed inputs continue the conversation. The original stays here.
-              </Text>
               <GenerationFooter
                 kind={form.values.kind}
                 onKindChange={(kind) => form.setValues({ kind, profileId: "" })}

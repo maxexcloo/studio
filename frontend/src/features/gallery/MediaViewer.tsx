@@ -2,13 +2,15 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Modal, Tooltip, VisuallyHidden } from "@mantine/core";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { MediaItem } from "../../types";
-import { MediaComparison } from "./MediaComparison";
 import { LoadingState } from "../../ui/LoadingState";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaDetails } from "./MediaDetails";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
+const MediaComparison = lazy(() =>
+  import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
+);
 const ZoomImage = lazy(() =>
   import("./ZoomImage").then((module) => ({ default: module.ZoomImage })),
 );
@@ -164,13 +166,15 @@ export function MediaViewer({
                 onClick={(event) => event.stopPropagation()}
               />
             ) : compare && item.upscale?.url ? (
-              <div className={classes.comparison} onClick={(event) => event.stopPropagation()}>
-                <MediaComparison
-                  original={item.url}
-                  upscale={item.upscale.url}
-                  width={item.width}
-                  height={item.height}
-                />
+              <div className={classes.comparison}>
+                <Suspense fallback={<LoadingState label="Loading Comparison" fill />}>
+                  <MediaComparison
+                    original={item.url}
+                    upscale={item.upscale.url}
+                    width={item.width}
+                    height={item.height}
+                  />
+                </Suspense>
               </div>
             ) : (
               <Suspense fallback={<LoadingState label="Loading Image" fill />}>

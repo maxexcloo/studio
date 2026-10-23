@@ -45,6 +45,10 @@ export function PresetEditor() {
     },
     onError: failure,
   });
+  function savePreset(existing: boolean) {
+    if (save.isPending || !draft.presetTitle?.trim()) return;
+    save.mutate(existing);
+  }
   return (
     <Stack>
       {presets.data?.presets.map((preset) => (
@@ -86,6 +90,17 @@ export function PresetEditor() {
       <TextInput
         label="Preset Name"
         value={draft.presetTitle || ""}
+        onKeyDown={(event) => {
+          if (
+            event.key !== "Enter" ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.nativeEvent.isComposing
+          )
+            return;
+          event.preventDefault();
+          savePreset(Boolean(draft.presetId));
+        }}
         onChange={(event) => {
           const presetTitle = event.currentTarget.value;
           setDraft((value) => ({ ...value, presetTitle }));
@@ -96,7 +111,7 @@ export function PresetEditor() {
           <Button
             disabled={!draft.presetTitle?.trim()}
             loading={save.isPending}
-            onClick={() => save.mutate(true)}
+            onClick={() => savePreset(true)}
           >
             Update Preset
           </Button>
@@ -105,7 +120,7 @@ export function PresetEditor() {
           variant="default"
           disabled={!draft.presetTitle?.trim()}
           loading={save.isPending}
-          onClick={() => save.mutate(false)}
+          onClick={() => savePreset(false)}
         >
           {draft.presetId ? "Save as New Preset" : "Save Preset"}
         </Button>
