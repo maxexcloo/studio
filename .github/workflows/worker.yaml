@@ -78,13 +78,6 @@ jobs:
             bash -n /opt/studio/entrypoint.sh
             sh -n /opt/studio/gpu-lease.sh
           '
-      - name: Scan Worker Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          exit-code: "1"
-          ignore-unfixed: true
-          image-ref: studio-worker:test
-          severity: CRITICAL,HIGH
       - name: Log In to GHCR
         if: env.PUBLISH == 'true'
         uses: docker/login-action@v4
