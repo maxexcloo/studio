@@ -12,6 +12,7 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure } from "../../api";
+import { PersonalMcpToken, type McpTokenStatus } from "./PersonalMcpToken";
 interface Account {
   id: string;
   username: string;
@@ -144,9 +145,21 @@ function AccountForm({ account }: { account: Account }) {
 export function OwnAccount() {
   const account = useQuery({
     queryKey: ["own-account"],
-    queryFn: () => api<{ account: Account }>("/api/accounts/me"),
+    queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
   });
   if (account.isPending) return <Loader aria-label="Loading Your Account" />;
   if (account.error) return <Alert color="red">{account.error.message}</Alert>;
-  return <AccountForm key={account.data.account.id} account={account.data.account} />;
+  return (
+    <Stack>
+      <Accordion transitionDuration={0}>
+        <Accordion.Item value="mcp">
+          <Accordion.Control>Personal MCP Connection</Accordion.Control>
+          <Accordion.Panel>
+            <PersonalMcpToken initial={account.data.mcp} />
+          </Accordion.Panel>
+        </Accordion.Item>
+      </Accordion>
+      <AccountForm key={account.data.account.id} account={account.data.account} />
+    </Stack>
+  );
 }
