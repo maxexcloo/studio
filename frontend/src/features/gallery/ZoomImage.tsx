@@ -1,23 +1,9 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import {
-  ActionIcon,
-  Button,
-  Group,
-  Loader,
-  Stack,
-  Text,
-  Transition,
-  VisuallyHidden,
-} from "@mantine/core";
-import { useFocusWithin } from "@mantine/hooks";
-import { Minus, Plus } from "lucide-react";
+import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
-import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
-import { useMotionDuration } from "../../ui/Appearance";
+import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
 import classes from "./ZoomImage.module.css";
-
-type Mode = "Fit" | "Fill" | "Actual Size" | "Custom";
 
 export function ZoomImage({
   src,
@@ -32,24 +18,15 @@ export function ZoomImage({
   height?: number;
   navigate?: (direction: -1 | 1) => void;
 }) {
-  const viewport = useRef<HTMLDivElement>(null);
-  const transform = useRef<ReactZoomPanPinchRef>(null);
-  const percent = useRef<HTMLSpanElement>(null);
-  const picture = useRef<HTMLButtonElement>(null);
   const instructions = useId();
-  const duration = useMotionDuration();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
-  const [mode, setMode] = useState<Mode>("Fit");
-  const modeRef = useRef<Mode>("Fit");
   const [loading, setLoading] = useState(true);
   const [displayedSrc, setDisplayedSrc] = useState(src);
   const [switching, setSwitching] = useState(false);
   const [versionFailed, setVersionFailed] = useState(false);
   const [versionRetry, setVersionRetry] = useState(0);
   const [failed, setFailed] = useState(false);
-  const [recent, setRecent] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const { ref: controls, focused } = useFocusWithin<HTMLDivElement>();
+  const zoom = useMediaZoom({ ...size, disabled: loading || failed });
   const suppressClick = useRef(false);
   const gesture = useRef<{
     id: number;
@@ -65,7 +42,7 @@ export function ZoomImage({
     if (src === displayedSrc) {
       setSwitching(false);
       setVersionFailed(false);
-      if (picture.current?.querySelector("img")?.naturalWidth) setFailed(false);
+      if (zoom.picture.current?.querySelector("img")?.naturalWidth) setFailed(false);
       return;
     }
     let current = true;
@@ -92,72 +69,6 @@ export function ZoomImage({
     };
   }, [src, displayedSrc, versionRetry]);
 
-  function revealControls() {
-    setRecent(true);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setRecent(false), 2000);
-  }
-  function changeMode(next: Mode) {
-    modeRef.current = next;
-    setMode(next);
-  }
-  function layout(next: Mode, animationTime = duration) {
-    const api = transform.current;
-    if (!api) return;
-    if (next === "Fit" || next === "Fill")
-      void api.fitToView({ mode: next === "Fit" ? "contain" : "cover", animationTime });
-    else if (next === "Actual Size") void api.centerView(1, animationTime);
-  }
-  function cycle() {
-    const next =
-      modeRef.current === "Fit" ? "Fill" : modeRef.current === "Fill" ? "Actual Size" : "Fit";
-    changeMode(next);
-    layout(next);
-    revealControls();
-  }
-  function manualZoom() {
-    changeMode("Custom");
-    revealControls();
-  }
-  useLayoutEffect(() => {
-    if (loading) return;
-    // Refit named views when the responsive viewer changes its available area.
-    const observer = new ResizeObserver(() => layout(modeRef.current));
-    observer.observe(viewport.current!);
-    layout(modeRef.current, 0);
-    return () => observer.disconnect();
-  }, [loading, size.width, size.height]);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
-    function key(event: KeyboardEvent) {
-      if (
-        loading ||
-        failed ||
-        event.defaultPrevented ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        (event.target as Element).closest(
-          'input,textarea,select,[contenteditable="true"],[role="slider"]',
-        )
-      )
-        return;
-      if (["+", "=", "-"].includes(event.key)) {
-        event.preventDefault();
-        manualZoom();
-        if (event.key === "-") void transform.current?.zoomOut(0.2, duration);
-        else void transform.current?.zoomIn(0.2, duration);
-      } else if (event.key === "0") {
-        event.preventDefault();
-        changeMode("Fit");
-        layout("Fit");
-        revealControls();
-      }
-    }
-    document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
-  }, [loading, failed, duration]);
-
   // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
   function down(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
@@ -172,8 +83,8 @@ export function ZoomImage({
       x: event.clientX,
       y: event.clientY,
       touch: event.pointerType === "touch",
-      image: Boolean(picture.current?.contains(event.target as Node)),
-      fit: modeRef.current === "Fit",
+      image: Boolean(zoom.picture.current?.contains(event.target as Node)),
+      fit: zoom.modeRef.current === "Fit",
       multiple: false,
     };
   }
@@ -195,7 +106,7 @@ export function ZoomImage({
       start.image &&
       start.fit &&
       !start.multiple &&
-      modeRef.current === "Fit" &&
+      zoom.modeRef.current === "Fit" &&
       Math.abs(dx) > 64 &&
       Math.abs(dx) > Math.abs(dy) * 1.3
     ) {
@@ -205,9 +116,9 @@ export function ZoomImage({
   }
   return (
     <div
-      ref={viewport}
+      ref={zoom.viewport}
       className={classes.zoom}
-      data-zoom-mode={mode}
+      data-zoom-mode={zoom.mode}
       onPointerDownCapture={down}
       onPointerMoveCapture={move}
       onPointerUpCapture={up}
@@ -225,29 +136,26 @@ export function ZoomImage({
         {navigate && " Swipe left or right at Fit to move between generations."}
       </VisuallyHidden>
       <TransformWrapper
-        ref={transform}
+        ref={zoom.transform}
         fitOnInit
         minScale={0.0001}
         maxScale={1000}
         limitToBounds
         centerZoomedOut
         disablePadding
-        disabled={loading || failed}
+        disabled={zoom.disabled}
         doubleClick={{ disabled: true }}
         panning={{ velocityDisabled: true }}
-        zoomAnimation={{ disabled: duration === 0, animationTime: duration }}
-        autoAlignment={{ animationTime: duration, velocityAlignmentTime: duration }}
-        onWheelStart={manualZoom}
-        onWheel={revealControls}
+        zoomAnimation={{ disabled: zoom.duration === 0, animationTime: zoom.duration }}
+        autoAlignment={{ animationTime: zoom.duration, velocityAlignmentTime: zoom.duration }}
+        onWheelStart={zoom.manualZoom}
+        onWheel={zoom.revealControls}
         onPinchStart={() => {
           suppressClick.current = true;
-          manualZoom();
+          zoom.manualZoom();
         }}
-        onPinch={revealControls}
-        onTransform={(_, state) => {
-          if (percent.current) percent.current.textContent = `${Math.round(state.scale * 100)}%`;
-          if (viewport.current) viewport.current.dataset.zoomScale = String(state.scale);
-        }}
+        onPinch={zoom.revealControls}
+        onTransform={zoom.onTransform}
       >
         <TransformComponent
           // Native focus scrolling must not shift the library's transformed viewport.
@@ -255,7 +163,7 @@ export function ZoomImage({
           contentStyle={{ width: size.width, height: size.height }}
         >
           <button
-            ref={picture}
+            ref={zoom.picture}
             type="button"
             className={classes.picture}
             aria-label="Change Image Zoom"
@@ -268,7 +176,7 @@ export function ZoomImage({
             }}
             onClick={(event) => {
               event.stopPropagation();
-              cycle();
+              zoom.cycle();
             }}
           >
             <img
@@ -323,58 +231,7 @@ export function ZoomImage({
           </Button>
         </Stack>
       )}
-      <Transition mounted={recent || focused} transition="fade" duration={duration} keepMounted>
-        {(style) => (
-          <Group
-            ref={controls}
-            className={classes.zoomControls}
-            style={style}
-            gap={2}
-            data-zoom-controls=""
-            role="group"
-            aria-label="Image Zoom"
-            onPointerEnter={revealControls}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label="Zoom Out"
-              disabled={loading || failed}
-              onClick={() => {
-                manualZoom();
-                void transform.current?.zoomOut(0.2, duration);
-              }}
-            >
-              <Minus size={14} />
-            </ActionIcon>
-            <Button
-              size="compact-xs"
-              variant="subtle"
-              color="gray"
-              aria-label={`Zoom: ${mode}`}
-              onClick={cycle}
-              disabled={loading || failed}
-            >
-              <span ref={percent}>100%</span>
-            </Button>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="sm"
-              aria-label="Zoom In"
-              disabled={loading || failed}
-              onClick={() => {
-                manualZoom();
-                void transform.current?.zoomIn(0.2, duration);
-              }}
-            >
-              <Plus size={14} />
-            </ActionIcon>
-          </Group>
-        )}
-      </Transition>
+      <MediaZoomControls zoom={zoom} />
     </div>
   );
 }

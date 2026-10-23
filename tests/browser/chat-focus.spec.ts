@@ -261,8 +261,9 @@ test("Desktop nested pickers retain gallery controls until keyboard focus leaves
   await width.press("Escape");
   await expect(size).toBeFocused();
   await expect(controls).toBeVisible();
-  await profile.focus();
-  await profile.press("Shift+Tab");
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.focus();
+  await prompt.press("Shift+Tab");
   await expect(controls).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
   expect(

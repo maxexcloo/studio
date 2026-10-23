@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Group, Menu, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Square } from "lucide-react";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
@@ -54,11 +54,13 @@ export function PromptAssistant({
   profile,
   onChange,
   references = [],
+  scopeKey = "",
 }: {
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   references?: ReferenceAsset[];
+  scopeKey?: string;
 }) {
   const status = useQuery({
     queryKey: ["assistant"],
@@ -69,16 +71,22 @@ export function PromptAssistant({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(false);
-  const latest = useRef({ input, profile });
-  latest.current = { input, profile };
+  const scope = useRef(0);
+  const undoNotifications = useRef(new Set<string>());
+  const latest = useRef({ input, profile, onChange });
+  latest.current = { input, profile, onChange };
   useEffect(() => {
     mounted.current = true;
+    scope.current++;
     setSuggestions([]);
     return () => {
       mounted.current = false;
+      scope.current++;
       controller.current?.abort();
+      undoNotifications.current.forEach((id) => notifications.hide(id));
+      undoNotifications.current.clear();
     };
-  }, [profile?.id]);
+  }, [profile?.id, scopeKey]);
   const info = status.data;
   const preset =
     info?.presets.find((item) => item.id === presetId) ||
@@ -90,12 +98,64 @@ export function PromptAssistant({
   const lorasOffered = Boolean(
     info?.loras && profile?.capabilities.lora && profile.options?.loras?.length,
   );
+  function applyChange(message: string, patch: Partial<GenerationInput>) {
+    const before = latest.current.input;
+    const epoch = scope.current;
+    latest.current.onChange(patch);
+    const notification = notifications.show({
+      autoClose: 10000,
+      message: (
+        <Group justify="space-between" wrap="nowrap">
+          <Text size="sm">{message}</Text>
+          <Button
+            data-composer-layer
+            size="compact-xs"
+            variant="subtle"
+            onClick={() => {
+              notifications.hide(notification);
+              undoNotifications.current.delete(notification);
+              if (!mounted.current || scope.current !== epoch) return;
+              const current = latest.current.input;
+              const restore: Partial<GenerationInput> = {};
+              for (const [key, value] of Object.entries(patch)) {
+                if (key === "loras") {
+                  const added = patch.loras!.filter(
+                    (lora) => !before.loras.some((prior) => prior.name === lora.name),
+                  );
+                  const remaining = current.loras.filter(
+                    (lora) =>
+                      !added.some(
+                        (applied) =>
+                          applied.name === lora.name &&
+                          applied.strength === lora.strength &&
+                          applied.enabled === lora.enabled,
+                      ),
+                  );
+                  if (remaining.length !== current.loras.length) restore.loras = remaining;
+                } else if (JSON.stringify(current[key]) === JSON.stringify(value))
+                  restore[key] = before[key];
+              }
+              if (Object.keys(restore).length) latest.current.onChange(restore);
+            }}
+          >
+            Undo
+          </Button>
+        </Group>
+      ),
+    });
+    undoNotifications.current.add(notification);
+  }
   const assistance = useMutation({
     mutationKey: ["prompt-assistance"],
     mutationFn: async (action: Action) => {
       if (!profile || !input.prompt.trim())
         throw new Error("Write a prompt and choose a profile first.");
-      const source = { profileId: profile.id, prompt: input.prompt, negative: input.negative };
+      const source = {
+        profileId: profile.id,
+        prompt: input.prompt,
+        negative: input.negative,
+        scope: scope.current,
+      };
       const abort = new AbortController();
       controller.current = abort;
       const body: Record<string, unknown> = { profileId: profile.id, prompt: input.prompt };
@@ -115,12 +175,13 @@ export function PromptAssistant({
         signal: abort.signal,
         body: JSON.stringify(body),
       });
+      abort.signal.throwIfAborted();
       if (action !== "loras" && result.source === "fallback")
         throw new Error(result.reason || "Prompt assistance is unavailable.");
       return { action, result, source, preset: preset?.id };
     },
     onSuccess: ({ action, result, source, preset }) => {
-      if (!mounted.current) return;
+      if (!mounted.current || source.scope !== scope.current) return;
       const current = latest.current;
       if (
         current.profile?.id !== source.profileId ||
@@ -138,18 +199,16 @@ export function PromptAssistant({
           failure("The assistant returned an empty prompt.");
           return;
         }
-        onChange({
+        applyChange("Prompt improved", {
           prompt: result.prompt,
           assistant: { preset, model: result.model, source: "ui" },
         });
-        notifications.show({ message: "Prompt improved" });
       } else if (action === "negative") {
         if (result.unused || !result.negative?.trim()) {
           notifications.show({ message: "This model does not use a negative prompt." });
           return;
         }
-        onChange({ negative: result.negative });
-        notifications.show({ message: "Negative prompt written" });
+        applyChange("Negative prompt written", { negative: result.negative });
       } else {
         const offered = new Set(current.profile?.options?.loras || []);
         const usable = (result.loras || []).filter((item) => offered.has(item.name));
@@ -177,7 +236,7 @@ export function PromptAssistant({
       const escaped = trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       return trigger.trim() && !new RegExp(`(?:^|\\W)${escaped}(?:$|\\W)`, "i").test(input.prompt);
     });
-    onChange({
+    applyChange("LoRA applied", {
       loras: [
         ...input.loras,
         { name: suggestion.name, strength: suggestion.strength, enabled: true },
@@ -203,33 +262,44 @@ export function PromptAssistant({
           disabled={assistance.isPending}
           style={{ flex: 1, minWidth: 0 }}
         />
-        <Menu withinPortal position="bottom-end">
-          <Menu.Target>
-            <Button
-              variant="light"
-              size="xs"
-              rightSection={<ChevronDown size={14} />}
-              loading={assistance.isPending}
-            >
-              Prompt Assistance
-            </Button>
-          </Menu.Target>
-          <Menu.Dropdown data-composer-layer>
-            <Menu.Item disabled={disabled} onClick={() => assistance.mutate("rewrite")}>
-              Improve Prompt
-            </Menu.Item>
-            {negativeOffered && (
-              <Menu.Item disabled={disabled} onClick={() => assistance.mutate("negative")}>
-                Write Negative
+        {assistance.isPending ? (
+          <Button
+            size="xs"
+            variant="light"
+            w={170}
+            leftSection={<Square size={13} />}
+            aria-label="Stop Assistance"
+            onClick={() => {
+              controller.current?.abort();
+              notifications.show({ message: "Assistance stopped" });
+            }}
+          >
+            Stop Assistance
+          </Button>
+        ) : (
+          <Menu withinPortal position="bottom-end">
+            <Menu.Target>
+              <Button variant="light" size="xs" rightSection={<ChevronDown size={14} />} w={170}>
+                Prompt Assistance
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown data-composer-layer>
+              <Menu.Item disabled={disabled} onClick={() => assistance.mutate("rewrite")}>
+                Improve Prompt
               </Menu.Item>
-            )}
-            {lorasOffered && (
-              <Menu.Item disabled={disabled} onClick={() => assistance.mutate("loras")}>
-                Suggest LoRAs
-              </Menu.Item>
-            )}
-          </Menu.Dropdown>
-        </Menu>
+              {negativeOffered && (
+                <Menu.Item disabled={disabled} onClick={() => assistance.mutate("negative")}>
+                  Write Negative
+                </Menu.Item>
+              )}
+              {lorasOffered && (
+                <Menu.Item disabled={disabled} onClick={() => assistance.mutate("loras")}>
+                  Suggest LoRAs
+                </Menu.Item>
+              )}
+            </Menu.Dropdown>
+          </Menu>
+        )}
       </Group>
       {!!references.length && (
         <Text size="xs" c="dimmed">

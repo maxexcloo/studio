@@ -1,0 +1,9 @@
+.controls {
+  position: absolute;
+  top: var(--mantine-spacing-md);
+  left: var(--mantine-spacing-md);
+  z-index: 1;
+  background: color-mix(in srgb, var(--mantine-color-body) 80%, transparent);
+  border-radius: var(--mantine-radius-sm);
+  padding: 2px;
+}

@@ -21,13 +21,12 @@ import { failure, post } from "../../api";
 import type { Session } from "../../types";
 import { useGeneration } from "./GenerationProvider";
 import { LoadingState } from "../../ui/LoadingState";
-import { ProfilePicker } from "./ProfilePicker";
+import { GenerationInputControls } from "./GenerationInputControls";
 import { PromptAssistant } from "./PromptAssistant";
 import { GenerationSettingsFields } from "./GenerationSettingsFields";
 import { PromptHistory } from "./PromptHistory";
 import { PresetEditor } from "./PresetEditor";
 import { GenerationFooter } from "./GenerationFooter";
-import { SizePicker } from "./SizePicker";
 import { generationInput, referenceDetails, primaryReference, referencePatch } from "./payload";
 import { ReferenceRoleControl } from "./ReferenceRoleControl";
 import { ReferencePicker } from "./ReferencePicker";
@@ -109,6 +108,11 @@ export function GenerationForm({
     event.currentTarget.requestSubmit();
   }
   const primary = primaryReference(referenceDetails(draft.references, input, profile), profile);
+  const supportsReferences = Boolean(
+    profile?.mediaInputs?.length ||
+    profile?.capabilities?.img2img ||
+    profile?.capabilities?.imageInput,
+  );
   const inpaint = input.inpaint as
     | { assetId?: string; mask?: string; strength?: number; feather?: number }
     | undefined;
@@ -204,7 +208,6 @@ export function GenerationForm({
       }}
     >
       <Stack gap="md">
-        <ProfilePicker />
         {profile?.ready === false && (
           <Alert color="yellow">
             This model needs additional files or worker nodes before it can run.
@@ -244,22 +247,31 @@ export function GenerationForm({
           onChange={(event) => update({ prompt: event.currentTarget.value })}
           required
         />
+        <GenerationInputControls
+          input={input}
+          profile={profile}
+          onChange={update}
+          references={
+            supportsReferences ? (
+              <ReferencePicker opened={referenceOpen} onOpenedChange={setReferenceOpen} />
+            ) : undefined
+          }
+        />
         <PromptAssistant
+          scopeKey={JSON.stringify([
+            input.kind,
+            draft.sessionId,
+            draft.parentJobId,
+            draft.presetId,
+            draft.operation,
+          ])}
           input={input}
           profile={profile}
           references={draft.references}
           onChange={update}
         />
-        {profile?.mediaInputs?.length ||
-        profile?.capabilities?.img2img ||
-        profile?.capabilities?.imageInput ? (
+        {supportsReferences && (draft.references.length > 0 || requiredReference) ? (
           <Stack gap="xs">
-            <Group justify="space-between">
-              <Text size="sm" fw={500}>
-                References
-              </Text>
-              <ReferencePicker opened={referenceOpen} onOpenedChange={setReferenceOpen} />
-            </Group>
             {!!draft.references.length && (
               <ReferenceRoleControl
                 value={input.referenceRole}
@@ -326,7 +338,6 @@ export function GenerationForm({
             )}
           </Stack>
         ) : null}
-        <SizePicker input={input} profile={profile} onChange={update} />
         <GenerationSettingsFields
           input={input}
           profile={profile}
