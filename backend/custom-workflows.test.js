@@ -66,6 +66,23 @@ test("legacy start image metadata is normalized into a media input", () => {
   assert.deepEqual(workflow.mediaInputs[0].control, { node: "1", input: "image" });
 });
 
+test("custom filename mappings expose one-image capacity without rewriting the saved declaration", () => {
+  const raw = {
+    heissUi: {
+      id: "single-filename",
+      mediaInputs: [
+        { id: "reference", label: "Style", max: 8, control: { node: "1", input: "image" } },
+      ],
+    },
+    graph: { 1: { class_type: "LoadImage", inputs: { image: "original.png" } } },
+  };
+  const workflow = metadataFromJson(raw);
+  assert.equal(workflow.mediaInputs[0].max, 1);
+  assert.match(workflow.metadataWarnings[0], /Style maps one image filename/);
+  assert.equal(raw.heissUi.mediaInputs[0].max, 8);
+  assert.equal(raw.graph[1].inputs.image, "original.png");
+});
+
 test("prepared recipe metadata preserves conditioning and exact adapter identities", () => {
   const recipe = {
     modelLabel: "MiniMax H3",

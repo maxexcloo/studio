@@ -2697,11 +2697,8 @@ const sessionChat = new ChatService({
         new Error("Choose a reference image before submitting a refinement or animation."),
         { status: 400 },
       );
-    if (
-      input.referenceAssets !== undefined &&
-      (!Array.isArray(input.referenceAssets) || input.referenceAssets.length > 8)
-    )
-      throw Object.assign(new Error("Choose up to eight reference images."), { status: 400 });
+    if (input.referenceAssets !== undefined && !Array.isArray(input.referenceAssets))
+      throw Object.assign(new Error("Choose reference images as an array."), { status: 400 });
     for (const reference of input.referenceAssets || [])
       if (
         !reference ||

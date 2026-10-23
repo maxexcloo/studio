@@ -16,7 +16,7 @@ import {
 import crypto from "node:crypto";
 import { demoMode } from "./comfy.js";
 import { families } from "./family-catalog.js";
-import { sanitizeGenerateBody } from "./validation.js";
+import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {
   dedupeGallery,
   gallery,
@@ -559,7 +559,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         const references = input.referenceAssets || [];
         if (
           !Array.isArray(references) ||
-          references.length > 8 ||
           references.some(
             (reference) => !reference || !referenceExistsForAccount(account, reference.assetId),
           )
@@ -568,7 +567,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             status: 400,
             payload: {
               ok: false,
-              error: "Choose up to eight reference images belonging to this account.",
+              error: "Choose reference images belonging to this account.",
             },
           };
         const start = input.startImageId || input.startImage;
@@ -582,18 +581,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             status: 400,
             payload: { ok: false, error: "A reference image is required for this workflow." },
           };
-        for (const [index, slot] of (routed.profile.mediaInputs || []).entries()) {
-          const count =
-            references.filter((reference) => reference.slot === slot.id).length ||
-            (index === 0 && start ? 1 : 0);
-          if (count < (slot.min || (slot.required ? 1 : 0)) || count > (slot.max || 1))
-            return {
-              status: 400,
-              payload: {
-                ok: false,
-                error: `${slot.label || slot.id} requires between ${slot.min || (slot.required ? 1 : 0)} and ${slot.max || 1} references.`,
-              },
-            };
+        try {
+          validateReferenceSlots(references, routed.profile, input);
+        } catch (error) {
+          return { status: 400, payload: { ok: false, error: error.message } };
         }
         return { status: 200, payload: { ok: true, backend: routed.backend, waiting: true } };
       }

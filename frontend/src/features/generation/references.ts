@@ -1,7 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
 import { failure, post } from "../../api";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
-import { addReference, referenceDetails, referencePatch } from "./payload";
+import {
+  addReference,
+  referenceDetails,
+  referencePatch,
+  referenceGroup,
+  referenceGroupAssets,
+  referenceCapacity,
+} from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import { useReferenceUpload } from "./useReferenceUpload";
 export const galleryReferenceType = "application/x-studio-gallery-item";
@@ -33,11 +40,12 @@ export function useReferenceFiles() {
   const adopt = useAdoptReference();
   const { upload, uploading } = useReferenceUpload(adopt);
   async function uploadFiles(files: File[]) {
-    const slot = profile?.mediaInputs?.[0];
-    const limit = slot?.max || (slot ? 1 : 8);
+    const group = referenceGroup(profile);
+    const limit = referenceCapacity(group);
     const current = form.getValues();
-    const used = referenceDetails(current.references, current.input, profile).filter(
-      (asset) => asset.slot === (slot?.id || "image"),
+    const used = referenceGroupAssets(
+      referenceDetails(current.references, current.input, profile),
+      group,
     ).length;
     const remaining = limit === 1 ? 1 : Math.max(0, limit - used);
     for (const file of files.filter((file) => file.type.startsWith("image/")).slice(0, remaining))

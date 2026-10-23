@@ -80,7 +80,7 @@ function validateWorkflow(workflow, info = {}, profile = null) {
   // so node checks are skipped and the result is marked unverified instead.
   const online = Object.keys(info || {}).length > 0;
   const issues = [];
-  const warnings = [];
+  const warnings = [...(workflow.metadataWarnings || [])];
   if (workflow.parseError) issues.push(workflow.parseError);
   try {
     validateGraph(workflow.graph);
@@ -98,6 +98,10 @@ function validateWorkflow(workflow, info = {}, profile = null) {
       issues.push(`Configured LoRA node must be ${expected}: ${workflow.loraStack.node}`);
   }
   for (const mediaInput of workflow.mediaInputs || []) {
+    if (mediaInput.min > mediaInput.max)
+      issues.push(
+        `Reference input ${mediaInput.label || mediaInput.id} requires ${mediaInput.min} images but its mapping accepts one filename.`,
+      );
     const mapping = mediaInput.control;
     const node = mapping?.node ? workflow.graph?.[mapping.node] : null;
     if (!mapping?.node || !mapping?.input)

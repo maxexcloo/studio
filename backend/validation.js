@@ -96,6 +96,31 @@ function sanitizeInpaint(input, profile, referenceAssets) {
   };
 }
 
+export function validateReferenceSlots(references, profile, input = {}) {
+  const slots = profile.mediaInputs || [];
+  // Plain img2img advertises one start image through its capability rather than named slots.
+  if (!slots.length && profile.capabilities?.startImage) {
+    if (references.length > 1) throw new Error("The selected profile accepts at most 1 image.");
+    return;
+  }
+  for (const reference of references) {
+    if (!slots.some((slot) => slot.id === reference.slot))
+      throw new Error(`The selected profile does not accept reference slot "${reference.slot}".`);
+  }
+  for (const [index, slot] of slots.entries()) {
+    const supplied = references.filter((reference) => reference.slot === slot.id).length;
+    const legacy = index === 0 && Boolean(input.startImage || input.startImageId);
+    const minimum = Number(slot.min || (slot.required ? 1 : 0));
+    const maximum = Number(slot.max || 1);
+    if (supplied < minimum && !legacy)
+      throw new Error(`${slot.label || "Reference image"} is required for this workflow.`);
+    if (supplied > maximum)
+      throw new Error(
+        `${slot.label || "Reference image"} accepts at most ${maximum} image${maximum === 1 ? "" : "s"}.`,
+      );
+  }
+}
+
 /**
  * A built-in family request, checked against the profile Studio built for that
  * model file: encoders must be files that fit their slot, the VAE must fit (or
@@ -133,7 +158,6 @@ function sanitizeFamilyBody(input, info, stats) {
   // Only asset IDs come from the client; ComfyUI input names are always staged by the server.
   const supplied = Array.isArray(input.referenceAssets)
     ? input.referenceAssets
-        .slice(0, 8)
         .map((item) => ({
           slot:
             String(item?.slot || "reference")
@@ -147,7 +171,7 @@ function sanitizeFamilyBody(input, info, stats) {
   const slots = (profile.mediaInputs || []).map((item) => item.id);
   // A model with reference slots takes an image per slot, in slot order; others keep the first as a start image.
   const referenceAssets = slots.length
-    ? slots.map((slot) => supplied.find((item) => item?.slot === slot)).filter(Boolean)
+    ? slots.flatMap((slot) => supplied.filter((item) => item?.slot === slot))
     : supplied;
   if (
     profile.capabilities.startImageRequired &&
@@ -159,6 +183,7 @@ function sanitizeFamilyBody(input, info, stats) {
       `${profile.displayName} makes a video from a picture. Add a start image first.`,
     );
   }
+  validateReferenceSlots(supplied, profile, input);
   return {
     kind,
     workflow: profile.workflow,
@@ -247,7 +272,6 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   if (kind !== workflowInfo.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
   const referenceAssets = Array.isArray(input.referenceAssets)
     ? input.referenceAssets
-        .slice(0, 8)
         .map((item) => ({
           slot:
             String(item?.slot || "reference")
@@ -258,23 +282,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
         }))
         .filter((item) => item.assetId)
     : [];
-  for (const mediaInput of workflowInfo.mediaInputs || []) {
-    const supplied = referenceAssets.filter((item) => item.slot === mediaInput.id).length;
-    const legacySupplied =
-      mediaInput.id === (workflowInfo.mediaInputs?.[0]?.id || "reference") &&
-      Boolean(input.startImage || input.startImageId);
-    if (
-      (mediaInput.required || Number(mediaInput.min || 0) > 0) &&
-      supplied < Number(mediaInput.min || 1) &&
-      !legacySupplied
-    ) {
-      throw new Error(`${mediaInput.label || "Reference image"} is required for this workflow.`);
-    }
-    if (supplied > Number(mediaInput.max || 1))
-      throw new Error(
-        `${mediaInput.label || "Reference image"} accepts at most ${mediaInput.max || 1} image.`,
-      );
-  }
+  validateReferenceSlots(referenceAssets, workflowInfo, input);
   const missing = missingNodes(info, workflowInfo.requiredNodes);
   if (missing.length)
     throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);

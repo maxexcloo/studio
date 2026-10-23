@@ -64,7 +64,8 @@ function mediaInputsConfig(meta = {}, controls = {}) {
       label: String(item?.label || (index ? `Reference ${index + 1}` : "Reference image")),
       required: Boolean(item?.required),
       min: Math.max(0, Number(item?.min ?? (item?.required ? 1 : 0)) || 0),
-      max: Math.max(1, Math.min(8, Number(item?.max || 1))),
+      // Each mapping writes one filename; several references need separate graph inputs.
+      max: 1,
       control:
         item?.control?.node && item?.control?.input
           ? { node: String(item.control.node), input: String(item.control.input) }
@@ -227,6 +228,12 @@ export function metadataFromJson(raw, file) {
     loraStack,
     imageModes,
     mediaInputs,
+    metadataWarnings: (Array.isArray(meta.mediaInputs) ? meta.mediaInputs : [])
+      .filter((input) => input?.control?.node && input?.control?.input && Number(input.max) > 1)
+      .map(
+        (input) =>
+          `Reference input ${input.label || input.id} maps one image filename. Use separate mapped inputs for multiple references.`,
+      ),
     promptComposition,
     requiredNodes:
       Array.isArray(meta.requiredNodes) && meta.requiredNodes.length ? meta.requiredNodes : classes,
