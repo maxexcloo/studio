@@ -101,6 +101,8 @@ export function createJobRecovery({ backends, finishJob, getGallery, jobs, recor
         }
         const candidates = candidateIds();
         for (const id of candidates) {
+          // An earlier ingest awaits I/O: another runner may have delivered this job since the snapshot.
+          if (!candidateIds().has(id)) continue;
           // Its runner reports its progress and delivers it; a second writer only races it.
           if (runnerOwned(id)) continue;
           const current = jobs.get(id);

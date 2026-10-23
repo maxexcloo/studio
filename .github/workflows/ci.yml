@@ -24,6 +24,8 @@ jobs:
   build:
     name: Check
     runs-on: ubuntu-latest
+    outputs:
+      browser-image: ${{ steps.browser-image.outputs.image }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -37,12 +39,19 @@ jobs:
         run: node --input-type=module -e "import { validateReleaseTag } from './scripts/release-plan.mjs'; import fs from 'node:fs'; validateReleaseTag(JSON.parse(fs.readFileSync('package.json')).version, process.env.GITHUB_REF)"
       - name: Install Dependencies
         run: mise run setup
+      - name: Resolve Browser Image
+        id: browser-image
+        run: node -e 'require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, "image=mcr.microsoft.com/playwright:v" + require("@playwright/test/package.json").version + "-noble\n")'
       - name: Run Checks
         run: mise run check
 
   browser:
     name: Browser (${{ matrix.shard }}/4)
+    needs: build
     runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.build.outputs.browser-image }}
+      options: --init --ipc=host
     strategy:
       fail-fast: false
       matrix:
@@ -59,8 +68,6 @@ jobs:
         run: mise run setup
       - name: Build Studio
         run: mise run build
-      - name: Install Browser
-        run: npx playwright install --with-deps chromium webkit
       - name: Check Studio Interactions
         run: npm run test:browser -- --shard=${{ matrix.shard }}/4
       - if: failure()
@@ -71,7 +78,7 @@ jobs:
           path: test-results
           retention-days: 7
 
-  # Builds, smoke-tests and scans the image once every check passes, then publishes it.
+  # Builds and smoke-tests the image once every check passes, then publishes it.
   container:
     if: github.event_name != 'pull_request'
     name: Container

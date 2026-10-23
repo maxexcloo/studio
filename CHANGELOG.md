@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Saved results stay complete while worker cleanup finishes
+
+### Fixed
+- **Generation status:** late worker progress, preview and cancellation messages can no longer change completed results back to Saving or an error while worker cleanup is still running.
+
+### Changed
+- **Browser checks:** use the official Playwright image matching the installed test version, avoiding stalled system-package downloads before tests start.
+
 ## [0.48.1] - 2026-10-22
 
 > The CLIProxyAPI and Radiance ComfyUI nodes ship with Studio
