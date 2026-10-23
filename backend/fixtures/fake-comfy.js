@@ -33,6 +33,7 @@ export async function startFakeComfy({
 } = {}) {
   const prompts = [];
   const requests = [];
+  const uploads = [];
   const history = {};
   const sockets = new Map();
   const connections = new Set();
@@ -74,6 +75,12 @@ export async function startFakeComfy({
     ) {
       res.writeHead(200, { "content-type": "image/png" });
       return res.end(outputFiles.get(url.searchParams.get("filename")));
+    }
+    if (req.method === "POST" && url.pathname === "/upload/image") {
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      uploads.push(Buffer.concat(chunks));
+      return json(res, 200, { name: `fixture-input-${uploads.length}.png` });
     }
     if (req.method === "POST" && url.pathname === "/prompt") {
       const body = await readBody(req);
@@ -171,6 +178,7 @@ export async function startFakeComfy({
   return {
     url,
     prompts,
+    uploads,
     requests,
     /** Resolves with the next prompt queued (or the last one, if one already came). */
     nextPrompt: () => new Promise((resolve) => waiting.set("prompt", resolve)),

@@ -26,6 +26,12 @@ test(
         name: "Cold Model",
         family: "sdxl",
         kind: "image",
+        mediaInputs: Array.from({ length: 10 }, (_, index) => ({
+          id: `reference-${index + 1}`,
+          kind: "image",
+          max: 1,
+          control: { node: String(100 + index), input: "image" },
+        })),
         controls: {
           model: { node: "1", input: "ckpt_name" },
           prompt: { node: "3", input: "text" },
@@ -65,6 +71,18 @@ test(
       "7": { class_type: "VAEDecode", inputs: { samples: ["6", 0], vae: ["1", 2] } },
       "8": { class_type: "SaveImage", inputs: { images: ["7", 0], filename_prefix: "fixture" } },
     };
+    Object.assign(
+      raw,
+      Object.fromEntries(
+        raw.heissUi.mediaInputs.map((slot) => [
+          slot.control.node,
+          {
+            class_type: "LoadImage",
+            inputs: { image: "" },
+          },
+        ]),
+      ),
+    );
     const profileFile = path.join(config, "profiles", "cold.json");
     writeFileSync(profileFile, JSON.stringify(raw));
     const removedFile = path.join(config, "profiles", "removed.json");
@@ -215,6 +233,16 @@ test(
         cold.workers.every((worker: any) => !worker.available),
         true,
       );
+      const form = new FormData();
+      form.append("image", new Blob([png], { type: "image/png" }), "owned-reference.png");
+      const uploaded = await fetch(base + "/api/reference-assets/upload", {
+        method: "POST",
+        headers: { cookie, "X-Studio": "1" },
+        body: form,
+      });
+      assert.equal(uploaded.status, 201);
+      const assetId = (await uploaded.json()).asset.id;
+      const references = profile.mediaInputs.map((slot: any) => ({ slot: slot.id, assetId }));
       const input = {
         ...profile.defaults,
         profileId: profile.id,
@@ -224,6 +252,7 @@ test(
         prompt: "Neutral white teapot",
         backendId: "chosen",
         allowFallback: false,
+        referenceAssets: references,
       };
       assert.equal((await request("/api/generate", { ...input, prompt: "" })).status, 400);
       assert.equal((await request("/api/generate", { ...input, width: 1e9 })).status, 400);
@@ -252,6 +281,12 @@ test(
         ).status,
         400,
       );
+      const excess = await request("/api/generate", {
+        ...input,
+        referenceAssets: [...references, references[0]],
+      });
+      assert.equal(excess.status, 400);
+      assert.match((await excess.json()).error, /accepts at most 1 image/);
       const adminCookie = cookie;
       await api("/api/accounts/profiles", {
         id: "denied",
@@ -284,11 +319,18 @@ test(
       await start();
       const restored = await waitFor(accepted.jobId, (job) => job.status === "waiting");
       assert.equal(restored.backend, "chosen");
+      assert.deepEqual(restored.input.referenceAssets, references);
       assert.equal(chosen.prompts.length + other.prompts.length, 0);
       const nextPrompt = chosen.nextPrompt();
       allowStart = true;
       const submitted = await nextPrompt;
       assert.equal(submitted.client_id, accepted.jobId);
+      assert.equal(chosen.uploads.length, 10);
+      for (const [index, slot] of raw.heissUi.mediaInputs.entries())
+        assert.equal(
+          submitted.prompt[slot.control.node].inputs.image,
+          `fixture-input-${index + 1}.png`,
+        );
       const acknowledged = await waitFor(accepted.jobId, (job) => Boolean(job.providerJobId));
       assert.equal(acknowledged.backend, "chosen");
       assert.equal(starts, 1);

@@ -88,7 +88,10 @@ primary component reference and verify APIs against the installed version.
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.
   Explicit slot IDs survive reordering; optional End-only inputs and one asset
-  used in several roles must work. Display numbered thumbnails and profile roles,
+  used in several roles must work. Group linked `follows` slots of the same role
+  into one picker choice, filling their declared capacity without a global reference
+  limit. A custom workflow's filename mapping accepts one image; use separate mapped
+  inputs for multiple references. Display numbered thumbnails and profile roles,
   never filenames; submission and Chat use owned asset IDs. Phones show the shared filtered gallery
   inside generation controls, desktop uses an anchored popover.
 - Profile and size controls share the gallery/card implementation. The prompt

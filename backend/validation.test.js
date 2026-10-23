@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sanitizeGenerateBody } from "./validation.js";
+import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 
 const exact = {
   UNETLoader: {
@@ -76,6 +76,22 @@ const request = {
   clipType: "flux2",
   weightDtype: "default",
 };
+
+test("reference capacity comes from exact roles or the retained single start-image capability", () => {
+  const references = Array.from({ length: 10 }, (_, index) => ({
+    slot: `reference-${index}`,
+    assetId: "same-owned-asset",
+  }));
+  const profile = { mediaInputs: references.map(({ slot }) => ({ id: slot, max: 1 })) };
+  validateReferenceSlots(references, profile);
+  assert.throws(
+    () => validateReferenceSlots([...references, references[0]], profile),
+    /at most 1 image/,
+  );
+  const img2img = { capabilities: { startImage: true } };
+  validateReferenceSlots([{ slot: "image", assetId: "owned-asset" }], img2img);
+  assert.throws(() => validateReferenceSlots(references.slice(0, 2), img2img), /at most 1 image/);
+});
 
 test("required reference slots are enforced for image-edit workflows", () => {
   assert.throws(() => sanitizeGenerateBody(request, exact, {}), /Reference image is required/);

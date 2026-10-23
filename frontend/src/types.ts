@@ -20,7 +20,14 @@ export interface Profile {
   nsfw?: boolean;
   defaults: Record<string, string | number>;
   capabilities: Record<string, boolean>;
-  mediaInputs?: { id: string; label?: string; required?: boolean; max?: number; role?: string }[];
+  mediaInputs?: {
+    id: string;
+    label?: string;
+    required?: boolean;
+    max?: number;
+    role?: string;
+    follows?: string;
+  }[];
   options?: Record<string, string[]>;
   encoderSlots?: { slot: string; label: string; options: string[]; default: string }[];
   encoderBuiltIn?: boolean;

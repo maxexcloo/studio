@@ -34,7 +34,14 @@ import {
   appendGalleryFilters,
   type GalleryFilterValues,
 } from "../gallery/GalleryFilters";
-import { addReference, referenceDetails, referencePatch } from "./payload";
+import {
+  addReference,
+  referenceDetails,
+  referencePatch,
+  referenceGroups,
+  referenceGroupAssets,
+  referenceCapacity,
+} from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import { referenceLabel, useGalleryReference } from "./references";
 import { useReferenceUpload } from "./useReferenceUpload";
@@ -78,13 +85,12 @@ export function ReferencePicker({
   const currentReferences = useRef<ReferenceAsset[]>(references);
   currentReferences.current = references;
   const [chosenSlot, setChosenSlot] = useState<string | null>(null);
-  const slots = profile?.mediaInputs?.length
-    ? profile.mediaInputs
-    : [{ id: "image", label: "Image", max: 8 }];
-  const slot = slots.find((input) => input.id === chosenSlot)?.id || slots[0].id;
-  const slotLimit = slots.find((input) => input.id === slot)?.max || 1;
-  const slotFull =
-    slotLimit > 1 && references.filter((asset) => asset.slot === slot).length >= slotLimit;
+  const groups = referenceGroups(profile);
+  const group = groups.find((items) => items.some((input) => input.id === chosenSlot)) || groups[0];
+  const slot = group[0].id;
+  const slotLimit = referenceCapacity(group);
+  const selectedCount = referenceGroupAssets(references, group).length;
+  const slotFull = slotLimit > 1 && selectedCount >= slotLimit;
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"gallery" | "uploads">("gallery");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -160,10 +166,7 @@ export function ReferencePicker({
     const remaining =
       slotLimit === 1
         ? 1
-        : Math.max(
-            0,
-            slotLimit - currentReferences.current.filter((asset) => asset.slot === slot).length,
-          );
+        : Math.max(0, slotLimit - referenceGroupAssets(currentReferences.current, group).length);
     for (const file of files.filter((file) => file.type.startsWith("image/")).slice(0, remaining))
       await upload(file);
   }
@@ -258,63 +261,61 @@ export function ReferencePicker({
           )}
         </FileButton>
       </Group>
-      {slots.length > 1 && (
+      {groups.length > 1 && (
         <Select
           comboboxProps={{ withinPortal: false }}
           label="Reference Slot"
           value={slot}
           onChange={setChosenSlot}
           allowDeselect={false}
-          data={slots.map((input) => ({
-            value: input.id,
-            label: `${input.label || input.id}${input.required ? " · Required" : " · Optional"}${input.max ? ` · Up to ${input.max}` : ""}`,
+          data={groups.map((items) => ({
+            value: items[0].id,
+            label: `${items[0].label || items[0].id}${items.some((input) => input.required) ? " · Required" : " · Optional"}${referenceCapacity(items) > 1 || items[0].max ? ` · Up to ${referenceCapacity(items)}` : ""}`,
           }))}
         />
       )}
       <Text size="xs" c="dimmed">
-        {slots.find((input) => input.id === slot)?.label || slot}:{" "}
-        {references.filter((asset) => asset.slot === slot).length}
-        {slots.find((input) => input.id === slot)?.max
-          ? ` / ${slots.find((input) => input.id === slot)?.max}`
-          : ""}
+        {group[0].label || slot}: {selectedCount} / {slotLimit}
       </Text>
       {!!references.length && (
-        <OrderedItems
-          kind="references"
-          items={references}
-          identity={(asset) => `${asset.slot}:${asset.id}`}
-          label={(asset) => referenceLabel(asset, references.indexOf(asset), profile)}
-          onChange={setReferences}
-        >
-          {(asset, index) => (
-            <Group gap="xs" wrap="nowrap">
-              <Image
-                src={asset.thumbnailUrl || asset.url}
-                alt={referenceLabel(asset, index, profile)}
-                h={32}
-                w={32}
-                radius="sm"
-              />
-              <Pill
-                withRemoveButton
-                removeButtonProps={{
-                  "aria-label": `Remove ${referenceLabel(asset, index, profile)}`,
-                  "aria-hidden": false,
-                  tabIndex: 0,
-                }}
-                onRemove={() =>
-                  setReferences(
-                    references.filter(
-                      (reference) => reference.id !== asset.id || reference.slot !== asset.slot,
-                    ),
-                  )
-                }
-              >
-                {referenceLabel(asset, index, profile)}
-              </Pill>
-            </Group>
-          )}
-        </OrderedItems>
+        <ScrollArea.Autosize mah="25dvh" style={{ flexShrink: 0 }}>
+          <OrderedItems
+            kind="references"
+            items={references}
+            identity={(asset) => `${asset.slot}:${asset.id}`}
+            label={(asset) => referenceLabel(asset, references.indexOf(asset), profile)}
+            onChange={setReferences}
+          >
+            {(asset, index) => (
+              <Group gap="xs" wrap="nowrap">
+                <Image
+                  src={asset.thumbnailUrl || asset.url}
+                  alt={referenceLabel(asset, index, profile)}
+                  h={32}
+                  w={32}
+                  radius="sm"
+                />
+                <Pill
+                  withRemoveButton
+                  removeButtonProps={{
+                    "aria-label": `Remove ${referenceLabel(asset, index, profile)}`,
+                    "aria-hidden": false,
+                    tabIndex: 0,
+                  }}
+                  onRemove={() =>
+                    setReferences(
+                      references.filter(
+                        (reference) => reference.id !== asset.id || reference.slot !== asset.slot,
+                      ),
+                    )
+                  }
+                >
+                  {referenceLabel(asset, index, profile)}
+                </Pill>
+              </Group>
+            )}
+          </OrderedItems>
+        </ScrollArea.Autosize>
       )}
       <SegmentedControl
         aria-label="Reference Source"

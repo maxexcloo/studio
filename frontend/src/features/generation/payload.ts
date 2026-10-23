@@ -16,26 +16,62 @@ export function referenceDetails(
       "image",
   }));
 }
+type ReferenceSlot = NonNullable<Profile["mediaInputs"]>[number];
+
+export function referenceGroups(profile?: Profile): ReferenceSlot[][] {
+  const groups: ReferenceSlot[][] = [];
+  for (const slot of profile?.mediaInputs?.length
+    ? profile.mediaInputs
+    : [{ id: "image", label: "Image", max: 1 }]) {
+    const group = slot.follows
+      ? groups.find(
+          (items) => items[0].role === slot.role && items.some((item) => item.id === slot.follows),
+        )
+      : undefined;
+    if (group) group.push(slot);
+    else groups.push([slot]);
+  }
+  return groups;
+}
+
+export function referenceGroup(profile?: Profile, slot?: string) {
+  const groups = referenceGroups(profile);
+  return groups.find((group) => group.some((input) => input.id === slot)) || groups[0];
+}
+
+export function referenceCapacity(group: ReferenceSlot[]) {
+  return group.reduce((total, input) => total + (input.max || 1), 0);
+}
+
+export function referenceGroupAssets(references: ReferenceAsset[], group: ReferenceSlot[]) {
+  return references.filter((asset) => group.some((slot) => slot.id === asset.slot));
+}
+
 export function addReference(
   references: ReferenceAsset[],
   asset: ReferenceAsset,
   profile?: Profile,
   slot = profile?.mediaInputs?.[0]?.id || "image",
 ) {
-  const limit =
-    profile?.mediaInputs?.find((input) => input.id === slot)?.max ||
-    (profile?.mediaInputs?.length ? 1 : 8);
-  const existing = references.findIndex(
-    (reference) => reference.slot === slot && reference.id === asset.id,
+  const group = referenceGroup(profile, slot);
+  const duplicate = referenceGroupAssets(references, group).find(
+    (reference) => reference.id === asset.id,
   );
-  const replaced =
-    limit === 1 ? references.findIndex((reference) => reference.slot === slot) : existing;
-  if (replaced >= 0)
-    return references.map((reference, index) =>
-      index === replaced ? { ...asset, slot } : reference,
-    );
-  if (references.filter((reference) => reference.slot === slot).length >= limit) return references;
-  return [...references, { ...asset, slot }];
+  if (duplicate) return references;
+  // An independent single-image role replaces; a linked stack fills its next free declared slot.
+  if (referenceCapacity(group) === 1) {
+    const replaced = references.findIndex((reference) => reference.slot === group[0].id);
+    return replaced < 0
+      ? [...references, { ...asset, slot: group[0].id }]
+      : references.map((reference, index) =>
+          index === replaced ? { ...asset, slot: group[0].id } : reference,
+        );
+  }
+  const target = group.find(
+    (input) =>
+      references.filter((reference) => reference.slot === input.id).length < (input.max || 1),
+  );
+  return target ? [...references, { ...asset, slot: target.id }] : references;
 }
 
 export function generationInput(
