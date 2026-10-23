@@ -23,6 +23,7 @@ import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   cloudModels: "Cloud Models",
   gallery: "Gallery",
@@ -54,6 +55,7 @@ interface Account {
   signInLinked?: boolean;
 }
 interface Administration {
+  gateway?: GatewayAccounts;
   accounts: Account[];
   accessProfiles: AccessGroup[];
   availableProfiles: string[];
@@ -433,6 +435,12 @@ export function AccountAdmin() {
                   }}
                 />
               </Stack>
+            </Accordion.Panel>
+          </Accordion.Item>
+          <Accordion.Item value="gateway">
+            <Accordion.Control>Chat Gateway</Accordion.Control>
+            <Accordion.Panel>
+              <ChatGatewayAccounts gateway={data.gateway} accounts={data.accounts} />
             </Accordion.Panel>
           </Accordion.Item>
           <Accordion.Item value="new-user">
