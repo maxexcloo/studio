@@ -82,6 +82,8 @@ export const theme = createTheme({
       },
     }),
     Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
+    ModalContent: Modal.Content.extend({ defaultProps: { p: 0, style: { border: 0 } } }),
+    DrawerContent: Drawer.Content.extend({ defaultProps: { p: 0, style: { border: 0 } } }),
     Input: Input.extend({ defaultProps: { size: "md" } }),
     Paper: Paper.extend({ defaultProps: { withBorder: true, p: "lg" } }),
     Select: Select.extend({ defaultProps: { checkIconPosition: "right" } }),
