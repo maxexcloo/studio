@@ -1,76 +1,139 @@
 # UI Patterns
 
-Studio has one responsive React interface. Use Mantine for standard controls,
-forms, dialogs, drawers, menus, notifications and focus management. Domain tools
-such as masking, media comparison and virtualised media layouts may use custom
-components. Do not introduce another primitive or styling framework.
+Studio has one responsive React interface. Compose recurring layouts and interactions from one shared component with data
+and purposeful props across pages and breakpoints; update that owner instead
+of copying a separate page or phone implementation. Use Mantine for standard controls,
+forms, dialogs, drawers, menus, notifications and focus management. Purposeful
+media tools such as masking, zoom, comparison and virtualised media layouts may
+use custom components. Do not add another primitive or styling framework.
+Use [Mantine’s LLM documentation index](https://mantine.dev/llms.txt) as the
+primary component reference and verify APIs against the installed version.
 
 ## Theme & Layout
 
-- `src/theme.ts` owns the MantineHub Shadcn-inspired theme: neutral surfaces,
-  shared radii and an amber accent. Follow the system colour scheme by default.
-  Header and Settings share the same persisted colour, radius and width controls.
-- Use Mantine spacing, typography, colours and breakpoints. Custom media CSS
-  uses the same tokens. No hover movement or decorative animation. Honour
-  reduced motion; essential behaviour must not depend on animation completion.
-- Images and Videos are immersive gallery modes with little chrome. Their bottom
-  compact generation box expands upward on interaction on desktop, with a
-  full-height Mantine Drawer on phones. Clicking outside collapses controls;
-  nested Mantine pickers and dialogs remain part of the active composer.
-- Chat is the iterative media workflow: prompts and results form a continuous
-  visual conversation, with sessions beside it on desktop and in a Drawer on
-  phones. Refine and Animate change the shared composer in place and retain
-  the session, source result and all generation inputs. Text replies stream into
-  persisted history. Discussion stays text-only; explicit media requests queue
-  work using the selected model and inputs, without a confirmation step or model
-  fallback. Each generation has its own recorded input card followed by results.
-  Editing and rerunning creates a new branch and leaves the original intact.
-- Library and Settings are route-backed Mantine modals with blurred overlays;
-  the media viewer fills the viewport. The generation form and its
-  state are shared across all modes, using Mantine forms. Keep expert controls
-  available, retain drafts across view changes and honour the phone keyboard.
-- The model summary expands with Mantine Accordion to select Family, Model & Finetune, then Fast, Quality &
-  Workflow Preset. Group only by explicit metadata and preserve the profile ID.
-  LoRAs are grouped by the current family and their catalogue type (slider,
-  style, character or concept); unknown types stay unclassified.
+- `src/theme.ts` owns the MantineHub Shadcn-inspired theme, shared radii,
+  spacing, motion and workspace width. Follow the system colour scheme by
+  default. The header Theme popover owns persisted Animations, Background, Colour,
+  Colour Scheme, Corners and Layout controls in that order; Settings does not duplicate appearance controls.
+- Use Mantine spacing, typography, colours and breakpoints, including custom
+  media CSS. Give Paper padding and borders explicitly where needed; do not
+  apply global Paper defaults that leak into dialogs and navigation.
+- Primary modes are Chat, Images and Videos in that order; Images is the
+  landing page at `/images`; videos use `/video` and conversation uses
+  `/chat` and `/chat/:id`. `/` redirects to Images. Phone tabs use MessageCircle, Image and Video icons with
+  accessible names and tooltips. The left status action opens sessions in Chat
+  and active work in gallery modes. Its slideout keeps the compact service
+  summary at the bottom and contextual content above it. The icon reflects the
+  current interface using actual gateway/worker health; cloud configuration
+  alone is not proof of availability. The phone overflow orders Account,
+  Library, Settings, Theme, a divider, the account name and supported Sign
+  Out. Desktop Settings is followed by Theme and the account icon; Studio remains
+  leftmost and the header follows the workspace width. All three service status
+  indicators remain visible on desktop; Queue opens an anchored popover. The account menu shows the actual name, Account and supported Sign Out.
+- Full/Fixed controls the workspace. Chat has a structural desktop sessions
+  sidebar, flush below the header through the viewport bottom, with a distinct
+  neutral surface and divider. Phones use a session Drawer. The Chat composer
+  stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
+  both layout modes; Full does not impose a separate conversation width.
+- Library and Settings are route-backed Mantine modals with blurred overlays.
+  Keep the same bounded dimensions and title typography across both workspaces,
+  with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
+  Section Select in the phone modal header. Keep inactive forms mounted to
+  preserve edits. Use Mantine Table for dense records; preview cards are for
+  visual content. Account authentication follows the standard Mantine form
+  layout, retaining local and OIDC sign-in.
+- Use shared `EmptyState` for centred, subdued welcome/empty copy without a
+  decorative card or redundant creation button. Use the exact empty copy
+  No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
+  the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
+  loading within the content area while the shell and navigation stay mounted.
+  Loading and failure remain distinct states.
 
-## Data & Interaction
+## Generation & Conversation
 
-- TanStack Query owns server data, polling and invalidation; generation drafts
-  stay inside the generation feature. Keep account data out of browser storage.
-- Account access groups own each user’s model grants and Cloud Models/NSFW
-  permissions. Read back saved group and account changes; generation definitions
-  remain read-only and owned by ai. Runtime presets support updates and copies.
-- Sessions retain inputs, job relationships and outputs. Gallery contains every
-  saved result. Refine and Animate preserve the source job relationship.
+- Gallery modes keep one compact bottom prompt row with reference thumbnails,
+  generation-input action and icon-only Generate. Expanded controls show the
+  labelled Generate action. Clicking inside expands; clicking outside collapses.
+  Nested Mantine pickers belong to the active composer. Do not add custom
+  collapse controls. Phones open a full-height Drawer upward with a short
+  transition and the standard accessible close action.
+- The Chat composer is one quiet inline row: compact reference picker,
+  growing writing area, compact actual text model/provider selector and one
+  Send/Stop action. Media settings belong
+  to timeline input cards, never a second mode in the bottom Chat composer.
+  Header status owns connection information; keep it out of the conversation.
+- Render assistant Markdown semantically with the shared safe renderer, using
+  Mantine typography. Defer parsing streamed changes and keep scroll anchored
+  only while the user remains at the bottom.
+- Chat retains streamed text, generation snapshots and results chronologically.
+  Assistant text appears above each input card and results below it. Discussion
+  stays text-only; explicit media requests use selected settings without model
+  fallback or an extra confirmation. Refine/Animate stage a new timeline card.
+- Editing and submitting an old card sends a structured Chat revision with its
+  source job and full normalised input. The assistant sees the changed prompt,
+  references, settings and LoRAs; successful admission creates a new iteration
+  while leaving the original intact. Keep card forms independent of the shared
+  gallery draft. Do not bypass the assistant with a direct queue request.
+- Profile selection follows Family → Model & Finetune → Fast, Quality & Workflow
+  Preset. Group only by explicit metadata and preserve exact profile IDs.
+  LoRAs follow Family → catalogue Type; unknown types remain unclassified.
 - References share a Gallery & Upload picker. Gallery drag-and-drop passes an
-  owned item identifier to the server; the client does not adopt arbitrary media
-  URLs or worker history as references.
-- Preserve profile identifiers and actual model information. Wait for the
-  selected backend unless the user explicitly permits fallback.
-- Show queued, waiting, starting, running, saving and terminal states with the
-  server's reason. Cancellation and retry operate on the recorded job.
-- Use Mantine notifications for action outcomes and inline alerts for failed
-  data views or forms. Do not duplicate errors across several surfaces.
-- Keep action names consistent: Download, Recreate, Refine, Animate, Extend,
-  Star, Upscale and Delete. Use Title Case for headings, labels and actions;
-  sentence case and Australian English for explanatory text.
+  owned item identifier, never arbitrary media URLs or shared worker history.
+  Preserve intentional reference order and source-result lineage across edits.
+  Explicit slot IDs survive reordering; optional End-only inputs and one asset
+  used in several roles must work. Phones show the shared filtered gallery
+  inside generation controls, desktop uses an anchored popover.
+- Profile and size controls share the gallery/card implementation. The footer
+  places the Image/Video toggle left and Clear/Generate right. Size uses
+  profile-provided aspect presets and constrained custom dimensions. Selected
+  LoRAs retain enable, weight and drag/keyboard ordering controls even when
+  catalogue filters hide them; suggested strength ranges remain visible hints.
 
-## Media & Accessibility
+## Data & Feedback
 
-- Reserve media dimensions, lazy-load images, virtualise long galleries and
-  avoid playing gallery videos automatically. Closing a viewer unmounts its
-  player, and hiding the tab pauses it. Heavy domain tools load only when opened.
-- Use semantic buttons and links, labels for every input and accessible names
-  for icon actions. Keep Mantine's keyboard focus and Escape behaviour.
-- Composer controls preserve the working draft and return focus on collapse.
-  Use Mantine Collapse for desktop expansion and Drawer on phones; reduced
-  motion also disables JavaScript-driven transitions. Focus must work without
-  waiting for an animation to finish. Touch feedback must not leave hover
-  overlays covering media.
-- Handle failed image loads without exposing a broken-image icon. Keep empty,
-  loading and failed data states distinct. Never display fixture data as a
-  production fallback.
-- Browser interaction tests exercise desktop and phone workflows using visible
-  roles and labels. Fixtures wait for meaningful events instead of exact
-  animation timing.
+- TanStack Query owns server data, polling and invalidation; drafts stay within
+  their feature. Keep account data and credentials out of browser storage.
+- Account access groups own model grants and Cloud Models/NSFW permissions.
+  Read back saved changes. Definitions are read-only and owned by ai; runtime
+  user presets support updates and copies.
+- Preserve actual model/provider metadata. Wait for the selected backend unless
+  the user explicitly permits fallback. Show truthful queue states and reasons.
+- The status panel shows compact active rows with a muted spinner and Cancel;
+  completed/cancelled work leaves the list, failed work retains Retry. Cancel
+  All requests cancellation of owned active jobs; accepted work may remain
+  active until the provider confirms cancellation or outputs are safely saved.
+- Gallery search expands into a full-width focused input; Escape closes it
+  while preserving the query. Supported filters use icon-triggered Mantine
+  popovers with scrollable controls. Normal, search, filters and selection
+  modes use the same toolbar region. Search/filter actions preserve queries.
+  Shared `SearchInput` clears only the query, never a selected model/profile.
+  Queue access has one owner: header status.
+- Use notifications for action outcomes and inline alerts for failed forms or
+  views. Avoid duplicate error surfaces. Use Title Case for headings, labels
+  and actions, and Australian English for explanatory prose.
+
+## Media, Motion & Accessibility
+
+- Viewers always fill the viewport independently of workspace width. Transparent
+  stage/content reveal the blurred gallery behind. Empty-stage clicks close;
+  media, native video controls and details/actions remain interactive. Keep
+  focus trapping, Escape and return focus. Image zoom and bottom details are
+  domain behaviour; retain the common generation actions and full settings.
+- Reserve media dimensions, virtualise large galleries, lazy-load images and
+  avoid autoplaying gallery videos. Closing a viewer releases its player;
+  hiding the tab pauses playback. Heavy tools load only when opened.
+- Use semantic buttons/links and accessible names for icons. Preserve drafts
+  and keyboard focus through expansion. Honour the phone keyboard and safe
+  areas. Failed images must not expose broken-image icons.
+- Prefer transform/opacity for interaction motion, no decorative hover movement
+  or layout animation in hot paths. Respect reduced motion in CSS and Mantine
+  transitions. Persist Off/Fast/Standard/Relaxed through one motion token; reduced
+  motion takes precedence. Desktop composer expansion uses a bottom-anchored
+  transform/opacity transition. Background previews use labelled, contrasting
+  swatches and preserve readable elevated surfaces in both schemes.
+  Disable native pressed translation centrally with Mantine’s
+  `activeClassName`; retain colour and focus feedback. Aim for smooth 120Hz interaction; report measured environment
+  and frame intervals rather than claiming hardware-independent frame rates.
+- Browser tests cover meaningful desktop, Chromium phone and WebKit phone
+  flows using accessible roles and event-driven fixtures. Avoid exact animation
+  timing and cosmetic-only tests. Fixtures are never production fallbacks.

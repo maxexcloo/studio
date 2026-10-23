@@ -1,40 +1,35 @@
-import { useEffect, useState } from "react";
-import {
-  ActionIcon,
-  Alert,
-  Button,
-  Group,
-  Loader,
-  Paper,
-  Stack,
-  Switch,
-  Text,
-  TextInput,
-  Title,
-  VisuallyHidden,
-} from "@mantine/core";
-import { Search } from "lucide-react";
-import { useDebouncedValue, useDisclosure } from "@mantine/hooks";
+import { useEffect, useRef, useState } from "react";
+import { ActionIcon, Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { SquareCheck } from "lucide-react";
+import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams, useLocation } from "react-router";
 import { useGeneration } from "../generation/GenerationProvider";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { MediaGrid } from "./MediaGrid";
 import { MediaViewer } from "./MediaViewer";
-import { QueueActivity } from "../generation/QueueActivity";
+import { EmptyState } from "../../ui/EmptyState";
+import { LoadingState } from "../../ui/LoadingState";
 import { ComposerDock } from "../generation/ComposerDock";
+import { GallerySelectionBar } from "./GallerySelectionBar";
+import { useGallerySelection } from "./useGallerySelection";
+import {
+  GalleryFilterToolbar,
+  appendGalleryFilters,
+  emptyGalleryFilters,
+  hasGalleryFilters,
+} from "./GalleryFilters";
 interface Page {
   items: MediaItem[];
   nextCursor: string;
   hasMore: boolean;
 }
 export function GalleryPage() {
-  const [searchOpen, { toggle: toggleSearch }] = useDisclosure(false);
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query, 250);
   const [params] = useSearchParams();
-  const kind = params.get("type") === "video" ? "video" : "image";
+  const kind = useLocation().pathname === "/video" ? "video" : "image";
   const { profiles, selectProfile, input } = useGeneration();
   useEffect(() => {
     if (input.kind !== kind) {
@@ -43,50 +38,82 @@ export function GalleryPage() {
     }
   }, [kind, profiles]);
   const [starred, setStarred] = useState(false);
+  const [filters, setFilters] = useState(emptyGalleryFilters);
+  const hasFilters = starred || hasGalleryFilters(filters);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const gallery = useInfiniteQuery({
-    queryKey: ["gallery", search, kind, starred],
+    queryKey: ["gallery", search, kind, starred, filters],
     initialPageParam: "",
-    queryFn: ({ pageParam }) =>
-      api<Page>(
-        `/api/gallery?${new URLSearchParams({ limit: "60", cursor: pageParam, q: search, type: kind || "", favorites: starred ? "1" : "0" })}`,
-      ),
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({
+        limit: "60",
+        cursor: pageParam,
+        q: search,
+        type: kind,
+        favorites: starred ? "1" : "0",
+      });
+      appendGalleryFilters(params, filters);
+      return api<Page>(`/api/gallery?${params}`);
+    },
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     refetchInterval: 3000,
   });
   const items = gallery.data?.pages.flatMap((page) => page.items) || [];
+  const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
+  const selectionButton = useRef<HTMLButtonElement>(null);
+  function doneSelecting() {
+    selection.end();
+    requestAnimationFrame(() => selectionButton.current?.focus());
+  }
   return (
-    <Stack gap="xl" className="studio-gallery-page">
+    <Stack
+      gap="xl"
+      className="studio-gallery-page"
+      onKeyDown={(event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "a" &&
+          !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
+        ) {
+          event.preventDefault();
+          selection.selectAll();
+        }
+      }}
+    >
       <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
-      <Group>
-        <ActionIcon
-          aria-label="Search Gallery"
-          aria-expanded={searchOpen}
-          onClick={toggleSearch}
-          variant={searchOpen || query ? "light" : "default"}
-          size="xl"
-          radius="xl"
-        >
-          <Search size={18} />
-        </ActionIcon>
-        {searchOpen && (
-          <TextInput
-            aria-label="Search Gallery"
-            placeholder="Search your generations…"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            style={{ flex: 1, minWidth: 180 }}
-          />
-        )}
-        <QueueActivity />
-        <Switch
-          label="Starred"
-          checked={starred}
-          onChange={(e) => setStarred(e.currentTarget.checked)}
+      {selection.selecting ? (
+        <GallerySelectionBar selection={{ ...selection, end: doneSelecting }} />
+      ) : (
+        <GalleryFilterToolbar
+          query={query}
+          onQueryChange={setQuery}
+          kind={kind}
+          value={filters}
+          onChange={setFilters}
+          starred={starred}
+          onStarredChange={setStarred}
+          actions={
+            !selection.selecting && (
+              <Tooltip label="Select Items">
+                <ActionIcon
+                  ref={selectionButton}
+                  aria-label="Select Items"
+                  variant="subtle"
+                  color="gray"
+                  size={44}
+                  ml="auto"
+                  disabled={!selection.selectable.length}
+                  onClick={selection.start}
+                >
+                  <SquareCheck size={19} />
+                </ActionIcon>
+              </Tooltip>
+            )
+          }
         />
-      </Group>
+      )}
       {gallery.isPending ? (
-        <Loader aria-label="Loading Gallery" />
+        <LoadingState fill label="Loading Gallery" />
       ) : gallery.error ? (
         <Alert color="red" title="Couldn’t Load the Gallery">
           {gallery.error.message}
@@ -95,23 +122,15 @@ export function GalleryPage() {
           </Button>
         </Alert>
       ) : items.length ? (
-        <MediaGrid items={items} open={setSelected} />
+        <MediaGrid items={items} open={setSelected} selection={selection} />
       ) : (
-        <Paper py={70}>
-          <Stack align="center">
-            <Title order={3}>
-              {search || starred ? "No Matching Results" : "Make Something Yours"}
-            </Title>
-            <Text c="dimmed" ta="center">
-              {search || starred
-                ? "Try another search or clear your filters."
-                : "Start with an image. Refine the details, then bring it to life."}
-            </Text>
-            <Button component={Link} to={`/?type=${kind}&compose=1`}>
-              Create an Image
-            </Button>
-          </Stack>
-        </Paper>
+        <EmptyState fill title={kind === "video" ? "No Videos" : "No Images"}>
+          {search || hasFilters
+            ? "Try another search or clear your filters."
+            : kind === "video"
+              ? "Videos you create will appear here."
+              : "Images you create will appear here."}
+        </EmptyState>
       )}
       {gallery.hasNextPage && (
         <Button
@@ -122,10 +141,12 @@ export function GalleryPage() {
           Load More
         </Button>
       )}
-      <ComposerDock />
+      {!selection.selecting && <ComposerDock />}
       {selected && (
         <MediaViewer
           item={items.find((i) => i.id === selected.id) || selected}
+          items={items}
+          navigate={setSelected}
           close={() => setSelected(null)}
         />
       )}

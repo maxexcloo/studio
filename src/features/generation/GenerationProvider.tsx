@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import { useForm } from "@mantine/form";
 import { useQuery } from "@tanstack/react-query";
 import type { GenerationInput, Models, Profile, ReferenceAsset } from "../../types";
@@ -21,6 +21,24 @@ export const initialInput: GenerationInput = {
   loras: [],
   referenceAssets: [],
 };
+export function inputForProfile(previous: GenerationInput, profile: Profile): GenerationInput {
+  return {
+    ...initialInput,
+    ...profile.defaults,
+    prompt: previous.prompt,
+    negative: previous.negative,
+    referenceAssets: previous.referenceAssets,
+    referenceDetails: previous.referenceDetails,
+    kind: profile.kind,
+    profileId: profile.id,
+    model: profile.model,
+    workflow: profile.workflow,
+    backendId: profile.workerIds?.includes(String(previous.backendId))
+      ? previous.backendId
+      : profile.workerIds?.[0],
+    loras: previous.loras,
+  };
+}
 interface Draft {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -40,6 +58,7 @@ const empty: Draft = {
   presetTitle: undefined,
 };
 function useGenerationState() {
+  const [prepared, setPrepared] = useState(false);
   const form = useForm<Draft>({
     mode: "controlled",
     initialValues: empty,
@@ -57,7 +76,11 @@ function useGenerationState() {
     },
     [form.getValues, form.setValues],
   );
-  const models = useQuery({ queryKey: ["models"], queryFn: () => api<Models>("/api/models") });
+  const models = useQuery({
+    queryKey: ["models"],
+    queryFn: () => api<Models>("/api/models"),
+    refetchInterval: 15000,
+  });
   const profiles = models.data?.profiles ?? [];
   const selectedDefault =
     draft.input.kind === "image"
@@ -76,21 +99,13 @@ function useGenerationState() {
   function selectProfile(profile: Profile) {
     setDraft((previous) => ({
       ...previous,
-      input: {
-        ...initialInput,
-        ...profile.defaults,
-        prompt: previous.input.prompt,
-        negative: previous.input.negative,
-        referenceAssets: previous.input.referenceAssets,
-        kind: profile.kind,
-        profileId: profile.id,
-        model: profile.model,
-        workflow: profile.workflow,
-        backendId: profile.workerIds?.includes(String(previous.input.backendId))
-          ? previous.input.backendId
-          : profile.workerIds?.[0],
-        loras: [],
-      } as GenerationInput,
+      input: inputForProfile(previous.input, profile),
+      operation:
+        profile.kind === "video"
+          ? "animate"
+          : previous.input.kind !== profile.kind
+            ? "image"
+            : previous.operation,
     }));
   }
   return {
@@ -103,6 +118,8 @@ function useGenerationState() {
     profile,
     models,
     selectProfile,
+    prepared,
+    setPrepared,
   };
 }
 const Context = createContext<ReturnType<typeof useGenerationState> | null>(null);

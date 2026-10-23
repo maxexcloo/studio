@@ -1,21 +1,32 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   ActionIcon,
+  Button,
+  SimpleGrid,
   ColorSwatch,
   Group,
   MantineProvider,
   Popover,
   SegmentedControl,
+  ScrollArea,
   Stack,
   Text,
   Tooltip,
   localStorageColorSchemeManager,
   useMantineColorScheme,
+  useComputedColorScheme,
   useMantineTheme,
 } from "@mantine/core";
-import { useLocalStorage } from "@mantine/hooks";
-import { Check, Maximize2, Minimize2, Palette } from "lucide-react";
-import { cssVariablesResolver, studioTheme } from "../theme";
+import { useLocalStorage, useReducedMotion } from "@mantine/hooks";
+import { Check, Palette } from "lucide-react";
+import {
+  backgrounds,
+  motionSpeeds,
+  type MotionSpeed,
+  type Background,
+  cssVariablesResolver,
+  studioTheme,
+} from "../theme";
 
 const colours = [
   "studio",
@@ -31,10 +42,18 @@ const colours = [
 ] as const;
 interface Appearance {
   colour: (typeof colours)[number];
+  background: Background;
+  motion: MotionSpeed;
   rounding: "square" | "soft" | "round";
   layout: "fixed" | "full";
 }
-const defaults: Appearance = { colour: "studio", rounding: "soft", layout: "full" };
+const defaults: Appearance = {
+  colour: "studio",
+  rounding: "soft",
+  layout: "full",
+  background: "default",
+  motion: "standard",
+};
 const Context = createContext<{
   appearance: Appearance;
   setAppearance: (next: Appearance | ((previous: Appearance) => Appearance)) => void;
@@ -46,12 +65,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     defaultValue: defaults,
     getInitialValueInEffect: false,
   });
+  const resolved = { ...defaults, ...appearance };
+  const reduced = useReducedMotion();
+  const duration = reduced ? 0 : motionSpeeds[resolved.motion];
   const configured = useMemo(
-    () => studioTheme(appearance.colour, appearance.rounding),
-    [appearance.colour, appearance.rounding],
+    () => studioTheme(resolved.colour, resolved.rounding, resolved.background, duration),
+    [resolved.colour, resolved.rounding, resolved.background, duration],
   );
   return (
-    <Context.Provider value={{ appearance, setAppearance }}>
+    <Context.Provider value={{ appearance: resolved, setAppearance }}>
       <MantineProvider
         theme={configured}
         cssVariablesResolver={cssVariablesResolver}
@@ -64,98 +86,154 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   );
 }
 export const useAppearance = () => useContext(Context);
+export function useMotionDuration() {
+  return useMantineTheme().other.studioMotionDuration as number;
+}
 export function AppearanceControls() {
   const { appearance, setAppearance } = useAppearance();
   const palette = useMantineTheme();
+  const scheme = useComputedColorScheme("light");
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   return (
-    <Stack gap="md">
-      <Stack gap="xs">
-        <Text size="sm" fw={500}>
-          Colour
-        </Text>
-        <Group gap="xs">
-          {colours.map((colour) => (
-            <Tooltip
-              key={colour}
-              label={colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)}
-            >
-              <ActionIcon
-                variant="transparent"
-                radius="xl"
-                size={30}
-                aria-label={`Use ${colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)} Colour`}
-                aria-pressed={appearance.colour === colour}
-                onClick={() => setAppearance((previous) => ({ ...previous, colour }))}
+    <ScrollArea.Autosize mah="calc(100dvh - 105px)" type="hover" scrollbars="y">
+      <Stack gap="sm">
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Animations
+          </Text>
+          <SegmentedControl
+            aria-label="Animation Speed"
+            fullWidth
+            value={appearance.motion}
+            onChange={(motion) =>
+              setAppearance((previous) => ({ ...previous, motion: motion as MotionSpeed }))
+            }
+            data={[
+              { value: "off", label: "Off" },
+              { value: "fast", label: "Fast" },
+              { value: "standard", label: "Standard" },
+              { value: "relaxed", label: "Relaxed" },
+            ]}
+          />
+        </Stack>
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Background
+          </Text>
+          <SimpleGrid cols={2} spacing="xs">
+            {(Object.keys(backgrounds) as Background[]).map((background) => (
+              <Button
+                key={background}
+                variant={appearance.background === background ? "light" : "default"}
+                aria-label={`Use ${backgrounds[background].label} Background`}
+                aria-pressed={appearance.background === background}
+                onClick={() => setAppearance((previous) => ({ ...previous, background }))}
+                h={54}
+                px={6}
+                justify="space-between"
               >
-                <ColorSwatch color={palette.colors[colour][5]} size={26}>
-                  {appearance.colour === colour && <Check size={15} color="black" />}
-                </ColorSwatch>
-              </ActionIcon>
-            </Tooltip>
-          ))}
-        </Group>
+                <Group gap={6} wrap="nowrap">
+                  <ColorSwatch
+                    color={backgrounds[background][scheme]}
+                    size={24}
+                    style={{ border: "1px solid var(--mantine-color-dimmed)" }}
+                  />
+                  <Text size="xs">{backgrounds[background].label}</Text>
+                  {appearance.background === background && <Check size={12} />}
+                </Group>
+              </Button>
+            ))}
+          </SimpleGrid>
+        </Stack>
+
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Colour
+          </Text>
+          <Group gap="xs">
+            {colours.map((colour) => (
+              <Tooltip
+                key={colour}
+                label={colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)}
+              >
+                <ActionIcon
+                  variant="transparent"
+                  radius="xl"
+                  size={30}
+                  aria-label={`Use ${colour === "studio" ? "Amber" : colour[0].toUpperCase() + colour.slice(1)} Colour`}
+                  aria-pressed={appearance.colour === colour}
+                  onClick={() => setAppearance((previous) => ({ ...previous, colour }))}
+                >
+                  <ColorSwatch color={palette.colors[colour][5]} size={26}>
+                    {appearance.colour === colour && <Check size={15} color="black" />}
+                  </ColorSwatch>
+                </ActionIcon>
+              </Tooltip>
+            ))}
+          </Group>
+        </Stack>
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Colour Scheme
+          </Text>
+          <SegmentedControl
+            aria-label="Colour Scheme"
+            fullWidth
+            value={colorScheme}
+            onChange={(value) => setColorScheme(value as "auto" | "light" | "dark")}
+            data={[
+              { value: "auto", label: "System" },
+              { value: "light", label: "Light" },
+              { value: "dark", label: "Dark" },
+            ]}
+          />
+        </Stack>
+
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Corners
+          </Text>
+          <SegmentedControl
+            aria-label="Corner Radius"
+            fullWidth
+            value={appearance.rounding}
+            onChange={(rounding) =>
+              setAppearance((previous) => ({
+                ...previous,
+                rounding: rounding as Appearance["rounding"],
+              }))
+            }
+            data={[
+              { value: "square", label: "Square" },
+              { value: "soft", label: "Soft" },
+              { value: "round", label: "Round" },
+            ]}
+          />
+        </Stack>
+        <Stack gap={6}>
+          <Text size="sm" fw={500}>
+            Layout
+          </Text>
+          <SegmentedControl
+            aria-label="Page Width"
+            fullWidth
+            value={appearance.layout}
+            onChange={(layout) =>
+              setAppearance((previous) => ({ ...previous, layout: layout as Appearance["layout"] }))
+            }
+            data={[
+              { value: "full", label: "Full Width" },
+              { value: "fixed", label: "Fixed Width" },
+            ]}
+          />
+        </Stack>
       </Stack>
-      <Stack gap="xs">
-        <Text size="sm" fw={500}>
-          Corners
-        </Text>
-        <SegmentedControl
-          aria-label="Corner Radius"
-          fullWidth
-          value={appearance.rounding}
-          onChange={(rounding) =>
-            setAppearance((previous) => ({
-              ...previous,
-              rounding: rounding as Appearance["rounding"],
-            }))
-          }
-          data={[
-            { value: "square", label: "Square" },
-            { value: "soft", label: "Soft" },
-            { value: "round", label: "Round" },
-          ]}
-        />
-      </Stack>
-      <Stack gap="xs">
-        <Text size="sm" fw={500}>
-          Layout
-        </Text>
-        <SegmentedControl
-          aria-label="Page Width"
-          fullWidth
-          value={appearance.layout}
-          onChange={(layout) =>
-            setAppearance((previous) => ({ ...previous, layout: layout as Appearance["layout"] }))
-          }
-          data={[
-            { value: "full", label: "Full Width" },
-            { value: "fixed", label: "Fixed Width" },
-          ]}
-        />
-      </Stack>
-      <Stack gap="xs">
-        <Text size="sm" fw={500}>
-          Colour Scheme
-        </Text>
-        <SegmentedControl
-          aria-label="Colour Scheme"
-          fullWidth
-          value={colorScheme}
-          onChange={(value) => setColorScheme(value as "auto" | "light" | "dark")}
-          data={[
-            { value: "auto", label: "System" },
-            { value: "light", label: "Light" },
-            { value: "dark", label: "Dark" },
-          ]}
-        />
-      </Stack>
-    </Stack>
+    </ScrollArea.Autosize>
   );
 }
 export function AppearanceMenu() {
   return (
-    <Popover width={300} position="bottom-end" shadow="md" withArrow trapFocus>
+    <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
       <Popover.Target>
         <ActionIcon aria-label="Change Theme" variant="subtle" color="gray" size="lg" radius="xl">
           <Palette size={19} />
@@ -165,29 +243,5 @@ export function AppearanceMenu() {
         <AppearanceControls />
       </Popover.Dropdown>
     </Popover>
-  );
-}
-export function LayoutToggle() {
-  const { appearance, setAppearance } = useAppearance();
-  const label = appearance.layout === "full" ? "Use Fixed Width" : "Use Full Width";
-  return (
-    <Tooltip label={label}>
-      <ActionIcon
-        aria-label={label}
-        aria-pressed={appearance.layout === "full"}
-        onClick={() =>
-          setAppearance((previous) => ({
-            ...previous,
-            layout: previous.layout === "full" ? "fixed" : "full",
-          }))
-        }
-        variant="subtle"
-        color="gray"
-        size="lg"
-        radius="xl"
-      >
-        {appearance.layout === "full" ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
-      </ActionIcon>
-    </Tooltip>
   );
 }

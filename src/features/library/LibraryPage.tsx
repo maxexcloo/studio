@@ -4,23 +4,23 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   FileButton,
   Group,
-  Image,
-  Loader,
-  Paper,
   SimpleGrid,
   Stack,
-  Tabs,
+  Table,
   Text,
   TextInput,
   Title,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router";
+import { useLocation } from "react-router";
 import { api, failure, post } from "../../api";
-import { useGeneration } from "../generation/GenerationProvider";
+import { WorkspaceSections, WorkspaceSectionSelect } from "../../ui/WorkspaceSections";
+import { EmptyState } from "../../ui/EmptyState";
+import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
+import { LoadingState } from "../../ui/LoadingState";
+import { SearchInput } from "../../ui/SearchInput";
 interface ImportRecord {
   id: string;
   name?: string;
@@ -45,25 +45,26 @@ interface LibraryItem {
   kind?: string;
   folder?: string;
 }
-interface Preset {
-  id: string;
-  name: string;
-  prompt: string;
-  negative: string;
-  settings: Record<string, unknown>;
-  thumbnailUrl?: string;
-  resources?: { profileId?: string }[];
+
+const librarySections = {
+  imports: { value: "imports", label: "Imports" },
+  presets: { value: "presets", label: "Inspiration" },
+  catalogue: { value: "catalogue", label: "Models & LoRAs" },
+};
+export function LibraryTitle() {
+  return <WorkspaceSectionSelect label="Library" sections={Object.values(librarySections)} />;
 }
 export function LibraryPage() {
   const [url, setUrl] = useState("");
   const [query, setQuery] = useState("");
   const client = useQueryClient();
-  const navigate = useNavigate();
-  const { update, profiles, selectProfile } = useGeneration();
+  const { hash } = useLocation();
+  const importsActive = hash !== "#presets" && hash !== "#catalogue";
   const imports = useQuery({
     queryKey: ["imports"],
     queryFn: () => api<{ imports: ImportRecord[] }>("/api/library/imports"),
-    refetchInterval: 4000,
+    enabled: importsActive,
+    refetchInterval: importsActive ? 4000 : false,
   });
   const catalogue = useQuery({
     queryKey: ["library"],
@@ -71,7 +72,7 @@ export function LibraryPage() {
   });
   const presets = useQuery({
     queryKey: ["presets"],
-    queryFn: () => api<{ presets: Preset[] }>("/api/presets"),
+    queryFn: () => api<{ presets: LibraryPreset[] }>("/api/presets"),
   });
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["imports"] });
@@ -126,218 +127,244 @@ export function LibraryPage() {
   }
   return (
     <Stack gap="xl">
-      <div>
-        <Text c="dimmed">Models, LoRAs and inspiration, with their original settings.</Text>
-      </div>
-      <Paper>
-        <Stack>
-          <Text fw={600}>Import a Link or Image</Text>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              importing.mutate();
-            }}
-          >
-            <Group align="end">
-              <TextInput
-                label="Civitai or Hugging Face URL"
-                placeholder="https://…"
-                value={url}
-                onChange={(e) => setUrl(e.currentTarget.value)}
-                required
-                type="url"
-                style={{ flex: 1, minWidth: 200 }}
-              />
-              <Button type="submit" loading={importing.isPending}>
-                Import
-              </Button>
-              <FileButton
-                onChange={(file) => void upload(file)}
-                accept="image/png,image/jpeg,image/webp"
-              >
-                {(props) => (
-                  <Button {...props} variant="default">
-                    Upload Image
-                  </Button>
-                )}
-              </FileButton>
-            </Group>
-          </form>
-        </Stack>
-      </Paper>
-      <Tabs defaultValue="imports">
-        <Tabs.List>
-          <Tabs.Tab value="imports">Imports</Tabs.Tab>
-          <Tabs.Tab value="presets">Inspiration</Tabs.Tab>
-          <Tabs.Tab value="catalogue">Models & LoRAs</Tabs.Tab>
-        </Tabs.List>
-        <Tabs.Panel value="imports" pt="lg">
-          <Stack>
-            {imports.isPending ? (
-              <Loader />
-            ) : imports.error ? (
-              <Alert color="red">{imports.error.message}</Alert>
-            ) : imports.data.imports.length === 0 ? (
-              <Text c="dimmed">
-                Import an image or model to see its files and compatibility grade.
-              </Text>
-            ) : (
-              imports.data.imports.map((record) => (
-                <Card key={record.id} withBorder>
-                  <Stack>
-                    <Group justify="space-between">
-                      <Text fw={500}>
-                        {record.name || record.image?.name || record.input?.url || record.id}
-                      </Text>
-                      <Badge>{record.grade?.value || record.state}</Badge>
-                    </Group>
-                    <Text size="sm" c="dimmed">
-                      {record.state}
-                    </Text>
-                    {record.grade?.reasons.map((reason) => (
-                      <Text size="sm" key={reason}>
-                        {reason}
-                      </Text>
-                    ))}
-                    <Accordion>
-                      <Accordion.Item value="files">
-                        <Accordion.Control>Files</Accordion.Control>
-                        <Accordion.Panel>
-                          {record.resources?.map((file) => (
-                            <Group key={file.name} justify="space-between">
-                              <Text size="sm">{file.name}</Text>
-                              <Badge color={file.status === "installed" ? "green" : "gray"}>
-                                {file.status}
-                              </Badge>
-                            </Group>
-                          ))}
-                        </Accordion.Panel>
-                      </Accordion.Item>
-                    </Accordion>
-                    <Group>
-                      <Button
-                        variant="default"
-                        loading={action.isPending}
-                        onClick={() => action.mutate({ id: record.id, action: "download" })}
-                      >
-                        Download Missing
+      <WorkspaceSections
+        label="Library"
+        sections={[
+          {
+            ...librarySections.imports,
+            content: (
+              <Stack>
+                <Stack>
+                  <Text size="sm" fw={600}>
+                    Import a Link or Image
+                  </Text>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      importing.mutate();
+                    }}
+                  >
+                    <Group align="end">
+                      <TextInput
+                        label="Civitai or Hugging Face URL"
+                        placeholder="https://…"
+                        value={url}
+                        onChange={(e) => setUrl(e.currentTarget.value)}
+                        required
+                        type="url"
+                        style={{ flex: 1, minWidth: 200 }}
+                      />
+                      <Button type="submit" loading={importing.isPending}>
+                        Import
                       </Button>
-                    </Group>
-                  </Stack>
-                </Card>
-              ))
-            )}
-          </Stack>
-        </Tabs.Panel>
-        <Tabs.Panel value="presets" pt="lg">
-          {presets.error ? (
-            <Alert color="red">{presets.error.message}</Alert>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-              {presets.data?.presets.map((preset) => (
-                <Card key={preset.id} withBorder>
-                  <Stack>
-                    {preset.thumbnailUrl && (
-                      <Image src={preset.thumbnailUrl} alt={preset.name} h={220} fit="cover" />
-                    )}
-                    <Text fw={500}>{preset.name}</Text>
-                    <Text lineClamp={3} size="sm" c="dimmed">
-                      {preset.prompt}
-                    </Text>
-                    <Group>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          update({ prompt: preset.prompt });
-                          navigate("/?compose=1");
-                        }}
+                      <FileButton
+                        onChange={(file) => void upload(file)}
+                        accept="image/png,image/jpeg,image/webp"
                       >
-                        Use Prompt
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const target = profiles.find((profile) =>
-                            preset.resources?.some((resource) => resource.profileId === profile.id),
-                          );
-                          if (target) selectProfile(target);
-                          update({
-                            ...preset.settings,
-                            prompt: preset.prompt,
-                            negative: preset.negative,
-                          });
-                          navigate("/?compose=1");
-                        }}
-                      >
-                        Use Settings
-                      </Button>
+                        {(props) => (
+                          <Button {...props} variant="default">
+                            Upload Image
+                          </Button>
+                        )}
+                      </FileButton>
                     </Group>
-                  </Stack>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
-        </Tabs.Panel>
-        <Tabs.Panel value="catalogue" pt="lg">
-          <Stack>
-            <TextInput
-              aria-label="Search Library"
-              placeholder="Search models and LoRAs…"
-              value={query}
-              onChange={(e) => setQuery(e.currentTarget.value)}
-            />
-            <Text c="dimmed" size="sm">
-              Definitions are managed in ai and mounted read-only. Imports and download progress
-              remain part of your runtime data.
-            </Text>
-            {catalogue.error ? (
-              <Alert color="red">{catalogue.error.message}</Alert>
-            ) : (
-              [...groups.entries()]
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([family, types]) => (
-                  <Stack key={family} gap="sm">
-                    <Title order={3}>{family}</Title>
-                    {[...types.entries()]
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([type, items]) => (
-                        <Stack key={type} gap="xs">
-                          <Text size="sm" fw={600} c="dimmed">
-                            {type}
-                          </Text>
-                          {items.map((item) => (
-                            <Card key={item.key} withBorder>
-                              <Group justify="space-between">
-                                <Stack gap={4}>
+                  </form>
+                </Stack>
+                <Stack>
+                  {imports.isPending ? (
+                    <LoadingState label="Loading Imports" />
+                  ) : imports.error ? (
+                    <Alert color="red">{imports.error.message}</Alert>
+                  ) : imports.data.imports.length === 0 ? (
+                    <EmptyState>Your imports and compatibility grades will appear here.</EmptyState>
+                  ) : (
+                    <Table.ScrollContainer minWidth={620}>
+                      <Table aria-label="Library Imports" verticalSpacing="sm" highlightOnHover>
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th>Import</Table.Th>
+                            <Table.Th>Grade & Progress</Table.Th>
+                            <Table.Th>Actions</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {imports.data.imports.map((record) => (
+                            <Table.Tr key={record.id}>
+                              <Table.Td>
+                                <Stack gap="xs">
                                   <Text fw={500}>
-                                    {item.title || item.name || item.file || item.key}
+                                    {record.name ||
+                                      record.image?.name ||
+                                      record.input?.url ||
+                                      record.id}
                                   </Text>
-                                  {item.description && (
-                                    <Text size="sm" c="dimmed">
-                                      {item.description}
-                                    </Text>
-                                  )}
-                                  {item.note && (
-                                    <Text size="sm" c="dimmed">
-                                      {item.note}
-                                    </Text>
-                                  )}
+                                  <Accordion variant="default">
+                                    <Accordion.Item value="files">
+                                      <Accordion.Control>Files</Accordion.Control>
+                                      <Accordion.Panel>
+                                        {record.resources?.map((file) => (
+                                          <Group key={file.name} justify="space-between">
+                                            <Text size="sm">{file.name}</Text>
+                                            <Badge
+                                              color={file.status === "installed" ? "green" : "gray"}
+                                            >
+                                              {file.status}
+                                            </Badge>
+                                          </Group>
+                                        ))}
+                                      </Accordion.Panel>
+                                    </Accordion.Item>
+                                  </Accordion>
                                 </Stack>
-                                <Badge color={item.installed ? "green" : "gray"}>
-                                  {item.installed ? "Installed" : "Not Installed"}
-                                </Badge>
-                              </Group>
-                            </Card>
+                              </Table.Td>
+                              <Table.Td>
+                                <Stack gap={4}>
+                                  <Badge style={{ alignSelf: "start" }}>
+                                    {record.grade?.value || record.state}
+                                  </Badge>
+                                  <Text size="sm" c="dimmed">
+                                    {record.state}
+                                  </Text>
+                                  {record.grade?.reasons.map((reason) => (
+                                    <Text size="sm" key={reason}>
+                                      {reason}
+                                    </Text>
+                                  ))}
+                                </Stack>
+                              </Table.Td>
+                              <Table.Td>
+                                <Button
+                                  variant="default"
+                                  size="compact-sm"
+                                  loading={action.isPending}
+                                  onClick={() =>
+                                    action.mutate({ id: record.id, action: "download" })
+                                  }
+                                >
+                                  Download Missing
+                                </Button>
+                              </Table.Td>
+                            </Table.Tr>
                           ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
+                  )}
+                </Stack>
+              </Stack>
+            ),
+          },
+          {
+            ...librarySections.presets,
+            content: (
+              <>
+                {presets.isPending ? (
+                  <LoadingState label="Loading Inspiration" />
+                ) : presets.error ? (
+                  <Alert color="red">{presets.error.message}</Alert>
+                ) : !presets.data?.presets.length ? (
+                  <EmptyState>Your saved inspiration will appear here.</EmptyState>
+                ) : (
+                  <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
+                    {presets.data?.presets.map((preset) => (
+                      <InspirationPreset key={preset.id} preset={preset} />
+                    ))}
+                  </SimpleGrid>
+                )}
+              </>
+            ),
+          },
+          {
+            ...librarySections.catalogue,
+            content: (
+              <>
+                <Stack>
+                  <SearchInput
+                    aria-label="Search Library"
+                    placeholder="Search models and LoRAs…"
+                    value={query}
+                    onClear={() => setQuery("")}
+                    onChange={(e) => setQuery(e.currentTarget.value)}
+                  />
+                  <Text c="dimmed" size="sm">
+                    Definitions are managed in ai and mounted read-only. Imports and download
+                    progress remain part of your runtime data.
+                  </Text>
+                  {catalogue.isPending ? (
+                    <LoadingState label="Loading Catalogue" />
+                  ) : catalogue.error ? (
+                    <Alert color="red">{catalogue.error.message}</Alert>
+                  ) : !groups.size ? (
+                    <EmptyState>
+                      {query.trim()
+                        ? "No models or LoRAs match your search."
+                        : "No models or LoRAs to show."}
+                    </EmptyState>
+                  ) : (
+                    [...groups.entries()]
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([family, types]) => (
+                        <Stack key={family} gap="sm">
+                          <Title order={3}>{family}</Title>
+                          <Table.ScrollContainer minWidth={520}>
+                            <Table
+                              aria-label={`${family} Models & LoRAs`}
+                              verticalSpacing="sm"
+                              highlightOnHover
+                            >
+                              <Table.Thead>
+                                <Table.Tr>
+                                  <Table.Th>Resource</Table.Th>
+                                  <Table.Th>Type</Table.Th>
+                                  <Table.Th>Status</Table.Th>
+                                </Table.Tr>
+                              </Table.Thead>
+                              <Table.Tbody>
+                                {[...types.entries()]
+                                  .sort(([a], [b]) => a.localeCompare(b))
+                                  .flatMap(([type, items]) =>
+                                    items.map((item) => (
+                                      <Table.Tr key={`${type}:${item.key}`}>
+                                        <Table.Td>
+                                          <Stack gap={4}>
+                                            <Text fw={500}>
+                                              {item.title || item.name || item.file || item.key}
+                                            </Text>
+                                            {item.description && (
+                                              <Text size="sm" c="dimmed">
+                                                {item.description}
+                                              </Text>
+                                            )}
+                                            {item.note && (
+                                              <Text size="sm" c="dimmed">
+                                                {item.note}
+                                              </Text>
+                                            )}
+                                          </Stack>
+                                        </Table.Td>
+                                        <Table.Td>
+                                          <Text size="sm">{type}</Text>
+                                        </Table.Td>
+                                        <Table.Td>
+                                          <Badge color={item.installed ? "green" : "gray"}>
+                                            {item.installed ? "Installed" : "Not Installed"}
+                                          </Badge>
+                                        </Table.Td>
+                                      </Table.Tr>
+                                    )),
+                                  )}
+                              </Table.Tbody>
+                            </Table>
+                          </Table.ScrollContainer>
                         </Stack>
-                      ))}
-                  </Stack>
-                ))
-            )}
-          </Stack>
-        </Tabs.Panel>
-      </Tabs>
+                      ))
+                  )}
+                </Stack>
+              </>
+            ),
+          },
+        ]}
+      />
     </Stack>
   );
 }

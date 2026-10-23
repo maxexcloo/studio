@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   Accordion,
+  ActionIcon,
+  Tooltip,
   Alert,
   AspectRatio,
   Badge,
@@ -16,16 +18,23 @@ import {
   Text,
   Textarea,
   TextInput,
+  type NumberInputProps,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { ArrowUp, SlidersHorizontal } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, failure, post } from "../../api";
 import type { GenerationInput, Session } from "../../types";
 import { useGeneration } from "./GenerationProvider";
-import { ModelPicker } from "./ModelPicker";
+import { LoadingState } from "../../ui/LoadingState";
+import { ProfilePicker } from "./ProfilePicker";
 import { LoraPicker } from "./LoraPicker";
 import { PresetEditor } from "./PresetEditor";
-import { generationInput } from "./payload";
+import { GenerationFooter } from "./GenerationFooter";
+import { SizePicker } from "./SizePicker";
+import { generationInput, referenceDetails, primaryReference, referencePatch } from "./payload";
+import { ReferenceRoleControl } from "./ReferenceRoleControl";
 import { ReferencePicker } from "./ReferencePicker";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
@@ -46,6 +55,8 @@ export function GenerationForm({
   const navigate = useNavigate();
   const location = useLocation();
   const [maskOpen, setMaskOpen] = useState(false);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
   const assistant = useQuery({
     queryKey: ["assistant"],
     queryFn: () =>
@@ -85,7 +96,7 @@ export function GenerationForm({
       void client.invalidateQueries({ queryKey: ["sessions"] });
       void client.invalidateQueries({ queryKey: ["session", sessionId] });
       onSubmitted?.();
-      if (location.pathname !== "/") navigate(`/sessions/${sessionId}`);
+      if (!["/images", "/video"].includes(location.pathname)) navigate(`/chat/${sessionId}`);
     },
     onError: failure,
   });
@@ -105,139 +116,114 @@ export function GenerationForm({
     },
     onError: failure,
   });
-  const number = (
-    key: keyof GenerationInput,
-    label: string,
-    props: Record<string, unknown> = {},
-  ) => (
+  const number = (key: keyof GenerationInput, label: string, props: NumberInputProps = {}) => (
     <NumberInput
       key={key}
       label={label}
       value={Number(input[key])}
       onChange={(value) => update({ [key]: value })}
       {...props}
+      min={profile?.constraints?.[String(key)]?.min ?? props.min}
+      max={profile?.constraints?.[String(key)]?.max ?? props.max}
+      step={profile?.constraints?.[String(key)]?.step ?? props.step}
     />
   );
-  const requiredReference =
-    profile?.mediaInputs?.some((slot) => slot.required) &&
-    draft.references.length === 0 &&
-    input.referenceAssets.length === 0;
+  const requiredReference = profile?.mediaInputs?.some(
+    (slot) =>
+      slot.required &&
+      !referenceDetails(draft.references, input, profile).some((asset) => asset.slot === slot.id) &&
+      !input.referenceAssets.some((asset) => asset.slot === slot.id),
+  );
+  function keyboardSubmit(event: React.KeyboardEvent<HTMLFormElement>) {
+    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey) || event.nativeEvent.isComposing)
+      return;
+    event.preventDefault();
+    if (
+      submit.isPending ||
+      !profile ||
+      profile.ready === false ||
+      !input.prompt.trim() ||
+      requiredReference
+    )
+      return;
+    event.currentTarget.requestSubmit();
+  }
+  const primary = primaryReference(referenceDetails(draft.references, input, profile), profile);
+  const inpaint = input.inpaint as
+    | { assetId?: string; mask?: string; strength?: number; feather?: number }
+    | undefined;
+  const submitLabel =
+    draft.operation === "refine"
+      ? "Refine Image"
+      : input.kind === "video"
+        ? "Generate Video"
+        : "Generate Image";
+  if (!compact && narrow && referenceOpen)
+    return <ReferencePicker inline opened onOpenedChange={setReferenceOpen} />;
   if (compact)
     return (
       <form
+        onKeyDown={keyboardSubmit}
         onSubmit={(event) => {
           event.preventDefault();
           submit.mutate();
         }}
       >
-        <Stack gap="xs">
-          {draft.parentJobId && (
-            <Group gap="xs" wrap="nowrap">
-              <Badge variant="light">{draft.operation === "animate" ? "Animate" : "Refine"}</Badge>
-              <Text size="xs" c="dimmed">
-                Continue from the selected result
-              </Text>
-              <Button
-                size="compact-xs"
-                variant="subtle"
-                onClick={() =>
-                  setDraft((value) => ({
-                    ...value,
-                    parentJobId: undefined,
-                    operation: "image",
-                    references: [],
-                  }))
-                }
-              >
-                Clear
-              </Button>
-            </Group>
-          )}
-          {draft.references.length > 0 && (
-            <Group gap="xs" wrap="nowrap" style={{ overflowX: "auto", paddingBottom: 2 }}>
-              {draft.references.map((asset) => (
-                <Group
-                  gap={4}
-                  key={asset.id}
-                  wrap="nowrap"
-                  style={{ flexShrink: 0, maxWidth: 200 }}
-                >
-                  <Image src={asset.thumbnailUrl} alt={asset.name} h={36} w={36} radius="sm" />
-                  <Text size="xs" c="dimmed" truncate>
-                    {asset.name}
-                  </Text>
-                </Group>
-              ))}
-            </Group>
-          )}
+        <Group wrap="nowrap" gap="xs" className="studio-compact-composer">
+          <ReferencePicker compact />
           <Textarea
             data-composer-prompt
             aria-label="Prompt"
-            placeholder={
-              input.kind === "video" ? "Describe the motion…" : "Describe it. Make it yours."
-            }
+            placeholder={input.kind === "video" ? "Describe the motion…" : "Describe your image…"}
             autosize
             minRows={1}
             maxRows={1}
             variant="unstyled"
+            className="studio-compact-prompt"
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
             required
           />
-          <Group justify="space-between" wrap="nowrap" className="studio-composer-actions">
-            <Group gap="xs" wrap="nowrap" className="studio-composer-tools">
-              <ReferencePicker compact />
-              <Button
-                data-generation-controls
-                variant="default"
-                size="compact-sm"
-                onClick={onControls}
-              >
-                {profile?.displayName || profile?.label || "Model & Controls"}
-              </Button>
-            </Group>
-            <Button
+          <Tooltip label={profile?.displayName || profile?.label || "Generation Inputs"}>
+            <ActionIcon
+              data-generation-controls
+              aria-label="Generation Inputs"
+              variant="subtle"
+              color="gray"
+              size={38}
+              onClick={onControls}
+            >
+              <SlidersHorizontal size={18} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label={submitLabel}>
+            <ActionIcon
               type="submit"
+              aria-label={submitLabel}
               className="studio-generate-button"
-              aria-label={
-                draft.operation === "refine"
-                  ? "Refine Image"
-                  : input.kind === "video"
-                    ? "Generate Video"
-                    : "Generate Image"
-              }
-              size="sm"
+              size={44}
+              radius="xl"
+              variant="filled"
               loading={submit.isPending}
               disabled={
                 !profile || profile.ready === false || !input.prompt.trim() || requiredReference
               }
             >
-              <span className="studio-generation-label-wide">
-                {draft.operation === "refine"
-                  ? "Refine Image"
-                  : input.kind === "video"
-                    ? "Generate Video"
-                    : "Generate Image"}
-              </span>
-              <span className="studio-generation-label-narrow">
-                {draft.operation === "refine"
-                  ? "Refine"
-                  : input.kind === "video"
-                    ? "Animate"
-                    : "Generate"}
-              </span>
-            </Button>
-          </Group>
-          {!!submit.error && (
-            <Text c="red" size="xs">
-              {submit.error instanceof Error ? submit.error.message : String(submit.error)}
-            </Text>
-          )}
-        </Stack>
+              <ArrowUp size={20} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
+        {!!submit.error && (
+          <Text c="red" size="xs">
+            {submit.error instanceof Error ? submit.error.message : String(submit.error)}
+          </Text>
+        )}
       </form>
     );
+  if (models.isPending) return <LoadingState label="Loading Profiles" />;
   return (
     <form
+      onKeyDown={keyboardSubmit}
       onSubmit={(event) => {
         event.preventDefault();
         submit.mutate();
@@ -254,21 +240,7 @@ export function GenerationForm({
                 : "Animate"}
           </Badge>
         </Group>
-        <Select
-          label="Output"
-          data={[
-            { value: "image", label: "Image" },
-            { value: "video", label: "Video" },
-          ]}
-          value={input.kind}
-          onChange={(value) => {
-            const next = profiles.find((p) => p.kind === value);
-            if (next) selectProfile(next);
-            else update({ kind: value as "image" | "video", profileId: "" });
-          }}
-          allowDeselect={false}
-        />
-        <ModelPicker />
+        <ProfilePicker />
         {profile?.ready === false && (
           <Alert color="yellow">
             This model needs additional files or worker nodes before it can run.
@@ -337,26 +309,43 @@ export function GenerationForm({
               <Text size="sm" fw={500}>
                 References
               </Text>
-              <ReferencePicker />
+              <ReferencePicker opened={referenceOpen} onOpenedChange={setReferenceOpen} />
             </Group>
+            {!!draft.references.length && (
+              <ReferenceRoleControl
+                value={input.referenceRole}
+                onChange={(referenceRole) => update({ referenceRole })}
+              />
+            )}
             {draft.references.map((asset) => (
-              <Paper key={asset.id} p="xs">
+              <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
                 <Group wrap="nowrap">
                   <AspectRatio ratio={1} w={52}>
                     <Image src={asset.thumbnailUrl} alt={asset.name} fallbackSrc="" />
                   </AspectRatio>
                   <Text size="sm" lineClamp={1} flex={1}>
                     {asset.name}
+                    {asset.slot
+                      ? ` · ${profile?.mediaInputs?.find((slot) => slot.id === asset.slot)?.label || asset.slot}`
+                      : ""}
                   </Text>
                   <Button
                     variant="subtle"
                     size="compact-xs"
                     onClick={() =>
-                      setDraft((value) => ({
-                        ...value,
-                        references: value.references.filter((a) => a.id !== asset.id),
-                        input: { ...value.input, referenceAssets: [] },
-                      }))
+                      setDraft((value) => {
+                        const references = value.references.filter(
+                          (a) => a.id !== asset.id || a.slot !== asset.slot,
+                        );
+                        return {
+                          ...value,
+                          references,
+                          input: {
+                            ...value.input,
+                            ...referencePatch(value.input, value.references, references, profile),
+                          },
+                        };
+                      })
                     }
                   >
                     Remove
@@ -369,7 +358,7 @@ export function GenerationForm({
                 This workflow requires a reference image.
               </Text>
             )}
-            {draft.references.length > 0 && profile?.capabilities?.inpaint && (
+            {primary && profile?.capabilities?.inpaint && (
               <Group>
                 <Button variant="default" size="compact-sm" onClick={() => setMaskOpen(true)}>
                   {input.inpaint ? "Edit Mask" : "Paint Mask"}
@@ -387,10 +376,7 @@ export function GenerationForm({
             )}
           </Stack>
         ) : null}
-        <SimpleGrid cols={2}>
-          {number("width", "Width", { min: 64, step: 64 })}
-          {number("height", "Height", { min: 64, step: 64 })}
-        </SimpleGrid>
+        <SizePicker input={input} profile={profile} onChange={update} />
         <Accordion variant="separated" transitionDuration={0}>
           <Accordion.Item value="expert">
             <Accordion.Control>Expert Controls</Accordion.Control>
@@ -479,34 +465,71 @@ export function GenerationForm({
             {submit.error instanceof Error ? submit.error.message : String(submit.error)}
           </Alert>
         )}
-        <Button
-          type="submit"
-          fullWidth
-          size="lg"
-          loading={submit.isPending}
-          disabled={
-            !profile ||
-            profile.ready === false ||
-            !input.prompt.trim() ||
-            requiredReference ||
-            rewrite.isPending
+        <GenerationFooter
+          kind={input.kind}
+          onKindChange={(kind) => {
+            const next = profiles.find((profile) => profile.kind === kind);
+            if (next) selectProfile(next);
+            else update({ kind, profileId: "" });
+          }}
+          onClear={() =>
+            setDraft((previous) => ({
+              ...previous,
+              references: [],
+              input: {
+                ...previous.input,
+                prompt: "",
+                negative: "",
+                referenceAssets: [],
+                referenceDetails: [],
+                inpaint: undefined,
+              },
+            }))
           }
         >
-          {draft.operation === "refine"
-            ? "Refine Image"
-            : input.kind === "video"
-              ? "Generate Video"
-              : "Generate Image"}
-        </Button>
+          <Button
+            type="submit"
+            rightSection={<ArrowUp size={18} />}
+            size="sm"
+            loading={submit.isPending}
+            disabled={
+              !profile ||
+              profile.ready === false ||
+              !input.prompt.trim() ||
+              requiredReference ||
+              rewrite.isPending
+            }
+          >
+            {draft.operation === "refine"
+              ? "Refine Image"
+              : input.kind === "video"
+                ? "Generate Video"
+                : "Generate Image"}
+          </Button>
+        </GenerationFooter>
         <Text size="xs" c="dimmed">
           Inputs and results are saved together in a session.
         </Text>
-        {maskOpen && draft.references[0] && (
+        {maskOpen && primary && (
           <Suspense fallback={null}>
             <MaskEditor
-              asset={draft.references[0]}
+              key={primary.id}
+              asset={primary}
+              initialMask={
+                !inpaint?.assetId || inpaint.assetId === primary.id ? inpaint?.mask : undefined
+              }
               close={() => setMaskOpen(false)}
-              save={(mask) => update({ inpaint: { mask, strength: 1, feather: 8 } })}
+              save={(mask) =>
+                update({
+                  inpaint: {
+                    ...inpaint,
+                    mask,
+                    assetId: primary.id,
+                    strength: inpaint?.strength ?? 1,
+                    feather: inpaint?.feather ?? 8,
+                  },
+                })
+              }
             />
           </Suspense>
         )}

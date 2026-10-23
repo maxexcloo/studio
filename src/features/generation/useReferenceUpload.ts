@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
-import { useGeneration } from "./GenerationProvider";
 
-export function useReferenceUpload() {
-  const { setDraft } = useGeneration();
+export function useReferenceUpload(adopt: (asset: ReferenceAsset) => void) {
   const [uploading, setUploading] = useState(false);
   async function upload(file: File | null) {
     if (!file) return;
@@ -16,7 +14,7 @@ export function useReferenceUpload() {
         method: "POST",
         body: form,
       });
-      setDraft((previous) => ({ ...previous, references: [...previous.references, asset] }));
+      adopt(asset);
       return asset;
     } catch (error) {
       failure(error);

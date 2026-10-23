@@ -1,10 +1,22 @@
-import { Alert, Badge, Button, Group, Progress, Stack, Text } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Group,
+  Progress,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
+import { Download, Info } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, failure } from "../../api";
 import type { MediaItem, QueueJob } from "../../types";
 import { useMediaAction } from "../gallery/useMediaAction";
 import { terminal } from "../generation/Queue";
 import { GenerationCard } from "./GenerationCard";
+import { mediaDownload } from "../gallery/download";
 function SessionResult({
   item,
   sessionId,
@@ -20,11 +32,16 @@ function SessionResult({
       <button
         className="studio-thread-media"
         aria-label={`Open ${item.type}: ${item.prompt || "Result"}`}
-        onClick={() => open(item)}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          open(item);
+        }}
       >
         {item.type === "video" ? (
           <video
             src={item.url}
+            width={item.width || 1024}
+            height={item.height || 1024}
             poster={item.thumbnailUrl}
             preload="none"
             muted
@@ -65,18 +82,29 @@ function SessionResult({
             Animate
           </Button>
         )}
-        <Button
-          component="a"
-          href={`/api/gallery/export?ids=${encodeURIComponent(item.id)}`}
-          variant="subtle"
-          color="gray"
-          size="sm"
-        >
-          Download
-        </Button>
-        <Button variant="subtle" color="gray" size="sm" onClick={() => open(item)}>
-          Details
-        </Button>
+        <Tooltip label="Download">
+          <ActionIcon
+            component="a"
+            aria-label="Download"
+            {...mediaDownload(item)}
+            variant="subtle"
+            color="gray"
+            size={36}
+          >
+            <Download size={17} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Generation Details">
+          <ActionIcon
+            aria-label="Details"
+            variant="subtle"
+            color="gray"
+            size={36}
+            onClick={() => open(item)}
+          >
+            <Info size={17} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
     </Stack>
   );
@@ -120,21 +148,19 @@ export function SessionIteration({
         <GenerationCard job={job} />
       </div>
       <Stack gap="md">
-        <Group gap="xs">
-          <Text size="sm" fw={600}>
-            Studio
-          </Text>
-          <Text size="xs" c="dimmed">
-            {String(job.input.profileName || job.input.profileId || "")}
-          </Text>
-          <Badge
-            size="xs"
-            variant="light"
-            color={job.status === "failed" ? "red" : job.status === "completed" ? "green" : "gray"}
-          >
-            {job.status}
-          </Badge>
-        </Group>
+        {job.status !== "completed" && (
+          <Group gap="xs">
+            <Text size="sm" fw={600}>
+              Studio
+            </Text>
+            <Text size="xs" c="dimmed">
+              {String(job.input.profileName || job.input.profileId || "")}
+            </Text>
+            <Badge size="xs" variant="light" color={job.status === "failed" ? "red" : "gray"}>
+              {job.status}
+            </Badge>
+          </Group>
+        )}
         {items.map((item) => (
           <SessionResult key={item.id} item={item} sessionId={job.sessionId} open={open} />
         ))}

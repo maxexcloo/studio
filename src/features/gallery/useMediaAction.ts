@@ -4,7 +4,7 @@ import { api, failure, post } from "../../api";
 import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
 import { initialInput, useGeneration } from "../generation/GenerationProvider";
 export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: () => void) {
-  const { setDraft, profiles } = useGeneration();
+  const { setDraft, profiles, setPrepared } = useGeneration();
   const navigate = useNavigate();
   const location = useLocation();
   return useMutation({
@@ -42,15 +42,45 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
             ...(item.type === "video" ? { frame: "last" } : {}),
           })
         ).asset;
+      const saved = source?.input || item.settings || {};
+      const recordedReferences = source?.input.referenceAssets ?? item.settings?.referenceAssets;
+      const recordedDetails = Array.isArray(saved.referenceDetails) ? saved.referenceDetails : [];
+      let restored = Array.isArray(recordedReferences)
+        ? recordedReferences.map((reference) => ({ ...reference }))
+        : recordedDetails.map((asset: ReferenceAsset) => ({
+            assetId: asset.id,
+            slot: asset.slot || profile.mediaInputs?.[0]?.id || "image",
+          }));
+      const legacyId = String(item.startImageId || item.referenceImage || saved.startImageId || "");
+      if (operation === "image" && !restored.length && legacyId)
+        restored = [{ assetId: legacyId, slot: profile.mediaInputs?.[0]?.id || "image" }];
+      const references: ReferenceAsset[] =
+        operation !== "image"
+          ? []
+          : await Promise.all(
+              restored.map(async (reference) => {
+                const detail = recordedDetails.find(
+                  (asset: ReferenceAsset) =>
+                    asset.id === reference.assetId &&
+                    (!asset.slot || asset.slot === reference.slot),
+                );
+                const asset = detail?.thumbnailUrl
+                  ? detail
+                  : (
+                      await api<{ asset: ReferenceAsset }>(
+                        `/api/reference-assets/${encodeURIComponent(reference.assetId)}`,
+                      )
+                    ).asset;
+                return { ...asset, slot: reference.slot };
+              }),
+            );
       setDraft({
         sessionId: sourceSession,
         operation: operation === "animate" || operation === "extend" ? "animate" : operation,
         parentJobId: sourceSession ? item.jobId : undefined,
         references: asset
-          ? [asset]
-          : operation === "image" && Array.isArray(source?.input.referenceDetails)
-            ? source.input.referenceDetails
-            : [],
+          ? [{ ...asset, slot: profile.mediaInputs?.[0]?.id || "image" }]
+          : references,
         input: {
           ...initialInput,
           ...profile.defaults,
@@ -68,12 +98,14 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
           prompt: item.prompt || "",
           negative: item.negative || "",
           ...(item.width ? { width: item.width, height: item.height || item.width } : {}),
-          referenceAssets: operation === "image" ? source?.input.referenceAssets || [] : [],
+          ...(operation === "image" && legacyId ? { startImageId: legacyId } : {}),
+          referenceAssets: operation === "image" ? restored : [],
         },
       });
       prepared?.();
-      if (location.pathname !== "/")
-        navigate(sourceSession ? `/sessions/${sourceSession}` : "/?compose=1");
+      if (location.pathname.startsWith("/chat")) setPrepared(true);
+      if (!["/images", "/video"].includes(location.pathname))
+        navigate(sourceSession ? `/chat/${sourceSession}` : "/images?compose=1");
       requestAnimationFrame(() =>
         document
           .querySelector<HTMLTextAreaElement>("[data-composer-prompt]")

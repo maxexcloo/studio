@@ -1,11 +1,9 @@
-import { Alert, Button, Group, Loader, Stack, Text } from "@mantine/core";
-import { useSearchParams } from "react-router";
+import { Alert, Group, Loader, Stack, Text } from "@mantine/core";
 import type { ChatMessage } from "../../../shared/chat";
-import { useGeneration } from "../generation/GenerationProvider";
+import { AssistantMarkdown } from "./AssistantMarkdown";
+import { GenerationCard } from "./GenerationCard";
 
 export function ChatTurn({ message }: { message: ChatMessage }) {
-  const { setDraft } = useGeneration();
-  const [params, setParams] = useSearchParams();
   if (message.role === "user")
     return (
       <div className="studio-thread-prompt">
@@ -20,14 +18,12 @@ export function ChatTurn({ message }: { message: ChatMessage }) {
       aria-busy={message.status === "streaming"}
     >
       <Group gap="xs">
-        <Text size="sm" fw={600}>
+        <Text size="xs" fw={600} c="dimmed">
           Studio
         </Text>
         {message.status === "streaming" && <Loader size="xs" aria-label="Studio Is Replying" />}
       </Group>
-      {message.content && (
-        <Text style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.content}</Text>
-      )}
+      {message.content && <AssistantMarkdown content={message.content} />}
       {message.status === "cancelled" && (
         <Text size="xs" c="dimmed">
           Response stopped.
@@ -40,29 +36,11 @@ export function ChatTurn({ message }: { message: ChatMessage }) {
       )}
       {message.actionError && (
         <Alert color="yellow" title="Choose Generation Inputs">
-          <Stack gap="sm">
-            <Text size="sm">{message.actionError}</Text>
-            <Button
-              variant="default"
-              size="sm"
-              style={{ alignSelf: "start" }}
-              onClick={() => {
-                if (message.draft)
-                  setDraft((previous) => ({
-                    ...previous,
-                    operation: message.draft!.operation,
-                    parentJobId: message.draft!.parentJobId,
-                    input: { ...previous.input, ...message.draft!.input },
-                  }));
-                const next = new URLSearchParams(params);
-                next.set("compose", "1");
-                setParams(next);
-              }}
-            >
-              Edit Generation Inputs
-            </Button>
-          </Stack>
+          {message.actionError}
         </Alert>
+      )}
+      {message.actionError && message.draft && (
+        <GenerationCard draft={message.draft} sessionId={message.sessionId} />
       )}
     </Stack>
   );

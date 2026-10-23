@@ -1,53 +1,28 @@
-import { lazy, Suspense } from "react";
-import {
-  ActionIcon,
-  AppShell,
-  Burger,
-  Button,
-  Group,
-  Loader,
-  Modal,
-  NavLink,
-  Text,
-  Title,
-  Tooltip,
-} from "@mantine/core";
-import { useDisclosure, useMediaQuery } from "@mantine/hooks";
-import {
-  Link,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router";
+import { ActionIcon, AppShell, Button, Group, Modal, Title, Tooltip } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
-import { GalleryHorizontalEnd, Layers, Library, Settings, Sparkles } from "lucide-react";
+import { Image, MessageCircle, Library, Settings, Video } from "lucide-react";
 import { AccountGate } from "./features/auth/AccountGate";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
 import { ChatProvider } from "./features/sessions/ChatProvider";
-import { AppearanceMenu, LayoutToggle, useAppearance } from "./ui/Appearance";
-const ChatPage = lazy(() =>
-  import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
-);
-const LibraryPage = lazy(() =>
-  import("./features/library/LibraryPage").then((module) => ({ default: module.LibraryPage })),
-);
-const SettingsPage = lazy(() =>
-  import("./features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
-);
+import { AppearanceMenu, useAppearance } from "./ui/Appearance";
+import { ServiceStatus } from "./ui/ServiceStatus";
+import { HeaderOptions } from "./ui/HeaderOptions";
+import { AccountMenu } from "./features/auth/AccountMenu";
+import { ChatPage } from "./features/sessions/SessionsPage";
+import { LibraryPage, LibraryTitle } from "./features/library/LibraryPage";
+import { SettingsPage, SettingsTitle } from "./features/settings/SettingsPage";
 const navigation = [
-  { to: "/", label: "Images", icon: GalleryHorizontalEnd },
-  { to: "/?type=video", label: "Videos", icon: Sparkles },
-  { to: "/sessions", label: "Chat", icon: Layers },
+  { to: "/chat", label: "Chat", icon: MessageCircle },
+  { to: "/images", label: "Images", icon: Image },
+  { to: "/video", label: "Videos", icon: Video },
   { to: "/library", label: "Library", icon: Library },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 function Workspace() {
   const { appearance } = useAppearance();
-  const [opened, { toggle, close }] = useDisclosure(false);
   const location = useLocation();
   const navigate = useNavigate();
   const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
@@ -61,63 +36,73 @@ function Workspace() {
   useEffect(() => {
     if (overlay) setLastPanel(overlay);
   }, [overlay]);
-  const background = location.state?.backgroundLocation || { pathname: "/", search: "", hash: "" };
+  const background = location.state?.backgroundLocation || {
+    pathname: "/images",
+    search: "",
+    hash: "",
+  };
   const panel = overlay || lastPanel;
-  const [params] = useSearchParams();
+  const chatRoute = (overlay ? background.pathname : location.pathname).startsWith("/chat");
+  const modeLocation = overlay ? background : location;
+
   const active = (to: string) =>
-    to === "/"
-      ? location.pathname === "/" && params.get("type") !== "video"
-      : to === "/?type=video"
-        ? location.pathname === "/" && params.get("type") === "video"
-        : location.pathname.startsWith(to);
+    (to === "/library" || to === "/settings"
+      ? location.pathname
+      : modeLocation.pathname
+    ).startsWith(to);
   return (
     <GenerationProvider>
       <ChatProvider>
-        <AppShell
-          header={{ height: 68 }}
-          navbar={{ width: 208, breakpoint: "sm", collapsed: { mobile: !opened, desktop: true } }}
-          padding={{ base: "sm", md: "lg" }}
-        >
+        <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
           <AppShell.Header>
-            <Group h="100%" px={{ base: "sm", sm: "lg" }} justify="space-between" wrap="nowrap">
-              <Group gap="sm">
-                <Burger
-                  opened={opened}
-                  onClick={toggle}
-                  hiddenFrom="sm"
-                  size="sm"
-                  aria-label="Toggle Navigation"
-                />
-                <Link to="/" className="studio-home-link" style={{ textDecoration: "none" }}>
+            <Group
+              h="100%"
+              px={{ base: "sm", sm: "lg" }}
+              gap="xs"
+              justify="space-between"
+              wrap="nowrap"
+              w="100%"
+              mx="auto"
+              maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
+            >
+              <Group gap="xs" wrap="nowrap">
+                <Link to="/images" className="studio-home-link" style={{ textDecoration: "none" }}>
                   <Title className="studio-logo" order={2}>
                     Studio<span style={{ color: "var(--mantine-primary-color-filled)" }}>.</span>
                   </Title>
                 </Link>
+                <ServiceStatus
+                  chat={chatRoute}
+                  kind={modeLocation.pathname === "/video" ? "video" : "image"}
+                />
               </Group>
               <Group
                 gap={4}
                 component="nav"
                 aria-label="Creative Modes"
                 className="studio-mode-tabs"
+                wrap="nowrap"
               >
                 {navigation.slice(0, 3).map((item) => (
-                  <Button
-                    key={item.to}
-                    component={Link}
-                    to={item.to}
-                    aria-current={active(item.to) ? "page" : undefined}
-                    variant={active(item.to) ? "light" : "subtle"}
-                    color={active(item.to) ? undefined : "gray"}
-                    size="sm"
-                    radius="xl"
-                  >
-                    {item.label}
-                  </Button>
+                  <Tooltip key={item.to} label={item.label} disabled={!narrow}>
+                    <Button
+                      aria-label={item.label}
+                      key={item.to}
+                      component={Link}
+                      to={item.to}
+                      aria-current={active(item.to) ? "page" : undefined}
+                      variant={active(item.to) ? "light" : "subtle"}
+                      color={active(item.to) ? undefined : "gray"}
+                      size="sm"
+                      px={{ base: "xs", sm: "md" }}
+                      radius="xl"
+                    >
+                      {narrow ? <item.icon size={20} /> : item.label}
+                    </Button>
+                  </Tooltip>
                 ))}
               </Group>
               <Group gap="xs" visibleFrom="sm">
-                <LayoutToggle />
-                <AppearanceMenu />
                 {navigation.slice(3).map((item) => (
                   <Tooltip key={item.to} label={item.label}>
                     <ActionIcon
@@ -134,64 +119,64 @@ function Workspace() {
                     </ActionIcon>
                   </Tooltip>
                 ))}
+                <AppearanceMenu />
+                <AccountMenu />
               </Group>
               <Group hiddenFrom="sm">
-                <AppearanceMenu />
+                <HeaderOptions />
               </Group>
             </Group>
           </AppShell.Header>
-          <AppShell.Navbar p="sm" hiddenFrom="sm" aria-hidden={!opened} inert={!opened}>
-            {navigation.map((item) => (
-              <NavLink
-                key={item.to}
-                component={Link}
-                to={item.to}
-                state={
-                  item.to === "/library" || item.to === "/settings"
-                    ? { backgroundLocation: location }
-                    : undefined
-                }
-                label={item.label}
-                leftSection={<item.icon size={18} />}
-                active={active(item.to)}
-                onClick={close}
-                mb={4}
-                style={{ borderRadius: "var(--mantine-radius-md)", minHeight: 44 }}
-              />
-            ))}
-            <Text size="xs" c="dimmed" mt="auto" p="sm">
-              Image → Refine → Animate
-            </Text>
-          </AppShell.Navbar>
-          <AppShell.Main>
+          <AppShell.Main className={chatRoute ? "studio-chat-shell" : undefined}>
             <div
               className="studio-page studio-content"
-              style={{ maxWidth: appearance.layout === "fixed" ? 1600 : undefined }}
+              style={{
+                maxWidth:
+                  appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined,
+              }}
             >
-              <Suspense fallback={<Loader aria-label="Loading Page" />}>
-                <Routes location={overlay ? background : location}>
-                  <Route path="/" element={<GalleryPage />} />
-                  <Route path="/sessions/:id?" element={<ChatPage />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Suspense>
+              <Routes location={overlay ? background : location}>
+                <Route path="/images" element={<GalleryPage />} />
+                <Route path="/video" element={<GalleryPage />} />
+                <Route path="/chat/:id?" element={<ChatPage />} />
+                <Route path="*" element={<Navigate to="/images" replace />} />
+              </Routes>
             </div>
           </AppShell.Main>
           <Modal
             opened={!!overlay}
             onClose={() =>
-              location.state?.backgroundLocation ? navigate(-1) : navigate("/", { replace: true })
+              location.state?.backgroundLocation
+                ? navigate(-1)
+                : navigate("/images", { replace: true })
             }
-            title={panel === "library" ? "Library" : "Settings"}
+            aria-label={panel === "library" ? "Library" : "Settings"}
+            title={
+              narrow ? (
+                <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
+              ) : panel === "library" ? (
+                "Library"
+              ) : (
+                "Settings"
+              )
+            }
             closeButtonProps={{
               "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
             }}
             size={1200}
+            styles={{
+              content: {
+                height: narrow ? "100dvh" : "min(90dvh, 960px)",
+                display: "flex",
+                flexDirection: "column",
+              },
+              header: { flexShrink: 0 },
+              title: { fontSize: "var(--mantine-font-size-xl)", fontWeight: 600 },
+              body: { flex: 1, minHeight: 0, overflowY: "auto" },
+            }}
             fullScreen={narrow}
           >
-            <Suspense fallback={<Loader aria-label="Loading Workspace" />}>
-              {panel === "library" ? <LibraryPage /> : <SettingsPage />}
-            </Suspense>
+            {panel === "library" ? <LibraryPage /> : <SettingsPage />}
           </Modal>
         </AppShell>
       </ChatProvider>

@@ -13,61 +13,130 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { failure, post } from "../../api";
 import type { GenerationInput, QueueJob, ReferenceAsset } from "../../types";
-import { initialInput } from "../generation/GenerationProvider";
+import { initialInput, useGeneration } from "../generation/GenerationProvider";
+import { ProfilePicker } from "../generation/ProfilePicker";
+import { ReferenceRoleControl } from "../generation/ReferenceRoleControl";
+import { ReferencePicker } from "../generation/ReferencePicker";
+import { LoraPicker } from "../generation/LoraPicker";
+import { GenerationFooter } from "../generation/GenerationFooter";
+import { SizePicker } from "../generation/SizePicker";
+import { generationInput, referencePatch } from "../generation/payload";
+import type { ChatDraft } from "../../../shared/chat";
+import { useChat } from "./ChatProvider";
 
-export function GenerationCard({ job }: { job: QueueJob }) {
-  const [editing, setEditing] = useState(false);
-  const client = useQueryClient();
+export function GenerationCard({
+  job,
+  draft,
+  sessionId,
+  onDismiss,
+}: {
+  job?: QueueJob;
+  draft?: ChatDraft;
+  sessionId?: string;
+  onDismiss?: () => void;
+}) {
+  const snapshot = job?.input || draft!.input;
+  const operation = job?.operation || draft!.operation;
+  const [editing, setEditing] = useState(!job);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const { profiles } = useGeneration();
+  const { send, sendingSession, status } = useChat();
   const form = useForm<GenerationInput>({
-    initialValues: { ...initialInput, ...job.input } as GenerationInput,
+    initialValues: { ...initialInput, ...snapshot } as GenerationInput,
   });
-  const references = Array.isArray(job.input.referenceDetails)
-    ? (job.input.referenceDetails as ReferenceAsset[])
+  const profile = profiles.find(
+    (profile) => profile.id === form.values.profileId && profile.kind === form.values.kind,
+  );
+  const references = Array.isArray(form.values.referenceDetails)
+    ? (form.values.referenceDetails as ReferenceAsset[])
     : [];
-  const rerun = useMutation({
-    mutationFn: () =>
-      post(`/api/sessions/${job.sessionId}/generations`, {
-        ...job.input,
-        ...form.getValues(),
-        parentJobId: job.id,
-        operation: job.operation === "upscale" ? "image" : job.operation,
-      }),
-    onSuccess: () => {
+  async function submit() {
+    if (operation === "upscale") return;
+    const input = generationInput(form.getValues(), profile, references);
+    const requestedOperation =
+      input.kind === "video" ? "animate" : operation === "animate" ? "image" : operation;
+    const sourceJobId = job?.id || draft?.parentJobId;
+    const generated = await send(
+      {
+        content: `Generate a variation: ${input.prompt}`,
+        ...(sourceJobId
+          ? { revision: { sourceJobId, input, operation: requestedOperation } }
+          : { generation: { input, operation: requestedOperation } }),
+      },
+      job?.sessionId || sessionId,
+    );
+    if (generated) {
       setEditing(false);
       form.reset();
-      void client.invalidateQueries({ queryKey: ["session", job.sessionId] });
-      void client.invalidateQueries({ queryKey: ["queue"] });
-      void client.invalidateQueries({ queryKey: ["sessions"] });
-    },
-    onError: failure,
-  });
+      onDismiss?.();
+    }
+  }
+  const changeReferences = (next: ReferenceAsset[]) =>
+    form.setValues(referencePatch(form.getValues(), references, next, profile));
+  if (editing && narrow && referenceOpen)
+    return (
+      <Paper withBorder p="md">
+        <ReferencePicker
+          inline
+          opened
+          onOpenedChange={setReferenceOpen}
+          value={references}
+          onChange={changeReferences}
+          profile={profile}
+          input={form.values}
+        />
+      </Paper>
+    );
   return (
-    <Paper radius="lg" p="md" className="studio-generation-card">
+    <Paper withBorder radius="lg" p="md" className="studio-generation-card">
       <Stack gap="sm">
         <Group justify="space-between" wrap="nowrap">
           <Text size="xs" fw={600} c="dimmed">
-            {editing ? "NEW VARIATION" : "GENERATION INPUTS"}
+            {editing ? "New Variation" : "Prompt"}
           </Text>
-          <Badge variant="light" color={job.input.kind === "video" ? "violet" : "gray"}>
-            {job.operation === "upscale"
-              ? "Upscale"
-              : job.input.kind === "video"
-                ? "Video"
-                : "Image"}
+          <Badge variant="light" color={snapshot.kind === "video" ? "violet" : "gray"}>
+            {operation === "upscale" ? "Upscale" : snapshot.kind === "video" ? "Video" : "Image"}
           </Badge>
         </Group>
         {editing ? (
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              rerun.mutate();
+              void submit();
             }}
           >
             <Stack gap="sm">
+              <ProfilePicker value={form.values} onChange={(values) => form.setValues(values)} />
+              <Group>
+                <ReferencePicker
+                  opened={referenceOpen}
+                  onOpenedChange={setReferenceOpen}
+                  profile={profile}
+                  input={form.values}
+                  value={references}
+                  onChange={changeReferences}
+                />
+                {references.map((asset) => (
+                  <Image
+                    key={`${asset.slot}:${asset.id}`}
+                    src={asset.thumbnailUrl || asset.url}
+                    alt={asset.name}
+                    h={36}
+                    w={36}
+                    radius="sm"
+                  />
+                ))}
+              </Group>
+              {!!references.length && (
+                <ReferenceRoleControl
+                  value={form.values.referenceRole}
+                  onChange={(referenceRole) => form.setValues({ referenceRole })}
+                />
+              )}
               <Textarea
                 label="Variation Prompt"
                 autosize
@@ -76,6 +145,11 @@ export function GenerationCard({ job }: { job: QueueJob }) {
                 required
                 {...form.getInputProps("prompt")}
               />
+              <SizePicker
+                input={form.values}
+                profile={profile}
+                onChange={(patch) => form.setValues(patch)}
+              />
               <Accordion variant="default">
                 <Accordion.Item value="settings">
                   <Accordion.Control>Variation Settings</Accordion.Control>
@@ -83,8 +157,6 @@ export function GenerationCard({ job }: { job: QueueJob }) {
                     <SimpleGrid cols={2}>
                       {(
                         [
-                          ["width", "Width"],
-                          ["height", "Height"],
                           ["steps", "Steps"],
                           ["cfg", "Guidance"],
                         ] as const
@@ -92,39 +164,55 @@ export function GenerationCard({ job }: { job: QueueJob }) {
                         <NumberInput key={key} label={label} {...form.getInputProps(key)} />
                       ))}
                       <TextInput label="Seed" {...form.getInputProps("seed")} />
+                      <NumberInput label="Count" {...form.getInputProps("count")} />
+                      <NumberInput label="Denoise" {...form.getInputProps("denoise")} step={0.05} />
+                      {form.values.kind === "video" && (
+                        <>
+                          <NumberInput label="Frames" {...form.getInputProps("frames")} />
+                          <NumberInput label="FPS" {...form.getInputProps("fps")} />
+                        </>
+                      )}
                     </SimpleGrid>
+                    <Textarea label="Negative Prompt" mt="sm" {...form.getInputProps("negative")} />
+                    {profile?.capabilities.lora && (
+                      <LoraPicker
+                        value={form.values}
+                        onChange={(values) => form.setValues(values)}
+                      />
+                    )}
                   </Accordion.Panel>
                 </Accordion.Item>
               </Accordion>
               <Text size="xs" c="dimmed">
-                Uses this generation’s model, references and remaining settings. The original stays
-                here.
+                Your changed inputs continue the conversation. The original stays here.
               </Text>
-              <Group>
-                <Button type="submit" size="sm" loading={rerun.isPending}>
+              <GenerationFooter
+                kind={form.values.kind}
+                onKindChange={(kind) => form.setValues({ kind, profileId: "" })}
+                onClear={() => {
+                  form.reset();
+                  setEditing(false);
+                  onDismiss?.();
+                }}
+              >
+                <Button
+                  type="submit"
+                  size="sm"
+                  loading={!!sendingSession}
+                  disabled={!profile || profile.ready === false || status.data?.available === false}
+                >
                   Generate Variation
                 </Button>
-                <Button
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  onClick={() => {
-                    form.reset();
-                    setEditing(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </Group>
+              </GenerationFooter>
             </Stack>
           </form>
         ) : (
           <>
-            <Text style={{ whiteSpace: "pre-wrap" }}>{String(job.input.prompt || "")}</Text>
+            <Text style={{ whiteSpace: "pre-wrap" }}>{String(snapshot.prompt || "")}</Text>
             <Group gap="xs">
               {references.map((asset) => (
                 <Image
-                  key={asset.id}
+                  key={`${asset.slot}:${asset.id}`}
                   src={asset.thumbnailUrl || asset.url}
                   alt={asset.name || "Reference"}
                   h={40}
@@ -137,21 +225,23 @@ export function GenerationCard({ job }: { job: QueueJob }) {
               <Stack gap={2} style={{ minWidth: 0, flex: 1 }}>
                 <Text size="xs" fw={500} truncate>
                   {String(
-                    job.input.profileName ||
-                      job.input.profileId ||
-                      job.input.model ||
+                    snapshot.profileName ||
+                      snapshot.profileId ||
+                      snapshot.model ||
                       "Selected Model",
                   )}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  {String(job.input.width || "")} × {String(job.input.height || "")}
-                  {job.input.steps ? ` · ${job.input.steps} steps` : ""}
-                  {job.input.seed ? ` · Seed ${job.input.seed}` : ""}
+                  {String(snapshot.width || "")} × {String(snapshot.height || "")}
+                  {snapshot.steps ? ` · ${snapshot.steps} steps` : ""}
+                  {snapshot.seed ? ` · Seed ${snapshot.seed}` : ""}
                 </Text>
               </Stack>
-              <Button variant="subtle" size="compact-sm" onClick={() => setEditing(true)}>
-                Edit & Rerun
-              </Button>
+              {operation !== "upscale" && (
+                <Button variant="subtle" size="compact-sm" onClick={() => setEditing(true)}>
+                  Edit & Rerun
+                </Button>
+              )}
             </Group>
           </>
         )}
