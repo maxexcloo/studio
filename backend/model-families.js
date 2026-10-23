@@ -250,7 +250,7 @@ export function familyFromMetadata(metadata = {}) {
  * remote ComfyUI still gets better than filename guesses. Only the __metadata__
  * block comes back (no tensor names), so this is weaker than a local header.
  */
-export async function primeModelMetadata(lists = {}, { concurrency = 6 } = {}) {
+export async function primeModelMetadata(lists = {}, { concurrency = 6, signal } = {}) {
   const queue = [];
   for (const source of modelSources) {
     for (const name of lists[source] || []) {
@@ -261,11 +261,12 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6 } = {}) {
     }
   }
   async function worker() {
-    while (queue.length) {
+    while (queue.length && !signal?.aborted) {
       const { source, name, key } = queue.shift();
       try {
         const metadata = await comfy(
           `/view_metadata/${metadataFolders[source]}?filename=${encodeURIComponent(name)}`,
+          { signal },
         );
         metadataCache.set(key, metadata && typeof metadata === "object" ? metadata : {});
       } catch (error) {
