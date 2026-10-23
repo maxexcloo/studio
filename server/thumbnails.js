@@ -10,7 +10,7 @@ import {
   noteComfyReachable,
 } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
-import { renameWithRetryAsync } from "./json-store.js";
+import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 
 // Small on-demand cache of downscaled previews for the gallery grid, so a LAN client
@@ -374,14 +374,7 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
     .toBuffer();
 
   await fs.promises.mkdir(thumbnailDir, { recursive: true, mode: 0o700 });
-  const temp = `${file}.${process.pid}.tmp`;
-  try {
-    await fs.promises.writeFile(temp, resized);
-    await renameWithRetryAsync(temp, file);
-  } catch (error) {
-    await fs.promises.rm(temp, { force: true }).catch(() => {});
-    throw error;
-  }
+  await writeBytesFileAsync(file, resized, { durable: false });
   const name = path.basename(file);
   // Best-effort: drop any earlier cached thumbnail for this resource under a stale ETag.
   for (const entry of [...(indexed().get(key) || [])]) {

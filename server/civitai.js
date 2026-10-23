@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { localOutputFile, modelFolders } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
-import { readJsonFile, renameWithRetryAsync, writeJsonFile } from "./json-store.js";
+import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { appVersion } from "./data-dir.js";
 
@@ -249,7 +249,6 @@ export async function writeCivitaiParameters(outputs, body) {
     .filter((file) => file && /\.png$/i.test(file));
   const results = await Promise.all(
     files.map(async (file) => {
-      const temp = `${file}.${process.pid}.${crypto.randomUUID()}.studio-tmp`;
       try {
         const buffer = await fs.promises.readFile(file);
         const width = buffer.length > 24 ? buffer.readUInt32BE(16) : 0;
@@ -260,12 +259,10 @@ export async function writeCivitaiParameters(outputs, body) {
           parametersText(body, { width, height, hashes }),
         );
         if (!next) return false;
-        await fs.promises.writeFile(temp, next);
-        await renameWithRetryAsync(temp, file);
+        await writeBytesFileAsync(file, next);
         return true;
       } catch {
         // Read-only folder, or the file moved: it simply goes without.
-        await fs.promises.rm(temp, { force: true }).catch(() => null);
         return false;
       }
     }),

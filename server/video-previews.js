@@ -10,7 +10,6 @@ import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { dataDir } from "./gallery-store.js";
 import { comfyUrl } from "./comfy.js";
-import { renameWithRetry } from "./json-store.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { trustedLocalOutput } from "./thumbnails.js";
 import { mediaType } from "./media-paths.js";
@@ -205,7 +204,7 @@ export async function getFileVideoPreview(file, identity = file) {
     const temporary = `${output}.${crypto.randomUUID()}.part`;
     try {
       await encode(file, temporary);
-      await renameWithRetry(temporary, output);
+      await fs.promises.rename(temporary, output);
       await sweep().catch(() => {});
       return output;
     } finally {
@@ -315,7 +314,7 @@ export async function getFileVideoPoster(file, identity = file) {
       const temporary = `${output}.${crypto.randomUUID()}.part`;
       try {
         await fs.promises.writeFile(temporary, await extractPoster(file));
-        await renameWithRetry(temporary, output);
+        await fs.promises.rename(temporary, output);
         return output;
       } finally {
         await fs.promises.rm(temporary, { force: true });
@@ -383,7 +382,7 @@ export async function getComfyVideoPreview(filename, subfolder, type) {
       const output = path.join(dir, `${key}-${hash.digest("hex")}.mp4`);
       if (!fs.existsSync(output)) {
         await encode(tempSource, temporary);
-        await renameWithRetry(temporary, output);
+        await fs.promises.rename(temporary, output);
       }
       remoteVersions.set(key, {
         file: output,

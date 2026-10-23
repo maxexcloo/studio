@@ -47,15 +47,13 @@ export function registerWorkerRoutes(app, { probe, forget = () => {}, refresh = 
       refresh();
       res.json(describe());
     } catch (error) {
-      res
-        .status(error instanceof WorkerConfigError ? 400 : 500)
-        .json({
-          ok: false,
-          error:
-            error instanceof WorkerConfigError
-              ? error.message
-              : `Couldn’t save the workers: ${error.message}`,
-        });
+      res.status(error instanceof WorkerConfigError ? 400 : 500).json({
+        ok: false,
+        error:
+          error instanceof WorkerConfigError
+            ? error.message
+            : `Couldn’t save the workers: ${error.message}`,
+      });
     }
   });
 
@@ -67,12 +65,10 @@ export function registerWorkerRoutes(app, { probe, forget = () => {}, refresh = 
       return res.status(404).json({ ok: false, error: "That worker is no longer configured." });
     const url = saved ? saved.url : normalizeWorkerUrl(req.body?.url);
     if (!url)
-      return res
-        .status(400)
-        .json({
-          ok: false,
-          error: "That doesn’t look like an address. Try something like 127.0.0.1:8188.",
-        });
+      return res.status(400).json({
+        ok: false,
+        error: "That doesn’t look like an address. Try something like 127.0.0.1:8188.",
+      });
     res.json({ ok: true, url, ...(await probe(url)) });
   });
 }

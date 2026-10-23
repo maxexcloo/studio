@@ -215,14 +215,12 @@ function publicStatus(req) {
 
 function requireAccountAdmin(req, res) {
   if (multiUserEnabled && canAdmin(req)) return true;
-  res
-    .status(multiUserEnabled ? 403 : 404)
-    .json({
-      ok: false,
-      error: multiUserEnabled
-        ? "Administrator access is required."
-        : "Account management is disabled.",
-    });
+  res.status(multiUserEnabled ? 403 : 404).json({
+    ok: false,
+    error: multiUserEnabled
+      ? "Administrator access is required."
+      : "Account management is disabled.",
+  });
   return false;
 }
 
@@ -279,15 +277,13 @@ export function registerMultiUserAuthRoutes(
       Buffer.byteLength(given) === Buffer.byteLength(setupToken) &&
       crypto.timingSafeEqual(Buffer.from(given), Buffer.from(setupToken));
     if (!clientOf(req).thisComputer && !tokenMatches) {
-      res
-        .status(403)
-        .json({
-          ok: false,
-          reason: "this-computer",
-          error: setupToken
-            ? "Enter the setup token, or create the recovery administrator on the computer running Studio."
-            : "Create the recovery administrator on the computer running Studio.",
-        });
+      res.status(403).json({
+        ok: false,
+        reason: "this-computer",
+        error: setupToken
+          ? "Enter the setup token, or create the recovery administrator on the computer running Studio."
+          : "Create the recovery administrator on the computer running Studio.",
+      });
       return;
     }
     if (bootstrapping) {
@@ -307,20 +303,18 @@ export function registerMultiUserAuthRoutes(
       const account = await bootstrapping;
       const session = createAccountSession(account.id);
       appendCookie(res, accountCookie(req, session.token, session.maxAge));
-      res
-        .status(201)
-        .json(
-          publicStatus({
-            ...req,
-            studioAccount: {
-              authenticated: true,
-              userId: account.id,
-              role: account.role,
-              generationProfiles: [],
-              features: {},
-            },
-          }),
-        );
+      res.status(201).json(
+        publicStatus({
+          ...req,
+          studioAccount: {
+            authenticated: true,
+            userId: account.id,
+            role: account.role,
+            generationProfiles: [],
+            features: {},
+          },
+        }),
+      );
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     } finally {
@@ -361,12 +355,10 @@ export function registerMultiUserAuthRoutes(
     if (!result.ok || !result.value) {
       if (result.retryAfterMs)
         res.setHeader("Retry-After", String(Math.ceil(result.retryAfterMs / 1000)));
-      res
-        .status(401)
-        .json({
-          ok: false,
-          error: "That email or password is incorrect, or the account is not approved.",
-        });
+      res.status(401).json({
+        ok: false,
+        error: "That email or password is incorrect, or the account is not approved.",
+      });
       return;
     }
     const session = createAccountSession(result.value.userId);

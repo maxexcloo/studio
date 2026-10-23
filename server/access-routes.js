@@ -33,35 +33,29 @@ export async function limitedCheck(req, res, check, wrongMessage) {
   if (result.retryAfterMs)
     res.setHeader("Retry-After", String(Math.ceil(result.retryAfterMs / 1000)));
   if (result.reason === "locked") {
-    res
-      .status(429)
-      .json({
-        ok: false,
-        error: `Too many wrong passwords. Try again in ${waitWords(result.retryAfterMs)}.`,
-      });
+    res.status(429).json({
+      ok: false,
+      error: `Too many wrong passwords. Try again in ${waitWords(result.retryAfterMs)}.`,
+    });
     return null;
   }
-  res
-    .status(401)
-    .json({
-      ok: false,
-      locked: true,
-      error: result.retryAfterMs
-        ? `${wrongMessage} Try again in ${waitWords(result.retryAfterMs)}.`
-        : wrongMessage,
-    });
+  res.status(401).json({
+    ok: false,
+    locked: true,
+    error: result.retryAfterMs
+      ? `${wrongMessage} Try again in ${waitWords(result.retryAfterMs)}.`
+      : wrongMessage,
+  });
   return null;
 }
 
 function requireThisComputer(req, res) {
   if (clientOf(req).thisComputer) return true;
-  res
-    .status(403)
-    .json({
-      ok: false,
-      reason: "this-computer",
-      error: "Only the computer running Studio can change this.",
-    });
+  res.status(403).json({
+    ok: false,
+    reason: "this-computer",
+    error: "Only the computer running Studio can change this.",
+  });
   return false;
 }
 
@@ -95,14 +89,12 @@ export function registerAccessRoutes(app) {
     }
     const password = String(req.body?.password || "");
     if (!studioPasswordSet()) {
-      res
-        .status(409)
-        .json({
-          ok: false,
-          reason: "setup",
-          error:
-            "Set a studio password first, on the computer running Studio (Settings › Connection).",
-        });
+      res.status(409).json({
+        ok: false,
+        reason: "setup",
+        error:
+          "Set a studio password first, on the computer running Studio (Settings › Connection).",
+      });
       return;
     }
     const right = await limitedCheck(
@@ -128,13 +120,11 @@ export function registerAccessRoutes(app) {
     res.setHeader("Cache-Control", "no-store");
     // /api/access/ is open before signing in (index.js), so this one checks for itself.
     if (!clientOf(req).thisComputer && !deviceSession(req)) {
-      res
-        .status(401)
-        .json({
-          ok: false,
-          reason: "sign-in",
-          error: "Sign in with the studio password to continue.",
-        });
+      res.status(401).json({
+        ok: false,
+        reason: "sign-in",
+        error: "Sign in with the studio password to continue.",
+      });
       return;
     }
     res.json({

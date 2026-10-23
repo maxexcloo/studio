@@ -1,21 +1,330 @@
-/* Studio's stylesheet, in cascade order: tokens and base first, then one file per
-   component, then the phone shell, motion and forced colours, which refine them. */
-@import "./styles/tokens.css";
-@import "./styles/base.css";
-@import "./styles/motion.css";
-@import "./styles/surfaces.css";
-@import "./styles/controls.css";
-@import "./styles/lists.css";
-@import "./styles/focus.css";
-@import "./styles/shell.css";
-@import "./styles/pickers.css";
-@import "./styles/composer.css";
-@import "./styles/dropdowns.css";
-@import "./styles/gallery.css";
-@import "./styles/viewer.css";
-@import "./styles/settings.css";
-@import "./styles/library.css";
-@import "./styles/messages.css";
-@import "./styles/lockscreen.css";
-@import "./styles/phone.css";
-@import "./styles/forced-colors.css";
+:root[data-mantine-color-scheme="dark"] {
+  color-scheme: dark;
+}
+:root[data-mantine-color-scheme="light"] {
+  color-scheme: light;
+}
+body {
+  margin: 0;
+}
+a {
+  color: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+.studio-page {
+  max-width: 1600px;
+  margin-inline: auto;
+}
+.studio-content {
+  min-width: 0;
+}
+.studio-logo {
+  letter-spacing: -0.055em;
+}
+.mantine-AppShell-header {
+  background: light-dark(rgb(255 255 255 / 0.94), rgb(9 9 11 / 0.94));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.studio-mode-tabs {
+  border: 1px solid var(--mantine-color-default-border);
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--mantine-color-default);
+}
+.studio-phone-header-space {
+  display: none;
+}
+.studio-gallery-page {
+  padding-bottom: 15rem;
+}
+
+.studio-media-button {
+  display: block;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: var(--mantine-color-default);
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-lg);
+}
+.studio-media-button:focus-visible,
+.studio-thread-media:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 3px;
+}
+.studio-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.studio-media-caption {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 2rem 1rem 1rem;
+  background: linear-gradient(transparent, rgb(0 0 0 / 0.8));
+  color: white;
+  text-align: left;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.studio-media-button:hover .studio-media-caption,
+.studio-media-button:focus-visible .studio-media-caption {
+  opacity: 1;
+}
+.studio-media-status {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+}
+.studio-viewer {
+  max-height: 65dvh;
+  width: 100%;
+  object-fit: contain;
+}
+.studio-composer-dock {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(780px, calc(100% - 2rem));
+}
+.studio-composer-dock > .mantine-Paper-root {
+  background: light-dark(rgb(255 255 255 / 0.94), rgb(24 24 27 / 0.94));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
+}
+.studio-composer-dock textarea {
+  font-size: 1rem;
+}
+.studio-expanded-composer {
+  max-height: min(75dvh, 850px);
+  overflow-y: auto;
+  padding-inline: 0.25rem;
+}
+.studio-chat-workspace {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 3rem;
+  height: calc(100dvh - var(--app-shell-header-height) - 2 * var(--app-shell-padding));
+}
+.studio-chat-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.studio-session-sidebar {
+  align-self: start;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.studio-session-page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+  max-width: 920px;
+  margin-inline: auto;
+}
+.studio-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.25rem 0.25rem 1rem;
+}
+.studio-thread-iteration {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.studio-thread-prompt {
+  align-self: flex-end;
+  max-width: 85%;
+  border-radius: var(--mantine-radius-xl);
+  padding: 1rem 1.25rem;
+  background: var(--mantine-color-default);
+}
+.studio-thread-result {
+  max-width: 680px;
+}
+.studio-thread-media {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  border: none;
+  padding: 0;
+  background: transparent;
+  border-radius: var(--mantine-radius-xl);
+  overflow: hidden;
+  cursor: pointer;
+}
+.studio-thread-media img,
+.studio-thread-media video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 660px;
+  object-fit: contain;
+}
+.studio-chat-workspace .studio-composer-dock {
+  position: static;
+  transform: none;
+  width: 100%;
+  flex-shrink: 0;
+}
+.studio-chat-empty {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 1rem;
+}
+.studio-mask {
+  display: block;
+  width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.studio-mask-wrap {
+  position: relative;
+  max-width: 720px;
+  margin: auto;
+}
+.studio-mask-wrap img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.studio-mask-wrap canvas {
+  position: relative;
+  opacity: 0.6;
+}
+@media (min-width: 48em) {
+  .studio-mode-tabs {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+@media (max-width: 48em) {
+  .studio-home-link {
+    display: none;
+  }
+  .studio-phone-header-space {
+    display: block;
+    width: 28px;
+  }
+  .studio-composer-dock {
+    width: calc(100% - 1rem);
+  }
+  .studio-composer-dock .mantine-Button-root {
+    min-height: 44px;
+  }
+  .studio-composer-dock [data-generation-controls] .mantine-Button-label {
+    max-width: 115px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .studio-chat-workspace {
+    display: flex;
+  }
+  .studio-chat-main {
+    flex: 1;
+  }
+  .studio-session-sidebar {
+    display: none;
+  }
+  .studio-thread {
+    gap: 2rem;
+  }
+  .studio-thread-prompt {
+    max-width: 94%;
+  }
+  .studio-thread-media img,
+  .studio-thread-media video {
+    max-height: 50dvh;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.studio-comparison {
+  position: relative;
+  width: 100%;
+  max-height: 60dvh;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-default);
+}
+.studio-comparison img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.studio-comparison-original {
+  position: absolute;
+  inset: 0;
+}
+.studio-comparison-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: white;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.3);
+  pointer-events: none;
+}
+
+.studio-generation-label-narrow {
+  display: none;
+}
+.studio-composer-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+.studio-composer-tools {
+  min-width: 0;
+}
+.studio-generate-button {
+  flex-shrink: 0;
+}
+@media (max-width: 48em) {
+  .studio-generation-label-wide {
+    display: none;
+  }
+  .studio-generation-label-narrow {
+    display: inline;
+  }
+  .studio-composer-tools {
+    gap: 0.25rem;
+  }
+  .studio-composer-tools [data-generation-controls] {
+    min-width: 0;
+    flex: 1;
+  }
+}

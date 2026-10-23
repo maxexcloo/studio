@@ -17,8 +17,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { trashFolderNames } from "./data-names.js";
 import { appVersion, currentDataDir } from "./data-dir.js";
+import { databaseFile } from "./persistence/runtime.ts";
 
 const defaultDataDir = currentDataDir();
 
@@ -28,7 +30,17 @@ const keepDays = 14;
 const keepCount = 3;
 // Large, or never rewritten by an update, or not ours to keep. An encrypted
 // vault from before Hidden was removed moves into backups/ on its first start.
-const skipped = new Set([".thumbnails", backupsName, "backups", ".private-vault", "reference-assets", "setup-demo", ...trashFolderNames, ".DS_Store", "Thumbs.db"]);
+const skipped = new Set([
+  ".thumbnails",
+  backupsName,
+  "backups",
+  ".private-vault",
+  "reference-assets",
+  "setup-demo",
+  ...trashFolderNames,
+  ".DS_Store",
+  "Thumbs.db",
+]);
 
 const currentVersion = () => String(appVersion || "");
 
@@ -52,12 +64,18 @@ export function pruneSnapshots({ dataDir = defaultDataDir, now = Date.now() } = 
   } catch {
     return 0;
   }
-  const dated = entries.map((entry) => {
-    const full = path.join(dir, entry.name);
-    let time = 0;
-    try { time = fs.statSync(full).mtimeMs; } catch { /* gone meanwhile */ }
-    return { full, time };
-  }).sort((a, b) => b.time - a.time);
+  const dated = entries
+    .map((entry) => {
+      const full = path.join(dir, entry.name);
+      let time = 0;
+      try {
+        time = fs.statSync(full).mtimeMs;
+      } catch {
+        /* gone meanwhile */
+      }
+      return { full, time };
+    })
+    .sort((a, b) => b.time - a.time);
   let removed = 0;
   dated.forEach(({ full, time }, index) => {
     if (index < keepCount && now - time < keepDays * 86_400_000) return;
@@ -76,11 +94,19 @@ export function pruneSnapshots({ dataDir = defaultDataDir, now = Date.now() } = 
  * here. Returns the snapshot's folder, or "" when none was needed. A failed
  * copy leaves the marker alone, so the next start tries again.
  */
-export function snapshotIfNewVersion({ dataDir = defaultDataDir, version = currentVersion(), now = Date.now() } = {}) {
+export function snapshotIfNewVersion({
+  dataDir = defaultDataDir,
+  version = currentVersion(),
+  now = Date.now(),
+} = {}) {
   if (!version) return "";
   const marker = path.join(dataDir, markerName);
   let previous = "";
-  try { previous = fs.readFileSync(marker, "utf8").trim(); } catch { previous = ""; }
+  try {
+    previous = fs.readFileSync(marker, "utf8").trim();
+  } catch {
+    previous = "";
+  }
   if (previous === version) {
     pruneSnapshots({ dataDir, now });
     return "";
@@ -88,21 +114,47 @@ export function snapshotIfNewVersion({ dataDir = defaultDataDir, version = curre
   let target = "";
   if (hasState(dataDir)) {
     const stamp = new Date(now).toISOString().replace(/[:.]/g, "-");
-    target = path.join(dataDir, backupsName, `${safeName(previous)}-to-${safeName(version)}-${stamp}`);
+    target = path.join(
+      dataDir,
+      backupsName,
+      `${safeName(previous)}-to-${safeName(version)}-${stamp}`,
+    );
     try {
       fs.mkdirSync(path.join(dataDir, backupsName), { recursive: true, mode: 0o700 });
       // Entry by entry: Node won't copy a folder into one inside itself (.backups).
       fs.mkdirSync(target, { recursive: true, mode: 0o700 });
+      const databaseName = path.basename(databaseFile(dataDir));
       for (const name of fs.readdirSync(dataDir)) {
         if (skipped.has(name) || name === markerName) continue;
-        fs.cpSync(path.join(dataDir, name), path.join(target, name), { recursive: true, preserveTimestamps: true });
+        if (name === `${databaseName}-wal` || name === `${databaseName}-shm`) continue;
+        if (name === databaseName) {
+          // A live SQLite connection can hold committed pages only in its WAL.
+          const source = new DatabaseSync(databaseFile(dataDir), { readOnly: true });
+          try {
+            source.prepare("VACUUM INTO ?").run(path.join(target, name));
+          } finally {
+            source.close();
+          }
+          fs.chmodSync(path.join(target, name), 0o600);
+          continue;
+        }
+        fs.cpSync(path.join(dataDir, name), path.join(target, name), {
+          recursive: true,
+          preserveTimestamps: true,
+        });
       }
       fs.chmodSync(target, 0o700);
       // preserveTimestamps gives the folder data/'s own date; its age counts from now.
       fs.utimesSync(target, new Date(now), new Date(now));
     } catch (error) {
-      console.warn(`\n  Couldn't back up the data folder before updating (${error.message}). Trying again next start.\n`);
-      try { fs.rmSync(target, { recursive: true, force: true }); } catch { /* nothing to undo */ }
+      console.warn(
+        `\n  Couldn't back up the data folder before updating (${error.message}). Trying again next start.\n`,
+      );
+      try {
+        fs.rmSync(target, { recursive: true, force: true });
+      } catch {
+        /* nothing to undo */
+      }
       return "";
     }
   }

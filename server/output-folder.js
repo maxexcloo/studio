@@ -1,17 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
 import { comfy, comfyOutputDir, normalizeFolderInput, root, setComfyOutputDir } from "./comfy.js";
-import {
-  dataDir,
-  gallery,
-  isComfyOutputItem,
-  outputFolderMatch,
-  outputsFrom,
-} from "./gallery-store.js";
-import { isInside, samePath } from "./paths.js";
-import { outputFolderNames } from "./data-names.js";
+import { gallery, isComfyOutputItem, outputFolderMatch, outputsFrom } from "./gallery-store.js";
 
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|mp4|webm|mov|mkv)$/i;
 const scanLimit = 4000;
@@ -93,73 +84,6 @@ export async function inspectOutputDir(value, samples) {
   };
 }
 
-/**
- * Whether a folder may become the output folder. Studio reads, serves and
- * clears what is in it, so it has to be one ComfyUI writes to: one that
- * holds ComfyUI's images or our recent outputs, sits next to ComfyUI's
- * models or custom_nodes, has Studio's own subfolder, or is where ComfyUI
- * says it saves. The folder already configured stays acceptable, so nobody
- * is locked out of a setup that works. Never a whole disk, a home folder,
- * or anything that holds Studio itself.
- */
-export async function outputDirChoice(
-  value,
-  { current = comfyOutputDir, comfyDirs = null, samples = undefined } = {},
-) {
-  const dir = normalizeFolderInput(value);
-  if (!dir) return { ok: false, error: "Choose an existing ComfyUI output folder." };
-  const report = await inspectOutputDir(dir, samples);
-  if (report.state === "missing")
-    return { ok: false, error: "That folder doesn’t exist on this computer.", report };
-  if (report.state === "not-folder")
-    return { ok: false, error: "That’s a file. Choose a folder.", report };
-  if (current && samePath(dir, current)) return { ok: true, dir, report };
-  const resolved = path.resolve(dir);
-  const guarded = [path.parse(resolved).root, os.homedir(), path.dirname(os.homedir())].filter(
-    Boolean,
-  );
-  if (
-    guarded.some((item) => samePath(item, resolved)) ||
-    isInside(resolved, root, { orSame: true }) ||
-    isInside(resolved, dataDir, { orSame: true })
-  ) {
-    return {
-      ok: false,
-      error: "That folder is too broad. Choose the output folder inside the ComfyUI folder.",
-      report,
-    };
-  }
-  if (
-    report.looksLikeComfy ||
-    report.state === "match" ||
-    outputFolderNames.some((name) => fs.existsSync(path.join(resolved, name)))
-  )
-    return { ok: true, dir, report };
-  const told = comfyDirs || (await comfyOutputDirs().catch(() => []));
-  if (told.some((item) => samePath(item, resolved))) return { ok: true, dir, report };
-  return {
-    ok: false,
-    error:
-      "That doesn’t look like a ComfyUI output folder. Choose the output folder inside the ComfyUI folder.",
-    report,
-  };
-}
-
-/** Where ComfyUI itself says it saves: --output-directory, --base-directory, or next to its models. */
-async function comfyOutputDirs() {
-  const stats = await comfy("/system_stats").catch(() => null);
-  const argv = Array.isArray(stats?.system?.argv) ? stats.system.argv : [];
-  const dirs = [];
-  const explicit = argValue(argv, "--output-directory");
-  if (explicit) dirs.push(explicit);
-  const baseDir = argValue(argv, "--base-directory");
-  if (baseDir) dirs.push(path.join(baseDir, "output"));
-  const folders = await comfy("/internal/folder_paths").catch(() => null);
-  for (const comfyRoot of new Set(flattenStrings(folders).map(rootFromComfyPath).filter(Boolean)))
-    dirs.push(path.join(comfyRoot, "output"));
-  return dirs.map((dir) => normalizeFolderInput(dir)).filter(Boolean);
-}
-
 function argValue(argv, flag) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = String(argv[index] || "");
@@ -205,14 +129,9 @@ export async function detectOutputDirs() {
   for (const comfyRoot of roots) add(path.join(comfyRoot, "output"), "comfy");
   const home = os.homedir();
   for (const dir of [
-    ...(process.platform === "win32"
-      ? ["C:\\ComfyUI_windows_portable\\ComfyUI\\output", "C:\\ComfyUI\\output"]
-      : []),
     path.join(home, "ComfyUI", "output"),
     path.join(home, "Documents", "ComfyUI", "output"),
-    path.join(home, "ComfyUI_windows_portable", "ComfyUI", "output"),
     path.join(path.dirname(root), "ComfyUI", "output"),
-    path.join(path.dirname(root), "ComfyUI_windows_portable", "ComfyUI", "output"),
   ])
     add(dir, "common");
   const samples = await sampleOutputs();
@@ -247,105 +166,4 @@ export function autoDetectOutputDir() {
       autoDetect = null;
     });
   return autoDetect;
-}
-
-function run(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    execFile(
-      command,
-      args,
-      { windowsHide: true, maxBuffer: 1024 * 64, ...options },
-      (error, stdout, stderr) => {
-        if (error)
-          reject(
-            Object.assign(error, { stdout: String(stdout || ""), stderr: String(stderr || "") }),
-          );
-        else resolve(String(stdout || ""));
-      },
-    );
-  });
-}
-
-const defaultPickPrompt = "Choose the ComfyUI output folder";
-
-/**
- * Show the operating system's own folder picker on this computer. Resolves to
- * the chosen path, or "" when the dialog was cancelled.
- */
-export async function pickFolder(start = "", pickPrompt = defaultPickPrompt) {
-  const startDir = (() => {
-    const dir = normalizeFolderInput(start);
-    try {
-      return dir && fs.statSync(dir).isDirectory() ? dir : "";
-    } catch {
-      return "";
-    }
-  })();
-  if (process.platform === "darwin") {
-    const script = [
-      "on run argv",
-      "activate",
-      `set promptText to "${pickPrompt}"`,
-      "if (count of argv) > 0 then",
-      "return POSIX path of (choose folder with prompt promptText default location (POSIX file (item 1 of argv)))",
-      "end if",
-      "return POSIX path of (choose folder with prompt promptText)",
-      "end run",
-    ];
-    try {
-      return (
-        await run("osascript", [
-          ...script.flatMap((line) => ["-e", line]),
-          ...(startDir ? [startDir] : []),
-        ])
-      ).trim();
-    } catch (error) {
-      if (/-128|cancel/i.test(error.stderr)) return "";
-      throw new Error("The folder picker didn’t open. Paste the path instead.");
-    }
-  }
-  if (process.platform === "win32") {
-    const script = [
-      "[Console]::OutputEncoding = [Text.Encoding]::UTF8",
-      "Add-Type -AssemblyName System.Windows.Forms",
-      "$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }",
-      "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog",
-      `$dialog.Description = '${pickPrompt}'`,
-      "$dialog.ShowNewFolderButton = $false",
-      "if ($env:STUDIO_PICK_START) { $dialog.SelectedPath = $env:STUDIO_PICK_START }",
-      "if ($dialog.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($dialog.SelectedPath) }",
-      "$owner.Dispose()",
-    ].join("; ");
-    try {
-      return (
-        await run("powershell.exe", ["-NoProfile", "-STA", "-Command", script], {
-          env: { ...process.env, STUDIO_PICK_START: startDir },
-        })
-      ).trim();
-    } catch {
-      throw new Error("The folder picker didn’t open. Paste the path instead.");
-    }
-  }
-  const attempts = [
-    [
-      "zenity",
-      [
-        "--file-selection",
-        "--directory",
-        `--title=${pickPrompt}`,
-        ...(startDir ? [`--filename=${startDir}${path.sep}`] : []),
-      ],
-    ],
-    ["kdialog", ["--getexistingdirectory", startDir || os.homedir(), "--title", pickPrompt]],
-  ];
-  for (const [command, args] of attempts) {
-    try {
-      return (await run(command, args)).trim();
-    } catch (error) {
-      if (error.code === "ENOENT") continue;
-      if (error.code === 1) return "";
-      throw new Error("The folder picker didn’t open. Paste the path instead.");
-    }
-  }
-  throw new Error("No folder picker is installed (zenity or kdialog). Paste the path instead.");
 }

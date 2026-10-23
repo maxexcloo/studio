@@ -25,6 +25,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { writeBytesFileAsync } from "./json-store.js";
 import { modelFolders } from "./comfy.js";
 import { civitaiJson } from "./civitai-access.js";
 import { modelChecksum, versionResource } from "./civitai-import.js";
@@ -218,9 +219,7 @@ export function importPictures({ dataDir = currentDataDir(), sharp = loadSharp }
         })
         .webp({ quality: 82 })
         .toBuffer();
-      await fs.promises.mkdir(dir, { recursive: true });
-      await fs.promises.writeFile(`${target}.tmp`, data, { mode: 0o600 });
-      await fs.promises.rename(`${target}.tmp`, target);
+      await writeBytesFileAsync(target, data, { mode: 0o600 });
       // Pictures of pruned imports go too.
       const records = path.join(dataDir, "library", "imports");
       const names = await fs.promises.readdir(dir).catch(() => []);
@@ -290,6 +289,7 @@ const itemFields = [
   "baseModel",
   "families",
   "role",
+  "type",
   "triggers",
   "strength",
   "note",
@@ -323,6 +323,7 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
       if (entry[field] !== undefined && entry[field] !== "") item[field] = entry[field];
     if (!item.title && info.title) item.title = info.title;
     if (!item.role && info.role) item.role = info.role;
+    if (!item.type && info.type) item.type = info.type;
     if (!item.baseModel && info.base) item.baseModel = info.base;
     if ((!item.families || !item.families.length) && info.families?.length)
       item.families = info.families;

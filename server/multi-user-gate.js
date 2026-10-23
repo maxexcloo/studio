@@ -9,7 +9,7 @@ const publicAccountPaths = new Set([
   "/api/accounts/sign-out",
   "/api/accounts/bootstrap",
   "/api/accounts/oidc/start",
-  "/api/accounts/oidc/callback"
+  "/api/accounts/oidc/callback",
 ]);
 
 /**
@@ -24,6 +24,13 @@ const ordinaryRoutes = [
   ["PATCH", /^\/api\/accounts\/me$/],
   ["POST", /^\/api\/accounts\/mcp-token(\/revoke)?$/],
   ["POST", /^\/api\/generate$/],
+  ["GET", /^\/api\/(sessions(\/[\w-]+)?|queue|user-presets)$/],
+  [
+    "POST",
+    /^\/api\/(sessions(\/[\w-]+\/generations)?|queue\/([\w-]+\/(cancel|retry)|cancel-pending)|user-presets)$/,
+  ],
+  ["PATCH", /^\/api\/(sessions|user-presets)\/[\w-]+$/],
+  ["DELETE", /^\/api\/user-presets\/[\w-]+$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["POST", /^\/api\/queue\/cancel$/],
@@ -42,7 +49,7 @@ const ordinaryRoutes = [
   ["DELETE", /^\/api\/reference-assets\/[^/]+$/],
   ["GET", /^\/api\/upscale\/status$/],
   ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],
-  ["GET", /^\/comfy\/(view|thumb|video-preview)$/]
+  ["GET", /^\/comfy\/(view|thumb|video-preview)$/],
 ];
 
 export function ordinaryRouteAllowed(method, routePath) {
@@ -57,7 +64,11 @@ export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
   const account = accountForRequest(req);
   if (!account) {
     res.setHeader(signInHeader, "1");
-    res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with an approved account to continue." });
+    res.status(401).json({
+      ok: false,
+      reason: "sign-in",
+      error: "Sign in with an approved account to continue.",
+    });
     return;
   }
   if (account.role === "administrator") return next();
@@ -65,6 +76,8 @@ export function enforceMultiUserRequest(req, res, next, { accountForRequest }) {
   res.status(403).json({
     ok: false,
     reason: "administrator",
-    error: req.path.startsWith("/comfy") ? "Raw ComfyUI access is restricted to administrators." : "This action is restricted to administrators."
+    error: req.path.startsWith("/comfy")
+      ? "Raw ComfyUI access is restricted to administrators."
+      : "This action is restricted to administrators.",
   });
 }

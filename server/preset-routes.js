@@ -19,7 +19,7 @@ import {
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai-library.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { presetsEnabled } from "./features.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import {
   libraryDownload,
   libraryDownloadAccess,
@@ -71,9 +71,7 @@ async function cachedThumbnail(id, source) {
   fs.mkdirSync(thumbnailsDir, { recursive: true });
   for (const old of fs.readdirSync(thumbnailsDir))
     if (old.startsWith(`${id}-`)) fs.rmSync(path.join(thumbnailsDir, old), { force: true });
-  const temporary = `${file}.tmp`;
-  fs.writeFileSync(temporary, buffer);
-  fs.renameSync(temporary, file);
+  await writeBytesFileAsync(file, buffer, { durable: false });
   return file;
 }
 

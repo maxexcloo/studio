@@ -1,7 +1,6 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyOutputDir, localOutputFile, normalizeFolderInput, root } from "./comfy.js";
+import { comfyOutputDir, localOutputFile, root } from "./comfy.js";
 import {
   dataDir,
   dedupeGallery,
@@ -18,7 +17,7 @@ import {
   invalidateVisibleCache,
 } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { isInside, samePath } from "./paths.js";
+import { isInside } from "./paths.js";
 import { parseA1111Parameters, readPngInfo } from "./png-text.js";
 import { loadSharp } from "./sharp-loader.js";
 import { probeVideo } from "./video-previews.js";
@@ -27,9 +26,7 @@ import { outputFolderNames } from "./data-names.js";
 /**
  * Earlier work in the gallery: images from other folders (old ComfyUI
  * outputs, an AUTOMATIC1111 or Forge folder) are shown where they are,
- * never copied, and images already in ComfyUI's output folder that the
- * gallery never saw (made in ComfyUI itself, or older than its history)
- * join as ordinary outputs.
+ * never copied. Saved folder registrations continue to be scanned and served.
  *
  * A prompt is read from the file's own metadata (ComfyUI's "prompt" chunk,
  * or A1111's "parameters") so it can be searched and shown. Nothing else is
@@ -50,13 +47,7 @@ const scanDepth = 8;
 // Studio's output folder (data-names.js), under either name. Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in
 // the gallery already or deleted on purpose.
-const skippedNames = new Set([
-  "node_modules",
-  "__pycache__",
-  "$RECYCLE.BIN",
-  "System Volume Information",
-  ...outputFolderNames,
-]);
+const skippedNames = new Set(["node_modules", "__pycache__", ...outputFolderNames]);
 
 function realPath(dir) {
   try {
@@ -330,36 +321,6 @@ export function fillVideoSizes() {
   return filling;
 }
 
-/* ------------------------------------------------------- The output folder */
-
-/**
- * Images in ComfyUI's output folder that the gallery does not know, added
- * as ordinary outputs (they open, upscale, hide and delete like any other).
- */
-export async function importOutputFolder() {
-  if (!comfyOutputDir) throw new Error("Set ComfyUI’s output folder first (Settings › Library).");
-  const base = realPath(comfyOutputDir);
-  try {
-    if (!fs.statSync(base).isDirectory()) throw new Error("missing");
-  } catch {
-    throw new Error("The output folder can’t be found.");
-  }
-  const own = outputFolderNames.map((name) => path.join(base, name));
-  const { files, capped } = await walk(
-    base,
-    (dir) => own.some((folder) => isInside(folder, dir, { orSame: true })) || isOwnFolder(dir),
-  );
-  const records = await toRecords(files, (file) => {
-    const rel = path.relative(base, realPath(file));
-    const subfolder = path.dirname(rel) === "." ? "" : path.dirname(rel);
-    const params = new URLSearchParams({ filename: path.basename(rel), subfolder, type: "output" });
-    return { url: `/comfy/view?${params}`, thumbnailUrl: `/comfy/thumb?${params}` };
-  });
-  const added = addRecords(records);
-  fillVideoSizes().catch(() => 0);
-  return { added, found: files.length, capped };
-}
-
 /* ------------------------------------------------------- Other folders */
 
 function libraryUrl(kind, folderId, rel) {
@@ -395,54 +356,6 @@ export function scanLibraryFolder(id) {
   })().finally(() => scans.delete(id));
   scans.set(id, run);
   return run;
-}
-
-/**
- * Adds a folder of earlier images. The output folder (or one inside it) is
- * imported as ordinary outputs instead; Studio's own folders are refused.
- */
-export async function addLibraryFolder(input) {
-  const dir = normalizeFolderInput(input);
-  if (!dir) throw new Error("Choose a folder.");
-  let stat;
-  try {
-    stat = fs.statSync(dir);
-  } catch {
-    throw new Error("That folder doesn’t exist on this computer.");
-  }
-  if (!stat.isDirectory()) throw new Error("That’s a file. Choose a folder.");
-  const real = realPath(dir);
-  if (isOwnFolder(real))
-    throw new Error("That’s the Studio folder. Choose the folder with your earlier images.");
-  if (isOutputFolder(real)) return { output: true, ...(await importOutputFolder()) };
-  const existing = folders.find((folder) => samePath(folder.path, real));
-  if (existing) return scanLibraryFolder(existing.id);
-  const folder = {
-    id: crypto.randomBytes(6).toString("hex"),
-    path: real,
-    name: path.basename(real) || real,
-    addedAt: new Date().toISOString(),
-    scannedAt: "",
-    count: 0,
-  };
-  folders = [...folders, folder];
-  saveFolders();
-  return scanLibraryFolder(folder.id);
-}
-
-/** Stops showing a folder: its images leave the gallery, the files stay where they are. */
-export function removeLibraryFolder(id) {
-  const folder = folders.find((entry) => entry.id === id);
-  if (!folder) return { removed: 0 };
-  folders = folders.filter((entry) => entry.id !== id);
-  saveFolders();
-  const before = gallery.length;
-  setGallery(
-    gallery.filter((item) => item.library?.folder !== id),
-    { track: false },
-  );
-  markGalleryReset();
-  return { removed: before - gallery.length };
 }
 
 /** Every added folder again, for new images since last time. Quiet: a missing drive is not news. */

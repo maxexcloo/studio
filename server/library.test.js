@@ -11,9 +11,20 @@ const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-da
 const earlier = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-earlier-")));
 process.env.COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = dataDir;
+fs.writeFileSync(
+  path.join(dataDir, "library-folders.json"),
+  JSON.stringify({
+    version: 1,
+    folders: [{ id: "earlier", path: earlier, name: "Earlier Images" }],
+  }),
+);
 const store = await import("./gallery-store.js");
 const library = await import("./library.js");
 const { withPngText } = await import("./png-text.js");
+test.after(() => {
+  for (const folder of [outputDir, dataDir, earlier])
+    fs.rmSync(folder, { recursive: true, force: true });
+});
 
 const image = (color = "#345") =>
   sharp({ create: { width: 12, height: 8, channels: 3, background: color } })
@@ -47,7 +58,7 @@ test("a folder of earlier images joins the gallery in place, with its prompts", 
     await image("#111"),
   );
 
-  const result = await library.addLibraryFolder(earlier);
+  const result = await library.scanLibraryFolder("earlier");
   assert.equal(result.added, 2);
   const items = store.gallery.filter((item) => item.library);
   const castle = items.find((item) => item.outputName === "castle.png");
@@ -66,8 +77,8 @@ test("a folder of earlier images joins the gallery in place, with its prompts", 
     "shown while the file is there",
   );
 
-  // Adding it again only adds what is new.
-  assert.equal((await library.addLibraryFolder(earlier)).added, 0);
+  // Rescanning only adds what is new.
+  assert.equal((await library.scanLibraryFolder("earlier")).added, 0);
 });
 
 test("only media inside the folder is served, never a dot folder or Studio's own files", async () => {
@@ -82,7 +93,6 @@ test("only media inside the folder is served, never a dot folder or Studio's own
     !store.gallery.some((item) => item.outputName === "image_00001_.png"),
     "never scanned in either",
   );
-  await assert.rejects(library.addLibraryFolder(dataDir), /the Studio folder/);
 });
 
 test("removing one from the gallery leaves its file alone and keeps it out of later scans", async () => {
@@ -96,29 +106,6 @@ test("removing one from the gallery leaves its file alone and keeps it out of la
   assert.ok(fs.existsSync(path.join(earlier, "comfy.png")));
   const [folder] = library.libraryFolders();
   assert.equal((await library.scanLibraryFolder(folder.id)).added, 0);
-});
-
-test("the output folder adds unknown images as ordinary outputs, never heiss-ui's own folder", async () => {
-  fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
-  fs.writeFileSync(path.join(outputDir, "ComfyUI_00007_.png"), await image());
-  fs.writeFileSync(path.join(outputDir, "heiss-ui", "image_00003_.png"), await image());
-  const result = await library.addLibraryFolder(outputDir);
-  assert.equal(result.output, true);
-  assert.equal(result.added, 1);
-  const added = store.gallery.find((item) => item.outputName === "ComfyUI_00007_.png");
-  assert.equal(added.library, undefined);
-  assert.equal(
-    added.url,
-    `/comfy/view?${new URLSearchParams({ filename: "ComfyUI_00007_.png", subfolder: "", type: "output" })}`,
-  );
-  assert.ok(!store.gallery.some((item) => item.outputName === "image_00003_.png"));
-});
-
-test("removing the folder takes its images out of the gallery only", () => {
-  const [folder] = library.libraryFolders();
-  library.removeLibraryFolder(folder.id);
-  assert.ok(!store.gallery.some((item) => item.library));
-  assert.ok(fs.existsSync(path.join(earlier, "2024", "castle.png")));
 });
 
 test("search looks through prompts, models and LoRAs; favourites filter by star", () => {

@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import path from "node:path";
 import sharp from "sharp";
 import { civitaiFetch, limitedBody } from "./civitai-access.js";
 import { parametersText } from "./civitai.js";
@@ -8,6 +7,7 @@ import { addGalleryItems, gallery, importedImageFile } from "./gallery-store.js"
 import { startLibraryDownload } from "./library-downloads.js";
 import { withPngText } from "./png-text.js";
 import { probeVideo } from "./video-previews.js";
+import { writeBytesFileAsync } from "./json-store.js";
 
 export function importedGalleryItem(preset, previous = {}) {
   const checkpoint = preset.resources.find((item) =>
@@ -113,18 +113,15 @@ export async function downloadPresetImage(
         throw new Error("The source video could not be downloaded. Try again.");
       }
       const data = await limitedBody(response, 512 * 1024 * 1024);
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      const temporary = `${file}.tmp`;
-      try {
-        fs.writeFileSync(temporary, data, { mode: 0o600 });
-        const info = await probeVideo(temporary);
-        if (!info) throw new Error("The source video could not be read.");
-        item.width = info.width;
-        item.height = info.height;
-        fs.renameSync(temporary, file);
-      } finally {
-        fs.rmSync(temporary, { force: true });
-      }
+      await writeBytesFileAsync(file, data, {
+        mode: 0o600,
+        validate: async (temporary) => {
+          const info = await probeVideo(temporary);
+          if (!info) throw new Error("The source video could not be read.");
+          item.width = info.width;
+          item.height = info.height;
+        },
+      });
     }
   } else {
     let data;
@@ -175,10 +172,7 @@ export async function downloadPresetImage(
     );
     const annotated = withPngText(data, "heiss", JSON.stringify(metadata)) || data;
     const buffer = withPngText(annotated, "parameters", parameters) || annotated;
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const temporary = `${file}.tmp`;
-    fs.writeFileSync(temporary, buffer, { mode: 0o600 });
-    fs.renameSync(temporary, file);
+    await writeBytesFileAsync(file, buffer, { mode: 0o600 });
   }
   addGalleryItems([item]);
   const downloadWarnings = [];

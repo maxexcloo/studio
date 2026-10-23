@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  readOfflineRuntime,
+  usesRuntimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import { writeJsonFile } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { accountFolders } from "./data-names.js";
@@ -37,13 +42,26 @@ function readJson(file, fallback) {
 // The same crash-safe write as the server's own (json-store.js), so the file it replaces stays as .bak.
 const writeJson = (file, value) => writeJsonFile(file, value, { mode: 0o600, compact: true });
 
+/** Source inspection never opens the server's writable connection or initialises schema. */
+function readDocument(dataDir, name, fallback) {
+  const snapshot = readOfflineRuntime(dataDir, [name]);
+  if (snapshot.migrated) return snapshot.documents[name] ?? fallback;
+  return readJson(path.join(dataDir, `${name}.json`), fallback);
+}
+
+function writeGallery(dataDir, records) {
+  if (usesRuntimeDatabase(dataDir)) writeRuntimeDocument(dataDir, "gallery", records);
+  else writeJson(path.join(dataDir, "gallery.json"), records);
+}
+
 function viewRef(url) {
   const value = String(url || "");
   if (!value.startsWith("/comfy/view?")) return null;
   const params = new URLSearchParams(value.slice(value.indexOf("?") + 1));
-  if ((params.get("type") || "output") !== "output") return null;
+  const type = params.get("type") || "output";
+  if (!["media", "output"].includes(type)) return null;
   const filename = params.get("filename") || "";
-  return filename ? { filename, subfolder: params.get("subfolder") || "" } : null;
+  return filename ? { filename, subfolder: params.get("subfolder") || "", type } : null;
 }
 
 function sourceFile(outputsDir, ref) {
@@ -76,7 +94,7 @@ function mediaUrls(filename, subfolder) {
 
 /** The account a username names in the target studio's account store. */
 export function findAccount(targetData, username) {
-  const store = readJson(path.join(targetData, "accounts.json"), { accounts: [] });
+  const store = readDocument(targetData, "accounts", { accounts: [] });
   const key = String(username || "")
     .trim()
     .normalize("NFKC")
@@ -96,6 +114,7 @@ export function findAccount(targetData, username) {
 export function planStudioImport({
   sourceData,
   sourceOutputs,
+  sourceMedia = path.join(sourceData, "media"),
   targetData,
   mediaRoot,
   account,
@@ -113,6 +132,7 @@ export function planStudioImport({
     account: { id: account.id, username: account.username },
     sourceData,
     sourceOutputs,
+    sourceMedia,
     targetData,
     mediaRoot,
     subfolder,
@@ -131,6 +151,7 @@ export function planStudioImport({
 
   // Only the backup left means the gallery is mid-recovery: never write a gallery of just the import over it.
   if (
+    !readOfflineRuntime(targetData).migrated &&
     !fs.existsSync(path.join(targetData, "gallery.json")) &&
     fs.existsSync(path.join(targetData, "gallery.json.bak"))
   ) {
@@ -138,11 +159,11 @@ export function planStudioImport({
       "The target gallery.json is missing but its backup exists. Start Studio once so it recovers the gallery, stop it, then import.",
     );
   }
-  const targetGallery = readJson(path.join(targetData, "gallery.json"), []);
+  const targetGallery = readDocument(targetData, "gallery", []);
   const targetJobs = new Set(targetGallery.map((item) => item.jobId).filter(Boolean));
   const usedNames = new Set();
   const copyMedia = (ref) => {
-    const from = sourceFile(sourceOutputs, ref);
+    const from = sourceFile(ref?.type === "media" ? sourceMedia : sourceOutputs, ref);
     if (!from) return null;
     let filename = `imported-${batch.slice(-6)}-${ref.filename}`;
     for (let n = 2; usedNames.has(filename); n += 1)
@@ -154,7 +175,7 @@ export function planStudioImport({
     return mediaUrls(filename, subfolder);
   };
 
-  for (const item of readJson(path.join(sourceData, "gallery.json"), [])) {
+  for (const item of readDocument(sourceData, "gallery", [])) {
     if (item.privateVault || item.hidden) {
       skip("Hidden items (encrypted, not migrated)");
       continue;
@@ -330,8 +351,11 @@ export function applyStudioImport(plan) {
     references: path.join(plan.targetData, "reference-assets", "index.json"),
     mcp: path.join(plan.targetData, "mcp-ownership.json"),
   };
-  for (const [name, file] of Object.entries(targets))
-    if (fs.existsSync(file)) fs.copyFileSync(file, path.join(backups, `${name}.json`));
+  for (const [name, file] of Object.entries(targets)) {
+    if (name === "gallery" && usesRuntimeDatabase(plan.targetData))
+      writeJson(path.join(backups, "gallery.json"), readDocument(plan.targetData, "gallery", []));
+    else if (fs.existsSync(file)) fs.copyFileSync(file, path.join(backups, `${name}.json`));
+  }
 
   const created = [];
   const hashOf = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -340,6 +364,9 @@ export function applyStudioImport(plan) {
     batch: plan.batch,
     label: plan.label,
     accountId: plan.account.id,
+    galleryStorage: usesRuntimeDatabase(plan.targetData)
+      ? "studio_documents/gallery"
+      : "gallery.json",
     created,
     fileHashes: {},
     previousMcp: {
@@ -374,7 +401,10 @@ export function applyStudioImport(plan) {
     }
     for (const reference of plan.references) for (const item of reference.copies) copy(item);
 
-    writeJson(targets.gallery, [...plan.records, ...readJson(targets.gallery, [])]);
+    writeGallery(plan.targetData, [
+      ...plan.records,
+      ...readDocument(plan.targetData, "gallery", []),
+    ]);
     if (plan.references.length)
       writeJson(targets.references, [
         ...plan.references.map((item) => item.record),
@@ -406,10 +436,9 @@ export function undoStudioImport(targetData, batch) {
   if (!manifest) throw new Error(`No import named ${batch} was found.`);
   const recordIds = new Set(manifest.recordIds);
   const referenceIds = new Set(manifest.referenceIds);
-  const gallery = path.join(targetData, "gallery.json");
-  writeJson(
-    gallery,
-    readJson(gallery, []).filter((item) => !recordIds.has(item.id)),
+  writeGallery(
+    targetData,
+    readDocument(targetData, "gallery", []).filter((item) => !recordIds.has(item.id)),
   );
   const references = path.join(targetData, "reference-assets", "index.json");
   if (fs.existsSync(references))

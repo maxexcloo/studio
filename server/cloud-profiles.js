@@ -6,4 +6,6 @@
  * ever picks one by itself.
  */
 export const isCloudProfile = (profile) =>
-  profile?.family === "grok" || /^grok/i.test(String(profile?.id || ""));
+  profile?.provider === "cliproxyapi" ||
+  profile?.family === "grok" ||
+  /^grok/i.test(String(profile?.id || ""));

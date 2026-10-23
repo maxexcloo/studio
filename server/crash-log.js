@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { PORT_IN_USE_CODE, recordExit } from "./exit-record.js";
 import { currentDataDir } from "./data-dir.js";
 
 const dataDir = currentDataDir();
@@ -30,8 +29,12 @@ const recentLimit = 40;
 const probes = new Map();
 let installed = false;
 
-function stamp() { return new Date().toISOString(); }
-function fileFor(date = new Date()) { return path.join(logDir, `studio-${date.toISOString().slice(0, 10)}.log`); }
+function stamp() {
+  return new Date().toISOString();
+}
+function fileFor(date = new Date()) {
+  return path.join(logDir, `studio-${date.toISOString().slice(0, 10)}.log`);
+}
 
 function write(level, message, extra) {
   const line = `${stamp()} ${level.padEnd(5)} ${message}${extra ? ` ${JSON.stringify(extra)}` : ""}`;
@@ -43,28 +46,52 @@ function write(level, message, extra) {
     fs.mkdirSync(logDir, { recursive: true });
     // Synchronous on purpose: a crash line has to reach the disk before exit.
     fs.appendFileSync(fileFor(), `${line}\n`);
-  } catch { /* logging must never be the thing that fails */ }
+  } catch {
+    /* logging must never be the thing that fails */
+  }
   return line;
 }
 
 /** Something worth knowing later; `extra` is a small object of numbers and flags. */
-export function logEvent(message, extra) { return write("info", message, extra); }
-export function logWarning(message, extra) { return write("warn", message, extra); }
+export function logEvent(message, extra) {
+  return write("info", message, extra);
+}
+export function logWarning(message, extra) {
+  return write("warn", message, extra);
+}
 
 /** A named reading added to every heartbeat and crash line, e.g. thumbnail builds in flight. */
-export function addProbe(name, read) { probes.set(name, read); }
+export function addProbe(name, read) {
+  probes.set(name, read);
+}
 
 function readings() {
   const memory = process.memoryUsage();
-  const out = { rssMb: Math.round(memory.rss / 1048576), heapMb: Math.round(memory.heapUsed / 1048576), uptimeS: Math.round(process.uptime()) };
+  const out = {
+    rssMb: Math.round(memory.rss / 1048576),
+    heapMb: Math.round(memory.heapUsed / 1048576),
+    uptimeS: Math.round(process.uptime()),
+  };
   for (const [name, read] of probes) {
-    try { out[name] = read(); } catch { out[name] = "?"; }
+    try {
+      out[name] = read();
+    } catch {
+      out[name] = "?";
+    }
   }
   return out;
 }
 
 function describe(error) {
-  if (error instanceof Error) return { name: error.name, message: error.message, stack: String(error.stack || "").split("\n").slice(0, 12).join(" | ") };
+  if (error instanceof Error)
+    return {
+      name: error.name,
+      message: error.message,
+      stack: String(error.stack || "")
+        .split("\n")
+        .slice(0, 12)
+        .join(" | "),
+    };
   return { message: String(error) };
 }
 
@@ -76,53 +103,38 @@ function sweep() {
       const file = path.join(logDir, name);
       if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file, { force: true });
     }
-  } catch { /* no logs yet */ }
+  } catch {
+    /* no logs yet */
+  }
 }
 
-/** Installs the handlers and the heartbeat. Call once, as early as possible. */
+export function logCrash(error) {
+  write("fatal", "Crashed: uncaught exception", { ...describe(error), ...readings() });
+  write("fatal", "Last events before the crash", { recent: recent.slice(-15, -1) });
+  return describe(error);
+}
+
+export function logRejection(reason) {
+  write("error", "Unhandled promise rejection (kept running)", {
+    ...describe(reason),
+    ...readings(),
+  });
+}
+
+export function logExit(code) {
+  write(code ? "error" : "info", "Studio exited", { code, ...readings() });
+}
+
+/** Starts diagnostic logging and heartbeat collection; shutdown.js owns process handlers. */
 export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
   if (installed) return;
   installed = true;
   sweep();
-  write("info", "Studio started", { pid: process.pid, node: process.version, platform: `${process.platform}-${process.arch}` });
-
-  process.on("uncaughtException", (error) => {
-    write("fatal", "Crashed: uncaught exception", { ...describe(error), ...readings() });
-    write("fatal", "Last events before the crash", { recent: recent.slice(-15, -1) });
-    const { message, stack } = describe(error);
-    recordExit({ who: "server", reason: `The server crashed: ${message}`, code: 1, detail: stack || message });
-    process.exit(1);
+  write("info", "Studio started", {
+    pid: process.pid,
+    node: process.version,
+    platform: `${process.platform}-${process.arch}`,
   });
-  process.on("unhandledRejection", (reason) => {
-    // Kept running: one failed background task shouldn't stop the studio.
-    write("error", "Unhandled promise rejection (kept running)", { ...describe(reason), ...readings() });
-  });
-  process.on("exit", (code) => {
-    write(code ? "error" : "info", "Studio exited", { code, ...readings() });
-    // Started while a copy already ran: that one's run, not this, so its record stays its own.
-    if (code === PORT_IN_USE_CODE) return;
-    const meant = code === 0;
-    recordExit({ who: "server", clean: meant, code, reason: meant ? "Stopped" : `The server stopped with exit code ${code}` });
-  });
-  // Gallery-store.js owns stopping: it saves synchronously, then exits explicitly
-  // so container PID 1 stops too. Note the requested stop before that handler runs.
-  for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
-    process.once(signal, () => {
-      write("info", `Stopping on ${signal}`);
-      // A stop asked for, recorded before the gallery handler exits.
-      recordExit({ who: "server", clean: true, signal, reason: "Stopped" });
-    });
-  }
-  // Windows: the console window closing (SIGHUP; Windows ends the process ~10 s later) or
-  // Ctrl+Break. Noted, since nothing else gets written: it ends the server from outside.
-  if (process.platform === "win32") {
-    for (const signal of ["SIGHUP", "SIGBREAK"]) {
-      process.once(signal, () => {
-        write("info", `Stopping on ${signal}`);
-        recordExit({ who: "server", clean: true, signal, reason: signal === "SIGHUP" ? "Its window was closed" : "Stopped with Ctrl+Break" });
-      });
-    }
-  }
 
   // The event loop running late means the server can't answer: log stalls as
   // they happen, and a heartbeat with memory once a minute.
@@ -153,6 +165,9 @@ export function noteComfyState(reachable, error) {
     write("warn", "ComfyUI stopped answering", { ...describe(error), ...readings() });
   } else if (reachable && comfyDown) {
     comfyDown = false;
-    write("warn", "ComfyUI answering again", { downForS: Math.round((Date.now() - comfyDownSince) / 1000), ...readings() });
+    write("warn", "ComfyUI answering again", {
+      downForS: Math.round((Date.now() - comfyDownSince) / 1000),
+      ...readings(),
+    });
   }
 }

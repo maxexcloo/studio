@@ -1,11 +1,10 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import { comfy } from "./comfy.js";
 import { currentComfyBackend } from "./comfy-backends.js";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { dataDir, mediaPath, mediaStorageEnabled, mediaType, mediaUrls } from "./media-paths.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { outputFolderName } from "./data-names.js";
 
 /*
@@ -88,14 +87,7 @@ export async function ingestOutput(output, ownerId = "") {
   const filename = storedName(ref.filename);
   const file = mediaPath(filename, subfolder);
   if (!file) throw new Error("This output's name cannot be stored.");
-  await fs.promises.mkdir(path.dirname(file), { recursive: true });
-  const temporary = `${file}.${crypto.randomUUID()}.part`;
-  try {
-    await fs.promises.writeFile(temporary, bytes, { flag: "wx" });
-    await fs.promises.rename(temporary, file);
-  } finally {
-    await fs.promises.rm(temporary, { force: true });
-  }
+  await writeBytesFileAsync(file, bytes, { mode: 0o600 });
   return {
     output: { ...output, ...mediaUrls(filename, subfolder), filename, comfyFilename: ref.filename },
     comfyFile: ref,

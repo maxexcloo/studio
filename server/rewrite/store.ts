@@ -1,0 +1,249 @@
+import { randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import type {
+  GenerationInput,
+  GenerationOperation,
+  QueueJob,
+  StudioSession,
+} from "../../shared/queue.ts";
+
+export type OwnedJob = QueueJob & { ownerId: string; resource: string; cancelRequested?: boolean };
+export interface UserPreset {
+  id: string;
+  title: string;
+  input: GenerationInput;
+}
+const now = () => new Date().toISOString();
+
+export class RewriteStore {
+  readonly db: DatabaseSync;
+
+  constructor(filename: string) {
+    if (filename !== ":memory:") mkdirSync(path.dirname(filename), { recursive: true });
+    this.db = new DatabaseSync(filename);
+    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+      CREATE TABLE IF NOT EXISTS studio_sessions (
+        id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, updated_at TEXT NOT NULL, record TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS studio_sessions_owner ON studio_sessions(owner_id, updated_at);
+      CREATE TABLE IF NOT EXISTS studio_queue (
+        id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES studio_sessions(id),
+        created_at TEXT NOT NULL, status TEXT NOT NULL, record TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS studio_queue_owner ON studio_queue(owner_id, created_at);
+      CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
+      CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
+      CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);`);
+  }
+
+  createSession(
+    ownerId: string,
+    title = "Untitled Session",
+    inputs: GenerationInput = {},
+  ): StudioSession {
+    const stamp = now();
+    const session = { id: randomUUID(), title, inputs, createdAt: stamp, updatedAt: stamp };
+    this.db
+      .prepare("INSERT INTO studio_sessions VALUES (?, ?, ?, ?)")
+      .run(session.id, ownerId, stamp, JSON.stringify(session));
+    return session;
+  }
+
+  sessions(ownerId: string): StudioSession[] {
+    return this.db
+      .prepare("SELECT record FROM studio_sessions WHERE owner_id = ? ORDER BY updated_at DESC")
+      .all(ownerId)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  session(ownerId: string, id: string): StudioSession | undefined {
+    const row = this.db
+      .prepare("SELECT record FROM studio_sessions WHERE id = ? AND owner_id = ?")
+      .get(id, ownerId);
+    return row ? JSON.parse(row.record as string) : undefined;
+  }
+
+  updateSession(
+    ownerId: string,
+    id: string,
+    patch: { title?: string; inputs?: GenerationInput },
+  ): StudioSession | undefined {
+    const session = this.session(ownerId, id);
+    if (!session) return;
+    const next = { ...session, ...patch, updatedAt: now() };
+    this.db
+      .prepare(
+        "UPDATE studio_sessions SET record = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
+      )
+      .run(JSON.stringify(next), next.updatedAt, id, ownerId);
+    return next;
+  }
+
+  enqueue(
+    ownerId: string,
+    sessionId: string,
+    input: GenerationInput,
+    operation: GenerationOperation,
+    parentJobId?: string,
+    resource = "local-media",
+    requestedId?: string,
+    jobLimit?: number,
+  ): OwnedJob {
+    if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
+    if (parentJobId && !this.job(ownerId, parentJobId))
+      throw new Error("Parent generation not found.");
+    if (jobLimit !== undefined) {
+      const row = this.db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled')",
+        )
+        .get(ownerId)!;
+      if (Number(row.count) >= jobLimit)
+        throw Object.assign(new Error(`You can have up to ${jobLimit} outstanding jobs.`), {
+          status: 429,
+          reason: "job-limit",
+        });
+    }
+    const stamp = now();
+    const id = requestedId || randomUUID();
+    const jobResource = resource.startsWith("provider:cliproxyapi")
+      ? `provider:cliproxyapi:${id}`
+      : resource;
+    const backend = /^(worker|cloud):/.test(resource)
+      ? resource.slice(resource.indexOf(":") + 1)
+      : undefined;
+    const job: OwnedJob = {
+      id,
+      jobId: id,
+      ownerId,
+      resource: jobResource,
+      backend,
+      sessionId,
+      parentJobId,
+      operation,
+      status: "queued",
+      reason: "",
+      input: { ...input, clientJobId: id },
+      items: [],
+      outputs: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
+        .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
+      this.updateSession(ownerId, sessionId, { inputs: input });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return job;
+  }
+
+  jobs(ownerId?: string, sessionId?: string): OwnedJob[] {
+    const clauses: string[] = [];
+    const values: string[] = [];
+    if (ownerId !== undefined) {
+      clauses.push("owner_id = ?");
+      values.push(ownerId);
+    }
+    if (sessionId !== undefined) {
+      clauses.push("session_id = ?");
+      values.push(sessionId);
+    }
+    return this.db
+      .prepare(
+        `SELECT record FROM studio_queue${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""} ORDER BY created_at, rowid`,
+      )
+      .all(...values)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  job(ownerId: string, id: string): OwnedJob | undefined {
+    const row = this.db
+      .prepare("SELECT record FROM studio_queue WHERE id = ? AND owner_id = ?")
+      .get(id, ownerId);
+    return row ? JSON.parse(row.record as string) : undefined;
+  }
+
+  save(job: OwnedJob): OwnedJob {
+    const next = { ...job, updatedAt: now() };
+    this.db
+      .prepare("UPDATE studio_queue SET record = ?, status = ? WHERE id = ? AND owner_id = ?")
+      .run(JSON.stringify(next), next.status, next.id, next.ownerId);
+    return next;
+  }
+
+  close() {
+    this.db.close();
+  }
+
+  providerRecord<T>(ownerId: string, id: string): T | undefined {
+    const row = this.db
+      .prepare("SELECT record FROM studio_provider_jobs WHERE id = ? AND owner_id = ?")
+      .get(id, ownerId);
+    return row ? JSON.parse(row.record as string) : undefined;
+  }
+
+  saveProviderRecord(ownerId: string, id: string, record: unknown) {
+    this.db
+      .prepare(
+        "INSERT INTO studio_provider_jobs VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record WHERE studio_provider_jobs.owner_id = excluded.owner_id",
+      )
+      .run(id, ownerId, JSON.stringify(record));
+  }
+
+  presets(ownerId: string): UserPreset[] {
+    return this.db
+      .prepare("SELECT record FROM studio_user_presets WHERE owner_id = ? ORDER BY rowid DESC")
+      .all(ownerId)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  createPreset(ownerId: string, title: string, input: GenerationInput): UserPreset {
+    const preset = { id: randomUUID(), title, input };
+    this.db
+      .prepare("INSERT INTO studio_user_presets VALUES (?, ?, ?)")
+      .run(preset.id, ownerId, JSON.stringify(preset));
+    return preset;
+  }
+
+  deletePreset(ownerId: string, id: string): boolean {
+    return (
+      this.db
+        .prepare("DELETE FROM studio_user_presets WHERE id = ? AND owner_id = ?")
+        .run(id, ownerId).changes > 0
+    );
+  }
+
+  updatePreset(
+    ownerId: string,
+    id: string,
+    patch: { title?: string; input?: GenerationInput },
+  ): UserPreset | undefined {
+    const row = this.db
+      .prepare("SELECT record FROM studio_user_presets WHERE id = ? AND owner_id = ?")
+      .get(id, ownerId);
+    if (!row) return;
+    const preset = { ...JSON.parse(row.record as string), ...patch };
+    this.db
+      .prepare("UPDATE studio_user_presets SET record = ? WHERE id = ? AND owner_id = ?")
+      .run(JSON.stringify(preset), id, ownerId);
+    return preset;
+  }
+}
+
+export function publicJob({
+  ownerId: _ownerId,
+  resource: _resource,
+  cancelRequested: _cancelRequested,
+  ...job
+}: OwnedJob): QueueJob {
+  return job;
+}

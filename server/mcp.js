@@ -163,6 +163,7 @@ export function registerMcpRoutes(
     noteGatewayIdentity = () => {},
     internalCredential = () => ({}),
     resolveSignedResult,
+    domainRequest,
     gatewayAdminTools = () => false,
     claimHandover = () => false,
   } = {},
@@ -204,6 +205,7 @@ export function registerMcpRoutes(
           signingKey: environment.MCP_SIGNING_KEY,
           fetchImpl,
           resolveSignedResult,
+          domainRequest,
         })
       : null;
   // A chat model waiting on Status or a preview can block its chat; only notification deliveries wait longer.
@@ -1359,13 +1361,11 @@ export function registerMcpRoutes(
       await transport.handleRequest(req, res, req.body);
     } catch {
       if (!res.headersSent)
-        res
-          .status(500)
-          .json({
-            jsonrpc: "2.0",
-            error: { code: -32603, message: "MCP could not complete this request." },
-            id: req.body?.id ?? null,
-          });
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "MCP could not complete this request." },
+          id: req.body?.id ?? null,
+        });
     }
   });
   app.all("/mcp", guard, (_req, res) =>

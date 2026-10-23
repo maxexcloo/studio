@@ -13,6 +13,35 @@ import {
 
 const available = ["image-fast", "image-quality", "video"];
 
+test("direct provider profiles enforce Cloud Models and NSFW grants even with neutral profile IDs", () => {
+  const profile = {
+    id: "custom:neutral-provider",
+    family: "custom",
+    provider: "cliproxyapi",
+    nsfw: true,
+  };
+  const user = { id: "artist", role: "user", accessProfileId: "artists" };
+  const access = (cloudModels, nsfwModels) =>
+    effectiveAccountAccess(user, {
+      artists: {
+        id: "artists",
+        name: "Artists",
+        allModels: true,
+        features: { cloudModels, nsfwModels, imageGeneration: true },
+      },
+    });
+  assert.equal(mayUseGenerationProfile(access(false, true), profile), false);
+  assert.equal(mayUseGenerationProfile(access(true, false), profile), false);
+  assert.equal(mayUseGenerationProfile(access(true, true), profile), true);
+  assert.equal(
+    mayUseGenerationProfile(
+      effectiveAccountAccess({ id: "admin", role: "administrator" }, {}),
+      profile,
+    ),
+    true,
+  );
+});
+
 test("account keys accept only bounded server-safe identifiers", () => {
   assert.equal(validAccountKey("user-23"), true);
   assert.equal(validAccountKey("custom:portrait-mode"), true);

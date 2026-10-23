@@ -4,6 +4,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { migrateRuntime } from "./persistence/migration.ts";
+import {
+  closeRuntimeDatabase,
+  readOfflineRuntime,
+  readRuntimeDocument,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import {
   accountMediaSubfolder,
   applyStudioImport,
@@ -205,4 +212,113 @@ test("applying copies into the account, refuses a repeat and undoes exactly what
     JSON.parse(fs.readFileSync(path.join(target, "mcp-ownership.json"), "utf8")).jobs,
     {},
   );
+});
+
+test("a migrated source imports into authoritative SQLite, backs up that document and undoes only its additions", () => {
+  const sourceData = path.join(root, "migrated-source");
+  const targetData = path.join(root, "migrated-target");
+  const sourceMedia = path.join(sourceData, "media");
+  const mediaRoot = path.join(targetData, "media");
+  const url = `/comfy/view?${new URLSearchParams({ filename: "owned.png", subfolder: "heiss-ui", type: "media" })}`;
+  const record = {
+    id: url,
+    url,
+    jobId: "native-job",
+    status: "done",
+    type: "image",
+    prompt: "Native saved image",
+  };
+  write(path.join(sourceData, "gallery.json"), []);
+  write(path.join(sourceMedia, "heiss-ui", "owned.png"), "native-media");
+  migrateRuntime(sourceData, { apply: true });
+  writeRuntimeDocument(sourceData, "gallery", [record]);
+  closeRuntimeDatabase(sourceData);
+
+  write(path.join(targetData, "gallery.json"), [{ id: "stale-json-record", status: "done" }]);
+  write(path.join(targetData, "accounts.json"), {
+    accounts: [{ id: "stale-account", username: "stale" }],
+  });
+  migrateRuntime(targetData, { apply: true });
+  const currentAccount = { id: "native-account", username: "Current User" };
+  const existing = {
+    id: "sqlite-existing",
+    jobId: "existing-job",
+    ownerId: "someone-else",
+    status: "done",
+  };
+  writeRuntimeDocument(targetData, "accounts", { accounts: [currentAccount] });
+  writeRuntimeDocument(targetData, "gallery", [existing]);
+  closeRuntimeDatabase(targetData);
+  const sourceBefore = tree(sourceData);
+  const targetBefore = tree(targetData);
+  const legacyGallery = fs.readFileSync(path.join(targetData, "gallery.json"), "utf8");
+  const account = findAccount(targetData, "CURRENT USER");
+  assert.deepEqual(account, currentAccount);
+  const options = { sourceData, sourceOutputs: outputs, targetData, mediaRoot, account };
+  const plan = planStudioImport(options);
+  assert.deepEqual(summarizePlan(plan).conflicts, []);
+  assert.equal(plan.records.length, 1);
+  assert.deepEqual(
+    [tree(sourceData), tree(targetData)],
+    [sourceBefore, targetBefore],
+    "planning does not alter either SQLite source or target",
+  );
+
+  const result = applyStudioImport(plan);
+  const imported = readRuntimeDocument(targetData, "gallery").find(
+    (item) => item.jobId === "native-job",
+  );
+  assert.deepEqual([imported.ownerId, imported.prompt], ["native-account", "Native saved image"]);
+  const params = new URLSearchParams(imported.url.split("?")[1]);
+  const savedFile = path.join(mediaRoot, params.get("subfolder"), params.get("filename"));
+  assert.equal(fs.readFileSync(savedFile, "utf8"), "native-media");
+  assert.equal(
+    fs.readFileSync(path.join(targetData, "gallery.json"), "utf8"),
+    legacyGallery,
+    "SQLite mode never writes the archived gallery JSON",
+  );
+  const backup = path.join(targetData, "imports", result.batch, "backup", "gallery.json");
+  assert.deepEqual(JSON.parse(fs.readFileSync(backup, "utf8")), [existing]);
+  assert.equal(
+    JSON.parse(fs.readFileSync(result.manifest, "utf8")).galleryStorage,
+    "studio_documents/gallery",
+  );
+  assert.ok(
+    planStudioImport(options).conflicts.some((conflict) => conflict.includes("native-job")),
+  );
+
+  const later = { id: "created-after-import", jobId: "later-job", status: "done" };
+  writeRuntimeDocument(targetData, "gallery", [
+    ...readRuntimeDocument(targetData, "gallery"),
+    later,
+  ]);
+  const undone = undoStudioImport(targetData, result.batch);
+  assert.equal(undone.records, 1);
+  assert.deepEqual(readRuntimeDocument(targetData, "gallery"), [existing, later]);
+  assert.equal(fs.existsSync(savedFile), false);
+  assert.equal(fs.readFileSync(path.join(targetData, "gallery.json"), "utf8"), legacyGallery);
+  assert.deepEqual(
+    tree(sourceData),
+    sourceBefore,
+    "apply and undo also leave the source untouched",
+  );
+  closeRuntimeDatabase(targetData);
+});
+
+test("offline inspection reads committed WAL records without touching source database or sidecars", () => {
+  const directory = path.join(root, "uncheckpointed-source");
+  write(path.join(directory, "gallery.json"), []);
+  migrateRuntime(directory, { apply: true });
+  try {
+    writeRuntimeDocument(directory, "gallery", [{ id: "committed-in-wal", status: "done" }]);
+    assert.ok(fs.statSync(path.join(directory, "studio.sqlite-wal")).size > 0);
+    const before = tree(directory);
+    assert.deepEqual(readOfflineRuntime(directory, ["gallery"]), {
+      migrated: true,
+      documents: { gallery: [{ id: "committed-in-wal", status: "done" }] },
+    });
+    assert.deepEqual(tree(directory), before);
+  } finally {
+    closeRuntimeDatabase(directory);
+  }
 });

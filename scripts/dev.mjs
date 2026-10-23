@@ -1,87 +1,79 @@
-// `npm run dev`: Vite serves the page, the Studio server answers the API.
-//
-// `npm run dev -- --lan` (or `npm run dev:lan`, or the switch in Settings ›
-// Connection, from the next start) opens both to the network.
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { listensBeyondThisComputer, readEnvFile, resolveLan } from "../server/lan.js";
-import { recordExit, tailKeeper } from "../server/exit-record.js";
-import { applyLegacyEnvNames } from "../server/env-names.js";
+import { parseArgs } from "node:util";
+import { migrateRuntime } from "../server/persistence/migration.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = process.argv.slice(2);
-const shell = { ...process.env };
-applyLegacyEnvNames(shell);
-// Vite proxies the API, so to the server every request comes from 127.0.0.1.
-// This token lets Vite say who is really asking (vite.config.ts), so a phone
-// in dev LAN mode is another device, not this computer.
-process.env.STUDIO_DEV_PROXY_TOKEN = crypto.randomBytes(32).toString("base64url");
-
-function viteHost() {
-  const file = readEnvFile(root);
-  const fileKeys = new Set([...file.keys].filter((key) => !(key in shell)));
-  const { host } = resolveLan({ argv: args, env: { ...file.values, ...shell }, fileKeys });
-  return listensBeyondThisComputer(host) ? "0.0.0.0" : "127.0.0.1";
+const { values } = parseArgs({ options: { demo: { type: "boolean" }, lan: { type: "boolean" } } });
+const dataDir = path.join(root, "data", values.demo ? "demo" : "development");
+const environment = {
+  ...process.env,
+  HOST: values.lan ? "0.0.0.0" : "127.0.0.1",
+  PORT: process.env.STUDIO_DEV_API_PORT || "18787",
+  STUDIO_DEV_API_PORT: process.env.STUDIO_DEV_API_PORT || "18787",
+  STUDIO_COMFY_SEARCH: "0",
+  STUDIO_DATA_DIR: dataDir,
+  STUDIO_DEV_PROXY_TOKEN: crypto.randomBytes(32).toString("base64url"),
+  STUDIO_RUNTIME_AUTOMATIC: "0",
+  STUDIO_MULTI_USER: "0",
+  STUDIO_OUTPUT_STORAGE: "studio",
+};
+if (values.demo) environment.STUDIO_DEMO = "1";
+const siblingConfig = path.resolve(root, "../ai");
+if (!environment.STUDIO_CONFIG_DIR && fs.existsSync(path.join(siblingConfig, "profiles")))
+  environment.STUDIO_CONFIG_DIR = siblingConfig;
+if (!environment.STUDIO_WORKERS && !environment.COMFY_URL && environment.STUDIO_CONFIG_DIR) {
+  const workloadsFile = path.join(environment.STUDIO_CONFIG_DIR, "workloads.json");
+  if (fs.existsSync(workloadsFile)) {
+    const workloads = JSON.parse(fs.readFileSync(workloadsFile, "utf8"));
+    const workers = Object.entries(workloads).flatMap(([id, workload]) =>
+      ["image", "video"].includes(workload.kind) && workload.service?.url
+        ? [
+            {
+              id,
+              name: workload.label,
+              url: workload.service.url,
+              capabilities: workload.kind === "image" ? ["image", "models", "upscale"] : ["video"],
+            },
+          ]
+        : [],
+    );
+    if (workers.length) environment.STUDIO_WORKERS = JSON.stringify(workers);
+  }
 }
+const migration = migrateRuntime(dataDir, { apply: true });
+if (migration.conflicts.length) throw new Error(migration.conflicts.join("\n"));
 
-let vite = null;
-let server = null;
+const children = [
+  spawn(
+    process.execPath,
+    ["--watch", "--watch-preserve-output", "server/index.js", ...(values.lan ? ["--lan"] : [])],
+    { cwd: root, env: environment, stdio: "inherit" },
+  ),
+  spawn(
+    process.execPath,
+    ["node_modules/vite/bin/vite.js", "--host", environment.HOST, "--port", "5173", "--strictPort"],
+    { cwd: root, env: environment, stdio: "inherit" },
+  ),
+];
 let stopping = false;
-// The last lines each child printed to stderr, so a stop nobody asked for says why (exit-record.js).
-const viteTail = tailKeeper();
-const serverTail = tailKeeper();
-function teeStderr(child, tail) {
-  child.stderr?.on("data", (chunk) => { tail.push(chunk); process.stderr.write(chunk); });
-}
-const exitWords = (code, signal) => signal ? `was ended (${signal})` : `exited with code ${code}`;
-
-function startVite(host) {
-  const child = spawn(process.execPath, [path.join(root, "node_modules", "vite", "bin", "vite.js"), "--host", host, "--port", "5173"], { cwd: root, stdio: ["ignore", "inherit", "pipe"] });
-  teeStderr(child, viteTail);
-  vite = child;
-  child.on("exit", (code, signal) => {
-    if (stopping) return;
-    // The page server stopping takes the studio with it: say so before stopping the rest.
-    recordExit({ who: "vite", code, signal, reason: `The page server (Vite) ${exitWords(code, signal)}, so Studio stopped with it`, detail: viteTail.text() });
-    console.error(`\n  Studio stopped: the page server (Vite) ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
-    shutdown(code ?? 1);
-  });
-}
-
-function runServer() {
-  return new Promise((resolve) => {
-    // Neither child reads the console, so a console event reaches this launcher only.
-    server = spawn(process.execPath, [path.join(root, "server", "index.js"), ...args], { cwd: root, stdio: ["ignore", "inherit", "pipe"] });
-    teeStderr(server, serverTail);
-    server.on("error", () => resolve(1));
-    server.on("exit", (code, signal) => {
-      server = null;
-      // The server writes its own crash down; this catches what it couldn't (killed from outside).
-      if (!stopping && code !== 0) {
-        recordExit({ who: "server", code, signal, reason: `The server ${exitWords(code, signal)}`, detail: serverTail.text() });
-        console.error(`\n  Studio stopped: the server ${exitWords(code, signal)}. The reason is in data/logs/last-exit.json.\n`);
-      }
-      resolve(code);
-    });
-  });
-}
-
-function shutdown(code = 0) {
+function stop(code = 0) {
+  if (stopping) return;
   stopping = true;
-  server?.kill("SIGTERM");
-  vite?.kill("SIGTERM");
-  process.exit(code);
+  for (const child of children) child.kill("SIGTERM");
+  process.exitCode = code;
 }
-// Stops someone meant: Ctrl+C, the launcher's stop, and on Windows the window closing or Ctrl+Break.
-const meant = { SIGINT: "Stopped with Ctrl+C", SIGTERM: "Stopped", SIGHUP: "Its window was closed", SIGBREAK: "Stopped with Ctrl+Break" };
-for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
-  process.on(signal, () => {
-    recordExit({ who: "launcher", clean: true, signal, reason: meant[signal] });
-    shutdown(130);
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, () => stop());
+for (const child of children) {
+  child.once("error", (error) => {
+    console.error(error.message);
+    stop(1);
   });
+  child.once("exit", (code) => stop(code ?? 1));
 }
-
-startVite(viteHost());
-shutdown((await runServer()) ?? 0);
+console.log(
+  `Studio preview: http://localhost:5173 (${values.demo ? "sample data" : "isolated development data"}; lifecycle control disabled)`,
+);

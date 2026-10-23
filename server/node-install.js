@@ -16,132 +16,52 @@ export function comfyRootDir() {
   return models ? path.dirname(models) : "";
 }
 
-/**
- * The Python that ComfyUI runs with, so pip installs into the right place.
- * Covers a venv inside ComfyUI, the Desktop app's standalone env and the
- * Windows portable build; anything else falls back to a plain `python`.
- */
-export function comfyPython(root, platform = process.platform) {
+/** The local ComfyUI virtual environment, when Studio can see it. */
+export function comfyPython(root) {
   if (!root) return "";
-  const win = platform === "win32";
-  const paths = win ? path.win32 : path.posix;
-  const candidates = win
-    ? [
-        [".venv", "Scripts", "python.exe"],
-        ["venv", "Scripts", "python.exe"],
-        ["..", "python_embeded", "python.exe"],
-        ["..", "python_embedded", "python.exe"],
-      ]
-    : [
-        [".venv", "bin", "python"],
-        ["venv", "bin", "python"],
-        ["..", "standalone-env", "bin", "python3"],
-        ["..", ".venv", "bin", "python"],
-      ];
-  const found = candidates
-    .map((parts) => paths.join(root, ...parts))
-    .find((file) => fs.existsSync(file));
-  return found ? paths.resolve(found) : "";
+  return (
+    [
+      path.join(root, ".venv", "bin", "python"),
+      path.join(root, "venv", "bin", "python"),
+      path.join(root, "..", ".venv", "bin", "python"),
+    ].find((file) => fs.existsSync(file)) || ""
+  );
 }
 
-/**
- * Whether this is the Windows portable build's python_embeded. It must ignore
- * per-user packages (%APPDATA%\Python): otherwise pip calls them "already
- * satisfied" and installs nothing into python_embeded, and the nodes fail to
- * import after the restart. Hence `-s` and PYTHONNOUSERSITE=1 for it.
- */
-export const isEmbeddedPython = (python) =>
-  /[\\/]python_embedd?ed[\\/]/i.test(String(python || ""));
-
-/** The arguments before `install` for ComfyUI's pip. */
-export const pipArgs = (python) => [...(isEmbeddedPython(python) ? ["-s"] : []), "-m", "pip"];
-
-/** The environment for running that Python. */
-export const pythonEnv = (python, env = process.env) =>
-  isEmbeddedPython(python) ? { ...env, PYTHONNOUSERSITE: "1" } : env;
-
-/**
- * Setup without ComfyUI Manager: clone the pack into custom_nodes and install
- * its requirements with ComfyUI's own Python. On a machine we can see, the
- * paths are the real ones; if the pack folder is already there but the nodes
- * do not load, only the requirements are missing.
- *
- * Windows gets two spellings. Windows Terminal opens PowerShell 5.1, which
- * knows neither `cd /d` nor `&&` and will not run a quoted path without `&`;
- * `if ($?)` chains steps there the way `&&` does in cmd. Elsewhere a missing
- * environment falls back to `python3`, since many Linux systems have no `python`.
- *
- * pack: { repository, folder }
- */
-export function packInstallPlan(pack, root = comfyRootDir(), platform = process.platform) {
-  const win = platform === "win32";
-  const paths = win ? path.win32 : path.posix;
-  const customNodes = root ? paths.join(root, "custom_nodes") : "";
-  const python = comfyPython(root, platform);
-  const cloned = Boolean(customNodes) && fs.existsSync(paths.join(customNodes, pack.folder));
-  const requirements = paths.join(pack.folder, "requirements.txt");
-  const folder = customNodes || paths.join("ComfyUI", "custom_nodes");
-  // A pack inside a bigger repository (pack.subdir) is cloned next to its folder,
-  // and only its own folder is copied into place.
+/** A reviewed node pack installed with the Python from its existing local environment. */
+export function packInstallPlan(pack, root = comfyRootDir()) {
+  const customNodes = root ? path.join(root, "custom_nodes") : "";
+  const python = comfyPython(root);
+  const cloned = Boolean(customNodes) && fs.existsSync(path.join(customNodes, pack.folder));
   const source = pack.subdir ? `${pack.folder}.src` : pack.folder;
-  const clone = `git clone ${pack.repository}${pack.subdir ? ` ${source}` : ""}`;
-  // The reviewed commit (node-packs.js), the same one the one-click install takes.
-  const checkout = pack.commit ? `git -C ${source} checkout --detach ${pack.commit}` : "";
-  const subdir = pack.subdir ? paths.join(source, ...pack.subdir.split("/")) : "";
-  const place = (copy, remove) => (pack.subdir ? [copy, remove] : []);
-  const fetchSteps = (copy, remove) =>
-    cloned ? [] : [clone, ...(checkout ? [checkout] : []), ...place(copy, remove)];
-  const pipNeeded = pack.requirements !== false;
-  const commands = [];
-  if (win) {
-    const exe = python ? `"${python}"` : "python";
-    const embedded = isEmbeddedPython(python);
-    const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}`;
-    // -LiteralPath: a plain Set-Location reads [ ] in a folder name as wildcards.
-    const steps = [
-      `Set-Location -LiteralPath "${folder}"`,
-      ...fetchSteps(
-        `Copy-Item -Recurse -LiteralPath "${subdir}" -Destination "${pack.folder}"`,
-        `Remove-Item -Recurse -Force -LiteralPath "${source}"`,
-      ),
-      ...(pipNeeded
-        ? [...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`]
-        : []),
-    ];
-    commands.push({
-      shell: "powershell",
-      label: "PowerShell",
-      command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; "),
-    });
-    // Quoted whole, or cmd keeps the space before && in the value.
-    commands.push({
-      shell: "cmd",
-      label: "Command Prompt",
-      command: [
-        `cd /d "${folder}"`,
-        ...fetchSteps(`xcopy /E /I /Q "${subdir}" "${pack.folder}"`, `rmdir /S /Q "${source}"`),
-        ...(pipNeeded ? [...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip] : []),
-      ].join(" && "),
-    });
-  } else {
-    const exe = python ? `"${python}"` : "python3";
-    commands.push({
-      shell: "sh",
-      label: "Terminal",
-      command: [
-        `cd "${folder}"`,
-        ...fetchSteps(`cp -R "${subdir}" "${pack.folder}"`, `rm -rf "${source}"`),
-        ...(pipNeeded ? [`${exe} -m pip install -r ${requirements}`] : []),
-      ].join(" && "),
-    });
-  }
+  const fetchSteps = cloned
+    ? []
+    : [
+        `git clone ${pack.repository}${pack.subdir ? ` ${source}` : ""}`,
+        ...(pack.commit ? [`git -C ${source} checkout --detach ${pack.commit}`] : []),
+        ...(pack.subdir
+          ? [
+              `cp -R "${path.join(source, ...pack.subdir.split("/"))}" "${pack.folder}"`,
+              `rm -rf "${source}"`,
+            ]
+          : []),
+      ];
+  const command = [
+    `cd "${customNodes || path.join("ComfyUI", "custom_nodes")}"`,
+    ...fetchSteps,
+    ...(pack.requirements !== false
+      ? [
+          `${python ? `"${python}"` : "python3"} -m pip install -r ${path.join(pack.folder, "requirements.txt")}`,
+        ]
+      : []),
+  ].join(" && ");
   return {
     exact: Boolean(customNodes && python),
     customNodesDir: customNodes,
     python,
     cloned,
     needsGit: !cloned,
-    commands,
+    commands: [{ shell: "sh", label: "Terminal", command }],
   };
 }
 

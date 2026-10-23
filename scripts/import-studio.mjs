@@ -5,7 +5,7 @@
 //   node scripts/import-studio.mjs --source-data <dir> --source-outputs <comfy output dir> --account <username> [--label X] [--apply]
 //   node scripts/import-studio.mjs --undo <batch>
 //
-// The target is this studio: STUDIO_DATA_DIR (and STUDIO_MEDIA_DIR). Stop Studio first.
+// The target is this studio: STUDIO_DATA_DIR (and STUDIO_MEDIA_DIR). Stop both studios first.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // The studio's own settings first: STUDIO_DATA_DIR, STUDIO_MEDIA_DIR and PORT may live in its .env (STUDIO_ENV_FILE).
@@ -28,7 +28,7 @@ const mediaRoot = path.resolve(
 );
 const port = Number(option("port") || process.env.PORT || 8787);
 
-// The server moves up to nine ports on when its own is taken, and may listen beyond loopback.
+// Studio binds its configured port exactly, and may listen beyond loopback.
 async function serverRunning() {
   const hosts = [
     ...new Set(
@@ -39,20 +39,18 @@ async function serverRunning() {
     ),
   ];
   for (const host of hosts) {
-    for (let offset = 0; offset < 10; offset += 1) {
-      try {
-        const response = await fetch(
-          `http://${host.includes(":") ? `[${host}]` : host}:${port + offset}/api/ping`,
-          { signal: AbortSignal.timeout(800) },
-        );
-        if (
-          response.ok &&
-          ["studio", "heiss-ui"].includes((await response.json().catch(() => ({}))).app)
-        )
-          return port + offset;
-      } catch {
-        /* nothing there */
-      }
+    try {
+      const response = await fetch(
+        `http://${host.includes(":") ? `[${host}]` : host}:${port}/api/ping`,
+        { signal: AbortSignal.timeout(800) },
+      );
+      if (
+        response.ok &&
+        ["studio", "heiss-ui"].includes((await response.json().catch(() => ({}))).app)
+      )
+        return port;
+    } catch {
+      /* nothing there */
     }
   }
   return 0;
@@ -65,7 +63,7 @@ function fail(message) {
 
 if (flag("help") || !args.length) {
   console.log(
-    "Usage: node scripts/import-studio.mjs --source-data <dir> --source-outputs <dir> --account <username> [--label <name>] [--apply]\n       node scripts/import-studio.mjs --undo <batch>\nTarget: STUDIO_DATA_DIR / STUDIO_MEDIA_DIR (or --target-data, --media-dir). Stop Studio before --apply or --undo.",
+    "Usage: node scripts/import-studio.mjs --source-data <dir> --source-outputs <dir> --account <username> [--source-media <dir>] [--label <name>] [--apply]\n       node scripts/import-studio.mjs --undo <batch>\nTarget: STUDIO_DATA_DIR / STUDIO_MEDIA_DIR (or --target-data, --media-dir). Stop both studios before planning or applying an import; stop the target before --undo.",
   );
   process.exit(0);
 }
@@ -91,6 +89,7 @@ if (!account) fail(`No account named ${username} exists in ${targetData}. Create
 const plan = planStudioImport({
   sourceData: path.resolve(sourceData),
   sourceOutputs: path.resolve(sourceOutputs),
+  ...(option("source-media") ? { sourceMedia: path.resolve(option("source-media")) } : {}),
   targetData,
   mediaRoot,
   account,
@@ -102,7 +101,7 @@ console.log(
   JSON.stringify(
     {
       mode: flag("apply") ? "apply" : "dry run",
-      from: { data: plan.sourceData, outputs: plan.sourceOutputs },
+      from: { data: plan.sourceData, media: plan.sourceMedia, outputs: plan.sourceOutputs },
       to: { data: targetData, media: path.join(mediaRoot, plan.subfolder) },
       ...summary,
     },

@@ -18,8 +18,17 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true
   },
-  "include": ["src"],
+  "include": [
+    "server/persistence",
+    "server/providers",
+    "server/rewrite",
+    "server/runtime",
+    "shared",
+    "src",
+    "tests/browser"
+  ],
   "references": []
 }

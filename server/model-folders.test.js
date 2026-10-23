@@ -213,7 +213,7 @@ test("sections survive a CRLF save, and adding and removing keep CRLF", async ()
   fs.rmSync(config, { force: true });
 });
 
-test("Windows paths are shown in full, not with ~", () => {
-  assert.equal(tildePath("C:\\Users\\me\\AI", "C:\\Users\\me", "win32"), "C:\\Users\\me\\AI");
-  assert.equal(tildePath("/Users/me/AI", "/Users/me", "darwin"), "~/AI");
+test("native home paths are shortened without matching a different user's prefix", () => {
+  assert.equal(tildePath("/Users/me/AI", "/Users/me"), "~/AI");
+  assert.equal(tildePath("/Users/meant/AI", "/Users/me"), "/Users/meant/AI");
 });

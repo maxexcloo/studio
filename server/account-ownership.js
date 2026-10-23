@@ -9,7 +9,11 @@ export function ownerIdForRequest(req) {
 
 /** Legacy single-user records remain visible only in the single-user mode. */
 export function recordBelongsToRequest(record, req) {
-  const ownerId = ownerIdForRequest(req);
+  return recordBelongsToAccount(record, req?.studioAccount);
+}
+
+export function recordBelongsToAccount(record, account) {
+  const ownerId = typeof account?.userId === "string" ? account.userId : "";
   if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   return record?.ownerId === ownerId;
 }

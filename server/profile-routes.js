@@ -29,13 +29,11 @@ import { profileBlock } from "./profile-block.js";
 import { writeExport } from "./profile-export.js";
 
 const fail = (res, error) =>
-  res
-    .status(error.status || 400)
-    .json({
-      ok: false,
-      error: error.message,
-      ...(error.checked ? { errors: error.checked.errors, warnings: error.checked.warnings } : {}),
-    });
+  res.status(error.status || 400).json({
+    ok: false,
+    error: error.message,
+    ...(error.checked ? { errors: error.checked.errors, warnings: error.checked.warnings } : {}),
+  });
 
 /**
  * `profiles()` and `guides()` give the profile-store.js stores; `objectInfo(kind)` ComfyUI's

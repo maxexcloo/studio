@@ -17,6 +17,7 @@ import { exportFilename, sendGalleryExport } from "./gallery-export.js";
 import {
   ownerIdForRequest,
   recordBelongsToRequest,
+  recordBelongsToAccount,
   recordsForRequest,
 } from "./account-ownership.js";
 import { mayUseFeature } from "./account-policy.js";
@@ -25,6 +26,34 @@ function requireGalleryAccess(req, res) {
   if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;
   res.status(403).json({ ok: false, error: "Gallery access is disabled for this account." });
   return false;
+}
+
+export function galleryJobResponse(account, id, settings = false) {
+  if (account && !mayUseFeature(account, "gallery"))
+    return {
+      status: 403,
+      payload: { ok: false, error: "Gallery access is disabled for this account.", items: [] },
+    };
+  cleanupGalleryState(jobs);
+  const items = filterVisibleGallery(
+    gallery.filter((item) => item.jobId === id && recordBelongsToAccount(item, account)),
+  );
+  const fields = [
+    "jobId",
+    "index",
+    "status",
+    "type",
+    "url",
+    ...(settings ? ["prompt", "negative", "width", "height", "settings", "assistant"] : []),
+  ];
+  return {
+    status: 200,
+    payload: {
+      items: items.map((item) =>
+        Object.fromEntries(fields.filter((key) => key in item).map((key) => [key, item[key]])),
+      ),
+    },
+  };
 }
 
 export function registerGalleryReadRoutes(app) {
@@ -52,27 +81,8 @@ export function registerGalleryReadRoutes(app) {
 
   // Exact job reads avoid sorting and paging the full gallery for MCP results.
   app.get("/api/gallery/jobs/:id", (req, res) => {
-    if (!requireGalleryAccess(req, res)) return res.json({ items: [] });
-    cleanupGalleryState(jobs);
-    const items = filterVisibleGallery(
-      recordsForRequest(gallery, req).filter((item) => item.jobId === req.params.id),
-    );
-    // Prompts and settings only on request: MCP reads them to run a finished result again or animate it.
-    const fields = [
-      "jobId",
-      "index",
-      "status",
-      "type",
-      "url",
-      ...(req.query.settings === "1"
-        ? ["prompt", "negative", "width", "height", "settings", "assistant"]
-        : []),
-    ];
-    res.json({
-      items: items.map((item) =>
-        Object.fromEntries(fields.filter((key) => key in item).map((key) => [key, item[key]])),
-      ),
-    });
+    const result = galleryJobResponse(req.studioAccount, req.params.id, req.query.settings === "1");
+    res.status(result.status).json(result.payload);
   });
 
   app.get("/api/gallery", (req, res) => {

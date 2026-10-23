@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { comfy } from "./comfy.js";
 import { StringDecoder } from "node:string_decoder";
-import { comfyPython, comfyRootDir, pipArgs, pythonEnv } from "./node-install.js";
+import { comfyPython, comfyRootDir } from "./node-install.js";
 import { nodePack } from "./node-packs.js";
 
 /**
@@ -31,11 +31,6 @@ import { nodePack } from "./node-packs.js";
 
 const installs = new Map();
 
-// Replaces git, pip and Manager for the setup demo (scripts/setup-demo.mjs); null in real use.
-let transport = null;
-export function setPackInstallTransport(fn) {
-  transport = fn;
-}
 const tailLimit = 4000;
 const stepTimeoutMs = 15 * 60 * 1000;
 
@@ -82,7 +77,6 @@ function run(state, command, args, cwd, env = process.env) {
     const child = spawn(command, args, {
       cwd,
       env: { ...env, GIT_TERMINAL_PROMPT: "0", PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
-      windowsHide: true,
     });
     state.child = child;
     const timer = setTimeout(() => child.kill(), stepTimeoutMs);
@@ -205,9 +199,9 @@ async function installLocally(state, pack) {
       freeze = await run(
         state,
         python,
-        [...pipArgs(python), "list", "--format=freeze", "--disable-pip-version-check"],
+        ["-m", "pip", "list", "--format=freeze", "--disable-pip-version-check"],
         target,
-        pythonEnv(python),
+        process.env,
       );
     } catch {
       throw new Error(
@@ -222,7 +216,8 @@ async function installLocally(state, pack) {
         state,
         python,
         [
-          ...pipArgs(python),
+          "-m",
+          "pip",
           "install",
           "-r",
           "requirements.txt",
@@ -231,7 +226,7 @@ async function installLocally(state, pack) {
           "--disable-pip-version-check",
         ],
         target,
-        pythonEnv(python),
+        process.env,
       );
     } catch (error) {
       if (/ResolutionImpossible|conflict/i.test(state.log))
@@ -386,9 +381,7 @@ export async function startPackInstall(id, { overrideManager = false } = {}) {
   installs.set(id, state);
   (async () => {
     try {
-      if (transport) {
-        await transport(state, pack);
-      } else if (viaManager) {
+      if (viaManager) {
         try {
           await (generation === 4
             ? installWithManager(state, pack)

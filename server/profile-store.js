@@ -1,3 +1,4 @@
+import { configurationFile, requireWritableConfiguration } from "./config-directory.js";
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Versioned generation profiles and prompting guides, owned by Studio.
@@ -20,30 +21,49 @@
  * administrator's edit or Approve clears it. Each store has one writer (this module) and writes
  * atomically (json-store.js).
  */
-import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { currentDataDir } from './data-dir.js';
-import { readJsonFile, writeJsonFile } from './json-store.js';
-import { loadMcpPrompting } from './mcp-prompting.js';
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { currentDataDir } from "./data-dir.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { loadMcpPrompting } from "./mcp-prompting.js";
 
-export const versionOrigins = Object.freeze(['seed', 'studio', 'ai', 'chat']);
-const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || '')) && !String(id).includes('..');
-const validPackId = (id) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(String(id || '')) && !String(id).includes('..');
-export const hashOf = (value) => crypto.createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
-const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+export const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
+const validId = (id) =>
+  /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
+const validPackId = (id) =>
+  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(String(id || "")) && !String(id).includes("..");
+export const hashOf = (value) =>
+  crypto
+    .createHash("sha256")
+    .update(typeof value === "string" ? value : JSON.stringify(value))
+    .digest("hex");
+const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const stamp = () => new Date().toISOString();
 const notFound = (message) => Object.assign(new Error(message), { status: 404 });
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 
 function readObject(file, fallback = {}) {
-  try { const value = readJsonFile(file); return isObject(value) ? value : fallback; } catch { return fallback; }
+  try {
+    const value = readJsonFile(file);
+    return isObject(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Version numbers kept in a history folder, ascending. */
 function versionsIn(dir) {
-  try { return fs.readdirSync(dir).map((name) => /^(\d+)\.json$/.exec(name)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b); }
-  catch { return []; }
+  try {
+    return fs
+      .readdirSync(dir)
+      .map((name) => /^(\d+)\.json$/.exec(name)?.[1])
+      .filter(Boolean)
+      .map(Number)
+      .sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
 }
 
 /** Writes version `n` once; an existing version is never replaced. */
@@ -55,11 +75,15 @@ function writeVersion(dir, n, record) {
 
 /* ------------------------------------------------------------ Profiles */
 
-export function createProfileStore({ dataDir = currentDataDir(), workflowsDir = path.join(dataDir, 'workflows'), log = console } = {}) {
-  const metaFile = path.join(workflowsDir, '.studio-meta.json');
-  const editsFile = path.join(workflowsDir, '.studio-edits.json');
-  const backupsDir = path.join(dataDir, 'backups', 'profile-edits');
-  const historyDir = (id) => path.join(dataDir, 'history', 'profiles', id);
+export function createProfileStore({
+  dataDir = currentDataDir(),
+  workflowsDir = configurationFile("profiles") || path.join(dataDir, "workflows"),
+  log = console,
+} = {}) {
+  const metaFile = path.join(workflowsDir, ".studio-meta.json");
+  const editsFile = path.join(workflowsDir, ".studio-edits.json");
+  const backupsDir = path.join(dataDir, "backups", "profile-edits");
+  const historyDir = (id) => path.join(dataDir, "history", "profiles", id);
   const readMeta = () => readObject(metaFile);
 
   function latest(id) {
@@ -72,45 +96,73 @@ export function createProfileStore({ dataDir = currentDataDir(), workflowsDir = 
    * Records `text` as the profile's next version, unless it is already the latest. Returns the
    * version record (the existing one when unchanged).
    */
-  function record(id, text, { by = '', origin = 'studio', aiDrafted = false, at = stamp(), note = '' } = {}) {
-    if (!validId(id)) throw notFound('That profile was not found.');
-    if (!versionOrigins.includes(origin)) throw new Error('Choose who made the change.');
-    const body = String(text ?? '');
+  function record(
+    id,
+    text,
+    { by = "", origin = "studio", aiDrafted = false, at = stamp(), note = "" } = {},
+  ) {
+    requireWritableConfiguration();
+    if (!validId(id)) throw notFound("That profile was not found.");
+    if (!versionOrigins.includes(origin)) throw new Error("Choose who made the change.");
+    const body = String(text ?? "");
     const hash = hashOf(body);
     const previous = latest(id);
     const meta = readMeta();
     if (previous?.hash === hash) return previous;
     const version = (previous?.version || 0) + 1;
-    const entry = { id, version, at, by: String(by || origin), origin, aiDrafted: Boolean(aiDrafted), hash, ...(note ? { note } : {}), text: body };
+    const entry = {
+      id,
+      version,
+      at,
+      by: String(by || origin),
+      origin,
+      aiDrafted: Boolean(aiDrafted),
+      hash,
+      ...(note ? { note } : {}),
+      text: body,
+    };
     writeVersion(historyDir(id), version, entry);
     const current = meta[id] || {};
-    meta[id] = { ...current, version, origin, aiDrafted: Boolean(aiDrafted), editedAt: at, by: entry.by, seedHash: current.seedHash || (origin === 'seed' ? hash : ''), exportedHash: current.exportedHash || '' };
-    if (origin === 'seed') meta[id].seedHash = hash;
+    meta[id] = {
+      ...current,
+      version,
+      origin,
+      aiDrafted: Boolean(aiDrafted),
+      editedAt: at,
+      by: entry.by,
+      seedHash: current.seedHash || (origin === "seed" ? hash : ""),
+      exportedHash: current.exportedHash || "",
+    };
+    if (origin === "seed") meta[id].seedHash = hash;
     writeJsonFile(metaFile, meta);
     return entry;
   }
 
   /** Every version of a profile, newest first, without their text. */
   function versions(id) {
-    if (!validId(id)) throw notFound('That profile was not found.');
-    return versionsIn(historyDir(id)).reverse().map((n) => {
-      const { text: _text, ...rest } = readJsonFile(path.join(historyDir(id), `${n}.json`));
-      return rest;
-    });
+    if (!validId(id)) throw notFound("That profile was not found.");
+    return versionsIn(historyDir(id))
+      .reverse()
+      .map((n) => {
+        const { text: _text, ...rest } = readJsonFile(path.join(historyDir(id), `${n}.json`));
+        return rest;
+      });
   }
 
   function version(id, n) {
     const file = path.join(historyDir(id), `${Number(n)}.json`);
-    if (!validId(id) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(file)) throw notFound('That profile version was not found.');
+    if (!validId(id) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(file))
+      throw notFound("That profile version was not found.");
     return readJsonFile(file);
   }
 
   /** Clears AI-Drafted on the current version (an administrator reviewed it). */
-  function approve(id, { by = '' } = {}) {
+  function approve(id, { by = "" } = {}) {
+    requireWritableConfiguration();
     const meta = readMeta();
-    if (!meta[id]) throw notFound('That profile was not found.');
+    if (!meta[id]) throw notFound("That profile was not found.");
     if (!meta[id].aiDrafted) return meta[id];
-    meta[id] = { ...meta[id], aiDrafted: false, approvedAt: stamp(), approvedBy: String(by || '') };
+    meta[id] = { ...meta[id], aiDrafted: false, approvedAt: stamp(), approvedBy: String(by || "") };
     writeJsonFile(metaFile, meta);
     return meta[id];
   }
@@ -122,68 +174,128 @@ export function createProfileStore({ dataDir = currentDataDir(), workflowsDir = 
    * outside Studio (a seed deploy) gets that as a new "seed" version. Nothing is deleted.
    */
   function migrate() {
+    if (configurationFile("profiles")) return { profiles: 0, versions: 0 };
     if (!fs.existsSync(workflowsDir)) return { profiles: 0, versions: 0 };
     const edits = readObject(editsFile);
     let backups = [];
-    try { backups = fs.readdirSync(backupsDir).filter((name) => name.endsWith('.json')).sort(); } catch { /* none */ }
+    try {
+      backups = fs
+        .readdirSync(backupsDir)
+        .filter((name) => name.endsWith(".json"))
+        .sort();
+    } catch {
+      /* none */
+    }
     let profiles = 0;
     let added = 0;
     for (const name of fs.readdirSync(workflowsDir)) {
-      if (!name.endsWith('.json') || name.startsWith('.')) continue;
+      if (!name.endsWith(".json") || name.startsWith(".")) continue;
       const id = name.slice(0, -5);
       if (!validId(id)) continue;
       let text;
-      try { text = fs.readFileSync(path.join(workflowsDir, name), 'utf8'); } catch { continue; }
+      try {
+        text = fs.readFileSync(path.join(workflowsDir, name), "utf8");
+      } catch {
+        continue;
+      }
       profiles += 1;
       const edited = edits[id];
       if (!versionsIn(historyDir(id)).length) {
-        const own = backups.filter((file) => file.startsWith(`${id}-`) && /^\d{4}-\d{2}-\d{2}T/.test(file.slice(id.length + 1)));
-        const steps = own.map((file) => {
-          const when = file.slice(id.length + 1, -5).replace(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, '$1:$2:$3.$4Z');
-          let body = '';
-          try { body = fs.readFileSync(path.join(backupsDir, file), 'utf8'); } catch { return null; }
-          return { text: body, at: Number.isNaN(Date.parse(when)) ? stamp() : when };
-        }).filter(Boolean);
+        const own = backups.filter(
+          (file) =>
+            file.startsWith(`${id}-`) && /^\d{4}-\d{2}-\d{2}T/.test(file.slice(id.length + 1)),
+        );
+        const steps = own
+          .map((file) => {
+            const when = file
+              .slice(id.length + 1, -5)
+              .replace(/^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/, "$1:$2:$3.$4Z");
+            let body = "";
+            try {
+              body = fs.readFileSync(path.join(backupsDir, file), "utf8");
+            } catch {
+              return null;
+            }
+            return { text: body, at: Number.isNaN(Date.parse(when)) ? stamp() : when };
+          })
+          .filter(Boolean);
         steps.push({ text, at: edited?.editedAt || stamp() });
         steps.forEach((step, index) => {
-          const origin = index === 0 || !edited ? 'seed' : 'studio';
+          const origin = index === 0 || !edited ? "seed" : "studio";
           const before = latest(id)?.version || 0;
-          record(id, step.text, { origin, at: step.at, by: origin === 'studio' && index === steps.length - 1 ? edited?.by || 'studio' : origin === 'seed' ? 'seed' : 'studio', note: index < steps.length - 1 ? 'From backups/profile-edits' : '' });
+          record(id, step.text, {
+            origin,
+            at: step.at,
+            by:
+              origin === "studio" && index === steps.length - 1
+                ? edited?.by || "studio"
+                : origin === "seed"
+                  ? "seed"
+                  : "studio",
+            note: index < steps.length - 1 ? "From backups/profile-edits" : "",
+          });
           if ((latest(id)?.version || 0) > before) added += 1;
         });
         const meta = readMeta();
-        if (edited?.baseHash && meta[id]) { meta[id].seedHash = edited.baseHash; writeJsonFile(metaFile, meta); }
+        if (edited?.baseHash && meta[id]) {
+          meta[id].seedHash = edited.baseHash;
+          writeJsonFile(metaFile, meta);
+        }
       } else if (latest(id)?.hash !== hashOf(text)) {
-        record(id, text, { origin: edited ? 'studio' : 'seed', by: edited ? edited.by || 'studio' : 'seed', note: 'Changed outside Studio' });
+        record(id, text, {
+          origin: edited ? "studio" : "seed",
+          by: edited ? edited.by || "studio" : "seed",
+          note: "Changed outside Studio",
+        });
         added += 1;
       }
     }
-    if (added) log.info?.(`[profiles] Recorded ${added} profile version${added === 1 ? '' : 's'} under history/profiles.`);
+    if (added)
+      log.info?.(
+        `[profiles] Recorded ${added} profile version${added === 1 ? "" : "s"} under history/profiles.`,
+      );
     return { profiles, versions: added };
   }
 
   /** Records what an export held (`{id: hash}`), so the next export can say what changed since. */
   function markExported(hashes) {
+    if (configurationFile("profiles")) return;
     const meta = readMeta();
     let changed = false;
-    for (const [id, hash] of Object.entries(hashes)) if (meta[id] && meta[id].exportedHash !== hash) { meta[id] = { ...meta[id], exportedHash: hash }; changed = true; }
+    for (const [id, hash] of Object.entries(hashes))
+      if (meta[id] && meta[id].exportedHash !== hash) {
+        meta[id] = { ...meta[id], exportedHash: hash };
+        changed = true;
+      }
     if (changed) writeJsonFile(metaFile, meta);
   }
 
   /** Whether Studio has ever held this profile (any version), so a seed never brings back one it removed. */
   const known = (id) => versionsIn(historyDir(id)).length > 0 || Boolean(readMeta()[id]);
 
-  return { metaFile, record, versions, version, approve, migrate, markExported, known, meta: (id) => readMeta()[id] || null, metas: readMeta };
+  return {
+    metaFile,
+    record,
+    versions,
+    version,
+    approve,
+    migrate,
+    markExported,
+    known,
+    meta: (id) => readMeta()[id] || null,
+    metas: readMeta,
+  };
 }
 
 /* ------------------------------------------------------------ Guides */
 
-const sections = ['reviewed_on', 'families', 'profiles', 'variants', 'negatives'];
+const sections = ["reviewed_on", "families", "profiles", "variants", "negatives"];
 
 /** A pack is a plain object of guidance; the store adds nothing to it. */
 function cleanPack(pack) {
-  if (!isObject(pack)) throw new Error('A guide pack is a JSON object.');
-  if (pack.modes !== undefined && !isObject(pack.modes)) throw new Error('A guide pack’s modes are an object.');
+  if (!isObject(pack)) throw new Error("A guide pack is a JSON object.");
+  if (pack.modes !== undefined && !isObject(pack.modes))
+    throw new Error("A guide pack’s modes are an object.");
   return structuredClone(pack);
 }
 
@@ -192,39 +304,87 @@ function cleanPack(pack) {
  * `config/prompting.json` (which profile-seed.js fills from the seed on a new install).
  */
 export function guideSeedFile(environment = process.env, dataDir = currentDataDir()) {
+  if (configurationFile("prompting.json", environment))
+    return configurationFile("prompting.json", environment);
   if (environment.MCP_PROMPTING_PATH) return environment.MCP_PROMPTING_PATH;
-  return String(environment.STUDIO_SEED_DIR || '').trim() ? path.join(dataDir, 'config', 'prompting.json') : '';
+  return String(environment.STUDIO_SEED_DIR || "").trim()
+    ? path.join(dataDir, "config", "prompting.json")
+    : "";
 }
 
-export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideSeedFile(process.env, dataDir), log = console } = {}) {
-  const file = path.join(dataDir, 'guides', 'prompting.json');
-  const historyDir = (packId) => path.join(dataDir, 'history', 'guides', packId);
+export function createGuideStore({
+  dataDir = currentDataDir(),
+  seedFile = guideSeedFile(process.env, dataDir),
+  log = console,
+} = {}) {
+  const mountedFile = configurationFile("prompting.json");
+  const file = mountedFile || path.join(dataDir, "guides", "prompting.json");
+  if (mountedFile) seedFile = mountedFile;
+  const historyDir = (packId) => path.join(dataDir, "history", "guides", packId);
   const read = () => {
-    try { const value = readJsonFile(file); return isObject(value) ? value : null; } catch { return null; }
+    if (mountedFile) {
+      const value = readJsonFile(file);
+      if (!isObject(value)) throw new Error(`Invalid mounted configuration ${file}.`);
+      return value;
+    }
+    try {
+      const value = readJsonFile(file);
+      return isObject(value) ? value : null;
+    } catch {
+      return null;
+    }
   };
   const readSeed = () => {
     if (!seedFile) return null;
-    try { const value = JSON.parse(fs.readFileSync(seedFile, 'utf8')); return isObject(value) ? value : null; } catch { return null; }
+    try {
+      const value = JSON.parse(fs.readFileSync(seedFile, "utf8"));
+      return isObject(value) ? value : null;
+    } catch {
+      return null;
+    }
   };
 
   function writeStore(store) {
+    requireWritableConfiguration();
     // Checked as the MCP loader reads it before it replaces the good copy.
     const { meta: _meta, ...config } = store;
-    const checked = path.join(path.dirname(file), '.check-prompting.json');
+    const checked = path.join(path.dirname(file), ".check-prompting.json");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(checked, JSON.stringify(config));
-    try { loadMcpPrompting(checked); } finally { fs.rmSync(checked, { force: true }); }
+    try {
+      loadMcpPrompting(checked);
+    } finally {
+      fs.rmSync(checked, { force: true });
+    }
     writeJsonFile(file, store);
   }
 
-  function addVersion(store, packId, pack, { by, origin, aiDrafted = false, note = '' }) {
+  function addVersion(store, packId, pack, { by, origin, aiDrafted = false, note = "" }) {
     const hash = hashOf(pack);
     const versions = versionsIn(historyDir(packId));
     const version = (versions.at(-1) || 0) + 1;
     const at = stamp();
-    writeVersion(historyDir(packId), version, { packId, version, at, by: String(by || origin), origin, aiDrafted: Boolean(aiDrafted), hash, ...(note ? { note } : {}), pack });
+    writeVersion(historyDir(packId), version, {
+      packId,
+      version,
+      at,
+      by: String(by || origin),
+      origin,
+      aiDrafted: Boolean(aiDrafted),
+      hash,
+      ...(note ? { note } : {}),
+      pack,
+    });
     const current = store.meta[packId] || {};
-    store.meta[packId] = { version, origin, aiDrafted: Boolean(aiDrafted), editedAt: at, by: String(by || origin), seedHash: origin === 'seed' ? hash : current.seedHash || '', exportedHash: current.exportedHash || '' };
+    store.meta[packId] = {
+      version,
+      origin,
+      aiDrafted: Boolean(aiDrafted),
+      editedAt: at,
+      by: String(by || origin),
+      seedHash: origin === "seed" ? hash : current.seedHash || "",
+      exportedHash: current.exportedHash || "",
+    };
   }
 
   /**
@@ -234,33 +394,46 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
    * The seed file is never written.
    */
   function migrate() {
+    if (configurationFile("prompting.json"))
+      return { packs: Object.keys(read()?.packs || {}).length, versions: 0 };
     const seed = readSeed();
     const existing = read();
     if (!seed && !existing) return { packs: 0, versions: 0 };
-    const store = existing ? { ...existing, meta: isObject(existing.meta) ? { ...existing.meta } : {} } : { packs: {}, meta: {} };
+    const store = existing
+      ? { ...existing, meta: isObject(existing.meta) ? { ...existing.meta } : {} }
+      : { packs: {}, meta: {} };
     store.packs = isObject(store.packs) ? { ...store.packs } : {};
     let added = 0;
     let bindings = false;
     if (seed) {
       for (const key of sections) {
         if (seed[key] === undefined) continue;
-        if (store[key] === undefined) { store[key] = structuredClone(seed[key]); bindings = true; continue; }
+        if (store[key] === undefined) {
+          store[key] = structuredClone(seed[key]);
+          bindings = true;
+          continue;
+        }
         if (!isObject(seed[key]) || !isObject(store[key])) continue;
         const missing = Object.keys(seed[key]).filter((name) => !Object.hasOwn(store[key], name));
         if (!missing.length) continue;
-        store[key] = { ...store[key], ...Object.fromEntries(missing.map((name) => [name, structuredClone(seed[key][name])])) };
+        store[key] = {
+          ...store[key],
+          ...Object.fromEntries(missing.map((name) => [name, structuredClone(seed[key][name])])),
+        };
         bindings = true;
       }
       for (const [packId, pack] of Object.entries(isObject(seed.packs) ? seed.packs : {})) {
         if (!validPackId(packId) || !isObject(pack) || store.packs[packId]) continue;
         store.packs[packId] = structuredClone(pack);
-        addVersion(store, packId, store.packs[packId], { by: 'seed', origin: 'seed' });
+        addVersion(store, packId, store.packs[packId], { by: "seed", origin: "seed" });
         added += 1;
       }
     }
     if (added || bindings || !existing) {
       writeStore(store);
-      log.info?.(`[guides] ${existing ? 'Added' : 'Copied'} ${added} prompting guide pack${added === 1 ? '' : 's'} ${existing ? 'missing from guides/prompting.json' : 'into guides/prompting.json'} from the seed; packs Studio holds stay as they are.`);
+      log.info?.(
+        `[guides] ${existing ? "Added" : "Copied"} ${added} prompting guide pack${added === 1 ? "" : "s"} ${existing ? "missing from guides/prompting.json" : "into guides/prompting.json"} from the seed; packs Studio holds stay as they are.`,
+      );
     }
     return { packs: Object.keys(store.packs).length, versions: added };
   }
@@ -268,23 +441,41 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
   /** One pack with its meta and hash, for an edit's base. */
   function pack(packId) {
     const store = read();
-    if (!store?.packs?.[packId]) throw notFound('That guide was not found.');
-    return { packId, pack: store.packs[packId], hash: hashOf(store.packs[packId]), meta: store.meta?.[packId] || null };
+    if (!store?.packs?.[packId]) throw notFound("That guide was not found.");
+    return {
+      packId,
+      pack: store.packs[packId],
+      hash: hashOf(store.packs[packId]),
+      meta: store.meta?.[packId] || null,
+    };
   }
 
   /**
    * Saves a pack as a new version. `baseHash` (the pack's hash when opened) refuses a stale edit;
    * an AI draft sets aiDrafted, any other save clears it. A new packId adds a pack.
    */
-  function save(packId, value, { by = '', origin = 'studio', aiDrafted = false, baseHash = '' } = {}) {
-    if (!validPackId(packId)) throw new Error('Choose a valid guide id.');
-    if (!versionOrigins.includes(origin)) throw new Error('Choose who made the change.');
+  function save(
+    packId,
+    value,
+    { by = "", origin = "studio", aiDrafted = false, baseHash = "" } = {},
+  ) {
+    requireWritableConfiguration();
+    if (!validPackId(packId)) throw new Error("Choose a valid guide id.");
+    if (!versionOrigins.includes(origin)) throw new Error("Choose who made the change.");
     const store = read() || { packs: {}, meta: {} };
     store.packs = { ...(store.packs || {}) };
     store.meta = { ...(store.meta || {}) };
-    if (baseHash && store.packs[packId] && hashOf(store.packs[packId]) !== baseHash) throw conflict('This guide changed since you opened it. Reload it, then make your edit again.');
+    if (baseHash && store.packs[packId] && hashOf(store.packs[packId]) !== baseHash)
+      throw conflict(
+        "This guide changed since you opened it. Reload it, then make your edit again.",
+      );
     const next = cleanPack(value);
-    if (store.packs[packId] && hashOf(store.packs[packId]) === hashOf(next) && Boolean(store.meta[packId]?.aiDrafted) === Boolean(aiDrafted)) return pack(packId);
+    if (
+      store.packs[packId] &&
+      hashOf(store.packs[packId]) === hashOf(next) &&
+      Boolean(store.meta[packId]?.aiDrafted) === Boolean(aiDrafted)
+    )
+      return pack(packId);
     store.packs[packId] = next;
     addVersion(store, packId, next, { by, origin, aiDrafted });
     writeStore(store);
@@ -292,30 +483,40 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
   }
 
   function versions(packId) {
-    if (!validPackId(packId)) throw notFound('That guide was not found.');
-    return versionsIn(historyDir(packId)).reverse().map((n) => {
-      const { pack: _pack, ...rest } = readJsonFile(path.join(historyDir(packId), `${n}.json`));
-      return rest;
-    });
+    if (!validPackId(packId)) throw notFound("That guide was not found.");
+    return versionsIn(historyDir(packId))
+      .reverse()
+      .map((n) => {
+        const { pack: _pack, ...rest } = readJsonFile(path.join(historyDir(packId), `${n}.json`));
+        return rest;
+      });
   }
 
   function version(packId, n) {
     const target = path.join(historyDir(packId), `${Number(n)}.json`);
-    if (!validPackId(packId) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(target)) throw notFound('That guide version was not found.');
+    if (!validPackId(packId) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(target))
+      throw notFound("That guide version was not found.");
     return readJsonFile(target);
   }
 
   /** Restores an earlier version as a new version (history only grows). */
-  function revert(packId, n, { by = '', baseHash = '', origin = 'studio' } = {}) {
+  function revert(packId, n, { by = "", baseHash = "", origin = "studio" } = {}) {
+    requireWritableConfiguration();
     const old = version(packId, n);
     return save(packId, old.pack, { by, origin, baseHash });
   }
 
-  function approve(packId, { by = '' } = {}) {
+  function approve(packId, { by = "" } = {}) {
+    requireWritableConfiguration();
     const store = read();
-    if (!store?.meta?.[packId]) throw notFound('That guide was not found.');
+    if (!store?.meta?.[packId]) throw notFound("That guide was not found.");
     if (!store.meta[packId].aiDrafted) return store.meta[packId];
-    store.meta[packId] = { ...store.meta[packId], aiDrafted: false, approvedAt: stamp(), approvedBy: String(by || '') };
+    store.meta[packId] = {
+      ...store.meta[packId],
+      aiDrafted: false,
+      approvedAt: stamp(),
+      approvedBy: String(by || ""),
+    };
     writeJsonFile(file, store);
     return store.meta[packId];
   }
@@ -329,14 +530,21 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
     const binding = isObject(store.profiles?.[profile.id]) ? store.profiles[profile.id] : null;
     const packId = binding?.pack ?? store.families?.[profile.family]?.[profile.kind];
     if (!packId || !store.packs?.[packId]) return null;
-    return { packId, source: binding?.pack ? 'profile' : 'family', ...(binding?.variant ? { variant: binding.variant } : {}), ...(binding?.mode ? { mode: binding.mode } : {}) };
+    return {
+      packId,
+      source: binding?.pack ? "profile" : "family",
+      ...(binding?.variant ? { variant: binding.variant } : {}),
+      ...(binding?.mode ? { mode: binding.mode } : {}),
+    };
   }
 
   /** Binds a profile (`custom:<id>`) to a pack, as a drafted profile's guide. */
   function bind(profileId, packId) {
+    requireWritableConfiguration();
     const store = read();
-    if (!store?.packs?.[packId]) throw notFound('That guide was not found.');
-    if (!/^[a-z0-9][a-z0-9._:-]{0,119}$/i.test(String(profileId || ''))) throw new Error('Choose a valid profile id.');
+    if (!store?.packs?.[packId]) throw notFound("That guide was not found.");
+    if (!/^[a-z0-9][a-z0-9._:-]{0,119}$/i.test(String(profileId || "")))
+      throw new Error("Choose a valid profile id.");
     if (store.profiles?.[profileId]?.pack === packId) return;
     store.profiles = { ...(store.profiles || {}), [profileId]: { pack: packId } };
     writeStore(store);
@@ -344,17 +552,38 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
 
   /** Records what an export held, so the next export can say what changed since. */
   function markExported(hashes) {
+    if (configurationFile("profiles")) return;
     const store = read();
     if (!store?.meta) return;
     let changed = false;
-    for (const [packId, hash] of Object.entries(hashes)) if (store.meta[packId] && store.meta[packId].exportedHash !== hash) { store.meta[packId] = { ...store.meta[packId], exportedHash: hash }; changed = true; }
+    for (const [packId, hash] of Object.entries(hashes))
+      if (store.meta[packId] && store.meta[packId].exportedHash !== hash) {
+        store.meta[packId] = { ...store.meta[packId], exportedHash: hash };
+        changed = true;
+      }
     if (changed) writeJsonFile(file, store);
   }
 
   /** The configuration file the guide loader reads: the store once it exists, else the seed. */
-  const configFile = () => (fs.existsSync(file) ? file : seedFile && fs.existsSync(seedFile) ? seedFile : '');
+  const configFile = () =>
+    mountedFile ||
+    (fs.existsSync(file) ? file : seedFile && fs.existsSync(seedFile) ? seedFile : "");
 
-  return { file, migrate, pack, save, versions, version, revert, approve, resolve, bind, markExported, configFile, read };
+  return {
+    file,
+    migrate,
+    pack,
+    save,
+    versions,
+    version,
+    revert,
+    approve,
+    resolve,
+    bind,
+    markExported,
+    configFile,
+    read,
+  };
 }
 
 /**
@@ -364,18 +593,28 @@ export function createGuideStore({ dataDir = currentDataDir(), seedFile = guideS
  * `negatives` entry also becomes its guide's `negative` when the guide has none; MCP leaves it off,
  * so its guides stay exactly as loadMcpPrompting gives them.
  */
-export function livePrompting({ dataDir = currentDataDir(), seedFile = guideSeedFile(process.env, dataDir), log = console, negatives: fillNegatives = false } = {}) {
+export function livePrompting({
+  dataDir = currentDataDir(),
+  seedFile = guideSeedFile(process.env, dataDir),
+  log = console,
+  negatives: fillNegatives = false,
+} = {}) {
   const store = createGuideStore({ dataDir, seedFile, log });
   let loaded = null;
   let negatives = {};
   let signature = null;
   const current = () => {
     const target = store.configFile();
-    let next = '';
-    try { const stat = target ? fs.statSync(target) : null; next = stat ? `${target}:${stat.size}:${stat.mtimeMs}` : ''; } catch { next = ''; }
+    let next = "";
+    try {
+      const stat = target ? fs.statSync(target) : null;
+      next = stat ? `${target}:${stat.size}:${stat.mtimeMs}` : "";
+    } catch {
+      next = "";
+    }
     if (loaded && next === signature) return loaded;
     try {
-      loaded = loadMcpPrompting(next ? target : '');
+      loaded = loadMcpPrompting(target);
       negatives = next ? readObject(target).negatives || {} : {};
       signature = next;
     } catch (error) {
@@ -388,7 +627,14 @@ export function livePrompting({ dataDir = currentDataDir(), seedFile = guideSeed
   current();
   return (profile, detailed = false) => {
     const guide = current()(profile, detailed);
-    if (!fillNegatives || !detailed || !guide || guide.negative || !isObject(negatives[profile?.id])) return guide;
+    if (
+      !fillNegatives ||
+      !detailed ||
+      !guide ||
+      guide.negative ||
+      !isObject(negatives[profile?.id])
+    )
+      return guide;
     return { ...guide, negative: structuredClone(negatives[profile.id]) };
   };
 }
@@ -398,7 +644,8 @@ const guideStores = new Map();
 /** The shared stores for a data folder: one writer per file. */
 export function profileStore(options = {}) {
   const key = options.dataDir || currentDataDir();
-  if (!profileStores.has(key)) profileStores.set(key, createProfileStore({ ...options, dataDir: key }));
+  if (!profileStores.has(key))
+    profileStores.set(key, createProfileStore({ ...options, dataDir: key }));
   return profileStores.get(key);
 }
 export function guideStore(options = {}) {
