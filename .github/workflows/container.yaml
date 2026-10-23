@@ -66,8 +66,12 @@ jobs:
         with:
           name: frontend
           path: dist
+      - name: Install Browser Dependencies
+        timeout-minutes: 5
+        run: npx playwright install-deps chromium webkit
       - name: Install Browsers
-        run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 5
+        run: npx playwright install chromium webkit
       - name: Check Studio Interactions
         run: npm run test:browser
       - name: Save Browser Failure Traces
