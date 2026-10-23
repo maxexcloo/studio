@@ -528,6 +528,23 @@ async function preferUpscale(original, readUpscale) {
   }
 }
 
+/** Ownership can be checked while a selected worker is offline, without fetching its media. */
+export function referenceExistsForAccount(account, id) {
+  if (readUploadedReference(id, "media", account?.userId || "")) return true;
+  const lastFrame = String(id).endsWith(lastFrameSuffix);
+  const item = findGalleryItemForAccount(
+    lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
+    account,
+  );
+  return Boolean(
+    item &&
+    !item.library &&
+    item.status === "done" &&
+    item.url &&
+    item.type === (lastFrame ? "video" : "image"),
+  );
+}
+
 /** The bytes a run gets for a reference (exported for tests). */
 export async function bytesForReference(req, id) {
   return bytesForReferenceAccount(req?.studioAccount, id);

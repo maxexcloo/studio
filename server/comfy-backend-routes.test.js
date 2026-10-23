@@ -148,10 +148,9 @@ test("the catalogue reports whether the local video worker answered, keeping Gro
     video.setDown(true);
     models = (await api("/api/models")).body;
     assert.deepEqual(models.backends.video, { configured: true, available: false });
-    assert.equal(
-      models.profiles.some((profile) => profile.family === "minimax_h3"),
-      false,
-    );
+    const offline = models.profiles.find((profile) => profile.family === "minimax_h3");
+    assert.equal(offline.availability, "offline");
+    assert.equal(offline.ready, undefined);
     assert.ok(models.profiles.some((profile) => profile.id === "custom:grok-video"));
   } finally {
     video.setDown(false);
@@ -160,7 +159,7 @@ test("the catalogue reports whether the local video worker answered, keeping Gro
 });
 
 test(
-  "a video worker that did not answer is not asked again on every catalogue load or run until a status check reaches it",
+  "catalogue reads cache an offline worker while accepted work waits on its selected backend",
   { timeout: 10000 },
   async () => {
     const h3 = (await api("/api/models")).body.profiles.find(
@@ -182,8 +181,19 @@ test(
         configured: true,
         available: false,
       });
-      assert.equal((await api("/api/generate", generation(h3))).status, 400);
       assert.equal(probes(), before);
+      const accepted = await api("/api/generate", generation(h3));
+      assert.equal(accepted.status, 200);
+      const recorded = (await api("/api/queue")).body.jobs.find(
+        (job) => job.id === accepted.body.jobId,
+      );
+      assert.equal(recorded.backend, "video");
+      assert.ok(["queued", "waiting"].includes(recorded.status));
+      await api(`/api/jobs/${recorded.id}/cancel`, {});
+      assert.equal(
+        (await api("/api/queue")).body.jobs.find((job) => job.id === recorded.id).status,
+        "cancelled",
+      );
       video.setDown(false);
       // Still remembered until something reaches the worker.
       assert.deepEqual((await api("/api/models")).body.backends.video, {
@@ -301,7 +311,7 @@ test(
 );
 
 test(
-  "offline secondary hides H3 and refuses stale H3 requests without primary submission",
+  "offline secondary retains H3 and queues only its selected backend",
   { timeout: 10000 },
   async () => {
     const h3 = (await api("/api/models")).body.profiles.find(
@@ -310,13 +320,16 @@ test(
     video.setDown(true);
     const count = primary.prompts.length;
     const catalogue = (await api("/api/models")).body;
-    assert.equal(
-      catalogue.profiles.some((profile) => profile.family === "minimax_h3"),
-      false,
-    );
-    // A failed catalogue refresh invalidates its backend cache.
+    const offline = catalogue.profiles.find((profile) => profile.family === "minimax_h3");
+    assert.equal(offline.availability, "offline");
+    assert.equal(offline.ready, undefined);
     const response = await api("/api/generate", generation(h3));
-    assert.equal(response.status, 400);
+    assert.equal(response.status, 200);
+    const queued = (await api("/api/queue")).body.jobs.find(
+      (job) => job.id === response.body.jobId,
+    );
+    assert.equal(queued.backend, "video");
+    await api(`/api/jobs/${queued.id}/cancel`, {});
     assert.equal(primary.prompts.length, count);
     video.setDown(false);
     await api("/api/comfy/status");

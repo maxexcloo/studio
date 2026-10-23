@@ -233,6 +233,25 @@ test(
       });
       assert.equal(upload.status, 201);
       const asset = (await upload.json()).asset;
+      const style = { assetId: asset.id, source: "upload", slot: "style" };
+      const continued = await chat(session.id, "Make it painterly.", {
+        operation: "refine",
+        parentJobId: second.id,
+        input: {
+          ...second.input,
+          referenceAssets: [...(second.input.referenceAssets as object[]), style],
+        },
+      });
+      const thirdId = continued.find((event) => event.event === "generation")!.data.job.id;
+      const third = await completed(thirdId);
+      assert.equal(third.parentJobId, second.id);
+      const thirdReferences = third.input.referenceAssets as { assetId: string }[];
+      assert.equal(
+        Buffer.from(thirdReferences[0].assetId.slice(8), "base64url").toString(),
+        second.outputs[0].url,
+        "third turn anchors the new parent rather than its inherited old source",
+      );
+      assert.deepEqual(thirdReferences[1], style, "a deliberate additional reference is retained");
       await chat(session.id, "Discuss this image.", { operation: "image", input }, [asset.id]);
       assert.match(
         requests.at(-1).messages.at(-1).content[1].image_url.url,
@@ -275,6 +294,7 @@ test(
         [
           [firstId, "completed"],
           [secondId, "completed"],
+          [thirdId, "completed"],
         ],
       );
     } finally {

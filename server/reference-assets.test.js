@@ -94,6 +94,8 @@ test("uploaded reference assets and byte reads are limited to their account owne
     [assetB.id],
   );
   assert.equal(referenceAssets.readUploadedReference(assetB.id, "media", "account-a"), null);
+  assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetA.id), true);
+  assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetB.id), false);
   await assert.rejects(
     referenceAssets.bytesForReference(ownerA, assetB.id),
     /no longer in the gallery/,
