@@ -3,7 +3,7 @@
 Every release of Studio, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/) as described in
-[docs/guides/CONTRIBUTING.md](docs/guides/CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 Add notes under **Unreleased** as changes land; `npm run release` turns that
 section into the next version and uses it as the GitHub release notes. Each
@@ -17,10 +17,10 @@ version opens with a `> ` summary line.
 
 - Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
 - Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
-- Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal.
-- Read profiles, guides and catalogue definitions from the ai-owned configuration mount. User presets remain editable; definition editing and approval are deferred.
+- Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal. Preserve declared reference slots through admission, recovery and worker graph bindings.
+- Keep live profiles, guides and catalogue definitions editable in Studio, with administrator approval and version conflicts. The ai mount supplies missing-definition seeds and backups. Existing workflow connections can be edited with node and input selectors alongside Advanced JSON.
 - Build a separate shared media/text worker image with GPU leases, Docker admission and authenticated local text streaming. Automatic lifecycle control remains disabled until ownership and traffic cutover are verified.
-- Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links.
+- Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
 - Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
 
 ## [0.48.1] - 2026-10-22
@@ -500,7 +500,7 @@ version opens with a `> ` summary line.
 
 ### Removed
 
-- **Hidden:** the private vault, its password, passkeys, lock screen, settings, routes and Move to Hidden are gone. On the first start, Studio backs up its data to `backups/hidden-removal-<time>/` in the data folder, moves any vault there untouched (it needs the owner's old password to open), returns hidden-flagged records to their owner's gallery and clears the markers that kept them out of it. Nothing is deleted; see [Configuration](docs/guides/CONFIGURATION.md).
+- **Hidden:** the private vault, its password, passkeys, lock screen, settings, routes and Move to Hidden are gone. On the first start, Studio backs up its data to `backups/hidden-removal-<time>/` in the data folder, moves any vault there untouched (it needs the owner's old password to open), returns hidden-flagged records to their owner's gallery and clears the markers that kept them out of it. Nothing is deleted; see [Configuration](CONFIGURATION.md).
 
 ### Changed
 
@@ -806,7 +806,7 @@ version opens with a `> ` summary line.
 - **Edit or Reference.** On Flux.2 and Qwen-Image 2.1, choose whether your
   first picture gets changed or only guides a new one.
 - **Docker.** Run HEISS with `docker compose up --build`
-  ([how](./docs/guides/DOCKER.md)).
+  ([how](DOCKER.md)).
 - **HEISS tells you why it stopped**, if it ever stops on its own.
 
 ### Changed
@@ -1070,7 +1070,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 - **Admin from other devices is off** until you turn on Trust other devices
   with admin at the computer running HEISS UI.
 - **HEISS UI keeps a copy of its data first**, in `data/.backups/`, so going
-  back to 0.11 works (see [the troubleshooting guide](docs/guides/TROUBLESHOOTING.md)).
+  back to 0.11 works (see [the troubleshooting guide](TROUBLESHOOTING.md)).
 
 ### Security
 
@@ -1750,7 +1750,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   in and out. Models, workflows and smart upscale refresh by themselves.
 - A new empty state for a gallery with nothing in it yet: a blank pixel
   canvas where a picture keeps developing and fading.
-- [The model guide](docs/guides/MODELS.md) documents how a new model family, and the custom nodes, text
+- [The model guide](MODELS.md) documents how a new model family, and the custom nodes, text
   encoders or VAEs it needs, gets added.
 
 ### Fixed
