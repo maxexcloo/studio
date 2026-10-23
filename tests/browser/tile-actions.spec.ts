@@ -92,6 +92,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await more.focus();
   await more.press("Enter");
   await expect(page.getByRole("menu")).toBeVisible();
+  await expect(page.getByRole("menu").locator(":focus")).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Refine", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
