@@ -230,7 +230,11 @@ export function ReferencePicker({
         }
       }}
       gap="sm"
-      style={{ minHeight: 0, height: inline ? "100%" : "min(70dvh, 640px)" }}
+      style={{
+        minHeight: 0,
+        flex: inline ? 1 : undefined,
+        height: inline ? undefined : "min(70dvh, 640px)",
+      }}
     >
       <Group justify="space-between" wrap="nowrap">
         <Button
