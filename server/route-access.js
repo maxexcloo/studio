@@ -1,6 +1,6 @@
-import { canAdmin, clientOf, deviceSession } from './access.js';
+import { canAdmin, clientOf, deviceSession } from "./access.js";
 
-import { multiUserEnabled } from './multi-user-auth.js';
+import { multiUserEnabled } from "./multi-user-auth.js";
 
 /** This computer, or another device that signed in (the gate below has already checked). */
 export function requireLocal(req, res) {
@@ -11,7 +11,9 @@ export function requireLocal(req, res) {
   }
   const client = clientOf(req);
   if (client.thisComputer || (client.network && deviceSession(req))) return true;
-  res.status(403).json({ ok: false, error: "Only this computer or a signed-in device can do this." });
+  res
+    .status(403)
+    .json({ ok: false, error: "Only this computer or a signed-in device can do this." });
   return false;
 }
 
@@ -24,7 +26,14 @@ export function requireLocal(req, res) {
  */
 export function requireAdmin(req, res) {
   if (canAdmin(req)) return true;
-  res.status(403).json({ ok: false, reason: "computer-only", error: "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection." });
+  res
+    .status(403)
+    .json({
+      ok: false,
+      reason: "computer-only",
+      error:
+        "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection.",
+    });
   return false;
 }
 

@@ -30,7 +30,7 @@ export const nodePacks = {
     ref: "v2.5.23",
     search: "SeedVR2",
     manager: "seedvr2_videoupscaler",
-    nodes: ["SeedVR2LoadDiTModel", "SeedVR2LoadVAEModel", "SeedVR2VideoUpscaler"]
+    nodes: ["SeedVR2LoadDiTModel", "SeedVR2LoadVAEModel", "SeedVR2VideoUpscaler"],
   },
   extramodels: {
     name: "ComfyUI_ExtraModels",
@@ -39,8 +39,14 @@ export const nodePacks = {
     folder: "ComfyUI_ExtraModels",
     commit: "09e895cf35384979e0bb9a1ea01fe8f3db913516",
     ref: "main, 2025-06-06",
-    nodes: ["SanaCheckpointLoader", "GemmaLoader", "SanaTextEncode", "GemmaTextEncode", "ExtraVAELoader"],
-    note: "Install it by Git URL. Manager’s search finds the older city96 version."
+    nodes: [
+      "SanaCheckpointLoader",
+      "GemmaLoader",
+      "SanaTextEncode",
+      "GemmaTextEncode",
+      "ExtraVAELoader",
+    ],
+    note: "Install it by Git URL. Manager’s search finds the older city96 version.",
   },
   impactpack: {
     name: "ComfyUI Impact Pack",
@@ -50,7 +56,7 @@ export const nodePacks = {
     ref: "8.28",
     search: "Impact Pack",
     manager: "comfyui-impact-pack",
-    nodes: ["FaceDetailer", "SAMLoader"]
+    nodes: ["FaceDetailer", "SAMLoader"],
   },
   impactsubpack: {
     name: "ComfyUI Impact Subpack",
@@ -60,7 +66,7 @@ export const nodePacks = {
     ref: "1.3.4",
     search: "Impact Subpack",
     manager: "comfyui-impact-subpack",
-    nodes: ["UltralyticsDetectorProvider"]
+    nodes: ["UltralyticsDetectorProvider"],
   },
   gguf: {
     name: "ComfyUI-GGUF",
@@ -70,7 +76,13 @@ export const nodePacks = {
     manager: "comfyui-gguf",
     commit: "6ea2651e7df66d7585f6ffee804b20e92fb38b8a",
     ref: "main, 2026-01-12",
-    nodes: ["UnetLoaderGGUF", "CLIPLoaderGGUF", "DualCLIPLoaderGGUF", "TripleCLIPLoaderGGUF", "QuadrupleCLIPLoaderGGUF"]
+    nodes: [
+      "UnetLoaderGGUF",
+      "CLIPLoaderGGUF",
+      "DualCLIPLoaderGGUF",
+      "TripleCLIPLoaderGGUF",
+      "QuadrupleCLIPLoaderGGUF",
+    ],
   },
   comfyui_sana: {
     name: "ComfyUI-SANA",
@@ -78,7 +90,7 @@ export const nodePacks = {
     folder: "ComfyUI-SANA",
     commit: "f515a0c807604fe755b5a5d2826488420402d193",
     ref: "master, 2026-06-25",
-    nodes: ["SanaModelLoader", "SanaGenerate"]
+    nodes: ["SanaModelLoader", "SanaGenerate"],
   },
   // Reads bitsandbytes NF4 checkpoints (Forge's Flux NF4 builds); same inputs as ComfyUI's checkpoint loader.
   bnb_nf4: {
@@ -89,7 +101,7 @@ export const nodePacks = {
     commit: "6c65152bc48b28fc44cec3aa44035a8eba400eb9",
     ref: "main, 2024-08-15",
     nodes: ["CheckpointLoaderNF4"],
-    note: "bitsandbytes runs on NVIDIA GPUs only."
+    note: "bitsandbytes runs on NVIDIA GPUs only.",
   },
   // OpenMOSS's own MOSS-Image loaders (Comfy Registry "moss-image", publisher mosi). Its model
   // supports the layer skip MOSS-Image's makers sample with; ComfyUI's built-in one doesn't yet.
@@ -105,8 +117,8 @@ export const nodePacks = {
     ref: "0.1.1 (main, 2026-10-16)",
     requirements: false,
     nodes: ["MOSSImageHFLoader"],
-    note: "From MOSS-Image’s makers. It needs ComfyUI 0.38 or newer."
-  }
+    note: "From MOSS-Image’s makers. It needs ComfyUI 0.38 or newer.",
+  },
 };
 
 export function nodePack(id) {

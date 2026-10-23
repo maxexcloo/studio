@@ -1,10 +1,20 @@
 import fs from "node:fs";
 import path from "node:path";
-import { comfy, modelFolders } from './comfy.js';
-import { dataDir } from './gallery-store.js';
-import { families, familyFromHeader, familyFromName, isKrea2Raw, isZImageBase, knownFamilies, quantFromHeader, refinedFamily, variantFor } from './family-catalog.js';
-import { isGguf, readGgufHeader } from './gguf.js';
-import { readJsonFile, writeJsonFile } from './json-store.js';
+import { comfy, modelFolders } from "./comfy.js";
+import { dataDir } from "./gallery-store.js";
+import {
+  families,
+  familyFromHeader,
+  familyFromName,
+  isKrea2Raw,
+  isZImageBase,
+  knownFamilies,
+  quantFromHeader,
+  refinedFamily,
+  variantFor,
+} from "./family-catalog.js";
+import { isGguf, readGgufHeader } from "./gguf.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
 
 /**
  * Which family (and variant) a model file belongs to, and which parts an
@@ -26,7 +36,7 @@ export const modelSources = ["unet", "checkpoint"];
 // ComfyUI folder kind and its subfolders under models/, per source.
 const sourceFolders = {
   unet: ["diffusion_models", ["diffusion_models", "unet"]],
-  checkpoint: ["checkpoints", ["checkpoints"]]
+  checkpoint: ["checkpoints", ["checkpoints"]],
 };
 
 // ComfyUI's /view_metadata folder names for the same sources.
@@ -82,7 +92,9 @@ export function setModelChoice(source, name, choice) {
   if (!safeName || safeName.length > 1024) throw new Error("Choose a model file.");
   if (safeChoice && !parseChoice(safeChoice, safeSource)) {
     const family = families[safeChoice.split("/")[0]];
-    throw new Error(family ? `${family.label} can’t load from this folder.` : "Unknown model type.");
+    throw new Error(
+      family ? `${family.label} can’t load from this folder.` : "Unknown model type.",
+    );
   }
   const next = { ...loadModelChoices() };
   if (safeChoice) next[choiceKey(safeSource, safeName)] = safeChoice;
@@ -93,14 +105,21 @@ export function setModelChoice(source, name, choice) {
 
 /** Options for the "Use as …" picker: every family, and each variant where there is a choice to make. */
 export function modelTypeChoices() {
-  return Object.fromEntries(modelSources.map((source) => [
-    source,
-    Object.entries(families)
-      .filter(([, family]) => family.sources.includes(source))
-      .flatMap(([id, family]) => family.variants.length > 1
-        ? family.variants.map((variant) => ({ value: `${id}/${variant.id}`, label: `${family.label} · ${variant.label}` }))
-        : [{ value: id, label: family.label }])
-  ]));
+  return Object.fromEntries(
+    modelSources.map((source) => [
+      source,
+      Object.entries(families)
+        .filter(([, family]) => family.sources.includes(source))
+        .flatMap(([id, family]) =>
+          family.variants.length > 1
+            ? family.variants.map((variant) => ({
+                value: `${id}/${variant.id}`,
+                label: `${family.label} · ${variant.label}`,
+              }))
+            : [{ value: id, label: family.label }],
+        ),
+    ]),
+  );
 }
 
 /* ------------------------------------------------------------ Tensor headers */
@@ -137,7 +156,11 @@ function localModelFile(source, name) {
   if (parts.some((part) => part === "..")) return "";
   for (const dir of modelFolders(...sourceFolders[source])) {
     const file = path.join(dir, ...parts);
-    try { if (fs.statSync(file).isFile()) return file; } catch { /* next folder */ }
+    try {
+      if (fs.statSync(file).isFile()) return file;
+    } catch {
+      /* next folder */
+    }
   }
   return "";
 }
@@ -145,7 +168,11 @@ function localModelFile(source, name) {
 /** A model file's size in bytes when it is on this computer, else 0 (a remote ComfyUI's). */
 export function modelFileBytes(source, name) {
   const file = localModelFile(source, name);
-  try { return file ? fs.statSync(file).size : 0; } catch { return 0; }
+  try {
+    return file ? fs.statSync(file).size : 0;
+  } catch {
+    return 0;
+  }
 }
 
 /** The local header of a model file, cached by size and mtime; null when out of reach. */
@@ -153,11 +180,19 @@ export function modelHeader(source, name) {
   const file = localModelFile(source, name);
   if (!file) return null;
   let stat;
-  try { stat = fs.statSync(file); } catch { return null; }
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return null;
+  }
   const key = `${file}:${stat.size}:${stat.mtimeMs}`;
   if (!headerCache.has(key)) {
     let header = null;
-    try { header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file); } catch { header = null; }
+    try {
+      header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file);
+    } catch {
+      header = null;
+    }
     headerCache.set(key, header);
   }
   return headerCache.get(key);
@@ -170,7 +205,12 @@ export function modelHeader(source, name) {
 export function bundledParts(header) {
   if (!header) return null;
   const keys = Object.keys(header);
-  const encoder = keys.some((key) => key.startsWith("text_encoders.") || key.startsWith("cond_stage_model.") || key.startsWith("conditioner.embedders."));
+  const encoder = keys.some(
+    (key) =>
+      key.startsWith("text_encoders.") ||
+      key.startsWith("cond_stage_model.") ||
+      key.startsWith("conditioner.embedders."),
+  );
   const vae = keys.some((key) => key.startsWith("first_stage_model.") || key.startsWith("vae."));
   return { encoder, vae };
 }
@@ -182,8 +222,14 @@ const metadataCache = new Map();
 
 /** A family from safetensors metadata (modelspec, kohya ss_* fields), or "". */
 export function familyFromMetadata(metadata = {}) {
-  const text = [metadata["modelspec.architecture"], metadata["modelspec.title"], metadata.ss_base_model_version]
-    .filter(Boolean).join(" ").toLowerCase();
+  const text = [
+    metadata["modelspec.architecture"],
+    metadata["modelspec.title"],
+    metadata.ss_base_model_version,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
   if (!text) return "";
   if (/krea[-_ .]?2/.test(text)) return "krea2";
   if (/z[-_ ]?image/.test(text)) return "zimage";
@@ -218,7 +264,9 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6 } = {}) {
     while (queue.length) {
       const { source, name, key } = queue.shift();
       try {
-        const metadata = await comfy(`/view_metadata/${metadataFolders[source]}?filename=${encodeURIComponent(name)}`);
+        const metadata = await comfy(
+          `/view_metadata/${metadataFolders[source]}?filename=${encodeURIComponent(name)}`,
+        );
         metadataCache.set(key, metadata && typeof metadata === "object" ? metadata : {});
       } catch (error) {
         // 404 means "no metadata block" and is worth remembering; anything else
@@ -238,7 +286,13 @@ const learnedKey = (name) => `learned:${name}`;
 
 export function rememberMissingParts(name, missing = {}) {
   const current = loadModelChoices()[learnedKey(name)] || {};
-  saveChoices({ ...loadModelChoices(), [learnedKey(name)]: { encoder: Boolean(current.encoder || missing.encoder), vae: Boolean(current.vae || missing.vae) } });
+  saveChoices({
+    ...loadModelChoices(),
+    [learnedKey(name)]: {
+      encoder: Boolean(current.encoder || missing.encoder),
+      vae: Boolean(current.vae || missing.vae),
+    },
+  });
 }
 
 /** Which parts a checkpoint carries: its header, what a failed run taught us, or an assumption. */
@@ -269,10 +323,12 @@ export function classifyModel(source, name) {
   const quant = quantFromHeader(header, header ? "" : name);
   const finish = (familyId, via, detail = null, variantId = "") => {
     // Families the weights cannot tell apart (Wan 2.1 and 2.2 14B, HunyuanVideo 1.5 T2V and I2V) narrow by name; a choice stands as made.
-    const id = via === "choice" ? familyId || "" : refinedFamily(familyId || "", base, Boolean(header));
+    const id =
+      via === "choice" ? familyId || "" : refinedFamily(familyId || "", base, Boolean(header));
     const family = families[id];
     const variant = family
-      ? (variantId && family.variants.find((item) => item.id === variantId)) || variantFor(id, base, header, detail)
+      ? (variantId && family.variants.find((item) => item.id === variantId)) ||
+        variantFor(id, base, header, detail)
       : null;
     return { family: id, variant, via, bundled, detail, header, quant };
   };
@@ -292,7 +348,10 @@ export function classifyModel(source, name) {
     if (family && family !== "other") return finish(family, "file", detail);
     // Weights we cannot place yet (a newer architecture) let its metadata or name decide.
     if (family === "other" && detail?.unrecognized) {
-      const named = familyFromMetadata(header.__metadata__ || metadataCache.get(choiceKey(source, name)) || {}) || familyFromName(name, source);
+      const named =
+        familyFromMetadata(
+          header.__metadata__ || metadataCache.get(choiceKey(source, name)) || {},
+        ) || familyFromName(name, source);
       if (families[named]?.sources.includes(source)) return finish(named, "name");
     }
     // Weights that were read and match nothing Studio knows are not SD: running them as
@@ -301,10 +360,12 @@ export function classifyModel(source, name) {
   }
 
   const fromMetadata = familyFromMetadata(metadataCache.get(choiceKey(source, name)) || {});
-  if (fromMetadata && families[fromMetadata]?.sources.includes(source)) return finish(fromMetadata, "metadata");
+  if (fromMetadata && families[fromMetadata]?.sources.includes(source))
+    return finish(fromMetadata, "metadata");
 
   const fromName = familyFromName(name, source);
-  if (fromName === "sdxl_or_sd15") return finish(/1[._]?5|sd15|v1[-_]5/i.test(base) ? "sd15" : "sdxl", "default");
+  if (fromName === "sdxl_or_sd15")
+    return finish(/1[._]?5|sd15|v1[-_]5/i.test(base) ? "sd15" : "sdxl", "default");
   if (fromName && families[fromName]?.sources.includes(source)) return finish(fromName, "name");
   return finish("", "");
 }
@@ -322,7 +383,7 @@ export function familyLabel(id) {
  */
 export function krea2RawShift(width, height) {
   const tokens = Math.ceil(Number(width || 1024) / 16) * Math.ceil(Number(height || 1024) / 16);
-  const mu = 0.5 + (tokens - 256) * (1.15 - 0.5) / (6400 - 256);
+  const mu = 0.5 + ((tokens - 256) * (1.15 - 0.5)) / (6400 - 256);
   return Math.round(mu * 1000) / 1000;
 }
 

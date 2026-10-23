@@ -21,7 +21,9 @@ import { normalizeFolderInput } from "./comfy.js";
 
 export const httpsPort = (() => {
   const value = Number(process.env.STUDIO_HTTPS_PORT || 0);
-  return Number.isInteger(value) && value > 0 && value < 65536 ? value : Number(process.env.PORT || 8787) + 1;
+  return Number.isInteger(value) && value > 0 && value < 65536
+    ? value
+    : Number(process.env.PORT || 8787) + 1;
 })();
 
 function readPem(file, what) {
@@ -29,17 +31,24 @@ function readPem(file, what) {
   try {
     return fs.readFileSync(file);
   } catch (error) {
-    throw new Error(error.code === "ENOENT" ? `The ${what} file isn’t there: ${file}` : `The ${what} file can’t be read: ${error.message}`);
+    throw new Error(
+      error.code === "ENOENT"
+        ? `The ${what} file isn’t there: ${file}`
+        : `The ${what} file can’t be read: ${error.message}`,
+    );
   }
 }
 
 /** The names a browser will accept this certificate for: DNS names and IP addresses. */
 export function certificateNames(x509) {
-  return String(x509?.subjectAltName || "").split(/,\s*/).map((entry) => {
-    const [kind, ...rest] = entry.split(":");
-    const value = rest.join(":").trim().toLowerCase();
-    return kind === "DNS" || kind === "IP Address" ? value : "";
-  }).filter(Boolean);
+  return String(x509?.subjectAltName || "")
+    .split(/,\s*/)
+    .map((entry) => {
+      const [kind, ...rest] = entry.split(":");
+      const value = rest.join(":").trim().toLowerCase();
+      return kind === "DNS" || kind === "IP Address" ? value : "";
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -49,7 +58,16 @@ export function certificateNames(x509) {
 export function inspectTls(certPath = "", keyPath = "") {
   const cert = normalizeFolderInput(certPath);
   const key = normalizeFolderInput(keyPath);
-  const report = { configured: Boolean(cert || key), certPath: cert, keyPath: key, ok: false, error: "", names: [], validTo: "", expired: false };
+  const report = {
+    configured: Boolean(cert || key),
+    certPath: cert,
+    keyPath: key,
+    ok: false,
+    error: "",
+    names: [],
+    validTo: "",
+    expired: false,
+  };
   if (!report.configured) return report;
   try {
     const certPem = readPem(cert, "certificate");
@@ -60,21 +78,31 @@ export function inspectTls(certPath = "", keyPath = "") {
     report.expired = Date.parse(x509.validTo) < Date.now();
     // Throws when the key does not belong to the certificate, or either is not PEM.
     tls.createSecureContext({ cert: certPem, key: keyPem });
-    if (!x509.checkPrivateKey(crypto.createPrivateKey(keyPem))) throw new Error("The key doesn’t belong to this certificate.");
-    if (report.expired) throw new Error(`The certificate expired on ${report.validTo.slice(0, 10)}. Renew it (for Tailscale: tailscale cert), then restart Studio.`);
-    if (!report.names.length) throw new Error("The certificate has no host name, so browsers won’t accept it.");
+    if (!x509.checkPrivateKey(crypto.createPrivateKey(keyPem)))
+      throw new Error("The key doesn’t belong to this certificate.");
+    if (report.expired)
+      throw new Error(
+        `The certificate expired on ${report.validTo.slice(0, 10)}. Renew it (for Tailscale: tailscale cert), then restart Studio.`,
+      );
+    if (!report.names.length)
+      throw new Error("The certificate has no host name, so browsers won’t accept it.");
     report.ok = true;
     report.pem = { cert: certPem, key: keyPem };
   } catch (error) {
     report.error = /PEM|asn1|DECODER|bad decrypt|header too long/i.test(error.message)
       ? "Those files aren’t a PEM certificate and its key."
-      : /key values mismatch|KEY_VALUES_MISMATCH/i.test(error.message) ? "The key doesn’t belong to this certificate." : error.message;
+      : /key values mismatch|KEY_VALUES_MISMATCH/i.test(error.message)
+        ? "The key doesn’t belong to this certificate."
+        : error.message;
   }
   return report;
 }
 
 /** The pair from the environment, as it was when Studio started. */
-export const startupTls = inspectTls(process.env.STUDIO_TLS_CERT || "", process.env.STUDIO_TLS_KEY || "");
+export const startupTls = inspectTls(
+  process.env.STUDIO_TLS_CERT || "",
+  process.env.STUDIO_TLS_KEY || "",
+);
 
 /** Names the certificate is for: the request guard accepts them as Host. */
 export function tlsHostNames() {
@@ -87,19 +115,32 @@ export function tlsHostNames() {
  */
 export function watchCertificate(server, report = startupTls, everyMs = 6 * 60 * 60 * 1000) {
   if (!report.ok) return null;
-  const stamp = () => [report.certPath, report.keyPath].map((file) => { try { return fs.statSync(file).mtimeMs; } catch { return 0; } }).join(":");
+  const stamp = () =>
+    [report.certPath, report.keyPath]
+      .map((file) => {
+        try {
+          return fs.statSync(file).mtimeMs;
+        } catch {
+          return 0;
+        }
+      })
+      .join(":");
   let last = stamp();
   const timer = setInterval(() => {
     const now = stamp();
     if (now === last) return;
     const next = inspectTls(report.certPath, report.keyPath);
     if (!next.ok) {
-      console.warn(`[Studio] The renewed certificate can’t be used (${next.error}); keeping the current one.`);
+      console.warn(
+        `[Studio] The renewed certificate can’t be used (${next.error}); keeping the current one.`,
+      );
       return;
     }
     server.setSecureContext({ cert: next.pem.cert, key: next.pem.key });
     last = now;
-    console.log(`[Studio] Reloaded the HTTPS certificate (valid until ${next.validTo.slice(0, 10)}).`);
+    console.log(
+      `[Studio] Reloaded the HTTPS certificate (valid until ${next.validTo.slice(0, 10)}).`,
+    );
   }, everyMs);
   timer.unref?.();
   return timer;

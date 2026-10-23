@@ -1,8 +1,8 @@
-import { families } from './family-catalog.js';
-import { catalogDownloadsForFile } from './family-profiles.js';
-import { packInstallPlan } from './node-install.js';
-import { nodePack, nodePacks } from './node-packs.js';
-import { packInstallRoutes } from './pack-installer.js';
+import { families } from "./family-catalog.js";
+import { catalogDownloadsForFile } from "./family-profiles.js";
+import { packInstallPlan } from "./node-install.js";
+import { nodePack, nodePacks } from "./node-packs.js";
+import { packInstallRoutes } from "./pack-installer.js";
 
 /**
  * What the viewer can offer as a button for a failure describeFailure
@@ -16,7 +16,7 @@ const loaderFolders = [
   [/^VAELoader/i, "vae"],
   [/^(CLIPLoader|DualCLIPLoader|TripleCLIPLoader|QuadrupleCLIPLoader)/i, "text_encoders"],
   [/^(UNETLoader|UnetLoaderGGUF)/i, "diffusion_models"],
-  [/^(CheckpointLoader|ImageOnlyCheckpointLoader)/i, "checkpoints"]
+  [/^(CheckpointLoader|ImageOnlyCheckpointLoader)/i, "checkpoints"],
 ];
 
 /** The known pack that brings a node class, or null. */
@@ -43,7 +43,9 @@ export function redownloadFor(file = "", nodeType = "") {
 /** Whether a built-in family's graph can swap its decode for a tiled one (the Sana packs decode themselves). */
 export function canDecodeTiled(body = {}) {
   const family = families[body.family];
-  return Boolean(family && family.sampling !== "sana" && String(body.workflow || "").startsWith("family:"));
+  return Boolean(
+    family && family.sampling !== "sana" && String(body.workflow || "").startsWith("family:"),
+  );
 }
 
 /** The failure with the fixes Studio can offer for it. */
@@ -53,7 +55,14 @@ export function withFixes(failure, body = {}) {
   if (failure.fix === "node" && failure.missingNode) {
     const pack = packForNode(failure.missingNode);
     if (pack) {
-      next.nodePack = { id: pack.id, name: pack.name, repository: pack.repository, folder: pack.folder, search: pack.search || "", note: pack.note || "" };
+      next.nodePack = {
+        id: pack.id,
+        name: pack.name,
+        repository: pack.repository,
+        folder: pack.folder,
+        search: pack.search || "",
+        note: pack.note || "",
+      };
       next.install = packInstallPlan(pack);
       next.autoInstall = packInstallRoutes(pack.id);
     }
@@ -63,7 +72,12 @@ export function withFixes(failure, body = {}) {
     if (download) next.redownload = download;
   }
   if (failure.fix === "memory") {
-    next.retry = { smaller: true, ...(canDecodeTiled(body) && /VAEDecode/i.test(failure.nodeType || "") ? { tiledDecode: true } : {}) };
+    next.retry = {
+      smaller: true,
+      ...(canDecodeTiled(body) && /VAEDecode/i.test(failure.nodeType || "")
+        ? { tiledDecode: true }
+        : {}),
+    };
   }
   return next;
 }

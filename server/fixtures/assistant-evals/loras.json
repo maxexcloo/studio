@@ -5,34 +5,18 @@
       "name": "krea-film-grain.safetensors",
       "info": {
         "title": "Film Grain",
-        "families": [
-          "krea2"
-        ],
-        "triggers": [
-          "filmgrain"
-        ],
-        "tags": [
-          "film grain",
-          "35mm",
-          "analog photo"
-        ]
+        "families": ["krea2"],
+        "triggers": ["filmgrain"],
+        "tags": ["film grain", "35mm", "analog photo"]
       }
     },
     {
       "name": "krea-watercolor.safetensors",
       "info": {
         "title": "Watercolour Wash",
-        "families": [
-          "krea2"
-        ],
-        "triggers": [
-          "wtrclr"
-        ],
-        "tags": [
-          "watercolor",
-          "painting",
-          "paper texture"
-        ],
+        "families": ["krea2"],
+        "triggers": ["wtrclr"],
+        "tags": ["watercolor", "painting", "paper texture"],
         "strengthRange": {
           "min": 0,
           "max": 1.2,
@@ -45,142 +29,84 @@
       "name": "krea-cyberpunk.safetensors",
       "info": {
         "title": "Neon Cyberpunk",
-        "families": [
-          "krea2"
-        ],
-        "triggers": [
-          "cyb3r"
-        ],
-        "tags": [
-          "neon",
-          "cyberpunk",
-          "city"
-        ]
+        "families": ["krea2"],
+        "triggers": ["cyb3r"],
+        "tags": ["neon", "cyberpunk", "city"]
       }
     },
     {
       "name": "krea-pixel.safetensors",
       "info": {
         "title": "Pixel Art",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "pixel art",
-          "8-bit",
-          "sprite"
-        ]
+        "families": ["krea2"],
+        "tags": ["pixel art", "8-bit", "sprite"]
       }
     },
     {
       "name": "krea-turbo.safetensors",
       "info": {
         "title": "Krea Turbo",
-        "families": [
-          "krea2"
-        ],
+        "families": ["krea2"],
         "role": "acceleration",
-        "tags": [
-          "fast",
-          "sketch"
-        ]
+        "tags": ["fast", "sketch"]
       }
     },
     {
       "name": "krea-anime.safetensors",
       "info": {
         "title": "Anime Lines",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "anime",
-          "cel shading"
-        ]
+        "families": ["krea2"],
+        "tags": ["anime", "cel shading"]
       }
     },
     {
       "name": "flux-watercolor.safetensors",
       "info": {
         "title": "Watercolour",
-        "families": [
-          "flux1"
-        ],
-        "tags": [
-          "watercolor"
-        ]
+        "families": ["flux1"],
+        "tags": ["watercolor"]
       }
     },
     {
       "name": "zimage-portrait.safetensors",
       "info": {
         "title": "Portrait Light",
-        "families": [
-          "zimage"
-        ],
-        "tags": [
-          "portrait",
-          "studio light"
-        ]
+        "families": ["zimage"],
+        "tags": ["portrait", "studio light"]
       }
     },
     {
       "name": "krea-portrait-skin.safetensors",
       "info": {
         "title": "Natural Skin",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "portrait",
-          "skin texture",
-          "freckles"
-        ]
+        "families": ["krea2"],
+        "tags": ["portrait", "skin texture", "freckles"]
       }
     },
     {
       "name": "krea-food.safetensors",
       "info": {
         "title": "Food Photography",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "food",
-          "dish",
-          "plating"
-        ]
+        "families": ["krea2"],
+        "tags": ["food", "dish", "plating"]
       }
     },
     {
       "name": "krea-snow.safetensors",
       "info": {
         "title": "Winter Snow",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "snow",
-          "winter",
-          "frost"
-        ]
+        "families": ["krea2"],
+        "tags": ["snow", "winter", "frost"]
       }
     },
     {
       "name": "krea-variant-only.safetensors",
       "info": {
         "title": "Neon Variant",
-        "families": [
-          "krea2"
-        ],
-        "tags": [
-          "neon",
-          "city"
-        ],
+        "families": ["krea2"],
+        "tags": ["neon", "city"],
         "compatibility": {
-          "profileIds": [
-            "custom:another-profile"
-          ],
+          "profileIds": ["custom:another-profile"],
           "unlisted": "other"
         }
       }
@@ -196,12 +122,8 @@
         "family": "krea2"
       },
       "prompt": "a watercolor painting of a harbour",
-      "expected": [
-        "krea-watercolor.safetensors"
-      ],
-      "forbidden": [
-        "flux-watercolor.safetensors"
-      ],
+      "expected": ["krea-watercolor.safetensors"],
+      "forbidden": ["flux-watercolor.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"krea-watercolor.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -213,12 +135,8 @@
         "family": "krea2"
       },
       "prompt": "a neon cyberpunk city street",
-      "expected": [
-        "krea-cyberpunk.safetensors"
-      ],
-      "forbidden": [
-        "krea-variant-only.safetensors"
-      ],
+      "expected": ["krea-cyberpunk.safetensors"],
+      "forbidden": ["krea-variant-only.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"krea-cyberpunk.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"krea-variant-only.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -230,9 +148,7 @@
         "family": "krea2"
       },
       "prompt": "an analog 35mm film photo of a street",
-      "expected": [
-        "krea-film-grain.safetensors"
-      ],
+      "expected": ["krea-film-grain.safetensors"],
       "forbidden": [],
       "recorded": "{\"loras\": [{\"name\": \"krea-film-grain.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
@@ -245,9 +161,7 @@
         "family": "krea2"
       },
       "prompt": "pixel art sprite of a knight",
-      "expected": [
-        "krea-pixel.safetensors"
-      ],
+      "expected": ["krea-pixel.safetensors"],
       "forbidden": [],
       "recorded": "{\"loras\": [{\"name\": \"krea-pixel.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
@@ -274,9 +188,7 @@
       },
       "prompt": "a fast sketch of a horse",
       "expected": [],
-      "forbidden": [
-        "krea-turbo.safetensors"
-      ],
+      "forbidden": ["krea-turbo.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"krea-turbo.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -288,12 +200,8 @@
         "family": "krea2"
       },
       "prompt": "a portrait with freckles and natural skin",
-      "expected": [
-        "krea-portrait-skin.safetensors"
-      ],
-      "forbidden": [
-        "zimage-portrait.safetensors"
-      ],
+      "expected": ["krea-portrait-skin.safetensors"],
+      "forbidden": ["zimage-portrait.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"krea-portrait-skin.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"zimage-portrait.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -305,12 +213,8 @@
         "family": "zimage"
       },
       "prompt": "studio light portrait of a woman",
-      "expected": [
-        "zimage-portrait.safetensors"
-      ],
-      "forbidden": [
-        "krea-portrait-skin.safetensors"
-      ],
+      "expected": ["zimage-portrait.safetensors"],
+      "forbidden": ["krea-portrait-skin.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"zimage-portrait.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -322,12 +226,8 @@
         "family": "flux1"
       },
       "prompt": "a watercolor of a fox",
-      "expected": [
-        "flux-watercolor.safetensors"
-      ],
-      "forbidden": [
-        "krea-watercolor.safetensors"
-      ],
+      "expected": ["flux-watercolor.safetensors"],
+      "forbidden": ["krea-watercolor.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"flux-watercolor.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -339,9 +239,7 @@
         "family": "krea2"
       },
       "prompt": "a plated dish of ramen, food photography",
-      "expected": [
-        "krea-food.safetensors"
-      ],
+      "expected": ["krea-food.safetensors"],
       "forbidden": [],
       "recorded": "{\"loras\": [{\"name\": \"krea-food.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
@@ -354,10 +252,7 @@
         "family": "krea2"
       },
       "prompt": "winter snow scene shot on 35mm film",
-      "expected": [
-        "krea-snow.safetensors",
-        "krea-film-grain.safetensors"
-      ],
+      "expected": ["krea-snow.safetensors", "krea-film-grain.safetensors"],
       "forbidden": [],
       "recorded": "{\"loras\": [{\"name\": \"krea-snow.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"krea-film-grain.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
@@ -370,9 +265,7 @@
         "family": "krea2"
       },
       "prompt": "anime girl in the rain",
-      "expected": [
-        "krea-anime.safetensors"
-      ],
+      "expected": ["krea-anime.safetensors"],
       "forbidden": [],
       "recorded": "I would suggest the anime one."
     },
@@ -385,13 +278,8 @@
         "family": "krea2"
       },
       "prompt": "neon cyberpunk watercolor pixel art city",
-      "expected": [
-        "krea-cyberpunk.safetensors",
-        "krea-watercolor.safetensors"
-      ],
-      "forbidden": [
-        "krea-pixel.safetensors"
-      ],
+      "expected": ["krea-cyberpunk.safetensors", "krea-watercolor.safetensors"],
+      "forbidden": ["krea-pixel.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"krea-cyberpunk.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"krea-watercolor.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"krea-pixel.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}",
       "limit": 2
     },
@@ -404,12 +292,8 @@
         "family": "krea2"
       },
       "prompt": "a watercolor harbour at dawn",
-      "expected": [
-        "krea-watercolor.safetensors"
-      ],
-      "forbidden": [
-        "flux-watercolor.safetensors"
-      ],
+      "expected": ["krea-watercolor.safetensors"],
+      "forbidden": ["flux-watercolor.safetensors"],
       "recorded": "{\"loras\": [{\"name\": \"flux-watercolor.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}, {\"name\": \"krea-watercolor.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     },
     {
@@ -421,9 +305,7 @@
         "family": "krea2"
       },
       "prompt": "a frosty winter morning in the hills",
-      "expected": [
-        "krea-snow.safetensors"
-      ],
+      "expected": ["krea-snow.safetensors"],
       "forbidden": [],
       "recorded": "{\"loras\": [{\"name\": \"krea-snow.safetensors\", \"strength\": 0.8, \"reason\": \"Fits the prompt\"}]}"
     }

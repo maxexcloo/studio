@@ -37,13 +37,20 @@ const seenFlushMs = 60 * 1000;
 
 export const deviceSessionSeconds = (() => {
   const days = Number(process.env.STUDIO_DEVICE_SESSION_DAYS || 7);
-  return Math.round(Math.max(1 / 24, Math.min(30, Number.isFinite(days) && days > 0 ? days : 7)) * 24 * 60 * 60);
+  return Math.round(
+    Math.max(1 / 24, Math.min(30, Number.isFinite(days) && days > 0 ? days : 7)) * 24 * 60 * 60,
+  );
 })();
 
 /** Who is asking, worked out once per request. */
 export function clientOf(req) {
   if (!req) return { address: "", proxied: false, thisComputer: false, network: false };
-  if (!req.studioClient) req.studioClient = classifyClient(req, { lanActions: allowLanActions, devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "", hostOnly: dockerHostOnly });
+  if (!req.studioClient)
+    req.studioClient = classifyClient(req, {
+      lanActions: allowLanActions,
+      devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "",
+      hostOnly: dockerHostOnly,
+    });
   return req.studioClient;
 }
 
@@ -56,13 +63,20 @@ function emptyConfig() {
 function load() {
   if (cache) return cache;
   let saved = {};
-  try { saved = readJsonFile(accessPath) || {}; } catch { saved = {}; }
+  try {
+    saved = readJsonFile(accessPath) || {};
+  } catch {
+    saved = {};
+  }
   const now = Date.now();
   cache = {
     ...emptyConfig(),
     adminFromDevices: saved.adminFromDevices === true,
-    studioPassword: saved.studioPassword?.salt && saved.studioPassword?.hash ? saved.studioPassword : null,
-    sessions: (Array.isArray(saved.sessions) ? saved.sessions : []).filter((item) => item?.id && Number(item.expiresAt) > now)
+    studioPassword:
+      saved.studioPassword?.salt && saved.studioPassword?.hash ? saved.studioPassword : null,
+    sessions: (Array.isArray(saved.sessions) ? saved.sessions : []).filter(
+      (item) => item?.id && Number(item.expiresAt) > now,
+    ),
   };
   return cache;
 }
@@ -72,15 +86,28 @@ function save({ twice = false } = {}) {
   clearTimeout(flushTimer);
   flushTimer = null;
   const config = load();
-  config.sessions = config.sessions.filter((item) => Number(item.expiresAt) > Date.now()).slice(-maxSessions);
+  config.sessions = config.sessions
+    .filter((item) => Number(item.expiresAt) > Date.now())
+    .slice(-maxSessions);
   writeJsonFile(accessPath, config, { mode: 0o600 });
   // The store keeps the previous copy as .bak; a revocation must not survive in it.
   if (twice) writeJsonFile(accessPath, config, { mode: 0o600 });
-  try { fs.chmodSync(accessPath, 0o600); } catch { /* Windows keeps its own ACLs. */ }
+  try {
+    fs.chmodSync(accessPath, 0o600);
+  } catch {
+    /* Windows keeps its own ACLs. */
+  }
 }
 
 function saveSoon() {
-  if (!flushTimer) flushTimer = setTimeout(() => { try { save(); } catch { /* the next change saves it */ } }, seenFlushMs);
+  if (!flushTimer)
+    flushTimer = setTimeout(() => {
+      try {
+        save();
+      } catch {
+        /* the next change saves it */
+      }
+    }, seenFlushMs);
   flushTimer.unref?.();
 }
 
@@ -114,7 +141,12 @@ export async function setStudioPassword(password = "") {
   const salt = crypto.randomBytes(16);
   const hash = await scryptAsync(password, salt);
   const config = load();
-  config.studioPassword = { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url"), setAt: new Date().toISOString() };
+  config.studioPassword = {
+    kdf,
+    salt: salt.toString("base64url"),
+    hash: hash.toString("base64url"),
+    setAt: new Date().toISOString(),
+  };
   // A new password is a fresh start: devices that knew the old one sign in again.
   config.sessions = [];
   save({ twice: true });
@@ -142,7 +174,11 @@ function parseCookies(req) {
     if (index < 0) continue;
     const key = part.slice(0, index).trim();
     if (!key || key in cookies) continue;
-    try { cookies[key] = decodeURIComponent(part.slice(index + 1).trim()); } catch { cookies[key] = ""; }
+    try {
+      cookies[key] = decodeURIComponent(part.slice(index + 1).trim());
+    } catch {
+      cookies[key] = "";
+    }
   }
   return cookies;
 }
@@ -153,9 +189,34 @@ export const secureRequest = (req) => Boolean(req?.socket?.encrypted);
 /** A short, human name for the device, from its browser's own description. */
 export function deviceLabel(userAgent = "") {
   const ua = String(userAgent || "");
-  const device = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? (/Mobile/.test(ua) ? "Android phone" : "Android tablet")
-    : /Macintosh|Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows PC" : /CrOS/.test(ua) ? "Chromebook" : /Linux/.test(ua) ? "Linux computer" : "Device";
-  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\/|FxiOS/.test(ua) ? "Firefox" : /OPR\//.test(ua) ? "Opera" : /Chrome\/|CriOS/.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+  const device = /iPhone/.test(ua)
+    ? "iPhone"
+    : /iPad/.test(ua)
+      ? "iPad"
+      : /Android/.test(ua)
+        ? /Mobile/.test(ua)
+          ? "Android phone"
+          : "Android tablet"
+        : /Macintosh|Mac OS X/.test(ua)
+          ? "Mac"
+          : /Windows/.test(ua)
+            ? "Windows PC"
+            : /CrOS/.test(ua)
+              ? "Chromebook"
+              : /Linux/.test(ua)
+                ? "Linux computer"
+                : "Device";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /Firefox\/|FxiOS/.test(ua)
+      ? "Firefox"
+      : /OPR\//.test(ua)
+        ? "Opera"
+        : /Chrome\/|CriOS/.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "";
   return browser ? `${device} · ${browser}` : device;
 }
 
@@ -202,7 +263,14 @@ export function migrateDeviceCookie(req, res) {
 }
 
 function cookie(req, value, maxAge, name = deviceCookieName) {
-  return [`${name}=${value}`, "Path=/", `Max-Age=${maxAge}`, "HttpOnly", "SameSite=Strict", ...(secureRequest(req) ? ["Secure"] : [])].join("; ");
+  return [
+    `${name}=${value}`,
+    "Path=/",
+    `Max-Age=${maxAge}`,
+    "HttpOnly",
+    "SameSite=Strict",
+    ...(secureRequest(req) ? ["Secure"] : []),
+  ].join("; ");
 }
 
 /** Adds a Set-Cookie without dropping one another part of the response already set. */
@@ -222,7 +290,7 @@ export function startDeviceSession(req, res) {
     lastSeenAt: new Date(now).toISOString(),
     expiresAt: now + deviceSessionSeconds * 1000,
     label: deviceLabel(req?.headers?.["user-agent"]),
-    address: clientOf(req).address.slice(0, 64)
+    address: clientOf(req).address.slice(0, 64),
   };
   const config = load();
   config.sessions.push(session);
@@ -241,7 +309,8 @@ export function endDeviceSession(req, res) {
     save({ twice: true });
   }
   appendSetCookie(res, cookie(req, "", 0));
-  if (parseCookies(req)[legacyDeviceCookieName]) appendSetCookie(res, cookie(req, "", 0, legacyDeviceCookieName));
+  if (parseCookies(req)[legacyDeviceCookieName])
+    appendSetCookie(res, cookie(req, "", 0, legacyDeviceCookieName));
   if (req) req.studioSession = null;
 }
 
@@ -255,9 +324,16 @@ export function endAllDeviceSessions() {
 }
 
 export function listDeviceSessions(current = null) {
-  return load().sessions
-    .filter((item) => Number(item.expiresAt) > Date.now())
-    .map((item) => ({ id: item.id.slice(0, 12), label: item.label || "Device", createdAt: item.createdAt, lastSeenAt: item.lastSeenAt, expiresAt: new Date(Number(item.expiresAt)).toISOString(), current: Boolean(current && current.id === item.id) }))
+  return load()
+    .sessions.filter((item) => Number(item.expiresAt) > Date.now())
+    .map((item) => ({
+      id: item.id.slice(0, 12),
+      label: item.label || "Device",
+      createdAt: item.createdAt,
+      lastSeenAt: item.lastSeenAt,
+      expiresAt: new Date(Number(item.expiresAt)).toISOString(),
+      current: Boolean(current && current.id === item.id),
+    }))
     .sort((a, b) => Date.parse(b.lastSeenAt || 0) - Date.parse(a.lastSeenAt || 0));
 }
 
@@ -280,7 +356,9 @@ export function canAdmin(req) {
       if (req) req.studioAccount = accountSession(token);
     }
     // A personal MCP token never carries administrator authority.
-    return req?.studioAccount?.role === "administrator" && req.studioAccount.credential !== "mcp-token";
+    return (
+      req?.studioAccount?.role === "administrator" && req.studioAccount.credential !== "mcp-token"
+    );
   }
   if (clientOf(req).thisComputer) return true;
   return devicesMayAdmin() && isSignedInDevice(req);

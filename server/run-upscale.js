@@ -19,7 +19,12 @@ const targetLabels = { 2048: "2K", 4096: "4K" };
  * output's size is already decided by that reference or mask, not the pick,
  * so a stale one from before either was set must not sneak an upscale in.
  */
-export function dropsAutoUpscale({ inpaint, referencesFamily, hasReference, referenceRole = "edit" }) {
+export function dropsAutoUpscale({
+  inpaint,
+  referencesFamily,
+  hasReference,
+  referenceRole = "edit",
+}) {
   // A reference that only guides (Edit | Ref) leaves the size to the pick, so its 2K/4K stays.
   return Boolean(inpaint || (referencesFamily && hasReference && referenceRole !== "reference"));
 }
@@ -35,7 +40,12 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
   const label = targetLabels[target] || tierLabels[quality] || "";
   const status = upscaleStatus(info, quality);
   if (!status.ready) {
-    return { skipped: status.nodesInstalled ? "Smart upscale’s SeedVR2 model isn’t installed yet" : "Smart upscale needs the SeedVR2 nodes in ComfyUI", quality };
+    return {
+      skipped: status.nodesInstalled
+        ? "Smart upscale’s SeedVR2 model isn’t installed yet"
+        : "Smart upscale needs the SeedVR2 nodes in ComfyUI",
+      quality,
+    };
   }
   const source = {
     quality,
@@ -44,18 +54,29 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
     target,
     // An inpaint result is the whole original picture, whatever size the crop sampled at.
     width: Number(body.inpaint?.image?.width || body.width || 0),
-    height: Number(body.inpaint?.image?.height || body.height || 0)
+    height: Number(body.inpaint?.image?.height || body.height || 0),
   };
   const phase = label ? `Upscaling to ${label}` : "Upscaling";
   const withFaces = Boolean(body.autoUpscale?.faceDetail && status.faceDetail?.nodesInstalled);
   const attempts = withFaces
-    ? [{ ...source, faceDetail: true, ...faceDetailSource({ model: body.model, settings: generationSettings(body) }, customWorkflow) }, source]
+    ? [
+        {
+          ...source,
+          faceDetail: true,
+          ...faceDetailSource(
+            { model: body.model, settings: generationSettings(body) },
+            customWorkflow,
+          ),
+        },
+        source,
+      ]
     : [source];
   let lastError = null;
   for (const attempt of attempts) {
     try {
       const embedded = embedUpscale(graph, attempt, info, { phase });
-      if (!embedded) return { skipped: "This workflow saves no image for Smart upscale to work on", quality };
+      if (!embedded)
+        return { skipped: "This workflow saves no image for Smart upscale to work on", quality };
       // The embedded save nodes arrive after the run's own prefix rewrite.
       if (body.ownerId && embedded.graph) saveIntoStudioFolder(embedded.graph, body.ownerId);
       return { ...embedded, quality, label, faceDetail: Boolean(attempt.faceDetail) };
@@ -63,7 +84,10 @@ export function planRunUpscale(graph, body, info, customWorkflow = null) {
       lastError = error;
     }
   }
-  return { skipped: `Smart upscale couldn’t start: ${normalizeComfyError(lastError?.message || "")}`, quality };
+  return {
+    skipped: `Smart upscale couldn’t start: ${normalizeComfyError(lastError?.message || "")}`,
+    quality,
+  };
 }
 
 /**
@@ -77,9 +101,15 @@ export function pairRunOutputs(entryOutputs = {}, pairs = []) {
   for (const [nodeId, output] of Object.entries(entryOutputs || {})) {
     if (upscaleIds.has(nodeId)) continue;
     const pair = pairs.find((item) => item.base === nodeId);
-    const upscales = pair ? outputsFrom({ outputs: { [pair.upscale]: entryOutputs[pair.upscale] || {} } }) : [];
+    const upscales = pair
+      ? outputsFrom({ outputs: { [pair.upscale]: entryOutputs[pair.upscale] || {} } })
+      : [];
     outputsFrom({ outputs: { [nodeId]: output } }).forEach((base, index) => {
-      results.push({ output: base, upscale: pair ? upscales[index] || null : null, paired: Boolean(pair) });
+      results.push({
+        output: base,
+        upscale: pair ? upscales[index] || null : null,
+        paired: Boolean(pair),
+      });
     });
   }
   return results;
@@ -92,7 +122,7 @@ export function missedUpscaleState(embed, { canceled = false, error = "" } = {})
     quality: embed?.quality || "balanced",
     progress: null,
     kept: true,
-    error: canceled ? "" : error || "Smart upscale failed"
+    error: canceled ? "" : error || "Smart upscale failed",
   };
 }
 
@@ -112,7 +142,7 @@ export function runUpscaleState(embed, upscale) {
     height: plan.estimatedHeight,
     scale: plan.scale,
     completedAt: new Date().toISOString(),
-    error: ""
+    error: "",
   };
 }
 

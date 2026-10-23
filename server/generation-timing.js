@@ -52,7 +52,9 @@ export function workUnits(body = {}) {
 /** What else shapes a run's time besides its size: the images it reads, and decoding in tiles. */
 export function runVariant(body = {}) {
   // The start image is the first reference when there are references, so it counts once.
-  const images = Array.isArray(body.referenceAssets) ? body.referenceAssets.length : Math.max(0, Number(body.refs) || 0);
+  const images = Array.isArray(body.referenceAssets)
+    ? body.referenceAssets.length
+    : Math.max(0, Number(body.refs) || 0);
   return { refs: Math.max(images, body.startImageId ? 1 : 0), tiled: Boolean(body.tiledDecode) };
 }
 
@@ -92,8 +94,19 @@ export class RunTimer {
       this.executionStartedAt ??= now;
       this.runAt ??= now;
     }
-    if (message?.type === "execution_success" || (message?.type === "executing" && (data.node === null || data.node === undefined) && this.runAt !== null)) this.endAt ??= now;
-    if (message?.type === "executed" && this.runAt !== null && this.endNodes.has(String(data.node ?? ""))) this.endAt ??= now;
+    if (
+      message?.type === "execution_success" ||
+      (message?.type === "executing" &&
+        (data.node === null || data.node === undefined) &&
+        this.runAt !== null)
+    )
+      this.endAt ??= now;
+    if (
+      message?.type === "executed" &&
+      this.runAt !== null &&
+      this.endNodes.has(String(data.node ?? ""))
+    )
+      this.endAt ??= now;
     if (message?.type !== "progress") return;
     this.runAt ??= now;
     const node = String(data.node ?? "");
@@ -133,7 +146,9 @@ export class RunTimer {
   /** The sampler reporting right now, if any. */
   current() {
     const segments = this.segments;
-    return segments.length ? segments.reduce((latest, segment) => (segment.lastT >= latest.lastT ? segment : latest)) : null;
+    return segments.length
+      ? segments.reduce((latest, segment) => (segment.lastT >= latest.lastT ? segment : latest))
+      : null;
   }
 
   /** How the finished run split, or null when it never really ran. */
@@ -142,13 +157,17 @@ export class RunTimer {
     const runMs = this.endAt - this.runAt;
     const segments = this.segments;
     const stepMs = this.stepMs();
-    if (!segments.length || !stepMs) return { runMs, stepMs: null, steps: 0, setupMs: null, tailMs: null };
+    if (!segments.length || !stepMs)
+      return { runMs, stepMs: null, steps: 0, setupMs: null, tailMs: null };
     const first = segments.reduce((a, b) => (b.firstT < a.firstT ? b : a));
     const last = segments.reduce((a, b) => (b.lastT > a.lastT ? b : a));
     const steps = segments.reduce((sum, segment) => sum + (segment.max || segment.lastV), 0);
     // The first report comes after its step finished; that step was sampling, not setup.
     const setupMs = Math.max(0, first.firstT - this.runAt - first.firstV * stepMs);
-    const tailMs = Math.max(0, this.endAt - last.lastT - Math.max(0, (last.max || last.lastV) - last.lastV) * stepMs);
+    const tailMs = Math.max(
+      0,
+      this.endAt - last.lastT - Math.max(0, (last.max || last.lastV) - last.lastV) * stepMs,
+    );
     return { runMs, stepMs, steps, setupMs, tailMs };
   }
 }
@@ -159,7 +178,8 @@ export function completedTiming(timer, submittedAt, result = timer?.result()) {
   const timing = { runMs: Math.round(result.runMs) };
   if (result.stepMs) timing.stepMs = Math.round(result.stepMs);
   if (Number.isFinite(timer.executionStartedAt)) {
-    if (Number.isFinite(submittedAt) && submittedAt <= timer.executionStartedAt) timing.queueMs = Math.round(timer.executionStartedAt - submittedAt);
+    if (Number.isFinite(submittedAt) && submittedAt <= timer.executionStartedAt)
+      timing.queueMs = Math.round(timer.executionStartedAt - submittedAt);
     if (Number.isFinite(result.setupMs) && Number.isFinite(result.tailMs)) {
       timing.setupMs = Math.min(timing.runMs, Math.round(result.setupMs));
       timing.finishMs = Math.min(timing.runMs - timing.setupMs, Math.round(result.tailMs));
@@ -177,14 +197,18 @@ export function isWarm(history = [], key, now = Date.now()) {
 
 /** How fast a step's cost grows with work, from the sizes this model has run at. */
 export function workExponent(runs) {
-  const points = runs.filter((run) => run.stepMs > 0 && run.w > 0).map((run) => [Math.log(run.w), Math.log(run.stepMs)]);
+  const points = runs
+    .filter((run) => run.stepMs > 0 && run.w > 0)
+    .map((run) => [Math.log(run.w), Math.log(run.stepMs)]);
   if (points.length < 3) return DEFAULT_EXPONENT;
   const xs = points.map(([x]) => x);
   // Too little spread in size to tell growth from noise.
   if (Math.exp(Math.max(...xs) - Math.min(...xs)) < 1.8) return DEFAULT_EXPONENT;
   const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
   const my = points.reduce((a, [, y]) => a + y, 0) / points.length;
-  const slope = points.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) / points.reduce((a, [x]) => a + (x - mx) ** 2, 0);
+  const slope =
+    points.reduce((a, [x, y]) => a + (x - mx) * (y - my), 0) /
+    points.reduce((a, [x]) => a + (x - mx) ** 2, 0);
   return Math.min(1.6, Math.max(0.8, slope));
 }
 
@@ -204,7 +228,9 @@ export function estimateRun(history = [], body = {}, { now = Date.now(), warm: k
   // Too few runs of this file: other files of the same family here (an fp8 and an fp16 build) run alike.
   if (runs.length < need && body.family) {
     const kind = key.slice(0, key.indexOf(":") + 1);
-    const family = history.filter((run) => run.fam === body.family && run.key.startsWith(kind)).slice(-RUNS_PER_FAMILY);
+    const family = history
+      .filter((run) => run.fam === body.family && run.key.startsWith(kind))
+      .slice(-RUNS_PER_FAMILY);
     if (family.length >= need) runs = family;
   }
   if (runs.length < need) return null;
@@ -224,7 +250,11 @@ export function estimateRun(history = [], body = {}, { now = Date.now(), warm: k
     return close.length >= NEAR_RUNS ? close : pool;
   };
   // Misses at another size say little about this one: a few bad 2K guesses don't silence 1K.
-  const errorsOf = (pool) => pool.map((run) => run.error).filter(Number.isFinite).slice(-5);
+  const errorsOf = (pool) =>
+    pool
+      .map((run) => run.error)
+      .filter(Number.isFinite)
+      .slice(-5);
   const nearErrors = errorsOf(near(runs));
   const errors = nearErrors.length >= 2 ? nearErrors : errorsOf(runs);
   const trusted = errors.length < 2 || median(errors) <= TRUSTED_ERROR;
@@ -235,36 +265,80 @@ export function estimateRun(history = [], body = {}, { now = Date.now(), warm: k
     const stepMs = median(near(stepped).map((run) => run.stepMs / run.w ** k)) * w ** k;
     // A two-pass workflow samples more steps than the steps setting; keep its ratio.
     const asked = Number(body.steps) || 0;
-    const ratio = median(stepped.filter((run) => run.asked > 0).map((run) => run.steps / run.asked));
-    const steps = asked ? Math.round(asked * (ratio || 1)) : Math.round(median(stepped.map((run) => run.steps)));
-    const setupMs = median(setupPool.map((run) => run.setupMs).filter((ms) => ms !== null && ms !== undefined)) ?? 0;
+    const ratio = median(
+      stepped.filter((run) => run.asked > 0).map((run) => run.steps / run.asked),
+    );
+    const steps = asked
+      ? Math.round(asked * (ratio || 1))
+      : Math.round(median(stepped.map((run) => run.steps)));
+    const setupMs =
+      median(setupPool.map((run) => run.setupMs).filter((ms) => ms !== null && ms !== undefined)) ??
+      0;
     // Decoding in tiles (native 2K/4K) costs differently from one whole-frame decode.
     const decoded = stepped.filter((run) => Boolean(run.tiled) === variant.tiled);
-    const tailMs = (median(near(decoded.length >= NEAR_RUNS ? decoded : stepped).map((run) => run.tailMs / run.w)) ?? 0) * w;
+    const tailMs =
+      (median(
+        near(decoded.length >= NEAR_RUNS ? decoded : stepped).map((run) => run.tailMs / run.w),
+      ) ?? 0) * w;
     const totalMs = setupMs + steps * stepMs + tailMs;
-    return { totalMs: Math.round(totalMs), setupMs: Math.round(setupMs), stepMs, steps, tailMs: Math.round(tailMs), trusted, warm };
+    return {
+      totalMs: Math.round(totalMs),
+      setupMs: Math.round(setupMs),
+      stepMs,
+      steps,
+      tailMs: Math.round(tailMs),
+      trusted,
+      warm,
+    };
   }
   // No step reports from this workflow: scale whole runs by work instead.
   const perWork = median(near(setupPool).map((run) => run.runMs / run.w));
-  return perWork ? { totalMs: Math.round(perWork * w), setupMs: null, stepMs: null, steps: 0, tailMs: null, trusted, warm } : null;
+  return perWork
+    ? {
+        totalMs: Math.round(perWork * w),
+        setupMs: null,
+        stepMs: null,
+        steps: 0,
+        tailMs: null,
+        trusted,
+        warm,
+      }
+    : null;
 }
 
 /**
  * The history with one finished run added. `predicted` is what was estimated
  * before it started, so later estimates know how far off they have been.
  */
-export function addRun(history = [], { body, result, predicted = null, warm = false, at = new Date().toISOString() }) {
+export function addRun(
+  history = [],
+  { body, result, predicted = null, warm = false, at = new Date().toISOString() },
+) {
   const key = timingKey(body);
   const w = workUnits(body);
   if (!key || !w || !result?.runMs) return history;
-  const run = { key, at, w, asked: Number(body.steps) || 0, warm: Boolean(warm), runMs: Math.round(result.runMs) };
+  const run = {
+    key,
+    at,
+    w,
+    asked: Number(body.steps) || 0,
+    warm: Boolean(warm),
+    runMs: Math.round(result.runMs),
+  };
   // The family, so another file of it can borrow these timings until it has its own.
   if (body.family) run.fam = String(body.family);
   const variant = runVariant(body);
   if (variant.refs) run.refs = variant.refs;
   if (variant.tiled) run.tiled = 1;
-  if (result.stepMs) Object.assign(run, { stepMs: Math.round(result.stepMs * 10) / 10, steps: result.steps, setupMs: Math.round(result.setupMs), tailMs: Math.round(result.tailMs) });
-  if (predicted?.totalMs) run.error = Math.round((Math.abs(result.runMs - predicted.totalMs) / result.runMs) * 100) / 100;
+  if (result.stepMs)
+    Object.assign(run, {
+      stepMs: Math.round(result.stepMs * 10) / 10,
+      steps: result.steps,
+      setupMs: Math.round(result.setupMs),
+      tailMs: Math.round(result.tailMs),
+    });
+  if (predicted?.totalMs)
+    run.error = Math.round((Math.abs(result.runMs - predicted.totalMs) / result.runMs) * 100) / 100;
   const next = [...history, run];
   // Keep each model's latest runs at each size (and with or without images), and the whole file small.
   const counts = new Map();
@@ -305,5 +379,7 @@ export function remainingMs(timer, estimate, now = Date.now()) {
 
 /** Steps well slower than this model's usual: the sign of a GPU out of memory, not of loading. */
 export function slowSteps(result, estimate) {
-  return Boolean(result?.stepMs && estimate?.trusted && estimate.stepMs && result.stepMs > estimate.stepMs * 2.5);
+  return Boolean(
+    result?.stepMs && estimate?.trusted && estimate.stepMs && result.stepMs > estimate.stepMs * 2.5,
+  );
 }

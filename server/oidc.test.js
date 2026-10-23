@@ -13,14 +13,23 @@ const { createOidcClient, oidcConfigFromEnv } = await import("./oidc.js");
 const store = await import("./account-store.js");
 
 const issuer = "https://id.example.test";
-const config = { issuer, clientId: "studio", clientSecret: "", redirectUri: "https://studio.example.test/api/accounts/oidc/callback", label: "Pocket ID", scopes: "openid email profile" };
+const config = {
+  issuer,
+  clientId: "studio",
+  clientSecret: "",
+  redirectUri: "https://studio.example.test/api/accounts/oidc/callback",
+  label: "Pocket ID",
+  scopes: "openid email profile",
+};
 const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: "jwk" }), kid: "key-1", alg: "RS256", use: "sig" };
 
 function idToken(claims, { kid = "key-1", key = privateKey } = {}) {
   const header = Buffer.from(JSON.stringify({ alg: "RS256", kid })).toString("base64url");
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  const signature = crypto.sign("sha256", Buffer.from(`${header}.${payload}`), key).toString("base64url");
+  const signature = crypto
+    .sign("sha256", Buffer.from(`${header}.${payload}`), key)
+    .toString("base64url");
   return `${header}.${payload}.${signature}`;
 }
 
@@ -28,7 +37,13 @@ function provider(claimsFor) {
   const exchanges = [];
   const fetchImpl = async (url, init = {}) => {
     const target = String(url);
-    if (target === `${issuer}/.well-known/openid-configuration`) return Response.json({ issuer, authorization_endpoint: `${issuer}/authorize`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks` });
+    if (target === `${issuer}/.well-known/openid-configuration`)
+      return Response.json({
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        jwks_uri: `${issuer}/jwks`,
+      });
     if (target === `${issuer}/jwks`) return Response.json({ keys: [jwk] });
     if (target === `${issuer}/token`) {
       const body = new URLSearchParams(String(init.body));
@@ -41,20 +56,55 @@ function provider(claimsFor) {
 }
 
 const nonceOf = (url) => new URL(url).searchParams.get("nonce");
-const baseClaims = (nonce, extra = {}) => ({ iss: issuer, aud: "studio", sub: "subject-1", exp: Math.floor(Date.now() / 1000) + 300, nonce, email: "n@excloo.com", email_verified: true, ...extra });
+const baseClaims = (nonce, extra = {}) => ({
+  iss: issuer,
+  aud: "studio",
+  sub: "subject-1",
+  exp: Math.floor(Date.now() / 1000) + 300,
+  nonce,
+  email: "n@excloo.com",
+  email_verified: true,
+  ...extra,
+});
 
 test("configuration needs issuer, client and HTTPS callback", () => {
   assert.equal(oidcConfigFromEnv({}), null);
-  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: "http://id.example.test", STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }));
-  assert.equal(oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: `${issuer}/`, STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" }).issuer, issuer);
+  assert.throws(() =>
+    oidcConfigFromEnv({
+      STUDIO_OIDC_ISSUER: "http://id.example.test",
+      STUDIO_OIDC_CLIENT_ID: "studio",
+      STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb",
+    }),
+  );
+  assert.equal(
+    oidcConfigFromEnv({
+      STUDIO_OIDC_ISSUER: `${issuer}/`,
+      STUDIO_OIDC_CLIENT_ID: "studio",
+      STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb",
+    }).issuer,
+    issuer,
+  );
 });
 
 test("a partial single sign-on configuration fails and names what is missing", () => {
-  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: "studio" }), /STUDIO_OIDC_REDIRECT_URI/);
-  assert.throws(() => oidcConfigFromEnv({ STUDIO_OIDC_LABEL: "Pocket ID" }), /STUDIO_OIDC_ISSUER, STUDIO_OIDC_CLIENT_ID, STUDIO_OIDC_REDIRECT_URI/);
-  const complete = { STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: "studio", STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb" };
+  assert.throws(
+    () => oidcConfigFromEnv({ STUDIO_OIDC_ISSUER: issuer, STUDIO_OIDC_CLIENT_ID: "studio" }),
+    /STUDIO_OIDC_REDIRECT_URI/,
+  );
+  assert.throws(
+    () => oidcConfigFromEnv({ STUDIO_OIDC_LABEL: "Pocket ID" }),
+    /STUDIO_OIDC_ISSUER, STUDIO_OIDC_CLIENT_ID, STUDIO_OIDC_REDIRECT_URI/,
+  );
+  const complete = {
+    STUDIO_OIDC_ISSUER: issuer,
+    STUDIO_OIDC_CLIENT_ID: "studio",
+    STUDIO_OIDC_REDIRECT_URI: "https://studio.example.test/cb",
+  };
   assert.equal(oidcConfigFromEnv(complete).label, "Single Sign-On");
-  assert.equal(oidcConfigFromEnv({ ...complete, STUDIO_OIDC_LABEL: "Pocket ID" }).label, "Pocket ID");
+  assert.equal(
+    oidcConfigFromEnv({ ...complete, STUDIO_OIDC_LABEL: "Pocket ID" }).label,
+    "Pocket ID",
+  );
 });
 
 test("a PKCE sign-in verifies the signed identity token once", async () => {
@@ -66,9 +116,15 @@ test("a PKCE sign-in verifies the signed identity token once", async () => {
   assert.equal(params.get("code_challenge_method"), "S256");
   assert.equal(params.get("redirect_uri"), config.redirectUri);
   const identity = await client.finish({ code: "code-1", state, expectedState: state });
-  assert.deepEqual([identity.subject, identity.email, identity.emailVerified], ["subject-1", "n@excloo.com", true]);
+  assert.deepEqual(
+    [identity.subject, identity.email, identity.emailVerified],
+    ["subject-1", "n@excloo.com", true],
+  );
   const verifier = exchanges[0].get("code_verifier");
-  assert.equal(crypto.createHash("sha256").update(verifier).digest("base64url"), params.get("code_challenge"));
+  assert.equal(
+    crypto.createHash("sha256").update(verifier).digest("base64url"),
+    params.get("code_challenge"),
+  );
   await assert.rejects(client.finish({ code: "code-1", state, expectedState: state }), /expired/);
 });
 
@@ -78,8 +134,11 @@ test("forged, mismatched or stale identity tokens are refused", async () => {
     ["wrong signature", (nonce) => idToken(baseClaims(nonce), { key: otherKey })],
     ["wrong audience", (nonce) => idToken(baseClaims(nonce, { aud: "someone-else" }))],
     ["wrong issuer", (nonce) => idToken(baseClaims(nonce, { iss: "https://evil.example.test" }))],
-    ["expired", (nonce) => idToken(baseClaims(nonce, { exp: Math.floor(Date.now() / 1000) - 3600 }))],
-    ["wrong nonce", () => idToken(baseClaims("another-nonce"))]
+    [
+      "expired",
+      (nonce) => idToken(baseClaims(nonce, { exp: Math.floor(Date.now() / 1000) - 3600 })),
+    ],
+    ["wrong nonce", () => idToken(baseClaims("another-nonce"))],
   ]) {
     let nonce = "";
     const { client } = provider(() => make(nonce));
@@ -89,29 +148,80 @@ test("forged, mismatched or stale identity tokens are refused", async () => {
   }
   const { client } = provider(() => "");
   const { state } = await client.start();
-  await assert.rejects(client.finish({ code: "c", state, expectedState: "a-different-browser" }), /started elsewhere/);
+  await assert.rejects(
+    client.finish({ code: "c", state, expectedState: "a-different-browser" }),
+    /started elsewhere/,
+  );
 });
 
 test("verified emails link to matching accounts; other identities wait for approval", async () => {
-  store.saveAccessProfile({ id: "artists", name: "Artists", generationProfiles: ["image-fast"], features: { gallery: true } }, ["image-fast"]);
-  const legacy = await store.createLocalAccount({ username: "n@excloo.com", password: "a legacy studio password", accessProfileId: "artists" });
-  const linked = store.signInWithOidcIdentity({ issuer, subject: "subject-1", email: "N@excloo.com", emailVerified: true });
+  store.saveAccessProfile(
+    {
+      id: "artists",
+      name: "Artists",
+      generationProfiles: ["image-fast"],
+      features: { gallery: true },
+    },
+    ["image-fast"],
+  );
+  const legacy = await store.createLocalAccount({
+    username: "n@excloo.com",
+    password: "a legacy studio password",
+    accessProfileId: "artists",
+  });
+  const linked = store.signInWithOidcIdentity({
+    issuer,
+    subject: "subject-1",
+    email: "N@excloo.com",
+    emailVerified: true,
+  });
   assert.equal(linked.access.userId, legacy.id);
   // The link is by subject from now on, even if the email changes.
-  assert.equal(store.signInWithOidcIdentity({ issuer, subject: "subject-1", email: "changed@example.test", emailVerified: true }).access.userId, legacy.id);
+  assert.equal(
+    store.signInWithOidcIdentity({
+      issuer,
+      subject: "subject-1",
+      email: "changed@example.test",
+      emailVerified: true,
+    }).access.userId,
+    legacy.id,
+  );
 
-  const unverified = store.signInWithOidcIdentity({ issuer, subject: "subject-2", email: "studio", emailVerified: false });
+  const unverified = store.signInWithOidcIdentity({
+    issuer,
+    subject: "subject-2",
+    email: "studio",
+    emailVerified: false,
+  });
   assert.equal(unverified.pending, true);
   const pending = store.listAccounts().find((account) => account.pending);
   assert.match(pending.username, /^oidc-/);
   assert.equal(pending.role, "user");
   store.assignAccessProfile(pending.id, "artists");
-  assert.equal(store.signInWithOidcIdentity({ issuer, subject: "subject-2" }).access.userId, pending.id);
+  assert.equal(
+    store.signInWithOidcIdentity({ issuer, subject: "subject-2" }).access.userId,
+    pending.id,
+  );
 
   // A matching email never links an administrator; that identity waits as its own pending account.
-  await store.createLocalAccount({ username: "admin@excloo.com", password: "an administrator password", role: "administrator" });
-  assert.equal(store.signInWithOidcIdentity({ issuer, subject: "attacker", email: "admin@excloo.com", emailVerified: true }).pending, true);
-  assert.equal(store.listAccounts().find((account) => account.username === "admin@excloo.com").signInLinked, undefined);
+  await store.createLocalAccount({
+    username: "admin@excloo.com",
+    password: "an administrator password",
+    role: "administrator",
+  });
+  assert.equal(
+    store.signInWithOidcIdentity({
+      issuer,
+      subject: "attacker",
+      email: "admin@excloo.com",
+      emailVerified: true,
+    }).pending,
+    true,
+  );
+  assert.equal(
+    store.listAccounts().find((account) => account.username === "admin@excloo.com").signInLinked,
+    undefined,
+  );
 
   store.setAccountDisabled(legacy.id, true);
   assert.equal(store.signInWithOidcIdentity({ issuer, subject: "subject-1" }).refused, true);

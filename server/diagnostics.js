@@ -8,7 +8,12 @@ import os from "node:os";
  */
 
 /** A readable name for this system, with its version where the system says it. */
-export function systemName({ platform = process.platform, release = os.release(), version = typeof os.version === "function" ? os.version() : "", readFile = (file) => fs.readFileSync(file, "utf8") } = {}) {
+export function systemName({
+  platform = process.platform,
+  release = os.release(),
+  version = typeof os.version === "function" ? os.version() : "",
+  readFile = (file) => fs.readFileSync(file, "utf8"),
+} = {}) {
   if (platform === "win32") return `${version || "Windows"} (${release})`;
   if (platform === "darwin") return `macOS (Darwin ${release})`;
   if (platform === "linux") {
@@ -23,13 +28,22 @@ export function systemName({ platform = process.platform, release = os.release()
   return `${platform} ${release}`;
 }
 
-const gigabytes = (bytes) => (Number(bytes) > 0 ? `${(Number(bytes) / 1024 ** 3).toFixed(1)} GB` : "");
+const gigabytes = (bytes) =>
+  Number(bytes) > 0 ? `${(Number(bytes) / 1024 ** 3).toFixed(1)} GB` : "";
 
 /**
  * The facts, as data. `stats` is ComfyUI's /system_stats, or null when it
  * did not answer; `comfyBusy` when it took the connection but answered too late.
  */
-export function diagnostics({ version = "", install = "", stats = null, comfyBusy = false, comfyLocal = true, platform = process.platform, arch = process.arch } = {}) {
+export function diagnostics({
+  version = "",
+  install = "",
+  stats = null,
+  comfyBusy = false,
+  comfyLocal = true,
+  platform = process.platform,
+  arch = process.arch,
+} = {}) {
   const system = stats?.system || {};
   const devices = Array.isArray(stats?.devices) ? stats.devices : [];
   return {
@@ -38,20 +52,20 @@ export function diagnostics({ version = "", install = "", stats = null, comfyBus
     system: { name: systemName({ platform }), platform, arch, memoryBytes: os.totalmem() },
     comfy: stats
       ? {
-        reachable: true,
-        local: Boolean(comfyLocal),
-        version: String(system.comfyui_version || ""),
-        python: String(system.python_version || "").split(" ")[0],
-        pytorch: String(system.pytorch_version || ""),
-        embeddedPython: Boolean(system.embedded_python),
-        devices: devices.map((device) => ({
-          name: String(device.name || ""),
-          type: String(device.type || ""),
-          vramBytes: Number(device.vram_total) || 0,
-          vramFreeBytes: Number(device.vram_free) || 0
-        }))
-      }
-      : { reachable: false, busy: Boolean(comfyBusy), local: Boolean(comfyLocal) }
+          reachable: true,
+          local: Boolean(comfyLocal),
+          version: String(system.comfyui_version || ""),
+          python: String(system.python_version || "").split(" ")[0],
+          pytorch: String(system.pytorch_version || ""),
+          embeddedPython: Boolean(system.embedded_python),
+          devices: devices.map((device) => ({
+            name: String(device.name || ""),
+            type: String(device.type || ""),
+            vramBytes: Number(device.vram_total) || 0,
+            vramFreeBytes: Number(device.vram_free) || 0,
+          })),
+        }
+      : { reachable: false, busy: Boolean(comfyBusy), local: Boolean(comfyLocal) },
   };
 }
 
@@ -61,19 +75,35 @@ export function diagnosticsText(report) {
   const lines = [
     `Studio ${studio.version || "(unknown version)"}${studio.install ? ` (${studio.install})` : ""}`,
     `Node.js ${node}`,
-    `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`
+    `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`,
   ];
   if (!comfy.reachable) {
     const where = comfy.local ? "on this computer" : "on another computer";
-    lines.push(comfy.busy ? `ComfyUI: busy, no answer within 10 s (${where})` : `ComfyUI: not answering (${where})`);
+    lines.push(
+      comfy.busy
+        ? `ComfyUI: busy, no answer within 10 s (${where})`
+        : `ComfyUI: not answering (${where})`,
+    );
     return lines.join("\n");
   }
-  const runtime = [comfy.python && `Python ${comfy.python}`, comfy.pytorch && `PyTorch ${comfy.pytorch}`, comfy.embeddedPython && "portable"].filter(Boolean).join(", ");
-  lines.push(`ComfyUI ${comfy.version || "(unknown version)"}, ${comfy.local ? "on this computer" : "on another computer"}${runtime ? `; ${runtime}` : ""}`);
+  const runtime = [
+    comfy.python && `Python ${comfy.python}`,
+    comfy.pytorch && `PyTorch ${comfy.pytorch}`,
+    comfy.embeddedPython && "portable",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  lines.push(
+    `ComfyUI ${comfy.version || "(unknown version)"}, ${comfy.local ? "on this computer" : "on another computer"}${runtime ? `; ${runtime}` : ""}`,
+  );
   if (!comfy.devices.length) lines.push("GPU: none reported");
   for (const device of comfy.devices) {
-    const memory = device.vramBytes ? `, ${gigabytes(device.vramBytes)} VRAM${device.vramFreeBytes ? ` (${gigabytes(device.vramFreeBytes)} free)` : ""}` : "";
-    lines.push(`GPU: ${device.name || "unnamed"}${device.type ? ` [${device.type}]` : ""}${memory}`);
+    const memory = device.vramBytes
+      ? `, ${gigabytes(device.vramBytes)} VRAM${device.vramFreeBytes ? ` (${gigabytes(device.vramFreeBytes)} free)` : ""}`
+      : "";
+    lines.push(
+      `GPU: ${device.name || "unnamed"}${device.type ? ` [${device.type}]` : ""}${memory}`,
+    );
   }
   return lines.join("\n");
 }

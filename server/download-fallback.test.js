@@ -12,11 +12,21 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { downloadState, setDownloadTransport, startDownload } = await import("./model-downloads.js");
 const { catalogDownload, downloadSource } = await import("./family-profiles.js");
 
-const spec = (file, extra = {}) => ({ id: `encoder:test:${file}`, file, folder: "text_encoders", label: "Test encoder", url: `https://huggingface.co/x/y/resolve/main/${file}`, bytes: 10, ...extra });
+const spec = (file, extra = {}) => ({
+  id: `encoder:test:${file}`,
+  file,
+  folder: "text_encoders",
+  label: "Test encoder",
+  url: `https://huggingface.co/x/y/resolve/main/${file}`,
+  bytes: 10,
+  ...extra,
+});
 
 async function settle(file) {
   for (let i = 0; i < 200; i += 1) {
-    const done = downloadState().recent.find((item) => item.file === file && item.status !== "queued");
+    const done = downloadState().recent.find(
+      (item) => item.file === file && item.status !== "queued",
+    );
     if (done) return done;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -29,12 +39,16 @@ test("a catalog entry carries the other builds of its part, and who publishes ea
   assert.equal(first.alternatives[0].id, "encoder:qwen3_4b:1");
   assert.equal(catalogDownload("encoder:qwen3_4b:1").alternatives.length, 0);
   assert.equal(catalogDownload("encoder:qwen3_4b:x"), null);
-  assert.deepEqual(downloadSource(first.alternatives[0].url), { source: "Comfy-Org", repo: "Comfy-Org/z_image_turbo" });
+  assert.deepEqual(downloadSource(first.alternatives[0].url), {
+    source: "Comfy-Org",
+    repo: "Comfy-Org/z_image_turbo",
+  });
 });
 
 test("a build gone from its address falls back to the next one by itself", async () => {
   setDownloadTransport(async (entry, _signal, { targetFor, finishDownload, finalError }) => {
-    if (entry.file === "gone.safetensors") throw finalError(`${entry.file} is no longer at its download address (HTTP 404).`);
+    if (entry.file === "gone.safetensors")
+      throw finalError(`${entry.file} is no longer at its download address (HTTP 404).`);
     const { partial, target, note } = targetFor(entry);
     fs.writeFileSync(partial, "0123456789");
     finishDownload(entry, partial, target, note);
@@ -51,15 +65,24 @@ test("the build a download falls back to is still checked against its own checks
   const seen = [];
   setDownloadTransport(async (entry, _signal, { targetFor, finishDownload, finalError }) => {
     seen.push({ file: entry.file, sha256: entry.sha256 });
-    if (entry.file === "missing.safetensors") throw finalError(`${entry.file} is no longer at its download address (HTTP 404).`);
+    if (entry.file === "missing.safetensors")
+      throw finalError(`${entry.file} is no longer at its download address (HTTP 404).`);
     const { partial, target, note } = targetFor(entry);
     fs.writeFileSync(partial, "0123456789");
     finishDownload(entry, partial, target, note);
   });
   const sha = "ab".repeat(32);
-  startDownload(spec("missing.safetensors", { sha256: "cd".repeat(32), alternatives: [spec("checked.safetensors", { sha256: sha.toUpperCase() })] }));
+  startDownload(
+    spec("missing.safetensors", {
+      sha256: "cd".repeat(32),
+      alternatives: [spec("checked.safetensors", { sha256: sha.toUpperCase() })],
+    }),
+  );
   await settle("checked.safetensors");
-  assert.deepEqual(seen.find((item) => item.file === "checked.safetensors"), { file: "checked.safetensors", sha256: sha });
+  assert.deepEqual(
+    seen.find((item) => item.file === "checked.safetensors"),
+    { file: "checked.safetensors", sha256: sha },
+  );
   setDownloadTransport(null);
 });
 

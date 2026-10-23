@@ -21,19 +21,42 @@ const socketsBuiltIn = typeof WebSocket === "function";
 
 function sdxlRequest(overrides = {}) {
   return {
-    kind: "image", family: "sdxl", variant: "standard", source: "checkpoint", workflow: "family:sdxl",
-    profileId: "image:checkpoint:sd_xl_base_1.0.safetensors", model: "sd_xl_base_1.0.safetensors",
-    bundled: { encoder: true, vae: true }, encoders: [], vae: "",
-    prompt: "a lighthouse in fog", negative: "", width: 1024, height: 1024, count: 1,
-    steps: 4, cfg: 7, sampler: "euler", scheduler: "normal", seed: "1234", weightDtype: "default",
-    ...overrides
+    kind: "image",
+    family: "sdxl",
+    variant: "standard",
+    source: "checkpoint",
+    workflow: "family:sdxl",
+    profileId: "image:checkpoint:sd_xl_base_1.0.safetensors",
+    model: "sd_xl_base_1.0.safetensors",
+    bundled: { encoder: true, vae: true },
+    encoders: [],
+    vae: "",
+    prompt: "a lighthouse in fog",
+    negative: "",
+    width: 1024,
+    height: 1024,
+    count: 1,
+    steps: 4,
+    cfg: 7,
+    sampler: "euler",
+    scheduler: "normal",
+    seed: "1234",
+    weightDtype: "default",
+    ...overrides,
   };
 }
 
 function queue(id, body) {
   const items = store.makePendingItems(id, body);
   store.setGallery([...items, ...store.gallery], { persist: false });
-  jobs.set(id, { status: "queued", kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: Date.now() });
+  jobs.set(id, {
+    status: "queued",
+    kind: body.kind,
+    prompt: body.prompt,
+    outputs: [],
+    items,
+    startedAt: Date.now(),
+  });
 }
 
 const waitFor = async (check, what, ms = 5000) => {
@@ -60,7 +83,10 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   if (socketsBuiltIn) {
     await fake.socketFor(id);
     fake.send(id, { type: "execution_start", data: { prompt_id: prompt.id } });
-    fake.send(id, { type: "progress", data: { value: 2, max: 4, prompt_id: prompt.id, node: sampler[0] } });
+    fake.send(id, {
+      type: "progress",
+      data: { value: 2, max: 4, prompt_id: prompt.id, node: sampler[0] },
+    });
     await waitFor(() => jobs.get(id)?.progress?.value === 2, "progress from the socket");
     assert.equal(jobs.get(id).status, "running");
     assert.equal(store.gallery.find((item) => item.jobId === id).progress.max, 4);
@@ -68,8 +94,13 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   }
 
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
-  fake.finish(prompt.id, { outputs: { [save]: { images: [{ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" }] } } });
-  if (socketsBuiltIn) fake.send(id, { type: "executing", data: { node: null, prompt_id: prompt.id } });
+  fake.finish(prompt.id, {
+    outputs: {
+      [save]: { images: [{ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" }] },
+    },
+  });
+  if (socketsBuiltIn)
+    fake.send(id, { type: "executing", data: { node: null, prompt_id: prompt.id } });
   await running;
 
   const job = jobs.get(id);
@@ -78,7 +109,10 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   const item = store.gallery.find((entry) => entry.jobId === id);
   assert.equal(item.status, "done");
   assert.equal(item.url, "/comfy/view?filename=image_00001_.png&subfolder=heiss-ui&type=output");
-  assert.equal(item.thumbnailUrl, "/comfy/thumb?filename=image_00001_.png&subfolder=heiss-ui&type=output");
+  assert.equal(
+    item.thumbnailUrl,
+    "/comfy/thumb?filename=image_00001_.png&subfolder=heiss-ui&type=output",
+  );
   assert.equal(item.settings.steps, 4);
 });
 
@@ -89,7 +123,15 @@ test("a run ComfyUI fails is kept as a failure that says why", async () => {
   const queued = fake.nextPrompt();
   const running = runJob(id, body);
   const prompt = await queued;
-  fake.finish(prompt.id, { error: { exception_message: "Allocation on device 0 would exceed allowed memory. (out of memory)", exception_type: "torch.OutOfMemoryError", node_type: "KSampler", node_id: "5", traceback: ["line 1\n"] } });
+  fake.finish(prompt.id, {
+    error: {
+      exception_message: "Allocation on device 0 would exceed allowed memory. (out of memory)",
+      exception_type: "torch.OutOfMemoryError",
+      node_type: "KSampler",
+      node_id: "5",
+      traceback: ["line 1\n"],
+    },
+  });
   await running;
   const job = jobs.get(id);
   assert.equal(job.status, "error");

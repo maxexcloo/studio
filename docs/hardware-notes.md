@@ -12,14 +12,14 @@ be the one running HEISS UI). For its first device it reports `name`, `type`,
 ([`server.py`](https://github.com/comfyanonymous/ComfyUI/blob/master/server.py),
 `/system_stats`).
 
-| GPU | What ComfyUI reports | HEISS budget |
-| --- | --- | --- |
-| NVIDIA | `type: "cuda"`, name like `cuda:0 NVIDIA GeForce RTX 4090 : cudaMallocAsync`, `vram_total` from `torch.cuda.mem_get_info` | `vram_total` |
-| AMD (ROCm) | Also `type: "cuda"`; the name says `AMD Radeon …` | `vram_total` |
-| Intel Arc | `type: "xpu"` | `vram_total` |
-| Apple Silicon | `type: "mps"`, name `mps`, and **all of the unified memory** as VRAM | see below |
-| DirectML | a placeholder 1 GB (`#TODO` in ComfyUI) | none |
-| CPU | `type: "cpu"` | none |
+| GPU           | What ComfyUI reports                                                                                                      | HEISS budget |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| NVIDIA        | `type: "cuda"`, name like `cuda:0 NVIDIA GeForce RTX 4090 : cudaMallocAsync`, `vram_total` from `torch.cuda.mem_get_info` | `vram_total` |
+| AMD (ROCm)    | Also `type: "cuda"`; the name says `AMD Radeon …`                                                                         | `vram_total` |
+| Intel Arc     | `type: "xpu"`                                                                                                             | `vram_total` |
+| Apple Silicon | `type: "mps"`, name `mps`, and **all of the unified memory** as VRAM                                                      | see below    |
+| DirectML      | a placeholder 1 GB (`#TODO` in ComfyUI)                                                                                   | none         |
+| CPU           | `type: "cpu"`                                                                                                             | none         |
 
 Budgets count in binary gigabytes, the way graphics cards are sold (a "24 GB"
 card reports 24 GiB). Download sizes stay decimal, like Finder and Explorer.

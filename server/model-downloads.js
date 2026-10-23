@@ -1,15 +1,22 @@
-import { remoteModelsEnabled, workerInventory, workerCopy, workerModelFile, refreshWorkerModels, uploadWorkerModel } from './worker-models.js';
+import {
+  remoteModelsEnabled,
+  workerInventory,
+  workerCopy,
+  workerModelFile,
+  refreshWorkerModels,
+  uploadWorkerModel,
+} from "./worker-models.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { comfyModelsDir, comfyUrl, modelFolders } from './comfy.js';
+import { comfyModelsDir, comfyUrl, modelFolders } from "./comfy.js";
 import { removeJsonFile, renameWithRetry, writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
-import { civitaiFetch } from './civitai-access.js';
+import { civitaiFetch } from "./civitai-access.js";
 
 /**
  * Fetches catalogue files and verified provider files into ComfyUI's folders.
@@ -26,7 +33,14 @@ import { civitaiFetch } from './civitai-access.js';
  * put where ComfyUI reads it.
  */
 
-const allowedFolders = new Set(["text_encoders", "vae", "diffusion_models", "checkpoints", "loras", "clip_vision"]);
+const allowedFolders = new Set([
+  "text_encoders",
+  "vae",
+  "diffusion_models",
+  "checkpoints",
+  "loras",
+  "clip_vision",
+]);
 const allowedHosts = new Set(["civitai.com", "huggingface.co"]);
 
 let queue = [];
@@ -48,27 +62,35 @@ export function downloadState() {
   return {
     // Retain the existing capability field for clients; backend names the selected storage.
     local: remoteModelsEnabled() || Boolean(comfyModelsDir()),
-    backend: remoteModelsEnabled() ? 'worker' : 'local',
+    backend: remoteModelsEnabled() ? "worker" : "local",
     active: snapshot(active),
     queued: queue.map(snapshot),
     recent: recent.map(snapshot),
     paused: pausedDownloads(),
-    space: downloadSpace()
+    space: downloadSpace(),
   };
 }
 
 /** Half-finished files on disk that nothing is fetching right now, from their .part.json notes. */
 function pausedDownloads() {
   if (remoteModelsEnabled()) {
-    const busy = new Set([active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`));
+    const busy = new Set(
+      [active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`),
+    );
     return workerInventory().paused.filter((entry) => !busy.has(`${entry.folder}/${entry.file}`));
   }
-  const busy = new Set([active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`));
+  const busy = new Set(
+    [active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`),
+  );
   const found = [];
   for (const folder of allowedFolders) {
     for (const dir of folderDirs(folder)) {
       let names = [];
-      try { names = fs.readdirSync(dir); } catch { continue; }
+      try {
+        names = fs.readdirSync(dir);
+      } catch {
+        continue;
+      }
       for (const name of names) {
         if (!name.endsWith(".part.json")) continue;
         const file = name.slice(0, -".part.json".length);
@@ -77,7 +99,15 @@ function pausedDownloads() {
         if (!received) continue;
         try {
           const note = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
-          found.push({ id: String(note.id || ""), file, folder, label: String(note.label || file), status: "paused", receivedBytes: received, totalBytes: Number(note.totalBytes || 0) });
+          found.push({
+            id: String(note.id || ""),
+            file,
+            folder,
+            label: String(note.label || file),
+            status: "paused",
+            receivedBytes: received,
+            totalBytes: Number(note.totalBytes || 0),
+          });
         } catch {
           // A note that cannot be read just means that file starts over.
         }
@@ -94,23 +124,48 @@ function remember(entry) {
 }
 
 function targetFor(spec) {
-  const modelsDir = remoteModelsEnabled() ? '' : comfyModelsDir();
-  if (!modelsDir && !remoteModelsEnabled()) throw new Error("Connect a Studio worker with model management or configure a local ComfyUI model folder.");
-  if (!allowedFolders.has(spec.folder)) throw new Error("That file doesn’t belong in a ComfyUI model folder.");
+  const modelsDir = remoteModelsEnabled() ? "" : comfyModelsDir();
+  if (!modelsDir && !remoteModelsEnabled())
+    throw new Error(
+      "Connect a Studio worker with model management or configure a local ComfyUI model folder.",
+    );
+  if (!allowedFolders.has(spec.folder))
+    throw new Error("That file doesn’t belong in a ComfyUI model folder.");
   const name = path.basename(String(spec.file || ""));
-  if (!name || name !== spec.file || !/\.(safetensors|gguf)$/i.test(name)) throw new Error("That isn’t a downloadable model file.");
+  if (!name || name !== spec.file || !/\.(safetensors|gguf)$/i.test(name))
+    throw new Error("That isn’t a downloadable model file.");
   const url = new URL(spec.url);
-  if (url.protocol !== "https:" || !allowedHosts.has(url.hostname) || url.username || url.password || (url.port && url.port !== '443')) throw new Error("Only Civitai and Hugging Face downloads are supported.");
+  if (
+    url.protocol !== "https:" ||
+    !allowedHosts.has(url.hostname) ||
+    url.username ||
+    url.password ||
+    (url.port && url.port !== "443")
+  )
+    throw new Error("Only Civitai and Hugging Face downloads are supported.");
   if (remoteModelsEnabled()) return { dir: "" };
   // Land it where ComfyUI itself reads that kind from, so it shows up without a restart.
   const dirs = folderDirs(spec.folder);
-  const dir = dirs.find((item) => path.basename(item) === spec.folder) || dirs[0] || path.join(modelsDir, spec.folder);
-  return { dir, target: path.join(dir, name), partial: path.join(dir, `${name}.part`), note: path.join(dir, `${name}.part.json`) };
+  const dir =
+    dirs.find((item) => path.basename(item) === spec.folder) ||
+    dirs[0] ||
+    path.join(modelsDir, spec.folder);
+  return {
+    dir,
+    target: path.join(dir, name),
+    partial: path.join(dir, `${name}.part`),
+    note: path.join(dir, `${name}.part.json`),
+  };
 }
 
 /** ComfyUI's own folders for this kind first (extra_model_paths.yaml included), then models/<folder>. */
 function folderDirs(folder) {
-  const subfolders = folder === "text_encoders" ? ["text_encoders", "clip"] : folder === "diffusion_models" ? ["diffusion_models", "unet"] : [folder];
+  const subfolders =
+    folder === "text_encoders"
+      ? ["text_encoders", "clip"]
+      : folder === "diffusion_models"
+        ? ["diffusion_models", "unet"]
+        : [folder];
   return modelFolders(folder, subfolders);
 }
 
@@ -120,7 +175,8 @@ function folderDirs(folder) {
  * a file someone has since deleted.
  */
 export function existingCopy(spec) {
-  if (remoteModelsEnabled()) return workerCopy(spec)?.size > 0 ? `worker:${spec.folder}/${spec.file}` : "";
+  if (remoteModelsEnabled())
+    return workerCopy(spec)?.size > 0 ? `worker:${spec.folder}/${spec.file}` : "";
   for (const dir of folderDirs(spec.folder)) {
     const file = path.join(dir, spec.file);
     if (fileSize(file) > 0) return file;
@@ -137,7 +193,9 @@ export function repositoryPage(url = "") {
   try {
     const parsed = new URL(url);
     const [owner, repo, kind] = parsed.pathname.split("/").filter(Boolean);
-    return owner && repo && ["resolve", "blob"].includes(kind) ? `${parsed.origin}/${owner}/${repo}` : "";
+    return owner && repo && ["resolve", "blob"].includes(kind)
+      ? `${parsed.origin}/${owner}/${repo}`
+      : "";
   } catch {
     return "";
   }
@@ -153,8 +211,11 @@ function finalError(message, { browser = false } = {}) {
 /** A dropped or refused connection, as undici reports it, rather than an answer from the server. */
 export function isNetworkError(error) {
   const code = error?.code || error?.cause?.code || "";
-  return error instanceof TypeError || /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|UND_ERR_\w+)$/.test(code)
-    || /terminated|fetch failed|socket|other side closed/i.test(error?.message || "");
+  return (
+    error instanceof TypeError ||
+    /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|UND_ERR_\w+)$/.test(code) ||
+    /terminated|fetch failed|socket|other side closed/i.test(error?.message || "")
+  );
 }
 
 // Decimal, like the setup panel and the file browser on a Mac.
@@ -168,17 +229,30 @@ const retryDelaysMs = [2000, 5000, 12000];
 function wait(ms, signal) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
-    signal.addEventListener("abort", () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
   });
 }
 
 function fileSize(file) {
-  try { return fs.statSync(file).size; } catch { return 0; }
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return 0;
+  }
 }
 
 /** The catalog's published SHA-256 for a file, lower case, or "" when it has none. */
 function catalogSha256(spec) {
-  return /^[0-9a-f]{64}$/i.test(String(spec?.sha256 || "")) ? String(spec.sha256).toLowerCase() : "";
+  return /^[0-9a-f]{64}$/i.test(String(spec?.sha256 || ""))
+    ? String(spec.sha256).toLowerCase()
+    : "";
 }
 
 /** Queue one catalog file. Returns the queued entry, or the running one if it is already going. */
@@ -191,7 +265,17 @@ export function startDownload(spec) {
   const existing = existingCopy(spec);
   if (existing && !remoteModelsEnabled()) {
     const size = remoteModelsEnabled() ? workerCopy(spec).size : fileSize(existing);
-    const done = { id: spec.id, file: spec.file, folder: spec.folder, label: spec.label || spec.file, status: "done", already: true, receivedBytes: size, totalBytes: size, finishedAt: Date.now() };
+    const done = {
+      id: spec.id,
+      file: spec.file,
+      folder: spec.folder,
+      label: spec.label || spec.file,
+      status: "done",
+      already: true,
+      receivedBytes: size,
+      totalBytes: size,
+      finishedAt: Date.now(),
+    };
     remember(done);
     return done;
   }
@@ -211,7 +295,7 @@ export function startDownload(spec) {
     queuedAt: Date.now(),
     error: "",
     // Other builds of the same part, tried in order if this one is gone or gated.
-    alternatives: Array.isArray(spec.alternatives) ? spec.alternatives : []
+    alternatives: Array.isArray(spec.alternatives) ? spec.alternatives : [],
   };
   queue.push(entry);
   pump();
@@ -238,7 +322,10 @@ async function pump() {
   active.status = "downloading";
   active.startedAt = Date.now();
   const signal = active.controller.signal;
-  const attempt = () => (transport ? transport(active, signal, { targetFor, finishDownload, finalError, fileSize }) : fetchInto(active, signal));
+  const attempt = () =>
+    transport
+      ? transport(active, signal, { targetFor, finishDownload, finalError, fileSize })
+      : fetchInto(active, signal);
   try {
     for (let retry = 0; ; retry += 1) {
       try {
@@ -255,11 +342,16 @@ async function pump() {
   } catch (error) {
     const canceled = signal.aborted;
     active.status = canceled ? "paused" : "error";
-    const percent = active.totalBytes ? Math.floor((active.receivedBytes / active.totalBytes) * 100) : 0;
-    active.error = canceled ? ""
-      : error?.code === "ENOSPC" ? "The disk is full. Free some space and try again. The download resumes where it stopped."
-      : isNetworkError(error) ? `The connection to Hugging Face kept dropping${percent ? ` at ${percent}%` : ""}. Check the internet connection and try again. The download resumes where it stopped.`
-      : error.message || "Download failed.";
+    const percent = active.totalBytes
+      ? Math.floor((active.receivedBytes / active.totalBytes) * 100)
+      : 0;
+    active.error = canceled
+      ? ""
+      : error?.code === "ENOSPC"
+        ? "The disk is full. Free some space and try again. The download resumes where it stopped."
+        : isNetworkError(error)
+          ? `The connection to Hugging Face kept dropping${percent ? ` at ${percent}%` : ""}. Check the internet connection and try again. The download resumes where it stopped.`
+          : error.message || "Download failed.";
     // Retrying only helps when the network was the problem.
     active.retryable = canceled || !error?.final;
     active.needsBrowser = Boolean(error?.browser);
@@ -282,8 +374,12 @@ async function pump() {
 
 /** Gone from its address (404, 410) or gated (401, 403): another build of the part may still be there. */
 function unavailable(error) {
-  const status = Number(error?.status) || Number(/\b(?:HTTP|answered) (\d{3})\b/.exec(error?.message || "")?.[1] || 0);
-  return Boolean(error?.browser) || status === 404 || status === 410 || status === 401 || status === 403;
+  const status =
+    Number(error?.status) ||
+    Number(/\b(?:HTTP|answered) (\d{3})\b/.exec(error?.message || "")?.[1] || 0);
+  return (
+    Boolean(error?.browser) || status === 404 || status === 410 || status === 401 || status === 403
+  );
 }
 
 /**
@@ -298,14 +394,30 @@ function fallbackFor(failed) {
     const spec = rest.shift();
     const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
     if (queue.some(same)) return null;
-    try { targetFor(spec); } catch { continue; }
+    try {
+      targetFor(spec);
+    } catch {
+      continue;
+    }
     if (existingCopy(spec)) return null;
     return {
       ...(failed.workerUrl ? { workerUrl: failed.workerUrl } : {}),
       // Checked against its own published checksum, like the build it stands in for.
-      id: spec.id, file: spec.file, folder: spec.folder, label: spec.label || spec.file, url: spec.url, sha256: catalogSha256(spec), dir: targetFor(spec).dir,
-      status: "queued", receivedBytes: 0, totalBytes: Number(spec.bytes || 0), bytesPerSecond: 0, queuedAt: Date.now(), error: "",
-      alternatives: rest, fallbackFrom: failed.file
+      id: spec.id,
+      file: spec.file,
+      folder: spec.folder,
+      label: spec.label || spec.file,
+      url: spec.url,
+      sha256: catalogSha256(spec),
+      dir: targetFor(spec).dir,
+      status: "queued",
+      receivedBytes: 0,
+      totalBytes: Number(spec.bytes || 0),
+      bytesPerSecond: 0,
+      queuedAt: Date.now(),
+      error: "",
+      alternatives: rest,
+      fallbackFrom: failed.file,
     };
   }
   return null;
@@ -318,12 +430,21 @@ export function downloadSpace() {
   if (!comfyModelsDir()) return space;
   for (const folder of allowedFolders) {
     let dir;
-    try { ({ dir } = targetFor({ folder, file: "probe.safetensors", url: "https://huggingface.co/x" })); } catch { continue; }
+    try {
+      ({ dir } = targetFor({ folder, file: "probe.safetensors", url: "https://huggingface.co/x" }));
+    } catch {
+      continue;
+    }
     // The folder may not exist yet; its nearest existing parent is on the same disk.
     let probe = dir;
-    while (probe && !fs.existsSync(probe) && path.dirname(probe) !== probe) probe = path.dirname(probe);
+    while (probe && !fs.existsSync(probe) && path.dirname(probe) !== probe)
+      probe = path.dirname(probe);
     let disk = "";
-    try { disk = String(fs.statSync(probe).dev); } catch { /* unknown disk: grouped alone */ }
+    try {
+      disk = String(fs.statSync(probe).dev);
+    } catch {
+      /* unknown disk: grouped alone */
+    }
     const free = freeBytesAt(probe);
     if (free !== null) space[folder] = { free, disk: disk || folder };
   }
@@ -332,8 +453,8 @@ export function downloadSpace() {
 
 async function fetchInto(entry, signal) {
   if (entry.workerUrl) return fetchIntoWorker(entry, signal);
-  const request = new URL(entry.url).hostname === 'civitai.com' ? civitaiFetch : fetch;
-  const provider = new URL(entry.url).hostname === 'civitai.com' ? 'Civitai' : 'Hugging Face';
+  const request = new URL(entry.url).hostname === "civitai.com" ? civitaiFetch : fetch;
+  const provider = new URL(entry.url).hostname === "civitai.com" ? "Civitai" : "Hugging Face";
   const { dir, target, partial, note } = targetFor(entry);
   fs.mkdirSync(dir, { recursive: true });
   let offset = fileSize(partial);
@@ -347,12 +468,14 @@ async function fetchInto(entry, signal) {
     offset = 0; // Longer than the file itself: start over.
   }
   const validator = resumeValidator(saved);
-  const rangeHeaders = () => (offset ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) } : {});
+  const rangeHeaders = () =>
+    offset ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) } : {};
   let response = await request(entry.url, { redirect: "follow", signal, headers: rangeHeaders() });
   if (offset && response.status === 416) {
     // Nothing left past the end: complete if the server's size matches, else the part is not this file.
     const total = Number(/\/(\d+)\s*$/.exec(response.headers.get("content-range") || "")?.[1] || 0);
-    if (total && total === offset && sameFile(saved, response)) return verifyAndFinish(entry, partial, target, note);
+    if (total && total === offset && sameFile(saved, response))
+      return verifyAndFinish(entry, partial, target, note);
     await response.body?.cancel().catch(() => {});
     offset = 0;
     response = await request(entry.url, { redirect: "follow", signal });
@@ -368,12 +491,17 @@ async function fetchInto(entry, signal) {
   if (!response.ok || !response.body) {
     await response.body?.cancel().catch(() => {});
     if (response.status === 401 || response.status === 403) {
-      throw finalError(`${entry.file} needs a ${provider} sign-in or an accepted licence (HTTP ${response.status}). Download it in your browser and put it in ComfyUI’s ${entry.folder} folder.`, { browser: true });
+      throw finalError(
+        `${entry.file} needs a ${provider} sign-in or an accepted licence (HTTP ${response.status}). Download it in your browser and put it in ComfyUI’s ${entry.folder} folder.`,
+        { browser: true },
+      );
     }
     if (response.status === 404) {
       // The catalog in this version is out of date; a newer one usually knows where the file went.
       const page = repositoryPage(entry.url);
-      throw finalError(`${entry.file} is no longer at its download address (HTTP 404). Update Studio in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`);
+      throw finalError(
+        `${entry.file} is no longer at its download address (HTTP 404). Update Studio in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`,
+      );
     }
     throw new Error(`${provider} answered ${response.status} for ${entry.file}.`);
   }
@@ -384,7 +512,9 @@ async function fetchInto(entry, signal) {
   const margin = 256 * 1024 * 1024;
   if (free !== null && length && free < length + margin) {
     await response.body.cancel().catch(() => {});
-    throw finalError(`Not enough space: ${entry.file} needs ${gigabytes(length)}, and the disk has ${gigabytes(free)} free.`);
+    throw finalError(
+      `Not enough space: ${entry.file} needs ${gigabytes(length)}, and the disk has ${gigabytes(free)} free.`,
+    );
   }
   const expected = length ? offset + length : 0;
   if (expected) entry.totalBytes = expected;
@@ -393,8 +523,21 @@ async function fetchInto(entry, signal) {
     // `exact` marks a length the server sent, not the catalog's estimate; etag and
     // lastModified say which version of the file the part holds, for the next resume.
     const etag = offset ? saved.etag || "" : response.headers.get("etag") || "";
-    const lastModified = offset ? saved.lastModified || "" : response.headers.get("last-modified") || "";
-    writeJsonFile(note, { id: entry.id, label: entry.label, totalBytes: entry.totalBytes, exact: Boolean(expected), etag, lastModified }, { compact: true });
+    const lastModified = offset
+      ? saved.lastModified || ""
+      : response.headers.get("last-modified") || "";
+    writeJsonFile(
+      note,
+      {
+        id: entry.id,
+        label: entry.label,
+        totalBytes: entry.totalBytes,
+        exact: Boolean(expected),
+        etag,
+        lastModified,
+      },
+      { compact: true },
+    );
   } catch {
     // Without the note it still resumes this session; only a restart forgets it.
   }
@@ -410,15 +553,17 @@ async function fetchInto(entry, signal) {
         const elapsed = Date.now() - windowStart;
         if (elapsed >= 1000) {
           const rate = (windowBytes * 1000) / elapsed;
-          entry.bytesPerSecond = entry.bytesPerSecond ? entry.bytesPerSecond * 0.6 + rate * 0.4 : rate;
+          entry.bytesPerSecond = entry.bytesPerSecond
+            ? entry.bytesPerSecond * 0.6 + rate * 0.4
+            : rate;
           windowStart = Date.now();
           windowBytes = 0;
         }
         done(null, chunk);
-      }
+      },
     }),
     fs.createWriteStream(partial, { flags: offset ? "a" : "w" }),
-    { signal }
+    { signal },
   );
   // Without a published checksum the length is the check: a short file is not a model.
   if (expected && fileSize(partial) !== expected) {
@@ -444,12 +589,25 @@ function sameFile(saved, response) {
 }
 
 function readNote(note) {
-  try { return JSON.parse(fs.readFileSync(note, "utf8")) || {}; } catch { return {}; }
+  try {
+    return JSON.parse(fs.readFileSync(note, "utf8")) || {};
+  } catch {
+    return {};
+  }
 }
 
 async function sha256Of(file, signal) {
   const hash = crypto.createHash("sha256");
-  await pipeline(fs.createReadStream(file), new Transform({ transform(chunk, _encoding, done) { hash.update(chunk); done(); } }), { signal });
+  await pipeline(
+    fs.createReadStream(file),
+    new Transform({
+      transform(chunk, _encoding, done) {
+        hash.update(chunk);
+        done();
+      },
+    }),
+    { signal },
+  );
   return hash.digest("hex");
 }
 
@@ -466,7 +624,9 @@ async function verifyAndFinish(entry, partial, target, note) {
       if (actual !== entry.sha256) {
         fs.rmSync(partial, { force: true });
         removeJsonFile(note);
-        throw new Error(`${entry.file} didn’t match its published checksum, so it was deleted. Try again to download it fresh.`);
+        throw new Error(
+          `${entry.file} didn’t match its published checksum, so it was deleted. Try again to download it fresh.`,
+        );
       }
     } finally {
       delete entry.verifying;
@@ -482,12 +642,15 @@ function finishDownload(entry, partial, target, note) {
   removeJsonFile(note);
 }
 
-
 /** Throws away a stopped download's partial file. */
 export function discardDownload(spec) {
-  const workerUrl = [active, ...queue].find(entry => entry?.id === spec.id)?.workerUrl || comfyUrl;
+  const workerUrl =
+    [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl || comfyUrl;
   cancelDownload(spec.id);
-  if (remoteModelsEnabled()) return workerModelFile({ ...spec, workerUrl }, "discard").then(() => refreshWorkerModels({ force: true, workerUrl }));
+  if (remoteModelsEnabled())
+    return workerModelFile({ ...spec, workerUrl }, "discard").then(() =>
+      refreshWorkerModels({ force: true, workerUrl }),
+    );
   for (const dir of folderDirs(spec.folder)) {
     fs.rmSync(path.join(dir, `${spec.file}.part`), { force: true });
     removeJsonFile(path.join(dir, `${spec.file}.part.json`));
@@ -503,26 +666,36 @@ export function replaceDownload(spec) {
   targetFor(spec);
   if (remoteModelsEnabled()) {
     spec = { ...spec, workerUrl: spec.workerUrl || comfyUrl };
-    if ([active, ...queue].some((entry) => entry?.folder === spec.folder && entry.file === spec.file)) return startDownload(spec);
-    return workerModelFile(spec, "replace").then(() => workerModelFile(spec, "discard")).then(() => refreshWorkerModels({ force: true, workerUrl: spec.workerUrl })).then(() => startDownload(spec));
+    if (
+      [active, ...queue].some((entry) => entry?.folder === spec.folder && entry.file === spec.file)
+    )
+      return startDownload(spec);
+    return workerModelFile(spec, "replace")
+      .then(() => workerModelFile(spec, "discard"))
+      .then(() => refreshWorkerModels({ force: true, workerUrl: spec.workerUrl }))
+      .then(() => startDownload(spec));
   }
   const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
   if (same(active) || queue.some(same)) return startDownload(spec);
-  for (let broken = existingCopy(spec); broken; broken = existingCopy(spec)) fs.rmSync(broken, { force: true });
+  for (let broken = existingCopy(spec); broken; broken = existingCopy(spec))
+    fs.rmSync(broken, { force: true });
   discardDownload(spec);
   return startDownload(spec);
 }
 
-
 /** Studio keeps provider credentials; only streamed weights and resume metadata reach the worker. */
 async function fetchIntoWorker(entry, signal) {
   await refreshWorkerModels({ force: true, workerUrl: entry.workerUrl });
-  if (!/^[a-f0-9]{64}$/i.test(entry.sha256 || '')) throw finalError('The worker requires a published SHA-256 checksum.');
-  const source = crypto.createHash('sha256').update(entry.url).digest('hex');
+  if (!/^[a-f0-9]{64}$/i.test(entry.sha256 || ""))
+    throw finalError("The worker requires a published SHA-256 checksum.");
+  const source = crypto.createHash("sha256").update(entry.url).digest("hex");
   const saved = await workerModelFile(entry);
   if (saved.size > 0) {
-    const existing = await workerModelFile(entry, 'hash');
-    if (existing.sha256 !== entry.sha256.toLowerCase()) throw finalError('A different model already uses this filename. Keep it or replace it explicitly.');
+    const existing = await workerModelFile(entry, "hash");
+    if (existing.sha256 !== entry.sha256.toLowerCase())
+      throw finalError(
+        "A different model already uses this filename. Keep it or replace it explicitly.",
+      );
     entry.receivedBytes = existing.size;
     entry.totalBytes = existing.size;
     entry.already = true;
@@ -531,14 +704,19 @@ async function fetchIntoWorker(entry, signal) {
   const bound = saved.note?.source === source && saved.note?.sha256 === entry.sha256.toLowerCase();
   let offset = bound ? saved.partialBytes || 0 : 0;
   const note = saved.note || {};
-  const request = new URL(entry.url).hostname === 'civitai.com' ? civitaiFetch : fetch;
+  const request = new URL(entry.url).hostname === "civitai.com" ? civitaiFetch : fetch;
   const validator = resumeValidator(note);
-  const headers = offset ? { range: `bytes=${offset}-`, ...(validator ? { 'if-range': validator } : {}) } : {};
-  let response = await request(entry.url, { redirect: 'follow', signal, headers });
-  if (offset && (response.status === 416 || (response.status === 206 && !sameFile(note, response)))) {
+  const headers = offset
+    ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) }
+    : {};
+  let response = await request(entry.url, { redirect: "follow", signal, headers });
+  if (
+    offset &&
+    (response.status === 416 || (response.status === 206 && !sameFile(note, response)))
+  ) {
     await response.body?.cancel().catch(() => {});
     offset = 0;
-    response = await request(entry.url, { redirect: 'follow', signal });
+    response = await request(entry.url, { redirect: "follow", signal });
   }
   if (response.status === 200) offset = 0;
   if (!response.ok || !response.body || (offset && response.status !== 206)) {
@@ -548,31 +726,44 @@ async function fetchIntoWorker(entry, signal) {
     error.final = [401, 403, 404, 410].includes(response.status);
     throw error;
   }
-  const length = Number(response.headers.get('content-length') || 0);
+  const length = Number(response.headers.get("content-length") || 0);
   const total = length ? offset + length : Number(entry.totalBytes || 0);
   if (!Number.isSafeInteger(total) || total <= 0 || total > 256 * 1024 ** 3) {
     await response.body.cancel();
-    throw finalError('The provider did not supply a model size for the worker transfer.');
+    throw finalError("The provider did not supply a model size for the worker transfer.");
   }
   if (offset) {
-    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get('content-range') || '');
+    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(response.headers.get("content-range") || "");
     if (!range || Number(range[1]) !== offset || Number(range[3]) !== total) {
       await response.body.cancel();
-      throw finalError('The provider returned an inconsistent resume range.');
+      throw finalError("The provider returned an inconsistent resume range.");
     }
   }
   entry.totalBytes = total;
   entry.receivedBytes = offset;
   let started = Date.now();
   let bytes = 0;
-  const result = await uploadWorkerModel(entry, response, { offset, total, signal,
-    note: { source, id: entry.id, label: entry.label, etag: response.headers.get('etag') || note.etag || '', lastModified: response.headers.get('last-modified') || note.lastModified || '' },
+  const result = await uploadWorkerModel(entry, response, {
+    offset,
+    total,
+    signal,
+    note: {
+      source,
+      id: entry.id,
+      label: entry.label,
+      etag: response.headers.get("etag") || note.etag || "",
+      lastModified: response.headers.get("last-modified") || note.lastModified || "",
+    },
     progress(size) {
       entry.receivedBytes += size;
       bytes += size;
       const elapsed = Date.now() - started;
-      if (elapsed >= 1000) { entry.bytesPerSecond = bytes * 1000 / elapsed; started = Date.now(); bytes = 0; }
-    }
+      if (elapsed >= 1000) {
+        entry.bytesPerSecond = (bytes * 1000) / elapsed;
+        started = Date.now();
+        bytes = 0;
+      }
+    },
   });
   entry.receivedBytes = result.size;
   entry.totalBytes = result.size;

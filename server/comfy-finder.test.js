@@ -5,7 +5,10 @@ import { findComfy, findComfyNow, looksLikeComfy, nearbyAddresses } from "./comf
 test("the other usual port is tried when the address on this computer is quiet", () => {
   assert.deepEqual(nearbyAddresses("http://127.0.0.1:8188"), ["http://127.0.0.1:8000"]);
   assert.deepEqual(nearbyAddresses("http://localhost:8000"), ["http://127.0.0.1:8188"]);
-  assert.deepEqual(nearbyAddresses("http://127.0.0.1:9000"), ["http://127.0.0.1:8188", "http://127.0.0.1:8000"]);
+  assert.deepEqual(nearbyAddresses("http://127.0.0.1:9000"), [
+    "http://127.0.0.1:8188",
+    "http://127.0.0.1:8000",
+  ]);
 });
 
 test("another computer's address is never swapped for this one's", () => {
@@ -14,7 +17,13 @@ test("another computer's address is never swapped for this one's", () => {
 
 test("the first address that answers as ComfyUI wins", async () => {
   const asked = [];
-  const found = await findComfy({ current: "http://127.0.0.1:9000", probe: async (url) => { asked.push(url); return url.endsWith(":8000"); } });
+  const found = await findComfy({
+    current: "http://127.0.0.1:9000",
+    probe: async (url) => {
+      asked.push(url);
+      return url.endsWith(":8000");
+    },
+  });
   assert.equal(found, "http://127.0.0.1:8000");
   assert.deepEqual(asked, ["http://127.0.0.1:8188", "http://127.0.0.1:8000"]);
   assert.equal(await findComfy({ current: "http://127.0.0.1:8188", probe: async () => false }), "");
@@ -28,7 +37,10 @@ test("only a ComfyUI answer counts, not any server on that port", () => {
 
 test("the status poll searches at most every few seconds", async () => {
   let probes = 0;
-  const probe = async () => { probes += 1; return false; };
+  const probe = async () => {
+    probes += 1;
+    return false;
+  };
   await findComfyNow("http://127.0.0.1:8188", { now: 1_000_000, probe });
   await findComfyNow("http://127.0.0.1:8188", { now: 1_002_000, probe });
   assert.equal(probes, 1);
@@ -39,7 +51,13 @@ test("the status poll searches at most every few seconds", async () => {
 test("STUDIO_COMFY_SEARCH=0 keeps Studio on its own address", async () => {
   process.env.STUDIO_COMFY_SEARCH = "0";
   try {
-    assert.equal(await findComfyNow("http://127.0.0.1:8189", { now: Date.now() + 60_000, probe: async () => true }), "");
+    assert.equal(
+      await findComfyNow("http://127.0.0.1:8189", {
+        now: Date.now() + 60_000,
+        probe: async () => true,
+      }),
+      "",
+    );
   } finally {
     delete process.env.STUDIO_COMFY_SEARCH;
   }
@@ -48,7 +66,10 @@ test("STUDIO_COMFY_SEARCH=0 keeps Studio on its own address", async () => {
 test("STUDIO_COMFY_SEARCH=0 also holds for the search at startup", async () => {
   process.env.STUDIO_COMFY_SEARCH = "0";
   try {
-    assert.equal(await findComfy({ current: "http://127.0.0.1:8189", probe: async () => true }), "");
+    assert.equal(
+      await findComfy({ current: "http://127.0.0.1:8189", probe: async () => true }),
+      "",
+    );
   } finally {
     delete process.env.STUDIO_COMFY_SEARCH;
   }

@@ -12,9 +12,11 @@ export const legacyEnvInUse = applyLegacyEnvNames(process.env);
 // STUDIO_ENV_FILE points at another file (tests use one of their own). Under
 // `node --test` (NODE_TEST_CONTEXT) the developer's own .env is never read or
 // written: a test would otherwise see their ComfyUI, or save over their settings.
-const envPath = process.env.STUDIO_ENV_FILE ? path.resolve(process.env.STUDIO_ENV_FILE)
-  : process.env.NODE_TEST_CONTEXT ? path.join(os.tmpdir(), `studio-test-env-${process.pid}`)
-  : path.join(root, ".env");
+const envPath = process.env.STUDIO_ENV_FILE
+  ? path.resolve(process.env.STUDIO_ENV_FILE)
+  : process.env.NODE_TEST_CONTEXT
+    ? path.join(os.tmpdir(), `studio-test-env-${process.pid}`)
+    : path.join(root, ".env");
 
 /** Keys that came from .env rather than the shell, so a setting knows it may rewrite them. */
 export const envFileKeys = new Set();
@@ -53,7 +55,11 @@ function forgetFileValue(key) {
 }
 
 function writeLines(lines) {
-  fs.writeFileSync(envPath, `${lines.filter((line, index, all) => line || index < all.length - 1).join("\n")}\n`, { mode: 0o600 });
+  fs.writeFileSync(
+    envPath,
+    `${lines.filter((line, index, all) => line || index < all.length - 1).join("\n")}\n`,
+    { mode: 0o600 },
+  );
 }
 
 /**
@@ -64,7 +70,11 @@ export function removeLocalEnvValue(key) {
   const safeKey = String(key || "").trim();
   if (!/^[A-Z_][A-Z0-9_]*$/.test(safeKey)) throw new Error("Invalid local setting.");
   let lines = [];
-  try { lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/); } catch { return false; }
+  try {
+    lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  } catch {
+    return false;
+  }
   const keyMatchers = matchers(safeKey);
   const kept = lines.filter((line) => !keyMatchers.some((matcher) => matcher.test(line)));
   if (kept.length !== lines.length) writeLines(kept);
@@ -76,9 +86,12 @@ export function removeLocalEnvValue(key) {
 export function writeLocalEnvValue(key, value) {
   const safeKey = String(key || "").trim();
   const safeValue = String(value || "").trim();
-  if (!/^[A-Z_][A-Z0-9_]*$/.test(safeKey) || /[\r\n]/.test(safeValue)) throw new Error("Invalid local setting.");
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(safeKey) || /[\r\n]/.test(safeValue))
+    throw new Error("Invalid local setting.");
   let lines = [];
-  try { lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/); } catch {}
+  try {
+    lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  } catch {}
   const matcher = keyMatcher(safeKey);
   const legacy = legacyEnvName(safeKey);
   const legacyMatcher = legacy ? keyMatcher(legacy) : null;

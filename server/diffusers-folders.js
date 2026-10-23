@@ -19,7 +19,9 @@ export function diffusersRoots() {
 
 function transformerClass(dir) {
   try {
-    const config = JSON.parse(fs.readFileSync(path.join(dir, "transformer", "config.json"), "utf8"));
+    const config = JSON.parse(
+      fs.readFileSync(path.join(dir, "transformer", "config.json"), "utf8"),
+    );
     return String(config?._class_name || "");
   } catch {
     return "";
@@ -35,7 +37,11 @@ export function diffusersFolders(classNames = [], roots = diffusersRoots()) {
   const found = [];
   for (const root of roots) {
     let entries = [];
-    try { entries = fs.readdirSync(root, { withFileTypes: true }); } catch { continue; }
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
       const dir = path.join(root, entry.name);
@@ -49,19 +55,33 @@ export function diffusersFolders(classNames = [], roots = diffusersRoots()) {
 
 /** Every weight file a folder's indexes name is there and whole, so a half-finished download never shows as a model. */
 export function diffusersFolderComplete(dir) {
-  for (const [part, stem] of [["transformer", "diffusion_pytorch_model"], ["text_encoder", "model"], ["vae", "diffusion_pytorch_model"]]) {
+  for (const [part, stem] of [
+    ["transformer", "diffusion_pytorch_model"],
+    ["text_encoder", "model"],
+    ["vae", "diffusion_pytorch_model"],
+  ]) {
     const base = path.join(dir, part);
     if (!fs.existsSync(path.join(base, "config.json"))) return false;
     const index = path.join(base, `${stem}.safetensors.index.json`);
     let files = [`${stem}.safetensors`];
     if (fs.existsSync(index)) {
       try {
-        files = [...new Set(Object.values(JSON.parse(fs.readFileSync(index, "utf8")).weight_map || {}))];
+        files = [
+          ...new Set(Object.values(JSON.parse(fs.readFileSync(index, "utf8")).weight_map || {})),
+        ];
       } catch {
         return false;
       }
     }
-    if (!files.length || files.some((file) => !fs.existsSync(path.join(base, file)) || fs.existsSync(path.join(base, `${file}.incomplete`)))) return false;
+    if (
+      !files.length ||
+      files.some(
+        (file) =>
+          !fs.existsSync(path.join(base, file)) ||
+          fs.existsSync(path.join(base, `${file}.incomplete`)),
+      )
+    )
+      return false;
   }
   return fs.existsSync(path.join(dir, "tokenizer"));
 }

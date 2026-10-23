@@ -23,12 +23,22 @@ function pngChunk(type, data) {
   return Buffer.concat([head, data, crc]);
 }
 
-const onePixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
-const prompt = JSON.stringify({ 3: { class_type: "CLIPTextEncode", inputs: { text: "a secret prompt" } } });
+const onePixel = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+const prompt = JSON.stringify({
+  3: { class_type: "CLIPTextEncode", inputs: { text: "a secret prompt" } },
+});
 
 test("a ComfyUI PNG loses its prompt and workflow and keeps every pixel", async () => {
   const iend = onePixel.length - 12;
-  const withText = Buffer.concat([onePixel.subarray(0, iend), pngChunk("tEXt", Buffer.from(`prompt\0${prompt}`, "latin1")), pngChunk("iTXt", Buffer.from("workflow\0\0\0\0\0{}", "latin1")), onePixel.subarray(iend)]);
+  const withText = Buffer.concat([
+    onePixel.subarray(0, iend),
+    pngChunk("tEXt", Buffer.from(`prompt\0${prompt}`, "latin1")),
+    pngChunk("iTXt", Buffer.from("workflow\0\0\0\0\0{}", "latin1")),
+    onePixel.subarray(iend),
+  ]);
   const { buffer, stripped } = stripMetadata(withText);
   assert.equal(stripped, true);
   assert.deepEqual(buffer, onePixel);
@@ -42,7 +52,10 @@ test("WebP and JPEG lose EXIF and XMP and still open", async (t) => {
   if (!sharp) return t.skip("sharp isn't installed here");
   const exif = { IFD0: { Model: `prompt:${prompt}`, ImageDescription: "a secret prompt" } };
   for (const format of ["webp", "jpeg"]) {
-    const input = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#f40" } })[format]().withExif(exif).toBuffer();
+    const input = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#f40" } })
+      [format]()
+      .withExif(exif)
+      .toBuffer();
     assert.ok(input.includes("a secret prompt"), `${format} fixture carries the prompt`);
     const { buffer, stripped } = stripMetadata(input);
     assert.equal(stripped, true, format);
@@ -64,15 +77,27 @@ function box(type, ...children) {
 test("an MP4 keeps its size and layout, with its metadata boxes emptied", () => {
   const video = Buffer.concat([
     box("ftyp", Buffer.from("isom\0\0\x02\0isomiso2mp41", "latin1")),
-    box("moov", box("mvhd", Buffer.alloc(20)), box("trak", box("tkhd", Buffer.alloc(12)), box("udta", Buffer.from("track note"))), box("udta", box("meta", Buffer.alloc(4), box("ilst", Buffer.from(`\xa9cmt${prompt}`, "latin1"))))),
-    box("mdat", Buffer.from("frames"))
+    box(
+      "moov",
+      box("mvhd", Buffer.alloc(20)),
+      box("trak", box("tkhd", Buffer.alloc(12)), box("udta", Buffer.from("track note"))),
+      box(
+        "udta",
+        box("meta", Buffer.alloc(4), box("ilst", Buffer.from(`\xa9cmt${prompt}`, "latin1"))),
+      ),
+    ),
+    box("mdat", Buffer.from("frames")),
   ]);
   const { buffer, stripped } = stripMetadata(video);
   assert.equal(stripped, true);
   assert.equal(buffer.length, video.length);
   assert.ok(!buffer.includes("a secret prompt"));
   assert.ok(!buffer.includes("track note"));
-  assert.equal(buffer.indexOf("mdat"), video.indexOf("mdat"), "the frames stay where the index says");
+  assert.equal(
+    buffer.indexOf("mdat"),
+    video.indexOf("mdat"),
+    "the frames stay where the index says",
+  );
   assert.ok(buffer.includes("frames"));
 });
 

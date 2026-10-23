@@ -1,11 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { completedTiming, addRun, estimateRun, isWarm, remainingMs, RunTimer, runVariant, slowSteps, timingKey, workExponent, workUnits } from "./generation-timing.js";
+import {
+  completedTiming,
+  addRun,
+  estimateRun,
+  isWarm,
+  remainingMs,
+  RunTimer,
+  runVariant,
+  slowSteps,
+  timingKey,
+  workExponent,
+  workUnits,
+} from "./generation-timing.js";
 
-const graph = { 3: { class_type: "KSampler" }, 4: { class_type: "UNETLoader" }, 8: { class_type: "VAEDecode" } };
+const graph = {
+  3: { class_type: "KSampler" },
+  4: { class_type: "UNETLoader" },
+  8: { class_type: "VAEDecode" },
+};
 
 /** A run as ComfyUI reports it: start, some setup, `steps` steps of `stepMs`, then a tail. */
-function play(timer, { at = 0, setupMs = 3000, steps = 20, stepMs = 500, tailMs = 1200, node = "3" } = {}) {
+function play(
+  timer,
+  { at = 0, setupMs = 3000, steps = 20, stepMs = 500, tailMs = 1200, node = "3" } = {},
+) {
   let t = at;
   timer.note({ type: "execution_start", data: {} }, t);
   timer.note({ type: "executing", data: { node: "4" } }, t);
@@ -20,8 +39,20 @@ function play(timer, { at = 0, setupMs = 3000, steps = 20, stepMs = 500, tailMs 
   return t;
 }
 
-const body = (extra = {}) => ({ kind: "image", model: "flux-dev.safetensors", width: 1024, height: 1024, count: 1, steps: 20, ...extra });
-const resultFor = (options) => { const timer = new RunTimer(graph); play(timer, options); return timer.result(); };
+const body = (extra = {}) => ({
+  kind: "image",
+  model: "flux-dev.safetensors",
+  width: 1024,
+  height: 1024,
+  count: 1,
+  steps: 20,
+  ...extra,
+});
+const resultFor = (options) => {
+  const timer = new RunTimer(graph);
+  play(timer, options);
+  return timer.result();
+};
 
 test("a run splits into setup, steps and tail", () => {
   const result = resultFor({ setupMs: 3000, steps: 20, stepMs: 500, tailMs: 1200 });
@@ -33,11 +64,17 @@ test("a run splits into setup, steps and tail", () => {
 });
 
 test("a second pass counts its steps too, and other nodes' progress is not sampling", () => {
-  const timer = new RunTimer({ ...graph, 5: { class_type: "KSamplerAdvanced" }, 9: { class_type: "UpscaleModelLoader" } });
+  const timer = new RunTimer({
+    ...graph,
+    5: { class_type: "KSamplerAdvanced" },
+    9: { class_type: "UpscaleModelLoader" },
+  });
   let t = play(timer, { steps: 10, stepMs: 400, tailMs: 0 });
   timer.endAt = null;
-  for (let tile = 1; tile <= 50; tile += 1) timer.note({ type: "progress", data: { node: "9", value: tile, max: 50 } }, (t += 10));
-  for (let step = 1; step <= 10; step += 1) timer.note({ type: "progress", data: { node: "5", value: step, max: 10 } }, (t += 400));
+  for (let tile = 1; tile <= 50; tile += 1)
+    timer.note({ type: "progress", data: { node: "9", value: tile, max: 50 } }, (t += 10));
+  for (let step = 1; step <= 10; step += 1)
+    timer.note({ type: "progress", data: { node: "5", value: step, max: 10 } }, (t += 400));
   timer.note({ type: "execution_success", data: {} }, (t += 800));
   const result = timer.result();
   assert.equal(result.steps, 20);
@@ -61,7 +98,12 @@ function historyOf(runs, { start = Date.parse("2026-09-27T10:00:00Z"), gapMs = 6
   let history = [];
   runs.forEach((run, index) => {
     const result = resultFor(run.timing);
-    history = addRun(history, { body: body(run.body), result, warm: index > 0, at: new Date(start + index * gapMs).toISOString() });
+    history = addRun(history, {
+      body: body(run.body),
+      result,
+      warm: index > 0,
+      at: new Date(start + index * gapMs).toISOString(),
+    });
   });
   return history;
 }
@@ -82,10 +124,17 @@ test("an estimate scales with size and steps", () => {
   const history = historyOf([{ timing: {} }, { timing: {} }, { timing: {} }]);
   const now = Date.parse("2026-09-27T10:03:00Z");
   const double = estimateRun(history, body({ width: 1448, height: 1448 }), { now });
-  assert.ok(double.stepMs > 1000 && double.stepMs < 1150, `about 2^1.15 × 500, got ${double.stepMs}`);
+  assert.ok(
+    double.stepMs > 1000 && double.stepMs < 1150,
+    `about 2^1.15 × 500, got ${double.stepMs}`,
+  );
   assert.ok(Math.abs(double.tailMs - 2400) < 50, "the tail scales with pixels");
   assert.equal(estimateRun(history, body({ steps: 40 }), { now }).steps, 40);
-  assert.equal(estimateRun(history, body({ width: 4096, height: 4096 }), { now }), null, "far past anything seen");
+  assert.equal(
+    estimateRun(history, body({ width: 4096, height: 4096 }), { now }),
+    null,
+    "far past anything seen",
+  );
   assert.equal(estimateRun(history, body({ model: "other.safetensors" }), { now }), null);
 });
 
@@ -93,32 +142,51 @@ test("the growth with size is learned from the sizes used", () => {
   const runs = [0.5, 1, 2, 4].map((w) => ({ w, stepMs: 400 * w ** 1.4 }));
   assert.ok(Math.abs(workExponent(runs) - 1.4) < 0.01);
   assert.equal(workExponent(runs.slice(0, 2)), 1.15, "too few runs");
-  assert.equal(workExponent([{ w: 1, stepMs: 400 }, { w: 1.1, stepMs: 460 }, { w: 1.2, stepMs: 500 }]), 1.15, "too little spread");
+  assert.equal(
+    workExponent([
+      { w: 1, stepMs: 400 },
+      { w: 1.1, stepMs: 460 },
+      { w: 1.2, stepMs: 500 },
+    ]),
+    1.15,
+    "too little spread",
+  );
 });
 
 test("a cold start is estimated from cold starts", () => {
   let history = [];
   const start = Date.parse("2026-09-27T10:00:00Z");
   [true, false, true, false, true].forEach((warm, index) => {
-    history = addRun(history, { body: body(), result: resultFor({ setupMs: warm ? 1000 : 20_000 }), warm, at: new Date(start + index * 60_000).toISOString() });
+    history = addRun(history, {
+      body: body(),
+      result: resultFor({ setupMs: warm ? 1000 : 20_000 }),
+      warm,
+      at: new Date(start + index * 60_000).toISOString(),
+    });
   });
   assert.equal(isWarm(history, "image:flux-dev.safetensors", start + 5 * 60_000), true);
   assert.equal(estimateRun(history, body(), { now: start + 5 * 60_000 }).setupMs, 1000);
-  assert.equal(isWarm(history, "image:flux-dev.safetensors", start + 90 * 60_000), false, "a while later it is likely unloaded");
+  assert.equal(
+    isWarm(history, "image:flux-dev.safetensors", start + 90 * 60_000),
+    false,
+    "a while later it is likely unloaded",
+  );
   assert.equal(estimateRun(history, body(), { now: start + 90 * 60_000 }).setupMs, 20_000);
 });
 
 test("estimates that keep missing stop being trusted", () => {
   let history = historyOf([{ timing: {} }, { timing: {} }, { timing: {} }]);
   const predicted = { totalMs: 5000 };
-  for (let index = 0; index < 3; index += 1) history = addRun(history, { body: body(), result: resultFor({}), predicted, warm: true });
+  for (let index = 0; index < 3; index += 1)
+    history = addRun(history, { body: body(), result: resultFor({}), predicted, warm: true });
   assert.equal(history.at(-1).error, 0.65);
   assert.equal(estimateRun(history, body()).trusted, false);
 });
 
 test("the history keeps each model's latest runs", () => {
   let history = [];
-  for (let index = 0; index < 45; index += 1) history = addRun(history, { body: body(), result: { runMs: 1000 + index }, at: String(index) });
+  for (let index = 0; index < 45; index += 1)
+    history = addRun(history, { body: body(), result: { runMs: 1000 + index }, at: String(index) });
   history = addRun(history, { body: body({ model: "b" }), result: { runMs: 5 }, at: "x" });
   assert.equal(history.length, 31);
   assert.equal(history[0].runMs, 1015);
@@ -130,7 +198,13 @@ const native2k = { width: 2048, height: 2048, tiledDecode: true };
 function runsOf(list, start = Date.parse("2026-09-27T10:00:00Z")) {
   let history = [];
   list.forEach(({ body: extra, timing, predicted }, index) => {
-    history = addRun(history, { body: body(extra), result: resultFor(timing), predicted, warm: index > 0, at: new Date(start + index * 60_000).toISOString() });
+    history = addRun(history, {
+      body: body(extra),
+      result: resultFor(timing),
+      predicted,
+      warm: index > 0,
+      at: new Date(start + index * 60_000).toISOString(),
+    });
   });
   return history;
 }
@@ -148,9 +222,17 @@ test("runs at a native size speak for it, and leave the default size alone", () 
 });
 
 test("a native size borrows the curve until it has runs of its own", () => {
-  const history = runsOf([...times(4, { timing: { stepMs: 500 } }), { body: native2k, timing: { stepMs: 4500 } }]);
-  const estimate = estimateRun(history, body({ width: 1800, height: 1800 }), { now: Date.parse("2026-09-27T10:06:00Z") });
-  assert.ok(estimate.stepMs > 2500 && estimate.stepMs < 4500, `between, along the fitted curve: ${estimate.stepMs}`);
+  const history = runsOf([
+    ...times(4, { timing: { stepMs: 500 } }),
+    { body: native2k, timing: { stepMs: 4500 } },
+  ]);
+  const estimate = estimateRun(history, body({ width: 1800, height: 1800 }), {
+    now: Date.parse("2026-09-27T10:06:00Z"),
+  });
+  assert.ok(
+    estimate.stepMs > 2500 && estimate.stepMs < 4500,
+    `between, along the fitted curve: ${estimate.stepMs}`,
+  );
 });
 
 test("misses at one size do not silence another", () => {
@@ -163,9 +245,15 @@ test("misses at one size do not silence another", () => {
 });
 
 test("a stretch at 2K keeps the 1K runs", () => {
-  const history = runsOf([...times(5, { timing: {} }), ...times(40, { body: native2k, timing: { stepMs: 4500 } })]);
+  const history = runsOf([
+    ...times(5, { timing: {} }),
+    ...times(40, { body: native2k, timing: { stepMs: 4500 } }),
+  ]);
   assert.equal(history.filter((run) => run.w === workUnits(body())).length, 5);
-  assert.equal(estimateRun(history, body(), { now: Date.parse("2026-09-27T11:00:00Z") }).stepMs, 500);
+  assert.equal(
+    estimateRun(history, body(), { now: Date.parse("2026-09-27T11:00:00Z") }).stepMs,
+    500,
+  );
 });
 
 test("a tiled decode's tail is learned apart from a whole one", () => {
@@ -175,7 +263,11 @@ test("a tiled decode's tail is learned apart from a whole one", () => {
   const now = Date.parse("2026-09-27T10:07:00Z");
   assert.equal(estimateRun(history, body(), { now }).tailMs, 1000);
   assert.equal(estimateRun(history, body({ tiledDecode: true }), { now }).tailMs, 2500);
-  assert.deepEqual(runVariant(body({ tiledDecode: true, referenceAssets: [{}, {}], startImageId: "a" })), { refs: 2, tiled: true }, "the start image is the first reference");
+  assert.deepEqual(
+    runVariant(body({ tiledDecode: true, referenceAssets: [{}, {}], startImageId: "a" })),
+    { refs: 2, tiled: true },
+    "the start image is the first reference",
+  );
   assert.deepEqual(runVariant({ refs: "1" }), { refs: 1, tiled: false }, "as the estimate asks it");
 });
 
@@ -185,7 +277,11 @@ test("runs that read an image are learned apart once there are enough", () => {
   const fromImage = { body: { startImageId: "a" }, timing: { steps: 12, setupMs: 5000 } };
   const now = Date.parse("2026-09-27T10:10:00Z");
   const few = runsOf([...times(4, plain), fromImage, fromImage]);
-  assert.equal(estimateRun(few, body({ refs: 1 }), { now }).steps, 20, "two are too few: all runs speak");
+  assert.equal(
+    estimateRun(few, body({ refs: 1 }), { now }).steps,
+    20,
+    "two are too few: all runs speak",
+  );
   const enough = runsOf([...times(4, plain), fromImage, fromImage, fromImage]);
   assert.equal(estimateRun(enough, body({ refs: 1 }), { now }).steps, 12);
   assert.equal(estimateRun(enough, body({ refs: 1 }), { now }).setupMs, 5000);
@@ -199,12 +295,18 @@ test("time left follows live steps, and the learned tail after them", () => {
   assert.equal(remainingMs(timer, estimate, 0), estimate.totalMs, "queued: the whole estimate");
   timer.note({ type: "execution_start", data: {} }, 0);
   assert.equal(remainingMs(timer, estimate, 1000), estimate.totalMs - 1000);
-  assert.equal(remainingMs(timer, estimate, 20_000), 20 * 500 + 1200, "a slow load still leaves the sampling");
+  assert.equal(
+    remainingMs(timer, estimate, 20_000),
+    20 * 500 + 1200,
+    "a slow load still leaves the sampling",
+  );
   // Running at half the learned speed: live steps win.
   let t = 3000;
-  for (let step = 1; step <= 10; step += 1) timer.note({ type: "progress", data: { node: "3", value: step, max: 20 } }, (t += 1000));
+  for (let step = 1; step <= 10; step += 1)
+    timer.note({ type: "progress", data: { node: "3", value: step, max: 20 } }, (t += 1000));
   assert.equal(remainingMs(timer, estimate, t), 10 * 1000 + 1200);
-  for (let step = 11; step <= 20; step += 1) timer.note({ type: "progress", data: { node: "3", value: step, max: 20 } }, (t += 1000));
+  for (let step = 11; step <= 20; step += 1)
+    timer.note({ type: "progress", data: { node: "3", value: step, max: 20 } }, (t += 1000));
   assert.equal(remainingMs(timer, estimate, t + 200), 1000);
   assert.equal(remainingMs(timer, estimate, t + 5000), 0);
 });
@@ -227,12 +329,22 @@ test("slow steps are flagged only against a trusted estimate", () => {
   assert.equal(slowSteps({ stepMs: 1500 }, null), false);
 });
 
-
 test("saved timing separates queue time and estimates stages without losing elapsed time", () => {
   const timer = new RunTimer(graph);
   play(timer, { at: 5000, setupMs: 3000, steps: 20, stepMs: 500, tailMs: 1200 });
-  assert.deepEqual(completedTiming(timer, 1000), { runMs: 14200, stepMs: 500, queueMs: 4000, setupMs: 3000, samplingMs: 10000, finishMs: 1200 });
-  assert.equal(completedTiming(timer, 6000).queueMs, undefined, "do not invent queue time when submission timestamps disagree");
+  assert.deepEqual(completedTiming(timer, 1000), {
+    runMs: 14200,
+    stepMs: 500,
+    queueMs: 4000,
+    setupMs: 3000,
+    samplingMs: 10000,
+    finishMs: 1200,
+  });
+  assert.equal(
+    completedTiming(timer, 6000).queueMs,
+    undefined,
+    "do not invent queue time when submission timestamps disagree",
+  );
 });
 
 test("missing execution or sampling events never fabricate stage timings", () => {

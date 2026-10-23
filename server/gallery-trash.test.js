@@ -21,7 +21,7 @@ const item = (filename, extra = {}) => ({
   filename: "a prompt",
   outputName: filename,
   createdAt: new Date().toISOString(),
-  ...extra
+  ...extra,
 });
 const file = (name) => path.join(outputDir, "heiss-ui", name);
 
@@ -29,7 +29,15 @@ test("clearing moves the files into a trash batch, upscales too, and Undo puts t
   fs.writeFileSync(file("image_00001_.png"), "one");
   fs.writeFileSync(file("image_00002_.png"), "two");
   fs.writeFileSync(file("upscale_00001_.png"), "big");
-  const items = [item("image_00001_.png", { upscale: { status: "done", url: `/comfy/view?${new URLSearchParams({ filename: "upscale_00001_.png", subfolder: "heiss-ui", type: "output" })}` } }), item("image_00002_.png")];
+  const items = [
+    item("image_00001_.png", {
+      upscale: {
+        status: "done",
+        url: `/comfy/view?${new URLSearchParams({ filename: "upscale_00001_.png", subfolder: "heiss-ui", type: "output" })}`,
+      },
+    }),
+    item("image_00002_.png"),
+  ];
   const result = trash.trashGalleryItems(items);
   assert.equal(result.moved, 3);
   assert.ok(result.batch);
@@ -39,7 +47,10 @@ test("clearing moves the files into a trash batch, upscales too, and Undo puts t
 
   const { restored, missing } = trash.restoreTrash(result.batch);
   assert.equal(missing, 0);
-  assert.deepEqual(restored.map((entry) => entry.outputName).sort(), ["image_00001_.png", "image_00002_.png"]);
+  assert.deepEqual(restored.map((entry) => entry.outputName).sort(), [
+    "image_00001_.png",
+    "image_00002_.png",
+  ]);
   assert.equal(fs.readFileSync(file("image_00001_.png"), "utf8"), "one");
   assert.equal(fs.readFileSync(file("upscale_00001_.png"), "utf8"), "big");
   assert.equal(trash.trashSummary().batches, 0, "an emptied batch goes");
@@ -58,8 +69,12 @@ test("a file whose name is taken again stays in the trash instead of overwriting
   const dir = path.join(trash.trashDir(outputDir), batch);
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "batch.json"), "utf8")).files.length, 1);
   assert.ok(fs.existsSync(path.join(dir, "batch.json.bak")));
-  assert.equal(fs.readdirSync(dir).some((name) => name.includes(".tmp-")), false);
-  if (process.platform !== "win32") assert.equal(fs.statSync(path.join(dir, "batch.json")).mode & 0o777, 0o600);
+  assert.equal(
+    fs.readdirSync(dir).some((name) => name.includes(".tmp-")),
+    false,
+  );
+  if (process.platform !== "win32")
+    assert.equal(fs.statSync(path.join(dir, "batch.json")).mode & 0o777, 0o600);
 });
 
 test("account trash summaries and restore operations stay within the selected owner", async () => {
@@ -71,7 +86,8 @@ test("account trash summaries and restore operations stay within the selected ow
     const url = `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`;
     return item(filename, { id: url, url, ownerId });
   };
-  for (const subfolder of [subfolderA, subfolderB]) fs.mkdirSync(path.join(outputDir, subfolder), { recursive: true });
+  for (const subfolder of [subfolderA, subfolderB])
+    fs.mkdirSync(path.join(outputDir, subfolder), { recursive: true });
   const itemA = ownedItem(ownerA, subfolderA, "account-a.png");
   const itemB = ownedItem(ownerB, subfolderB, "account-b.png");
   fs.writeFileSync(path.join(outputDir, subfolderA, "account-a.png"), "a");
@@ -92,14 +108,22 @@ test("account trash summaries and restore operations stay within the selected ow
 test("nothing outside the output folder is touched, and old batches are purged after the retention", async () => {
   const outside = path.join(temporary, "outside.png");
   fs.writeFileSync(outside, "keep");
-  const escaping = { id: "x", url: `/comfy/view?${new URLSearchParams({ filename: "outside.png", subfolder: "../..", type: "output" })}`, status: "done" };
+  const escaping = {
+    id: "x",
+    url: `/comfy/view?${new URLSearchParams({ filename: "outside.png", subfolder: "../..", type: "output" })}`,
+    status: "done",
+  };
   assert.equal(trash.trashGalleryItems([escaping]).moved, 0);
   assert.equal(fs.readFileSync(outside, "utf8"), "keep");
 
   const later = Date.now() + (trash.trashDays + 1) * 24 * 60 * 60 * 1000;
   assert.ok(trash.trashSummary().batches >= 1);
   assert.equal(await trash.purgeTrash({ now: Date.now() }), 0, "nothing is old yet");
-  assert.ok(await trash.purgeTrash({ now: later }) >= 1);
+  assert.ok((await trash.purgeTrash({ now: later })) >= 1);
   assert.equal(trash.trashSummary().batches, 0);
-  assert.equal(fs.existsSync(path.join(outputDir, trash.trashFolderName)), true, "the trash folder itself stays");
+  assert.equal(
+    fs.existsSync(path.join(outputDir, trash.trashFolderName)),
+    true,
+    "the trash folder itself stays",
+  );
 });

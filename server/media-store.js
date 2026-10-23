@@ -18,16 +18,28 @@ const maxIngested = 20_000;
 let ingested = null;
 function ingestedJobs() {
   if (ingested) return ingested;
-  try { ingested = new Map(Object.entries(readJsonFile(ingestedPath)?.jobs || {})); } catch { ingested = new Map(); }
+  try {
+    ingested = new Map(Object.entries(readJsonFile(ingestedPath)?.jobs || {}));
+  } catch {
+    ingested = new Map();
+  }
   return ingested;
 }
 export function noteIngested(jobIds) {
   const jobs = ingestedJobs();
   let changed = false;
-  for (const id of jobIds) if (id && !jobs.has(id)) { jobs.set(String(id), Date.now()); changed = true; }
+  for (const id of jobIds)
+    if (id && !jobs.has(id)) {
+      jobs.set(String(id), Date.now());
+      changed = true;
+    }
   if (!changed) return;
   while (jobs.size > maxIngested) jobs.delete(jobs.keys().next().value);
-  try { writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 }); } catch (error) { console.warn(`[Studio] Could not record ingested runs: ${error.message}`); }
+  try {
+    writeJsonFile(ingestedPath, { version: 1, jobs: Object.fromEntries(jobs) }, { mode: 0o600 });
+  } catch (error) {
+    console.warn(`[Studio] Could not record ingested runs: ${error.message}`);
+  }
 }
 export function wasIngested(jobId) {
   return Boolean(jobId && ingestedJobs().has(String(jobId)));
@@ -40,7 +52,10 @@ export function wasIngested(jobId) {
  * cannot be fetched keeps its ComfyUI address, so nothing is lost.
  */
 
-const workerTokenHeader = () => (process.env.STUDIO_WORKER_TOKEN ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN } : {});
+const workerTokenHeader = () =>
+  process.env.STUDIO_WORKER_TOKEN
+    ? { "X-Studio-Worker-Token": process.env.STUDIO_WORKER_TOKEN }
+    : {};
 const missingWorker = new Set();
 
 function comfyRef(url) {
@@ -81,7 +96,10 @@ export async function ingestOutput(output, ownerId = "") {
   } finally {
     await fs.promises.rm(temporary, { force: true });
   }
-  return { output: { ...output, ...mediaUrls(filename, subfolder), filename, comfyFilename: ref.filename }, comfyFile: ref };
+  return {
+    output: { ...output, ...mediaUrls(filename, subfolder), filename, comfyFilename: ref.filename },
+    comfyFile: ref,
+  };
 }
 
 /**
@@ -101,9 +119,19 @@ export async function ingestRunResults(results, ownerId = "") {
     }
   };
   // Every picture and upscale comes across at once; the order of what ComfyUI removes stays the run's order.
-  const pairs = await Promise.all(results.map((result) => Promise.all([move(result.output), result.upscale ? move(result.upscale) : null])));
-  const comfyFiles = pairs.flatMap(([output, upscale]) => [output.comfyFile, upscale?.comfyFile]).filter(Boolean);
-  const moved = results.map((result, index) => ({ ...result, output: pairs[index][0].output, ...(result.upscale ? { upscale: pairs[index][1].output } : {}) }));
+  const pairs = await Promise.all(
+    results.map((result) =>
+      Promise.all([move(result.output), result.upscale ? move(result.upscale) : null]),
+    ),
+  );
+  const comfyFiles = pairs
+    .flatMap(([output, upscale]) => [output.comfyFile, upscale?.comfyFile])
+    .filter(Boolean);
+  const moved = results.map((result, index) => ({
+    ...result,
+    output: pairs[index][0].output,
+    ...(result.upscale ? { upscale: pairs[index][1].output } : {}),
+  }));
   return { results: moved, comfyFiles };
 }
 
@@ -127,10 +155,24 @@ export async function ingestRecords(records) {
   const result = [];
   for (const record of records) {
     const moved = record?.url ? await move(record, record.ownerId || "") : null;
-    const next = moved ? { ...record, url: moved.url, thumbnailUrl: moved.thumbnailUrl, id: moved.url, outputName: moved.filename } : { ...record };
+    const next = moved
+      ? {
+          ...record,
+          url: moved.url,
+          thumbnailUrl: moved.thumbnailUrl,
+          id: moved.url,
+          outputName: moved.filename,
+        }
+      : { ...record };
     if (record?.upscale?.url) {
       const upscale = await move(record.upscale, record.ownerId || "");
-      if (upscale) next.upscale = { ...record.upscale, url: upscale.url, thumbnailUrl: upscale.thumbnailUrl, outputName: upscale.filename };
+      if (upscale)
+        next.upscale = {
+          ...record.upscale,
+          url: upscale.url,
+          thumbnailUrl: upscale.thumbnailUrl,
+          outputName: upscale.filename,
+        };
     }
     result.push(next);
   }
@@ -143,7 +185,8 @@ export async function removeComfyFiles(files) {
   // The worker takes at most 256 names a call.
   if (all.length > 256) {
     let deleted = 0;
-    for (let start = 0; start < all.length; start += 256) deleted += (await removeComfyFiles(all.slice(start, start + 256))).deleted;
+    for (let start = 0; start < all.length; start += 256)
+      deleted += (await removeComfyFiles(all.slice(start, start + 256))).deleted;
     return { deleted, skipped: all.length - deleted };
   }
   const list = all;
@@ -154,14 +197,19 @@ export async function removeComfyFiles(files) {
       method: "POST",
       headers: { "content-type": "application/json", ...workerTokenHeader() },
       body: JSON.stringify({ files: list }),
-      timeout: 15_000
+      timeout: 15_000,
     });
     missingWorker.delete(backend);
-    return { deleted: Number(result?.deleted || 0), skipped: list.length - Number(result?.deleted || 0) };
+    return {
+      deleted: Number(result?.deleted || 0),
+      skipped: list.length - Number(result?.deleted || 0),
+    };
   } catch (error) {
     if (!missingWorker.has(backend)) {
       missingWorker.add(backend);
-      console.warn(`[Studio] ComfyUI (${backend}) kept its copies: install the Studio worker node (comfyui/studio_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim());
+      console.warn(
+        `[Studio] ComfyUI (${backend}) kept its copies: install the Studio worker node (comfyui/studio_worker) to remove them. ${error.status === 404 ? "" : error.message}`.trim(),
+      );
     }
     return { deleted: 0, skipped: list.length };
   }
@@ -171,7 +219,12 @@ export async function removeComfyFiles(files) {
 export function temporaryInputFiles(body) {
   return (body?.referenceAssets || [])
     .filter((item) => item?.temporary && item.comfyName)
-    .map((item) => ({ type: "input", filename: path.basename(String(item.comfyName)), subfolder: path.dirname(String(item.comfyName)) === "." ? "" : path.dirname(String(item.comfyName)) }));
+    .map((item) => ({
+      type: "input",
+      filename: path.basename(String(item.comfyName)),
+      subfolder:
+        path.dirname(String(item.comfyName)) === "." ? "" : path.dirname(String(item.comfyName)),
+    }));
 }
 
 export { mediaStorageEnabled, mediaType };

@@ -1,8 +1,13 @@
-import { backendUrl, currentComfyBackend, isDefaultBackend, noteWorkerReachable } from "./comfy-backends.js";
+import {
+  backendUrl,
+  currentComfyBackend,
+  isDefaultBackend,
+  noteWorkerReachable,
+} from "./comfy-backends.js";
 import { defaultWorker, onWorkersChanged, saveDefaultWorkerUrl } from "./workers.js";
 import { envFileKeys, writeLocalEnvValue } from "./env.js";
 import { listensBeyondThisComputer, resolveLan } from "./lan.js";
-import { noteComfyState } from './crash-log.js';
+import { noteComfyState } from "./crash-log.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -16,7 +21,9 @@ export const root = path.resolve(__dirname, "..");
 // It is the default worker's (workers.js), or "" with no workers at all;
 // STUDIO_DEFAULT_COMFY_URL seeds a fresh install (the Docker image's host.docker.internal).
 export let comfyUrl = defaultWorker()?.url || "";
-onWorkersChanged(() => { comfyUrl = defaultWorker()?.url || ""; });
+onWorkersChanged(() => {
+  comfyUrl = defaultWorker()?.url || "";
+});
 
 /** "localhost:8000", "http://pc.local:8188/" or a bare port all become a clean http(s) origin. */
 export function normalizeComfyUrl(value = "") {
@@ -34,7 +41,8 @@ export function normalizeComfyUrl(value = "") {
 
 export function setComfyUrl(value = "") {
   const next = normalizeComfyUrl(value);
-  if (!next) throw new Error("That doesn’t look like an address. Try something like 127.0.0.1:8188.");
+  if (!next)
+    throw new Error("That doesn’t look like an address. Try something like 127.0.0.1:8188.");
   // The default worker's address: Studio's saved workers, or the seed before they are saved.
   saveDefaultWorkerUrl(next);
   comfyUrl = defaultWorker()?.url || next;
@@ -62,10 +70,15 @@ export function setListeningPort(value) {
  */
 export function inDotFolder(subfolder = "") {
   // A query string can name it twice; every value counts.
-  return [].concat(subfolder ?? "").some((value) => String(value || "").split(/[\\/]/).some((part) => part.startsWith(".")));
+  return [].concat(subfolder ?? "").some((value) =>
+    String(value || "")
+      .split(/[\\/]/)
+      .some((part) => part.startsWith(".")),
+  );
 }
 /** What an output can be: images, videos and sound. Anything else in the folder is never served. */
-export const outputMediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
+export const outputMediaPattern =
+  /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
 
 /**
  * An output file on this computer, for when ComfyUI itself cannot serve it
@@ -91,16 +104,25 @@ export function localOutputFile(filename, subfolder = "", type = "output") {
 }
 
 // Resolved, so a hand-written `D:/x` becomes `D:\x` on Windows (Explorer opens its default view otherwise).
-export let comfyOutputDir = process.env.COMFY_OUTPUT_DIR ? path.resolve(process.env.COMFY_OUTPUT_DIR) : "";
+export let comfyOutputDir = process.env.COMFY_OUTPUT_DIR
+  ? path.resolve(process.env.COMFY_OUTPUT_DIR)
+  : "";
 
 /**
  * Turn whatever got pasted into a folder path: Explorer's "Copy as path" wraps it
  * in quotes, Finder drags arrive as file:// URLs, and shells write ~ for home.
  */
 export function normalizeFolderInput(value = "") {
-  let text = String(value || "").trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+  let text = String(value || "")
+    .trim()
+    .replace(/^(["'])(.*)\1$/, "$2")
+    .trim();
   if (/^file:\/\//i.test(text)) {
-    try { text = fileURLToPath(text); } catch { /* keep the raw text */ }
+    try {
+      text = fileURLToPath(text);
+    } catch {
+      /* keep the raw text */
+    }
   }
   if (text === "~" || /^~[\\/]/.test(text)) text = path.join(os.homedir(), text.slice(1));
   return text ? path.resolve(text) : "";
@@ -109,7 +131,8 @@ export function normalizeFolderInput(value = "") {
 export function setComfyOutputDir(value = "") {
   const next = normalizeFolderInput(value);
   if (!next) throw new Error("Choose an existing ComfyUI output folder.");
-  if (!fs.existsSync(next) || !fs.statSync(next).isDirectory()) throw new Error("That folder doesn’t exist on this computer.");
+  if (!fs.existsSync(next) || !fs.statSync(next).isDirectory())
+    throw new Error("That folder doesn’t exist on this computer.");
   writeLocalEnvValue("COMFY_OUTPUT_DIR", next);
   comfyOutputDir = next;
   return comfyOutputDir;
@@ -160,10 +183,16 @@ export function setComfyFolderPaths(map = {}) {
 export function modelFolders(kind, subfolders = [kind]) {
   const models = comfyModelsDir();
   // extra_model_paths.yaml keys are matched loosely by custom nodes (SEEDVR2: and seedvr2: are one folder kind).
-  const named = Object.keys(comfyFolderPaths).filter((key) => key.toLowerCase() === String(kind).toLowerCase()).flatMap((key) => comfyFolderPaths[key] || []);
+  const named = Object.keys(comfyFolderPaths)
+    .filter((key) => key.toLowerCase() === String(kind).toLowerCase())
+    .flatMap((key) => comfyFolderPaths[key] || []);
   const dirs = [...named, ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
   return [...new Set(dirs)].filter((dir) => {
-    try { return fs.statSync(dir).isDirectory(); } catch { return false; }
+    try {
+      return fs.statSync(dir).isDirectory();
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -200,7 +229,10 @@ export function noteComfyReachable() {
  * that timed out reads as busy, for as long as a run would wait for it
  * (comfy-queue.js), and only then as stopped.
  */
-export const comfyBusyGraceMs = Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0 ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) : 60_000;
+export const comfyBusyGraceMs =
+  Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0
+    ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS)
+    : 60_000;
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
 export function isComfyTimeout(error) {
   return error?.name === "AbortError" || error?.name === "TimeoutError";
@@ -246,7 +278,9 @@ let comfyAnswering = false;
 
 export async function comfy(pathname, options = {}) {
   const { timeout, ...init } = options;
-  const limit = AbortSignal.timeout(Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname));
+  const limit = AbortSignal.timeout(
+    Number(timeout) > 0 ? Number(timeout) : comfyTimeoutFor(pathname),
+  );
   init.signal = init.signal ? AbortSignal.any([init.signal, limit]) : limit;
   let response;
   try {
@@ -257,14 +291,23 @@ export async function comfy(pathname, options = {}) {
       // the link to a remote worker blips, and one lost GET shouldn't fail a run or a chat's request.
       // Only while it was answering: a ComfyUI already down fails at once, as before.
       const method = String(init.method || "GET").toUpperCase();
-      if (!comfyAnswering || method !== "GET" || init.signal.aborted || isComfyTimeout(error) || error?.noWorker || error?.name !== "TypeError") throw error;
+      if (
+        !comfyAnswering ||
+        method !== "GET" ||
+        init.signal.aborted ||
+        isComfyTimeout(error) ||
+        error?.noWorker ||
+        error?.name !== "TypeError"
+      )
+        throw error;
       await new Promise((resolve) => setTimeout(resolve, 250));
       response = await fetch(`${activeComfyUrl()}${pathname}`, init);
     }
   } catch (error) {
     comfyAnswering = false;
     // A busy worker that is slow to answer still counts as there; only a refusal marks it offline for routing.
-    if (!isComfyTimeout(error) && !error?.noWorker) noteWorkerReachable(currentComfyBackend(), false);
+    if (!isComfyTimeout(error) && !error?.noWorker)
+      noteWorkerReachable(currentComfyBackend(), false);
     if (isDefaultBackend()) noteComfyFetchError(error);
     throw error;
   }
@@ -293,7 +336,7 @@ export function normalizeComfyError(message = "") {
           const name = error?.name || node?.class_type || `node ${nodeId}`;
           const detail = error?.message || error?.type || "invalid value";
           return `${name}: ${detail}`;
-        })
+        }),
       );
       text = details.length
         ? `${parsed?.error?.message || "Prompt validation failed"}: ${details.slice(0, 3).join("; ")}`
@@ -344,7 +387,7 @@ export function textRange(info, node, key) {
   const parsedMax = match ? Number(match[1].replace(/,/g, "")) : undefined;
   return {
     ...meta,
-    max: Number(meta.max || meta.maxLength || meta.max_length || parsedMax || 0) || undefined
+    max: Number(meta.max || meta.maxLength || meta.max_length || parsedMax || 0) || undefined,
   };
 }
 
@@ -355,9 +398,15 @@ export function comfyInputDir() {
   const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
   const candidates = [
     comfyRoot ? path.join(path.resolve(comfyRoot), "input") : "",
-    comfyOutputDir ? path.join(path.dirname(path.resolve(comfyOutputDir)), "input") : ""
+    comfyOutputDir ? path.join(path.dirname(path.resolve(comfyOutputDir)), "input") : "",
   ].filter(Boolean);
-  return candidates.find((dir) => {
-    try { return fs.statSync(dir).isDirectory(); } catch { return false; }
-  }) || "";
+  return (
+    candidates.find((dir) => {
+      try {
+        return fs.statSync(dir).isDirectory();
+      } catch {
+        return false;
+      }
+    }) || ""
+  );
 }

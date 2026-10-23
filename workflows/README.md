@@ -48,15 +48,17 @@ node:
 {
   "heissUi": {
     "capabilities": { "imageToImage": true },
-    "mediaInputs": [{
-      "id": "reference",
-      "kind": "image",
-      "label": "Reference image",
-      "required": true,
-      "min": 1,
-      "max": 1,
-      "control": { "node": "369", "input": "image" }
-    }],
+    "mediaInputs": [
+      {
+        "id": "reference",
+        "kind": "image",
+        "label": "Reference image",
+        "required": true,
+        "min": 1,
+        "max": 1,
+        "control": { "node": "369", "input": "image" }
+      }
+    ],
     "promptComposition": {
       "prefix": "Edit: ",
       "suffix": "Keep everything else the same.",

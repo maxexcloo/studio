@@ -1,16 +1,26 @@
-import { refreshWorkerModels } from './worker-models.js';
-import { comfyUrl } from './comfy.js';
-import { catalogDownload } from './family-profiles.js';
-import { cancelDownload, discardDownload, downloadState, replaceDownload, startDownload } from './model-downloads.js';
-import { describeHardware } from './hardware.js';
-import { starterPlan } from './starter-models.js';
+import { refreshWorkerModels } from "./worker-models.js";
+import { comfyUrl } from "./comfy.js";
+import { catalogDownload } from "./family-profiles.js";
+import {
+  cancelDownload,
+  discardDownload,
+  downloadState,
+  replaceDownload,
+  startDownload,
+} from "./model-downloads.js";
+import { describeHardware } from "./hardware.js";
+import { starterPlan } from "./starter-models.js";
 import { requireAdmin } from "./route-access.js";
-import { libraryDownload } from './library-downloads.js';
+import { libraryDownload } from "./library-downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
-  app.use('/api/models/downloads', async (req, res, next) => {
-    try { await refreshWorkerModels(); next(); }
-    catch (error) { res.status(503).json({ ok: false, error: error.message }); }
+  app.use("/api/models/downloads", async (req, res, next) => {
+    try {
+      await refreshWorkerModels();
+      next();
+    } catch (error) {
+      res.status(503).json({ ok: false, error: error.message });
+    }
   });
 
   app.get("/api/models/downloads", (_req, res) => {
@@ -21,7 +31,7 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   // by ID; this route never accepts a browser-supplied download address.
   app.post("/api/models/downloads", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    const spec = catalogDownload(req.body?.id) || libraryDownload(String(req.body?.id || ''));
+    const spec = catalogDownload(req.body?.id) || libraryDownload(String(req.body?.id || ""));
     if (!spec) {
       res.status(400).json({ ok: false, error: "Unknown file." });
       return;
@@ -41,7 +51,12 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   app.get("/api/starter-models", async (_req, res) => {
     const context = await loadComfyContext().catch(() => null);
     const hardware = await describeHardware({ stats: context?.stats, comfyUrl });
-    res.json({ ok: true, hardware, local: downloadState().local, families: starterPlan({ hardware, info: context?.info }) });
+    res.json({
+      ok: true,
+      hardware,
+      local: downloadState().local,
+      families: starterPlan({ hardware, info: context?.info }),
+    });
   });
 
   app.post("/api/models/downloads/cancel", async (req, res) => {
@@ -52,7 +67,9 @@ export function registerModelDownloadRoutes(app, { loadComfyContext }) {
       if (spec) await discardDownload(spec);
       else cancelDownload(id);
       res.json({ ok: true, ...downloadState() });
-    } catch (error) { res.status(400).json({ ok: false, error: error.message }); }
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
   });
 
   // "Download again" for a catalog file a run found damaged: the broken copy goes first.

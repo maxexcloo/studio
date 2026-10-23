@@ -1,11 +1,17 @@
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
-import { readJsonFile, writeJsonFile } from './json-store.js';
+import { readJsonFile, writeJsonFile } from "./json-store.js";
 import crypto from "node:crypto";
 
-const stacksPath = (ownerId = "") => ownerId
-  ? path.join(dataDir, "accounts", crypto.createHash("sha256").update(String(ownerId)).digest("hex"), "lora-stacks.json")
-  : path.join(dataDir, "lora-stacks.json");
+const stacksPath = (ownerId = "") =>
+  ownerId
+    ? path.join(
+        dataDir,
+        "accounts",
+        crypto.createHash("sha256").update(String(ownerId)).digest("hex"),
+        "lora-stacks.json",
+      )
+    : path.join(dataDir, "lora-stacks.json");
 
 // Generous caps: enough for anyone, small enough that a bad client cannot bloat the file.
 const maxLorasPerStack = 8;
@@ -15,7 +21,8 @@ const maxOpsPerRequest = 500;
 function readState(ownerId = "") {
   try {
     const value = readJsonFile(stacksPath(ownerId));
-    if (value?.stacks && typeof value.stacks === "object") return { stacks: value.stacks, library: value.library || null };
+    if (value?.stacks && typeof value.stacks === "object")
+      return { stacks: value.stacks, library: value.library || null };
     return { stacks: value && typeof value === "object" ? value : {}, library: null };
   } catch {
     return { stacks: {}, library: null };
@@ -29,39 +36,68 @@ function writeState(state, ownerId = "") {
 function cleanStack(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
-  return value.flatMap((item) => {
-    const name = String(item?.name || "").trim();
-    if (!name || seen.has(name)) return [];
-    seen.add(name);
-    return [{ name, enabled: item?.enabled !== false, strength: Number.isFinite(Number(item?.strength)) ? Number(item.strength) : 0.7 }];
-  }).slice(0, maxLorasPerStack);
+  return value
+    .flatMap((item) => {
+      const name = String(item?.name || "").trim();
+      if (!name || seen.has(name)) return [];
+      seen.add(name);
+      return [
+        {
+          name,
+          enabled: item?.enabled !== false,
+          strength: Number.isFinite(Number(item?.strength)) ? Number(item.strength) : 0.7,
+        },
+      ];
+    })
+    .slice(0, maxLorasPerStack);
 }
 
 function cleanNames(value, limit = 500) {
-  return Array.isArray(value) ? [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, limit) : [];
+  return Array.isArray(value)
+    ? [...new Set(value.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, limit)
+    : [];
 }
 
 function cleanSnapshot(value) {
-  const id = String(value?.id || "").trim().slice(0, 100);
+  const id = String(value?.id || "")
+    .trim()
+    .slice(0, 100);
   if (!id) return null;
-  return { id, name: String(value?.name || "").trim().slice(0, 120) || "Untitled stack", loras: cleanStack(value?.loras) };
+  return {
+    id,
+    name:
+      String(value?.name || "")
+        .trim()
+        .slice(0, 120) || "Untitled stack",
+    loras: cleanStack(value?.loras),
+  };
 }
 
 function cleanSnapshots(value) {
   const source = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(Object.entries(source).map(([key, list]) => {
-    const seen = new Set();
-    const stacks = (Array.isArray(list) ? list : []).map(cleanSnapshot).filter((stack) => stack && !seen.has(stack.id) && seen.add(stack.id));
-    return [String(key).slice(0, 200), stacks.slice(0, maxStacksPerFamily)];
-  }));
+  return Object.fromEntries(
+    Object.entries(source).map(([key, list]) => {
+      const seen = new Set();
+      const stacks = (Array.isArray(list) ? list : [])
+        .map(cleanSnapshot)
+        .filter((stack) => stack && !seen.has(stack.id) && seen.add(stack.id));
+      return [String(key).slice(0, 200), stacks.slice(0, maxStacksPerFamily)];
+    }),
+  );
 }
 
 function cleanStrengths(value) {
   const source = value && typeof value === "object" ? value : {};
-  return Object.fromEntries(Object.entries(source).map(([workflow, entries]) => [
-    workflow,
-    Object.fromEntries(Object.entries(entries && typeof entries === "object" ? entries : {}).filter(([, strength]) => Number.isFinite(Number(strength))).map(([name, strength]) => [name, Number(strength)]))
-  ]));
+  return Object.fromEntries(
+    Object.entries(source).map(([workflow, entries]) => [
+      workflow,
+      Object.fromEntries(
+        Object.entries(entries && typeof entries === "object" ? entries : {})
+          .filter(([, strength]) => Number.isFinite(Number(strength)))
+          .map(([name, strength]) => [name, Number(strength)]),
+      ),
+    ]),
+  );
 }
 
 function cleanLibrary(value) {
@@ -71,7 +107,7 @@ function cleanLibrary(value) {
     // Stacks are keyed by model family ("family:z-image"); older builds keyed them by workflow id.
     snapshots: cleanSnapshots(source.snapshots),
     favorites: cleanNames(source.favorites),
-    recents: cleanNames(source.recents, 12)
+    recents: cleanNames(source.recents, 12),
   };
 }
 
@@ -129,11 +165,19 @@ function applyOp(state, library, op) {
       break;
     }
     case "stack.update":
-      if (key) library.snapshots[key] = list().map((item) => item.id === op.id ? { ...item, loras: cleanStack(op.loras) } : item);
+      if (key)
+        library.snapshots[key] = list().map((item) =>
+          item.id === op.id ? { ...item, loras: cleanStack(op.loras) } : item,
+        );
       break;
     case "stack.rename": {
-      const name = String(op.name || "").trim().slice(0, 120);
-      if (key && name) library.snapshots[key] = list().map((item) => item.id === op.id ? { ...item, name } : item);
+      const name = String(op.name || "")
+        .trim()
+        .slice(0, 120);
+      if (key && name)
+        library.snapshots[key] = list().map((item) =>
+          item.id === op.id ? { ...item, name } : item,
+        );
       break;
     }
     case "stack.delete":
@@ -143,24 +187,34 @@ function applyOp(state, library, op) {
       // Stacks older builds saved per workflow move to the model family.
       const from = String(op.from || "");
       if (!key || !from || from === key || !library.snapshots[from]) break;
-      for (const stack of library.snapshots[from]) if (!list().some((item) => item.id === stack.id)) list().push(stack);
+      for (const stack of library.snapshots[from])
+        if (!list().some((item) => item.id === stack.id)) list().push(stack);
       delete library.snapshots[from];
       break;
     }
     case "strengths": {
       const workflow = String(op.workflowId || "");
-      if (workflow) library.strengths[workflow] = { ...(library.strengths[workflow] || {}), ...cleanStrengths({ x: op.values }).x };
+      if (workflow)
+        library.strengths[workflow] = {
+          ...(library.strengths[workflow] || {}),
+          ...cleanStrengths({ x: op.values }).x,
+        };
       break;
     }
     case "favorite": {
       const name = String(op.name || "").trim();
       if (!name) break;
-      library.favorites = op.on ? [...new Set([...library.favorites, name])] : library.favorites.filter((item) => item !== name);
+      library.favorites = op.on
+        ? [...new Set([...library.favorites, name])]
+        : library.favorites.filter((item) => item !== name);
       break;
     }
     case "recents": {
       const added = cleanNames(op.names, 12);
-      library.recents = [...added, ...library.recents.filter((item) => !added.includes(item))].slice(0, 12);
+      library.recents = [
+        ...added,
+        ...library.recents.filter((item) => !added.includes(item)),
+      ].slice(0, 12);
       break;
     }
     case "active": {

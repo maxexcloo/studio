@@ -4,13 +4,13 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 
 ## Who may do what
 
-| Who | Can use the studio | Can look after the studio* | Can manage accounts and groups |
-| --- | --- | --- | --- |
-| An administrator account | Yes | Yes | Yes |
-| An ordinary account | What its group allows, on its own outputs | No | No (only its own name, email, password and MCP token) |
-| A personal MCP token | Generate, read its own jobs and results, upload references | No | No |
-| No account, or a waiting or disabled one | No | No | No |
-| Another website open in your browser | No | No | No |
+| Who                                      | Can use the studio                                         | Can look after the studio* | Can manage accounts and groups                        |
+| ---------------------------------------- | ---------------------------------------------------------- | -------------------------- | ----------------------------------------------------- |
+| An administrator account                 | Yes                                                        | Yes                        | Yes                                                   |
+| An ordinary account                      | What its group allows, on its own outputs                  | No                         | No (only its own name, email, password and MCP token) |
+| A personal MCP token                     | Generate, read its own jobs and results, upload references | No                         | No                                                    |
+| No account, or a waiting or disabled one | No                                                         | No                         | No                                                    |
+| Another website open in your browser     | No                                                         | No                         | No                                                    |
 
 \* Models, downloads and node packs, workers and ComfyUI's address and restarts, the output folder, workflow files, presets, logs and raw ComfyUI access.
 
@@ -41,12 +41,12 @@ Only without accounts (`STUDIO_MULTI_USER` unset). This mode is kept for a studi
 
 By default a single-user studio answers only this computer: it listens on `127.0.0.1`, and nothing about it is reachable from your network.
 
-| Who | Can use the studio | Can look after the computer* | Can change the studio password, the admin switch, sign-ins |
-| --- | --- | --- | --- |
-| This computer (`http://localhost:8787`) | Yes | Yes | Yes |
-| A device signed in with the studio password (LAN mode) | Yes | Only with **Trust other devices with admin** on | No |
-| A device that hasn't signed in, or LAN mode off | No | No | No |
-| Anything reached through a proxy or tunnel on this computer | Like any other device: it signs in | Same as a device | No |
+| Who                                                         | Can use the studio                 | Can look after the computer*                    | Can change the studio password, the admin switch, sign-ins |
+| ----------------------------------------------------------- | ---------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
+| This computer (`http://localhost:8787`)                     | Yes                                | Yes                                             | Yes                                                        |
+| A device signed in with the studio password (LAN mode)      | Yes                                | Only with **Trust other devices with admin** on | No                                                         |
+| A device that hasn't signed in, or LAN mode off             | No                                 | No                                              | No                                                         |
+| Anything reached through a proxy or tunnel on this computer | Like any other device: it signs in | Same as a device                                | No                                                         |
 
 - **Other devices** are only answered in LAN mode (**Settings › Workers › Open on other devices**, or `npm start -- --lan`), only from private network addresses, and only after signing in with the studio password, set on this computer. A sign-in lasts a week (`STUDIO_DEVICE_SESSION_DAYS`); **Sign out all devices** ends every one of them. Wrong passwords lock the device's address out for longer each time, one try at a time; the computer itself is never slowed down by them.
 - **Admin stays at the computer.** Looking after the computer is for the computer running Studio, and other devices don't show those controls. Turn on **Trust other devices with admin** (at the computer) to allow them from signed-in devices too. The studio password, that switch, HTTPS and signing devices out only change at the computer.

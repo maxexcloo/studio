@@ -8,9 +8,11 @@ export function sharedRequests() {
   return function share(key, start, { fresh = false } = {}) {
     const current = pending.get(key);
     if (current && !fresh) return current;
-    const request = Promise.resolve().then(start).finally(() => {
-      if (pending.get(key) === request) pending.delete(key);
-    });
+    const request = Promise.resolve()
+      .then(start)
+      .finally(() => {
+        if (pending.get(key) === request) pending.delete(key);
+      });
     pending.set(key, request);
     return request;
   };

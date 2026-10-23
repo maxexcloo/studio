@@ -12,27 +12,38 @@ import http from "node:http";
  * all of them.
  */
 export function probeHost(host = "") {
-  const text = String(host || "").trim().replace(/^\[|\]$/g, "");
+  const text = String(host || "")
+    .trim()
+    .replace(/^\[|\]$/g, "");
   return !text || text === "0.0.0.0" || text === "::" || text === "localhost" ? "127.0.0.1" : text;
 }
 
 /** Whether a Studio server (or an older HEISS UI one) answers on this port of this computer (at `host`, when it listens on one address). */
 export function studioAnswersAt(port, { timeoutMs = 1500, host = "" } = {}) {
   return new Promise((resolve) => {
-    const request = http.get({ host: probeHost(host), port, path: "/api/ping", timeout: timeoutMs }, (response) => {
-      let body = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => { if (body.length < 4096) body += chunk; });
-      response.on("end", () => {
-        // Older versions have no /api/ping, but their unknown-route answer names Studio.
-        try {
-          const data = JSON.parse(body);
-          resolve(data?.app === "studio" || data?.app === "heiss-ui" || /Studio/.test(String(data?.error || "")));
-        } catch {
-          resolve(false);
-        }
-      });
-    });
+    const request = http.get(
+      { host: probeHost(host), port, path: "/api/ping", timeout: timeoutMs },
+      (response) => {
+        let body = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          if (body.length < 4096) body += chunk;
+        });
+        response.on("end", () => {
+          // Older versions have no /api/ping, but their unknown-route answer names Studio.
+          try {
+            const data = JSON.parse(body);
+            resolve(
+              data?.app === "studio" ||
+                data?.app === "heiss-ui" ||
+                /Studio/.test(String(data?.error || "")),
+            );
+          } catch {
+            resolve(false);
+          }
+        });
+      },
+    );
     request.on("timeout", () => request.destroy());
     request.on("error", () => resolve(false));
   });
@@ -56,7 +67,10 @@ function listenOnce(handler, port, host) {
  * `port` and the `host` it answered at. `tries` ports are tried in all; `fallback: false` tries one;
  * `skip` names ports the fallback passes over.
  */
-export async function listenWithFallback(handler, { port, host, tries = 10, fallback = true, skip = [], isStudio = studioAnswersAt } = {}) {
+export async function listenWithFallback(
+  handler,
+  { port, host, tries = 10, fallback = true, skip = [], isStudio = studioAnswersAt } = {},
+) {
   const first = Number(port);
   for (let offset = 0; ; offset += 1) {
     const candidate = first + offset;

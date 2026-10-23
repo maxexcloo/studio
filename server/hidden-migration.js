@@ -39,10 +39,16 @@ const galleryKey = (item) => item?.url || item?.id || item?.outputName || item?.
 function markerFor(dataDir) {
   let key = null;
   try {
-    const saved = Buffer.from(fs.readFileSync(path.join(dataDir, ".gallery-marker-key"), "utf8").trim(), "base64url");
+    const saved = Buffer.from(
+      fs.readFileSync(path.join(dataDir, ".gallery-marker-key"), "utf8").trim(),
+      "base64url",
+    );
     if (saved.length === 32) key = saved;
-  } catch { /* none yet: only plain markers can exist */ }
-  return (text) => (key ? `h:${crypto.createHmac("sha256", key).update(text).digest("base64url")}` : "");
+  } catch {
+    /* none yet: only plain markers can exist */
+  }
+  return (text) =>
+    key ? `h:${crypto.createHmac("sha256", key).update(text).digest("base64url")}` : "";
 }
 
 function readOptionalJson(file) {
@@ -73,7 +79,11 @@ function ordinaryRecord(record, changes) {
   const sealedPrompt = sealed(next.prompt) || sealed(next.negative);
   if (without(sealedFields) || sealedPrompt) {
     changes.sealedPrompts += 1;
-    next = { ...next, ...(sealed(next.prompt) ? { prompt: "" } : {}), ...(sealed(next.negative) ? { negative: "" } : {}) };
+    next = {
+      ...next,
+      ...(sealed(next.prompt) ? { prompt: "" } : {}),
+      ...(sealed(next.negative) ? { negative: "" } : {}),
+    };
   }
   return next;
 }
@@ -83,12 +93,12 @@ function readme(summary) {
     "Studio removed Hidden. This folder is the backup taken first; nothing was deleted.",
     "",
     "gallery.json and gallery-hidden.json are the gallery and its delete markers as they were.",
-    "privacy.json and hidden-runs.json, where present, are Hidden's key ring and unfinished runs."
+    "privacy.json and hidden-runs.json, where present, are Hidden's key ring and unfinished runs.",
   ];
   if (summary.vault) {
     lines.push(
       ".private-vault is Hidden's encrypted store, kept here whole.",
-      `It holds ${summary.vault.encryptedFiles} encrypted file(s). Opening them needs the Hidden password (or a passkey) and privacy.json; Studio no longer can.`
+      `It holds ${summary.vault.encryptedFiles} encrypted file(s). Opening them needs the Hidden password (or a passkey) and privacy.json; Studio no longer can.`,
     );
   }
   lines.push("", "summary.json counts what changed in the gallery.", "");
@@ -106,7 +116,8 @@ export function removeHidden({ dataDir = defaultDataDir, now = new Date(), log =
   const backupsDir = path.join(dataDir, backupsName);
   fs.mkdirSync(backupsDir, { recursive: true, mode: 0o700 });
   let backup = path.join(backupsDir, `hidden-removal-${stamp}`);
-  for (let suffix = 2; fs.existsSync(backup); suffix += 1) backup = path.join(backupsDir, `hidden-removal-${stamp}-${suffix}`);
+  for (let suffix = 2; fs.existsSync(backup); suffix += 1)
+    backup = path.join(backupsDir, `hidden-removal-${stamp}-${suffix}`);
   fs.mkdirSync(backup, { mode: 0o700 });
   fs.chmodSync(backup, 0o700);
 
@@ -142,22 +153,40 @@ export function removeHidden({ dataDir = defaultDataDir, now = new Date(), log =
   if (Array.isArray(gallery)) {
     changes.records = gallery.length;
     const next = gallery.map((record) => ordinaryRecord(record, changes));
-    if (changes.unflagged || changes.sealedPrompts) writeJsonFile(galleryPath, next, { compact: true });
+    if (changes.unflagged || changes.sealedPrompts)
+      writeJsonFile(galleryPath, next, { compact: true });
 
     const markersPath = path.join(dataDir, "gallery-hidden.json");
     const markers = readOptionalJson(markersPath);
     if (markers && typeof markers === "object") {
       const markerOf = markerFor(dataDir);
-      const present = new Set(next.map(galleryKey).filter(Boolean).flatMap((key) => [key, markerOf(key)]).filter(Boolean));
-      const entries = Array.isArray(markers) ? markers.map((key) => [String(key)]) : Object.entries(markers);
+      const present = new Set(
+        next
+          .map(galleryKey)
+          .filter(Boolean)
+          .flatMap((key) => [key, markerOf(key)])
+          .filter(Boolean),
+      );
+      const entries = Array.isArray(markers)
+        ? markers.map((key) => [String(key)])
+        : Object.entries(markers);
       const kept = entries.filter(([key]) => !present.has(key));
       changes.unsuppressed = entries.length - kept.length;
-      if (changes.unsuppressed) writeJsonFile(markersPath, Array.isArray(markers) ? kept.map(([key]) => key) : Object.fromEntries(kept));
+      if (changes.unsuppressed)
+        writeJsonFile(
+          markersPath,
+          Array.isArray(markers) ? kept.map(([key]) => key) : Object.fromEntries(kept),
+        );
     }
   }
 
-  const hiddenFound = Boolean(vault || changes.unflagged || changes.unsuppressed || changes.sealedPrompts
-    || copied.some((file) => file.startsWith("privacy.json") || file.startsWith("hidden-runs.json")));
+  const hiddenFound = Boolean(
+    vault ||
+    changes.unflagged ||
+    changes.unsuppressed ||
+    changes.sealedPrompts ||
+    copied.some((file) => file.startsWith("privacy.json") || file.startsWith("hidden-runs.json")),
+  );
   const summary = {
     version: 1,
     migratedAt: now.toISOString(),
@@ -165,14 +194,19 @@ export function removeHidden({ dataDir = defaultDataDir, now = new Date(), log =
     hiddenFound,
     copied,
     vault,
-    gallery: changes
+    gallery: changes,
   };
   writeJsonFile(path.join(backup, "summary.json"), summary, { mode: 0o600 });
   fs.writeFileSync(path.join(backup, "README.txt"), readme(summary), { mode: 0o600 });
   writeJsonFile(flag, { migratedAt: summary.migratedAt, backup: summary.backup, hiddenFound });
 
-  log.log(`[Studio] Hidden removal: backup in ${summary.backup}; ${changes.unflagged} record(s) unflagged, ${changes.unsuppressed} brought back into view, ${changes.sealedPrompts} sealed prompt(s) cleared.`);
-  if (vault) log.warn(`[Studio] Hidden removal: ${vault.encryptedFiles} encrypted Hidden file(s) are kept in ${summary.backup}/${vaultName}; restoring them needs the owner's Hidden password.`);
+  log.log(
+    `[Studio] Hidden removal: backup in ${summary.backup}; ${changes.unflagged} record(s) unflagged, ${changes.unsuppressed} brought back into view, ${changes.sealedPrompts} sealed prompt(s) cleared.`,
+  );
+  if (vault)
+    log.warn(
+      `[Studio] Hidden removal: ${vault.encryptedFiles} encrypted Hidden file(s) are kept in ${summary.backup}/${vaultName}; restoring them needs the owner's Hidden password.`,
+    );
   return summary;
 }
 
@@ -180,5 +214,7 @@ try {
   removeHidden();
 } catch (error) {
   // No flag is written, so the next start tries again; data/ keeps what it had.
-  console.error(`[Studio] Hidden removal failed (${error.message}); it runs again on the next start.`);
+  console.error(
+    `[Studio] Hidden removal failed (${error.message}); it runs again on the next start.`,
+  );
 }

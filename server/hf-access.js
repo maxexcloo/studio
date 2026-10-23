@@ -77,9 +77,10 @@ export function proxyFor(value, env = process.env) {
   const noProxy = String(env.NO_PROXY ?? env.no_proxy ?? "");
   if (noProxy.split(/[\s,]+/).some((entry) => hostMatches(entry, url.hostname, port))) return null;
   // Like curl and undici: HTTPS requests use HTTPS_PROXY and fall back to HTTP_PROXY.
-  const raw = url.protocol === "https:"
-    ? env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy
-    : env.HTTP_PROXY || env.http_proxy;
+  const raw =
+    url.protocol === "https:"
+      ? env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy
+      : env.HTTP_PROXY || env.http_proxy;
   const text = String(raw || "").trim();
   if (!text) return null;
   try {
@@ -107,12 +108,19 @@ export function openTunnel(proxy, host, port, signal) {
       path: `${host}:${port}`,
       headers: { host: `${host}:${port}`, ...proxyAuthorization(proxy) },
       agent: false,
-      signal
+      signal,
     });
     request.once("connect", (response, socket) => {
       if (response.statusCode === 200) return resolve(socket);
       socket.destroy();
-      reject(Object.assign(new Error(`The proxy did not open a connection to ${host} (HTTP ${response.statusCode}).`), { final: response.statusCode === 407 }));
+      reject(
+        Object.assign(
+          new Error(
+            `The proxy did not open a connection to ${host} (HTTP ${response.statusCode}).`,
+          ),
+          { final: response.statusCode === 407 },
+        ),
+      );
     });
     request.once("error", reject);
     request.end();
@@ -128,7 +136,11 @@ function asResponse(incoming) {
   }
   const empty = incoming.statusCode === 204 || incoming.statusCode === 304;
   if (empty) incoming.resume();
-  return new Response(empty ? null : Readable.toWeb(incoming), { status: incoming.statusCode, statusText: incoming.statusMessage || "", headers });
+  return new Response(empty ? null : Readable.toWeb(incoming), {
+    status: incoming.statusCode,
+    statusText: incoming.statusMessage || "",
+    headers,
+  });
 }
 
 /** One request through the proxy: a CONNECT tunnel for https, the absolute URL for plain http. */
@@ -136,10 +148,18 @@ async function proxiedRequest(url, proxy, { method = "GET", headers, signal } = 
   const plain = Object.fromEntries(new Headers(headers || {}).entries());
   if (url.protocol === "http:") {
     return new Promise((resolve, reject) => {
-      const request = (proxy.protocol === "https:" ? https : http).request({
-        host: proxy.hostname.replace(/^\[|\]$/g, ""), port: proxy.port || (proxy.protocol === "https:" ? 443 : 80),
-        method, path: url.href, headers: { ...plain, host: url.host, ...proxyAuthorization(proxy) }, agent: false, signal
-      }, (incoming) => resolve(asResponse(incoming)));
+      const request = (proxy.protocol === "https:" ? https : http).request(
+        {
+          host: proxy.hostname.replace(/^\[|\]$/g, ""),
+          port: proxy.port || (proxy.protocol === "https:" ? 443 : 80),
+          method,
+          path: url.href,
+          headers: { ...plain, host: url.host, ...proxyAuthorization(proxy) },
+          agent: false,
+          signal,
+        },
+        (incoming) => resolve(asResponse(incoming)),
+      );
       request.once("error", reject);
       request.end();
     });
@@ -147,12 +167,23 @@ async function proxiedRequest(url, proxy, { method = "GET", headers, signal } = 
   const port = Number(url.port || 443);
   const socket = await openTunnel(proxy, url.hostname, port, signal);
   return new Promise((resolve, reject) => {
-    const request = https.request({
-      host: url.hostname, port, method, path: `${url.pathname}${url.search}`, headers: { ...plain, host: url.host },
-      agent: false, signal,
-      createConnection: () => tls.connect({ socket, servername: url.hostname })
-    }, (incoming) => resolve(asResponse(incoming)));
-    request.once("error", (error) => { socket.destroy(); reject(error); });
+    const request = https.request(
+      {
+        host: url.hostname,
+        port,
+        method,
+        path: `${url.pathname}${url.search}`,
+        headers: { ...plain, host: url.host },
+        agent: false,
+        signal,
+        createConnection: () => tls.connect({ socket, servername: url.hostname }),
+      },
+      (incoming) => resolve(asResponse(incoming)),
+    );
+    request.once("error", (error) => {
+      socket.destroy();
+      reject(error);
+    });
     request.end();
   });
 }
@@ -172,12 +203,15 @@ export async function hfFetch(input, init = {}, { env = process.env, transport =
   for (let hop = 0; hop <= 10; hop += 1) {
     const headers = new Headers(init.headers || {});
     headers.delete("authorization");
-    if (token && url.protocol === "https:" && url.hostname === "huggingface.co") headers.set("authorization", `Bearer ${token}`);
+    if (token && url.protocol === "https:" && url.hostname === "huggingface.co")
+      headers.set("authorization", `Bearer ${token}`);
     const proxy = proxyFor(url, env);
     const options = { ...init, headers, redirect: "manual" };
-    const response = transport ? await transport(url, options, proxy)
-      : proxy ? await proxiedRequest(url, proxy, options)
-      : await fetch(url, options);
+    const response = transport
+      ? await transport(url, options, proxy)
+      : proxy
+        ? await proxiedRequest(url, proxy, options)
+        : await fetch(url, options);
     const location = response.headers.get("location");
     if (!redirects.has(response.status) || !location) return response;
     await response.body?.cancel().catch(() => {});

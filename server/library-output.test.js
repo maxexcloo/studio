@@ -25,7 +25,15 @@ test("an image the library does not serve is not shown either, as when the outpu
   assert.equal(result.added, 1, "the output folder inside it is not scanned");
   const folder = library.libraryFolders()[0];
   // A record from before the output folder was set there.
-  const stale = { id: "/api/library/file?stale", url: "/api/library/file?stale", type: "image", status: "done", outputName: "made.png", createdAt: new Date().toISOString(), library: { folder: folder.id, path: "output/made.png" } };
+  const stale = {
+    id: "/api/library/file?stale",
+    url: "/api/library/file?stale",
+    type: "image",
+    status: "done",
+    outputName: "made.png",
+    createdAt: new Date().toISOString(),
+    library: { folder: folder.id, path: "output/made.png" },
+  };
   store.setGallery([stale, ...store.gallery], { persist: false });
   assert.equal(library.libraryFile(folder.id, "output/made.png"), null);
   const shown = store.filterVisibleGallery(store.gallery).map((item) => item.outputName);

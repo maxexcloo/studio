@@ -1,4 +1,17 @@
-import { canAdmin, checkStudioPassword, clientOf, deviceSession, devicesMayAdmin, endAllDeviceSessions, endDeviceSession, listDeviceSessions, setDevicesMayAdmin, setStudioPassword, startDeviceSession, studioPasswordSet } from "./access.js";
+import {
+  canAdmin,
+  checkStudioPassword,
+  clientOf,
+  deviceSession,
+  devicesMayAdmin,
+  endAllDeviceSessions,
+  endDeviceSession,
+  listDeviceSessions,
+  setDevicesMayAdmin,
+  setStudioPassword,
+  startDeviceSession,
+  studioPasswordSet,
+} from "./access.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 
 /** One limiter for every password this server checks. */
@@ -17,19 +30,38 @@ export async function limitedCheck(req, res, check, wrongMessage) {
     res.json({ ok: false, error: "Wait a moment, then try again." });
     return null;
   }
-  if (result.retryAfterMs) res.setHeader("Retry-After", String(Math.ceil(result.retryAfterMs / 1000)));
+  if (result.retryAfterMs)
+    res.setHeader("Retry-After", String(Math.ceil(result.retryAfterMs / 1000)));
   if (result.reason === "locked") {
-    res.status(429).json({ ok: false, error: `Too many wrong passwords. Try again in ${waitWords(result.retryAfterMs)}.` });
+    res
+      .status(429)
+      .json({
+        ok: false,
+        error: `Too many wrong passwords. Try again in ${waitWords(result.retryAfterMs)}.`,
+      });
     return null;
   }
-  res.status(401).json({ ok: false, locked: true, error: result.retryAfterMs ? `${wrongMessage} Try again in ${waitWords(result.retryAfterMs)}.` : wrongMessage });
+  res
+    .status(401)
+    .json({
+      ok: false,
+      locked: true,
+      error: result.retryAfterMs
+        ? `${wrongMessage} Try again in ${waitWords(result.retryAfterMs)}.`
+        : wrongMessage,
+    });
   return null;
 }
 
-
 function requireThisComputer(req, res) {
   if (clientOf(req).thisComputer) return true;
-  res.status(403).json({ ok: false, reason: "this-computer", error: "Only the computer running Studio can change this." });
+  res
+    .status(403)
+    .json({
+      ok: false,
+      reason: "this-computer",
+      error: "Only the computer running Studio can change this.",
+    });
   return false;
 }
 
@@ -43,7 +75,9 @@ function accessStatus(req) {
     canAdmin: canAdmin(req),
     // What a device that is not signed in needs to know to sign in, and no more.
     studioPassword: { set: studioPasswordSet() },
-    ...(session ? { session: { expiresAt: new Date(Number(session.expiresAt)).toISOString() } } : {})
+    ...(session
+      ? { session: { expiresAt: new Date(Number(session.expiresAt)).toISOString() } }
+      : {}),
   };
 }
 
@@ -55,13 +89,28 @@ export function registerAccessRoutes(app) {
 
   app.post("/api/access/sign-in", async (req, res) => {
     const client = clientOf(req);
-    if (client.thisComputer) { res.json(accessStatus(req)); return; }
-    const password = String(req.body?.password || "");
-    if (!studioPasswordSet()) {
-      res.status(409).json({ ok: false, reason: "setup", error: "Set a studio password first, on the computer running Studio (Settings › Connection)." });
+    if (client.thisComputer) {
+      res.json(accessStatus(req));
       return;
     }
-    const right = await limitedCheck(req, res, async () => checkStudioPassword(password), "That password is incorrect.");
+    const password = String(req.body?.password || "");
+    if (!studioPasswordSet()) {
+      res
+        .status(409)
+        .json({
+          ok: false,
+          reason: "setup",
+          error:
+            "Set a studio password first, on the computer running Studio (Settings › Connection).",
+        });
+      return;
+    }
+    const right = await limitedCheck(
+      req,
+      res,
+      async () => checkStudioPassword(password),
+      "That password is incorrect.",
+    );
     if (!right) return;
     startDeviceSession(req, res);
     res.json(accessStatus(req));
@@ -79,14 +128,20 @@ export function registerAccessRoutes(app) {
     res.setHeader("Cache-Control", "no-store");
     // /api/access/ is open before signing in (index.js), so this one checks for itself.
     if (!clientOf(req).thisComputer && !deviceSession(req)) {
-      res.status(401).json({ ok: false, reason: "sign-in", error: "Sign in with the studio password to continue." });
+      res
+        .status(401)
+        .json({
+          ok: false,
+          reason: "sign-in",
+          error: "Sign in with the studio password to continue.",
+        });
       return;
     }
     res.json({
       ok: true,
       adminFromDevices: devicesMayAdmin(),
       studioPassword: { set: studioPasswordSet() },
-      devices: canAdmin(req) ? listDeviceSessions(deviceSession(req)) : []
+      devices: canAdmin(req) ? listDeviceSessions(deviceSession(req)) : [],
     });
   });
 

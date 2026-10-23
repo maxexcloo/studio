@@ -1,12 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appleBudget, cleanDeviceName, fitsHardware, gpuKind, hardwareFromStats, isThisComputer, localHardware } from "./hardware.js";
+import {
+  appleBudget,
+  cleanDeviceName,
+  fitsHardware,
+  gpuKind,
+  hardwareFromStats,
+  isThisComputer,
+  localHardware,
+} from "./hardware.js";
 
 const GiB = 1024 ** 3;
-const stats = (device, ram = 64 * GiB) => ({ system: { os: "linux", ram_total: ram, ram_free: ram / 2 }, devices: device ? [device] : [] });
+const stats = (device, ram = 64 * GiB) => ({
+  system: { os: "linux", ram_total: ram, ram_free: ram / 2 },
+  devices: device ? [device] : [],
+});
 
 test("an NVIDIA card: its name without ComfyUI's decorations, and its memory as the budget", () => {
-  const hardware = hardwareFromStats(stats({ name: "cuda:0 NVIDIA GeForce RTX 4090 : cudaMallocAsync", type: "cuda", vram_total: 25_757_220_864, vram_free: 24 * GiB }));
+  const hardware = hardwareFromStats(
+    stats({
+      name: "cuda:0 NVIDIA GeForce RTX 4090 : cudaMallocAsync",
+      type: "cuda",
+      vram_total: 25_757_220_864,
+      vram_free: 24 * GiB,
+    }),
+  );
   assert.equal(hardware.kind, "nvidia");
   assert.equal(hardware.name, "NVIDIA GeForce RTX 4090");
   assert.equal(hardware.budgetGB, 24);
@@ -16,14 +34,18 @@ test("an NVIDIA card: its name without ComfyUI's decorations, and its memory as 
 });
 
 test("ROCm presents AMD cards as cuda devices; the name tells them apart", () => {
-  const hardware = hardwareFromStats(stats({ name: "cuda:0 AMD Radeon RX 7900 XTX : native", type: "cuda", vram_total: 24 * GiB }));
+  const hardware = hardwareFromStats(
+    stats({ name: "cuda:0 AMD Radeon RX 7900 XTX : native", type: "cuda", vram_total: 24 * GiB }),
+  );
   assert.equal(hardware.kind, "amd");
   assert.equal(hardware.name, "AMD Radeon RX 7900 XTX");
   assert.equal(hardware.budgetGB, 24);
 });
 
 test("Intel Arc through XPU", () => {
-  const hardware = hardwareFromStats(stats({ name: "xpu:0 Intel(R) Arc(TM) A770 Graphics", type: "xpu", vram_total: 16 * GiB }));
+  const hardware = hardwareFromStats(
+    stats({ name: "xpu:0 Intel(R) Arc(TM) A770 Graphics", type: "xpu", vram_total: 16 * GiB }),
+  );
   assert.equal(hardware.kind, "intel");
   assert.equal(hardware.name, "Intel(R) Arc(TM) A770 Graphics");
   assert.equal(hardware.budgetGB, 16);
@@ -31,7 +53,10 @@ test("Intel Arc through XPU", () => {
 
 test("Apple Silicon: ComfyUI reports all of the unified memory; the budget is a share of it", () => {
   const ram = 24 * GiB;
-  const hardware = hardwareFromStats({ system: { os: "darwin", ram_total: ram }, devices: [{ name: "mps", type: "mps", vram_total: ram, vram_free: ram / 2 }] });
+  const hardware = hardwareFromStats({
+    system: { os: "darwin", ram_total: ram },
+    devices: [{ name: "mps", type: "mps", vram_total: ram, vram_free: ram / 2 }],
+  });
   assert.equal(hardware.kind, "apple");
   assert.equal(hardware.unified, true);
   assert.equal(hardware.name, "Apple Silicon");
@@ -49,7 +74,11 @@ test("a raised GPU wired limit on the Mac is the budget, never more than the mem
 });
 
 test("no budget where ComfyUI cannot tell: DirectML's placeholder, the CPU, no device", () => {
-  assert.equal(hardwareFromStats(stats({ name: "privateuseone", type: "privateuseone", vram_total: GiB })).budgetGB, null);
+  assert.equal(
+    hardwareFromStats(stats({ name: "privateuseone", type: "privateuseone", vram_total: GiB }))
+      .budgetGB,
+    null,
+  );
   const cpu = hardwareFromStats(stats({ name: "cpu", type: "cpu", vram_total: 64 * GiB }));
   assert.equal(cpu.kind, "cpu");
   assert.equal(cpu.budgetGB, null);
@@ -80,7 +109,12 @@ test("this computer, when ComfyUI is meant to run here but does not answer", asy
   assert.equal(mac.kind, "apple");
   assert.equal(mac.source, "this-computer");
   assert.ok(mac.budgetGB > 0);
-  const nvidia = await localHardware({ platform: "linux", arch: "x64", run: async (command) => command === "nvidia-smi" ? "NVIDIA GeForce RTX 3060, 12288, 11000\n" : "" });
+  const nvidia = await localHardware({
+    platform: "linux",
+    arch: "x64",
+    run: async (command) =>
+      command === "nvidia-smi" ? "NVIDIA GeForce RTX 3060, 12288, 11000\n" : "",
+  });
   assert.equal(nvidia.kind, "nvidia");
   assert.equal(nvidia.name, "NVIDIA GeForce RTX 3060");
   assert.equal(nvidia.budgetGB, 12);

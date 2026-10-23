@@ -78,7 +78,9 @@ export function readJsonFile(file) {
       console.warn(`[Studio] ${path.basename(file)} was unreadable; restored the previous copy.`);
       return backup;
     }
-    console.warn(`[Studio] ${path.basename(file)} was unreadable and had no backup; it was set aside.`);
+    console.warn(
+      `[Studio] ${path.basename(file)} was unreadable and had no backup; it was set aside.`,
+    );
     throw error;
   }
 }
@@ -128,7 +130,11 @@ const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
  * write (a newer one already landed), so an older copy never replaces a newer.
  * Resolves to whether the file was replaced.
  */
-export async function writeJsonFileAsync(file, value, { mode, sliceSize = 500, shouldCommit = () => true } = {}) {
+export async function writeJsonFileAsync(
+  file,
+  value,
+  { mode, sliceSize = 500, shouldCommit = () => true } = {},
+) {
   await fs.promises.mkdir(path.dirname(file), { recursive: true });
   const temporary = temporaryFor(file);
   const backupTemporary = `${temporary}.bak`;
@@ -142,7 +148,10 @@ export async function writeJsonFileAsync(file, value, { mode, sliceSize = 500, s
         for (let start = 0; start < value.length; start += sliceSize) {
           if (start) await yieldToEventLoop();
           // JSON.stringify writes null for what it cannot represent in an array; so does this.
-          const text = value.slice(start, start + sliceSize).map((item) => JSON.stringify(item) ?? "null").join(",");
+          const text = value
+            .slice(start, start + sliceSize)
+            .map((item) => JSON.stringify(item) ?? "null")
+            .join(",");
           await handle.write(start ? `,${text}` : text);
         }
         await handle.write("]");
@@ -189,9 +198,14 @@ export function removeStaleTemporaries(file) {
   const prefix = `${path.basename(file)}.tmp-`;
   const own = `${prefix}${process.pid}-`;
   let names = [];
-  try { names = fs.readdirSync(dir); } catch { return; }
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return;
+  }
   for (const name of names) {
-    if (name.startsWith(prefix) && !name.startsWith(own)) fs.rmSync(path.join(dir, name), { force: true });
+    if (name.startsWith(prefix) && !name.startsWith(own))
+      fs.rmSync(path.join(dir, name), { force: true });
   }
 }
 

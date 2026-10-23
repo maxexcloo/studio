@@ -49,19 +49,27 @@ function fit(samples) {
   if (Math.max(...xs) / Math.min(...xs) < 1.5) return null;
   const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
   const my = samples.reduce((a, item) => a + item.ms, 0) / samples.length;
-  const slope = samples.reduce((a, item) => a + (item.w - mx) * (item.ms - my), 0) / samples.reduce((a, item) => a + (item.w - mx) ** 2, 0);
+  const slope =
+    samples.reduce((a, item) => a + (item.w - mx) * (item.ms - my), 0) /
+    samples.reduce((a, item) => a + (item.w - mx) ** 2, 0);
   const intercept = my - slope * mx;
   return slope > 0 && intercept >= 0 ? { fixedMs: intercept, perWorkMs: slope } : null;
 }
 
 /** What an upscale should take here: `{ totalMs, trusted }`, or null with too little to go on. */
-export function estimateUpscale(history = [], { quality = "", model = "", faceDetail = false, work = 0 } = {}) {
+export function estimateUpscale(
+  history = [],
+  { quality = "", model = "", faceDetail = false, work = 0 } = {},
+) {
   if (!work) return null;
   const samples = samplesFor(history, { quality, model, faceDetail });
   if (samples.length < MIN_UPSCALES) return null;
   const sizes = samples.map((item) => item.w);
   if (work > Math.max(...sizes) * 3 || work < Math.min(...sizes) / 3) return null;
-  const errors = samples.map((item) => item.e).filter(Number.isFinite).slice(-5);
+  const errors = samples
+    .map((item) => item.e)
+    .filter(Number.isFinite)
+    .slice(-5);
   const trusted = errors.length < 2 || median(errors) <= TRUSTED_ERROR;
   const line = fit(samples);
   const totalMs = line
@@ -71,9 +79,26 @@ export function estimateUpscale(history = [], { quality = "", model = "", faceDe
 }
 
 /** The history with one finished upscale added; `predicted` says how far off its estimate was. */
-export function addUpscale(history = [], { quality = "", model = "", faceDetail = false, work = 0, ms = 0, predicted = null, at = new Date().toISOString() } = {}) {
+export function addUpscale(
+  history = [],
+  {
+    quality = "",
+    model = "",
+    faceDetail = false,
+    work = 0,
+    ms = 0,
+    predicted = null,
+    at = new Date().toISOString(),
+  } = {},
+) {
   if (!work || !(ms > 0)) return history;
-  const entry = { q: String(quality), m: String(model), w: Math.round(work * 1000) / 1000, ms: Math.round(ms), at };
+  const entry = {
+    q: String(quality),
+    m: String(model),
+    w: Math.round(work * 1000) / 1000,
+    ms: Math.round(ms),
+    at,
+  };
   if (faceDetail) entry.f = 1;
   if (predicted?.totalMs) entry.e = Math.round((Math.abs(ms - predicted.totalMs) / ms) * 100) / 100;
   const next = [...history, entry];

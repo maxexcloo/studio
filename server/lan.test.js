@@ -3,11 +3,19 @@ import test from "node:test";
 import { listensBeyondThisComputer, resolveLan } from "./lan.js";
 
 test("off by default, on this computer only", () => {
-  assert.deepEqual(resolveLan({ argv: [], env: {} }), { host: "127.0.0.1", source: "setting", saved: false });
+  assert.deepEqual(resolveLan({ argv: [], env: {} }), {
+    host: "127.0.0.1",
+    source: "setting",
+    saved: false,
+  });
 });
 
 test("--lan opens it for the run, whatever was saved", () => {
-  assert.deepEqual(resolveLan({ argv: ["--lan"], env: { STUDIO_LAN: "0" } }), { host: "0.0.0.0", source: "flag", saved: false });
+  assert.deepEqual(resolveLan({ argv: ["--lan"], env: { STUDIO_LAN: "0" } }), {
+    host: "0.0.0.0",
+    source: "flag",
+    saved: false,
+  });
 });
 
 test("the Settings switch, saved in .env, opens it", () => {
@@ -20,11 +28,20 @@ test("the Settings switch, saved in .env, opens it", () => {
 test("an older HOST=0.0.0.0 in .env counts as the switch, until the switch says otherwise", () => {
   const keys = new Set(["HOST"]);
   assert.equal(resolveLan({ env: { HOST: "0.0.0.0" }, fileKeys: keys }).saved, true);
-  assert.equal(resolveLan({ env: { HOST: "0.0.0.0", STUDIO_LAN: "0" }, fileKeys: new Set(["HOST", "STUDIO_LAN"]) }).host, "127.0.0.1");
+  assert.equal(
+    resolveLan({
+      env: { HOST: "0.0.0.0", STUDIO_LAN: "0" },
+      fileKeys: new Set(["HOST", "STUDIO_LAN"]),
+    }).host,
+    "127.0.0.1",
+  );
 });
 
 test("HOST from the shell outranks the switch", () => {
-  const lan = resolveLan({ env: { HOST: "0.0.0.0", STUDIO_LAN: "0" }, fileKeys: new Set(["STUDIO_LAN"]) });
+  const lan = resolveLan({
+    env: { HOST: "0.0.0.0", STUDIO_LAN: "0" },
+    fileKeys: new Set(["STUDIO_LAN"]),
+  });
   assert.equal(lan.host, "0.0.0.0");
   assert.equal(lan.source, "shell");
 });

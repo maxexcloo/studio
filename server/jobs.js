@@ -1,32 +1,53 @@
-import path from 'node:path';
-import { ingestRunResults, mediaStorageEnabled, noteIngested, removeComfyFiles, temporaryInputFiles } from './media-store.js';
-import { dataDir, flushGallery } from './gallery-store.js';
-import { createCloudJobStore, isCloudGraph } from './cloud-jobs.js';
-import { currentComfyBackend, withComfyBackend } from './comfy-backends.js';
-import { defaultWorkerId } from './workers.js';
-import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from './comfy.js';
-import { cancelPrompt, promptTracker } from './comfy-queue.js';
-import { describeFailure } from './failures.js';
-import { withFixes } from './failure-fixes.js';
-import { nextProgress } from './progress-phase.js';
-import { rememberMissingParts } from './model-families.js';
-import { imageGraph, videoGraph } from './graphs.js';
-import { generationSettings, outputsFrom, replaceGalleryJob, updateGalleryJob, updateGalleryJobPreviews } from './gallery-store.js';
-import { forgetComfyRun } from './comfy-traces.js';
-import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from './run-upscale.js';
-import { writeCivitaiParameters } from './civitai.js';
-import { warmNewOutputs } from './media-warmup.js';
-import { markWorkflowUsed } from './workflow-catalog.js';
-import { completedTiming, remainingMs, RunTimer, slowSteps } from './generation-timing.js';
-import { generationEstimate, generationWarm, recordGeneration, recordUpscale, upscaleEstimate } from './timings.js';
-import { upscaleLeftMs, upscaleWork } from './upscale-timing.js';
+import path from "node:path";
+import {
+  ingestRunResults,
+  mediaStorageEnabled,
+  noteIngested,
+  removeComfyFiles,
+  temporaryInputFiles,
+} from "./media-store.js";
+import { dataDir, flushGallery } from "./gallery-store.js";
+import { createCloudJobStore, isCloudGraph } from "./cloud-jobs.js";
+import { currentComfyBackend, withComfyBackend } from "./comfy-backends.js";
+import { defaultWorkerId } from "./workers.js";
+import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from "./comfy.js";
+import { cancelPrompt, promptTracker } from "./comfy-queue.js";
+import { describeFailure } from "./failures.js";
+import { withFixes } from "./failure-fixes.js";
+import { nextProgress } from "./progress-phase.js";
+import { rememberMissingParts } from "./model-families.js";
+import { imageGraph, videoGraph } from "./graphs.js";
+import {
+  generationSettings,
+  outputsFrom,
+  replaceGalleryJob,
+  updateGalleryJob,
+  updateGalleryJobPreviews,
+} from "./gallery-store.js";
+import { forgetComfyRun } from "./comfy-traces.js";
+import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
+import { writeCivitaiParameters } from "./civitai.js";
+import { warmNewOutputs } from "./media-warmup.js";
+import { markWorkflowUsed } from "./workflow-catalog.js";
+import { completedTiming, remainingMs, RunTimer, slowSteps } from "./generation-timing.js";
+import {
+  generationEstimate,
+  generationWarm,
+  recordGeneration,
+  recordUpscale,
+  upscaleEstimate,
+} from "./timings.js";
+import { upscaleLeftMs, upscaleWork } from "./upscale-timing.js";
 
 export const jobs = new Map();
-export const cloudJobs = createCloudJobStore(path.join(dataDir, 'cloud-jobs.json'));
+export const cloudJobs = createCloudJobStore(path.join(dataDir, "cloud-jobs.json"));
 const previewSlots = new Map();
 const terminalCleanupTimers = new Map();
 const previewIntervalMs = Math.max(100, Number(process.env.STUDIO_PREVIEW_INTERVAL_MS || 500));
-const terminalJobTtlMs = Math.max(10_000, Number(process.env.STUDIO_TERMINAL_JOB_TTL_MS || 5 * 60 * 1000));
+const terminalJobTtlMs = Math.max(
+  10_000,
+  Number(process.env.STUDIO_TERMINAL_JOB_TTL_MS || 5 * 60 * 1000),
+);
 
 function clearPreviewSlot(id) {
   const slot = previewSlots.get(id);
@@ -44,7 +65,7 @@ export function setTerminalJob(id, patch) {
     previews: undefined,
     prompt: undefined,
     items: undefined,
-    terminalAt: Date.now()
+    terminalAt: Date.now(),
   };
   jobs.set(id, next);
   cloudJobs.forget(id);
@@ -158,9 +179,12 @@ function leftMsFor(timing, now = Date.now()) {
   if (up?.startAt) return upscaleLeftMs(up.estimate, up.startAt, now);
   const upscaleMs = up ? up.estimate.totalMs : 0;
   if (timing.kind === "upscale") return upscaleMs;
-  const generation = timing.timer && timing.timer.runAt !== null
-    ? remainingMs(timing.timer, timing.estimate, now)
-    : timing.estimate?.trusted ? timing.estimate.totalMs : null;
+  const generation =
+    timing.timer && timing.timer.runAt !== null
+      ? remainingMs(timing.timer, timing.estimate, now)
+      : timing.estimate?.trusted
+        ? timing.estimate.totalMs
+        : null;
   return generation === null ? null : generation + upscaleMs;
 }
 
@@ -180,7 +204,12 @@ function withEta(id, progress, now = Date.now()) {
   const left = leftMsFor(timing, now);
   if (left === null) return { ...plain, ...upscaling };
   const started = startedAt(timing);
-  return { ...plain, ...upscaling, endsAt: Math.round(now + left), ...(started !== null ? { runStartedAt: started } : {}) };
+  return {
+    ...plain,
+    ...upscaling,
+    endsAt: Math.round(now + left),
+    ...(started !== null ? { runStartedAt: started } : {}),
+  };
 }
 
 /**
@@ -189,7 +218,10 @@ function withEta(id, progress, now = Date.now()) {
  * (a model or upscale without a trusted estimate), since everything behind it
  * would be a guess.
  */
-function refreshQueueEstimates(now = Date.now(), { apply = true, backend = defaultWorkerId() } = {}) {
+function refreshQueueEstimates(
+  now = Date.now(),
+  { apply = true, backend = defaultWorkerId() } = {},
+) {
   const queues = new Map();
   for (const [id, job] of jobs) {
     if (!["queued", "running", "canceling"].includes(job.status)) continue;
@@ -205,7 +237,8 @@ function refreshQueueEstimates(now = Date.now(), { apply = true, backend = defau
     if (startedAt(timing) !== null || timing.upscale?.startAt) {
       if (left === null) queue.known = false;
       else queue.cursor = Math.max(queue.cursor, now + left);
-      if (apply && timing.kind === "upscale") timing.onEta?.(left === null ? null : Math.round(now + left));
+      if (apply && timing.kind === "upscale")
+        timing.onEta?.(left === null ? null : Math.round(now + left));
       continue;
     }
     const endsAt = queue.known && left !== null ? Math.round(queue.cursor + left) : null;
@@ -224,7 +257,7 @@ function refreshQueueEstimates(now = Date.now(), { apply = true, backend = defau
     updateGalleryJob(id, { progress }, { persist: false });
   }
   const queue = queues.get(backend);
-  return !queue || queue.known ? queue?.cursor ?? now : null;
+  return !queue || queue.known ? (queue?.cursor ?? now) : null;
 }
 
 /**
@@ -240,8 +273,12 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
     onEta(endsAt) {
       if (endsAt === last || (endsAt && last && Math.abs(endsAt - last) < 2000)) return;
       last = endsAt;
-      onEta(endsAt ? { endsAt, ...(timing.upscale.startAt ? { runStartedAt: timing.upscale.startAt } : {}) } : {});
-    }
+      onEta(
+        endsAt
+          ? { endsAt, ...(timing.upscale.startAt ? { runStartedAt: timing.upscale.startAt } : {}) }
+          : {},
+      );
+    },
   };
   runTimings.set(jobId, timing);
   refreshQueueEstimates();
@@ -254,13 +291,18 @@ export function trackUpscale(jobId, estimate, onEta = () => {}) {
     },
     /** The clock fields for a progress patch. */
     eta() {
-      return last ? { endsAt: last, ...(timing.upscale.startAt ? { runStartedAt: timing.upscale.startAt } : {}) } : {};
+      return last
+        ? {
+            endsAt: last,
+            ...(timing.upscale.startAt ? { runStartedAt: timing.upscale.startAt } : {}),
+          }
+        : {};
     },
     startAt: () => timing.upscale.startAt,
     end() {
       runTimings.delete(jobId);
       refreshQueueEstimates();
-    }
+    },
   };
 }
 
@@ -294,7 +336,9 @@ function waitForSocketOpen(socket) {
 function sendSocketFeatureFlags(socket) {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
   try {
-    socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
+    socket.send(
+      JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }),
+    );
   } catch {
     // Preview frames are optional; generation should still continue.
   }
@@ -342,7 +386,14 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       if (next) {
         const progress = withEta(id, next);
         // A cancel asked for meanwhile stands; progress must not turn it back into running.
-        jobs.set(id, { ...current, status: current.status === "canceling" || current.status === "canceled" ? current.status : "running", progress });
+        jobs.set(id, {
+          ...current,
+          status:
+            current.status === "canceling" || current.status === "canceled"
+              ? current.status
+              : "running",
+          progress,
+        });
         updateGalleryJob(id, { status: "pending", progress }, { persist: false });
         refreshQueueEstimates();
       }
@@ -366,15 +417,24 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
         }
       }
       // Finished: look for the images now rather than at the next poll.
-      if (message.type === "execution_success" || (message.type === "executing" && (data.node === null || data.node === undefined))) {
+      if (
+        message.type === "execution_success" ||
+        (message.type === "executing" && (data.node === null || data.node === undefined))
+      ) {
         if (timing?.upscale?.startAt) timing.upscale.endAt ??= Date.now();
         // Remembered as well as woken: a finish that lands mid-check must not wait out a full poll.
         run.finished = true;
         run.wake?.();
       }
       // Stopped or failed while upscaling: runJob delivers the saved picture instead.
-      if ((message.type === "execution_interrupted" || message.type === "execution_error") && run.saved?.size) {
-        run.missed = message.type === "execution_interrupted" ? { canceled: true } : { error: normalizeComfyError(data.exception_message || "") };
+      if (
+        (message.type === "execution_interrupted" || message.type === "execution_error") &&
+        run.saved?.size
+      ) {
+        run.missed =
+          message.type === "execution_interrupted"
+            ? { canceled: true }
+            : { error: normalizeComfyError(data.exception_message || "") };
         run.wake?.();
         return;
       }
@@ -384,7 +444,17 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
       }
       if (message.type === "execution_error") {
         const learned = learnFromFailure(jobBodies.get(id), data.exception_message);
-        const failure = withFixes(describeFailure({ message: data.exception_message, nodeType: data.node_type, nodeId: data.node_id, exceptionType: data.exception_type, traceback: data.traceback, learned }), jobBodies.get(id));
+        const failure = withFixes(
+          describeFailure({
+            message: data.exception_message,
+            nodeType: data.node_type,
+            nodeId: data.node_id,
+            exceptionType: data.exception_type,
+            traceback: data.traceback,
+            learned,
+          }),
+          jobBodies.get(id),
+        );
         setTerminalJob(id, { status: "error", error: failure.summary, failure });
         updateGalleryJob(id, { status: "error", filename: failure.title, failure });
       }
@@ -395,10 +465,10 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
   return socket;
 }
 
-
 /** A run's temporary input copies (resized references, legacy uploads) go when it ends. */
 function forgetTemporaryInputs(body) {
-  if (body?.temporaryInputNames?.length) forgetComfyRun({ inputNames: body.temporaryInputNames }).catch(() => null);
+  if (body?.temporaryInputNames?.length)
+    forgetComfyRun({ inputNames: body.temporaryInputNames }).catch(() => null);
 }
 
 // What each running job asked for, so a failure can be read against it.
@@ -412,7 +482,8 @@ const jobBodies = new Map();
 function learnFromFailure(body, message = "") {
   if (body?.source !== "checkpoint" || !body.bundled) return "";
   const text = String(message || "");
-  const noEncoder = /clip input is invalid: None|does not contain a valid clip|no CLIP\/text encoder/i.test(text);
+  const noEncoder =
+    /clip input is invalid: None|does not contain a valid clip|no CLIP\/text encoder/i.test(text);
   const noVae = /VAE is invalid: None|vae.*is None|does not contain a valid vae/i.test(text);
   if (!noEncoder && !noVae) return "";
   rememberMissingParts(body.model, { encoder: noEncoder, vae: noVae });
@@ -446,7 +517,14 @@ function showReconnecting(id, run, on) {
   let progress;
   if (on) {
     run.progressBefore = current.progress || null;
-    progress = { value: 0, max: 0, node: "", phase: "Reconnecting…", steps: false, reconnecting: true };
+    progress = {
+      value: 0,
+      max: 0,
+      node: "",
+      phase: "Reconnecting…",
+      steps: false,
+      reconnecting: true,
+    };
   } else {
     progress = run.progressBefore || { value: 0, max: 0 };
     run.progressBefore = null;
@@ -479,8 +557,17 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     timing.timer = new RunTimer(prompt, { endNodes: pairs.map((pair) => pair.base) });
     if (embed) {
       // Its upscale is part of the run's time: learned from every SeedVR2 upscale here (upscale-timing.js).
-      const work = upscaleWork({ width: embed.plan?.estimatedWidth, height: embed.plan?.estimatedHeight, count: (Number(body.count) || 1) * pairs.length });
-      const learn = { quality: embed.quality, model: embed.plan?.model || "", faceDetail: Boolean(embed.faceDetail), work };
+      const work = upscaleWork({
+        width: embed.plan?.estimatedWidth,
+        height: embed.plan?.estimatedHeight,
+        count: (Number(body.count) || 1) * pairs.length,
+      });
+      const learn = {
+        quality: embed.quality,
+        model: embed.plan?.model || "",
+        faceDetail: Boolean(embed.faceDetail),
+        work,
+      };
       timing.upscale = { estimate: upscaleEstimate(learn), learn, startAt: null, endAt: null };
     }
     socket = openProgressSocket(id);
@@ -492,7 +579,26 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prompt, client_id: id, extra_data: { preview_method: "auto", studio_generation: { jobId: id, prompt: body.prompt, negative: body.negative, model: body.model, createdAt: body.createdAt, width: body.width, height: body.height, settings: generationSettings(body), ...(body.ownerId ? { ownerId: body.ownerId } : {}), ...(body.assistant ? { assistant: body.assistant } : {}), ...(body.chat ? { chat: body.chat } : {}) } } })
+      body: JSON.stringify({
+        prompt,
+        client_id: id,
+        extra_data: {
+          preview_method: "auto",
+          studio_generation: {
+            jobId: id,
+            prompt: body.prompt,
+            negative: body.negative,
+            model: body.model,
+            createdAt: body.createdAt,
+            width: body.width,
+            height: body.height,
+            settings: generationSettings(body),
+            ...(body.ownerId ? { ownerId: body.ownerId } : {}),
+            ...(body.assistant ? { assistant: body.assistant } : {}),
+            ...(body.chat ? { chat: body.chat } : {}),
+          },
+        },
+      }),
     });
     if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
       // It may already have started on an idle ComfyUI; this stops it either way, and only it.
@@ -504,7 +610,14 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     run.promptId = queued.prompt_id;
     jobs.set(id, { ...jobs.get(id), status: "running", promptId: queued.prompt_id });
     // The provider keeps working through a Studio restart; the restarted server resumes from this record.
-    if (isCloudGraph(prompt)) cloudJobs.remember(id, { promptId: queued.prompt_id, comfyBackend: currentComfyBackend(), kind: body.kind, profileId: body.profileId || "", ...(body.ownerId ? { ownerId: body.ownerId } : {}) });
+    if (isCloudGraph(prompt))
+      cloudJobs.remember(id, {
+        promptId: queued.prompt_id,
+        comfyBackend: currentComfyBackend(),
+        kind: body.kind,
+        profileId: body.profileId || "",
+        ...(body.ownerId ? { ownerId: body.ownerId } : {}),
+      });
     const tracker = promptTracker(queued.prompt_id);
     run.alive = tracker.alive;
     /**
@@ -520,18 +633,33 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         results = moved.results;
         comfyCopies = moved.comfyFiles;
       }
-      const upscaled = (result) => (result.upscale && !missed ? runUpscaleState(embed, result.upscale) : null);
-      const missedState = (result) => (result.paired && (missed || !result.upscale) ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image" }) : null);
+      const upscaled = (result) =>
+        result.upscale && !missed ? runUpscaleState(embed, result.upscale) : null;
+      const missedState = (result) =>
+        result.paired && (missed || !result.upscale)
+          ? missedUpscaleState(embed, missed || { error: "The upscale ended without an image" })
+          : null;
       const outputs = results.map((result) => result.output);
-      const kept = missed ? keptMessage({ canceled: Boolean(missed.canceled), count: outputs.length }) : "";
-      const skipped = upscale?.skipped ? { status: "error", quality: upscale.quality, progress: null, error: upscale.skipped } : null;
+      const kept = missed
+        ? keptMessage({ canceled: Boolean(missed.canceled), count: outputs.length })
+        : "";
+      const skipped = upscale?.skipped
+        ? { status: "error", quality: upscale.quality, progress: null, error: upscale.skipped }
+        : null;
       // Every upscale it made teaches the next estimate.
       const clock = timing.upscale;
       if (clock?.startAt && !missed && results.some((result) => result.upscale)) {
-        recordUpscale({ ...clock.learn, ms: (clock.endAt ?? Date.now()) - clock.startAt, predicted: clock.estimate });
+        recordUpscale({
+          ...clock.learn,
+          ms: (clock.endAt ?? Date.now()) - clock.startAt,
+          predicted: clock.estimate,
+        });
       }
       // Before the gallery shows them, so no browser reads a file mid-write.
-      await writeCivitaiParameters([...outputs, ...results.map((result) => result.upscale).filter(Boolean)], body);
+      await writeCivitaiParameters(
+        [...outputs, ...results.map((result) => result.upscale).filter(Boolean)],
+        body,
+      );
       // Thumbnails now, from the final files, rather than on first view.
       warmNewOutputs([...outputs, ...results.map((result) => result.upscale).filter(Boolean)]);
       const withUpscales = results.map((result) => {
@@ -541,26 +669,35 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         return state ? { ...result.output, upscale: state } : result.output;
       });
       const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
-      markWorkflowUsed(body.profileId || body.model || body.workflow || "", completed[0]?.url || "");
+      markWorkflowUsed(
+        body.profileId || body.model || body.workflow || "",
+        completed[0]?.url || "",
+      );
       setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
-      if (body.temporaryInputNames?.length) await forgetComfyRun({ inputNames: body.temporaryInputNames });
+      if (body.temporaryInputNames?.length)
+        await forgetComfyRun({ inputNames: body.temporaryInputNames });
       // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
       if (mediaStorageEnabled) {
         await flushGallery();
         noteIngested([id]);
         await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
-        if (comfyCopies.length) await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
+        if (comfyCopies.length)
+          await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
       }
       socket?.close();
     };
     // The pictures Smart upscale was working on, from what ComfyUI said as each was saved.
-    const savedResults = () => pairs.flatMap((pair) => {
-      const output = run.saved.get(pair.base);
-      return output ? pairRunOutputs({ [pair.base]: output }, [pair]) : [];
-    });
+    const savedResults = () =>
+      pairs.flatMap((pair) => {
+        const output = run.saved.get(pair.base);
+        return output ? pairRunOutputs({ [pair.base]: output }, [pair]) : [];
+      });
     while (true) {
-      if ((jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") && run.saved.size) {
+      if (
+        (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") &&
+        run.saved.size
+      ) {
         // Stopped while upscaling: the pictures are done, so they stay.
         await cancelPrompt(queued.prompt_id).catch(() => null);
         await deliver(savedResults(), { canceled: true });
@@ -594,7 +731,11 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       if (checked.reconnected) {
         showReconnecting(id, run, false);
         // A socket that dropped with the connection gets a fresh one, so progress and previews come back.
-        if (!socket || socket.readyState === WebSocket.CLOSING || socket.readyState === WebSocket.CLOSED) {
+        if (
+          !socket ||
+          socket.readyState === WebSocket.CLOSING ||
+          socket.readyState === WebSocket.CLOSED
+        ) {
           socket = openProgressSocket(id);
           await waitForSocketOpen(socket);
           sendSocketFeatureFlags(socket);
@@ -609,21 +750,31 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           const messages = entry.status.messages || [];
           const interrupted = messages.some(([type]) => type === "execution_interrupted");
           const failed = messages.find(([type]) => type === "execution_error")?.[1] || {};
-          await deliver(results, interrupted ? { canceled: true } : { error: normalizeComfyError(failed.exception_message || "") });
+          await deliver(
+            results,
+            interrupted
+              ? { canceled: true }
+              : { error: normalizeComfyError(failed.exception_message || "") },
+          );
           return;
         }
       }
       // A run that failed while the socket was down still says why in its history.
       if (entry?.status?.status_str === "error") {
-        const failed = (entry.status.messages || []).find(([type]) => type === "execution_error")?.[1] || {};
-        throw Object.assign(new Error(failed.exception_message || "ComfyUI execution failed"), { comfyFailure: failed });
+        const failed =
+          (entry.status.messages || []).find(([type]) => type === "execution_error")?.[1] || {};
+        throw Object.assign(new Error(failed.exception_message || "ComfyUI execution failed"), {
+          comfyFailure: failed,
+        });
       }
       if (entry) {
         recordTiming(id, body, timing);
         const results = pairRunOutputs(entry.outputs, pairs);
         // Replacing the placeholder with nothing would delete the tile; keep it as a failure that says why.
         if (!results.length) {
-          throw Object.assign(new Error("ComfyUI finished the run but saved no image."), { noOutput: true });
+          throw Object.assign(new Error("ComfyUI finished the run but saved no image."), {
+            noOutput: true,
+          });
         }
         await deliver(results);
         return;
@@ -638,7 +789,21 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const learned = learnFromFailure(body, raw);
     const friendly = learned ? "" : normalizeComfyError(raw);
     const from = error.comfyFailure || {};
-    const failure = known || (error.noOutput ? describeFailure({ message: error.message, noOutput: true }) : null) || withFixes(describeFailure({ message: raw, friendly: friendly !== raw ? friendly : "", nodeType: from.node_type, nodeId: from.node_id, exceptionType: from.exception_type, traceback: from.traceback, learned }), body);
+    const failure =
+      known ||
+      (error.noOutput ? describeFailure({ message: error.message, noOutput: true }) : null) ||
+      withFixes(
+        describeFailure({
+          message: raw,
+          friendly: friendly !== raw ? friendly : "",
+          nodeType: from.node_type,
+          nodeId: from.node_id,
+          exceptionType: from.exception_type,
+          traceback: from.traceback,
+          learned,
+        }),
+        body,
+      );
     setTerminalJob(id, { status: "error", error: failure.summary, failure });
     updateGalleryJob(id, { status: "error", filename: failure.title, failure });
     socket?.close();
@@ -664,8 +829,16 @@ function recordTiming(id, body, timing) {
   const slow = slowSteps(result, timing.estimate);
   // Upscale runs in the same ComfyUI prompt after the picture is saved, so it is outside Active: kept on its own.
   const up = timing.upscale;
-  const upscaleMs = up?.startAt && up?.endAt && up.endAt > up.startAt ? Math.round(up.endAt - up.startAt) : 0;
-  jobs.set(id, { ...jobs.get(id), timing: { ...completedTiming(timing.timer, body.startedAt, result), ...(upscaleMs ? { upscaleMs } : {}), ...(slow ? { slow: true } : {}) } });
+  const upscaleMs =
+    up?.startAt && up?.endAt && up.endAt > up.startAt ? Math.round(up.endAt - up.startAt) : 0;
+  jobs.set(id, {
+    ...jobs.get(id),
+    timing: {
+      ...completedTiming(timing.timer, body.startedAt, result),
+      ...(upscaleMs ? { upscaleMs } : {}),
+      ...(slow ? { slow: true } : {}),
+    },
+  });
 }
 
 function hashString(str = "") {
@@ -728,7 +901,11 @@ export function runMockJob(id, body) {
   const count = body.kind === "image" ? Math.max(1, Math.min(8, Number(body.count || 1))) : 1;
   let currentStep = 0;
 
-  updateGalleryJob(id, { status: "running", progress: { value: 1, max: steps, node: "KSampler" } }, { persist: false });
+  updateGalleryJob(
+    id,
+    { status: "running", progress: { value: 1, max: steps, node: "KSampler" } },
+    { persist: false },
+  );
 
   const interval = setInterval(() => {
     if (isCanceled()) {
@@ -739,10 +916,18 @@ export function runMockJob(id, body) {
     }
     currentStep += Math.max(1, Math.ceil(steps / 4));
     if (currentStep < steps) {
-      updateGalleryJob(id, { progress: { value: currentStep, max: steps, node: "KSampler" } }, { persist: false });
+      updateGalleryJob(
+        id,
+        { progress: { value: currentStep, max: steps, node: "KSampler" } },
+        { persist: false },
+      );
     } else {
       clearInterval(interval);
-      updateGalleryJob(id, { progress: { value: steps, max: steps, node: "VAEDecode" } }, { persist: false });
+      updateGalleryJob(
+        id,
+        { progress: { value: steps, max: steps, node: "VAEDecode" } },
+        { persist: false },
+      );
 
       setTimeout(async () => {
         if (isCanceled()) {
@@ -752,13 +937,19 @@ export function runMockJob(id, body) {
         }
         const completedAt = new Date().toISOString();
         const outputs = Array.from({ length: count }, (_, index) => {
-          const url = generateMockImageDataUrl(body.prompt + (count > 1 ? ` #${index + 1}` : ""), body.width, body.height, body.kind);
+          const url = generateMockImageDataUrl(
+            body.prompt + (count > 1 ? ` #${index + 1}` : ""),
+            body.width,
+            body.height,
+            body.kind,
+          );
           return {
             id: `${id}-${index}`,
             jobId: id,
             index,
             url,
-            filename: body.kind === "image" && count > 1 ? `${body.prompt} ${index + 1}` : body.prompt,
+            filename:
+              body.kind === "image" && count > 1 ? `${body.prompt} ${index + 1}` : body.prompt,
             type: body.kind === "video" ? "video" : "image",
             status: "done",
             completedAt,
@@ -767,13 +958,15 @@ export function runMockJob(id, body) {
             height: Number(body.height || 1024),
             model: body.model || "flux1-schnell.safetensors",
             prompt: body.prompt,
-            negative: body.negative || ""
+            negative: body.negative || "",
           };
         });
 
-
         await replaceGalleryJob(id, outputs, body, jobs);
-        markWorkflowUsed(body.profileId || body.model || body.workflow || "", outputs[0]?.url || "");
+        markWorkflowUsed(
+          body.profileId || body.model || body.workflow || "",
+          outputs[0]?.url || "",
+        );
         setTerminalJob(id, { status: "done", outputs });
       }, 400);
     }

@@ -32,7 +32,11 @@ AwEHoUQDQgAEHp7uHp705/Mb2DwHzo40e69LIuF2ziGvN658O6eXCOX1tusq0GSZ
 `;
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-tls-"));
-const write = (name, text) => { const file = path.join(dir, name); fs.writeFileSync(file, text); return file; };
+const write = (name, text) => {
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, text);
+  return file;
+};
 const certFile = write("studio.crt", cert);
 const keyFile = write("studio.key", key);
 
@@ -53,11 +57,23 @@ test("a wrong key, a missing file or something that isn't PEM is refused in plai
 
 test("with a certificate, other devices get HTTPS and plain HTTP stays on this computer", () => {
   const ready = inspectTls(certFile, keyFile);
-  assert.deepEqual(listenPlan({ host: "0.0.0.0", tls: ready }), { httpHost: "127.0.0.1", httpsHost: "0.0.0.0", tlsProblem: "" });
+  assert.deepEqual(listenPlan({ host: "0.0.0.0", tls: ready }), {
+    httpHost: "127.0.0.1",
+    httpsHost: "0.0.0.0",
+    tlsProblem: "",
+  });
   // LAN mode off: nothing about HTTPS, nothing changes.
-  assert.deepEqual(listenPlan({ host: "127.0.0.1", tls: ready }), { httpHost: "127.0.0.1", httpsHost: "", tlsProblem: "" });
+  assert.deepEqual(listenPlan({ host: "127.0.0.1", tls: ready }), {
+    httpHost: "127.0.0.1",
+    httpsHost: "",
+    tlsProblem: "",
+  });
   // No certificate: plain HTTP for everyone, as before.
-  assert.deepEqual(listenPlan({ host: "0.0.0.0", tls: inspectTls("", "") }), { httpHost: "0.0.0.0", httpsHost: "", tlsProblem: "" });
+  assert.deepEqual(listenPlan({ host: "0.0.0.0", tls: inspectTls("", "") }), {
+    httpHost: "0.0.0.0",
+    httpsHost: "",
+    tlsProblem: "",
+  });
 });
 
 test("a certificate that can't be used keeps the network closed instead of falling back to plain HTTP", () => {

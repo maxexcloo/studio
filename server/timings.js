@@ -17,7 +17,11 @@ function load() {
   if (timings) return timings;
   try {
     const raw = readJsonFile(timingsPath);
-    timings = { restarts: Array.isArray(raw?.restarts) ? raw.restarts : [], runs: Array.isArray(raw?.runs) ? raw.runs : [], upscales: Array.isArray(raw?.upscales) ? raw.upscales : [] };
+    timings = {
+      restarts: Array.isArray(raw?.restarts) ? raw.restarts : [],
+      runs: Array.isArray(raw?.runs) ? raw.runs : [],
+      upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
+    };
   } catch {
     timings = { restarts: [], runs: [], upscales: [] };
   }

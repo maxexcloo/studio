@@ -10,30 +10,64 @@ test("the token goes to huggingface.co only, never along a redirect to the CDN",
   const seen = [];
   const transport = async (url, options) => {
     seen.push({ host: url.hostname, auth: options.headers.get("authorization") });
-    if (url.hostname === "huggingface.co") return new Response(null, { status: 302, headers: { location: "https://cdn-lfs.hf.co/file?sig=1" } });
+    if (url.hostname === "huggingface.co")
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://cdn-lfs.hf.co/file?sig=1" },
+      });
     return new Response("data", { status: 200 });
   };
-  const response = await hfFetch("https://huggingface.co/org/repo/resolve/main/a.safetensors", { headers: { range: "bytes=0-" } }, { env: { HF_TOKEN: token }, transport });
+  const response = await hfFetch(
+    "https://huggingface.co/org/repo/resolve/main/a.safetensors",
+    { headers: { range: "bytes=0-" } },
+    { env: { HF_TOKEN: token }, transport },
+  );
   assert.equal(await response.text(), "data");
-  assert.deepEqual(seen, [{ host: "huggingface.co", auth: `Bearer ${token}` }, { host: "cdn-lfs.hf.co", auth: null }]);
+  assert.deepEqual(seen, [
+    { host: "huggingface.co", auth: `Bearer ${token}` },
+    { host: "cdn-lfs.hf.co", auth: null },
+  ]);
 });
 
 test("a mirror takes the downloads, and does not get the token", async () => {
   const env = { HF_ENDPOINT: "https://hf-mirror.com", HF_TOKEN: token };
-  assert.equal(mirroredUrl("https://huggingface.co/org/repo/resolve/main/a.safetensors", env).href, "https://hf-mirror.com/org/repo/resolve/main/a.safetensors");
+  assert.equal(
+    mirroredUrl("https://huggingface.co/org/repo/resolve/main/a.safetensors", env).href,
+    "https://hf-mirror.com/org/repo/resolve/main/a.safetensors",
+  );
   assert.equal(mirroredUrl("https://example.com/x", env).href, "https://example.com/x");
   const seen = [];
-  await hfFetch("https://huggingface.co/org/repo/resolve/main/a.safetensors", {}, { env, transport: async (url, options) => { seen.push([url.hostname, options.headers.get("authorization")]); return new Response("ok"); } });
+  await hfFetch(
+    "https://huggingface.co/org/repo/resolve/main/a.safetensors",
+    {},
+    {
+      env,
+      transport: async (url, options) => {
+        seen.push([url.hostname, options.headers.get("authorization")]);
+        return new Response("ok");
+      },
+    },
+  );
   assert.deepEqual(seen, [["hf-mirror.com", null]]);
 });
 
 test("proxy variables are honoured, NO_PROXY included", () => {
-  const env = { HTTPS_PROXY: "http://user:pa%40ss@proxy.local:3128", NO_PROXY: "localhost,.internal.corp,mirror.lan:8080" };
+  const env = {
+    HTTPS_PROXY: "http://user:pa%40ss@proxy.local:3128",
+    NO_PROXY: "localhost,.internal.corp,mirror.lan:8080",
+  };
   assert.equal(proxyFor("https://huggingface.co/x", env)?.host, "proxy.local:3128");
   assert.equal(proxyFor("https://a.internal.corp/x", env), null);
   assert.equal(proxyFor("http://mirror.lan:8080/x", env), null);
-  assert.equal(proxyFor("https://huggingface.co/x", { http_proxy: "proxy.lan:8080" })?.host, "proxy.lan:8080", "https falls back to HTTP_PROXY, scheme optional");
-  assert.equal(proxyFor("https://huggingface.co/x", { HTTPS_PROXY: "http://p:1", NO_PROXY: "*" }), null);
+  assert.equal(
+    proxyFor("https://huggingface.co/x", { http_proxy: "proxy.lan:8080" })?.host,
+    "proxy.lan:8080",
+    "https falls back to HTTP_PROXY, scheme optional",
+  );
+  assert.equal(
+    proxyFor("https://huggingface.co/x", { HTTPS_PROXY: "http://p:1", NO_PROXY: "*" }),
+    null,
+  );
   assert.equal(proxyFor("https://huggingface.co/x", {}), null);
 });
 
@@ -53,8 +87,15 @@ test("a CONNECT tunnel carries bytes through the proxy, with its credentials", a
   });
   await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
   try {
-    const socket = await openTunnel(new URL(`http://me:secret@127.0.0.1:${proxy.address().port}`), "127.0.0.1", echo.address().port);
-    const answer = await new Promise((resolve) => { socket.once("data", (data) => resolve(String(data))); socket.write("ping"); });
+    const socket = await openTunnel(
+      new URL(`http://me:secret@127.0.0.1:${proxy.address().port}`),
+      "127.0.0.1",
+      echo.address().port,
+    );
+    const answer = await new Promise((resolve) => {
+      socket.once("data", (data) => resolve(String(data)));
+      socket.write("ping");
+    });
     socket.destroy();
     assert.equal(answer, "ping");
     assert.equal(auth, `Basic ${Buffer.from("me:secret").toString("base64")}`);

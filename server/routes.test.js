@@ -10,7 +10,11 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 // The real server, started the way the launcher starts it, against a stand-in
 // ComfyUI that answers with a recorded /object_info (fixtures/) plus one model.
 const here = path.dirname(fileURLToPath(import.meta.url));
-const snapshot = fs.readdirSync(path.join(here, "fixtures")).filter((name) => name.startsWith("object_info-comfyui-")).sort().at(-1);
+const snapshot = fs
+  .readdirSync(path.join(here, "fixtures"))
+  .filter((name) => name.startsWith("object_info-comfyui-"))
+  .sort()
+  .at(-1);
 const objectInfo = JSON.parse(fs.readFileSync(path.join(here, "fixtures", snapshot), "utf8"));
 objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 
@@ -22,11 +26,22 @@ let base = "";
 test.before(async () => {
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
-    env: { ...process.env, PORT: "0", HOST: "127.0.0.1", COMFY_URL: fake.url, STUDIO_DATA_DIR: dataDir, COMFY_OUTPUT_DIR: "", STUDIO_LAN: "0", npm_lifecycle_event: "" },
-    stdio: ["ignore", "ignore", "pipe", "ipc"]
+    env: {
+      ...process.env,
+      PORT: "0",
+      HOST: "127.0.0.1",
+      COMFY_URL: fake.url,
+      STUDIO_DATA_DIR: dataDir,
+      COMFY_OUTPUT_DIR: "",
+      STUDIO_LAN: "0",
+      npm_lifecycle_event: "",
+    },
+    stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
   let errors = "";
-  server.stderr.on("data", (chunk) => { errors += chunk; });
+  server.stderr.on("data", (chunk) => {
+    errors += chunk;
+  });
   const message = await new Promise((resolve, reject) => {
     server.on("message", resolve);
     server.on("exit", (code) => reject(new Error(`The server exited (${code}): ${errors}`)));
@@ -36,7 +51,10 @@ test.before(async () => {
 
 test.after(async () => {
   // SIGTERM saves the gallery before exiting, so wait for that before removing its folder.
-  const exited = server && server.exitCode === null ? new Promise((resolve) => server.once("exit", resolve)) : null;
+  const exited =
+    server && server.exitCode === null
+      ? new Promise((resolve) => server.once("exit", resolve))
+      : null;
   server?.kill("SIGTERM");
   await exited;
   await fake.close();
@@ -47,9 +65,13 @@ const api = async (pathname, options = {}) => {
   const response = await fetch(`${base}${pathname}`, {
     ...options,
     headers: { "content-type": "application/json", ...(options.headers || {}) },
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body ? JSON.stringify(options.body) : undefined,
   });
-  return { status: response.status, headers: response.headers, body: await response.json().catch(() => null) };
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: await response.json().catch(() => null),
+  };
 };
 
 test("the server says who it is, and an unknown API route fails as JSON", async () => {
@@ -77,11 +99,15 @@ test("diagnostics name this setup for a bug report", async () => {
   assert.equal(body.text.includes(dataDir), false);
 });
 
-test("the page is served and always checked again", { skip: !fs.existsSync(path.join(here, "..", "dist", "index.html")) && "dist/ is not built" }, async () => {
-  const page = await fetch(`${base}/`);
-  assert.equal(page.status, 200);
-  assert.equal(page.headers.get("cache-control"), "no-cache");
-});
+test(
+  "the page is served and always checked again",
+  { skip: !fs.existsSync(path.join(here, "..", "dist", "index.html")) && "dist/ is not built" },
+  async () => {
+    const page = await fetch(`${base}/`);
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get("cache-control"), "no-cache");
+  },
+);
 
 test("a model ComfyUI lists becomes a ready profile, and a generate request runs it to the gallery", async () => {
   const models = await api("/api/models");
@@ -94,16 +120,26 @@ test("a model ComfyUI lists becomes a ready profile, and a generate request runs
     method: "POST",
     body: {
       ...profile.defaults,
-      kind: profile.kind, profileId: profile.id, model: profile.model, workflow: profile.workflow,
-      prompt: "a lighthouse in fog", negative: "", count: 1, seed: "42"
-    }
+      kind: profile.kind,
+      profileId: profile.id,
+      model: profile.model,
+      workflow: profile.workflow,
+      prompt: "a lighthouse in fog",
+      negative: "",
+      count: 1,
+      seed: "42",
+    },
   });
   assert.equal(generate.status, 200, JSON.stringify(generate.body));
   const jobId = generate.body.jobId;
   const prompt = await queued;
   assert.equal(prompt.client_id, jobId);
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
-  fake.finish(prompt.id, { outputs: { [save]: { images: [{ filename: "route_00001_.png", subfolder: "", type: "output" }] } } });
+  fake.finish(prompt.id, {
+    outputs: {
+      [save]: { images: [{ filename: "route_00001_.png", subfolder: "", type: "output" }] },
+    },
+  });
 
   let job;
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -121,15 +157,31 @@ test("a model ComfyUI lists becomes a ready profile, and a generate request runs
 test("a generate request with no prompt is refused plainly", async () => {
   const models = await api("/api/models");
   const profile = models.body.profiles.find((item) => item.model === "sd_xl_base_1.0.safetensors");
-  const refused = await api("/api/generate", { method: "POST", body: { ...profile.defaults, kind: "image", profileId: profile.id, model: profile.model, workflow: profile.workflow, prompt: "   " } });
+  const refused = await api("/api/generate", {
+    method: "POST",
+    body: {
+      ...profile.defaults,
+      kind: "image",
+      profileId: profile.id,
+      model: profile.model,
+      workflow: profile.workflow,
+      prompt: "   ",
+    },
+  });
   assert.equal(refused.status, 400);
   assert.ok(refused.body.error);
 });
 
 test("the gallery's trash and other dot folders are never served, not even through ComfyUI", async () => {
   for (const route of ["view", "thumb"]) {
-    for (const query of ["subfolder=.heiss-trash%2Fbatch%2Ffiles%2Fheiss-ui", "subfolder=heiss-ui%2F.hidden", "subfolder=heiss-ui&subfolder=.heiss-trash"]) {
-      const response = await fetch(`${base}/comfy/${route}?filename=image_00001_.png&type=output&${query}`);
+    for (const query of [
+      "subfolder=.heiss-trash%2Fbatch%2Ffiles%2Fheiss-ui",
+      "subfolder=heiss-ui%2F.hidden",
+      "subfolder=heiss-ui&subfolder=.heiss-trash",
+    ]) {
+      const response = await fetch(
+        `${base}/comfy/${route}?filename=image_00001_.png&type=output&${query}`,
+      );
       assert.equal(response.status, 404, `${route}?${query}`);
       assert.equal((await response.json()).error, "Not an output.");
     }

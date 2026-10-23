@@ -3,7 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { comfy, comfyModelsDir, comfyOutputDir, localOutputFile, modelFolders, optionsFor } from "./comfy.js";
+import {
+  comfy,
+  comfyModelsDir,
+  comfyOutputDir,
+  localOutputFile,
+  modelFolders,
+  optionsFor,
+} from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
@@ -27,25 +34,40 @@ export const upscaleQualities = ["fast", "balanced", "high"];
  */
 export const modelFiles = {
   "seedvr2_ema_3b_fp8_e4m3fn.safetensors": {
-    repo: "numz/SeedVR2_comfyUI", label: "SeedVR2 3B", detail: "fp8", bytes: 3_391_544_696,
-    sha256: "3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff"
+    repo: "numz/SeedVR2_comfyUI",
+    label: "SeedVR2 3B",
+    detail: "fp8",
+    bytes: 3_391_544_696,
+    sha256: "3bf1e43ebedd570e7e7a0b1b60d6a02e105978f505c8128a241cde99a8240cff",
   },
   "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors": {
-    repo: "AInVFX/SeedVR2_comfyUI", label: "SeedVR2 7B", detail: "fp8, last block fp16", bytes: 8_466_296_338,
-    sha256: "3d68b5ec0b295ae28092e355c8cad870edd00b817b26587d0cb8f9dd2df19bb2"
+    repo: "AInVFX/SeedVR2_comfyUI",
+    label: "SeedVR2 7B",
+    detail: "fp8, last block fp16",
+    bytes: 8_466_296_338,
+    sha256: "3d68b5ec0b295ae28092e355c8cad870edd00b817b26587d0cb8f9dd2df19bb2",
   },
   "seedvr2_ema_7b_fp8_e4m3fn.safetensors": {
-    repo: "numz/SeedVR2_comfyUI", label: "SeedVR2 7B", detail: "fp8", bytes: 8_239_729_704,
-    sha256: "1fdbf3877b7d1eb266038d3a165a977f17dbb4daa4a0f0d334d5461476963037"
+    repo: "numz/SeedVR2_comfyUI",
+    label: "SeedVR2 7B",
+    detail: "fp8",
+    bytes: 8_239_729_704,
+    sha256: "1fdbf3877b7d1eb266038d3a165a977f17dbb4daa4a0f0d334d5461476963037",
   },
   "seedvr2_ema_7b_fp16.safetensors": {
-    repo: "numz/SeedVR2_comfyUI", label: "SeedVR2 7B", detail: "fp16", bytes: 16_479_334_424,
-    sha256: "7b8241aa957606ab6cfb66edabc96d43234f9819c5392b44d2492d9f0b0bbe4a"
+    repo: "numz/SeedVR2_comfyUI",
+    label: "SeedVR2 7B",
+    detail: "fp16",
+    bytes: 16_479_334_424,
+    sha256: "7b8241aa957606ab6cfb66edabc96d43234f9819c5392b44d2492d9f0b0bbe4a",
   },
   "ema_vae_fp16.safetensors": {
-    repo: "numz/SeedVR2_comfyUI", label: "SeedVR2 VAE", detail: "fp16", bytes: 501_324_814,
-    sha256: "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1"
-  }
+    repo: "numz/SeedVR2_comfyUI",
+    label: "SeedVR2 VAE",
+    detail: "fp16",
+    bytes: 501_324_814,
+    sha256: "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1",
+  },
 };
 
 /**
@@ -56,8 +78,11 @@ export const modelFiles = {
  */
 const ditTiers = {
   fast: ["seedvr2_ema_3b_fp8_e4m3fn.safetensors"],
-  balanced: ["seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors", "seedvr2_ema_7b_fp8_e4m3fn.safetensors"],
-  high: ["seedvr2_ema_7b_fp16.safetensors"]
+  balanced: [
+    "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+    "seedvr2_ema_7b_fp8_e4m3fn.safetensors",
+  ],
+  high: ["seedvr2_ema_7b_fp16.safetensors"],
 };
 const vaeFile = "ema_vae_fp16.safetensors";
 
@@ -68,17 +93,24 @@ const vaeFile = "ema_vae_fp16.safetensors";
  * Names outside this list are files the node discovered on disk, so those count.
  */
 const nodeRegistryNames = new Set([
-  "seedvr2_ema_3b-Q4_K_M.gguf", "seedvr2_ema_3b-Q8_0.gguf", "seedvr2_ema_3b_fp8_e4m3fn.safetensors", "seedvr2_ema_3b_fp16.safetensors",
-  "seedvr2_ema_7b-Q4_K_M.gguf", "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors", "seedvr2_ema_7b_fp16.safetensors",
-  "seedvr2_ema_7b_sharp-Q4_K_M.gguf", "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors", "seedvr2_ema_7b_sharp_fp16.safetensors",
-  "ema_vae_fp16.safetensors"
+  "seedvr2_ema_3b-Q4_K_M.gguf",
+  "seedvr2_ema_3b-Q8_0.gguf",
+  "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+  "seedvr2_ema_3b_fp16.safetensors",
+  "seedvr2_ema_7b-Q4_K_M.gguf",
+  "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+  "seedvr2_ema_7b_fp16.safetensors",
+  "seedvr2_ema_7b_sharp-Q4_K_M.gguf",
+  "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+  "seedvr2_ema_7b_sharp_fp16.safetensors",
+  "ema_vae_fp16.safetensors",
 ]);
 
 const presets = {
   fast: { preScale: 1, targetScale: 1.5, maxShort: 1280, blocksToSwap: 16, tileSize: 768 },
   // Smaller VAE tiles reduce memory peaks while an image model remains loaded.
   balanced: { preScale: 0.7, targetScale: 2, maxShort: 2048, blocksToSwap: 32, tileSize: 512 },
-  high: { preScale: 0.7, targetScale: 3, maxShort: 2816, blocksToSwap: 36, tileSize: 512 }
+  high: { preScale: 0.7, targetScale: 3, maxShort: 2816, blocksToSwap: 36, tileSize: 512 },
 };
 
 export const upscaleNodeClasses = nodePacks.seedvr2.nodes;
@@ -92,7 +124,10 @@ export function normalizeQuality(value = "") {
 }
 
 function downloadUrl(file) {
-  const repo = (repoOverride && modelFiles[file].repo === "numz/SeedVR2_comfyUI") ? repoOverride : modelFiles[file].repo;
+  const repo =
+    repoOverride && modelFiles[file].repo === "numz/SeedVR2_comfyUI"
+      ? repoOverride
+      : modelFiles[file].repo;
   return `https://huggingface.co/${repo}/resolve/main/${encodeURIComponent(file)}?download=true`;
 }
 
@@ -133,7 +168,11 @@ function partialBytes(dir, file) {
 function diskDitFiles(dir) {
   if (!dir) return [];
   try {
-    return fs.readdirSync(dir).filter((name) => /seedvr2/i.test(name) && /\.(safetensors|gguf)$/i.test(name) && onDisk(dir, name));
+    return fs
+      .readdirSync(dir)
+      .filter(
+        (name) => /seedvr2/i.test(name) && /\.(safetensors|gguf)$/i.test(name) && onDisk(dir, name),
+      );
   } catch {
     return [];
   }
@@ -148,14 +187,30 @@ function diskDitFiles(dir) {
 function available(info, dir) {
   const ditOptions = optionsFor(info, "SeedVR2LoadDiTModel", "model").map(String);
   const vaeOptions = optionsFor(info, "SeedVR2LoadVAEModel", "model").map(String);
-  if (!dir) return { dit: ditOptions.filter((name) => /seedvr2/i.test(name)), vae: vaeOptions, remote: true };
-  const discovered = (options) => options.filter((name) => !nodeRegistryNames.has(path.basename(name)));
+  if (!dir)
+    return {
+      dit: ditOptions.filter((name) => /seedvr2/i.test(name)),
+      vae: vaeOptions,
+      remote: true,
+    };
+  const discovered = (options) =>
+    options.filter((name) => !nodeRegistryNames.has(path.basename(name)));
   // Every folder ComfyUI reads for SeedVR2 (extra_model_paths.yaml included), not just ComfyUI/models/SEEDVR2.
   const dirs = [...new Set([dir, ...modelFolders("seedvr2", ["SEEDVR2"])])];
-  const dit = [...new Set([...dirs.flatMap(diskDitFiles), ...discovered(ditOptions).filter((name) => /seedvr2/i.test(name))])]
+  const dit = [
+    ...new Set([
+      ...dirs.flatMap(diskDitFiles),
+      ...discovered(ditOptions).filter((name) => /seedvr2/i.test(name)),
+    ]),
+  ]
     // The node can't load int8 builds (ConvRot and the like): "Only Tensors of floating point ... require gradients".
     .filter((name) => !/int8|convrot/i.test(name));
-  const vae = [...new Set([...(dirs.some((folder) => onDisk(folder, vaeFile)) ? [vaeFile] : []), ...discovered(vaeOptions)])];
+  const vae = [
+    ...new Set([
+      ...(dirs.some((folder) => onDisk(folder, vaeFile)) ? [vaeFile] : []),
+      ...discovered(vaeOptions),
+    ]),
+  ];
   return { dit, vae, remote: false };
 }
 
@@ -167,7 +222,9 @@ function resolveDit(quality, have) {
     const found = byBase(have.dit, file);
     if (found) return { file: found };
   }
-  return have.dit[0] ? { file: have.dit[0], substituted: true } : { file: ditTiers[quality][0], missing: true };
+  return have.dit[0]
+    ? { file: have.dit[0], substituted: true }
+    : { file: ditTiers[quality][0], missing: true };
 }
 
 function resolveVae(have) {
@@ -183,8 +240,12 @@ export function requiredModelsFor(quality, info, dir = seedvr2ModelDir()) {
   const ditFile = tier.find((file) => byBase(have.dit, file)) || tier[0];
   return [
     { key: "dit", file: ditFile, present: ditPresent },
-    { key: "vae", file: vaeFile, present: Boolean(byBase(have.vae, vaeFile) || have.vae.length) }
-  ].map((model) => ({ ...model, ...modelFiles[model.file], partialBytes: model.present ? 0 : partialBytes(dir, model.file) }));
+    { key: "vae", file: vaeFile, present: Boolean(byBase(have.vae, vaeFile) || have.vae.length) },
+  ].map((model) => ({
+    ...model,
+    ...modelFiles[model.file],
+    partialBytes: model.present ? 0 : partialBytes(dir, model.file),
+  }));
 }
 
 function missingNodeClasses(info, classes) {
@@ -197,7 +258,9 @@ function missingNodeClasses(info, classes) {
  * machine that visibly has SeedVR2 into a diagnosis the user can act on.
  */
 function detectedSeedVR2Nodes(info) {
-  return Object.keys(info || {}).filter((name) => /seedvr2/i.test(name)).sort();
+  return Object.keys(info || {})
+    .filter((name) => /seedvr2/i.test(name))
+    .sort();
 }
 
 /* ------------------------------------------------------------ node install */
@@ -219,13 +282,21 @@ export async function managerInfo() {
   for (const route of ["/v2/manager/version", "/manager/version"]) {
     try {
       const answer = await comfy(route, { signal: AbortSignal.timeout(5000) });
-      const version = typeof answer === "string" ? answer : answer instanceof ArrayBuffer ? Buffer.from(answer).toString("utf8") : String(answer?.version || "");
+      const version =
+        typeof answer === "string"
+          ? answer
+          : answer instanceof ArrayBuffer
+            ? Buffer.from(answer).toString("utf8")
+            : String(answer?.version || "");
       return { connected: true, available: true, version: version.trim().slice(0, 40) || null };
     } catch {
       // Try the next route.
     }
   }
-  const connected = await comfy("/system_stats", { signal: AbortSignal.timeout(5000) }).then(() => true, () => false);
+  const connected = await comfy("/system_stats", { signal: AbortSignal.timeout(5000) }).then(
+    () => true,
+    () => false,
+  );
   return { connected, available: false, version: null };
 }
 
@@ -248,21 +319,32 @@ export function upscaleStatus(info = {}, quality = "balanced") {
     remote: have.remote,
     canDownload: Boolean(modelDir),
     freeBytes: freeBytesAt(modelDir),
-    models: models.map(({ key, file, label, detail, bytes, present, partialBytes }) => ({ key, file, label, detail, bytes, present, partialBytes })),
+    models: models.map(({ key, file, label, detail, bytes, present, partialBytes }) => ({
+      key,
+      file,
+      label,
+      detail,
+      bytes,
+      present,
+      partialBytes,
+    })),
     missingModels: missingModels.map((model) => model.key),
     downloadBytes: missingModels.reduce((sum, model) => sum + model.bytes - model.partialBytes, 0),
     needsDownload: missingModels.length > 0 && !canSubstitute,
     substituting: missingModels.length > 0 && canSubstitute,
     // The weight a substituting tier actually loads, so the UI can name it.
-    fallbackFile: missingModels.length > 0 && canSubstitute ? path.basename(resolveDit(normalized, have).file) : "",
+    fallbackFile:
+      missingModels.length > 0 && canSubstitute
+        ? path.basename(resolveDit(normalized, have).file)
+        : "",
     ready: missingNodes.length === 0 && (missingModels.length === 0 || canSubstitute),
     faceDetail: {
       nodesInstalled: missingNodeClasses(info, faceDetailNodeClasses).length === 0,
       missingNodes: missingNodeClasses(info, faceDetailNodeClasses),
       detectors: optionsFor(info, "UltralyticsDetectorProvider", "model_name").map(String),
-      samModels: optionsFor(info, "SAMLoader", "model_name").map(String)
+      samModels: optionsFor(info, "SAMLoader", "model_name").map(String),
     },
-    install: installSnapshot()
+    install: installSnapshot(),
   };
 }
 
@@ -286,9 +368,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Hashes what an earlier attempt left behind so a resumed file is still checked end to end. */
 async function hashExisting(file, hash, signal) {
-  await pipeline(fs.createReadStream(file), new Transform({
-    transform(chunk, _encoding, done) { hash.update(chunk); done(); }
-  }), { signal });
+  await pipeline(
+    fs.createReadStream(file),
+    new Transform({
+      transform(chunk, _encoding, done) {
+        hash.update(chunk);
+        done();
+      },
+    }),
+    { signal },
+  );
 }
 
 /**
@@ -315,7 +404,11 @@ async function downloadOne(entry, dir, onProgress, signal) {
   let received = offset;
   onProgress(received);
   if (offset < spec.bytes) {
-    const response = await fetch(downloadUrl(entry.file), { redirect: "follow", signal, headers: offset ? { range: `bytes=${offset}-` } : {} });
+    const response = await fetch(downloadUrl(entry.file), {
+      redirect: "follow",
+      signal,
+      headers: offset ? { range: `bytes=${offset}-` } : {},
+    });
     if (offset && response.status === 200) {
       // The server ignored the range: start this file over.
       offset = 0;
@@ -323,7 +416,9 @@ async function downloadOne(entry, dir, onProgress, signal) {
       hash = crypto.createHash("sha256");
     }
     if (!response.ok || !response.body) {
-      throw new Error(`Hugging Face answered ${response.status} for ${entry.file}. Try again, or put it in ${dir} yourself.`);
+      throw new Error(
+        `Hugging Face answered ${response.status} for ${entry.file}. Try again, or put it in ${dir} yourself.`,
+      );
     }
     await pipeline(
       Readable.fromWeb(response.body),
@@ -333,17 +428,19 @@ async function downloadOne(entry, dir, onProgress, signal) {
           received += chunk.length;
           onProgress(received);
           done(null, chunk);
-        }
+        },
       }),
       fs.createWriteStream(partial, { flags: offset ? "a" : "w" }),
-      { signal }
+      { signal },
     );
   }
   entry.phase = "verifying";
   const digest = hash.digest("hex");
   if (received !== spec.bytes || digest !== spec.sha256) {
     fs.rmSync(partial, { force: true });
-    throw new VerifyError(`${entry.file} didn’t match its published checksum, so it was deleted. Try again.`);
+    throw new VerifyError(
+      `${entry.file} didn’t match its published checksum, so it was deleted. Try again.`,
+    );
   }
   renameWithRetry(partial, target);
   rememberValidated(dir, entry.file, spec);
@@ -360,7 +457,11 @@ function rememberValidated(dir, file, spec) {
   const cachePath = path.join(dir, ".validation_cache.json");
   try {
     let cache = {};
-    try { cache = JSON.parse(fs.readFileSync(cachePath, "utf8")) || {}; } catch { cache = {}; }
+    try {
+      cache = JSON.parse(fs.readFileSync(cachePath, "utf8")) || {};
+    } catch {
+      cache = {};
+    }
     const stat = fs.statSync(path.join(dir, file));
     cache[file] = { size: stat.size, mtime: stat.mtimeMs / 1000, hash: spec.sha256 };
     writeJsonFile(cachePath, cache);
@@ -392,26 +493,53 @@ export function downloadPlan(quality, info) {
   const dir = seedvr2ModelDir();
   const files = requiredModelsFor(quality, info, dir)
     .filter((model) => !model.present)
-    .map(({ key, file, label, detail, bytes, partialBytes }) => ({ key, file, label, detail, bytes, partialBytes }));
+    .map(({ key, file, label, detail, bytes, partialBytes }) => ({
+      key,
+      file,
+      label,
+      detail,
+      bytes,
+      partialBytes,
+    }));
   const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
   const remainingBytes = files.reduce((sum, file) => sum + file.bytes - file.partialBytes, 0);
-  return { quality: normalizeQuality(quality), modelDir: dir, files, totalBytes, remainingBytes, freeBytes: freeBytesAt(dir) };
+  return {
+    quality: normalizeQuality(quality),
+    modelDir: dir,
+    files,
+    totalBytes,
+    remainingBytes,
+    freeBytes: freeBytesAt(dir),
+  };
 }
 
 export function startModelInstall(quality, info) {
   if (install?.status === "running") return installSnapshot();
   const plan = downloadPlan(quality, info);
   const dir = plan.modelDir;
-  if (!dir) throw new Error("Set ComfyUI’s output folder in Settings › Library first. The upscale models go in the models folder next to it.");
+  if (!dir)
+    throw new Error(
+      "Set ComfyUI’s output folder in Settings › Library first. The upscale models go in the models folder next to it.",
+    );
   if (!plan.files.length) {
-    install = { status: "done", quality: plan.quality, files: [], receivedBytes: 0, totalBytes: 0, startedAt: Date.now(), finishedAt: Date.now() };
+    install = {
+      status: "done",
+      quality: plan.quality,
+      files: [],
+      receivedBytes: 0,
+      totalBytes: 0,
+      startedAt: Date.now(),
+      finishedAt: Date.now(),
+    };
     return installSnapshot();
   }
   // Leave room to breathe: a disk filled to the last byte takes ComfyUI down with it.
   const headroom = 512 * 1024 * 1024;
   if (plan.freeBytes !== null && plan.freeBytes < plan.remainingBytes + headroom) {
     const gb = (bytes) => `${(bytes / 1e9).toFixed(1)} GB`;
-    throw new Error(`Not enough disk space. The models need ${gb(plan.remainingBytes)}, and the drive has ${gb(plan.freeBytes)} free.`);
+    throw new Error(
+      `Not enough disk space. The models need ${gb(plan.remainingBytes)}, and the drive has ${gb(plan.freeBytes)} free.`,
+    );
   }
   fs.mkdirSync(dir, { recursive: true });
   const controller = new AbortController();
@@ -420,13 +548,21 @@ export function startModelInstall(quality, info) {
     dir,
     quality: plan.quality,
     current: plan.files[0].file,
-    files: plan.files.map((file) => ({ file: file.file, label: file.label, detail: file.detail, bytes: file.partialBytes, totalBytes: file.bytes, phase: "queued", done: false })),
+    files: plan.files.map((file) => ({
+      file: file.file,
+      label: file.label,
+      detail: file.detail,
+      bytes: file.partialBytes,
+      totalBytes: file.bytes,
+      phase: "queued",
+      done: false,
+    })),
     receivedBytes: plan.totalBytes - plan.remainingBytes,
     totalBytes: plan.totalBytes,
     bytesPerSecond: 0,
     startedAt: Date.now(),
     error: "",
-    controller
+    controller,
   };
   const state = install;
   let sampleAt = Date.now();
@@ -435,21 +571,38 @@ export function startModelInstall(quality, info) {
     try {
       for (const entry of state.files) {
         state.current = entry.file;
-        await downloadWithRetry(entry, dir, (received) => {
-          entry.bytes = received;
-          state.receivedBytes = state.files.reduce((sum, item) => sum + item.bytes, 0);
-          const now = Date.now();
-          if (now - sampleAt >= 500) {
-            const rate = Math.max(0, (state.receivedBytes - sampleBytes) / ((now - sampleAt) / 1000));
-            state.bytesPerSecond = state.bytesPerSecond ? state.bytesPerSecond * 0.7 + rate * 0.3 : rate;
-            sampleAt = now;
-            sampleBytes = state.receivedBytes;
-          }
-        }, controller.signal);
+        await downloadWithRetry(
+          entry,
+          dir,
+          (received) => {
+            entry.bytes = received;
+            state.receivedBytes = state.files.reduce((sum, item) => sum + item.bytes, 0);
+            const now = Date.now();
+            if (now - sampleAt >= 500) {
+              const rate = Math.max(
+                0,
+                (state.receivedBytes - sampleBytes) / ((now - sampleAt) / 1000),
+              );
+              state.bytesPerSecond = state.bytesPerSecond
+                ? state.bytesPerSecond * 0.7 + rate * 0.3
+                : rate;
+              sampleAt = now;
+              sampleBytes = state.receivedBytes;
+            }
+          },
+          controller.signal,
+        );
         entry.done = true;
         entry.bytes = entry.totalBytes;
       }
-      if (install === state) install = { ...installSnapshot(), status: "done", current: "", bytesPerSecond: 0, finishedAt: Date.now() };
+      if (install === state)
+        install = {
+          ...installSnapshot(),
+          status: "done",
+          current: "",
+          bytesPerSecond: 0,
+          finishedAt: Date.now(),
+        };
     } catch (error) {
       const canceled = controller.signal.aborted;
       if (install === state) {
@@ -458,7 +611,7 @@ export function startModelInstall(quality, info) {
           status: canceled ? "canceled" : "error",
           bytesPerSecond: 0,
           error: canceled ? "" : error.message || "Model download failed.",
-          finishedAt: Date.now()
+          finishedAt: Date.now(),
         };
       }
     }
@@ -495,7 +648,7 @@ export function upscalePlan({ width, height, quality = "balanced", target = 0 })
   const longSide = Math.max(sourceWidth, sourceHeight);
   const aspect = longSide / shortSide;
   const goal = upscaleTargets.includes(Number(target))
-    ? roundTo(shortSide * Number(target) / longSide)
+    ? roundTo((shortSide * Number(target)) / longSide)
     : Math.min(roundTo(shortSide * preset.targetScale), preset.maxShort);
   const resolution = Math.max(goal, roundTo(shortSide));
   // Never hand the model an input so small that it has nothing to restore.
@@ -511,7 +664,7 @@ export function upscalePlan({ width, height, quality = "balanced", target = 0 })
     sourceHeight,
     estimatedWidth: sourceWidth >= sourceHeight ? Math.round(resolution * aspect) : resolution,
     estimatedHeight: sourceWidth >= sourceHeight ? resolution : Math.round(resolution * aspect),
-    scale: Number((resolution / shortSide).toFixed(2))
+    scale: Number((resolution / shortSide).toFixed(2)),
   };
 }
 
@@ -537,8 +690,8 @@ export function faceDetailSource(item, workflow = null) {
       vae: settings.vae || defaults.vae || "",
       // What it recorded may be the "wan" stand-in for an unset type; the graph and the file know better.
       clipType: defaults.clipType || family?.clipType || settings.clipType || "",
-      weightDtype: settings.weightDtype || defaults.weightDtype || ""
-    }
+      weightDtype: settings.weightDtype || defaults.weightDtype || "",
+    },
   };
 }
 
@@ -556,22 +709,41 @@ function faceDetailStack(graph, body, imageSource, info) {
   const textEncoder = String(settings.textEncoder || "");
   const vae = String(settings.vae || "");
   if (!model || !textEncoder || !vae) {
-    throw new Error("Face detail needs the image’s model, text encoder and VAE, and this image doesn’t record them.");
+    throw new Error(
+      "Face detail needs the image’s model, text encoder and VAE, and this image doesn’t record them.",
+    );
   }
   const unets = optionsFor(info, "UNETLoader", "unet_name").map(String);
   if (unets.length && !unets.includes(model)) {
-    throw new Error(`Face detail needs this image’s model, ${model}, and ComfyUI doesn’t have it. Turn off face detail to upscale this image.`);
+    throw new Error(
+      `Face detail needs this image’s model, ${model}, and ComfyUI doesn’t have it. Turn off face detail to upscale this image.`,
+    );
   }
-  const detector = optionsFor(info, "UltralyticsDetectorProvider", "model_name").find((name) => /face/i.test(String(name)));
-  if (!detector) throw new Error("Face detail needs an Ultralytics face detector model for the Impact Pack.");
-  const sam = optionsFor(info, "SAMLoader", "model_name").map(String).find((name) => name && name !== "None");
-  graph["10"] = { class_type: "UNETLoader", inputs: { unet_name: model, weight_dtype: String(settings.weightDtype || "default") } };
-  graph["11"] = { class_type: "CLIPLoader", inputs: { clip_name: textEncoder, type: String(settings.clipType || "wan"), device: "default" } };
+  const detector = optionsFor(info, "UltralyticsDetectorProvider", "model_name").find((name) =>
+    /face/i.test(String(name)),
+  );
+  if (!detector)
+    throw new Error("Face detail needs an Ultralytics face detector model for the Impact Pack.");
+  const sam = optionsFor(info, "SAMLoader", "model_name")
+    .map(String)
+    .find((name) => name && name !== "None");
+  graph["10"] = {
+    class_type: "UNETLoader",
+    inputs: { unet_name: model, weight_dtype: String(settings.weightDtype || "default") },
+  };
+  graph["11"] = {
+    class_type: "CLIPLoader",
+    inputs: { clip_name: textEncoder, type: String(settings.clipType || "wan"), device: "default" },
+  };
   graph["12"] = { class_type: "VAELoader", inputs: { vae_name: vae } };
-  graph["13"] = { class_type: "CLIPTextEncode", inputs: { text: String(body.prompt || ""), clip: ["11", 0] } };
+  graph["13"] = {
+    class_type: "CLIPTextEncode",
+    inputs: { text: String(body.prompt || ""), clip: ["11", 0] },
+  };
   graph["14"] = { class_type: "ConditioningZeroOut", inputs: { conditioning: ["13", 0] } };
   graph["15"] = { class_type: "UltralyticsDetectorProvider", inputs: { model_name: detector } };
-  if (sam) graph["16"] = { class_type: "SAMLoader", inputs: { model_name: sam, device_mode: "AUTO" } };
+  if (sam)
+    graph["16"] = { class_type: "SAMLoader", inputs: { model_name: sam, device_mode: "AUTO" } };
   graph["17"] = {
     class_type: "FaceDetailer",
     inputs: {
@@ -608,8 +780,8 @@ function faceDetailStack(graph, body, imageSource, info) {
       wildcard: "",
       cycle: 1,
       inpaint_model: false,
-      noise_mask_feather: 20
-    }
+      noise_mask_feather: 20,
+    },
   };
   return ["17", 0];
 }
@@ -638,8 +810,13 @@ function comboOptions(info, nodeClass, key) {
 function devicesFor(info, nodeClass) {
   const devices = comboOptions(info, nodeClass, "device");
   const offloads = comboOptions(info, nodeClass, "offload_device");
-  const device = devices.find((name) => name !== "none" && name !== "cpu") || devices[0] || "cuda:0";
-  const offload = offloads.length ? (offloads.includes("cpu") && device !== "cpu" ? "cpu" : "none") : "cpu";
+  const device =
+    devices.find((name) => name !== "none" && name !== "cpu") || devices[0] || "cuda:0";
+  const offload = offloads.length
+    ? offloads.includes("cpu") && device !== "cpu"
+      ? "cpu"
+      : "none"
+    : "cpu";
   return { device, offload };
 }
 
@@ -659,10 +836,17 @@ export function upscaleGraph(body, info = {}) {
     graph["1"] = { class_type: "LoadVideo", inputs: { file: String(body.imageName || "") } };
     graph["6"] = { class_type: "GetVideoComponents", inputs: { video: ["1", 0] } };
   }
-  const source = video ? ["6", 0] : body.faceDetail ? faceDetailStack(graph, body, ["1", 0], info) : ["1", 0];
+  const source = video
+    ? ["6", 0]
+    : body.faceDetail
+      ? faceDetailStack(graph, body, ["1", 0], info)
+      : ["1", 0];
   Object.assign(graph, {
-    "2": { class_type: "ImageScaleBy", inputs: { image: source, upscale_method: "bicubic", scale_by: plan.preScale } },
-    "3": {
+    2: {
+      class_type: "ImageScaleBy",
+      inputs: { image: source, upscale_method: "bicubic", scale_by: plan.preScale },
+    },
+    3: {
       class_type: "SeedVR2LoadDiTModel",
       inputs: {
         model: dit.file,
@@ -671,10 +855,10 @@ export function upscaleGraph(body, info = {}) {
         swap_io_components: swap,
         offload_device: ditDevices.offload,
         cache_model: false,
-        attention_mode: "sdpa"
-      }
+        attention_mode: "sdpa",
+      },
     },
-    "4": {
+    4: {
       class_type: "SeedVR2LoadVAEModel",
       inputs: {
         model: vae.file,
@@ -687,10 +871,10 @@ export function upscaleGraph(body, info = {}) {
         decode_tile_overlap: 128,
         tile_debug: "false",
         offload_device: vaeDevices.offload,
-        cache_model: false
-      }
+        cache_model: false,
+      },
     },
-    "5": {
+    5: {
       class_type: "SeedVR2VideoUpscaler",
       inputs: {
         image: ["2", 0],
@@ -708,15 +892,29 @@ export function upscaleGraph(body, info = {}) {
         input_noise_scale: 0,
         latent_noise_scale: 0,
         offload_device: devicesFor(info, "SeedVR2VideoUpscaler").offload,
-        enable_debug: false
-      }
-    }
+        enable_debug: false,
+      },
+    },
   });
   if (video) {
-    graph["7"] = { class_type: "CreateVideo", inputs: { images: ["5", 0], audio: ["6", 1], fps: ["6", 2], codec: "none" } };
-    graph["9"] = { class_type: "SaveVideo", inputs: { video: ["7", 0], filename_prefix: `${outputFolderName}/upscale`, format: "mp4", "format.codec": "h264" } };
+    graph["7"] = {
+      class_type: "CreateVideo",
+      inputs: { images: ["5", 0], audio: ["6", 1], fps: ["6", 2], codec: "none" },
+    };
+    graph["9"] = {
+      class_type: "SaveVideo",
+      inputs: {
+        video: ["7", 0],
+        filename_prefix: `${outputFolderName}/upscale`,
+        format: "mp4",
+        "format.codec": "h264",
+      },
+    };
   } else {
-    graph["9"] = { class_type: "SaveImage", inputs: { images: ["5", 0], filename_prefix: `${outputFolderName}/upscale` } };
+    graph["9"] = {
+      class_type: "SaveImage",
+      inputs: { images: ["5", 0], filename_prefix: `${outputFolderName}/upscale` },
+    };
   }
   // The weight it runs on, which is what its timing is learned by (upscale-timing.js).
   return { graph, plan: { ...plan, model: dit.file } };
@@ -724,7 +922,12 @@ export function upscaleGraph(body, info = {}) {
 
 /** A link inside the upscale's own graph, renamed into the run's graph; its LoadImage becomes `source`. */
 function relink(value, prefix, source) {
-  if (Array.isArray(value) && value.length === 2 && typeof value[0] === "string" && Number.isInteger(value[1])) {
+  if (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === "string" &&
+    Number.isInteger(value[1])
+  ) {
     return value[0] === "1" ? source : [`${prefix}${value[0]}`, value[1]];
   }
   return value;
@@ -740,7 +943,9 @@ function relink(value, prefix, source) {
  * the graph saves no image.
  */
 export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
-  const saves = Object.entries(graph || {}).filter(([, node]) => node?.class_type === "SaveImage" && Array.isArray(node.inputs?.images));
+  const saves = Object.entries(graph || {}).filter(
+    ([, node]) => node?.class_type === "SaveImage" && Array.isArray(node.inputs?.images),
+  );
   if (!saves.length) return null;
   const next = { ...graph };
   const pairs = [];
@@ -751,8 +956,21 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
     plan = built.plan;
     for (const [id, node] of Object.entries(built.graph)) {
       if (id === "1") continue;
-      const inputs = Object.fromEntries(Object.entries(node.inputs || {}).map(([key, value]) => [key, relink(value, prefix, save.inputs.images)]));
-      next[`${prefix}${id}`] = { ...node, inputs, _meta: { title: "Smart upscale", studioUpscale: true, ...(phase ? { studioPhase: phase } : {}) } };
+      const inputs = Object.fromEntries(
+        Object.entries(node.inputs || {}).map(([key, value]) => [
+          key,
+          relink(value, prefix, save.inputs.images),
+        ]),
+      );
+      next[`${prefix}${id}`] = {
+        ...node,
+        inputs,
+        _meta: {
+          title: "Smart upscale",
+          studioUpscale: true,
+          ...(phase ? { studioPhase: phase } : {}),
+        },
+      };
     }
     pairs.push({ base: saveId, upscale: `${prefix}9` });
   });
@@ -762,12 +980,18 @@ export function embedUpscale(graph, body, info = {}, { phase = "" } = {}) {
 /** Stage the original local video; the gallery keeps its audio and frame rate. */
 export async function uploadUpscaleVideoSource(item) {
   const url = new URL(String(item.url || ""), "http://localhost");
-  if (url.pathname !== "/comfy/view") throw new Error("The original video is not a ComfyUI output.");
+  if (url.pathname !== "/comfy/view")
+    throw new Error("The original video is not a ComfyUI output.");
   const name = url.searchParams.get("filename") || "";
-  const file = localOutputFile(name, url.searchParams.get("subfolder") || "", url.searchParams.get("type") || "output");
+  const file = localOutputFile(
+    name,
+    url.searchParams.get("subfolder") || "",
+    url.searchParams.get("type") || "output",
+  );
   if (!file) throw new Error("The original video file is missing.");
   const extension = path.extname(name).toLowerCase();
-  if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension)) throw new Error("Unsupported video format.");
+  if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension))
+    throw new Error("Unsupported video format.");
   const buffer = fs.readFileSync(file);
   const filename = `heiss-ui-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
   const form = new FormData();

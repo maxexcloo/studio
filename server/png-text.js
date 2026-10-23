@@ -26,7 +26,8 @@ const crcTable = (() => {
 function crc32(...buffers) {
   let crc = 0xffffffff;
   for (const buffer of buffers) {
-    for (let index = 0; index < buffer.length; index += 1) crc = crcTable[(crc ^ buffer[index]) & 0xff] ^ (crc >>> 8);
+    for (let index = 0; index < buffer.length; index += 1)
+      crc = crcTable[(crc ^ buffer[index]) & 0xff] ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -42,7 +43,8 @@ function decodeText(type, data) {
   const keyword = data.subarray(0, zero).toString("latin1");
   try {
     if (type === "tEXt") return { keyword, value: data.subarray(zero + 1).toString("latin1") };
-    if (type === "zTXt") return { keyword, value: zlib.inflateSync(data.subarray(zero + 2)).toString("latin1") };
+    if (type === "zTXt")
+      return { keyword, value: zlib.inflateSync(data.subarray(zero + 2)).toString("latin1") };
     if (type === "iTXt") {
       const compressed = data[zero + 1] === 1;
       // Language tag and translated keyword, each ended by a zero byte.
@@ -82,7 +84,10 @@ export function readPngInfo(file) {
         fs.readSync(fd, dims, 0, 8, offset + 8);
         info.width = dims.readUInt32BE(0);
         info.height = dims.readUInt32BE(4);
-      } else if ((type === "tEXt" || type === "zTXt" || type === "iTXt") && length <= maxTextChunk) {
+      } else if (
+        (type === "tEXt" || type === "zTXt" || type === "iTXt") &&
+        length <= maxTextChunk
+      ) {
         const data = Buffer.alloc(length);
         fs.readSync(fd, data, 0, length, offset + 8);
         const text = decodeText(type, data);
@@ -94,7 +99,12 @@ export function readPngInfo(file) {
   } catch {
     return null;
   } finally {
-    if (fd !== undefined) try { fs.closeSync(fd); } catch { /* already closed */ }
+    if (fd !== undefined)
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* already closed */
+      }
   }
 }
 
@@ -110,8 +120,23 @@ function chunk(type, data) {
 /** Plain tEXt when the value is Latin-1, otherwise uncompressed UTF-8 iTXt (as Pillow does). */
 function textChunk(keyword, value) {
   const latin = /^[\u0000-ÿ]*$/.test(value);
-  if (latin) return chunk("tEXt", Buffer.concat([Buffer.from(keyword, "latin1"), Buffer.from([0]), Buffer.from(value, "latin1")]));
-  return chunk("iTXt", Buffer.concat([Buffer.from(keyword, "latin1"), Buffer.from([0, 0, 0, 0, 0]), Buffer.from(value, "utf8")]));
+  if (latin)
+    return chunk(
+      "tEXt",
+      Buffer.concat([
+        Buffer.from(keyword, "latin1"),
+        Buffer.from([0]),
+        Buffer.from(value, "latin1"),
+      ]),
+    );
+  return chunk(
+    "iTXt",
+    Buffer.concat([
+      Buffer.from(keyword, "latin1"),
+      Buffer.from([0, 0, 0, 0, 0]),
+      Buffer.from(value, "utf8"),
+    ]),
+  );
 }
 
 /**
@@ -134,7 +159,9 @@ export function withPngText(buffer, keyword, value) {
       ended = true;
       break;
     }
-    const replaced = (type === "tEXt" || type === "zTXt" || type === "iTXt") && decodeText(type, buffer.subarray(offset + 8, offset + 8 + length))?.keyword === keyword;
+    const replaced =
+      (type === "tEXt" || type === "zTXt" || type === "iTXt") &&
+      decodeText(type, buffer.subarray(offset + 8, offset + 8 + length))?.keyword === keyword;
     if (!replaced) parts.push(buffer.subarray(offset, end));
     offset = end;
   }
@@ -148,7 +175,9 @@ export function withPngText(buffer, keyword, value) {
  * the prompt, an optional "Negative prompt:" line, then "Key: value, …".
  */
 export function parseA1111Parameters(text = "") {
-  const source = String(text || "").replace(/\r\n?/g, "\n").trim();
+  const source = String(text || "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
   if (!source) return null;
   const lines = source.split("\n");
   let settingsLine = "";
@@ -158,15 +187,25 @@ export function parseA1111Parameters(text = "") {
   const body = lines.join("\n");
   const negativeAt = body.search(/(^|\n)Negative prompt:/);
   const prompt = (negativeAt >= 0 ? body.slice(0, negativeAt) : body).trim();
-  const negative = negativeAt >= 0 ? body.slice(negativeAt).replace(/^\n?Negative prompt:\s*/, "").trim() : "";
+  const negative =
+    negativeAt >= 0
+      ? body
+          .slice(negativeAt)
+          .replace(/^\n?Negative prompt:\s*/, "")
+          .trim()
+      : "";
   const settings = {};
   // Values can be quoted (and contain commas) in newer versions.
-  for (const match of settingsLine.matchAll(/\s*([\w ][\w ()/.-]*?):\s*("(?:\\.|[^"])*"|[^,]*)(?:,|$)/g)) {
+  for (const match of settingsLine.matchAll(
+    /\s*([\w ][\w ()/.-]*?):\s*("(?:\\.|[^"])*"|[^,]*)(?:,|$)/g,
+  )) {
     const key = match[1].trim();
     if (!key) continue;
     settings[key] = match[2].trim().replace(/^"(.*)"$/s, "$1");
   }
-  const [width, height] = String(settings.Size || "").split("x").map(Number);
+  const [width, height] = String(settings.Size || "")
+    .split("x")
+    .map(Number);
   return {
     prompt,
     negative,
@@ -176,6 +215,6 @@ export function parseA1111Parameters(text = "") {
     cfg: Number(settings["CFG scale"]) || 0,
     seed: settings.Seed || "",
     width: width || 0,
-    height: height || 0
+    height: height || 0,
   };
 }

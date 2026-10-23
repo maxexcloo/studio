@@ -1,8 +1,14 @@
 import crypto from "node:crypto";
-import { mediaType } from './media-paths.js';
+import { mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyRecentlyUnreachable, comfyUrl, localOutputFile, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
+import {
+  comfyRecentlyUnreachable,
+  comfyUrl,
+  localOutputFile,
+  noteComfyFetchError,
+  noteComfyReachable,
+} from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
 import { renameWithRetryAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -17,7 +23,7 @@ const thumbnailDir = path.join(dataDir, ".thumbnails");
  */
 export const RENDITIONS = {
   thumb: { longestEdge: 768, quality: 72 },
-  display: { longestEdge: 2560, quality: 90 }
+  display: { longestEdge: 2560, quality: 90 },
 };
 const { longestEdge, quality } = RENDITIONS.thumb;
 const renditionOf = (size) => RENDITIONS[size] || RENDITIONS.thumb;
@@ -33,15 +39,20 @@ const pending = new Map();
 export const BUILD_SLOTS = 4;
 let building = 0;
 const waiting = [];
-export function buildStats() { return { building, waiting: waiting.length }; }
+export function buildStats() {
+  return { building, waiting: waiting.length };
+}
 async function inSlot(work) {
   // A freed slot is handed straight to the next in line, still counted, so a
   // caller arriving in between can never take it too and make five.
   if (building < BUILD_SLOTS) building += 1;
   else await new Promise((resolve) => waiting.push(resolve));
-  try { return await work(); } finally {
+  try {
+    return await work();
+  } finally {
     const next = waiting.shift();
-    if (next) next(); else building -= 1;
+    if (next) next();
+    else building -= 1;
   }
 }
 
@@ -52,12 +63,17 @@ async function inSlot(work) {
  * listing a cache of tens of thousands on every build.
  */
 let cacheIndex = null;
-const keyOfName = (name) => (name.endsWith(".webp") && name.includes("-") ? name.slice(0, name.indexOf("-")) : "");
+const keyOfName = (name) =>
+  name.endsWith(".webp") && name.includes("-") ? name.slice(0, name.indexOf("-")) : "";
 function indexed() {
   if (cacheIndex) return cacheIndex;
   cacheIndex = new Map();
   let names = [];
-  try { names = fs.readdirSync(thumbnailDir); } catch { /* No cache yet. */ }
+  try {
+    names = fs.readdirSync(thumbnailDir);
+  } catch {
+    /* No cache yet. */
+  }
   for (const name of names) indexAdd(name);
   return cacheIndex;
 }
@@ -81,7 +97,8 @@ function indexRemove(name) {
  * in the last 15 minutes counts as in use (an open gallery page) and stays;
  * a removed thumbnail is simply made again when it is next asked for.
  */
-export const cacheLimitBytes = Math.max(16, Number(process.env.STUDIO_THUMBNAIL_CACHE_MB) || 2048) * 1024 * 1024;
+export const cacheLimitBytes =
+  Math.max(16, Number(process.env.STUDIO_THUMBNAIL_CACHE_MB) || 2048) * 1024 * 1024;
 const inUseMs = 15 * 60 * 1000;
 const sweepEveryMs = 10 * 60 * 1000;
 // When each thumbnail was last served by this server. The file's access time
@@ -97,16 +114,28 @@ function noteUsed(file) {
   lastUsed.set(file, now);
   if (now - previous < touchEveryMs) return;
   // Keep the modified time: it tells a newer thumbnail of the same image from an older one.
-  fs.promises.stat(file).then((stat) => fs.promises.utimes(file, new Date(now), stat.mtime)).catch(() => {});
+  fs.promises
+    .stat(file)
+    .then((stat) => fs.promises.utimes(file, new Date(now), stat.mtime))
+    .catch(() => {});
 }
 
 /**
  * Trims the cache to `limitBytes` if it is over, oldest use first, never a
  * thumbnail used within `recentMs`. Resolves to what it removed.
  */
-export async function sweepThumbnails({ dir = thumbnailDir, limitBytes = cacheLimitBytes, now = Date.now(), recentMs = inUseMs } = {}) {
+export async function sweepThumbnails({
+  dir = thumbnailDir,
+  limitBytes = cacheLimitBytes,
+  now = Date.now(),
+  recentMs = inUseMs,
+} = {}) {
   let names = [];
-  try { names = await fs.promises.readdir(dir); } catch { return { removed: 0, freedBytes: 0, totalBytes: 0 }; }
+  try {
+    names = await fs.promises.readdir(dir);
+  } catch {
+    return { removed: 0, freedBytes: 0, totalBytes: 0 };
+  }
   const entries = [];
   let totalBytes = 0;
   for (const name of names) {
@@ -115,7 +144,11 @@ export async function sweepThumbnails({ dir = thumbnailDir, limitBytes = cacheLi
     try {
       const stat = await fs.promises.stat(file);
       totalBytes += stat.size;
-      entries.push({ file, size: stat.size, usedAt: Math.max(stat.atimeMs, stat.mtimeMs, lastUsed.get(file) || 0) });
+      entries.push({
+        file,
+        size: stat.size,
+        usedAt: Math.max(stat.atimeMs, stat.mtimeMs, lastUsed.get(file) || 0),
+      });
     } catch {
       // Removed meanwhile.
     }
@@ -147,10 +180,15 @@ function maybeSweep() {
   lastSweepAt = now;
   sweeping = sweepThumbnails()
     .then(({ removed, freedBytes }) => {
-      if (removed) console.log(`[Studio] Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`);
+      if (removed)
+        console.log(
+          `[Studio] Thumbnail cache: removed ${removed} older thumbnails (${Math.round(freedBytes / 1e6)} MB).`,
+        );
     })
     .catch(() => {})
-    .finally(() => { sweeping = null; });
+    .finally(() => {
+      sweeping = null;
+    });
 }
 
 // A cache that grew past the cap before there was one is trimmed soon after start.
@@ -160,7 +198,10 @@ setTimeout(maybeSweep, 60_000).unref?.();
 // naturally starts a fresh cache generation instead of serving stale-sized files.
 function cacheKey(filename, subfolder, type, size = "thumb") {
   const rendition = renditionOf(size);
-  return crypto.createHash("sha1").update(`${type}:${subfolder}:${filename}:${rendition.longestEdge}:${rendition.quality}`).digest("hex");
+  return crypto
+    .createHash("sha1")
+    .update(`${type}:${subfolder}:${filename}:${rendition.longestEdge}:${rendition.quality}`)
+    .digest("hex");
 }
 
 function cachePath(key, sourceHash) {
@@ -174,10 +215,17 @@ function cachedThumbnail(key) {
     const file = path.join(thumbnailDir, name);
     let time;
     // Gone from the folder behind this server's back (cleared by hand): forget it.
-    try { time = fs.statSync(file).mtimeMs; } catch { indexRemove(name); continue; }
+    try {
+      time = fs.statSync(file).mtimeMs;
+    } catch {
+      indexRemove(name);
+      continue;
+    }
     if (!found || time > found.time) found = { file, time };
   }
-  return found ? { file: found.file, etag: `"${path.basename(found.file, ".webp").slice(key.length + 1)}"` } : null;
+  return found
+    ? { file: found.file, etag: `"${path.basename(found.file, ".webp").slice(key.length + 1)}"` }
+    : null;
 }
 
 /** The original's bytes: from ComfyUI, or from disk while ComfyUI is not answering. */
@@ -195,7 +243,9 @@ async function sourceBytes(filename, subfolder, type) {
     if (bytes) return bytes;
   }
   try {
-    const response = await fetch(`${comfyUrl}/view?${params}`, { signal: AbortSignal.timeout(15000) });
+    const response = await fetch(`${comfyUrl}/view?${params}`, {
+      signal: AbortSignal.timeout(15000),
+    });
     noteComfyReachable();
     return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
   } catch (error) {
@@ -222,19 +272,29 @@ export async function trustedLocalOutput(filename, subfolder = "", type = "outpu
   // Studio media is the file itself; there is no ComfyUI copy to compare it with.
   if (type === mediaType) return file;
   let stat;
-  try { stat = fs.statSync(file); } catch { return null; }
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return null;
+  }
   const version = `${file}:${stat.size}:${stat.mtimeMs}`;
   if (checkedLocal.has(version)) return checkedLocal.get(version) ? file : null;
   if (comfyRecentlyUnreachable()) return file;
   let same;
   try {
     const params = new URLSearchParams({ filename, subfolder, type });
-    const response = await fetch(`${comfyUrl}/view?${params}`, { headers: { Range: "bytes=0-0" }, signal: AbortSignal.timeout(5000) });
+    const response = await fetch(`${comfyUrl}/view?${params}`, {
+      headers: { Range: "bytes=0-0" },
+      signal: AbortSignal.timeout(5000),
+    });
     noteComfyReachable();
     await response.body?.cancel().catch(() => {});
-    const total = response.status === 206
-      ? Number(String(response.headers.get("content-range") || "").split("/")[1])
-      : response.ok ? Number(response.headers.get("content-length")) : NaN;
+    const total =
+      response.status === 206
+        ? Number(String(response.headers.get("content-range") || "").split("/")[1])
+        : response.ok
+          ? Number(response.headers.get("content-length"))
+          : NaN;
     // ComfyUI doesn't have it at all: the local file belongs to some other folder.
     if (response.status === 404) same = false;
     else same = !Number.isFinite(total) || total <= 0 || total === stat.size;
@@ -257,7 +317,10 @@ async function localSource(filename, subfolder, type) {
   if (!file) return null;
   try {
     const stat = fs.statSync(file);
-    const sourceHash = crypto.createHash("sha256").update(`local:${stat.size}:${stat.mtimeMs}`).digest("hex");
+    const sourceHash = crypto
+      .createHash("sha256")
+      .update(`local:${stat.size}:${stat.mtimeMs}`)
+      .digest("hex");
     return { file, sourceHash };
   } catch {
     return null;
@@ -274,7 +337,11 @@ async function build(filename, subfolder, type, size) {
       if (fs.existsSync(file)) return { file, etag: `\"${local.sourceHash}\"` };
       // sharp reads the file itself, off the main thread, instead of it being
       // read here into a buffer first. Unreadable: try ComfyUI below.
-      try { return await writeThumbnail(key, local.sourceHash, local.file, size); } catch { return null; }
+      try {
+        return await writeThumbnail(key, local.sourceHash, local.file, size);
+      } catch {
+        return null;
+      }
     });
     if (made) return made;
   }
@@ -320,7 +387,12 @@ async function writeThumbnail(key, sourceHash, source, size = "thumb") {
   for (const entry of [...(indexed().get(key) || [])]) {
     if (entry === name) continue;
     // Synchronous, so the stale file is gone by the time the new one is served.
-    try { fs.rmSync(path.join(thumbnailDir, entry), { force: true }); indexRemove(entry); } catch { /* in use (Windows); next build retries */ }
+    try {
+      fs.rmSync(path.join(thumbnailDir, entry), { force: true });
+      indexRemove(entry);
+    } catch {
+      /* in use (Windows); next build retries */
+    }
   }
   indexAdd(name);
   lastUsed.set(file, Date.now());
@@ -345,7 +417,8 @@ export function warmThumbnail(filename, subfolder = "", type = "output", size = 
 
 async function findOrBuild(filename, subfolder, type, size = "thumb") {
   if (!RENDITIONS[size]) size = "thumb";
-  if (!(await loadSharp())) return cachedThumbnail(cacheKey(filename, subfolder, type, size)) || { original: true };
+  if (!(await loadSharp()))
+    return cachedThumbnail(cacheKey(filename, subfolder, type, size)) || { original: true };
   const dedupeKey = `${size}:${type}:${subfolder}:${filename}`;
   if (pending.has(dedupeKey)) return pending.get(dedupeKey);
   const promise = build(filename, subfolder, type, size).finally(() => pending.delete(dedupeKey));
@@ -367,12 +440,18 @@ export async function getFileThumbnail(file) {
 
 async function findOrBuildFile(file) {
   const resolved = path.resolve(file);
-  const key = crypto.createHash("sha1").update(`file:${resolved}:${longestEdge}:${quality}`).digest("hex");
+  const key = crypto
+    .createHash("sha1")
+    .update(`file:${resolved}:${longestEdge}:${quality}`)
+    .digest("hex");
   if (!(await loadSharp())) return cachedThumbnail(key) || { original: true };
   if (pending.has(key)) return pending.get(key);
   const promise = (async () => {
     const stat = await fs.promises.stat(resolved);
-    const sourceHash = crypto.createHash("sha256").update(`local:${stat.size}:${stat.mtimeMs}`).digest("hex");
+    const sourceHash = crypto
+      .createHash("sha256")
+      .update(`local:${stat.size}:${stat.mtimeMs}`)
+      .digest("hex");
     const cached = cachePath(key, sourceHash);
     if (fs.existsSync(cached)) return { file: cached, etag: `"${sourceHash}"` };
     return inSlot(() => writeThumbnail(key, sourceHash, resolved));
@@ -387,7 +466,9 @@ export function viewParams(url = "") {
   if (!/^\/comfy\/(view|thumb)\?/.test(text)) return null;
   const params = new URLSearchParams(text.slice(text.indexOf("?") + 1));
   const filename = params.get("filename") || "";
-  return filename ? { filename, subfolder: params.get("subfolder") || "", type: params.get("type") || "output" } : null;
+  return filename
+    ? { filename, subfolder: params.get("subfolder") || "", type: params.get("type") || "output" }
+    : null;
 }
 
 /**
@@ -401,7 +482,11 @@ export function forgetThumbnail(filename, subfolder = "", type = "output") {
   const keys = Object.keys(RENDITIONS).map((size) => cacheKey(filename, subfolder, type, size));
   let removed = 0;
   let names = [];
-  try { names = fs.readdirSync(thumbnailDir); } catch { return 0; }
+  try {
+    names = fs.readdirSync(thumbnailDir);
+  } catch {
+    return 0;
+  }
   for (const name of names) {
     if (!keys.some((key) => name.startsWith(`${key}-`))) continue;
     try {
@@ -422,10 +507,18 @@ export function forgetThumbnail(filename, subfolder = "", type = "output") {
  */
 export async function forgetItemThumbnails(item) {
   let removed = 0;
-  for (const url of [item?.url, item?.thumbnailUrl, item?.upscale?.url, item?.upscale?.thumbnailUrl]) {
+  for (const url of [
+    item?.url,
+    item?.thumbnailUrl,
+    item?.upscale?.url,
+    item?.upscale?.thumbnailUrl,
+  ]) {
     const params = viewParams(url);
     if (!params) continue;
-    for (const size of Object.keys(RENDITIONS)) await pending.get(`${size}:${params.type}:${params.subfolder}:${params.filename}`)?.catch(() => null);
+    for (const size of Object.keys(RENDITIONS))
+      await pending
+        .get(`${size}:${params.type}:${params.subfolder}:${params.filename}`)
+        ?.catch(() => null);
     removed += forgetThumbnail(params.filename, params.subfolder, params.type);
   }
   return removed;

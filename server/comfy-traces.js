@@ -16,8 +16,11 @@ export async function forgetComfyRun({ promptIds = [], inputNames = [] } = {}) {
     historyGone = await comfy("/history", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ delete: ids })
-    }).then(() => true, () => false);
+      body: JSON.stringify({ delete: ids }),
+    }).then(
+      () => true,
+      () => false,
+    );
   }
   const inputDir = comfyInputDir();
   if (!inputDir) return historyGone;
@@ -25,7 +28,11 @@ export async function forgetComfyRun({ promptIds = [], inputNames = [] } = {}) {
   for (const name of new Set(inputNames.filter(Boolean).map(String))) {
     const file = path.resolve(base, name);
     if (!file.startsWith(`${base}${path.sep}`)) continue;
-    try { fs.unlinkSync(file); } catch { /* already gone, or ComfyUI still holds it */ }
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      /* already gone, or ComfyUI still holds it */
+    }
   }
   return historyGone;
 }

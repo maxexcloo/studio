@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { isSampler, nextProgress, phaseOf } from "./progress-phase.js";
 
 const graph = {
-  "1": { class_type: "LoadImage" },
-  "2": { class_type: "UpscaleModelLoader" },
-  "3": { class_type: "ImageUpscaleWithModel" },
-  "4": { class_type: "VAEEncode" },
-  "5": { class_type: "KSampler" },
-  "6": { class_type: "VAEDecode" },
-  "7": { class_type: "KSamplerSelect" },
-  "8": { class_type: "SamplerCustomAdvanced" }
+  1: { class_type: "LoadImage" },
+  2: { class_type: "UpscaleModelLoader" },
+  3: { class_type: "ImageUpscaleWithModel" },
+  4: { class_type: "VAEEncode" },
+  5: { class_type: "KSampler" },
+  6: { class_type: "VAEDecode" },
+  7: { class_type: "KSamplerSelect" },
+  8: { class_type: "SamplerCustomAdvanced" },
 };
 
 test("only samplers count steps", () => {
@@ -22,8 +22,17 @@ test("only samplers count steps", () => {
 });
 
 test("a tiled VAE encode reports its tiles as a phase, not steps", () => {
-  const progress = nextProgress(graph, { type: "progress", data: { node: "4", value: 241, max: 357 } });
-  assert.deepEqual(progress, { value: 241, max: 357, node: "4", phase: "Encoding image", steps: false });
+  const progress = nextProgress(graph, {
+    type: "progress",
+    data: { node: "4", value: 241, max: 357 },
+  });
+  assert.deepEqual(progress, {
+    value: 241,
+    max: 357,
+    node: "4",
+    phase: "Encoding image",
+    steps: false,
+  });
 });
 
 test("sampler progress is steps", () => {
@@ -33,7 +42,10 @@ test("sampler progress is steps", () => {
 });
 
 test("a sampler that has started but not stepped says it is loading the model", () => {
-  const before = nextProgress(graph, { type: "progress", data: { node: "4", value: 357, max: 357 } });
+  const before = nextProgress(graph, {
+    type: "progress",
+    data: { node: "4", value: 357, max: 357 },
+  });
   const progress = nextProgress(graph, { type: "executing", data: { node: "5" } }, before);
   assert.deepEqual(progress, { value: 0, max: 0, node: "5", phase: "Loading model", steps: false });
 });
@@ -55,8 +67,14 @@ test("each node gets a plain phase name", () => {
 });
 
 test("unknown nodes keep the old step reading, and expanded ids find their parent", () => {
-  assert.equal(nextProgress(graph, { type: "progress", data: { node: "99", value: 3, max: 20 } }).steps, true);
-  assert.equal(nextProgress(graph, { type: "progress", data: { node: "4:12", value: 3, max: 20 } }).phase, "Encoding image");
+  assert.equal(
+    nextProgress(graph, { type: "progress", data: { node: "99", value: 3, max: 20 } }).steps,
+    true,
+  );
+  assert.equal(
+    nextProgress(graph, { type: "progress", data: { node: "4:12", value: 3, max: 20 } }).phase,
+    "Encoding image",
+  );
 });
 
 test("the end of a run and unrelated messages change nothing", () => {

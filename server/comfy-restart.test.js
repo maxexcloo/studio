@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { beginComfyRestart, comfyRestarting, finishComfyRestart, lastComfyRestart, noteComfyRestart, resetComfyRestart, RESTART_WINDOW_MS } from "./comfy-restart.js";
+import {
+  beginComfyRestart,
+  comfyRestarting,
+  finishComfyRestart,
+  lastComfyRestart,
+  noteComfyRestart,
+  resetComfyRestart,
+  RESTART_WINDOW_MS,
+} from "./comfy-restart.js";
 
 test("a restart lasts until ComfyUI answers after going down, and is timed", () => {
   resetComfyRestart();
@@ -8,12 +16,24 @@ test("a restart lasts until ComfyUI answers after going down, and is timed", () 
   assert.equal(noteComfyRestart(true, 500).phase, "restarting", "still the old process answering");
   assert.equal(noteComfyRestart(false, 2000).phase, "restarting");
   assert.equal(comfyRestarting(3000), true);
-  assert.deepEqual(noteComfyRestart(true, 9000), { phase: "back", startedAt: 0, durationMs: 9000, packs: ["rgthree-comfy"] });
+  assert.deepEqual(noteComfyRestart(true, 9000), {
+    phase: "back",
+    startedAt: 0,
+    durationMs: 9000,
+    packs: ["rgthree-comfy"],
+  });
   assert.equal(noteComfyRestart(true, 9500), null, "reported once");
   assert.equal(comfyRestarting(9500), true, "still restarting while the checks after it run");
   finishComfyRestart({ durationMs: 9000, newPacks: [], failedPacks: [] }, 10_000);
   assert.equal(comfyRestarting(10_000), false);
-  assert.deepEqual(lastComfyRestart(10_000), { startedAt: 0, endedAt: 10_000, outcome: "back", durationMs: 9000, newPacks: [], failedPacks: [] });
+  assert.deepEqual(lastComfyRestart(10_000), {
+    startedAt: 0,
+    endedAt: 10_000,
+    outcome: "back",
+    durationMs: 9000,
+    newPacks: [],
+    failedPacks: [],
+  });
   assert.equal(lastComfyRestart(10_000 + 121_000), null, "forgotten after two minutes");
 });
 

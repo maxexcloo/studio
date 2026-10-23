@@ -26,8 +26,16 @@ export function precompressDir(dir) {
     const source = fs.readFileSync(file);
     if (source.length < minBytes) continue;
     const variants = [
-      [".br", brotliCompressSync(source, { params: { [constants.BROTLI_PARAM_QUALITY]: 11, [constants.BROTLI_PARAM_SIZE_HINT]: source.length } })],
-      [".gz", gzipSync(source, { level: 9 })]
+      [
+        ".br",
+        brotliCompressSync(source, {
+          params: {
+            [constants.BROTLI_PARAM_QUALITY]: 11,
+            [constants.BROTLI_PARAM_SIZE_HINT]: source.length,
+          },
+        }),
+      ],
+      [".gz", gzipSync(source, { level: 9 })],
     ];
     let wrote = false;
     for (const [suffix, compressed] of variants) {

@@ -8,5 +8,11 @@ export { currentDataDir, projectRoot } from "./data-root.js";
 
 /** Package version, read once; "" when package.json can't be read. */
 export const appVersion = (() => {
-  try { return JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")).version || ""; } catch { return ""; }
+  try {
+    return (
+      JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8")).version || ""
+    );
+  } catch {
+    return "";
+  }
 })();

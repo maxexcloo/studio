@@ -1,21 +1,122 @@
 {
   "_note": "A Civitai /api/v1/models/:id answer pinned for version offers and update checks (library-offers.js, library-updates.js). Versions are newest first; hashes are placeholders.",
   "model": {
-    "id": 70, "name": "Nightfall Diffusion", "type": "Checkpoint", "nsfw": false, "mode": null,
+    "id": 70,
+    "name": "Nightfall Diffusion",
+    "type": "Checkpoint",
+    "nsfw": false,
+    "mode": null,
     "modelVersions": [
-      { "id": 704, "name": "v4 Early", "baseModel": "Flux.1 D", "availability": "EarlyAccess", "status": "Published", "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z", "earlyAccessConfig": { "chargeForDownload": true, "downloadPrice": 800 },
-        "files": [{ "id": 7041, "name": "nightfall-v4-fp8.safetensors", "type": "Model", "primary": true, "sizeKB": 11000000, "metadata": { "fp": "fp8", "format": "SafeTensor" }, "hashes": { "SHA256": "4444444444444444444444444444444444444444444444444444444444444444" } }] },
-      { "id": 703, "name": "v3", "baseModel": "Flux.1 D", "availability": "Public", "status": "Published", "trainedWords": [],
+      {
+        "id": 704,
+        "name": "v4 Early",
+        "baseModel": "Flux.1 D",
+        "availability": "EarlyAccess",
+        "status": "Published",
+        "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z",
+        "earlyAccessConfig": { "chargeForDownload": true, "downloadPrice": 800 },
         "files": [
-          { "id": 7031, "name": "nightfall-v3-fp8.safetensors", "type": "Model", "primary": true, "sizeKB": 11000000, "metadata": { "fp": "fp8", "format": "SafeTensor" }, "hashes": { "SHA256": "3333333333333333333333333333333333333333333333333333333333333333" } },
-          { "id": 7032, "name": "nightfall-v3-bf16.safetensors", "type": "Model", "sizeKB": 22000000, "metadata": { "fp": "bf16", "format": "SafeTensor" }, "hashes": { "SHA256": "3434343434343434343434343434343434343434343434343434343434343434" } },
-          { "id": 7033, "name": "nightfall-v3-Q4_K_M.gguf", "type": "Diffusion Model", "sizeKB": 6500000, "metadata": { "format": "GGUF", "size": "full" }, "hashes": { "SHA256": "3535353535353535353535353535353535353535353535353535353535353535" } },
-          { "id": 7034, "name": "nightfall-v3-vae.safetensors", "type": "VAE", "sizeKB": 160000, "hashes": { "SHA256": "3636363636363636363636363636363636363636363636363636363636363636" } }
-        ] },
-      { "id": 702, "name": "v2 SDXL", "baseModel": "SDXL 1.0", "availability": "Public", "status": "Published",
-        "files": [{ "id": 7021, "name": "nightfall-v2-xl.safetensors", "type": "Model", "primary": true, "sizeKB": 6900000, "hashes": { "SHA256": "2121212121212121212121212121212121212121212121212121212121212121" } }] },
-      { "id": 701, "name": "v1", "baseModel": "Flux.1 D", "availability": "Public", "status": "Published",
-        "files": [{ "id": 7011, "name": "nightfall-v1-fp8.safetensors", "type": "Model", "primary": true, "sizeKB": 11000000, "hashes": { "SHA256": "1212121212121212121212121212121212121212121212121212121212121212" } }] }
+          {
+            "id": 7041,
+            "name": "nightfall-v4-fp8.safetensors",
+            "type": "Model",
+            "primary": true,
+            "sizeKB": 11000000,
+            "metadata": { "fp": "fp8", "format": "SafeTensor" },
+            "hashes": {
+              "SHA256": "4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          }
+        ]
+      },
+      {
+        "id": 703,
+        "name": "v3",
+        "baseModel": "Flux.1 D",
+        "availability": "Public",
+        "status": "Published",
+        "trainedWords": [],
+        "files": [
+          {
+            "id": 7031,
+            "name": "nightfall-v3-fp8.safetensors",
+            "type": "Model",
+            "primary": true,
+            "sizeKB": 11000000,
+            "metadata": { "fp": "fp8", "format": "SafeTensor" },
+            "hashes": {
+              "SHA256": "3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "id": 7032,
+            "name": "nightfall-v3-bf16.safetensors",
+            "type": "Model",
+            "sizeKB": 22000000,
+            "metadata": { "fp": "bf16", "format": "SafeTensor" },
+            "hashes": {
+              "SHA256": "3434343434343434343434343434343434343434343434343434343434343434"
+            }
+          },
+          {
+            "id": 7033,
+            "name": "nightfall-v3-Q4_K_M.gguf",
+            "type": "Diffusion Model",
+            "sizeKB": 6500000,
+            "metadata": { "format": "GGUF", "size": "full" },
+            "hashes": {
+              "SHA256": "3535353535353535353535353535353535353535353535353535353535353535"
+            }
+          },
+          {
+            "id": 7034,
+            "name": "nightfall-v3-vae.safetensors",
+            "type": "VAE",
+            "sizeKB": 160000,
+            "hashes": {
+              "SHA256": "3636363636363636363636363636363636363636363636363636363636363636"
+            }
+          }
+        ]
+      },
+      {
+        "id": 702,
+        "name": "v2 SDXL",
+        "baseModel": "SDXL 1.0",
+        "availability": "Public",
+        "status": "Published",
+        "files": [
+          {
+            "id": 7021,
+            "name": "nightfall-v2-xl.safetensors",
+            "type": "Model",
+            "primary": true,
+            "sizeKB": 6900000,
+            "hashes": {
+              "SHA256": "2121212121212121212121212121212121212121212121212121212121212121"
+            }
+          }
+        ]
+      },
+      {
+        "id": 701,
+        "name": "v1",
+        "baseModel": "Flux.1 D",
+        "availability": "Public",
+        "status": "Published",
+        "files": [
+          {
+            "id": 7011,
+            "name": "nightfall-v1-fp8.safetensors",
+            "type": "Model",
+            "primary": true,
+            "sizeKB": 11000000,
+            "hashes": {
+              "SHA256": "1212121212121212121212121212121212121212121212121212121212121212"
+            }
+          }
+        ]
+      }
     ]
   }
 }

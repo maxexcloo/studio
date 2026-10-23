@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { hasNode, modelFolders, optionsFor } from './comfy.js';
+import { hasNode, modelFolders, optionsFor } from "./comfy.js";
 
 /**
  * GGUF model files, the way ComfyUI-GGUF (city96) loads them.
@@ -22,10 +22,38 @@ export const isGguf = (name = "") => /\.gguf$/i.test(String(name));
 
 // ggml_type ids (ggml.h) for the dtype column; unknown ids stay numeric.
 const ggmlTypes = {
-  0: "F32", 1: "F16", 2: "Q4_0", 3: "Q4_1", 6: "Q5_0", 7: "Q5_1", 8: "Q8_0", 9: "Q8_1",
-  10: "Q2_K", 11: "Q3_K", 12: "Q4_K", 13: "Q5_K", 14: "Q6_K", 15: "Q8_K",
-  16: "IQ2_XXS", 17: "IQ2_XS", 18: "IQ3_XXS", 19: "IQ1_S", 20: "IQ4_NL", 21: "IQ3_S", 22: "IQ2_S", 23: "IQ4_XS",
-  24: "I8", 25: "I16", 26: "I32", 27: "I64", 28: "F64", 29: "IQ1_M", 30: "BF16", 34: "TQ1_0", 35: "TQ2_0", 39: "MXFP4"
+  0: "F32",
+  1: "F16",
+  2: "Q4_0",
+  3: "Q4_1",
+  6: "Q5_0",
+  7: "Q5_1",
+  8: "Q8_0",
+  9: "Q8_1",
+  10: "Q2_K",
+  11: "Q3_K",
+  12: "Q4_K",
+  13: "Q5_K",
+  14: "Q6_K",
+  15: "Q8_K",
+  16: "IQ2_XXS",
+  17: "IQ2_XS",
+  18: "IQ3_XXS",
+  19: "IQ1_S",
+  20: "IQ4_NL",
+  21: "IQ3_S",
+  22: "IQ2_S",
+  23: "IQ4_XS",
+  24: "I8",
+  25: "I16",
+  26: "I32",
+  27: "I64",
+  28: "F64",
+  29: "IQ1_M",
+  30: "BF16",
+  34: "TQ1_0",
+  35: "TQ2_0",
+  39: "MXFP4",
 };
 
 // gguf_type: byte size of each fixed-size value; 8 is a string, 9 an array.
@@ -63,24 +91,35 @@ function cursor(fd, limit) {
     skip: (count) => {
       if (count < 0 || pos + count > limit) throw new Error("GGUF header too large.");
       pos += count;
-    }
+    },
   };
 }
 
 function readScalar(r, type) {
   const bytes = r.take(valueSizes[type]);
   switch (type) {
-    case 0: return bytes.readUInt8(0);
-    case 1: return bytes.readInt8(0);
-    case 2: return bytes.readUInt16LE(0);
-    case 3: return bytes.readInt16LE(0);
-    case 4: return bytes.readUInt32LE(0);
-    case 5: return bytes.readInt32LE(0);
-    case 6: return bytes.readFloatLE(0);
-    case 7: return bytes[0] !== 0;
-    case 10: return Number(bytes.readBigUInt64LE(0));
-    case 11: return Number(bytes.readBigInt64LE(0));
-    default: return bytes.readDoubleLE(0);
+    case 0:
+      return bytes.readUInt8(0);
+    case 1:
+      return bytes.readInt8(0);
+    case 2:
+      return bytes.readUInt16LE(0);
+    case 3:
+      return bytes.readInt16LE(0);
+    case 4:
+      return bytes.readUInt32LE(0);
+    case 5:
+      return bytes.readInt32LE(0);
+    case 6:
+      return bytes.readFloatLE(0);
+    case 7:
+      return bytes[0] !== 0;
+    case 10:
+      return Number(bytes.readBigUInt64LE(0));
+    case 11:
+      return Number(bytes.readBigInt64LE(0));
+    default:
+      return bytes.readDoubleLE(0);
   }
 }
 
@@ -90,7 +129,8 @@ function readValue(r, type) {
   if (type === 9) {
     const itemType = r.u32();
     const count = r.u64();
-    if (count <= keptArrayLength) return Array.from({ length: count }, () => readValue(r, itemType));
+    if (count <= keptArrayLength)
+      return Array.from({ length: count }, () => readValue(r, itemType));
     if (valueSizes[itemType]) r.skip(count * valueSizes[itemType]);
     else for (let index = 0; index < count; index += 1) readValue(r, itemType);
     return undefined;
@@ -130,7 +170,13 @@ export function readGgufHeader(file) {
       const shape = Array.from({ length: dims }, () => r.u64()).reverse();
       const type = r.u32();
       r.skip(8); // offset into the data section
-      tensors.push([name, { dtype: ggmlTypes[type] || String(type), shape: Array.isArray(origShapes[name]) ? origShapes[name] : shape }]);
+      tensors.push([
+        name,
+        {
+          dtype: ggmlTypes[type] || String(type),
+          shape: Array.isArray(origShapes[name]) ? origShapes[name] : shape,
+        },
+      ]);
     }
     const renamed = textEncoderKeys(metadata["general.architecture"], tensors);
     return { __metadata__: { ...metadata, format: "gguf" }, ...Object.fromEntries(renamed) };
@@ -144,29 +190,62 @@ export function readGgufHeader(file) {
 // ComfyUI-GGUF's loader.py maps llama.cpp names back to the originals before
 // ComfyUI detects the encoder; replacements run in order, like its dicts.
 const t5Keys = [
-  ["enc.", "encoder."], [".blk.", ".block."], ["token_embd", "shared"], ["output_norm", "final_layer_norm"],
-  ["attn_q", "layer.0.SelfAttention.q"], ["attn_k", "layer.0.SelfAttention.k"], ["attn_v", "layer.0.SelfAttention.v"],
-  ["attn_o", "layer.0.SelfAttention.o"], ["attn_norm", "layer.0.layer_norm"], ["attn_rel_b", "layer.0.SelfAttention.relative_attention_bias"],
-  ["ffn_up", "layer.1.DenseReluDense.wi_1"], ["ffn_down", "layer.1.DenseReluDense.wo"], ["ffn_gate", "layer.1.DenseReluDense.wi_0"],
-  ["ffn_norm", "layer.1.layer_norm"]
+  ["enc.", "encoder."],
+  [".blk.", ".block."],
+  ["token_embd", "shared"],
+  ["output_norm", "final_layer_norm"],
+  ["attn_q", "layer.0.SelfAttention.q"],
+  ["attn_k", "layer.0.SelfAttention.k"],
+  ["attn_v", "layer.0.SelfAttention.v"],
+  ["attn_o", "layer.0.SelfAttention.o"],
+  ["attn_norm", "layer.0.layer_norm"],
+  ["attn_rel_b", "layer.0.SelfAttention.relative_attention_bias"],
+  ["ffn_up", "layer.1.DenseReluDense.wi_1"],
+  ["ffn_down", "layer.1.DenseReluDense.wo"],
+  ["ffn_gate", "layer.1.DenseReluDense.wi_0"],
+  ["ffn_norm", "layer.1.layer_norm"],
 ];
 const llamaKeys = [
-  ["blk.", "model.layers."], ["attn_norm", "input_layernorm"], ["attn_q_norm.", "self_attn.q_norm."], ["attn_k_norm.", "self_attn.k_norm."],
-  ["attn_v_norm.", "self_attn.v_norm."], ["attn_q", "self_attn.q_proj"], ["attn_k", "self_attn.k_proj"], ["attn_v", "self_attn.v_proj"],
-  ["attn_output", "self_attn.o_proj"], ["ffn_up", "mlp.up_proj"], ["ffn_down", "mlp.down_proj"], ["ffn_gate", "mlp.gate_proj"],
-  ["ffn_norm", "post_attention_layernorm"], ["token_embd", "model.embed_tokens"], ["output_norm", "model.norm"], ["output.weight", "lm_head.weight"]
+  ["blk.", "model.layers."],
+  ["attn_norm", "input_layernorm"],
+  ["attn_q_norm.", "self_attn.q_norm."],
+  ["attn_k_norm.", "self_attn.k_norm."],
+  ["attn_v_norm.", "self_attn.v_norm."],
+  ["attn_q", "self_attn.q_proj"],
+  ["attn_k", "self_attn.k_proj"],
+  ["attn_v", "self_attn.v_proj"],
+  ["attn_output", "self_attn.o_proj"],
+  ["ffn_up", "mlp.up_proj"],
+  ["ffn_down", "mlp.down_proj"],
+  ["ffn_gate", "mlp.gate_proj"],
+  ["ffn_norm", "post_attention_layernorm"],
+  ["token_embd", "model.embed_tokens"],
+  ["output_norm", "model.norm"],
+  ["output.weight", "lm_head.weight"],
 ];
 const gemma3Keys = [
   ...llamaKeys.map(([from, to]) => [from, from === "ffn_norm" ? "pre_feedforward_layernorm" : to]),
-  ["post_ffw_norm", "post_feedforward_layernorm"], ["post_attention_norm", "post_attention_layernorm"]
+  ["post_ffw_norm", "post_feedforward_layernorm"],
+  ["post_attention_norm", "post_attention_layernorm"],
 ];
 // loader.py TXT_ARCH_LIST: what CLIPLoaderGGUF accepts, and how it renames each.
-export const ggufTextArchitectures = { t5: t5Keys, t5encoder: t5Keys, llama: llamaKeys, qwen2vl: llamaKeys, qwen3: llamaKeys, qwen3vl: llamaKeys, gemma3: gemma3Keys };
+export const ggufTextArchitectures = {
+  t5: t5Keys,
+  t5encoder: t5Keys,
+  llama: llamaKeys,
+  qwen2vl: llamaKeys,
+  qwen3: llamaKeys,
+  qwen3vl: llamaKeys,
+  gemma3: gemma3Keys,
+};
 
 function textEncoderKeys(arch, tensors) {
   const map = ggufTextArchitectures[arch];
   if (!map) return tensors;
-  return tensors.map(([name, info]) => [map.reduce((key, [from, to]) => key.replaceAll(from, to), name), info]);
+  return tensors.map(([name, info]) => [
+    map.reduce((key, [from, to]) => key.replaceAll(from, to), name),
+    info,
+  ]);
 }
 
 /* ------------------------------------------------------------ Model lists */
@@ -177,18 +256,25 @@ function textEncoderKeys(arch, tensors) {
  * searched instead: those files show up needing the pack, not missing.
  */
 export function ggufModelNames(info) {
-  if (hasNode(info, "UnetLoaderGGUF")) return optionsFor(info, "UnetLoaderGGUF", "unet_name").filter(isGguf);
+  if (hasNode(info, "UnetLoaderGGUF"))
+    return optionsFor(info, "UnetLoaderGGUF", "unet_name").filter(isGguf);
   const found = new Set();
   const walk = (dir, prefix, depth) => {
     let entries = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
     for (const entry of entries) {
       const name = prefix ? path.join(prefix, entry.name) : entry.name;
-      if (entry.isDirectory() && depth < 3 && !entry.name.startsWith(".")) walk(path.join(dir, entry.name), name, depth + 1);
+      if (entry.isDirectory() && depth < 3 && !entry.name.startsWith("."))
+        walk(path.join(dir, entry.name), name, depth + 1);
       else if (entry.isFile() && isGguf(entry.name)) found.add(name);
     }
   };
-  for (const dir of modelFolders("diffusion_models", ["diffusion_models", "unet"])) walk(dir, "", 0);
+  for (const dir of modelFolders("diffusion_models", ["diffusion_models", "unet"]))
+    walk(dir, "", 0);
   return [...found].sort();
 }
 
@@ -203,9 +289,21 @@ export function ggufEncoderNames(info) {
 export const ggufLoaders = {
   UNETLoader: { node: "UnetLoaderGGUF", files: ["unet_name"], drop: ["weight_dtype"] },
   CLIPLoader: { node: "CLIPLoaderGGUF", files: ["clip_name"], drop: ["device"] },
-  DualCLIPLoader: { node: "DualCLIPLoaderGGUF", files: ["clip_name1", "clip_name2"], drop: ["device"] },
-  TripleCLIPLoader: { node: "TripleCLIPLoaderGGUF", files: ["clip_name1", "clip_name2", "clip_name3"], drop: [] },
-  QuadrupleCLIPLoader: { node: "QuadrupleCLIPLoaderGGUF", files: ["clip_name1", "clip_name2", "clip_name3", "clip_name4"], drop: [] }
+  DualCLIPLoader: {
+    node: "DualCLIPLoaderGGUF",
+    files: ["clip_name1", "clip_name2"],
+    drop: ["device"],
+  },
+  TripleCLIPLoader: {
+    node: "TripleCLIPLoaderGGUF",
+    files: ["clip_name1", "clip_name2", "clip_name3"],
+    drop: [],
+  },
+  QuadrupleCLIPLoader: {
+    node: "QuadrupleCLIPLoaderGGUF",
+    files: ["clip_name1", "clip_name2", "clip_name3", "clip_name4"],
+    drop: [],
+  },
 };
 
 /**

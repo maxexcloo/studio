@@ -1,23 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cancelPrompt, cancelPrompts, isTransientComfyError, promptTracker, queuePlace } from "./comfy-queue.js";
+import {
+  cancelPrompt,
+  cancelPrompts,
+  isTransientComfyError,
+  promptTracker,
+  queuePlace,
+} from "./comfy-queue.js";
 
 /** A fake ComfyUI: answers by path from a table, records every call. */
 function fakeComfy(routes) {
   const calls = [];
   const request = async (pathname, options = {}) => {
-    calls.push({ pathname, method: options.method || "GET", body: options.body ? JSON.parse(options.body) : null });
+    calls.push({
+      pathname,
+      method: options.method || "GET",
+      body: options.body ? JSON.parse(options.body) : null,
+    });
     const route = routes[`${options.method || "GET"} ${pathname}`] ?? routes[pathname];
     if (typeof route === "function") return route(options);
     if (route instanceof Error) throw route;
-    if (route === undefined) throw Object.assign(new Error("Comfy 404: Not Found"), { status: 404 });
+    if (route === undefined)
+      throw Object.assign(new Error("Comfy 404: Not Found"), { status: 404 });
     return route;
   };
   return { request, calls };
 }
 
 const entry = (id) => [1, id, {}, {}, []];
-const refused = () => Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } });
+const refused = () =>
+  Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } });
 
 test("queuePlace reads running and pending entries", () => {
   const queue = { queue_running: [entry("a")], queue_pending: [entry("b"), entry("c")] };
@@ -30,40 +42,59 @@ test("queuePlace reads running and pending entries", () => {
 test("a current ComfyUI cancels through its atomic jobs route", async () => {
   const { request, calls } = fakeComfy({ "POST /api/jobs/p1/cancel": { cancelled: true } });
   assert.equal(await cancelPrompt("p1", request), "canceled");
-  assert.deepEqual(calls.map((call) => call.pathname), ["/api/jobs/p1/cancel"]);
+  assert.deepEqual(
+    calls.map((call) => call.pathname),
+    ["/api/jobs/p1/cancel"],
+  );
 });
 
 test("an older ComfyUI: a pending prompt is only dequeued, never interrupted", async () => {
   let deleted = false;
   const { request, calls } = fakeComfy({
-    "GET /queue": () => ({ queue_running: [entry("other")], queue_pending: deleted ? [] : [entry("p1")] }),
-    "POST /queue": () => { deleted = true; return {}; }
+    "GET /queue": () => ({
+      queue_running: [entry("other")],
+      queue_pending: deleted ? [] : [entry("p1")],
+    }),
+    "POST /queue": () => {
+      deleted = true;
+      return {};
+    },
   });
   assert.equal(await cancelPrompt("p1", request), "pending");
   assert.ok(!calls.some((call) => call.pathname === "/interrupt"), "the other job keeps running");
-  assert.deepEqual(calls.find((call) => call.method === "POST" && call.pathname === "/queue").body, { delete: ["p1"] });
+  assert.deepEqual(
+    calls.find((call) => call.method === "POST" && call.pathname === "/queue").body,
+    { delete: ["p1"] },
+  );
 });
 
 test("an older ComfyUI: only the prompt that is running gets interrupted, by id", async () => {
   const { request, calls } = fakeComfy({
     "GET /queue": { queue_running: [entry("p1")], queue_pending: [] },
-    "POST /interrupt": {}
+    "POST /interrupt": {},
   });
   assert.equal(await cancelPrompt("p1", request), "running");
   assert.deepEqual(calls.find((call) => call.pathname === "/interrupt").body, { prompt_id: "p1" });
 });
 
 test("a prompt that is neither queued nor running is left alone", async () => {
-  const { request, calls } = fakeComfy({ "GET /queue": { queue_running: [entry("someone-else")], queue_pending: [] } });
+  const { request, calls } = fakeComfy({
+    "GET /queue": { queue_running: [entry("someone-else")], queue_pending: [] },
+  });
   assert.equal(await cancelPrompt("gone", request), "");
-  assert.ok(!calls.some((call) => call.pathname === "/interrupt" || (call.pathname === "/queue" && call.method === "POST")));
+  assert.ok(
+    !calls.some(
+      (call) =>
+        call.pathname === "/interrupt" || (call.pathname === "/queue" && call.method === "POST"),
+    ),
+  );
 });
 
 test("cancelPrompts never clears the whole queue and reports failures", async () => {
   const { request, calls } = fakeComfy({
     "POST /api/jobs/a/cancel": { cancelled: true },
     "POST /api/jobs/b/cancel": refused(),
-    "GET /queue": refused()
+    "GET /queue": refused(),
   });
   assert.equal(await cancelPrompts(["a", "b", "a", ""], request), 1);
   assert.ok(!calls.some((call) => call.body?.clear), "no queue clear");
@@ -71,9 +102,15 @@ test("cancelPrompts never clears the whole queue and reports failures", async ()
 
 test("transient errors are network trouble and 5xx, not answers", () => {
   assert.equal(isTransientComfyError(refused()), true);
-  assert.equal(isTransientComfyError(Object.assign(new Error("timed out"), { name: "TimeoutError" })), true);
+  assert.equal(
+    isTransientComfyError(Object.assign(new Error("timed out"), { name: "TimeoutError" })),
+    true,
+  );
   assert.equal(isTransientComfyError(Object.assign(new Error("Comfy 502"), { status: 502 })), true);
-  assert.equal(isTransientComfyError(Object.assign(new Error("Comfy 400"), { status: 400 })), false);
+  assert.equal(
+    isTransientComfyError(Object.assign(new Error("Comfy 400"), { status: 400 })),
+    false,
+  );
   assert.equal(isTransientComfyError(new Error("something else")), false);
 });
 
@@ -81,8 +118,11 @@ test("the tracker waits out a blip and then recovers the finished run", async ()
   let clock = 0;
   let down = true;
   const { request } = fakeComfy({
-    "/history/p1": () => { if (down) throw refused(); return { p1: { outputs: {} } }; },
-    "/queue": { queue_running: [], queue_pending: [] }
+    "/history/p1": () => {
+      if (down) throw refused();
+      return { p1: { outputs: {} } };
+    },
+    "/queue": { queue_running: [], queue_pending: [] },
   });
   const tracker = promptTracker("p1", { request, now: () => clock, lostAfterMs: 60_000 });
   const first = await tracker.check();
@@ -100,7 +140,11 @@ test("the tracker waits out a blip and then recovers the finished run", async ()
 
 test("the tracker gives up after a minute without any sign of life", async () => {
   let clock = 0;
-  const { request } = fakeComfy({ "/history/p1": () => { throw refused(); } });
+  const { request } = fakeComfy({
+    "/history/p1": () => {
+      throw refused();
+    },
+  });
   const tracker = promptTracker("p1", { request, now: () => clock, lostAfterMs: 60_000 });
   await tracker.check();
   clock = 30_000;
@@ -109,15 +153,21 @@ test("the tracker gives up after a minute without any sign of life", async () =>
   clock = 80_000;
   assert.equal((await tracker.check()).state, "reconnecting");
   clock = 95_000;
-  await assert.rejects(() => tracker.check(), (error) => error.lostConnection === true);
+  await assert.rejects(
+    () => tracker.check(),
+    (error) => error.lostConnection === true,
+  );
 });
 
 test("a prompt missing from queue and history after a reconnect fails as dropped", async () => {
   let clock = 0;
   let down = true;
   const { request } = fakeComfy({
-    "/history/p1": () => { if (down) throw refused(); return {}; },
-    "/queue": { queue_running: [], queue_pending: [] }
+    "/history/p1": () => {
+      if (down) throw refused();
+      return {};
+    },
+    "/queue": { queue_running: [], queue_pending: [] },
   });
   const tracker = promptTracker("p1", { request, now: () => clock });
   await tracker.check();
@@ -125,13 +175,16 @@ test("a prompt missing from queue and history after a reconnect fails as dropped
   clock = 5000;
   // The first miss could be ComfyUI's unlocked queue read; the second is not.
   assert.equal((await tracker.check()).state, "waiting");
-  await assert.rejects(() => tracker.check(), (error) => error.droppedRun === true);
+  await assert.rejects(
+    () => tracker.check(),
+    (error) => error.droppedRun === true,
+  );
 });
 
 test("a queued prompt keeps waiting through the periodic check", async () => {
   const { request, calls } = fakeComfy({
     "/history/p1": {},
-    "/queue": { queue_running: [entry("x")], queue_pending: [entry("p1")] }
+    "/queue": { queue_running: [entry("x")], queue_pending: [entry("p1")] },
   });
   const tracker = promptTracker("p1", { request, verifyEvery: 2 });
   assert.equal((await tracker.check()).state, "waiting");
@@ -143,7 +196,7 @@ test("a run that finishes between the history and queue reads is found, not drop
   let reads = 0;
   const { request } = fakeComfy({
     "/history/p1": () => (++reads >= 3 ? { p1: { outputs: {} } } : {}),
-    "/queue": { queue_running: [], queue_pending: [] }
+    "/queue": { queue_running: [], queue_pending: [] },
   });
   const tracker = promptTracker("p1", { request, verifyEvery: 2 });
   assert.equal((await tracker.check()).state, "waiting");
@@ -153,12 +206,24 @@ test("a run that finishes between the history and queue reads is found, not drop
 test("a worker too busy to answer in time keeps a long run waiting, not abandoned after a minute", async () => {
   let clock = 0;
   let busy = true;
-  const timedOut = () => Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+  const timedOut = () =>
+    Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
   const { request } = fakeComfy({
-    "/history/p1": () => { if (busy) throw timedOut(); return { p1: { outputs: {} } }; },
-    "/queue": () => { if (busy) throw timedOut(); return { queue_running: [entry("p1")], queue_pending: [] }; }
+    "/history/p1": () => {
+      if (busy) throw timedOut();
+      return { p1: { outputs: {} } };
+    },
+    "/queue": () => {
+      if (busy) throw timedOut();
+      return { queue_running: [entry("p1")], queue_pending: [] };
+    },
   });
-  const tracker = promptTracker("p1", { request, now: () => clock, lostAfterMs: 60_000, busyLostAfterMs: 20 * 60_000 });
+  const tracker = promptTracker("p1", {
+    request,
+    now: () => clock,
+    lostAfterMs: 60_000,
+    busyLostAfterMs: 20 * 60_000,
+  });
   // Decoding and saving 192 frames: no socket messages and slow answers for minutes.
   for (clock = 0; clock <= 10 * 60_000; clock += 15_000) {
     const checked = await tracker.check();
@@ -172,7 +237,11 @@ test("a worker too busy to answer in time keeps a long run waiting, not abandone
 test("a worker that stays busy and silent past the busy limit is still given up", async () => {
   let clock = 0;
   const timedOut = () => Object.assign(new Error("timed out"), { name: "TimeoutError" });
-  const { request } = fakeComfy({ "/history/p1": () => { throw timedOut(); } });
+  const { request } = fakeComfy({
+    "/history/p1": () => {
+      throw timedOut();
+    },
+  });
   const tracker = promptTracker("p1", { request, now: () => clock, busyLostAfterMs: 120_000 });
   assert.equal((await tracker.check()).state, "waiting");
   clock = 90_000;
@@ -180,5 +249,8 @@ test("a worker that stays busy and silent past the busy limit is still given up"
   clock = 200_000;
   assert.equal((await tracker.check()).state, "waiting");
   clock = 211_000;
-  await assert.rejects(() => tracker.check(), (error) => error.lostConnection === true);
+  await assert.rejects(
+    () => tracker.check(),
+    (error) => error.lostConnection === true,
+  );
 });

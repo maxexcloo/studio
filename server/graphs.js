@@ -1,13 +1,13 @@
 import crypto from "node:crypto";
 import { selectImageMode } from "./workflow-modes.js";
-import { comfy } from './comfy.js';
-import { getCustomWorkflow } from './custom-workflows.js';
-import { startImageDataUrl } from './start-images.js';
-import { prepareInputImage } from './input-image-sizing.js';
-import { families } from './family-catalog.js';
-import { familyGraph } from './family-graph.js';
-import { withGgufLoaders } from './gguf.js';
-import { accountOutputSubfolder } from './account-ownership.js';
+import { comfy } from "./comfy.js";
+import { getCustomWorkflow } from "./custom-workflows.js";
+import { startImageDataUrl } from "./start-images.js";
+import { prepareInputImage } from "./input-image-sizing.js";
+import { families } from "./family-catalog.js";
+import { familyGraph } from "./family-graph.js";
+import { withGgufLoaders } from "./gguf.js";
+import { accountOutputSubfolder } from "./account-ownership.js";
 import { outputFolderName } from "./data-names.js";
 
 export async function uploadReferenceImage(dataUrl, body = {}) {
@@ -17,10 +17,13 @@ export async function uploadReferenceImage(dataUrl, body = {}) {
   let type = match?.[1] || "image/png";
   const family = families[body.family];
   const directImg2img = family?.img2img && !family.references;
-  const prepared = await prepareInputImage({ buffer: Buffer.from(data, "base64"), mime: type, name: "start-image" }, {
-    pixels: body.autoResizeInputs !== false ? Number(body.width) * Number(body.height) : 0,
-    step: directImg2img ? family.sizeStep || 8 : 1
-  });
+  const prepared = await prepareInputImage(
+    { buffer: Buffer.from(data, "base64"), mime: type, name: "start-image" },
+    {
+      pixels: body.autoResizeInputs !== false ? Number(body.width) * Number(body.height) : 0,
+      step: directImg2img ? family.sizeStep || 8 : 1,
+    },
+  );
   if (directImg2img && prepared.width) {
     body.requestedSize ||= { width: body.width, height: body.height };
     body.width = prepared.width;
@@ -73,21 +76,26 @@ export async function videoGraph(body) {
  * ComfyUI (already uploaded, by name), or a legacy start image uploaded now.
  */
 async function builtInGraph(body) {
-  const referenceImages = (body.referenceAssets || []).map((item) => item?.comfyName).filter(Boolean);
+  const referenceImages = (body.referenceAssets || [])
+    .map((item) => item?.comfyName)
+    .filter(Boolean);
   const staged = referenceImages[0] || "";
-  const startImageComfy = staged || ((body.startImage || body.startImageId) ? await uploadBodyStartImage(body) : "");
+  const startImageComfy =
+    staged || (body.startImage || body.startImageId ? await uploadBodyStartImage(body) : "");
   // Inpainting samples the crop around the painted part, at its own working size (inpaint.js).
   const inpaint = body.inpaint?.crop ? body.inpaint : null;
   if (inpaint) {
-    return withGgufLoaders(familyGraph({
-      ...body,
-      width: inpaint.work.width,
-      height: inpaint.work.height,
-      startImageComfy: inpaint.crop,
-      // Edit models edit the crop itself; only the painted part is stitched back.
-      referenceImages: [inpaint.crop, ...referenceImages.slice(1)],
-      inpaint
-    }));
+    return withGgufLoaders(
+      familyGraph({
+        ...body,
+        width: inpaint.work.width,
+        height: inpaint.work.height,
+        startImageComfy: inpaint.crop,
+        // Edit models edit the crop itself; only the painted part is stitched back.
+        referenceImages: [inpaint.crop, ...referenceImages.slice(1)],
+        inpaint,
+      }),
+    );
   }
   return withGgufLoaders(familyGraph({ ...body, startImageComfy, referenceImages, inpaint: null }));
 }
@@ -130,10 +138,11 @@ async function applyMappedInputs(graph, workflow, body) {
     frames: Number(body.frames || 0),
     fps: Number(body.fps || 0),
     duration: Number(body.duration || 0),
-    resolution: body.resolution || ""
+    resolution: body.resolution || "",
   };
   for (const [key, value] of Object.entries(values)) {
-    if (value !== "" && value !== undefined && value !== null) setMappedInput(graph, controls[key], value);
+    if (value !== "" && value !== undefined && value !== null)
+      setMappedInput(graph, controls[key], value);
   }
   // Flux 2's schedule depends on the dimensions of the latent being sampled.
   for (const sampler of Object.values(graph)) {
@@ -141,9 +150,14 @@ async function applyMappedInputs(graph, workflow, body) {
     const scheduler = graph[sampler.inputs.sigmas?.[0]];
     const latentId = sampler.inputs.latent_image?.[0];
     const latent = graph[latentId];
-    if (scheduler?.class_type !== "Flux2Scheduler" || latent?.class_type !== "EmptyFlux2LatentImage") continue;
+    if (
+      scheduler?.class_type !== "Flux2Scheduler" ||
+      latent?.class_type !== "EmptyFlux2LatentImage"
+    )
+      continue;
     for (const dimension of ["width", "height"]) {
-      if (controls[dimension]?.node === latentId && controls[dimension]?.input === dimension) scheduler.inputs[dimension] = latent.inputs[dimension];
+      if (controls[dimension]?.node === latentId && controls[dimension]?.input === dimension)
+        scheduler.inputs[dimension] = latent.inputs[dimension];
     }
   }
   let mappedReference = false;
@@ -154,8 +168,14 @@ async function applyMappedInputs(graph, workflow, body) {
       mappedReference = true;
     }
   }
-  if (String(workflow.family || "").replaceAll("-", "_") === "minimax_h3" && !mappedReference && !body.startImage && !body.startImageId) {
-    if (workflow.capabilities?.startImageRequired) throw new Error("This H3 reference preset requires an image.");
+  if (
+    String(workflow.family || "").replaceAll("-", "_") === "minimax_h3" &&
+    !mappedReference &&
+    !body.startImage &&
+    !body.startImageId
+  ) {
+    if (workflow.capabilities?.startImageRequired)
+      throw new Error("This H3 reference preset requires an image.");
     for (const node of Object.values(graph)) {
       if (node.class_type === "MiniMaxH3ImageToVideo") delete node.inputs.first_frame;
     }
@@ -180,7 +200,7 @@ function applyPowerLoraStack(graph, body, config) {
   if (node?.class_type !== "Power Lora Loader (rgthree)") {
     throw new Error("The configured Power LoRA Loader is missing from this workflow.");
   }
-  const inputs = node.inputs ||= {};
+  const inputs = (node.inputs ||= {});
   for (const key of Object.keys(inputs)) {
     if (/^lora_\d+$/i.test(key)) delete inputs[key];
   }
@@ -188,7 +208,7 @@ function applyPowerLoraStack(graph, body, config) {
     inputs[`lora_${index + 1}`] = {
       on: true,
       lora: lora.name,
-      strength: Number(lora.strength ?? 0.7)
+      strength: Number(lora.strength ?? 0.7),
     };
   }
 }
@@ -199,7 +219,7 @@ function applyRgthreeLoraStack(graph, body, config) {
   if (node?.class_type !== "Lora Loader Stack (rgthree)") {
     throw new Error("The configured rgthree LoRA Stack is missing from this workflow.");
   }
-  const inputs = node.inputs ||= {};
+  const inputs = (node.inputs ||= {});
   for (let index = 1; index <= config.max; index += 1) {
     const suffix = String(index).padStart(2, "0");
     inputs[`lora_${suffix}`] = "None";
@@ -216,7 +236,12 @@ function applyRgthreeLoraStack(graph, body, config) {
 function applyRadianceLoraStack(graph, body, config) {
   const node = graph[config.node];
   if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
-  (node.inputs ||= {}).loras = JSON.stringify(enabledLoras(body, config.max).map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) })));
+  (node.inputs ||= {}).loras = JSON.stringify(
+    enabledLoras(body, config.max).map((lora) => ({
+      name: lora.name,
+      strength: Number(lora.strength ?? 0.7),
+    })),
+  );
 }
 
 /**
@@ -229,7 +254,13 @@ export function saveIntoStudioFolder(graph, ownerId = "") {
     const inputs = node?.inputs;
     if (!inputs || !Object.hasOwn(inputs, "filename_prefix")) continue;
     // Only the name part is kept; a linked or empty prefix becomes a plain one.
-    const name = typeof inputs.filename_prefix === "string" ? inputs.filename_prefix.split(/[\\/]/).filter((part) => part && part !== "." && part !== "..").pop() : "";
+    const name =
+      typeof inputs.filename_prefix === "string"
+        ? inputs.filename_prefix
+            .split(/[\\/]/)
+            .filter((part) => part && part !== "." && part !== "..")
+            .pop()
+        : "";
     inputs.filename_prefix = `${accountPrefix || outputFolderName}/${name || "output"}`;
   }
   return graph;
@@ -241,8 +272,10 @@ export async function customWorkflowGraph(body) {
   if (!workflow) throw new Error("This workflow isn’t installed.");
   const graph = cloneGraph(workflow.graph);
   await applyMappedInputs(graph, workflow, body);
-  if (workflow.loraStack?.adapter === "rgthree-stack-v1") applyRgthreeLoraStack(graph, body, workflow.loraStack);
-  else if (workflow.loraStack?.adapter === "radiance-tags-v1") applyRadianceLoraStack(graph, body, workflow.loraStack);
+  if (workflow.loraStack?.adapter === "rgthree-stack-v1")
+    applyRgthreeLoraStack(graph, body, workflow.loraStack);
+  else if (workflow.loraStack?.adapter === "radiance-tags-v1")
+    applyRadianceLoraStack(graph, body, workflow.loraStack);
   else applyPowerLoraStack(graph, body, workflow.loraStack);
   return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
 }

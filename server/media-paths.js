@@ -19,18 +19,29 @@ export const mediaType = "media";
 /** Whether outputs live in Studio media; any value other than `studio` or `comfy` is refused. */
 export function outputStorageFromEnv(env = process.env) {
   if (!env.STUDIO_OUTPUT_STORAGE) return env.STUDIO_MULTI_USER === "1";
-  if (!["studio", "comfy"].includes(env.STUDIO_OUTPUT_STORAGE)) throw new Error('STUDIO_OUTPUT_STORAGE must be "studio" or "comfy".');
+  if (!["studio", "comfy"].includes(env.STUDIO_OUTPUT_STORAGE))
+    throw new Error('STUDIO_OUTPUT_STORAGE must be "studio" or "comfy".');
   return env.STUDIO_OUTPUT_STORAGE === "studio";
 }
 export const mediaStorageEnabled = outputStorageFromEnv();
 export const mediaRoot = path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(dataDir, "media"));
 
-const mediaPattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
-const inDotFolder = (subfolder) => String(subfolder || "").split(/[\\/]/).some((part) => part.startsWith("."));
+const mediaPattern =
+  /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
+const inDotFolder = (subfolder) =>
+  String(subfolder || "")
+    .split(/[\\/]/)
+    .some((part) => part.startsWith("."));
 
 /** Where a media file lives (or would live); null for anything outside the media folder or in a dot folder. */
 export function mediaPath(filename, subfolder = "") {
-  if (!filename || filename !== path.basename(String(filename)) || /[\\/]/.test(String(filename)) || !mediaPattern.test(String(filename))) return null;
+  if (
+    !filename ||
+    filename !== path.basename(String(filename)) ||
+    /[\\/]/.test(String(filename)) ||
+    !mediaPattern.test(String(filename))
+  )
+    return null;
   if (inDotFolder(subfolder) || path.isAbsolute(String(subfolder || ""))) return null;
   const file = path.resolve(mediaRoot, String(subfolder || ""), String(filename));
   return isInside(mediaRoot, file) ? file : null;
@@ -51,7 +62,12 @@ export function mediaFile(filename, subfolder = "") {
 /** A gallery URL's media file reference, or null when it is not a Studio media URL. */
 export function mediaParams(url) {
   const value = String(url || "");
-  if (!value.startsWith("/comfy/view?") && !value.startsWith("/comfy/thumb?") && !value.startsWith("/comfy/video-preview?")) return null;
+  if (
+    !value.startsWith("/comfy/view?") &&
+    !value.startsWith("/comfy/thumb?") &&
+    !value.startsWith("/comfy/video-preview?")
+  )
+    return null;
   const params = new URLSearchParams(value.slice(value.indexOf("?") + 1));
   if (params.get("type") !== mediaType) return null;
   return { filename: params.get("filename") || "", subfolder: params.get("subfolder") || "" };

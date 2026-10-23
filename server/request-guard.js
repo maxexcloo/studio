@@ -34,7 +34,9 @@ const signOutPaths = new Set(["/api/accounts/sign-out", "/api/access/sign-out"])
 
 /** "Localhost.:8787" -> "localhost", "[::1]:8787" -> "::1". "" when it cannot be read. */
 export function hostnameOf(hostHeader = "") {
-  const text = String(hostHeader || "").trim().toLowerCase();
+  const text = String(hostHeader || "")
+    .trim()
+    .toLowerCase();
   if (!text) return "";
   const bracketed = text.match(/^\[([0-9a-f:.]+)\](?::\d+)?$/);
   if (bracketed) return bracketed[1];
@@ -48,9 +50,16 @@ function machineNames() {
   if (Date.now() - ownNames.at < 5000) return ownNames.names;
   const names = new Set();
   for (const entries of Object.values(os.networkInterfaces())) {
-    for (const entry of entries || []) names.add(String(entry.address || "").toLowerCase().replace(/%.*$/, ""));
+    for (const entry of entries || [])
+      names.add(
+        String(entry.address || "")
+          .toLowerCase()
+          .replace(/%.*$/, ""),
+      );
   }
-  const host = String(os.hostname() || "").toLowerCase().replace(/\.$/, "");
+  const host = String(os.hostname() || "")
+    .toLowerCase()
+    .replace(/\.$/, "");
   if (host) {
     names.add(host);
     const short = host.replace(/\.local$/, "").split(".")[0];
@@ -64,7 +73,10 @@ function machineNames() {
 
 /** STUDIO_ALLOWED_HOSTS: names a person put in front of the studio themselves (a home DNS name, a tailnet name). */
 export function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
-  return String(value || "").split(/[\s,]+/).map((name) => hostnameOf(name.replace(/^https?:\/\//i, "").replace(/\/.*$/, ""))).filter(Boolean);
+  return String(value || "")
+    .split(/[\s,]+/)
+    .map((name) => hostnameOf(name.replace(/^https?:\/\//i, "").replace(/\/.*$/, "")))
+    .filter(Boolean);
 }
 
 /**
@@ -76,7 +88,16 @@ export function hostAllowed(hostHeader, { lan = false, extra = [] } = {}) {
   if (!name) return false;
   if (name === "localhost" || name.endsWith(".localhost")) return true;
   if (/^127\.\d+\.\d+\.\d+$/.test(name) || name === "::1") return true;
-  if (extra.some((item) => item === name || (item.startsWith("*.") && name.endsWith(item.slice(1)) && name.split(".").length === item.split(".").length))) return true;
+  if (
+    extra.some(
+      (item) =>
+        item === name ||
+        (item.startsWith("*.") &&
+          name.endsWith(item.slice(1)) &&
+          name.split(".").length === item.split(".").length),
+    )
+  )
+    return true;
   if (configuredHosts().includes(name)) return true;
   return lan && machineNames().has(name);
 }
@@ -107,13 +128,20 @@ export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) 
   return (req, res, next) => {
     if (!gatedPath(req.path)) return next();
     if (!hostAllowed(req.headers.host, { lan: lan(), extra: extraHosts() })) {
-      refuse(res, "host", `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to STUDIO_ALLOWED_HOSTS.`);
+      refuse(
+        res,
+        "host",
+        `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to STUDIO_ALLOWED_HOSTS.`,
+      );
       return;
     }
     const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
     // The sign-in provider's redirect back is a top-level navigation from its own site.
     // Its single-use state, bound to a cookie, is what proves it (multi-user-auth.js).
-    const signInReturn = req.method === "GET" && req.path === "/api/accounts/oidc/callback" && String(req.headers["sec-fetch-mode"] || "navigate").toLowerCase() === "navigate";
+    const signInReturn =
+      req.method === "GET" &&
+      req.path === "/api/accounts/oidc/callback" &&
+      String(req.headers["sec-fetch-mode"] || "navigate").toLowerCase() === "navigate";
     if ((site === "cross-site" || site === "same-site") && !signInReturn) {
       refuse(res, "origin", "Blocked a request from another website.");
       return;
@@ -126,8 +154,17 @@ export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) 
     // Signing out only ever ends the sender's own session, so a plain same-origin POST (a console
     // fetch, a form) may do it; another site was already refused above.
     const signOut = req.method === "POST" && signOutPaths.has(req.path);
-    if (!signOut && !req.headers[studioHeader] && !req.headers[legacyStudioHeader] && !req.is("application/json")) {
-      refuse(res, "header", "This request didn’t come from the studio. Reload the page and try again.");
+    if (
+      !signOut &&
+      !req.headers[studioHeader] &&
+      !req.headers[legacyStudioHeader] &&
+      !req.is("application/json")
+    ) {
+      refuse(
+        res,
+        "header",
+        "This request didn’t come from the studio. Reload the page and try again.",
+      );
       return;
     }
     next();

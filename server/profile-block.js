@@ -7,16 +7,22 @@
  * `ai/profiles/` is migrated, so every file it writes stays readable by the seed's own checks.
  * A file carrying both `studio` and `heissUi` is ambiguous and refused by validateProfileText.
  */
-export const profileBlockNames = Object.freeze(['studio', 'heissUi', 'heiss_ui', 'jAiStudio', 'j_ai_studio']);
+export const profileBlockNames = Object.freeze([
+  "studio",
+  "heissUi",
+  "heiss_ui",
+  "jAiStudio",
+  "j_ai_studio",
+]);
 /** The name Studio writes. Change it only after the seed is migrated to `studio`. */
-export const writtenBlockName = 'heissUi';
+export const writtenBlockName = "heissUi";
 
-const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 /** Which block name a file uses, or '' without one. `studio` wins when both are present. */
 export function profileBlockName(raw) {
-  if (!isObject(raw)) return '';
-  return profileBlockNames.find((name) => isObject(raw[name])) || '';
+  if (!isObject(raw)) return "";
+  return profileBlockNames.find((name) => isObject(raw[name])) || "";
 }
 
 /** The file's block, or null. */
@@ -37,6 +43,7 @@ export function profileBlocksIn(raw) {
 export function withWrittenBlock(raw, block = profileBlock(raw)) {
   if (!block) return raw;
   const out = { [writtenBlockName]: block };
-  for (const [key, value] of Object.entries(raw)) if (!profileBlockNames.includes(key)) out[key] = value;
+  for (const [key, value] of Object.entries(raw))
+    if (!profileBlockNames.includes(key)) out[key] = value;
   return out;
 }

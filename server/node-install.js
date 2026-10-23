@@ -26,9 +26,21 @@ export function comfyPython(root, platform = process.platform) {
   const win = platform === "win32";
   const paths = win ? path.win32 : path.posix;
   const candidates = win
-    ? [[".venv", "Scripts", "python.exe"], ["venv", "Scripts", "python.exe"], ["..", "python_embeded", "python.exe"], ["..", "python_embedded", "python.exe"]]
-    : [[".venv", "bin", "python"], ["venv", "bin", "python"], ["..", "standalone-env", "bin", "python3"], ["..", ".venv", "bin", "python"]];
-  const found = candidates.map((parts) => paths.join(root, ...parts)).find((file) => fs.existsSync(file));
+    ? [
+        [".venv", "Scripts", "python.exe"],
+        ["venv", "Scripts", "python.exe"],
+        ["..", "python_embeded", "python.exe"],
+        ["..", "python_embedded", "python.exe"],
+      ]
+    : [
+        [".venv", "bin", "python"],
+        ["venv", "bin", "python"],
+        ["..", "standalone-env", "bin", "python3"],
+        ["..", ".venv", "bin", "python"],
+      ];
+  const found = candidates
+    .map((parts) => paths.join(root, ...parts))
+    .find((file) => fs.existsSync(file));
   return found ? paths.resolve(found) : "";
 }
 
@@ -38,13 +50,15 @@ export function comfyPython(root, platform = process.platform) {
  * satisfied" and installs nothing into python_embeded, and the nodes fail to
  * import after the restart. Hence `-s` and PYTHONNOUSERSITE=1 for it.
  */
-export const isEmbeddedPython = (python) => /[\\/]python_embedd?ed[\\/]/i.test(String(python || ""));
+export const isEmbeddedPython = (python) =>
+  /[\\/]python_embedd?ed[\\/]/i.test(String(python || ""));
 
 /** The arguments before `install` for ComfyUI's pip. */
 export const pipArgs = (python) => [...(isEmbeddedPython(python) ? ["-s"] : []), "-m", "pip"];
 
 /** The environment for running that Python. */
-export const pythonEnv = (python, env = process.env) => (isEmbeddedPython(python) ? { ...env, PYTHONNOUSERSITE: "1" } : env);
+export const pythonEnv = (python, env = process.env) =>
+  isEmbeddedPython(python) ? { ...env, PYTHONNOUSERSITE: "1" } : env;
 
 /**
  * Setup without ComfyUI Manager: clone the pack into custom_nodes and install
@@ -75,7 +89,8 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
   const checkout = pack.commit ? `git -C ${source} checkout --detach ${pack.commit}` : "";
   const subdir = pack.subdir ? paths.join(source, ...pack.subdir.split("/")) : "";
   const place = (copy, remove) => (pack.subdir ? [copy, remove] : []);
-  const fetchSteps = (copy, remove) => (cloned ? [] : [clone, ...(checkout ? [checkout] : []), ...place(copy, remove)]);
+  const fetchSteps = (copy, remove) =>
+    cloned ? [] : [clone, ...(checkout ? [checkout] : []), ...place(copy, remove)];
   const pipNeeded = pack.requirements !== false;
   const commands = [];
   if (win) {
@@ -83,19 +98,42 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
     const embedded = isEmbeddedPython(python);
     const pip = `${exe} ${pipArgs(python).join(" ")} install -r ${requirements}`;
     // -LiteralPath: a plain Set-Location reads [ ] in a folder name as wildcards.
-    const steps = [`Set-Location -LiteralPath "${folder}"`,
-      ...fetchSteps(`Copy-Item -Recurse -LiteralPath "${subdir}" -Destination "${pack.folder}"`, `Remove-Item -Recurse -Force -LiteralPath "${source}"`),
-      ...(pipNeeded ? [...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`] : [])];
-    commands.push({ shell: "powershell", label: "PowerShell", command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; ") });
+    const steps = [
+      `Set-Location -LiteralPath "${folder}"`,
+      ...fetchSteps(
+        `Copy-Item -Recurse -LiteralPath "${subdir}" -Destination "${pack.folder}"`,
+        `Remove-Item -Recurse -Force -LiteralPath "${source}"`,
+      ),
+      ...(pipNeeded
+        ? [...(embedded ? ['$env:PYTHONNOUSERSITE = "1"'] : []), `${python ? "& " : ""}${pip}`]
+        : []),
+    ];
+    commands.push({
+      shell: "powershell",
+      label: "PowerShell",
+      command: steps.map((step, i) => (i ? `if ($?) { ${step} }` : step)).join("; "),
+    });
     // Quoted whole, or cmd keeps the space before && in the value.
-    commands.push({ shell: "cmd", label: "Command Prompt", command: [`cd /d "${folder}"`,
-      ...fetchSteps(`xcopy /E /I /Q "${subdir}" "${pack.folder}"`, `rmdir /S /Q "${source}"`),
-      ...(pipNeeded ? [...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip] : [])].join(" && ") });
+    commands.push({
+      shell: "cmd",
+      label: "Command Prompt",
+      command: [
+        `cd /d "${folder}"`,
+        ...fetchSteps(`xcopy /E /I /Q "${subdir}" "${pack.folder}"`, `rmdir /S /Q "${source}"`),
+        ...(pipNeeded ? [...(embedded ? ['set "PYTHONNOUSERSITE=1"'] : []), pip] : []),
+      ].join(" && "),
+    });
   } else {
     const exe = python ? `"${python}"` : "python3";
-    commands.push({ shell: "sh", label: "Terminal", command: [`cd "${folder}"`,
-      ...fetchSteps(`cp -R "${subdir}" "${pack.folder}"`, `rm -rf "${source}"`),
-      ...(pipNeeded ? [`${exe} -m pip install -r ${requirements}`] : [])].join(" && ") });
+    commands.push({
+      shell: "sh",
+      label: "Terminal",
+      command: [
+        `cd "${folder}"`,
+        ...fetchSteps(`cp -R "${subdir}" "${pack.folder}"`, `rm -rf "${source}"`),
+        ...(pipNeeded ? [`${exe} -m pip install -r ${requirements}`] : []),
+      ].join(" && "),
+    });
   }
   return {
     exact: Boolean(customNodes && python),
@@ -103,7 +141,7 @@ export function packInstallPlan(pack, root = comfyRootDir(), platform = process.
     python,
     cloned,
     needsGit: !cloned,
-    commands
+    commands,
   };
 }
 
@@ -117,12 +155,21 @@ export function missingPackPart(info, packId, { detail = "", extra = [] } = {}) 
   const absent = missingNodes(info, [...pack.nodes, ...extra]);
   if (!absent.length) return null;
   return {
-    part: "comfy", label: `${pack.name} nodes`,
+    part: "comfy",
+    label: `${pack.name} nodes`,
     detail: detail || `ComfyUI needs the ${pack.name} custom nodes for this.`,
     downloads: [],
     missingNodes: absent,
-    nodePack: { id: pack.id, name: pack.name, repository: pack.repository, folder: pack.folder, search: pack.search || "", note: pack.note || "", ...(pack.subdir ? { subdir: pack.subdir } : {}) },
+    nodePack: {
+      id: pack.id,
+      name: pack.name,
+      repository: pack.repository,
+      folder: pack.folder,
+      search: pack.search || "",
+      note: pack.note || "",
+      ...(pack.subdir ? { subdir: pack.subdir } : {}),
+    },
     install: packInstallPlan(pack),
-    autoInstall: packInstallRoutes(pack.id)
+    autoInstall: packInstallRoutes(pack.id),
   };
 }

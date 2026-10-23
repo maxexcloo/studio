@@ -24,7 +24,12 @@ test("an oversized cache loses the thumbnails used longest ago, down to 80%", as
   for (let index = 0; index < 10; index += 1) thumbnail(`old-${index}`, 1000, 100 - index, now);
   const result = await sweepThumbnails({ dir, limitBytes: 6000, now });
   assert.equal(result.removed, 6, "10 kB down to 4.8 kB takes six of the ten");
-  assert.deepEqual(fs.readdirSync(dir).sort(), ["old-6.webp", "old-7.webp", "old-8.webp", "old-9.webp"]);
+  assert.deepEqual(fs.readdirSync(dir).sort(), [
+    "old-6.webp",
+    "old-7.webp",
+    "old-8.webp",
+    "old-9.webp",
+  ]);
   assert.equal(result.totalBytes, 4000);
 });
 
@@ -41,9 +46,16 @@ test("thumbnails served recently stay, even when the cache is still over", async
 
 test("a cache under its cap, or none at all, is left alone", async () => {
   assert.equal((await sweepThumbnails({ dir, limitBytes: 1e9 })).removed, 0);
-  assert.equal((await sweepThumbnails({ dir: path.join(dir, "missing"), limitBytes: 1 })).removed, 0);
+  assert.equal(
+    (await sweepThumbnails({ dir: path.join(dir, "missing"), limitBytes: 1 })).removed,
+    0,
+  );
   fs.writeFileSync(path.join(dir, "notes.txt"), Buffer.alloc(5000));
-  assert.equal((await sweepThumbnails({ dir, limitBytes: 2000, now: Date.now() })).removed, 0, "only thumbnails count, and these are in use");
+  assert.equal(
+    (await sweepThumbnails({ dir, limitBytes: 2000, now: Date.now() })).removed,
+    0,
+    "only thumbnails count, and these are in use",
+  );
   assert.equal(fs.existsSync(path.join(dir, "notes.txt")), true);
 });
 
@@ -51,7 +63,9 @@ test("a library image's thumbnail served from the cache counts as in use", async
   const sharp = (await import("sharp")).default;
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-"));
   const photo = path.join(folder, "photo.png");
-  await sharp({ create: { width: 16, height: 16, channels: 3, background: "#c33" } }).png().toFile(photo);
+  await sharp({ create: { width: 16, height: 16, channels: 3, background: "#c33" } })
+    .png()
+    .toFile(photo);
   const built = await getFileThumbnail(photo);
   assert.ok(built.file);
   // Made two days ago, before a restart: only being served again says it is on screen.

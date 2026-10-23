@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { modelFolders } from './comfy.js';
-import { isGguf, readGgufHeader } from './gguf.js';
-import { readSafetensorsHeader } from './model-families.js';
+import { modelFolders } from "./comfy.js";
+import { isGguf, readGgufHeader } from "./gguf.js";
+import { readSafetensorsHeader } from "./model-families.js";
 
 /**
  * Text encoders and VAEs, recognised the way ComfyUI recognises them: by tensor
@@ -26,16 +26,22 @@ export const encoderKinds = {
   qwen35_9b: { label: "Qwen3.5 9B", name: /qwen[-_ ]?3[._]5[-_ ]?9b|qwen35[-_ ]?9b/i },
   qwen3vl_32b: { label: "Qwen3-VL 32B", name: /qwen[-_ ]?3[-_ ]?vl.*32b/i },
   qwen3vl_8b: { label: "Qwen3-VL 8B", name: /qwen[-_ ]?3[-_ ]?vl.*8b/i },
-  qwen3vl_4b: { label: "Qwen3-VL 4B", name: /qwen[-_ ]?3[-_ ]?vl.*4b|qwen[-_ ]?3[-_ ]?vl(?!.*\d+b)/i },
+  qwen3vl_4b: {
+    label: "Qwen3-VL 4B",
+    name: /qwen[-_ ]?3[-_ ]?vl.*4b|qwen[-_ ]?3[-_ ]?vl(?!.*\d+b)/i,
+  },
   qwen25vl_7b: { label: "Qwen2.5-VL 7B", name: /qwen[-_ ]?2[._]?5[-_ ]?vl/i },
   qwen3_8b: { label: "Qwen3 8B", name: /qwen[-_ ]?3(?![-_ .]?vl)(?![-_ .]?5)[-_ .]*8b/i },
   qwen3_4b: { label: "Qwen3 4B", name: /qwen[-_ ]?3(?![-_ .]?vl)(?![-_ .]?5)[-_ .]*4b/i },
   qwen3_06b: { label: "Qwen3 0.6B", name: /qwen[-_ ]?3(?![-_ .]?vl)[-_ .]*0[._]?6b/i },
-  mistral3_24b: { label: "Mistral 3 Small 24B", name: /mistral[-_ ]?3|mistral.*small|mistral.*24b/i },
+  mistral3_24b: {
+    label: "Mistral 3 Small 24B",
+    name: /mistral[-_ ]?3|mistral.*small|mistral.*24b/i,
+  },
   ministral3_3b: { label: "Ministral 3 3B", name: /ministral/i },
   gemma3_12b: { label: "Gemma 3 12B", name: /gemma[-_ ]?3.*12b/i },
   gemma2_2b: { label: "Gemma 2 2B", name: /gemma[-_ ]?2.*2b/i },
-  llama31_8b: { label: "Llama 3.1 8B", name: /llama/i }
+  llama31_8b: { label: "Llama 3.1 8B", name: /llama/i },
 };
 
 // VAE layouts are what the header can prove; `hint` is what only a name can add
@@ -58,7 +64,7 @@ export const vaeKinds = {
   ltx_video: { label: "LTX video VAE", layout: "ltx" },
   h3_video: { label: "MiniMax H3 video VAE", layout: "h3v" },
   h3_audio: { label: "MiniMax H3 audio VAE", layout: "h3a" },
-  mage_flow: { label: "MageFlow VAE", layout: "mage" }
+  mage_flow: { label: "MageFlow VAE", layout: "mage" },
 };
 
 /* ------------------------------------------------------------ Headers */
@@ -83,29 +89,50 @@ export function encoderKindFromHeader(header) {
     if (width === 5120) return "t5xl";
     if (width !== 10240) return "other";
     // UMT5 keeps a relative position bias in every block and a 256k vocabulary.
-    const umt5 = keys.has("encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight") || shape(header, "shared.weight")[0] > 200000;
+    const umt5 =
+      keys.has("encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight") ||
+      shape(header, "shared.weight")[0] > 200000;
     return umt5 ? "umt5xxl" : "t5xxl";
   }
   if (keys.has("encoder.block.0.layer.0.SelfAttention.k.weight")) {
-    return shape(header, "encoder.block.0.layer.0.SelfAttention.k.weight")[0] === 384 ? "byt5_glyph" : "other";
+    return shape(header, "encoder.block.0.layer.0.SelfAttention.k.weight")[0] === 384
+      ? "byt5_glyph"
+      : "other";
   }
   if (keys.has("model.layers.0.post_feedforward_layernorm.weight")) {
     if (keys.has("model.layers.59.self_attn.q_norm.weight")) return "other";
-    if (keys.has("model.layers.47.self_attn.q_norm.weight") && keys.has("model.layers.5.self_attn.v_proj.weight")) return "gemma3_12b";
+    if (
+      keys.has("model.layers.47.self_attn.q_norm.weight") &&
+      keys.has("model.layers.5.self_attn.v_proj.weight")
+    )
+      return "gemma3_12b";
     if (!keys.has("model.layers.0.self_attn.q_norm.weight")) return "gemma2_2b";
     return "other";
   }
   if (keys.has("model.layers.0.self_attn.k_proj.bias")) {
-    return shape(header, "model.layers.0.self_attn.k_proj.bias")[0] === 512 ? "qwen25vl_7b" : "other";
+    return shape(header, "model.layers.0.self_attn.k_proj.bias")[0] === 512
+      ? "qwen25vl_7b"
+      : "other";
   }
   // Qwen3.5: hybrid linear attention, under the multimodal model's language_model prefix.
-  if (keys.has("model.language_model.layers.0.linear_attn.A_log") && keys.has("model.language_model.layers.0.input_layernorm.weight")) {
-    return shape(header, "model.language_model.layers.0.input_layernorm.weight")[0] === 4096 ? "qwen35_9b" : "other";
+  if (
+    keys.has("model.language_model.layers.0.linear_attn.A_log") &&
+    keys.has("model.language_model.layers.0.input_layernorm.weight")
+  ) {
+    return shape(header, "model.language_model.layers.0.input_layernorm.weight")[0] === 4096
+      ? "qwen35_9b"
+      : "other";
   }
   if (keys.has("model.visual.deepstack_merger_list.0.norm.weight")) {
-    return shape(header, "model.visual.merger.linear_fc2.weight")[0] === 2560 ? "qwen3vl_4b" : "qwen3vl_8b";
+    return shape(header, "model.visual.merger.linear_fc2.weight")[0] === 2560
+      ? "qwen3vl_4b"
+      : "qwen3vl_8b";
   }
-  if (keys.has("visual.deepstack_merger_list.0.norm.weight") && keys.has("model.layers.49.self_attn.q_proj.weight")) return "qwen3vl_32b";
+  if (
+    keys.has("visual.deepstack_merger_list.0.norm.weight") &&
+    keys.has("model.layers.49.self_attn.q_proj.weight")
+  )
+    return "qwen3vl_32b";
   if (keys.has("model.layers.0.post_attention_layernorm.weight")) {
     const width = shape(header, "model.layers.0.post_attention_layernorm.weight")[0];
     if (keys.has("model.layers.0.self_attn.q_norm.weight")) {
@@ -127,7 +154,11 @@ export function vaeLayoutFromHeader(header) {
   if (keys.has("decoder.middle.0.residual.0.gamma")) {
     return keys.has("decoder.upsamples.0.upsamples.0.residual.2.weight") ? "wan48" : "wan16";
   }
-  if (keys.has("decoder.transformer_blocks.0.scale1") && keys.has("encoder.down.5.block.0.conv1.weight")) return "h3v";
+  if (
+    keys.has("decoder.transformer_blocks.0.scale1") &&
+    keys.has("encoder.down.5.block.0.conv1.weight")
+  )
+    return "h3v";
   if (keys.has("pre_block.attn.zero_k_bias")) return "h3a";
   // Mage-VAE: a one-step diffusion codec (comfy/sd.py, "student.dconv_encoder").
   if (keys.has("student.dconv_encoder.proj_out.weight")) return "mage";
@@ -156,18 +187,30 @@ function localFile(kind, subfolders, name) {
   if (parts.some((part) => part === "..")) return "";
   for (const dir of modelFolders(kind, subfolders)) {
     const file = path.join(dir, ...parts);
-    try { if (fs.statSync(file).isFile()) return file; } catch { /* next folder */ }
+    try {
+      if (fs.statSync(file).isFile()) return file;
+    } catch {
+      /* next folder */
+    }
   }
   return "";
 }
 
 function cachedHeader(file) {
   let stat;
-  try { stat = fs.statSync(file); } catch { return null; }
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return null;
+  }
   const key = `${file}:${stat.size}:${stat.mtimeMs}`;
   if (!headerCache.has(key)) {
     let header = null;
-    try { header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file); } catch { header = null; }
+    try {
+      header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file);
+    } catch {
+      header = null;
+    }
     headerCache.set(key, header);
   }
   return headerCache.get(key);
@@ -212,11 +255,13 @@ const vaeNameHints = [
   ["h3_audio", /h3.*audio/i],
   ["h3_video", /h3/i],
   ["ltx_video", /ltx/i],
-  ["sd15", /sd[-_ ]?1|vae[-_]ft|mse|ema/i]
+  ["sd15", /sd[-_ ]?1|vae[-_]ft|mse|ema/i],
 ];
 
 function vaeKindsForLayout(layout) {
-  return Object.entries(vaeKinds).filter(([, spec]) => spec.layout === layout).map(([kind]) => kind);
+  return Object.entries(vaeKinds)
+    .filter(([, spec]) => spec.layout === layout)
+    .map(([kind]) => kind);
 }
 
 /**
@@ -231,13 +276,20 @@ export function classifyVae(name) {
   const hinted = vaeNameHints.filter(([, pattern]) => pattern.test(base)).map(([kind]) => kind);
   if (layout && layout !== "other" && layout !== "preview") {
     const within = vaeKindsForLayout(layout);
-    const kind = hinted.find((hint) => within.includes(hint) || vaeKinds[hint].layout === "unknown") || "";
+    const kind =
+      hinted.find((hint) => within.includes(hint) || vaeKinds[hint].layout === "unknown") || "";
     // Shapes alone cannot split these pairs, so an unnamed file fits either.
     return { name, layout, kind, kinds: kind ? [kind] : within, via: "file" };
   }
   if (layout === "preview") return { name, layout, kind: "", kinds: [], via: "file" };
   const kind = hinted[0] || "";
-  return { name, layout: kind ? vaeKinds[kind].layout : "", kind, kinds: kind ? [kind] : [], via: kind ? "name" : "" };
+  return {
+    name,
+    layout: kind ? vaeKinds[kind].layout : "",
+    kind,
+    kinds: kind ? [kind] : [],
+    via: kind ? "name" : "",
+  };
 }
 
 /* ------------------------------------------------------------ Matching */
@@ -255,9 +307,13 @@ export function rankEncoders(encoders, slot) {
     .filter((item) => {
       const base = String(item.name).split(/[\\/]/).pop() || "";
       // `only`: the model's own build; `not`: a tuned build of the same shapes it must not take.
-      return kinds.has(item.kind) && (!slot.only || slot.only.test(base)) && (!slot.not || !slot.not.test(base));
+      return (
+        kinds.has(item.kind) &&
+        (!slot.only || slot.only.test(base)) &&
+        (!slot.not || !slot.not.test(base))
+      );
     })
-    .sort((a, b) => (isAbliterated(b.name) - isAbliterated(a.name)) || (a.index - b.index))
+    .sort((a, b) => isAbliterated(b.name) - isAbliterated(a.name) || a.index - b.index)
     .map((item) => item.name);
 }
 
@@ -267,6 +323,6 @@ export function rankVaes(vaes, want) {
   return vaes
     .map((item, index) => ({ ...item, index }))
     .filter((item) => item.kinds.some((kind) => wanted.has(kind)))
-    .sort((a, b) => (Number(wanted.has(b.kind)) - Number(wanted.has(a.kind))) || (a.index - b.index))
+    .sort((a, b) => Number(wanted.has(b.kind)) - Number(wanted.has(a.kind)) || a.index - b.index)
     .map((item) => item.name);
 }

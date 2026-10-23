@@ -20,8 +20,14 @@ let cache = null;
 export function dismissedKeys() {
   if (!cache) {
     let saved = null;
-    try { saved = readJsonFile(file); } catch { saved = null; }
-    cache = new Set(Array.isArray(saved?.keys) ? saved.keys.filter((key) => keyPattern.test(String(key))) : []);
+    try {
+      saved = readJsonFile(file);
+    } catch {
+      saved = null;
+    }
+    cache = new Set(
+      Array.isArray(saved?.keys) ? saved.keys.filter((key) => keyPattern.test(String(key))) : [],
+    );
   }
   return cache;
 }

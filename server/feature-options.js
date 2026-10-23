@@ -9,7 +9,7 @@
  */
 export const retiredFeatureSwitches = Object.freeze([
   ["loras", "STUDIO_ENABLE_LORAS"],
-  ["cloudModels", "STUDIO_ENABLE_GROK"]
+  ["cloudModels", "STUDIO_ENABLE_GROK"],
 ]);
 
 /**

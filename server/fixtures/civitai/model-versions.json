@@ -1,63 +1,212 @@
 {
   "_note": "Civitai /api/v1 shapes pinned for availability checks (library-availability.js). Hashes are placeholders.",
   "model": {
-    "id": 9, "name": "Watercolour Style", "type": "LORA", "nsfw": false, "nsfwLevel": 1, "mode": null,
+    "id": 9,
+    "name": "Watercolour Style",
+    "type": "LORA",
+    "nsfw": false,
+    "nsfwLevel": 1,
+    "mode": null,
     "description": "<p>Soft <strong>watercolour</strong> washes.</p><ul><li>Use at 0.8</li></ul>",
     "modelVersions": [
-      { "id": 30, "name": "V3 Paid", "availability": "EarlyAccess", "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z" },
+      {
+        "id": 30,
+        "name": "V3 Paid",
+        "availability": "EarlyAccess",
+        "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z"
+      },
       { "id": 20, "name": "V2", "availability": "Public" },
       { "id": 17, "name": "V1", "availability": "Public" }
     ]
   },
   "versions": {
     "public": {
-      "id": 20, "modelId": 9, "name": "V2", "baseModel": "Krea 2", "availability": "Public", "status": "Published", "earlyAccessEndsAt": null,
-      "trainedWords": ["wtrclr", "soft wash"], "description": "<p>Second release.</p>", "settings": { "strength": 0.8 },
+      "id": 20,
+      "modelId": 9,
+      "name": "V2",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
+      "earlyAccessEndsAt": null,
+      "trainedWords": ["wtrclr", "soft wash"],
+      "description": "<p>Second release.</p>",
+      "settings": { "strength": 0.8 },
       "model": { "name": "Watercolour Style", "type": "LORA", "nsfw": false },
-      "files": [{ "id": 31, "name": "watercolour-v2.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" } }]
+      "files": [
+        {
+          "id": 31,
+          "name": "watercolour-v2.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }
+        }
+      ]
     },
     "paid": {
-      "id": 30, "modelId": 9, "name": "V3 Paid", "baseModel": "Krea 2", "availability": "EarlyAccess", "status": "Published",
-      "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z", "earlyAccessConfig": { "timeframe": 14, "chargeForDownload": true, "downloadPrice": 500, "chargeForGeneration": false },
+      "id": 30,
+      "modelId": 9,
+      "name": "V3 Paid",
+      "baseModel": "Krea 2",
+      "availability": "EarlyAccess",
+      "status": "Published",
+      "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z",
+      "earlyAccessConfig": {
+        "timeframe": 14,
+        "chargeForDownload": true,
+        "downloadPrice": 500,
+        "chargeForGeneration": false
+      },
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 41, "name": "watercolour-v3.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" } }]
+      "files": [
+        {
+          "id": 41,
+          "name": "watercolour-v3.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" }
+        }
+      ]
     },
     "earlyAccess": {
-      "id": 31, "modelId": 9, "name": "V3 Early", "baseModel": "Krea 2", "availability": "EarlyAccess", "status": "Published",
-      "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z", "earlyAccessConfig": { "timeframe": 7, "chargeForDownload": false },
+      "id": 31,
+      "modelId": 9,
+      "name": "V3 Early",
+      "baseModel": "Krea 2",
+      "availability": "EarlyAccess",
+      "status": "Published",
+      "earlyAccessEndsAt": "2099-01-01T00:00:00.000Z",
+      "earlyAccessConfig": { "timeframe": 7, "chargeForDownload": false },
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 42, "name": "watercolour-v3e.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" } }]
+      "files": [
+        {
+          "id": 42,
+          "name": "watercolour-v3e.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC" }
+        }
+      ]
     },
     "earlyAccessOver": {
-      "id": 32, "modelId": 9, "name": "V3", "baseModel": "Krea 2", "availability": "Public", "status": "Published",
-      "earlyAccessEndsAt": "2020-01-01T00:00:00.000Z", "earlyAccessConfig": { "timeframe": 7, "chargeForDownload": false },
+      "id": 32,
+      "modelId": 9,
+      "name": "V3",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
+      "earlyAccessEndsAt": "2020-01-01T00:00:00.000Z",
+      "earlyAccessConfig": { "timeframe": 7, "chargeForDownload": false },
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 43, "name": "watercolour-v3.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD" } }]
+      "files": [
+        {
+          "id": 43,
+          "name": "watercolour-v3.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD" }
+        }
+      ]
     },
     "generationOnly": {
-      "id": 33, "modelId": 9, "name": "On-Site", "baseModel": "Krea 2", "availability": "Public", "status": "Published", "usageControl": "Generation",
+      "id": 33,
+      "modelId": 9,
+      "name": "On-Site",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
+      "usageControl": "Generation",
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 44, "name": "watercolour-site.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" } }]
+      "files": [
+        {
+          "id": 44,
+          "name": "watercolour-site.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE" }
+        }
+      ]
     },
     "unknownAvailability": {
-      "id": 34, "modelId": 9, "name": "Odd", "baseModel": "Krea 2", "availability": "Private", "status": "Published",
+      "id": 34,
+      "modelId": 9,
+      "name": "Odd",
+      "baseModel": "Krea 2",
+      "availability": "Private",
+      "status": "Published",
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 45, "name": "watercolour-odd.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" } }]
+      "files": [
+        {
+          "id": 45,
+          "name": "watercolour-odd.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" }
+        }
+      ]
     },
     "unreadableEarlyAccess": {
-      "id": 35, "modelId": 9, "name": "Odd Date", "baseModel": "Krea 2", "availability": "Public", "status": "Published", "earlyAccessEndsAt": "soon",
+      "id": 35,
+      "modelId": 9,
+      "name": "Odd Date",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
+      "earlyAccessEndsAt": "soon",
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 46, "name": "watercolour-date.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": { "SHA256": "1111111111111111111111111111111111111111111111111111111111111111" } }]
+      "files": [
+        {
+          "id": 46,
+          "name": "watercolour-date.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": { "SHA256": "1111111111111111111111111111111111111111111111111111111111111111" }
+        }
+      ]
     },
     "noChecksum": {
-      "id": 36, "modelId": 9, "name": "No Hash", "baseModel": "Krea 2", "availability": "Public", "status": "Published",
+      "id": 36,
+      "modelId": 9,
+      "name": "No Hash",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
       "model": { "name": "Watercolour Style", "type": "LORA" },
-      "files": [{ "id": 47, "name": "watercolour-nohash.safetensors", "type": "Model", "primary": true, "sizeKB": 1024, "hashes": {} }]
+      "files": [
+        {
+          "id": 47,
+          "name": "watercolour-nohash.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 1024,
+          "hashes": {}
+        }
+      ]
     },
     "checkpoint": {
-      "id": 50, "modelId": 12, "name": "Base", "baseModel": "Krea 2", "availability": "Public", "status": "Published",
+      "id": 50,
+      "modelId": 12,
+      "name": "Base",
+      "baseModel": "Krea 2",
+      "availability": "Public",
+      "status": "Published",
       "model": { "name": "Krea Fine Tune", "type": "Checkpoint" },
-      "files": [{ "id": 51, "name": "krea-tune.safetensors", "type": "Model", "primary": true, "sizeKB": 2048, "hashes": { "SHA256": "2222222222222222222222222222222222222222222222222222222222222222" } }]
+      "files": [
+        {
+          "id": 51,
+          "name": "krea-tune.safetensors",
+          "type": "Model",
+          "primary": true,
+          "sizeKB": 2048,
+          "hashes": { "SHA256": "2222222222222222222222222222222222222222222222222222222222222222" }
+        }
+      ]
     }
   }
 }
