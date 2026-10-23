@@ -1,4 +1,4 @@
-import { requireWritableConfiguration } from "./config-directory.js";
+import { configurationFile, requireWritableConfiguration } from "./config-directory.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,12 +15,8 @@ import { profileStore } from "./profile-store.js";
 import { profileBlock, profileBlockName, profileBlocksIn } from "./profile-block.js";
 
 /**
- * Settings › Profiles: an administrator edits one of Studio's model profiles
- * (a workflow JSON in the data folder) as text. Studio is the only writer of
- * live profiles; the profiles repository is seed and backup (profile-seed.js,
- * profile-export.js). Each save keeps the previous file in backups, becomes a
- * version (profile-store.js) and is listed in `.studio-edits.json` beside the
- * profiles.
+ * Retained profile APIs support legacy runtime definitions. Mounted ai definitions
+ * are read-only; their metadata readers must never attempt runtime-file recovery.
  */
 export const editsFile = () => path.join(userWorkflowsDir, ".studio-edits.json");
 const backupsDir = () => path.join(dataDir, "backups", "profile-edits");
@@ -32,7 +28,9 @@ const metaOf = (raw) => profileBlock(raw);
 
 function readEdits() {
   try {
-    const saved = readJsonFile(editsFile());
+    const saved = configurationFile("profiles")
+      ? JSON.parse(fs.readFileSync(editsFile(), "utf8"))
+      : readJsonFile(editsFile());
     return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
   } catch {
     return {};

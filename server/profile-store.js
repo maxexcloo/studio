@@ -43,9 +43,9 @@ const stamp = () => new Date().toISOString();
 const notFound = (message) => Object.assign(new Error(message), { status: 404 });
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 
-function readObject(file, fallback = {}) {
+function readObject(file, fallback = {}, recover = true) {
   try {
-    const value = readJsonFile(file);
+    const value = recover ? readJsonFile(file) : JSON.parse(fs.readFileSync(file, "utf8"));
     return isObject(value) ? value : fallback;
   } catch {
     return fallback;
@@ -84,7 +84,7 @@ export function createProfileStore({
   const editsFile = path.join(workflowsDir, ".studio-edits.json");
   const backupsDir = path.join(dataDir, "backups", "profile-edits");
   const historyDir = (id) => path.join(dataDir, "history", "profiles", id);
-  const readMeta = () => readObject(metaFile);
+  const readMeta = () => readObject(metaFile, {}, !configurationFile("profiles"));
 
   function latest(id) {
     const versions = versionsIn(historyDir(id));
@@ -323,7 +323,7 @@ export function createGuideStore({
   const historyDir = (packId) => path.join(dataDir, "history", "guides", packId);
   const read = () => {
     if (mountedFile) {
-      const value = readJsonFile(file);
+      const value = JSON.parse(fs.readFileSync(file, "utf8"));
       if (!isObject(value)) throw new Error(`Invalid mounted configuration ${file}.`);
       return value;
     }
@@ -615,7 +615,9 @@ export function livePrompting({
     if (loaded && next === signature) return loaded;
     try {
       loaded = loadMcpPrompting(target);
-      negatives = next ? readObject(target).negatives || {} : {};
+      negatives = next
+        ? readObject(target, {}, !configurationFile("prompting.json")).negatives || {}
+        : {};
       signature = next;
     } catch (error) {
       if (!loaded) throw error;

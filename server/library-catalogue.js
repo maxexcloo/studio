@@ -269,7 +269,10 @@ export function cleanCataloguePatch(patch, { provenance = false } = {}) {
 function readSource(file) {
   try {
     const stat = fs.statSync(file);
-    return { signature: `${stat.size}:${stat.mtimeMs}`, value: readJsonFile(file) };
+    return {
+      signature: `${stat.size}:${stat.mtimeMs}`,
+      value: JSON.parse(fs.readFileSync(file, "utf8")),
+    };
   } catch (error) {
     return error.code === "ENOENT"
       ? { signature: "", value: undefined }

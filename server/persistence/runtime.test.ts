@@ -76,3 +76,29 @@ test("malformed source fails migration without creating or overwriting a databas
   assert.equal(result.conflicts.length, 1);
   assert.equal(fs.existsSync(path.join(data, "studio.sqlite")), false);
 });
+
+test("a backup manifest write failure leaves legacy state authoritative", (t) => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-migration-backup-failure-"));
+  t.after(() => {
+    closeRuntimeDatabase(data);
+    fs.rmSync(data, { recursive: true, force: true });
+  });
+  const original = JSON.stringify([{ id: "kept" }]);
+  fs.writeFileSync(path.join(data, "gallery.json"), original);
+  const write = fs.writeFileSync;
+  t.mock.method(
+    fs,
+    "writeFileSync",
+    (
+      file: Parameters<typeof fs.writeFileSync>[0],
+      value: Parameters<typeof fs.writeFileSync>[1],
+      options?: Parameters<typeof fs.writeFileSync>[2],
+    ) => {
+      if (String(file).endsWith("mapping.json")) throw new Error("Backup disk is full");
+      return write(file, value, options);
+    },
+  );
+  assert.throws(() => migrateRuntime(data, { apply: true }), /Backup disk is full/);
+  assert.equal(usesRuntimeDatabase(data), false);
+  assert.equal(fs.readFileSync(path.join(data, "gallery.json"), "utf8"), original);
+});
