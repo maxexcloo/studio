@@ -17,6 +17,14 @@ COPY worker/patches/ /opt/studio/patches/
 COPY worker/entrypoint.sh worker/gpu-lease.sh /opt/studio/
 RUN python3 /opt/studio/patches/patch_minimax.py /root/ComfyUI \
     && python3 -m compileall -q /root/ComfyUI/custom_nodes/radiance /root/ComfyUI/custom_nodes/studio_worker
+# Update affected runtime packages through the official repositories; other image repositories are unrelated.
+RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /etc/zypp/repos.d/*.repo \
+    && zypper --non-interactive refresh repo-oss repo-update \
+    && zypper --non-interactive --no-refresh update --repo repo-oss --repo repo-update --no-recommends \
+        libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
+    && zypper clean --all \
+    && python3 -m pip install --no-cache-dir uv==0.13.4
+COPY LICENSE /opt/studio/LICENSE
 WORKDIR /root/ComfyUI
 EXPOSE 8000 8188
 ENTRYPOINT ["/bin/sh", "/opt/studio/gpu-lease.sh", "/bin/bash", "/opt/studio/entrypoint.sh"]
