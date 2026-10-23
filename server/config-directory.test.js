@@ -204,3 +204,41 @@ test("a missing mounted guide never falls back to stale runtime or an explicit l
     fs.writeFileSync(file, content);
   }
 });
+
+test("malformed mounted definitions never recover stale backups or change the owner's files", () => {
+  for (const name of [
+    "prompting.json",
+    "lora-catalogue.json",
+    "models.json",
+    "profiles/.studio-meta.json",
+    "profiles/.studio-edits.json",
+  ]) {
+    const file = path.join(config, name);
+    const original = fs.existsSync(file) ? fs.readFileSync(file) : undefined;
+    fs.writeFileSync(file, "{broken owner definition");
+    fs.writeFileSync(`${file}.bak`, original || '{"owned":{"aiDrafted":true}}');
+    const before = snapshot(config);
+    try {
+      if (name === "prompting.json")
+        assert.throws(() => createGuideStore({ log: quiet }).pack("owned"), SyntaxError);
+      else if (name === "lora-catalogue.json" || name === "models.json") {
+        assert.throws(
+          () =>
+            createCatalogueStore({
+              dataDir: data,
+              environment: { STUDIO_CONFIG_DIR: config },
+              log: quiet,
+            }).entries(),
+          /Cannot read mounted configuration/,
+        );
+      } else if (name.endsWith(".studio-meta.json"))
+        assert.deepEqual(createProfileStore({ log: quiet }).metas(), {});
+      else assert.equal(editor.readEditableProfile("owned").edited, null);
+      assert.deepEqual(snapshot(config), before);
+    } finally {
+      if (original) fs.writeFileSync(file, original);
+      else fs.rmSync(file);
+      fs.rmSync(`${file}.bak`);
+    }
+  }
+});

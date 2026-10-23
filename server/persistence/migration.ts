@@ -60,6 +60,33 @@ export function migrateRuntime(dataDir: string, { apply = false } = {}) {
     )
       throw new Error(`Backup verification failed: ${mapping.source}`);
   }
+  const manifestFile = path.join(backup, "mapping.json");
+  const manifest =
+    JSON.stringify(
+      {
+        ...plan,
+        database: path.basename(databaseFile(dataDir)),
+        createdAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ) + "\n";
+  fs.writeFileSync(manifestFile, manifest, { mode: 0o600, flag: "wx" });
+  if (fs.readFileSync(manifestFile, "utf8") !== manifest)
+    throw new Error("Backup mapping verification failed");
+  // The complete restorable backup must reach disk before SQLite becomes authoritative.
+  for (const file of [
+    ...plan.mappings.map((mapping) => path.join(backup, mapping.source)),
+    manifestFile,
+    backup,
+  ]) {
+    const handle = fs.openSync(file, "r");
+    try {
+      fs.fsyncSync(handle);
+    } finally {
+      fs.closeSync(handle);
+    }
+  }
   const db = runtimeDatabase(dataDir);
   db.exec("BEGIN IMMEDIATE");
   try {
@@ -83,19 +110,6 @@ export function migrateRuntime(dataDir: string, { apply = false } = {}) {
     db.exec("ROLLBACK");
     throw error;
   }
-  fs.writeFileSync(
-    path.join(backup, "mapping.json"),
-    JSON.stringify(
-      {
-        ...plan,
-        database: path.basename(databaseFile(dataDir)),
-        appliedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    ) + "\n",
-    { mode: 0o600 },
-  );
   return { ...plan, applied: true, backup };
 }
 
