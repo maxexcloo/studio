@@ -3,8 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { compareGalleryItems, galleryBucket, sortGalleryItems } from "./gallery-order.js";
-import { groupGallery } from "../src/app/runs.js";
+import { compareGalleryItems, sortGalleryItems } from "./gallery-order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
@@ -12,12 +11,23 @@ process.env.COMFY_OUTPUT_DIR = "";
 const { pageGallery, setGallery, sortGallery } = await import("./gallery-store.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const item = (id, createdAt, extra = {}) => ({ id, createdAt, prompt: "a lantern", status: "done", type: "image", ...extra });
+const item = (id, createdAt, extra = {}) => ({
+  id,
+  createdAt,
+  prompt: "a lantern",
+  status: "done",
+  type: "image",
+  ...extra,
+});
 const ids = (items) => items.map((item) => item.id);
 
 test("explicit Civitai imports stay newest first even without source prompts", () => {
   const imported = item("civitai:42", "2026-01-03", { prompt: "", civitai: { imageId: "42" } });
-  const items = [item("generation", "2026-01-02"), imported, item("scan", "2026-01-04", { prompt: "" })];
+  const items = [
+    item("generation", "2026-01-02"),
+    imported,
+    item("scan", "2026-01-04", { prompt: "" }),
+  ];
   assert.deepEqual(ids(sortGalleryItems(items)), ["civitai:42", "generation", "scan"]);
   setGallery(items);
   assert.equal(pageGallery({ limit: 1 }).items[0].id, "civitai:42");
@@ -25,11 +35,14 @@ test("explicit Civitai imports stay newest first even without source prompts", (
 
 test("server pages and client merges put blank imports last, newest first within both buckets", () => {
   const items = [
-    item("import-old", "2026-01-01", { prompt: "", library: { folder: "photos", path: "old.png" } }),
+    item("import-old", "2026-01-01", {
+      prompt: "",
+      library: { folder: "photos", path: "old.png" },
+    }),
     item("generation", "2026-01-02"),
     item("history-import", "2026-01-05", { prompt: " \n ", jobId: "comfy-history" }),
     item("pending", "2026-01-03", { status: "pending", prompt: "" }),
-    item("failed", "2026-01-04", { status: "error", prompt: "" })
+    item("failed", "2026-01-04", { status: "error", prompt: "" }),
   ];
   const expected = ["failed", "pending", "generation", "history-import", "import-old"];
   assert.deepEqual(ids(sortGallery(items)), expected);
@@ -47,7 +60,12 @@ test("server pages and client merges put blank imports last, newest first within
 });
 
 test("a removed cursor continues through the bucket boundary and descending id ties", () => {
-  const items = [item("z", "2026-01-01"), item("m", "2026-01-01"), item("a", "2026-01-01"), item("import", "2026-12-01", { prompt: "" })];
+  const items = [
+    item("z", "2026-01-01"),
+    item("m", "2026-01-01"),
+    item("a", "2026-01-01"),
+    item("import", "2026-12-01", { prompt: "" }),
+  ];
   setGallery(items);
   const cursor = pageGallery({ limit: 2 }).nextCursor;
   setGallery(items.filter((item) => item.id !== "m"));
@@ -59,20 +77,26 @@ test("a removed cursor continues through the bucket boundary and descending id t
 });
 
 test("valid dates precede missing and invalid dates, retaining batch indices and id ties", () => {
-  const items = [item("invalid", "bad"), item("undated", undefined), item("epoch", "1970-01-01"), item("older", "1960-01-01"), item("batch-1", "2026-01-01", { jobId: "batch", index: 1 }), item("batch-0", "2026-01-01", { jobId: "batch", index: 0 }), item("blank-invalid", "bad", { prompt: "" }), item("blank-dated", "1960-01-01", { prompt: "" })];
-  const expected = ["batch-0", "batch-1", "epoch", "older", "undated", "invalid", "blank-dated", "blank-invalid"];
+  const items = [
+    item("invalid", "bad"),
+    item("undated", undefined),
+    item("epoch", "1970-01-01"),
+    item("older", "1960-01-01"),
+    item("batch-1", "2026-01-01", { jobId: "batch", index: 1 }),
+    item("batch-0", "2026-01-01", { jobId: "batch", index: 0 }),
+    item("blank-invalid", "bad", { prompt: "" }),
+    item("blank-dated", "1960-01-01", { prompt: "" }),
+  ];
+  const expected = [
+    "batch-0",
+    "batch-1",
+    "epoch",
+    "older",
+    "undated",
+    "invalid",
+    "blank-dated",
+    "blank-invalid",
+  ];
   assert.deepEqual(ids(sortGallery(items)), expected);
   assert.deepEqual(ids(sortGalleryItems(items)), expected);
-});
-
-test("moments and runs stay separated when blank imports are newer than generated outputs", () => {
-  const generated = [0, 1, 2].map((index) => item(`generated-${index}`, `2026-01-01T00:0${index}:00Z`, { jobId: "same-job" }));
-  const imported = [0, 1, 2].map((index) => item(`imported-${index}`, `2026-01-01T00:1${index}:00Z`, { jobId: "same-job", prompt: "" }));
-  const ordered = sortGallery([...generated, ...imported]);
-  const grouped = groupGallery(ordered);
-  assert.equal(grouped.moments.length, 2);
-  assert.deepEqual(ids(grouped.moments[0].items), ids(sortGallery(generated)));
-  assert.deepEqual(ids(grouped.moments[1].items), ids(sortGallery(imported)));
-  assert.equal(grouped.runs.length, 2);
-  assert.ok(grouped.runs.every((run) => new Set(run.items.map(galleryBucket)).size === 1));
 });

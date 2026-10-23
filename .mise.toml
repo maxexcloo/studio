@@ -9,9 +9,13 @@ run = "npm run build"
 depends = [
   "check:actions",
   "check:mise",
+  "check:oxfmt",
+  "check:python",
   "check:typescript",
   "check:updates",
+  "check:whitespace",
   "test",
+  "test:python",
 ]
 
 [tasks.dev]
@@ -36,6 +40,15 @@ run = "node scripts/assistant-eval.mjs"
 [tasks."import:studio"]
 run = "node scripts/import-studio.mjs"
 
-# Release Preparation
-[tasks."release:prepare"]
-run = "npm run release -- minor --dry-run"
+# Native bridge checks live with each custom node, outside tests/.
+[tasks."test:python"]
+run = """
+PYTHONPATH=comfyui uv run --no-project --with pillow python -B -m unittest discover -s comfyui/cliproxy -p 'test_*.py'
+PYTHONPATH=comfyui python -B -m unittest discover -s comfyui/radiance -p 'test_*.py'
+PYTHONPATH=comfyui python -B -m unittest discover -s comfyui/studio_worker -p 'test_*.py'
+python -B -m unittest discover -s worker -p 'test_*.py'
+"""
+
+# Offline runtime migration is a dry run unless --apply is supplied.
+[tasks."migrate:runtime"]
+run = "node scripts/migrate-runtime.mjs"

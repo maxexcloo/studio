@@ -9,6 +9,8 @@ import {
   removeStaleTemporaries,
   writeJsonFile,
   writeJsonFileAsync,
+  writeBytesFile,
+  writeBytesFileAsync,
 } from "./json-store.js";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-json-"));
@@ -24,6 +26,27 @@ test("writes land whole and keep the previous copy as a backup", () => {
     fs.readdirSync(dir).filter((name) => name.includes(".tmp-")),
     [],
   );
+});
+
+test("byte writes preserve a good destination while a replacement is validated", async () => {
+  const file = path.join(dir, "image.bin");
+  const first = Buffer.from([0, 255, 1, 254]);
+  const replacement = Buffer.from([8, 0, 9]);
+  writeBytesFile(file, first, { mode: 0o600 });
+  await assert.rejects(
+    writeBytesFileAsync(file, replacement, {
+      validate: async (temporary) => {
+        assert.deepEqual(fs.readFileSync(temporary), replacement);
+        assert.deepEqual(fs.readFileSync(file), first);
+        throw new Error("Media could not be read");
+      },
+    }),
+    /Media could not be read/,
+  );
+  assert.deepEqual(fs.readFileSync(file), first);
+  await writeBytesFileAsync(file, replacement, { mode: 0o600 });
+  assert.deepEqual(fs.readFileSync(file), replacement);
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
 test("a half-written file falls back to the backup and is set aside, not lost", () => {

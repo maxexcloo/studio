@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { comfyOutputDir } from "./comfy.js";
 import { outputFileCandidates } from "./gallery-store.js";
-import { renameWithRetry, writeJsonFile } from "./json-store.js";
+import { writeJsonFile } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { forgetItemThumbnails } from "./thumbnails.js";
 import { forgetItemVideoPreviews } from "./video-previews.js";
@@ -52,7 +52,7 @@ export function trashDir(baseDir = mediaStorageEnabled ? mediaRoot : comfyOutput
 function moveFile(from, to) {
   fs.mkdirSync(path.dirname(to), { recursive: true });
   try {
-    renameWithRetry(from, to);
+    fs.renameSync(from, to);
   } catch (error) {
     // Another disk after all (a symlinked subfolder): copy, then remove.
     if (error.code !== "EXDEV") throw error;

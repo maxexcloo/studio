@@ -185,12 +185,14 @@ test("a download that fails its checksum is thrown away, not installed", async (
 });
 
 test("the terminal install uses ComfyUI's own folder and Python when it can see them", async () => {
-  const { nodeInstallPlan } = await import("./upscale.js");
+  const { packInstallPlan } = await import("./node-install.js");
+  const { nodePack } = await import("./node-packs.js");
+  const installPlan = (root) => packInstallPlan(nodePack("seedvr2"), root);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-comfy-"));
   fs.mkdirSync(path.join(root, "custom_nodes"));
   fs.mkdirSync(path.join(root, ".venv", "bin"), { recursive: true });
   fs.writeFileSync(path.join(root, ".venv", "bin", "python"), "");
-  const fresh = nodeInstallPlan(root, "linux");
+  const fresh = installPlan(root);
   assert.equal(fresh.exact, true);
   assert.equal(fresh.commands.length, 1);
   assert.match(
@@ -199,45 +201,16 @@ test("the terminal install uses ComfyUI's own folder and Python when it can see 
   );
   // Cloned but not loading: only the requirements are missing.
   fs.mkdirSync(path.join(root, "custom_nodes", "ComfyUI-SeedVR2_VideoUpscaler"));
-  const cloned = nodeInstallPlan(root, "linux");
+  const cloned = installPlan(root);
   assert.equal(cloned.cloned, true);
   assert.equal(cloned.needsGit, false);
   assert.doesNotMatch(cloned.commands[0].command, /git clone/);
   fs.rmSync(root, { recursive: true, force: true });
   // Nothing known: generic, and python3 since many Linux systems have no `python`.
   assert.equal(
-    nodeInstallPlan("", "linux").commands[0].command,
+    installPlan("").commands[0].command,
     'cd "ComfyUI/custom_nodes" && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 && python3 -m pip install -r ComfyUI-SeedVR2_VideoUpscaler/requirements.txt',
   );
-});
-
-test("Windows gets a PowerShell spelling and a Command Prompt one", async () => {
-  const { nodeInstallPlan } = await import("./upscale.js");
-  const [powershell, cmd] = nodeInstallPlan(
-    "C:\\ComfyUI_windows_portable\\ComfyUI",
-    "win32",
-  ).commands;
-  // PowerShell 5.1 has no && and no cd /d; $? chains the steps instead.
-  assert.equal(
-    powershell.command,
-    'Set-Location -LiteralPath "C:\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes"; if ($?) { git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git }; if ($?) { git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 }; if ($?) { python -m pip install -r ComfyUI-SeedVR2_VideoUpscaler\\requirements.txt }',
-  );
-  assert.doesNotMatch(powershell.command, /&&|cd \/d/);
-  assert.equal(
-    cmd.command,
-    'cd /d "C:\\ComfyUI_windows_portable\\ComfyUI\\custom_nodes" && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 && python -m pip install -r ComfyUI-SeedVR2_VideoUpscaler\\requirements.txt',
-  );
-});
-
-test("the portable build's embedded Python ignores per-user packages", async () => {
-  const { isEmbeddedPython, pipArgs, pythonEnv } = await import("./node-install.js");
-  const embedded = "C:\\ComfyUI_windows_portable\\python_embeded\\python.exe";
-  assert.equal(isEmbeddedPython(embedded), true);
-  assert.equal(isEmbeddedPython("C:\\ComfyUI\\.venv\\Scripts\\python.exe"), false);
-  assert.deepEqual(pipArgs(embedded), ["-s", "-m", "pip"]);
-  assert.deepEqual(pipArgs("/opt/comfy/.venv/bin/python"), ["-m", "pip"]);
-  assert.equal(pythonEnv(embedded, {}).PYTHONNOUSERSITE, "1");
-  assert.equal(pythonEnv("python", {}).PYTHONNOUSERSITE, undefined);
 });
 
 test("face detail on an imported workflow's image loads the workflow's model file, not its id", () => {

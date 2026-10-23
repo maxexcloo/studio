@@ -183,15 +183,13 @@ export function registerAssistantRoutes(
 ) {
   const fail = (res, error) => {
     const status = error instanceof AssistantError ? error.status : Number(error?.status) || 400;
-    res
-      .status(status >= 400 && status < 600 ? status : 502)
-      .json({
-        ok: false,
-        error:
-          error instanceof AssistantError && error.status >= 500
-            ? `The prompt assistant is unavailable (${error.reason}).`
-            : error.message,
-      });
+    res.status(status >= 400 && status < 600 ? status : 502).json({
+      ok: false,
+      error:
+        error instanceof AssistantError && error.status >= 500
+          ? `The prompt assistant is unavailable (${error.reason}).`
+          : error.message,
+    });
   };
   /** The engine and the account's profile, or an answer explaining why not. */
   const ready = async (req, res, { profileRequired = true } = {}) => {

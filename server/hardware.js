@@ -10,7 +10,7 @@ import os from "node:os";
  *
  * Apple Silicon shares one pool of memory between CPU and GPU. ComfyUI reports
  * that pool as the "VRAM" of its mps device (psutil's total and available), but
- * macOS only lets the GPU wire part of it. See docs/hardware-notes.md.
+ * macOS only lets the GPU wire part of it. See docs/guides/MODELS.md#worker-memory.
  */
 
 // Graphics memory is sold in binary gigabytes ("a 24 GB card" holds 24 GiB), so

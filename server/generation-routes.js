@@ -1,56 +1,94 @@
-import { loraInfos } from './lora-info.js';
-import { optionalLoraIssue } from './lora-catalogue.js';
-import { currentComfyBackend, isDefaultBackend, routeProfile, withComfyBackend } from "./comfy-backends.js";
-import { listWorkers, noWorkerMessage, workerHas } from "./workers.js";
+import { loraInfos } from "./lora-info.js";
+import { optionalLoraIssue } from "./lora-catalogue.js";
+import {
+  currentComfyBackend,
+  isDefaultBackend,
+  routeProfile,
+  withComfyBackend,
+} from "./comfy-backends.js";
+import {
+  capabilityForProfile,
+  listWorkers,
+  noWorkerMessage,
+  workerById,
+  workerHas,
+} from "./workers.js";
 import crypto from "node:crypto";
-import { demoMode } from './comfy.js';
-import { families } from './family-catalog.js';
-import { sanitizeGenerateBody } from './validation.js';
-import { dedupeGallery, gallery, galleryLimit, makePendingItems, setGallery, galleryRevisionValue, storedChatRecord } from './gallery-store.js';
-import { recordPrompt } from './prompt-history.js';
-import { jobs, runJob, runMockJob } from './jobs.js';
-import { getCustomWorkflow } from './custom-workflows.js';
-import { markWorkflowUsed } from './workflow-catalog.js';
+import { demoMode } from "./comfy.js";
+import { families } from "./family-catalog.js";
+import { sanitizeGenerateBody } from "./validation.js";
+import {
+  dedupeGallery,
+  gallery,
+  galleryLimit,
+  makePendingItems,
+  setGallery,
+  galleryRevisionValue,
+  storedChatRecord,
+} from "./gallery-store.js";
+import { recordPrompt } from "./prompt-history.js";
+import { jobs, runJob, runMockJob } from "./jobs.js";
+import { getCustomWorkflow } from "./custom-workflows.js";
+import { markWorkflowUsed } from "./workflow-catalog.js";
 
-import { forgetComfyRun } from './comfy-traces.js';
-import { inpaintInputNames, prepareInpaint } from './inpaint.js';
-import { stageReferenceAssets } from './reference-assets.js';
-import { comfyRestarting } from './comfy-restart.js';
-import { upscaleQualities, upscaleTargets } from './upscale.js';
-import { dropsAutoUpscale, planRunUpscale } from './run-upscale.js';
-import { ownerIdForRequest } from './account-ownership.js';
-import { mayUseFeature, mayUseGenerationProfile } from './account-policy.js';
-import { configuredAccountJobLimit, reserveAccountJob } from './account-jobs.js';
-import { assistantRecord } from './assistant-routes.js';
+import { forgetComfyRun } from "./comfy-traces.js";
+import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
+import { stageReferenceAssets } from "./reference-assets.js";
+import { comfyRestarting } from "./comfy-restart.js";
+import { upscaleQualities, upscaleTargets } from "./upscale.js";
+import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
+import { ownerIdForRequest } from "./account-ownership.js";
+import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
+import { configuredAccountJobLimit, reserveAccountJob } from "./account-jobs.js";
+import { assistantRecord } from "./assistant-routes.js";
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
   const accountReservations = new Map();
   const accountJobLimit = configuredAccountJobLimit();
-  app.post("/api/generate", async (req, res) => {
+  const generate = async (req, res) => {
     const id = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     // Serialise retries before any asynchronous image staging or backend work.
     // Once acknowledged, the job below answers repeats without staging again.
     let release;
     if (id) {
       while (submissions.has(id)) await submissions.get(id);
-      submissions.set(id, new Promise((resolve) => { release = resolve; }));
+      submissions.set(
+        id,
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+      );
     }
     let releaseReservation = () => {};
     try {
       if (req.studioAccount?.role === "user" && !(id && jobs.has(id))) {
-        const reservation = reserveAccountJob(req.studioAccount.userId, jobs, accountReservations, accountJobLimit);
+        const reservation = reserveAccountJob(
+          req.studioAccount.userId,
+          jobs,
+          accountReservations,
+          accountJobLimit,
+        );
         if (!reservation.accepted) {
-          return res.status(429).json({ ok: false, reason: "job-limit", error: `You can have up to ${accountJobLimit} outstanding jobs.` });
+          return res.status(429).json({
+            ok: false,
+            reason: "job-limit",
+            error: `You can have up to ${accountJobLimit} outstanding jobs.`,
+          });
         }
         releaseReservation = reservation.release;
       }
       await dispatchGenerate(req, res);
     } finally {
       releaseReservation();
-      if (id) { submissions.delete(id); release(); }
+      if (id) {
+        submissions.delete(id);
+        release();
+      }
     }
-  });
+  };
+  let admission;
+  app.post("/api/generate", (req, res) => (admission ? admission(req, res) : generate(req, res)));
 
   /**
    * Which worker runs this generation (workers.js): one that has the
@@ -58,41 +96,187 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
    * one with Upscale when Smart upscale is asked for. Nothing runs on a worker
    * without the capability, and nothing falls back to the cloud.
    */
-  async function dispatchGenerate(req, res) {
-    const accountUser = req.studioAccount?.role === "user";
+  async function routeGeneration(input, account, pinnedBackend) {
+    const accountUser = account?.role === "user";
     const workers = listWorkers();
-    const kindCapability = req.body?.kind === "video" ? "video" : "image";
-    if (!workers.length && !demoMode) return res.status(503).json({ ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) });
-    // One worker that runs this kind needs no catalogue lookup (upstream's single ComfyUI).
-    if (!accountUser && (workers.length === 0 || (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))) return generateOnBackend(req, res);
+    const kindCapability = input?.kind === "video" ? "video" : "image";
+    if (!workers.length && !demoMode)
+      return {
+        status: 503,
+        payload: { ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) },
+      };
+    if (
+      !accountUser &&
+      (workers.length === 0 ||
+        (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))
+    )
+      return { backend: currentComfyBackend() };
     try {
       const available = await mediaModels();
-      const profile = available.models.profiles.find((item) => item.id === req.body?.profileId)
-        || available.models.profiles.find((item) => item.workflow === req.body?.workflow && item.model === req.body?.model);
+      const profile =
+        available.models.profiles.find((item) => item.id === input?.profileId) ||
+        available.models.profiles.find(
+          (item) => item.workflow === input?.workflow && item.model === input?.model,
+        );
       if (!profile) {
-        // A local video request with no video worker at all says so, rather than blaming the profile.
-        if (kindCapability === "video" && !workers.some((worker) => worker.capabilities.includes("video"))) return res.status(503).json({ ok: false, reason: "no-worker", error: noWorkerMessage("video") });
-        return res.status(400).json({ ok: false, error: "This profile is unavailable on its configured backend. Rescan models; the job was not submitted." });
+        if (
+          kindCapability === "video" &&
+          !workers.some((worker) => worker.capabilities.includes("video"))
+        )
+          return {
+            status: 503,
+            payload: { ok: false, reason: "no-worker", error: noWorkerMessage("video") },
+          };
+        return {
+          status: 400,
+          payload: {
+            ok: false,
+            error:
+              "This profile is unavailable on its configured backend. Rescan models; the job was not submitted.",
+          },
+        };
       }
       if (accountUser) {
-        const feature = (req.body?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
-        if (!mayUseGenerationProfile(req.studioAccount, profile) || !mayUseFeature(req.studioAccount, feature)) {
-          return res.status(403).json({ ok: false, error: "This account cannot use the selected generation profile." });
-        }
-        if (Array.isArray(req.body?.loras) && req.body.loras.length && !mayUseFeature(req.studioAccount, "loras")) {
-          return res.status(403).json({ ok: false, error: "LoRAs are not enabled for this account." });
-        }
-        const hasReference = Boolean(req.body?.startImage || req.body?.startImageId || req.body?.referenceAssets?.length);
-        const referenceFeature = feature === "videoGeneration" ? "videoReferences" : "imageReferences";
-        if (hasReference && !mayUseFeature(req.studioAccount, referenceFeature)) {
-          return res.status(403).json({ ok: false, error: "References are not enabled for this account." });
-        }
+        const feature =
+          (input?.kind || profile.kind) === "video" ? "videoGeneration" : "imageGeneration";
+        if (!mayUseGenerationProfile(account, profile) || !mayUseFeature(account, feature))
+          return {
+            status: 403,
+            payload: {
+              ok: false,
+              error: "This account cannot use the selected generation profile.",
+            },
+          };
+        if (Array.isArray(input?.loras) && input.loras.length && !mayUseFeature(account, "loras"))
+          return {
+            status: 403,
+            payload: { ok: false, error: "LoRAs are not enabled for this account." },
+          };
+        const hasReference = Boolean(
+          input?.startImage || input?.startImageId || input?.referenceAssets?.length,
+        );
+        if (
+          hasReference &&
+          !mayUseFeature(
+            account,
+            feature === "videoGeneration" ? "videoReferences" : "imageReferences",
+          )
+        )
+          return {
+            status: 403,
+            payload: { ok: false, error: "References are not enabled for this account." },
+          };
       }
-      const worker = routeProfile(profile, { prefers: req.body?.autoUpscale ? ["upscale"] : [] });
-      return await withComfyBackend(worker.id, () => generateOnBackend(req, res));
+      const worker = pinnedBackend
+        ? workerById(pinnedBackend)
+        : routeProfile(profile, { prefers: input?.autoUpscale ? ["upscale"] : [] });
+      if (!worker)
+        return {
+          status: 503,
+          payload: { ok: false, error: "The selected worker is no longer configured." },
+        };
+      if (!workerHas(worker.id, capabilityForProfile(profile)))
+        return {
+          status: 503,
+          payload: {
+            ok: false,
+            reason: "no-worker",
+            error: noWorkerMessage(capabilityForProfile(profile)),
+          },
+        };
+      return { backend: worker.id };
     } catch (error) {
-      if (!res.headersSent) res.status(503).json({ ok: false, ...(error?.noWorker ? { reason: "no-worker" } : {}), error: error.message });
+      return {
+        status: 503,
+        payload: {
+          ok: false,
+          ...(error?.noWorker ? { reason: "no-worker" } : {}),
+          error: error.message,
+        },
+      };
     }
+  }
+
+  async function dispatchGenerate(req, res) {
+    const routed = await routeGeneration(req.body, req.studioAccount, req.studioQueueBackend);
+    if (routed.payload) return res.status(routed.status).json(routed.payload);
+    return withComfyBackend(routed.backend, () => generateOnBackend(req, res));
+  }
+
+  async function prepareGenerationBody(input) {
+    let body;
+    let isMockJob = false;
+    let context = null;
+    try {
+      context = await loadComfyContext();
+    } catch (error) {
+      // Placeholder generations are only for agent and UI testing without a GPU.
+      if (!demoMode) {
+        return {
+          status: 503,
+          payload: {
+            ok: false,
+            restarting: isDefaultBackend() && comfyRestarting(),
+            error: comfyDownMessage(error?.message),
+          },
+        };
+      }
+    }
+    if (context) {
+      try {
+        // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
+        // refuses one trained for another model instead of applying it.
+        const requested = (Array.isArray(input?.loras) ? input.loras : [])
+          .filter(
+            (item) => item && item.enabled !== false && typeof item.name === "string" && item.name,
+          )
+          .map((item) => item.name);
+        if (requested.length) await loraInfos(requested.slice(0, 32)).catch(() => null);
+        body = sanitizeGenerateBody(input, context.info, context.stats);
+        const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
+        if (enabledLoras.length) {
+          const issue = optionalLoraIssue(
+            enabledLoras,
+            await loraInfos(enabledLoras.map((item) => item.name)),
+          );
+          if (issue) throw new Error(issue);
+        }
+      } catch (error) {
+        return { status: 400, payload: { ok: false, error: error.message } };
+      }
+    } else {
+      const prompt = String(input?.prompt || "").trim();
+      if (!prompt) {
+        return { status: 400, payload: { ok: false, error: "Enter a prompt." } };
+      }
+      isMockJob = true;
+      body = {
+        kind: input?.kind === "video" ? "video" : "image",
+        prompt,
+        negative: String(input?.negative || ""),
+        model: String(input?.model || "flux1-schnell.safetensors"),
+        profileId: String(input?.profileId || ""),
+        width: Number(input?.width || 1024),
+        height: Number(input?.height || 1024),
+        steps: Number(input?.steps || 4),
+        cfg: Number(input?.cfg || 1),
+        count: Number(input?.count || 1),
+        ...(input?.variationCount !== undefined
+          ? {
+              variationCount: Math.max(
+                1,
+                Math.min(8, Math.round(Number(input.variationCount) || 1)),
+              ),
+            }
+          : {}),
+        sampler: String(input?.sampler || "euler"),
+        scheduler: String(input?.scheduler || "simple"),
+        seed: String(input?.seed || ""),
+        startImageId: String(input?.startImageId || ""),
+        startImageName: String(input?.startImageName || ""),
+      };
+    }
+    return { body, isMockJob };
   }
 
   async function generateOnBackend(req, res) {
@@ -102,91 +286,77 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // another account's live job or saved outputs, and the answer must not reveal which.
     if (duplicateId && req.studioAccount) {
       const ownerId = ownerIdForRequest(req);
-      const foreign = (existing && (existing.ownerId || "") !== ownerId)
-        || gallery.some((item) => item.jobId === duplicateId && (item.ownerId || "") !== ownerId);
-      if (foreign) return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
+      const foreign =
+        (existing && (existing.ownerId || "") !== ownerId) ||
+        gallery.some((item) => item.jobId === duplicateId && (item.ownerId || "") !== ownerId);
+      if (foreign)
+        return res.status(409).json({ ok: false, error: "That generation ID is already in use." });
     }
     if (existing) {
-      return res.json({ jobId: duplicateId, items: existing.items || existing.outputs || [], revision: galleryRevisionValue() });
+      return res.json({
+        jobId: duplicateId,
+        items: existing.items || existing.outputs || [],
+        revision: galleryRevisionValue(),
+      });
     }
-    let body;
-    let isMockJob = false;
-    let context = null;
-    try {
-      context = await loadComfyContext();
-    } catch (error) {
-      // Placeholder generations are only for agent and UI testing without a GPU.
-      if (!demoMode) {
-        res.status(503).json({ ok: false, restarting: isDefaultBackend() && comfyRestarting(), error: comfyDownMessage(error?.message) });
-        return;
-      }
-    }
-    if (context) {
-      try {
-        // Read each requested LoRA's family first (a worker's files answer over HTTP), so validation
-        // refuses one trained for another model instead of applying it.
-        const requested = (Array.isArray(req.body?.loras) ? req.body.loras : []).filter((item) => item && item.enabled !== false && typeof item.name === "string" && item.name).map((item) => item.name);
-        if (requested.length) await loraInfos(requested.slice(0, 32)).catch(() => null);
-        body = sanitizeGenerateBody(req.body, context.info, context.stats);
-        const enabledLoras = (body.loras || []).filter((item) => item.enabled !== false);
-        if (enabledLoras.length) {
-          const issue = optionalLoraIssue(enabledLoras, await loraInfos(enabledLoras.map((item) => item.name)));
-          if (issue) throw new Error(issue);
-        }
-      } catch (error) {
-        res.status(400).json({ ok: false, error: error.message });
-        return;
-      }
-    } else {
-      const prompt = String(req.body?.prompt || "").trim();
-      if (!prompt) {
-        res.status(400).json({ ok: false, error: "Enter a prompt." });
-        return;
-      }
-      isMockJob = true;
-      body = {
-        kind: req.body?.kind === "video" ? "video" : "image",
-        prompt,
-        negative: String(req.body?.negative || ""),
-        model: String(req.body?.model || "flux1-schnell.safetensors"),
-        profileId: String(req.body?.profileId || ""),
-        width: Number(req.body?.width || 1024),
-        height: Number(req.body?.height || 1024),
-        steps: Number(req.body?.steps || 4),
-        cfg: Number(req.body?.cfg || 1),
-        count: Number(req.body?.count || 1),
-        ...(req.body?.variationCount !== undefined ? { variationCount: Math.max(1, Math.min(8, Math.round(Number(req.body.variationCount) || 1))) } : {}),
-        sampler: String(req.body?.sampler || "euler"),
-        scheduler: String(req.body?.scheduler || "simple"),
-        seed: String(req.body?.seed || ""),
-        startImageId: String(req.body?.startImageId || ""),
-        startImageName: String(req.body?.startImageName || "")
-      };
-    }
+    const prepared = await prepareGenerationBody(req.body);
+    if (prepared.payload) return res.status(prepared.status).json(prepared.payload);
+    let { body, isMockJob } = prepared;
     body.comfyBackend = currentComfyBackend();
     body.ownerId = ownerIdForRequest(req);
     // What the prompt assistant did for this run (preset, chosen LoRAs), for Details; only with the feature.
-    const assistant = !req.studioAccount || mayUseFeature(req.studioAccount, 'promptAssistant') ? assistantRecord(req.body?.assistant, body.loras) : null;
-    if (assistant) body.assistant = assistant; else delete body.assistant;
+    const assistant =
+      !req.studioAccount || mayUseFeature(req.studioAccount, "promptAssistant")
+        ? assistantRecord(req.body?.assistant, body.loras)
+        : null;
+    if (assistant) body.assistant = assistant;
+    else delete body.assistant;
     // The chat conversation that asked for it (Studio MCP), so the gallery can link back to it.
     const chat = storedChatRecord(req.body?.chat);
-    if (chat) body.chat = chat; else delete body.chat;
+    if (chat) body.chat = chat;
+    else delete body.chat;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.
-    body.autoUpscale = body.kind === "image" && upscaleQualities.includes(autoUpscale?.quality) && (demoMode || workerHas(body.comfyBackend, "upscale"))
-      ? { quality: autoUpscale.quality, faceDetail: Boolean(autoUpscale.faceDetail), ...(upscaleTargets.includes(Number(autoUpscale.target)) ? { target: Number(autoUpscale.target) } : {}) }
-      : null;
-    if ((!req.studioAccount || mayUseFeature(req.studioAccount, 'promptHistory'))) try { recordPrompt(body.prompt, "positive", body.ownerId); recordPrompt(body.negative, "negative", body.ownerId); } catch { /* a run matters more than its history */ }
+    body.autoUpscale =
+      body.kind === "image" &&
+      upscaleQualities.includes(autoUpscale?.quality) &&
+      (demoMode || workerHas(body.comfyBackend, "upscale"))
+        ? {
+            quality: autoUpscale.quality,
+            faceDetail: Boolean(autoUpscale.faceDetail),
+            ...(upscaleTargets.includes(Number(autoUpscale.target))
+              ? { target: Number(autoUpscale.target) }
+              : {}),
+          }
+        : null;
+    if (!req.studioAccount || mayUseFeature(req.studioAccount, "promptHistory"))
+      try {
+        recordPrompt(body.prompt, "positive", body.ownerId);
+        recordPrompt(body.negative, "negative", body.ownerId);
+      } catch {
+        /* a run matters more than its history */
+      }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {
       // Not a library id (an old start-image upload): keep the legacy path for it.
-      body.referenceAssets = await stageReferenceAssets(req, [{ slot: "reference", assetId: body.startImageId }], { unique: Boolean(body.ownerId), generation: body }).catch(() => []);
+      body.referenceAssets = await stageReferenceAssets(
+        req,
+        [{ slot: "reference", assetId: body.startImageId }],
+        { unique: Boolean(body.ownerId), generation: body },
+      ).catch(() => []);
     }
-    if (!isMockJob && body.referenceAssets?.length && !body.referenceAssets.every((item) => item.comfyName)) {
+    if (
+      !isMockJob &&
+      body.referenceAssets?.length &&
+      !body.referenceAssets.every((item) => item.comfyName)
+    ) {
       try {
-        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, { unique: Boolean(body.ownerId), generation: body });
+        body.referenceAssets = await stageReferenceAssets(req, body.referenceAssets, {
+          unique: Boolean(body.ownerId),
+          generation: body,
+        });
         body.startImageId ||= body.referenceAssets[0]?.assetId || "";
         body.startImageName ||= body.referenceAssets[0]?.name || "";
       } catch (error) {
@@ -200,7 +370,11 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       try {
         body.inpaint = isMockJob ? null : await prepareInpaint(req, body);
       } catch (error) {
-        await forgetComfyRun({ inputNames: (body.referenceAssets || []).filter((item) => item.temporary).map((item) => item.comfyName) });
+        await forgetComfyRun({
+          inputNames: (body.referenceAssets || [])
+            .filter((item) => item.temporary)
+            .map((item) => item.comfyName),
+        });
         res.status(400).json({ ok: false, error: error.message });
         return;
       }
@@ -208,18 +382,27 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     // An empty painted mask falls back to a normal run, so apply normal sizing too.
     if (body.inpaint?.box) {
       const { box, image, work } = body.inpaint;
-      console.log(`[Studio] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`);
+      console.log(
+        `[Studio] Inpaint: repainting ${box.width}×${box.height} at ${box.x},${box.y} of ${image?.width}×${image?.height}, sampled at ${work.width}×${work.height}, strength ${body.inpaint.strength}`,
+      );
     }
     // Said back to the page: a mask was sent but nothing in it was painted, so this runs as a plain edit.
     const inpaintSkipped = Boolean(!isMockJob && req.body?.inpaint?.mask && !body.inpaint);
     if (!isMockJob && req.body?.inpaint && !body.inpaint && body.referenceAssets?.length) {
       try {
         const [first, ...others] = body.referenceAssets;
-        const [replacement] = await stageReferenceAssets(req, [first], { unique: Boolean(body.ownerId), generation: body });
+        const [replacement] = await stageReferenceAssets(req, [first], {
+          unique: Boolean(body.ownerId),
+          generation: body,
+        });
         if (first.temporary) await forgetComfyRun({ inputNames: [first.comfyName] });
         body.referenceAssets = [replacement, ...others];
       } catch (error) {
-        await forgetComfyRun({ inputNames: (body.referenceAssets || []).filter((item) => item.temporary).map((item) => item.comfyName) });
+        await forgetComfyRun({
+          inputNames: (body.referenceAssets || [])
+            .filter((item) => item.temporary)
+            .map((item) => item.comfyName),
+        });
         res.status(400).json({ ok: false, error: error.message });
         return;
       }
@@ -232,11 +415,26 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       body.width = startSize.width;
       body.height = startSize.height;
     }
-    if (body.autoUpscale && dropsAutoUpscale({ inpaint: body.inpaint, referencesFamily: inputFamily?.references, hasReference: Boolean(startSize), referenceRole: body.referenceRole })) body.autoUpscale = null;
+    if (
+      body.autoUpscale &&
+      dropsAutoUpscale({
+        inpaint: body.inpaint,
+        referencesFamily: inputFamily?.references,
+        hasReference: Boolean(startSize),
+        referenceRole: body.referenceRole,
+      })
+    )
+      body.autoUpscale = null;
     // Every image this run handed ComfyUI; temporary resized copies go when it ends.
     const staged = (body.referenceAssets || []).filter((item) => item.comfyName);
-    body.stagedInputNames = [...staged.map((item) => item.comfyName), ...inpaintInputNames(body.inpaint)];
-    body.temporaryInputNames = [...(body.temporaryInputNames || []), ...staged.filter((item) => item.temporary).map((item) => item.comfyName)];
+    body.stagedInputNames = [
+      ...staged.map((item) => item.comfyName),
+      ...inpaintInputNames(body.inpaint),
+    ];
+    body.temporaryInputNames = [
+      ...(body.temporaryInputNames || []),
+      ...staged.filter((item) => item.temporary).map((item) => item.comfyName),
+    ];
     // A random seed is drawn here rather than inside the graph, so the gallery
     // records the number that actually ran and the image can be made again.
     if (!/^\d+$/.test(String(body.seed ?? "").trim())) {
@@ -251,12 +449,37 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const items = makePendingItems(id, body);
     markWorkflowUsed(body.profileId || body.model || body.workflow || "");
     setGallery(dedupeGallery([...items, ...gallery]).slice(0, galleryLimit));
-    jobs.set(id, { status: "queued", ownerId: body.ownerId || undefined, comfyBackend: body.comfyBackend, kind: body.kind, prompt: body.prompt, outputs: [], items, startedAt: body.startedAt });
-    res.json({ jobId: id, items, revision: galleryRevisionValue(), ...(inpaintSkipped ? { notice: "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture." } : {}) });
+    jobs.set(id, {
+      status: "queued",
+      ownerId: body.ownerId || undefined,
+      comfyBackend: body.comfyBackend,
+      kind: body.kind,
+      prompt: body.prompt,
+      outputs: [],
+      items,
+      startedAt: body.startedAt,
+    });
+    res.json({
+      jobId: id,
+      items,
+      revision: galleryRevisionValue(),
+      ...(inpaintSkipped
+        ? {
+            notice:
+              "Nothing painted showed up in the mask, so this ran as a normal edit of the whole picture.",
+          }
+        : {}),
+    });
     if (isMockJob) {
       setTimeout(() => runMockJob(id, body), 0);
     } else {
-      setTimeout(() => runJob(id, body, { prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null }).catch(() => null), 0);
+      setTimeout(
+        () =>
+          runJob(id, body, {
+            prepare: body.autoUpscale ? (graph) => smartUpscalePrepare(graph, body) : null,
+          }).catch(() => null),
+        0,
+      );
     }
   }
 
@@ -267,8 +490,30 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
    */
   async function smartUpscalePrepare(graph, body) {
     const { info } = await loadComfyContext().catch(() => ({ info: null }));
-    if (!info) return { skipped: "Smart upscale couldn’t check ComfyUI’s nodes", quality: body.autoUpscale?.quality };
-    const customWorkflow = String(body.model || "").startsWith("custom:") ? getCustomWorkflow(body.model) : null;
+    if (!info)
+      return {
+        skipped: "Smart upscale couldn’t check ComfyUI’s nodes",
+        quality: body.autoUpscale?.quality,
+      };
+    const customWorkflow = String(body.model || "").startsWith("custom:")
+      ? getCustomWorkflow(body.model)
+      : null;
     return planRunUpscale(graph, body, info, customWorkflow);
   }
+  return {
+    generate,
+    setAdmission(handler) {
+      admission = handler;
+    },
+    async validateInput(input, account) {
+      const routed = await routeGeneration(input, account);
+      if (routed.payload) return routed;
+      return withComfyBackend(routed.backend, async () => {
+        const prepared = await prepareGenerationBody(input);
+        return prepared.payload
+          ? prepared
+          : { status: 200, payload: { ok: true, backend: routed.backend } };
+      });
+    },
+  };
 }

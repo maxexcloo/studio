@@ -13,9 +13,8 @@ import {
 } from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
-import { comfyPython, comfyRootDir, packInstallPlan } from "./node-install.js";
 import { nodePacks } from "./node-packs.js";
-import { renameWithRetry, writeJsonFile } from "./json-store.js";
+import { writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 import { outputFolderName } from "./data-names.js";
 
@@ -265,13 +264,6 @@ function detectedSeedVR2Nodes(info) {
 
 /* ------------------------------------------------------------ node install */
 
-export { comfyPython, comfyRootDir };
-
-/** The SeedVR2 pack's terminal install; see node-install.js. */
-export function nodeInstallPlan(root = comfyRootDir(), platform = process.platform) {
-  return packInstallPlan(nodePacks.seedvr2, root, platform);
-}
-
 /** Manager 4 (pip, off unless ComfyUI starts with --enable-manager) and the older git install answer on different routes. */
 export async function managerAvailable() {
   return (await managerInfo()).available;
@@ -442,7 +434,7 @@ async function downloadOne(entry, dir, onProgress, signal) {
       `${entry.file} didn’t match its published checksum, so it was deleted. Try again.`,
     );
   }
-  renameWithRetry(partial, target);
+  fs.renameSync(partial, target);
   rememberValidated(dir, entry.file, spec);
   entry.phase = "verified";
 }

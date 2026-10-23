@@ -1,15 +1,30 @@
+import {
+  readRuntimeDocument,
+  usesRuntimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import { generationRecord } from "./generation-record.js";
-import { hasGalleryFilters, matchesGalleryFilters } from './gallery-filters.js';
-import { mediaFile, mediaParams, mediaPath } from './media-paths.js';
+import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
+import { mediaFile, mediaParams, mediaPath } from "./media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyOutputDir, localOutputFile } from './comfy.js';
-import { defaultWorkerId } from './workers.js';
+import { comfyOutputDir, localOutputFile } from "./comfy.js";
+import { defaultWorkerId } from "./workers.js";
 
-import { readJsonFile, removeStaleTemporaries, writeJsonFile, writeJsonFileAsync } from './json-store.js';
-import { isInside } from './paths.js';
-import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from './gallery-order.js';
+import {
+  readJsonFile,
+  removeStaleTemporaries,
+  writeJsonFile,
+  writeJsonFileAsync,
+} from "./json-store.js";
+import { isInside } from "./paths.js";
+import {
+  compareGalleryItems,
+  compareGalleryKeys,
+  galleryOrderKey,
+  galleryTime,
+} from "./gallery-order.js";
 import { currentDataDir } from "./data-dir.js";
 
 export const dataDir = currentDataDir();
@@ -24,21 +39,34 @@ const galleryChanges = [];
 let hiddenVersion = 0;
 
 function loadGallery() {
+  const database = usesRuntimeDatabase(dataDir);
   try {
-    removeStaleTemporaries(galleryPath);
+    if (!database) removeStaleTemporaries(galleryPath);
     const staleAfter = 30 * 60 * 1000;
-    return readJsonFile(galleryPath).map((item) => {
-      let next = item;
-      if (next.status === "pending" && Date.now() - Date.parse(next.createdAt || 0) > staleAfter) {
-        next = { ...next, status: "canceled" };
-      }
-      // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
-      if (next.type === "image" && !next.thumbnailUrl && typeof next.url === "string" && next.url.startsWith("/comfy/view?")) {
-        next = { ...next, thumbnailUrl: next.url.replace("/comfy/view?", "/comfy/thumb?") };
-      }
-      return next;
-    });
-  } catch {
+    return (database ? readRuntimeDocument(dataDir, "gallery") : readJsonFile(galleryPath)).map(
+      (item) => {
+        let next = item;
+        if (
+          !database &&
+          next.status === "pending" &&
+          Date.now() - Date.parse(next.createdAt || 0) > staleAfter
+        ) {
+          next = { ...next, status: "canceled" };
+        }
+        // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
+        if (
+          next.type === "image" &&
+          !next.thumbnailUrl &&
+          typeof next.url === "string" &&
+          next.url.startsWith("/comfy/view?")
+        ) {
+          next = { ...next, thumbnailUrl: next.url.replace("/comfy/view?", "/comfy/thumb?") };
+        }
+        return next;
+      },
+    );
+  } catch (error) {
+    if (database && error.code !== "ENOENT") throw error;
     return [];
   }
 }
@@ -88,22 +116,31 @@ export function markerOf(key) {
 export let hiddenGalleryIds = loadHiddenGalleryIds();
 
 function loadHiddenGalleryIds() {
+  const database = usesRuntimeDatabase(dataDir);
   let raw;
   try {
-    raw = readJsonFile(hiddenGalleryPath);
-  } catch {
+    raw = database
+      ? readRuntimeDocument(dataDir, "gallery-hidden")
+      : readJsonFile(hiddenGalleryPath);
+  } catch (error) {
+    if (database && error.code !== "ENOENT") throw error;
     return new Map();
   }
   const entries = Array.isArray(raw)
     ? raw.filter((key) => !String(key).startsWith("/comfy/view?")).map((key) => [key, Date.now()])
     : Object.entries(raw || {}).map(([key, value]) => [key, Number(value) || 0]);
   const plain = entries.filter(([key]) => !String(key).startsWith(markerPrefix));
-  const markers = new Map(entries.map(([key, value]) => [String(key).startsWith(markerPrefix) ? key : markerOf(key), value]));
+  const markers = new Map(
+    entries.map(([key, value]) => [
+      String(key).startsWith(markerPrefix) ? key : markerOf(key),
+      value,
+    ]),
+  );
   if (plain.length || Array.isArray(raw)) {
     try {
       // Twice, so the store's .bak copy of the readable list is replaced too.
-      writeJsonFile(hiddenGalleryPath, Object.fromEntries(markers));
-      writeJsonFile(hiddenGalleryPath, Object.fromEntries(markers));
+      persistHiddenMarkers(Object.fromEntries(markers));
+      persistHiddenMarkers(Object.fromEntries(markers));
     } catch {
       // Stays as it was until the next save.
     }
@@ -133,8 +170,15 @@ function bumpRevision(changes = {}) {
     // Live previews are base64 frames: the log keeps up to changeLogLimit entries, so
     // they stay out of it and a delta attaches the item's current one instead.
     const logged = upserts.map((item) => (item.preview ? withoutPreview(item) : item));
-    galleryChanges.push({ revision: galleryRevision, upserts: logged, removes, removeOwners, reset: Boolean(changes.reset) });
-    if (galleryChanges.length > changeLogLimit) galleryChanges.splice(0, galleryChanges.length - changeLogLimit);
+    galleryChanges.push({
+      revision: galleryRevision,
+      upserts: logged,
+      removes,
+      removeOwners,
+      reset: Boolean(changes.reset),
+    });
+    if (galleryChanges.length > changeLogLimit)
+      galleryChanges.splice(0, galleryChanges.length - changeLogLimit);
   }
   return galleryRevision;
 }
@@ -160,7 +204,10 @@ function diffGallery(before, after) {
     if (!previous || JSON.stringify(previous) !== JSON.stringify(item)) upserts.push(item);
   }
   for (const [key, item] of beforeMap) {
-    if (!afterMap.has(key)) { removes.push(key); removeOwners.push(item?.ownerId || ""); }
+    if (!afterMap.has(key)) {
+      removes.push(key);
+      removeOwners.push(item?.ownerId || "");
+    }
   }
   return { upserts, removes, removeOwners };
 }
@@ -269,13 +316,17 @@ function visibleItems({ type = "", includeFailed = true, filter = null } = {}) {
 /** Where the page after `cursor` starts: right after the cursor's own item while it is listed, else the first one past its time. */
 function pageStart(entry, cursor) {
   if (!cursor) return 0;
-  if (!entry.positions) entry.positions = new Map(entry.items.map((item, index) => [cursorFor(item), index]));
+  if (!entry.positions)
+    entry.positions = new Map(entry.items.map((item, index) => [cursorFor(item), index]));
   const exact = entry.positions.get(String(cursor));
   if (exact !== undefined) return exact + 1;
   if (!String(cursor).startsWith("v2|")) {
     const [timeText, encodedId = ""] = String(cursor).split("|");
     const id = decodeURIComponent(encodedId);
-    const legacy = entry.items.findIndex((item) => String(item.id || item.url || "") === id && galleryTime(item) === Number(timeText || 0));
+    const legacy = entry.items.findIndex(
+      (item) =>
+        String(item.id || item.url || "") === id && galleryTime(item) === Number(timeText || 0),
+    );
     if (legacy >= 0) return legacy + 1;
   }
   const found = entry.items.findIndex((item) => afterCursor(item, cursor));
@@ -292,8 +343,19 @@ export function gallerySearchText(item) {
   let text = searchTexts.get(item);
   if (text === undefined) {
     const settings = item.settings || {};
-    const loras = Array.isArray(settings.loras) ? settings.loras.map((lora) => lora?.name || "") : [];
-    text = [item.prompt, item.negative, item.model, settings.modelName, settings.profileId, settings.workflow, item.outputName, ...loras]
+    const loras = Array.isArray(settings.loras)
+      ? settings.loras.map((lora) => lora?.name || "")
+      : [];
+    text = [
+      item.prompt,
+      item.negative,
+      item.model,
+      settings.modelName,
+      settings.profileId,
+      settings.workflow,
+      item.outputName,
+      ...loras,
+    ]
       .filter((value) => typeof value === "string" && value)
       .join("\n")
       .toLowerCase();
@@ -308,9 +370,22 @@ export function gallerySearchText(item) {
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
-export function galleryFilter({ q = "", favorites = false, lora = "", model = "", workflow = "", size = "", aspect = "" } = {}) {
-  const terms = String(q || "").toLowerCase().split(/\s+/).filter(Boolean).slice(0, 12);
-  if (!terms.length && !favorites && !hasGalleryFilters({ lora, model, workflow, size, aspect })) return null;
+export function galleryFilter({
+  q = "",
+  favorites = false,
+  lora = "",
+  model = "",
+  workflow = "",
+  size = "",
+  aspect = "",
+} = {}) {
+  const terms = String(q || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 12);
+  if (!terms.length && !favorites && !hasGalleryFilters({ lora, model, workflow, size, aspect }))
+    return null;
   return (item) => {
     if (item.status === "pending") return true;
     if (favorites && !item.favorite) return false;
@@ -351,26 +426,54 @@ function afterCursor(item, cursor = "") {
     try {
       const key = JSON.parse(decodeURIComponent(String(cursor).slice(3)));
       return compareGalleryKeys(galleryOrderKey(item), key) > 0;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   }
   const [timeText, encodedId = ""] = String(cursor).split("|");
   const cursorTime = Number(timeText || 0);
   const cursorId = decodeURIComponent(encodedId);
-  return compareGalleryKeys(galleryOrderKey(item), { bucket: 0, time: cursorTime, id: cursorId, jobId: "", index: 0 }) > 0;
+  return (
+    compareGalleryKeys(galleryOrderKey(item), {
+      bucket: 0,
+      time: cursorTime,
+      id: cursorId,
+      jobId: "",
+      index: 0,
+    }) > 0
+  );
 }
 
-export function pageGallery({ type = "", limit = 200, cursor = "", includeFailed = true, filter = null } = {}) {
+export function pageGallery({
+  type = "",
+  limit = 200,
+  cursor = "",
+  includeFailed = true,
+  filter = null,
+} = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
   const entry = visibleItems({ type, includeFailed, filter });
   const all = entry.items;
   const start = pageStart(entry, cursor);
   const items = all.slice(start, start + safeLimit);
   const nextCursor = start + safeLimit < all.length ? cursorFor(items[items.length - 1]) : "";
-  return { items, nextCursor, hasMore: Boolean(nextCursor), revision: galleryRevision, totalApprox: all.length };
+  return {
+    items,
+    nextCursor,
+    hasMore: Boolean(nextCursor),
+    revision: galleryRevision,
+    totalApprox: all.length,
+  };
 }
 
 /** `owner` (account mode) keeps only that owner's upserts and removes; other owners' changes stay invisible. */
-export function galleryDelta({ since = 0, type = "", includeFailed = true, filter = null, owner = null } = {}) {
+export function galleryDelta({
+  since = 0,
+  type = "",
+  includeFailed = true,
+  filter = null,
+  owner = null,
+} = {}) {
   const mine = (ownerId) => owner === null || (ownerId || "") === owner;
   const numericSince = Number(since || 0);
   const earliest = galleryChanges[0]?.revision || galleryRevision;
@@ -389,35 +492,43 @@ export function galleryDelta({ since = 0, type = "", includeFailed = true, filte
       removes.delete(key);
     }
     (change.removes || []).forEach((key, index) => {
-      if (owner !== null && (change.removeOwners?.[index] === undefined || !mine(change.removeOwners[index]))) return;
+      if (
+        owner !== null &&
+        (change.removeOwners?.[index] === undefined || !mine(change.removeOwners[index]))
+      )
+        return;
       removes.add(key);
       upsertMap.delete(key);
     });
   }
-  const upserts = [...upsertMap.values()].filter((item) => {
-    if (type && item.type !== type) return false;
-    if (!includeFailed && item.status === "error") return false;
-    if (item.status === "canceled" || isGalleryHidden(item)) return false;
-    // With a search on, what no longer matches (unstarred, or a run that
-    // finished with another prompt) leaves the results instead of going stale.
-    if (filter && !filter(item)) {
-      removes.add(galleryKey(item));
-      return false;
-    }
-    return true;
-  }).map((item) => {
-    if (item.status !== "pending" && item.status !== "running") return item;
-    const key = galleryKey(item);
-    const preview = gallery.find((live) => galleryKey(live) === key)?.preview;
-    return preview ? { ...item, preview } : item;
-  });
+  const upserts = [...upsertMap.values()]
+    .filter((item) => {
+      if (type && item.type !== type) return false;
+      if (!includeFailed && item.status === "error") return false;
+      if (item.status === "canceled" || isGalleryHidden(item)) return false;
+      // With a search on, what no longer matches (unstarred, or a run that
+      // finished with another prompt) leaves the results instead of going stale.
+      if (filter && !filter(item)) {
+        removes.add(galleryKey(item));
+        return false;
+      }
+      return true;
+    })
+    .map((item) => {
+      if (item.status !== "pending" && item.status !== "running") return item;
+      const key = galleryKey(item);
+      const preview = gallery.find((live) => galleryKey(live) === key)?.preview;
+      return preview ? { ...item, preview } : item;
+    });
   return { revision: galleryRevision, reset: false, upserts, removes: [...removes] };
 }
 
 /** Imported image paths are derived from the provider ID, never supplied paths. */
 export function importedImageFile(item) {
-  const id = /^civitai:([1-9]\d*)$/.exec(String(item?.id || ''))?.[1];
-  return id && item.url === `/api/presets/${id}/media` ? path.join(dataDir, 'imported-images', `${id}.${item.type === 'video' ? 'mp4' : 'png'}`) : '';
+  const id = /^civitai:([1-9]\d*)$/.exec(String(item?.id || ""))?.[1];
+  return id && item.url === `/api/presets/${id}/media`
+    ? path.join(dataDir, "imported-images", `${id}.${item.type === "video" ? "mp4" : "png"}`)
+    : "";
 }
 
 export function outputFileCandidates(item, baseDir = comfyOutputDir) {
@@ -451,9 +562,10 @@ export function outputFileCandidates(item, baseDir = comfyOutputDir) {
     }
     if (!filename || filename === "." || filename === "/") continue;
     const base = path.resolve(baseDir);
-    const withSubfolder = subfolder && path.basename(base).toLowerCase() !== path.basename(subfolder).toLowerCase()
-      ? path.resolve(base, subfolder, filename)
-      : path.resolve(base, filename);
+    const withSubfolder =
+      subfolder && path.basename(base).toLowerCase() !== path.basename(subfolder).toLowerCase()
+        ? path.resolve(base, subfolder, filename)
+        : path.resolve(base, filename);
     candidates.push(withSubfolder);
   }
   return [...new Set(candidates)];
@@ -466,7 +578,14 @@ export function deleteGalleryFiles(items) {
   for (const item of items) {
     const imported = importedImageFile(item);
     if (imported) {
-      try { if (fs.existsSync(imported)) { fs.unlinkSync(imported); deleted += 1; } } catch { skipped += 1; }
+      try {
+        if (fs.existsSync(imported)) {
+          fs.unlinkSync(imported);
+          deleted += 1;
+        }
+      } catch {
+        skipped += 1;
+      }
       continue;
     }
     // An image added from another folder is only shown here; its file is not ours to delete.
@@ -474,7 +593,14 @@ export function deleteGalleryFiles(items) {
     const media = mediaParams(item.url);
     if (media) {
       const file = mediaFile(media.filename, media.subfolder);
-      try { if (file) { fs.unlinkSync(file); deleted += 1; } } catch { skipped += 1; }
+      try {
+        if (file) {
+          fs.unlinkSync(file);
+          deleted += 1;
+        }
+      } catch {
+        skipped += 1;
+      }
       continue;
     }
     if (!base) continue;
@@ -516,8 +642,13 @@ function outputFileExistsIn(item, baseDir) {
  */
 export function outputFolderMatch(baseDir = comfyOutputDir, items = gallery, sampleSize = 12) {
   if (!baseDir) return { checked: 0, found: 0 };
-  const sample = sortGallery(items.filter((item) => item?.status === "done" && isComfyOutputItem(item))).slice(0, sampleSize);
-  return { checked: sample.length, found: sample.filter((item) => outputFileExistsIn(item, baseDir)).length };
+  const sample = sortGallery(
+    items.filter((item) => item?.status === "done" && isComfyOutputItem(item)),
+  ).slice(0, sampleSize);
+  return {
+    checked: sample.length,
+    found: sample.filter((item) => outputFileExistsIn(item, baseDir)).length,
+  };
 }
 
 // A wrong output folder must never read as an empty gallery. Missing files only
@@ -525,7 +656,8 @@ export function outputFolderMatch(baseDir = comfyOutputDir, items = gallery, sam
 let folderTrust = { dir: "", checkedAt: 0, trusted: true };
 function outputFolderTrusted() {
   const now = Date.now();
-  if (folderTrust.dir === comfyOutputDir && now - folderTrust.checkedAt < 15000) return folderTrust.trusted;
+  if (folderTrust.dir === comfyOutputDir && now - folderTrust.checkedAt < 15000)
+    return folderTrust.trusted;
   let trusted = false;
   try {
     if (fs.statSync(comfyOutputDir).isDirectory()) {
@@ -569,7 +701,11 @@ function folderListing(dir) {
   const cached = folderListings.get(dir);
   if (cached && now - cached.statAt < listingRecheckMs) return cached.names;
   let stat;
-  try { stat = fs.statSync(dir); } catch { stat = null; }
+  try {
+    stat = fs.statSync(dir);
+  } catch {
+    stat = null;
+  }
   if (!stat?.isDirectory()) {
     if (cached?.names) listingGeneration += 1;
     folderListings.set(dir, { statAt: now, readAt: now, mtimeMs: -1, names: null });
@@ -577,12 +713,21 @@ function folderListing(dir) {
   }
   // A listing read within 2 s of the folder's last change may predate a write in
   // the same mtime tick (FAT/exFAT round to 2 s), so it is only reused after that.
-  if (cached && cached.mtimeMs === stat.mtimeMs && cached.readAt - stat.mtimeMs > 2000 && now - cached.readAt < listingMaxAgeMs) {
+  if (
+    cached &&
+    cached.mtimeMs === stat.mtimeMs &&
+    cached.readAt - stat.mtimeMs > 2000 &&
+    now - cached.readAt < listingMaxAgeMs
+  ) {
     cached.statAt = now;
     return cached.names;
   }
   let names = null;
-  try { names = new Set(fs.readdirSync(dir).map(listedName)); } catch { names = null; }
+  try {
+    names = new Set(fs.readdirSync(dir).map(listedName));
+  } catch {
+    names = null;
+  }
   if (!cached || !sameNames(cached.names, names)) listingGeneration += 1;
   if (folderListings.size > 500) folderListings.clear();
   folderListings.set(dir, { statAt: now, readAt: now, mtimeMs: stat.mtimeMs, names });
@@ -613,8 +758,12 @@ const freshOutputs = new Map();
 const freshOutputMs = 10 * 60 * 1000;
 function markFreshOutputs(items) {
   const now = Date.now();
-  for (const item of items) { const key = galleryKey(item); if (key) freshOutputs.set(key, now); }
-  if (freshOutputs.size > 500) for (const [key, at] of freshOutputs) if (now - at > freshOutputMs) freshOutputs.delete(key);
+  for (const item of items) {
+    const key = galleryKey(item);
+    if (key) freshOutputs.set(key, now);
+  }
+  if (freshOutputs.size > 500)
+    for (const [key, at] of freshOutputs) if (now - at > freshOutputMs) freshOutputs.delete(key);
 }
 
 export function hasExistingOutputFile(item) {
@@ -631,7 +780,11 @@ export function hasExistingOutputFile(item) {
   const paths = outputPathsFor(item, base);
   if (paths.some(({ dir, name }) => Boolean(folderListing(dir)?.has(name)))) return true;
   const freshAt = freshOutputs.get(galleryKey(item));
-  return Boolean(freshAt && Date.now() - freshAt < freshOutputMs && paths.some(({ file }) => fs.existsSync(file)));
+  return Boolean(
+    freshAt &&
+    Date.now() - freshAt < freshOutputMs &&
+    paths.some(({ file }) => fs.existsSync(file)),
+  );
 }
 
 /**
@@ -661,7 +814,9 @@ function persistableGallery() {
 export function saveGallery() {
   dirty = true;
   if (saveTimer || writing) return;
-  saveTimer = setTimeout(() => { flushGallery().catch(() => {}); }, saveDelayMs);
+  saveTimer = setTimeout(() => {
+    flushGallery().catch(() => {});
+  }, saveDelayMs);
   saveTimer.unref?.();
 }
 
@@ -678,8 +833,19 @@ export async function flushGallery() {
   if (!dirty) return undefined;
   dirty = false;
   const sequence = (writeSequence += 1);
-  writing = writeJsonFileAsync(galleryPath, persistableGallery(), { shouldCommit: () => sequence > committedSequence })
-    .then((replaced) => { if (replaced) committedSequence = sequence; })
+  writing = (
+    usesRuntimeDatabase(dataDir)
+      ? Promise.resolve().then(() => {
+          writeRuntimeDocument(dataDir, "gallery", persistableGallery());
+          return true;
+        })
+      : writeJsonFileAsync(galleryPath, persistableGallery(), {
+          shouldCommit: () => sequence > committedSequence,
+        })
+  )
+    .then((replaced) => {
+      if (replaced) committedSequence = sequence;
+    })
     .catch((error) => {
       // Try again shortly; the old file (and its backup) are still whole.
       dirty = true;
@@ -688,11 +854,27 @@ export async function flushGallery() {
     .finally(() => {
       writing = null;
       if (dirty && !saveTimer) {
-        saveTimer = setTimeout(() => { flushGallery().catch(() => {}); }, Math.max(saveDelayMs, 1000));
+        saveTimer = setTimeout(
+          () => {
+            flushGallery().catch(() => {});
+          },
+          Math.max(saveDelayMs, 1000),
+        );
         saveTimer.unref?.();
       }
     });
   return writing;
+}
+
+/** A workload may release its lease only when all gallery changes are durable. */
+export async function flushGalleryStrict() {
+  await flushGallery();
+  if (dirty) throw new Error("The gallery could not be saved. Outputs remain reserved.");
+}
+
+function persistHiddenMarkers(value) {
+  if (usesRuntimeDatabase(dataDir)) writeRuntimeDocument(dataDir, "gallery-hidden", value);
+  else writeJsonFile(hiddenGalleryPath, value);
 }
 
 /** Writes the gallery at once, blocking: for when the process is about to exit. */
@@ -703,28 +885,18 @@ export function writeGalleryNow() {
   }
   dirty = false;
   const sequence = (writeSequence += 1);
-  writeJsonFile(galleryPath, persistableGallery(), { compact: true });
+  if (usesRuntimeDatabase(dataDir)) writeRuntimeDocument(dataDir, "gallery", persistableGallery());
+  else writeJsonFile(galleryPath, persistableGallery(), { compact: true });
   committedSequence = sequence;
 }
 
-function flushBeforeExit() {
+export function flushPendingGallery() {
   if (!dirty && !writing) return;
   try {
     writeGalleryNow();
   } catch (error) {
     console.warn(`[Studio] Could not save the gallery before stopping: ${error.message}`);
   }
-}
-
-// Ctrl+C, a stop from the launcher or process.exit() (restart, shutdown):
-// the save that was waiting still lands. Exit explicitly: Linux PID 1 can ignore
-// a re-raised signal with its default disposition inside a container.
-process.on("exit", flushBeforeExit);
-for (const signal of process.platform === "win32" ? ["SIGINT", "SIGTERM"] : ["SIGINT", "SIGTERM", "SIGHUP"]) {
-  process.once(signal, () => {
-    flushBeforeExit();
-    process.exit(0);
-  });
 }
 
 /** Items drop out of the gallery as if deleted, without a delete marker left behind. */
@@ -738,7 +910,8 @@ export function removeGalleryItems(items) {
 export function addGalleryItems(items) {
   // A name ComfyUI reused may carry a delete marker from an older image; this one is wanted.
   let cleared = false;
-  for (const item of items) cleared = hiddenGalleryIds.delete(markerOf(galleryKey(item))) || cleared;
+  for (const item of items)
+    cleared = hiddenGalleryIds.delete(markerOf(galleryKey(item))) || cleared;
   if (cleared) saveHiddenGalleryIds();
   // Just written, so a folder listing that has not caught up yet must not hide them.
   markFreshOutputs(items);
@@ -749,7 +922,7 @@ export function saveHiddenGalleryIds() {
   hiddenVersion += 1;
   fs.mkdirSync(dataDir, { recursive: true });
   const entries = [...hiddenGalleryIds.entries()].slice(-galleryLimit * 2);
-  writeJsonFile(hiddenGalleryPath, Object.fromEntries(entries));
+  persistHiddenMarkers(Object.fromEntries(entries));
 }
 
 export function promptTitle(text = "") {
@@ -760,18 +933,27 @@ export function promptTitle(text = "") {
 export function outputsFrom(history) {
   const urls = [];
   for (const output of Object.values(history.outputs || {})) {
-    const imageItems = Array.isArray(output?.images) ? output.images.map((item) => [item, "image"]) : [];
-    const videoItems = Array.isArray(output?.videos) ? output.videos.map((item) => [item, "video"]) : [];
+    const imageItems = Array.isArray(output?.images)
+      ? output.images.map((item) => [item, "image"])
+      : [];
+    const videoItems = Array.isArray(output?.videos)
+      ? output.videos.map((item) => [item, "video"])
+      : [];
     for (const [item, collectionType] of [...imageItems, ...videoItems]) {
       const filename = typeof item?.filename === "string" ? item.filename : "";
       if (!filename) continue;
       const params = new URLSearchParams({
         filename,
         subfolder: item.subfolder || "",
-        type: item.type || "output"
+        type: item.type || "output",
       });
       const isVideo = collectionType === "video" || /\.(mp4|webm|mov|mkv)$/i.test(filename);
-      urls.push({ url: `/comfy/view?${params}`, thumbnailUrl: isVideo ? undefined : `/comfy/thumb?${params}`, filename, type: isVideo ? "video" : "image" });
+      urls.push({
+        url: `/comfy/view?${params}`,
+        thumbnailUrl: isVideo ? undefined : `/comfy/thumb?${params}`,
+        filename,
+        type: isVideo ? "video" : "image",
+      });
     }
   }
   return urls;
@@ -783,34 +965,61 @@ export function outputsFrom(history) {
  * "prompt" text chunk ComfyUI writes into every PNG it saves.
  */
 export function describeComfyGraph(graph = {}) {
-  const textNodes = Object.values(graph || {}).filter((node) => node?.class_type === "CLIPTextEncode");
+  const textNodes = Object.values(graph || {}).filter(
+    (node) => node?.class_type === "CLIPTextEncode",
+  );
   const prompt = textNodes[0]?.inputs?.text || "";
   const negative = textNodes[1]?.inputs?.text || "";
-  const latentNode = Object.values(graph || {}).find((node) => /Latent/i.test(node?.class_type || "") && (node?.inputs?.width || node?.inputs?.height));
+  const latentNode = Object.values(graph || {}).find(
+    (node) =>
+      /Latent/i.test(node?.class_type || "") && (node?.inputs?.width || node?.inputs?.height),
+  );
   const latent = latentNode?.inputs || {};
-  const modelLoader = Object.values(graph || {}).find((node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name);
+  const modelLoader = Object.values(graph || {}).find(
+    (node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name,
+  );
   const model = modelLoader?.inputs?.unet_name || modelLoader?.inputs?.ckpt_name || "";
   return {
     prompt: typeof prompt === "string" ? prompt : "",
     negative: typeof negative === "string" ? negative : "",
     width: Number(latent.width || 0),
     height: Number(latent.height || 0),
-    model: typeof model === "string" ? model : ""
+    model: typeof model === "string" ? model : "",
   };
 }
 
 /** A stored `assistant` record (assistant-routes.js assistantRecord), kept to its known fields, or null. */
 /** The chat that asked for a run: its conversation id, as LibreChat names it (X-Studio-Conversation-Id). */
 export function storedChatRecord(value) {
-  const id = value && typeof value === "object" && !Array.isArray(value) && typeof value.conversationId === "string" ? value.conversationId.trim() : "";
+  const id =
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value.conversationId === "string"
+      ? value.conversationId.trim()
+      : "";
   return id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id) ? { conversationId: id } : null;
 }
 
 export function storedAssistantRecord(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.preset !== "string" || !/^[a-z-]{1,40}$/.test(value.preset)) return null;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    typeof value.preset !== "string" ||
+    !/^[a-z-]{1,40}$/.test(value.preset)
+  )
+    return null;
   const model = typeof value.model === "string" ? value.model.slice(0, 200) : "";
-  const loras = Array.isArray(value.lorasSuggested) ? value.lorasSuggested.filter((name) => typeof name === "string" && name).slice(0, 8) : [];
-  return { preset: value.preset, ...(model ? { model } : {}), source: value.source === "chat" ? "chat" : "ui", ...(loras.length ? { lorasSuggested: loras } : {}) };
+  const loras = Array.isArray(value.lorasSuggested)
+    ? value.lorasSuggested.filter((name) => typeof name === "string" && name).slice(0, 8)
+    : [];
+  return {
+    preset: value.preset,
+    ...(model ? { model } : {}),
+    source: value.source === "chat" ? "chat" : "ui",
+    ...(loras.length ? { lorasSuggested: loras } : {}),
+  };
 }
 
 export function recordsFromComfyHistory(history) {
@@ -821,31 +1030,45 @@ export function recordsFromComfyHistory(history) {
     const textNodes = Object.values(graph).filter((node) => node?.class_type === "CLIPTextEncode");
     const prompt = textNodes[0]?.inputs?.text || "";
     const negative = textNodes[1]?.inputs?.text || "";
-    const latentNode = Object.values(graph).find((node) => /Latent/i.test(node?.class_type || "") && (node?.inputs?.width || node?.inputs?.height));
+    const latentNode = Object.values(graph).find(
+      (node) =>
+        /Latent/i.test(node?.class_type || "") && (node?.inputs?.width || node?.inputs?.height),
+    );
     const latent = latentNode?.inputs || {};
-    const modelLoader = Object.values(graph).find((node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name);
+    const modelLoader = Object.values(graph).find(
+      (node) => node?.inputs?.unet_name || node?.inputs?.ckpt_name,
+    );
     const model = modelLoader?.inputs?.unet_name || modelLoader?.inputs?.ckpt_name || "";
-    const loras = Object.values(graph).flatMap((node) => {
-      if (node?.class_type === "LoraLoader" && node?.inputs?.lora_name) {
-        return [{
-          name: node.inputs.lora_name,
-          enabled: true,
-          strength: Number(node.inputs.strength_model ?? node.inputs.strength_clip ?? 0.7)
-        }];
-      }
-      if (node?.class_type !== "Power Lora Loader (rgthree)") return [];
-      return Object.entries(node.inputs || {})
-        .filter(([key, value]) => /^lora_\d+$/i.test(key) && value?.on && value?.lora)
-        .map(([, value]) => ({
-          name: value.lora,
-          enabled: true,
-          strength: Number(value.strength ?? 0.7)
-        }));
-    }).slice(0, 8);
+    const loras = Object.values(graph)
+      .flatMap((node) => {
+        if (node?.class_type === "LoraLoader" && node?.inputs?.lora_name) {
+          return [
+            {
+              name: node.inputs.lora_name,
+              enabled: true,
+              strength: Number(node.inputs.strength_model ?? node.inputs.strength_clip ?? 0.7),
+            },
+          ];
+        }
+        if (node?.class_type !== "Power Lora Loader (rgthree)") return [];
+        return Object.entries(node.inputs || {})
+          .filter(([key, value]) => /^lora_\d+$/i.test(key) && value?.on && value?.lora)
+          .map(([, value]) => ({
+            name: value.lora,
+            enabled: true,
+            strength: Number(value.strength ?? 0.7),
+          }));
+      })
+      .slice(0, 8);
     const rawCreatedAt = Number(item?.prompt?.[3]?.create_time || Date.now());
-    const createdAtMs = rawCreatedAt > 0 && rawCreatedAt < 1e12 ? rawCreatedAt * 1000 : rawCreatedAt;
+    const createdAtMs =
+      rawCreatedAt > 0 && rawCreatedAt < 1e12 ? rawCreatedAt * 1000 : rawCreatedAt;
     // Smart upscale's copy belongs to its picture; recovered on its own it would be a second tile.
-    const own = Object.fromEntries(Object.entries(item?.outputs || {}).filter(([id]) => !(graph[id]?._meta?.studioUpscale || graph[id]?._meta?.heissUpscale)));
+    const own = Object.fromEntries(
+      Object.entries(item?.outputs || {}).filter(
+        ([id]) => !(graph[id]?._meta?.studioUpscale || graph[id]?._meta?.heissUpscale),
+      ),
+    );
     for (const output of outputsFrom({ outputs: own })) {
       const record = {
         ...output,
@@ -862,9 +1085,11 @@ export function recordsFromComfyHistory(history) {
         model: saved.model || model,
         settings: saved.settings || (loras.length ? { loras } : {}),
         // How the prompt was written (the prompt assistant, in Studio or chat) survives a rebuild from history.
-        ...(storedAssistantRecord(saved.assistant) ? { assistant: storedAssistantRecord(saved.assistant) } : {}),
+        ...(storedAssistantRecord(saved.assistant)
+          ? { assistant: storedAssistantRecord(saved.assistant) }
+          : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
-        ...(typeof saved.ownerId === "string" && saved.ownerId ? { ownerId: saved.ownerId } : {})
+        ...(typeof saved.ownerId === "string" && saved.ownerId ? { ownerId: saved.ownerId } : {}),
       };
       if (hasExistingOutputFile(record)) records.push(record);
     }
@@ -898,7 +1123,7 @@ export function makePendingItems(id, body) {
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
     ...(body.chat ? { chat: body.chat } : {}),
-    ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {})
+    ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
   }));
 }
 
@@ -916,9 +1141,11 @@ export function dedupeGallery(items) {
 export function cleanupGalleryState(jobs) {
   // Called on every gallery page: most of the time there is nothing pending
   // and no upscale running, and one pass says so without building anything.
-  if (!gallery.some((item) => item.status === "pending" || item.upscale?.status === "running")) return;
+  if (!gallery.some((item) => item.status === "pending" || item.upscale?.status === "running"))
+    return;
   const before = gallery;
-  const runKey = (item) => `${item.jobId || ""}|${item.prompt || ""}|${item.model || ""}|${item.width || ""}|${item.height || ""}`;
+  const runKey = (item) =>
+    `${item.jobId || ""}|${item.prompt || ""}|${item.model || ""}|${item.width || ""}|${item.height || ""}`;
   const doneJobs = new Set();
   const doneKeys = new Set();
   for (const item of gallery) {
@@ -965,45 +1192,76 @@ export function generationSettings(body) {
     ...(body.variationCount ? { variationCount: Number(body.variationCount) } : {}),
     ...(body.duration ? { duration: Number(body.duration) } : {}),
     ...(body.resolution ? { resolution: String(body.resolution) } : {}),
-    ...(!grok ? {
-      steps: Number(body.steps || 0),
-      // A distilled profile takes no CFG (server/validation.js), so none is recorded for it.
-      ...(body.cfg !== undefined && body.cfg !== null ? { cfg: Number(body.cfg || 0) } : {}),
-      sampler: body.sampler || "",
-      scheduler: body.scheduler || ""
-    } : {}),
+    ...(!grok
+      ? {
+          steps: Number(body.steps || 0),
+          // A distilled profile takes no CFG (server/validation.js), so none is recorded for it.
+          ...(body.cfg !== undefined && body.cfg !== null ? { cfg: Number(body.cfg || 0) } : {}),
+          sampler: body.sampler || "",
+          scheduler: body.scheduler || "",
+        }
+      : {}),
     seed: body.seed || "Random",
     ...(body.seedRandom ? { seedRandom: true } : {}),
     // An imported workflow's model is the workflow; this is the file it loaded.
-    ...(body.modelName && String(body.model || "").startsWith("custom:") ? { modelName: String(body.modelName) } : {}),
+    ...(body.modelName && String(body.model || "").startsWith("custom:")
+      ? { modelName: String(body.modelName) }
+      : {}),
     textEncoder: body.textEncoder || "",
-    ...(Array.isArray(body.encoders) && body.encoders.length > 1 ? { textEncoders: body.encoders.map(String) } : {}),
+    ...(Array.isArray(body.encoders) && body.encoders.length > 1
+      ? { textEncoders: body.encoders.map(String) }
+      : {}),
     vae: body.vae || "",
     clipType: body.clipType || "",
     weightDtype: body.weightDtype || "",
     referenceImageName: body.startImageName || "",
     autoResizeInputs: body.autoResizeInputs !== false,
-    ...(body.requestedSize ? { width: body.requestedSize.width, height: body.requestedSize.height } : {}),
-    referenceAssets: Array.isArray(body.referenceAssets) ? body.referenceAssets.map(({ slot, assetId, source, name }) => ({ slot, assetId, source, name })) : [],
+    ...(body.requestedSize
+      ? { width: body.requestedSize.width, height: body.requestedSize.height }
+      : {}),
+    referenceAssets: Array.isArray(body.referenceAssets)
+      ? body.referenceAssets.map(({ slot, assetId, source, name }) => ({
+          slot,
+          assetId,
+          source,
+          name,
+        }))
+      : [],
     // A first reference that only guided: kept, so a retry runs it the same way (Edit is the default).
-    ...(body.referenceRole === "reference" && Array.isArray(body.referenceAssets) && body.referenceAssets.length ? { referenceRole: "reference" } : {}),
-    promptPolicy: body.promptPolicy || null
+    ...(body.referenceRole === "reference" &&
+    Array.isArray(body.referenceAssets) &&
+    body.referenceAssets.length
+      ? { referenceRole: "reference" }
+      : {}),
+    promptPolicy: body.promptPolicy || null,
   };
   const loras = Array.isArray(body.loras)
-    ? body.loras.filter((item) => item?.enabled !== false && item?.name).slice(0, 8).map((item) => ({
-      name: String(item.name || ""),
-      enabled: true,
-      strength: Number(item.strength ?? 0.7)
-    }))
+    ? body.loras
+        .filter((item) => item?.enabled !== false && item?.name)
+        .slice(0, 8)
+        .map((item) => ({
+          name: String(item.name || ""),
+          enabled: true,
+          strength: Number(item.strength ?? 0.7),
+        }))
     : [];
   if (loras.length) settings.loras = loras;
   if (body.kind === "image") {
     settings.count = Number(body.count || 1);
-    if ((body.startImage || body.startImageId) && !providerModel.endsWith(".rad")) settings.denoise = Number(body.denoise || 0);
+    if ((body.startImage || body.startImageId) && !providerModel.endsWith(".rad"))
+      settings.denoise = Number(body.denoise || 0);
     // Where the painted part sat in the reference; the mask itself is never kept.
     if (body.inpaint?.box) {
-      settings.inpaint = { box: body.inpaint.box, strength: body.inpaint.strength, feather: body.inpaint.feather };
-      if (body.inpaint.image?.width) settings.inpaint.image = { width: body.inpaint.image.width, height: body.inpaint.image.height };
+      settings.inpaint = {
+        box: body.inpaint.box,
+        strength: body.inpaint.strength,
+        feather: body.inpaint.feather,
+      };
+      if (body.inpaint.image?.width)
+        settings.inpaint.image = {
+          width: body.inpaint.image.width,
+          height: body.inpaint.image.height,
+        };
       // The reference's id lets the live preview draw over the original.
       if (body.inpaint.referenceId) settings.inpaint.referenceId = body.inpaint.referenceId;
     }
@@ -1023,44 +1281,54 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   const ownerId = body.ownerId || job.ownerId || "";
   const ownJob = (item) => item.jobId === id && (item.ownerId || "") === ownerId;
   const existing = gallery.filter(ownJob);
-  const completed = await Promise.all(outputs.map(async (item, index) => {
-    let videoSize = null;
-    if (item.type === "video" && typeof item.url === "string" && item.url.startsWith("/comfy/view?")) {
-      const params = new URLSearchParams(item.url.slice(item.url.indexOf("?") + 1));
-      const file = localOutputFile(params.get("filename") || "", params.get("subfolder") || "", params.get("type") || "output");
-      if (file) {
-        const { probeVideo } = await import('./video-previews.js');
-        videoSize = await probeVideo(file);
+  const completed = await Promise.all(
+    outputs.map(async (item, index) => {
+      let videoSize = null;
+      if (
+        item.type === "video" &&
+        typeof item.url === "string" &&
+        item.url.startsWith("/comfy/view?")
+      ) {
+        const params = new URLSearchParams(item.url.slice(item.url.indexOf("?") + 1));
+        const file = localOutputFile(
+          params.get("filename") || "",
+          params.get("subfolder") || "",
+          params.get("type") || "output",
+        );
+        if (file) {
+          const { probeVideo } = await import("./video-previews.js");
+          videoSize = await probeVideo(file);
+        }
       }
-    }
-    return {
-      ...item,
-      id: item.url,
-      jobId: id,
-      ...(ownerId ? { ownerId } : {}),
-      status,
-      prompt: body.prompt || "",
-      negative: body.negative || "",
-      filename: title || item.filename,
-      createdAt: existing[index]?.createdAt || new Date().toISOString(),
-      durationMs,
-      // How long ComfyUI itself took, without waiting in its queue.
-      ...(job.timing ? { timing: job.timing } : {}),
-      // An inpaint result is the whole original picture, whatever size the crop sampled at.
-      width: Number(videoSize?.width || body.inpaint?.image?.width || body.width || 0),
-      height: Number(videoSize?.height || body.inpaint?.image?.height || body.height || 0),
-      model: body.model || "",
-      referenceImage: body.startImageId || "",
-      referenceImageName: body.startImageName || "",
-      startImageId: body.startImageId || "",
-      settings: generationSettings(body),
-      ...(body.assistant ? { assistant: body.assistant } : {}),
-      ...(body.chat ? { chat: body.chat } : {}),
-      outputName: item.filename,
-      promptId: job.promptId || "",
-      index
-    };
-  }));
+      return {
+        ...item,
+        id: item.url,
+        jobId: id,
+        ...(ownerId ? { ownerId } : {}),
+        status,
+        prompt: body.prompt || "",
+        negative: body.negative || "",
+        filename: title || item.filename,
+        createdAt: existing[index]?.createdAt || new Date().toISOString(),
+        durationMs,
+        // How long ComfyUI itself took, without waiting in its queue.
+        ...(job.timing ? { timing: job.timing } : {}),
+        // An inpaint result is the whole original picture, whatever size the crop sampled at.
+        width: Number(videoSize?.width || body.inpaint?.image?.width || body.width || 0),
+        height: Number(videoSize?.height || body.inpaint?.image?.height || body.height || 0),
+        model: body.model || "",
+        referenceImage: body.startImageId || "",
+        referenceImageName: body.startImageName || "",
+        startImageId: body.startImageId || "",
+        settings: generationSettings(body),
+        ...(body.assistant ? { assistant: body.assistant } : {}),
+        ...(body.chat ? { chat: body.chat } : {}),
+        outputName: item.filename,
+        promptId: job.promptId || "",
+        index,
+      };
+    }),
+  );
   let nextIndex = 0;
   const replaced = [];
   gallery.forEach((item) => {
@@ -1078,7 +1346,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   if (status === "done") {
     markFreshOutputs(completed);
     let cleared = false;
-    for (const item of completed) cleared = hiddenGalleryIds.delete(markerOf(galleryKey(item))) || cleared;
+    for (const item of completed)
+      cleared = hiddenGalleryIds.delete(markerOf(galleryKey(item))) || cleared;
     if (cleared) saveHiddenGalleryIds();
   }
   setGallery(dedupeGallery(replaced).slice(0, galleryLimit));

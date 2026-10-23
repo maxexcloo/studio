@@ -26,14 +26,12 @@ export function requireLocal(req, res) {
  */
 export function requireAdmin(req, res) {
   if (canAdmin(req)) return true;
-  res
-    .status(403)
-    .json({
-      ok: false,
-      reason: "computer-only",
-      error:
-        "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection.",
-    });
+  res.status(403).json({
+    ok: false,
+    reason: "computer-only",
+    error:
+      "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection.",
+  });
   return false;
 }
 

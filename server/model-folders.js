@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -93,10 +92,9 @@ const layouts = {
 
 /* ------------------------------------------------------------ helpers */
 
-// .native: on Windows it resolves mapped and subst drives the way Python's realpath does.
 function realpath(dir) {
   try {
-    return fs.realpathSync.native(dir);
+    return fs.realpathSync(dir);
   } catch {
     return path.resolve(dir);
   }
@@ -188,9 +186,8 @@ function modelFiles(dir, limit = 400) {
   return { files: found, bytes };
 }
 
-/** A path shortened with ~ for home. Not on Windows, where people do not read `~\` as their user folder. */
-export function tildePath(dir, home = os.homedir(), platform = process.platform) {
-  if (platform === "win32") return dir;
+/** A native path shortened with ~ for home. */
+export function tildePath(dir, home = os.homedir()) {
   return dir === home || dir.startsWith(`${home}/`) ? `~${dir.slice(home.length)}` : dir;
 }
 
@@ -214,7 +211,7 @@ function argValues(argv, flag) {
 
 /**
  * Where ComfyUI reads models from and which config file it would read a new
- * folder from: a file it was started with (the Desktop app does this), else
+ * folder from: a file it was started with, else
  * extra_model_paths.yaml in its own folder, which ComfyUI always loads.
  */
 export async function comfyModelSetup() {
@@ -235,36 +232,22 @@ export async function comfyModelSetup() {
       .map((dir) => path.dirname(dir))
       .find((dir) => fs.existsSync(path.join(dir, "main.py"))) || "";
   const baseDir = argValues(argv, "--base-directory")[0] || "";
-  // ComfyUI opens a relative config from its working folder. The portable build's
-  // launcher runs it from the folder above ComfyUI, next to python_embeded.
-  const portable =
-    root &&
-    ["python_embeded", "python_embedded"].some((name) =>
-      isDir(path.join(path.dirname(root), name)),
-    );
-  const workingDir = portable ? path.dirname(root) : root || baseDir || ".";
+  const workingDir = root || baseDir || ".";
   const configs = argValues(argv, "--extra-model-paths-config").map((file) =>
     path.resolve(workingDir, file),
   );
   const rootConfig = root ? path.join(root, "extra_model_paths.yaml") : "";
-  // Prefer a file ComfyUI was pointed at (the Desktop app's own), then its folder's, if we may write there.
+  // Prefer the configured file, then ComfyUI's own file, where writable.
   const configPath =
     [...configs, rootConfig].find((file) => file && canWrite(file)) || configs[0] || rootConfig;
   return { kinds, root, configPath, reachable: Boolean(root || configs.length) };
 }
 
-/**
- * Whether Studio can write the file and its backup next to it. On Windows
- * accessSync(W_OK) passes for every folder (it only reads the read-only flag),
- * so the folder is tested by making and removing a file in it.
- */
+/** Whether the native filesystem permits writing the config and a backup beside it. */
 function canWrite(file) {
   try {
-    if (fs.existsSync(file)) fs.closeSync(fs.openSync(file, "r+"));
-    const probe = path.join(path.dirname(file), `.studio-write-test-${process.pid}`);
-    fs.rmSync(probe, { force: true });
-    fs.closeSync(fs.openSync(probe, "wx"));
-    fs.rmSync(probe, { force: true });
+    if (fs.existsSync(file)) fs.accessSync(file, fs.constants.W_OK);
+    fs.accessSync(path.dirname(file), fs.constants.W_OK);
     return true;
   } catch {
     return false;
@@ -308,55 +291,7 @@ function layoutFromNames(names, knownKinds) {
 }
 
 const skipNames =
-  /^(Library|Applications|System|node_modules|Pictures|Music|Movies|Photos Library\.photoslibrary|AppData|\$Recycle\.Bin|Windows|Program Files.*|ProgramData|proc|sys|dev|snap|venv|\.venv|site-packages|__pycache__)$/i;
-
-// Below C:\'s second level only folders named like an AI install are opened, so
-// C:\ComfyUI_windows_portable\ComfyUI\models is found without walking all of C:.
-const aiNames =
-  /comfy|stable|diffusion|models?$|^ai$|^sd|forge|webui|matrix|invoke|fooocus|swarm|a1111|automatic/i;
-
-/**
- * Drive letters other than C: that are local disks. Network drives (DriveType 4)
- * and optical drives (5) are skipped: a disconnected NAS mapping can take about
- * 20 s per call. Asked of PowerShell (wmic is gone from new Windows) with a
- * time limit; without an answer, only letters that answer quickly are used.
- */
-let driveCache = null;
-async function localDrives() {
-  if (driveCache && Date.now() - driveCache.at < 60000) return driveCache.letters;
-  const script =
-    'Get-CimInstance Win32_LogicalDisk | ForEach-Object { "$($_.DeviceID) $($_.DriveType)" }';
-  const answer = await new Promise((resolve) => {
-    execFile(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", script],
-      { timeout: 5000, windowsHide: true },
-      (error, stdout) => resolve(error ? null : String(stdout)),
-    );
-  });
-  let letters;
-  if (answer) {
-    letters = [...answer.matchAll(/^([A-Z]):\s+(\d+)\s*$/gim)]
-      .filter(([, , type]) => !["4", "5"].includes(type))
-      .map(([, letter]) => letter.toUpperCase());
-  } else {
-    const probes = [..."DEFGHIJKLMNOPQRSTUVWXYZ"].map(async (letter) => {
-      const ok = await withTimeout(
-        fs.promises.stat(`${letter}:\\`).then(
-          (stat) => stat.isDirectory(),
-          () => false,
-        ),
-        1000,
-        false,
-      );
-      return ok ? letter : "";
-    });
-    letters = (await Promise.all(probes)).filter(Boolean);
-  }
-  letters = letters.filter((letter) => letter !== "C");
-  driveCache = { at: Date.now(), letters };
-  return letters;
-}
+  /^(Library|Applications|System|node_modules|Pictures|Music|Movies|Photos Library\.photoslibrary|proc|sys|dev|snap|venv|\.venv|site-packages|__pycache__)$/i;
 
 /** Folders worth a look: shared spots other apps use, then a shallow walk of home and the other drives. */
 async function candidateRoots(home, drivesToo = true) {
@@ -368,30 +303,6 @@ async function candidateRoots(home, drivesToo = true) {
     const support = path.join(home, "Library", "Application Support");
     add(path.join(support, "StabilityMatrix", "Models"), "stability");
     add(path.join(support, "StabilityMatrix", "Data", "Models"), "stability");
-    try {
-      // The ComfyUI Desktop app keeps its models under a base_path of its own choosing.
-      const text = fs.readFileSync(
-        path.join(support, "ComfyUI", "extra_models_config.yaml"),
-        "utf8",
-      );
-      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm))
-        add(path.join(match[1], "models"), "desktop");
-    } catch {
-      /* no Desktop app */
-    }
-  } else if (process.platform === "win32") {
-    const appData = process.env.APPDATA || path.join(home, "AppData", "Roaming");
-    add(path.join(appData, "StabilityMatrix", "Models"), "stability");
-    try {
-      const text = fs.readFileSync(
-        path.join(appData, "ComfyUI", "extra_models_config.yaml"),
-        "utf8",
-      );
-      for (const match of text.matchAll(/^\s*base_path:\s*['"]?([^'"\n]+?)['"]?\s*$/gm))
-        add(path.join(match[1], "models"), "desktop");
-    } catch {
-      /* no Desktop app */
-    }
   } else {
     add(path.join(home, ".config", "StabilityMatrix", "Models"), "stability");
   }
@@ -409,11 +320,6 @@ async function candidateRoots(home, drivesToo = true) {
       if (realpath(dir) !== "/") walkRoots.push({ dir, depth: 3, source: "drive" });
     }
   }
-  if (process.platform === "win32" && drivesToo) {
-    for (const letter of await localDrives())
-      walkRoots.push({ dir: `${letter}:\\`, depth: 3, source: "drive" });
-    walkRoots.push({ dir: "C:\\", depth: 3, narrowFrom: 3, source: "drive" });
-  }
   return { explicit, walkRoots };
 }
 
@@ -428,7 +334,6 @@ export async function findModelFolders(
   { home = os.homedir(), drives = true, budget = 6000, deadline } = {},
 ) {
   const { explicit, walkRoots } = await candidateRoots(home, drives);
-  // Counted from here, so asking Windows for its drives does not use up the walk's time.
   const until = deadline ?? Date.now() + 4000;
   const found = new Map();
   // Returns the folder's subfolder names when it is not a models folder, for the walk to go on.
@@ -443,7 +348,7 @@ export async function findModelFolders(
   };
   for (const { dir, source } of explicit) await consider(dir, source);
   let visited = 0;
-  for (const { dir: start, depth: maxDepth, narrowFrom = Infinity, source } of walkRoots) {
+  for (const { dir: start, depth: maxDepth, source } of walkRoots) {
     const queue = [{ dir: start, depth: 0 }];
     while (queue.length && visited < budget && Date.now() < until) {
       const { dir, depth } = queue.shift();
@@ -452,7 +357,7 @@ export async function findModelFolders(
       const names = depth > 0 ? await consider(dir, source) : await subdirsAsync(dir);
       if (!names || depth >= maxDepth) continue;
       for (const name of names) {
-        if (skipNames.test(name) || (depth + 1 >= narrowFrom && !aiNames.test(name))) continue;
+        if (skipNames.test(name)) continue;
         queue.push({ dir: path.join(dir, name), depth: depth + 1 });
       }
     }
@@ -468,7 +373,7 @@ const endMark = "# <<< Studio";
 /** Sections Studio added before, by the folder they point at. */
 export function studioModelSections(text = "") {
   const sections = [];
-  // \r?: Notepad and other Windows editors save CRLF.
+  // Imported configuration may use CRLF line endings.
   const pattern = /^# >>> Added by Studio: (.+?)\r?\n([\s\S]*?)^# <<< Studio\s*$/gm;
   for (const match of text.matchAll(pattern))
     sections.push({ path: match[1].trim(), block: match[0] });
@@ -541,7 +446,6 @@ export async function modelFolderReport({ local = true, scan = {} } = {}) {
     return { ok: true, local: false, folders: [], linked: [], configPath: setup.configPath };
   }
   const knownKinds = Object.keys(setup.kinds);
-  // Keyed without case on Windows: the yaml may say d:\ai\models for D:\AI\Models.
   const read = new Set(
     Object.values(setup.kinds)
       .flat()
@@ -629,7 +533,6 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
     );
   const chosen = [];
   for (const wanted of paths.map(String)) {
-    // The same folder can come back spelled differently (case, 8.3 short names on Windows).
     const folder = report.folders.find(
       (item) => item.path === wanted || samePath(item.path, realpath(wanted)),
     );
@@ -655,7 +558,7 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   } catch {
     /* a new file */
   }
-  // Keep the file's own line endings (a Windows editor saves CRLF).
+  // Preserve the imported file's line endings.
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const already = new Set(studioModelSections(text).map((section) => pathKey(section.path)));
   const backup = text ? `${file}.heiss-backup` : "";
@@ -672,7 +575,6 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   }
   if (!added.length) return { ok: true, added, configPath: file, backup: "" };
   try {
-    // Inside the try, so a folder Windows will not let us write to gets the friendly message too.
     if (backup) fs.copyFileSync(file, backup);
     fs.writeFileSync(file, next);
   } catch (error) {

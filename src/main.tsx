@@ -1,28 +1,29 @@
-// First: browser storage under its old HEISS UI names moves to Studio's before anything reads it.
-import "./app/storageMigration";
-import "./app/domGuard";
-import { createRoot } from "react-dom/client";
-import { MotionConfig } from "framer-motion";
+import "@fontsource-variable/geist";
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
 import "./styles.css";
+import { createRoot } from "react-dom/client";
+import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter } from "react-router";
+import { App } from "./App";
+import { cssVariablesResolver, theme } from "./theme";
 
-import { useStudio } from './app/useStudio';
-import { StudioView } from './app/StudioView';
-import { DeviceGate } from './app/DeviceGate';
-import { CrashBoundary } from './app/CrashScreen';
-import { TooltipProvider } from './components/ui/tooltip';
-
-function App() {
-  const { view, confirmationDialog } = useStudio();
-  return (
-    <>
-      <StudioView view={view} />
-      {confirmationDialog}
-    </>
-  );
-}
-
-// Other devices sign in before the studio loads (DeviceGate.tsx).
-// A render error anywhere shows the crash screen (with Reload and Report) instead of a blank page.
-// One tooltip provider for the whole app holds the shared hover delay and lets neighbours open at once.
-// Framer Motion follows the system reduced-motion setting, as the CSS animations do.
-createRoot(document.getElementById("root")!).render(<MotionConfig reducedMotion="user"><TooltipProvider><CrashBoundary><DeviceGate><App /></DeviceGate></CrashBoundary></TooltipProvider></MotionConfig>);
+const client = new QueryClient({
+  defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
+});
+createRoot(document.getElementById("root")!).render(
+  <MantineProvider
+    theme={theme}
+    cssVariablesResolver={cssVariablesResolver}
+    defaultColorScheme="dark"
+  >
+    <QueryClientProvider client={client}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+      <Notifications position="top-right" />
+    </QueryClientProvider>
+  </MantineProvider>,
+);

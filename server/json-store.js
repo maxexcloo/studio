@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Crash-safe JSON files for everything Studio remembers.
+ * Atomic byte writes and JSON recovery for Studio files.
  *
  * A plain writeFileSync truncates the file first, so a crash, a full disk or a
  * killed process mid-write leaves half a file. Every loader here treats an
@@ -14,37 +14,6 @@ import path from "node:path";
  * `.bak`. Reads fall back to that copy, and a corrupt file is set aside as
  * `.corrupt-<time>` instead of being overwritten, so nothing is lost silently.
  */
-
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-
-/**
- * Windows can refuse a rename for a moment while antivirus or an indexer holds the file.
- * The defaults wait about 0.3 s in total; `retries` and `step` (ms, growing linearly) stretch that.
- */
-export function renameWithRetry(from, to, { retries = 5, step = 20 } = {}) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      fs.renameSync(from, to);
-      return;
-    } catch (error) {
-      if (attempt >= retries || !["EPERM", "EACCES", "EBUSY"].includes(error.code)) throw error;
-      sleepSync(step * (attempt + 1));
-    }
-  }
-}
-
-/** renameWithRetry that waits without holding up the server, for files nothing else races to write. */
-export async function renameWithRetryAsync(from, to, { retries = 5, step = 20 } = {}) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await fs.promises.rename(from, to);
-      return;
-    } catch (error) {
-      if (attempt >= retries || !["EPERM", "EACCES", "EBUSY"].includes(error.code)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, step * (attempt + 1)));
-    }
-  }
-}
 
 function parseFile(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
@@ -70,7 +39,7 @@ export function readJsonFile(file) {
       backup = undefined;
     }
     try {
-      renameWithRetry(file, `${file}.corrupt-${Date.now()}`);
+      fs.renameSync(file, `${file}.corrupt-${Date.now()}`);
     } catch {
       // Leave it in place; the next write replaces it either way.
     }
@@ -96,27 +65,69 @@ const temporaryFor = (file) => `${file}.tmp-${process.pid}-${(temporaryCount += 
  * Either form reads back the same.
  */
 export function writeJsonFile(file, value, { mode, compact = false } = {}) {
+  writeBytesFile(file, compact ? JSON.stringify(value) : JSON.stringify(value, null, 2), {
+    mode,
+    backup: true,
+  });
+}
+
+/** Same-directory writes become visible only after the bytes and directory entry are durable. */
+export function writeBytesFile(file, bytes, { mode, backup = false } = {}) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temporary = temporaryFor(file);
-  const text = compact ? JSON.stringify(value) : JSON.stringify(value, null, 2);
-  const handle = fs.openSync(temporary, "w", mode);
   try {
-    fs.writeSync(handle, text);
-    fs.fsyncSync(handle);
-  } finally {
-    fs.closeSync(handle);
-  }
-  if (fs.existsSync(file)) {
-    // Every file here is only ever written this way, so the current one is whole.
-    // Copying (not parsing) keeps this cheap for a large gallery saved often.
+    const handle = fs.openSync(temporary, "wx", mode);
     try {
-      fs.copyFileSync(file, `${file}.bak`);
-      if (mode !== undefined) fs.chmodSync(`${file}.bak`, mode);
-    } catch {
-      // Keep the older backup.
+      fs.writeFileSync(handle, bytes);
+      fs.fsyncSync(handle);
+    } finally {
+      fs.closeSync(handle);
     }
+    if (backup && fs.existsSync(file)) {
+      try {
+        fs.copyFileSync(file, `${file}.bak`);
+        if (mode !== undefined) fs.chmodSync(`${file}.bak`, mode);
+      } catch {
+        /* Keep the older backup. */
+      }
+    }
+    fs.renameSync(temporary, file);
+    const directory = fs.openSync(path.dirname(file), "r");
+    try {
+      fs.fsyncSync(directory);
+    } finally {
+      fs.closeSync(directory);
+    }
+  } finally {
+    fs.rmSync(temporary, { force: true });
   }
-  renameWithRetry(temporary, file);
+}
+
+/** Validate completed media before replacement; reproducible caches can skip durability syncs. */
+export async function writeBytesFileAsync(file, bytes, { mode, validate, durable = true } = {}) {
+  await fs.promises.mkdir(path.dirname(file), { recursive: true });
+  const temporary = temporaryFor(file);
+  try {
+    const handle = await fs.promises.open(temporary, "wx", mode);
+    try {
+      await handle.writeFile(bytes);
+      if (durable) await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    if (validate) await validate(temporary);
+    await fs.promises.rename(temporary, file);
+    if (durable) {
+      const directory = await fs.promises.open(path.dirname(file), "r");
+      try {
+        await directory.sync();
+      } finally {
+        await directory.close();
+      }
+    }
+  } finally {
+    await fs.promises.rm(temporary, { force: true });
+  }
 }
 
 const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
@@ -178,13 +189,19 @@ export async function writeJsonFileAsync(
     if (!shouldCommit()) return false;
     if (backedUp) {
       try {
-        renameWithRetry(backupTemporary, `${file}.bak`);
+        fs.renameSync(backupTemporary, `${file}.bak`);
       } catch {
         // Keep the older backup.
       }
     }
-    renameWithRetry(temporary, file);
+    fs.renameSync(temporary, file);
     committed = true;
+    const directory = await fs.promises.open(path.dirname(file), "r");
+    try {
+      await directory.sync();
+    } finally {
+      await directory.close();
+    }
     return true;
   } finally {
     if (!committed) await fs.promises.rm(temporary, { force: true }).catch(() => {});

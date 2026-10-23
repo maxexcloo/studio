@@ -1,9 +1,23 @@
 import fs from "node:fs";
+import {
+  readRuntimeDocument,
+  usesRuntimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import crypto from "node:crypto";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
-import { accountRoles, builtInAccessProfiles, effectiveAccountAccess, migrateCloudModels, migrateFeatureOptions, normaliseAccessProfile, predatesCloudModels, validAccountKey } from "./account-policy.js";
+import {
+  accountRoles,
+  builtInAccessProfiles,
+  effectiveAccountAccess,
+  migrateCloudModels,
+  migrateFeatureOptions,
+  normaliseAccessProfile,
+  predatesCloudModels,
+  validAccountKey,
+} from "./account-policy.js";
 import { currentDataDir } from "./data-dir.js";
 
 const dataDir = currentDataDir();
@@ -14,26 +28,47 @@ const maxSessions = 500;
 const kdf = "scrypt-n32768-r8-p1";
 let cache;
 
-const emptyStore = () => ({ version: 1, accounts: [], profiles: {}, sessions: [], gatewayLinks: [], gatewayPending: [] });
+const emptyStore = () => ({
+  version: 1,
+  accounts: [],
+  profiles: {},
+  sessions: [],
+  gatewayLinks: [],
+  gatewayPending: [],
+});
 const maxPendingGatewayIdentities = 100;
-const validGatewayIdentity = (value) => typeof value === "string" && value.length > 0 && value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value);
+const validGatewayIdentity = (value) =>
+  typeof value === "string" &&
+  value.length > 0 &&
+  value.length <= 256 &&
+  !/[\x00-\x1f\x7f]/.test(value);
 const tokenHash = (token) => crypto.createHash("sha256").update(String(token)).digest("base64url");
 // Email addresses are valid usernames, so a verified sign-in can match them.
-const validUsername = (value) => /^[\p{L}\p{N}][\p{L}\p{N}._@+-]{1,127}$/u.test(String(value || "").trim());
-const usernameKey = (value) => String(value || "").trim().normalize("NFKC").toLocaleLowerCase("en-AU");
+const validUsername = (value) =>
+  /^[\p{L}\p{N}][\p{L}\p{N}._@+-]{1,127}$/u.test(String(value || "").trim());
+const usernameKey = (value) =>
+  String(value || "")
+    .trim()
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-AU");
 
 function readStore() {
   if (cache) return cache;
   try {
-    const saved = readJsonFile(storePath);
+    const saved = usesRuntimeDatabase(dataDir)
+      ? readRuntimeDocument(dataDir, "accounts")
+      : readJsonFile(storePath);
     cache = {
       ...emptyStore(),
       ...saved,
       accounts: Array.isArray(saved?.accounts) ? saved.accounts : [],
-      profiles: saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles) ? saved.profiles : {},
+      profiles:
+        saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles)
+          ? saved.profiles
+          : {},
       sessions: Array.isArray(saved?.sessions) ? saved.sessions : [],
       gatewayLinks: Array.isArray(saved?.gatewayLinks) ? saved.gatewayLinks : [],
-      gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : []
+      gatewayPending: Array.isArray(saved?.gatewayPending) ? saved.gatewayPending : [],
     };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
@@ -45,10 +80,20 @@ function readStore() {
 function saveStore({ scrubBackup = false } = {}) {
   const store = readStore();
   const now = Date.now();
-  store.sessions = store.sessions.filter((session) => Number(session.expiresAt) > now).slice(-maxSessions);
+  store.sessions = store.sessions
+    .filter((session) => Number(session.expiresAt) > now)
+    .slice(-maxSessions);
+  if (usesRuntimeDatabase(dataDir)) {
+    writeRuntimeDocument(dataDir, "accounts", store);
+    return;
+  }
   writeJsonFile(storePath, store, { mode: 0o600 });
   if (scrubBackup) writeJsonFile(storePath, store, { mode: 0o600 });
-  try { fs.chmodSync(storePath, 0o600); } catch { /* Windows keeps its own ACLs. */ }
+  try {
+    fs.chmodSync(storePath, 0o600);
+  } catch {
+    /* Windows keeps its own ACLs. */
+  }
 }
 
 export function resetAccountStoreForTests() {
@@ -59,9 +104,33 @@ export function accountStoreSnapshot() {
   const store = readStore();
   return {
     version: store.version,
-    accounts: store.accounts.map(({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity, pending, oidc }) => ({ id, username, displayName, role, accessProfileId, disabled, createdAt, identity, ...(pending ? { pending: true } : {}), ...(oidc ? { signInLinked: true } : {}) })),
+    accounts: store.accounts.map(
+      ({
+        id,
+        username,
+        displayName,
+        role,
+        accessProfileId,
+        disabled,
+        createdAt,
+        identity,
+        pending,
+        oidc,
+      }) => ({
+        id,
+        username,
+        displayName,
+        role,
+        accessProfileId,
+        disabled,
+        createdAt,
+        identity,
+        ...(pending ? { pending: true } : {}),
+        ...(oidc ? { signInLinked: true } : {}),
+      }),
+    ),
     profiles: structuredClone(store.profiles),
-    sessions: store.sessions.length
+    sessions: store.sessions.length,
   };
 }
 
@@ -89,7 +158,10 @@ export function migrateCloudModelAccess(cloudProfiles = []) {
   let changed = false;
   for (const [id, profile] of Object.entries(store.profiles)) {
     const next = migrateCloudModels(profile, cloudProfiles);
-    if (next !== profile) { store.profiles[id] = next; changed = true; }
+    if (next !== profile) {
+      store.profiles[id] = next;
+      changed = true;
+    }
   }
   if (changed) saveStore();
   return changed;
@@ -114,7 +186,8 @@ export function ensureBuiltInAccessProfiles() {
 export function migrateFeatureOptionAccess(globals = {}) {
   const store = readStore();
   if (store.featureOptionsMigrated) return false;
-  for (const [id, profile] of Object.entries(store.profiles)) store.profiles[id] = migrateFeatureOptions(profile, globals);
+  for (const [id, profile] of Object.entries(store.profiles))
+    store.profiles[id] = migrateFeatureOptions(profile, globals);
   store.featureOptionsMigrated = true;
   saveStore();
   return true;
@@ -159,11 +232,12 @@ export function setGatewayAdminTools(on) {
 }
 
 /** The default access profile a new self-arriving account starts on now, or "" when it waits. */
-const startingProfileId = () => requireApproval() ? "" : defaultAccessProfileId();
+const startingProfileId = () => (requireApproval() ? "" : defaultAccessProfileId());
 
 export function setDefaultAccessProfile(profileId) {
   const store = readStore();
-  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId])) throw new Error("Choose an existing group");
+  if (profileId !== "" && (!validAccountKey(profileId) || !store.profiles[profileId]))
+    throw new Error("Choose an existing group");
   if (profileId) store.defaultAccessProfileId = profileId;
   else delete store.defaultAccessProfileId;
   saveStore();
@@ -177,11 +251,21 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
   const existing = stored?.generationProfiles || [];
   const cloud = new Set(cloudProfiles);
   // Cloud profiles follow Cloud Models, never a grant of their own.
-  const profile = normaliseAccessProfile({ ...input, generationProfiles: Array.isArray(input?.generationProfiles) ? input.generationProfiles.filter((id) => !cloud.has(id)) : [], retiredCloudGrants: stored?.retiredCloudGrants }, [...availableProfiles, ...existing].filter((id) => !cloud.has(id)));
+  const profile = normaliseAccessProfile(
+    {
+      ...input,
+      generationProfiles: Array.isArray(input?.generationProfiles)
+        ? input.generationProfiles.filter((id) => !cloud.has(id))
+        : [],
+      retiredCloudGrants: stored?.retiredCloudGrants,
+    },
+    [...availableProfiles, ...existing].filter((id) => !cloud.has(id)),
+  );
   if (!profile.id) throw new Error("Choose a valid profile ID.");
   if (!profile.name) throw new Error("Enter a name for this group");
   // A profile that could not be settled yet keeps its old cloud grants unless this save turns Cloud Models on.
-  if (stored && predatesCloudModels(stored) && !profile.features.cloudModels) delete profile.features.cloudModels;
+  if (stored && predatesCloudModels(stored) && !profile.features.cloudModels)
+    delete profile.features.cloudModels;
   readStore().profiles[profile.id] = profile;
   saveStore();
   return structuredClone(profile);
@@ -189,9 +273,12 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
 
 export function assignAccessProfile(accountId, profileId) {
   const store = readStore();
-  const account = store.accounts.find((item) => item.id === accountId && item.role === accountRoles.user);
+  const account = store.accounts.find(
+    (item) => item.id === accountId && item.role === accountRoles.user,
+  );
   if (!account) throw new Error("That ordinary user account was not found.");
-  if (!validAccountKey(profileId) || !store.profiles[profileId]) throw new Error("Choose an existing group");
+  if (!validAccountKey(profileId) || !store.profiles[profileId])
+    throw new Error("Choose an existing group");
   account.accessProfileId = profileId;
   // Assigning a profile is how an administrator approves a pending sign-in.
   delete account.pending;
@@ -199,7 +286,15 @@ export function assignAccessProfile(accountId, profileId) {
   return { id: account.id, accessProfileId: account.accessProfileId };
 }
 
-export async function createLocalAccount({ username, displayName = "", password, role = accountRoles.user, accessProfileId = "", identity = null, onlyIfEmpty = false } = {}) {
+export async function createLocalAccount({
+  username,
+  displayName = "",
+  password,
+  role = accountRoles.user,
+  accessProfileId = "",
+  identity = null,
+  onlyIfEmpty = false,
+} = {}) {
   const key = usernameKey(username);
   // Without a choice, an ordinary account starts on the default access profile.
   if (role === accountRoles.user && !accessProfileId) accessProfileId = defaultAccessProfileId();
@@ -207,27 +302,39 @@ export async function createLocalAccount({ username, displayName = "", password,
   // An ordinary account may start without a password and sign in through single sign-on only.
   const withPassword = Boolean(String(password || ""));
   if (!withPassword && role !== accountRoles.user) throw new Error("Enter a password.");
-  if (![accountRoles.administrator, accountRoles.user].includes(role)) throw new Error("Choose administrator or user.");
-  if (role === accountRoles.user && (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])) throw new Error("Assign this user to an existing group");
-  if (readStore().accounts.some((account) => usernameKey(account.username) === key)) throw new Error("An account with that email already exists.");
+  if (![accountRoles.administrator, accountRoles.user].includes(role))
+    throw new Error("Choose administrator or user.");
+  if (
+    role === accountRoles.user &&
+    (!validAccountKey(accessProfileId) || !readStore().profiles[accessProfileId])
+  )
+    throw new Error("Assign this user to an existing group");
+  if (readStore().accounts.some((account) => usernameKey(account.username) === key))
+    throw new Error("An account with that email already exists.");
 
   const salt = crypto.randomBytes(16);
   const hash = withPassword ? await scryptAsync(password, salt) : null;
   const account = {
     id: crypto.randomBytes(18).toString("base64url"),
     username: String(username).trim().normalize("NFKC"),
-    displayName: String(displayName || username).trim().slice(0, 80),
+    displayName: String(displayName || username)
+      .trim()
+      .slice(0, 80),
     role,
     ...(role === accountRoles.user ? { accessProfileId } : {}),
     ...(identity ? { identity } : {}),
     disabled: false,
-    ...(hash ? { password: { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") } } : {}),
-    createdAt: new Date().toISOString()
+    ...(hash
+      ? { password: { kdf, salt: salt.toString("base64url"), hash: hash.toString("base64url") } }
+      : {}),
+    createdAt: new Date().toISOString(),
   };
   // Recheck after the asynchronous KDF before inserting.
   const store = readStore();
-  if (onlyIfEmpty && store.accounts.length) throw new Error("Recovery administrator setup is already complete.");
-  if (store.accounts.some((item) => usernameKey(item.username) === key)) throw new Error("An account with that email already exists.");
+  if (onlyIfEmpty && store.accounts.length)
+    throw new Error("Recovery administrator setup is already complete.");
+  if (store.accounts.some((item) => usernameKey(item.username) === key))
+    throw new Error("An account with that email already exists.");
   store.accounts.push(account);
   saveStore();
   const { password: _secret, ...publicAccount } = account;
@@ -253,16 +360,25 @@ export function createAccountSession(accountId) {
   if (!account) throw new Error("That account is unavailable.");
   const token = crypto.randomBytes(32).toString("base64url");
   const now = Date.now();
-  store.sessions.push({ tokenHash: tokenHash(token), accountId, createdAt: new Date(now).toISOString(), expiresAt: now + sessionLifetimeMs });
+  store.sessions.push({
+    tokenHash: tokenHash(token),
+    accountId,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: now + sessionLifetimeMs,
+  });
   saveStore();
   return { token, maxAge: Math.floor(sessionLifetimeMs / 1000) };
 }
 
 export function accountSession(token) {
   if (!token) return null;
-  const session = readStore().sessions.find((item) => item.tokenHash === tokenHash(token) && Number(item.expiresAt) > Date.now());
+  const session = readStore().sessions.find(
+    (item) => item.tokenHash === tokenHash(token) && Number(item.expiresAt) > Date.now(),
+  );
   if (!session) return null;
-  const account = readStore().accounts.find((item) => item.id === session.accountId && item.disabled !== true);
+  const account = readStore().accounts.find(
+    (item) => item.id === session.accountId && item.disabled !== true,
+  );
   if (!account) return null;
   const access = effectiveAccountAccess(account, readStore().profiles);
   return access.authenticated ? access : null;
@@ -271,13 +387,17 @@ export function accountSession(token) {
 export function verifyAccountMcpToken(token) {
   if (typeof token !== "string" || token.length < 32) return null;
   const hash = tokenHash(token);
-  const account = readStore().accounts.find((item) => item.mcpTokenHash === hash && item.disabled !== true);
+  const account = readStore().accounts.find(
+    (item) => item.mcpTokenHash === hash && item.disabled !== true,
+  );
   const access = account ? effectiveAccountAccess(account, readStore().profiles) : null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
 
 export function rotateAccountMcpToken(accountId) {
-  const account = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  const account = readStore().accounts.find(
+    (item) => item.id === accountId && item.disabled !== true,
+  );
   if (!account) throw new Error("That account is unavailable.");
   const token = crypto.randomBytes(32).toString("base64url");
   account.mcpTokenHash = tokenHash(token);
@@ -310,7 +430,9 @@ export function revokeAccountSession(token) {
 
 /** What an account may see and change about itself. Provider accounts have no password here. */
 export function ownAccount(accountId) {
-  const account = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  const account = readStore().accounts.find(
+    (item) => item.id === accountId && item.disabled !== true,
+  );
   if (!account) return null;
   const provider = account.identity?.provider === "pocket-id";
   return {
@@ -322,8 +444,14 @@ export function ownAccount(accountId) {
     provider: provider ? "pocket-id" : "local",
     canChangePassword: !provider && Boolean(account.password),
     canChangeEmail: !provider,
-    accessProfile: account.role === accountRoles.user && account.accessProfileId ? { id: account.accessProfileId, name: readStore().profiles[account.accessProfileId]?.name || account.accessProfileId } : null,
-    createdAt: account.createdAt || ""
+    accessProfile:
+      account.role === accountRoles.user && account.accessProfileId
+        ? {
+            id: account.accessProfileId,
+            name: readStore().profiles[account.accessProfileId]?.name || account.accessProfileId,
+          }
+        : null,
+    createdAt: account.createdAt || "",
   };
 }
 
@@ -340,19 +468,36 @@ export const wrongCurrentPassword = "Your current password is incorrect.";
 
 /** Everything about a change to one's own account that can be checked without the current password. */
 export function validateOwnAccountChange(accountId, { displayName, username, newPassword } = {}) {
-  const found = readStore().accounts.find((item) => item.id === accountId && item.disabled !== true);
+  const found = readStore().accounts.find(
+    (item) => item.id === accountId && item.disabled !== true,
+  );
   if (!found) throw new Error("That account was not found.");
   const provider = found.identity?.provider === "pocket-id";
   const nextName = typeof displayName === "string" ? displayName.trim().slice(0, 80) : undefined;
   const nextUsername = typeof username === "string" ? username.trim().normalize("NFKC") : undefined;
   const nextPassword = typeof newPassword === "string" && newPassword ? newPassword : undefined;
   if (nextName !== undefined && !nextName) throw new Error("Enter a display name.");
-  const emailChanges = nextUsername !== undefined && usernameKey(nextUsername) !== usernameKey(found.username);
+  const emailChanges =
+    nextUsername !== undefined && usernameKey(nextUsername) !== usernameKey(found.username);
   const needsPassword = emailChanges || nextPassword !== undefined;
-  if (needsPassword && provider) throw new Error("This account signs in through single sign-on, so its email and password are managed there.");
-  if (emailChanges && (!validUsername(nextUsername) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextUsername))) throw new Error("Enter an email address of up to 128 characters.");
-  if (emailChanges && readStore().accounts.some((item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername))) throw new Error("An account with that email already exists.");
-  if (nextPassword !== undefined && nextPassword.length < 8) throw new Error("Use a new password of at least 8 characters.");
+  if (needsPassword && provider)
+    throw new Error(
+      "This account signs in through single sign-on, so its email and password are managed there.",
+    );
+  if (
+    emailChanges &&
+    (!validUsername(nextUsername) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextUsername))
+  )
+    throw new Error("Enter an email address of up to 128 characters.");
+  if (
+    emailChanges &&
+    readStore().accounts.some(
+      (item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername),
+    )
+  )
+    throw new Error("An account with that email already exists.");
+  if (nextPassword !== undefined && nextPassword.length < 8)
+    throw new Error("Use a new password of at least 8 characters.");
   return { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword };
 }
 
@@ -362,24 +507,38 @@ export function validateOwnAccountChange(accountId, { displayName, username, new
  * other browser session but keeps the one making the change.
  */
 export async function updateOwnAccount(accountId, changes = {}, { keepSessionToken = "" } = {}) {
-  const { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword } = validateOwnAccountChange(accountId, changes);
-  if (needsPassword && !await passwordMatches(found, changes.currentPassword)) throw new Error(wrongCurrentPassword);
+  const { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword } =
+    validateOwnAccountChange(accountId, changes);
+  if (needsPassword && !(await passwordMatches(found, changes.currentPassword)))
+    throw new Error(wrongCurrentPassword);
   let hashed = null;
   if (nextPassword !== undefined) {
     const salt = crypto.randomBytes(16);
-    hashed = { kdf, salt: salt.toString("base64url"), hash: (await scryptAsync(nextPassword, salt)).toString("base64url") };
+    hashed = {
+      kdf,
+      salt: salt.toString("base64url"),
+      hash: (await scryptAsync(nextPassword, salt)).toString("base64url"),
+    };
   }
   // Recheck after the asynchronous KDF.
   const store = readStore();
   const account = store.accounts.find((item) => item.id === accountId && item.disabled !== true);
   if (!account) throw new Error("That account was not found.");
-  if (emailChanges && store.accounts.some((item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername))) throw new Error("An account with that email already exists.");
+  if (
+    emailChanges &&
+    store.accounts.some(
+      (item) => item.id !== accountId && usernameKey(item.username) === usernameKey(nextUsername),
+    )
+  )
+    throw new Error("An account with that email already exists.");
   if (nextName !== undefined) account.displayName = nextName;
   if (emailChanges) account.username = nextUsername;
   if (hashed) {
     account.password = hashed;
     const keep = keepSessionToken ? tokenHash(keepSessionToken) : "";
-    store.sessions = store.sessions.filter((item) => item.accountId !== accountId || (keep && item.tokenHash === keep));
+    store.sessions = store.sessions.filter(
+      (item) => item.accountId !== accountId || (keep && item.tokenHash === keep),
+    );
   }
   saveStore({ scrubBackup: Boolean(hashed) });
   return ownAccount(accountId);
@@ -388,11 +547,18 @@ export async function updateOwnAccount(accountId, changes = {}, { keepSessionTok
 export function setAccountDisabled(accountId, disabled) {
   const account = readStore().accounts.find((item) => item.id === accountId);
   if (!account) throw new Error("That account was not found.");
-  if (account.role === accountRoles.administrator && disabled && readStore().accounts.filter((item) => item.role === accountRoles.administrator && item.disabled !== true).length < 2) {
+  if (
+    account.role === accountRoles.administrator &&
+    disabled &&
+    readStore().accounts.filter(
+      (item) => item.role === accountRoles.administrator && item.disabled !== true,
+    ).length < 2
+  ) {
     throw new Error("Keep at least one enabled administrator account.");
   }
   account.disabled = Boolean(disabled);
-  if (account.disabled) readStore().sessions = readStore().sessions.filter((item) => item.accountId !== accountId);
+  if (account.disabled)
+    readStore().sessions = readStore().sessions.filter((item) => item.accountId !== accountId);
   saveStore({ scrubBackup: account.disabled });
   return { id: account.id, disabled: account.disabled };
 }
@@ -412,7 +578,9 @@ export function gatewayAccountAccess(identity, email = "") {
   const store = readStore();
   const link = store.gatewayLinks.find((item) => item.identity === identity);
   if (!link) return linkGatewayEmail(store, identity, email);
-  const account = store.accounts.find((item) => item.id === link.accountId && item.disabled !== true);
+  const account = store.accounts.find(
+    (item) => item.id === link.accountId && item.disabled !== true,
+  );
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
   return access?.authenticated ? { ...access, credential: "mcp-token" } : null;
 }
@@ -434,7 +602,7 @@ function linkGatewayEmail(store, identity, email) {
       ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
       identity: { provider: "gateway" },
       disabled: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     store.accounts.push(account);
     created = true;
@@ -443,7 +611,11 @@ function linkGatewayEmail(store, identity, email) {
   const access = account ? effectiveAccountAccess(account, store.profiles) : null;
   if (!access?.authenticated) {
     if (created) {
-      store.gatewayLinks.push({ identity, accountId: account.id, linkedAt: new Date().toISOString() });
+      store.gatewayLinks.push({
+        identity,
+        accountId: account.id,
+        linkedAt: new Date().toISOString(),
+      });
       store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
       saveStore();
     }
@@ -475,8 +647,16 @@ export function noteGatewayIdentity(identity) {
 export function listGatewayIdentities() {
   const store = readStore();
   return {
-    links: store.gatewayLinks.map(({ identity, accountId, linkedAt }) => ({ identity, accountId, linkedAt })),
-    pending: store.gatewayPending.map(({ identity, firstSeenAt, lastSeenAt }) => ({ identity, firstSeenAt, lastSeenAt }))
+    links: store.gatewayLinks.map(({ identity, accountId, linkedAt }) => ({
+      identity,
+      accountId,
+      linkedAt,
+    })),
+    pending: store.gatewayPending.map(({ identity, firstSeenAt, lastSeenAt }) => ({
+      identity,
+      firstSeenAt,
+      lastSeenAt,
+    })),
   };
 }
 
@@ -486,7 +666,8 @@ export function setGatewayLink(identity, accountId) {
   const store = readStore();
   store.gatewayLinks = store.gatewayLinks.filter((item) => item.identity !== identity);
   if (accountId) {
-    if (!store.accounts.some((item) => item.id === accountId)) throw new Error("That account was not found.");
+    if (!store.accounts.some((item) => item.id === accountId))
+      throw new Error("That account was not found.");
     store.gatewayLinks.push({ identity, accountId, linkedAt: new Date().toISOString() });
     store.gatewayPending = store.gatewayPending.filter((item) => item.identity !== identity);
   }
@@ -499,7 +680,8 @@ export function dismissGatewayIdentity(identity) {
   if (!validGatewayIdentity(identity)) throw new Error("Choose a valid gateway user ID.");
   const store = readStore();
   const pending = store.gatewayPending.filter((item) => item.identity !== identity);
-  if (pending.length === store.gatewayPending.length) throw new Error("That chat user is not waiting.");
+  if (pending.length === store.gatewayPending.length)
+    throw new Error("That chat user is not waiting.");
   store.gatewayPending = pending;
   saveStore({ scrubBackup: true });
   return listGatewayIdentities();
@@ -513,10 +695,18 @@ export function dismissGatewayIdentity(identity) {
  * administrator approves by assigning an access profile. The provider never
  * decides roles or access.
  */
-export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerified = false, name = "" } = {}) {
+export function signInWithOidcIdentity({
+  issuer,
+  subject,
+  email = "",
+  emailVerified = false,
+  name = "",
+} = {}) {
   if (!issuer || !subject) throw new Error("The sign-in identity is incomplete.");
   const store = readStore();
-  let account = store.accounts.find((item) => item.oidc?.issuer === issuer && item.oidc?.subject === subject);
+  let account = store.accounts.find(
+    (item) => item.oidc?.issuer === issuer && item.oidc?.subject === subject,
+  );
   if (!account && emailVerified && email) {
     const key = usernameKey(email);
     const match = store.accounts.find((item) => usernameKey(item.username) === key);
@@ -528,9 +718,17 @@ export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerif
     }
   }
   if (!account) {
-    const base = validUsername(email) && emailVerified ? email : `oidc-${crypto.createHash("sha256").update(`${issuer}|${subject}`).digest("hex").slice(0, 12)}`;
+    const base =
+      validUsername(email) && emailVerified
+        ? email
+        : `oidc-${crypto.createHash("sha256").update(`${issuer}|${subject}`).digest("hex").slice(0, 12)}`;
     let username = base;
-    for (let suffix = 2; store.accounts.some((item) => usernameKey(item.username) === usernameKey(username)); suffix += 1) username = `${base}-${suffix}`;
+    for (
+      let suffix = 2;
+      store.accounts.some((item) => usernameKey(item.username) === usernameKey(username));
+      suffix += 1
+    )
+      username = `${base}-${suffix}`;
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username,
@@ -541,7 +739,7 @@ export function signInWithOidcIdentity({ issuer, subject, email = "", emailVerif
       // With a default access profile and approval off it starts on that; otherwise an administrator approves it.
       ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
       disabled: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
     store.accounts.push(account);
     saveStore();

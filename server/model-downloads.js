@@ -12,7 +12,7 @@ import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { comfyModelsDir, comfyUrl, modelFolders } from "./comfy.js";
-import { removeJsonFile, renameWithRetry, writeJsonFile } from "./json-store.js";
+import { removeJsonFile, writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
@@ -46,7 +46,7 @@ const allowedHosts = new Set(["civitai.com", "huggingface.co"]);
 let queue = [];
 let active = null;
 
-// Replaces the network for the setup demo (scripts/setup-demo.mjs); null in real use.
+// Native download tests inject their transport without fetching real model weights.
 let transport = null;
 export function setDownloadTransport(fn) {
   transport = fn;
@@ -638,7 +638,7 @@ async function verifyAndFinish(entry, partial, target, note) {
 function finishDownload(entry, partial, target, note) {
   entry.receivedBytes = fileSize(partial);
   entry.totalBytes = entry.receivedBytes;
-  renameWithRetry(partial, target);
+  fs.renameSync(partial, target);
   removeJsonFile(note);
 }
 

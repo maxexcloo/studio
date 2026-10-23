@@ -19,7 +19,7 @@ export function listenPlan({ host, tls = startupTls }) {
   return {
     httpHost: secure ? "127.0.0.1" : host,
     httpsHost: secure && tls.ok ? host : "",
-    tlsProblem: secure && !tls.ok ? tls.error || "The certificate can’t be used." : ""
+    tlsProblem: secure && !tls.ok ? tls.error || "The certificate can’t be used." : "",
   };
 }
 
@@ -37,24 +37,39 @@ export async function startServers(app, { host, port, fallback = true, onListeni
   const plan = listenPlan({ host });
   let listening;
   try {
-    listening = await listenWithFallback(app, { port, host: plan.httpHost, fallback, skip: plan.httpsHost ? [httpsPort] : [] });
+    listening = await listenWithFallback(app, {
+      port,
+      host: plan.httpHost,
+      fallback,
+      skip: plan.httpsHost ? [httpsPort] : [],
+    });
   } catch (error) {
     onFatal(error);
     return null;
   }
+  const servers = [listening.server];
   onListening({ plan, port: listening.port, moved: listening.moved });
   httpsProblem = plan.tlsProblem;
-  if (plan.tlsProblem) console.warn(`\n  HTTPS can’t start: ${plan.tlsProblem}\n  Other devices can’t connect until that’s fixed. This computer can still open http://localhost:${listening.port}\n`);
+  if (plan.tlsProblem)
+    console.warn(
+      `\n  HTTPS can’t start: ${plan.tlsProblem}\n  Other devices can’t connect until that’s fixed. This computer can still open http://localhost:${listening.port}\n`,
+    );
   if (plan.httpsHost) {
     const secure = https.createServer({ cert: startupTls.pem.cert, key: startupTls.pem.key }, app);
+    servers.push(secure);
     secure.once("error", (error) => {
-      httpsProblem = error.code === "EADDRINUSE" ? `Port ${httpsPort} is already in use. Set STUDIO_HTTPS_PORT to another one.` : error.message;
-      console.warn(`\n  HTTPS couldn’t start on port ${httpsPort}: ${error.code === "EADDRINUSE" ? "the port is in use (set STUDIO_HTTPS_PORT)" : error.message}\n`);
+      httpsProblem =
+        error.code === "EADDRINUSE"
+          ? `Port ${httpsPort} is already in use. Set STUDIO_HTTPS_PORT to another one.`
+          : error.message;
+      console.warn(
+        `\n  HTTPS couldn’t start on port ${httpsPort}: ${error.code === "EADDRINUSE" ? "the port is in use (set STUDIO_HTTPS_PORT)" : error.message}\n`,
+      );
     });
     secure.listen(httpsPort, plan.httpsHost, () => {
       httpsListening = true;
       watchCertificate(secure);
     });
   }
-  return { server: listening.server, plan };
+  return { server: listening.server, servers, plan };
 }

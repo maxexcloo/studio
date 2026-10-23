@@ -683,7 +683,7 @@ export const checkpointDownloads = {
  * when it is not the slot's first. memory: GPU memory (GB) the version runs
  * comfortably in. appleMemory: what a Mac would need instead (the size at full
  * precision), and appleDetail how the version is described there. A model
- * download flagged `fp8` cannot load on a Mac (docs/hardware-notes.md), so
+ * download flagged `fp8` cannot load on a Mac (docs/guides/MODELS.md#worker-memory), so
  * there that version never counts as fitting. ram: system memory it wants
  * besides. The studio highlights the largest version that fits and never
  * hides the others.

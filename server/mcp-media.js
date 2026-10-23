@@ -142,6 +142,7 @@ export class McpMedia {
     signingKey,
     fetchImpl = fetch,
     resolveSignedResult,
+    domainRequest,
     profileTtl = 60000,
   }) {
     this.profileTtl = profileTtl;
@@ -149,6 +150,7 @@ export class McpMedia {
     this.publicBase = publicUrl;
     this.fetch = fetchImpl;
     this.resolveSignedResult = resolveSignedResult;
+    this.domainRequest = domainRequest;
     this.credentials = new Map();
     this.profileRequests = new Map();
     this.file = path.join(dataDir, "mcp-ownership.json");
@@ -262,17 +264,20 @@ export class McpMedia {
       ...(credential || {}),
     };
     try {
-      response = await this.fetch(new URL(route, base), {
-        method,
-        headers,
-        ...(body === undefined
-          ? {}
-          : { body: body instanceof FormData ? body : JSON.stringify(body) }),
-        redirect: "error",
-        signal: signal
-          ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
-          : AbortSignal.timeout(timeoutMs),
-      });
+      const direct = await this.domainRequest?.(method, route, body, owner);
+      response = direct
+        ? Response.json(direct.payload, { status: direct.status })
+        : await this.fetch(new URL(route, base), {
+            method,
+            headers,
+            ...(body === undefined
+              ? {}
+              : { body: body instanceof FormData ? body : JSON.stringify(body) }),
+            redirect: "error",
+            signal: signal
+              ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+              : AbortSignal.timeout(timeoutMs),
+          });
     } catch {
       if (signal?.aborted) throw aborted(signal);
       // A status read that stalls says so in time for the chat, rather than holding it past the client's own deadline.

@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { databaseFile } from "./persistence/runtime.ts";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-snapshot-"));
 process.env.STUDIO_DATA_DIR = dataDir;
 const { pruneSnapshots, snapshotIfNewVersion } = await import("./data-snapshot.js");
 const backups = path.join(dataDir, ".backups");
 const day = 86_400_000;
+test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test("a fresh install has nothing to keep, and only notes its version", () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), "studio-snapshot-empty-"));
@@ -41,15 +44,48 @@ test("a new version copies the state files, not thumbnails, references or backup
   assert.equal(fs.existsSync(path.join(target, ".backups")), false, "never copies itself");
   if (process.platform !== "win32") assert.equal(fs.statSync(target).mode & 0o777, 0o700);
 
-  assert.equal(snapshotIfNewVersion({ dataDir, version: "0.12.0" }), "", "the same version again takes none");
+  assert.equal(
+    snapshotIfNewVersion({ dataDir, version: "0.12.0" }),
+    "",
+    "the same version again takes none",
+  );
   const next = snapshotIfNewVersion({ dataDir, version: "0.12.1" });
   assert.match(path.basename(next), /^0\.12\.0-to-0\.12\.1-/);
 });
 
 test("snapshots go after 14 days, and never more than three stay", () => {
   const now = Date.now();
-  for (let i = 0; i < 4; i += 1) snapshotIfNewVersion({ dataDir, version: `0.13.${i}`, now: now + i * 1000 });
+  for (let i = 0; i < 4; i += 1)
+    snapshotIfNewVersion({ dataDir, version: `0.13.${i}`, now: now + i * 1000 });
   assert.equal(fs.readdirSync(backups).length, 3);
   assert.equal(pruneSnapshots({ dataDir, now: now + 15 * day }), 3);
   assert.deepEqual(fs.readdirSync(backups), []);
+});
+
+test("a SQLite snapshot restores committed WAL data as a consistent standalone database", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-snapshot-wal-"));
+  const live = new DatabaseSync(databaseFile(directory));
+  t.after(() => {
+    live.close();
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  live.exec(
+    "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE saved (value TEXT); INSERT INTO saved VALUES ('before snapshot');",
+  );
+  assert.ok(fs.statSync(`${databaseFile(directory)}-wal`).size > 0);
+  const target = snapshotIfNewVersion({ dataDir: directory, version: "test-snapshot" });
+  live.exec("INSERT INTO saved VALUES ('after snapshot')");
+  const restored = new DatabaseSync(databaseFile(target), { readOnly: true });
+  try {
+    assert.equal(restored.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
+    assert.deepEqual(
+      restored
+        .prepare("SELECT value FROM saved")
+        .all()
+        .map((row) => row.value),
+      ["before snapshot"],
+    );
+  } finally {
+    restored.close();
+  }
 });

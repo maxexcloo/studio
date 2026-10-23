@@ -247,11 +247,14 @@ test("saving a large gallery is compact, runs in the background and reads back",
   );
 });
 
-test("a save still waiting when the server stops is written before it exits", async () => {
+test("a save still waiting when the server stops is written before it exits", async (t) => {
   const child = await import("node:child_process");
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-exit-"));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const script = [
     `const store = await import(${JSON.stringify(new URL("./gallery-store.js", import.meta.url).href)});`,
+    `const { installShutdown } = await import(${JSON.stringify(new URL("./shutdown.js", import.meta.url).href)});`,
+    "installShutdown({ flush: store.flushPendingGallery });",
     "store.setGallery([{ id: 'kept', status: 'done', type: 'image', createdAt: new Date().toISOString() }]);",
     "process.exit(0);",
   ].join("\n");
@@ -262,7 +265,6 @@ test("a save still waiting when the server stops is written before it exits", as
     JSON.parse(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8")).map((item) => item.id),
     ["kept"],
   );
-  fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
 test("a live preview reaches other browsers while rendering, and is not kept once done", () => {
