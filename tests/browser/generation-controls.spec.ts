@@ -249,3 +249,77 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
     original[1],
   ]);
 });
+
+test("Clear restores profile defaults and random seed; masked inputs keep Edit mode in both editors", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const asset = {
+    id: "mask-source",
+    slot: "image",
+    name: "Reference",
+    url: image,
+    thumbnailUrl: image,
+    width: 1024,
+    height: 1024,
+  };
+  state.presets.push({
+    id: "masked",
+    title: "Masked Study",
+    input: {
+      kind: "image",
+      profileId: profiles[0].id,
+      prompt: "A masked copper bird",
+      negative: "harsh light",
+      backendId: "worker-b",
+      width: 768,
+      height: 768,
+      steps: 37,
+      cfg: 8,
+      seed: "117",
+      count: 1,
+      loras: [{ name: "detail.safetensors", strength: 0.7, enabled: true }],
+      referenceAssets: [{ assetId: asset.id, slot: asset.slot }],
+      referenceDetails: [asset],
+      inpaint: { assetId: asset.id, mask: image, strength: 0.6 },
+      referenceRole: "reference",
+    },
+  });
+  await create(page);
+  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Masked Study", exact: true }).click();
+  const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
+  await expect(role.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+  await expect(role.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(prompt).toHaveValue("");
+  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
+  await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
+  await prompt.fill("A fresh bird without inherited styling");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({
+    profileId: profiles[0].id,
+    backendId: "worker-b",
+    seed: "",
+    steps: 20,
+    cfg: 5,
+    width: 1024,
+    height: 1024,
+    loras: [],
+    referenceAssets: [],
+  });
+  expect(state.jobs[1].input.inpaint).toBeUndefined();
+  expect(state.jobs[1].sessionId).toBe(state.jobs[0].sessionId);
+  await page.goto(`/chat/${state.jobs[0].sessionId}`);
+  const original = page.getByRole("article", { name: "Iteration 1", exact: true });
+  await original.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  const cardRole = original.getByRole("radiogroup", { name: "Reference Role", exact: true });
+  await expect(cardRole.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+  await expect(cardRole.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
+});

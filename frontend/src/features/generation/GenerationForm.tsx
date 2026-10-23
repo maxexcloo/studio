@@ -19,7 +19,7 @@ import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-quer
 import { useLocation, useNavigate } from "react-router";
 import { failure, post } from "../../api";
 import type { Session } from "../../types";
-import { useGeneration } from "./GenerationProvider";
+import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { LoadingState } from "../../ui/LoadingState";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { PromptAssistant } from "./PromptAssistant";
@@ -274,6 +274,7 @@ export function GenerationForm({
           <Stack gap="xs">
             {!!draft.references.length && (
               <ReferenceRoleControl
+                locked={Boolean(input.inpaint)}
                 value={input.referenceRole}
                 onChange={(referenceRole) => update({ referenceRole })}
               />
@@ -361,12 +362,13 @@ export function GenerationForm({
               ...previous,
               references: [],
               input: {
-                ...previous.input,
-                prompt: "",
-                negative: "",
-                referenceAssets: [],
-                referenceDetails: [],
-                inpaint: undefined,
+                ...(profile
+                  ? inputForProfile(
+                      { ...initialInput, backendId: previous.input.backendId },
+                      profile,
+                    )
+                  : { ...initialInput, kind: previous.input.kind }),
+                seed: "",
               },
             }))
           }

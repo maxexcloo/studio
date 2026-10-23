@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, stamp } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 async function galleryFixture(page: Page) {
   const state = await fixtures(page);
   const input = {
@@ -162,3 +162,61 @@ test("A failed tile retries its owned durable job and refreshes the gallery", as
     release();
   }
 });
+
+for (const surface of ["tile", "viewer"]) {
+  test(`Reference This Image from the ${surface} retains the current draft instead of recreating the source`, async ({
+    page,
+  }) => {
+    const state = await galleryFixture(page);
+    state.presets.push({
+      id: "current-direction",
+      title: "Current Direction",
+      input: {
+        kind: "image",
+        profileId: "image:fast",
+        prompt: "Keep this separate visual direction",
+        negative: "hard shadows",
+        width: 768,
+        height: 1024,
+        steps: 4,
+        seed: "725",
+        count: 1,
+        loras: [],
+        referenceAssets: [],
+      },
+    });
+    await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+    await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+    await page.getByRole("button", { name: "Current Direction", exact: true }).click();
+    await page.keyboard.press("Escape");
+    if (surface === "viewer") {
+      await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
+      await viewerAction(page, "Reference This Image");
+    } else {
+      await page
+        .getByRole("button", { name: "More Actions for A copper bird", exact: true })
+        .click();
+      await page.getByRole("menuitem", { name: "Reference This Image", exact: true }).click();
+    }
+    const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+    await expect(prompt).toHaveValue("Keep this separate visual direction");
+    await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveValue(
+      "Image Fast",
+    );
+    await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+    await expect.poll(() => state.jobs.length).toBe(2);
+    expect(state.referenceRequests).toEqual([{ galleryItemId: "tile-bird" }]);
+    expect(state.jobs[1].input).toMatchObject({
+      profileId: "image:fast",
+      prompt: "Keep this separate visual direction",
+      negative: "hard shadows",
+      seed: "725",
+      width: 768,
+      height: 1024,
+      steps: 4,
+      referenceAssets: [{ assetId: "asset-tile-bird", slot: "image" }],
+    });
+    expect(state.jobs[1].sessionId).not.toBe("owned-session");
+  });
+}

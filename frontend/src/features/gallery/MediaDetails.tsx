@@ -24,6 +24,7 @@ import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { useMotionDuration } from "../../ui/Appearance";
 import { useMediaAction } from "./useMediaAction";
+import { ReferenceMediaAction } from "./ReferenceMediaAction";
 import { mediaDownload } from "./download";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { UpscaleControls } from "./UpscaleControls";
@@ -323,6 +324,7 @@ ${download.download}`;
               >
                 Copy Prompt
               </Menu.Item>
+              <ReferenceMediaAction item={item} onApplied={onAction} />
               <Menu.Item h={36} disabled={action.isPending} onClick={() => action.mutate("image")}>
                 Recreate
               </Menu.Item>

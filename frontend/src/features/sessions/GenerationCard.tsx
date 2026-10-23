@@ -189,6 +189,7 @@ export function GenerationCard({
                     ))}
                   </Group>
                   <ReferenceRoleControl
+                    locked={Boolean(form.values.inpaint)}
                     value={form.values.referenceRole}
                     onChange={(referenceRole) => form.setValues({ referenceRole })}
                   />
