@@ -172,6 +172,7 @@ test("cancel a video without interrupting primary image work", async () => {
   const before = primary.requests.length;
   await withComfyBackend(jobs.get("video-cancel").comfyBackend, () => cancelPrompt(prompt.id));
   jobs.set("video-cancel", { ...jobs.get("video-cancel"), status: "canceling" });
+  video.drop(prompt.id);
   await running;
   assert.equal(jobs.get("video-cancel").status, "canceled");
   assert.equal(

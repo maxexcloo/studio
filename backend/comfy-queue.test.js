@@ -192,6 +192,25 @@ test("a queued prompt keeps waiting through the periodic check", async () => {
   assert.equal(calls.filter((call) => call.pathname === "/queue").length, 1);
 });
 
+test("cancellation verifies the own prompt immediately but still needs two confirmed absences", async () => {
+  const queue = { queue_running: [entry("p1"), entry("foreign")], queue_pending: [] };
+  const { request, calls } = fakeComfy({ "/history/p1": {}, "/queue": queue });
+  const tracker = promptTracker("p1", { request });
+  assert.equal((await tracker.check({ verify: true })).state, "waiting");
+  assert.equal(
+    calls.some((call) => call.pathname === "/queue"),
+    true,
+  );
+  queue.queue_running = [entry("foreign")];
+  assert.equal((await tracker.check({ verify: true })).state, "waiting");
+  await assert.rejects(
+    () => tracker.check({ verify: true }),
+    (error) => error.droppedRun === true,
+  );
+  assert.deepEqual(queue.queue_running, [entry("foreign")]);
+  assert.ok(calls.every((call) => call.method === "GET"));
+});
+
 test("a run that finishes between the history and queue reads is found, not dropped", async () => {
   let reads = 0;
   const { request } = fakeComfy({

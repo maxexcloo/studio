@@ -7,6 +7,7 @@ function fixture() {
     backend: "",
     gallery: [],
     jobs: new Map(),
+    cancellations: [],
     writes: 0,
     snapshots: { primary: { queue: {}, history: {} }, video: { queue: {}, history: {} } },
   };
@@ -31,6 +32,7 @@ function fixture() {
       state.backend = backend;
       await run();
     },
+    cancel: async (promptId) => state.cancellations.push({ promptId, backend: state.backend }),
   });
   return state;
 }
@@ -200,14 +202,44 @@ test("an available backend recovers even when the other backend is offline", asy
   assert.equal(s.gallery[0].status, "done");
 });
 
-test("cancelling a recovered video keeps it cancelled even if its output arrives", async () => {
+test("a completed recovered video racing cancellation retains its saved output", async () => {
   const s = fixture();
   s.gallery = [tile("one", "canceled")];
   s.jobs.set("one", { recovered: true, status: "canceling", comfyBackend: "video" });
   s.snapshots.video.history = { "one-prompt": result("one") };
   await s.recover();
-  assert.equal(s.jobs.get("one").status, "canceled");
-  assert.equal(s.gallery[0].status, "canceled");
+  assert.equal(s.jobs.get("one").status, "done");
+  assert.equal(s.gallery[0].status, "done");
+  assert.equal(s.gallery[0].url, "one.mp4");
+});
+
+test("cancel recovery without an acknowledgement waits for its exact recorded job and saves late completion", async () => {
+  const s = fixture();
+  s.gallery = [tile("own", "pending")];
+  s.jobs.set("own", { recovered: true, status: "canceling", comfyBackend: "video" });
+  s.snapshots.video.history = { "foreign-prompt": result("foreign") };
+  await s.recover();
+  await s.recover();
+  assert.equal(s.jobs.get("own").status, "canceling");
+  assert.equal(s.jobs.get("own").terminalAt, undefined);
+  assert.equal(s.jobs.has("foreign"), false);
+  s.snapshots.video.queue = { queue_running: [queued("own", "late-provider-id")] };
+  await s.recover();
+  assert.equal(s.jobs.get("own").promptId, "late-provider-id");
+  assert.equal(s.jobs.get("own").status, "canceling");
+  assert.deepEqual(s.cancellations, [{ promptId: "late-provider-id", backend: "video" }]);
+  s.snapshots.video.queue = {};
+  await s.recover();
+  assert.equal(
+    s.jobs.get("own").terminalAt,
+    undefined,
+    "one absence cannot discard a racing completion",
+  );
+  s.snapshots.video.history["late-provider-id"] = result("own");
+  await s.recover();
+  assert.equal(s.jobs.get("own").status, "done");
+  assert.equal(s.gallery[0].url, "own.mp4");
+  assert.equal(s.jobs.size, 1);
 });
 
 test("an untracked job reported lost can still accept a late backend result", async () => {

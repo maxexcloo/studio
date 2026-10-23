@@ -156,14 +156,14 @@ test("a run that ends without an image is a failure, not a vanished tile", async
   assert.equal(store.gallery.filter((entry) => entry.jobId === id).length, 1);
 });
 
-test("a cancel while queued takes the prompt back out of ComfyUI's queue", async () => {
+test("a cancel before dispatch finishes without submitting provider work", async () => {
   const id = "job-cancel";
   const body = sdxlRequest();
   queue(id, body);
   jobs.set(id, { ...jobs.get(id), status: "canceling" });
-  const queued = fake.nextPrompt();
+  const submitted = fake.prompts.length;
   await runJob(id, body);
-  await queued;
+  assert.equal(fake.prompts.length, submitted);
   assert.equal(jobs.get(id).status, "canceled");
   assert.equal(store.gallery.find((entry) => entry.jobId === id).status, "canceled");
 });

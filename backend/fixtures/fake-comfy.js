@@ -30,6 +30,7 @@ export async function startFakeComfy({
   systemStats = {},
   version = "0.34.1",
   outputFiles = new Map(),
+  acknowledgePrompt,
 } = {}) {
   const prompts = [];
   const requests = [];
@@ -88,6 +89,10 @@ export async function startFakeComfy({
       // A current ComfyUI takes the id the client chose.
       const id = body.prompt_id || `prompt-${count}`;
       prompts.push({ id, ...body });
+      if (acknowledgePrompt && !(await acknowledgePrompt(prompts.at(-1)))) {
+        res.destroy();
+        return;
+      }
       json(res, 200, { prompt_id: id, number: count, node_errors: {} });
       waiting.get("prompt")?.(prompts.at(-1));
       return;
