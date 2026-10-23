@@ -182,7 +182,8 @@ export function promptTracker(
 
   return {
     alive: noteAlive,
-    async check() {
+    async check({ verify = false } = {}) {
+      if (verify) verifyNext = true;
       const history = await ask(`/history/${encodeURIComponent(promptId)}`);
       if (history.down) return history.down;
       const wasDown = downSince !== null;

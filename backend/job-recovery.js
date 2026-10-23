@@ -84,6 +84,7 @@ export function createJobRecovery({
   visible,
   withBackend,
   ingest = async (records) => records,
+  cancel = async () => {},
 }) {
   let active;
   const missing = new Map();
@@ -188,8 +189,20 @@ export function createJobRecovery({
           const current = jobs.get(id);
           if (current?.comfyBackend && current.comfyBackend !== backend) continue;
           const place = places.get(id);
-          if (current?.recovered && ["canceling", "canceled"].includes(current.status)) {
-            if (!place) finishJob(id, { status: "canceled" });
+          if (
+            current?.recovered &&
+            ["canceling", "canceled"].includes(current.status) &&
+            !completed.has(id)
+          ) {
+            if (place) {
+              missing.delete(id);
+              jobs.set(id, { ...current, promptId: place.promptId, comfyBackend: backend });
+              await cancel(place.promptId).catch(() => {});
+            } else if (current.promptId) {
+              const misses = (missing.get(id) || 0) + 1;
+              missing.set(id, misses);
+              if (misses >= 2) finishJob(id, { status: "canceled" });
+            }
             continue;
           }
           if (place && !["canceling", "canceled"].includes(current?.status)) {

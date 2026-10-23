@@ -439,8 +439,9 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
         return;
       }
       if (message.type === "execution_interrupted") {
-        setTerminalJob(id, { status: "canceled" });
-        updateGalleryJob(id, { status: "canceled" });
+        jobs.set(id, { ...jobs.get(id), status: "canceling" });
+        run.finished = true;
+        run.wake?.();
       }
       if (message.type === "execution_error") {
         const learned = learnFromFailure(jobBodies.get(id), data.exception_message);
@@ -548,6 +549,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
   runTimings.set(id, timing);
   refreshQueueEstimates();
   let socket = null;
+  let submissionStarted = false;
   try {
     let prompt = body.kind === "video" ? await videoGraph(body) : await imageGraph(body);
     const upscale = prepare ? await prepare(prompt) : null;
@@ -576,6 +578,14 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     // `saved`: Smart upscale's source pictures, by save node, as ComfyUI reported them; `missed`: why their upscale did not finish.
     const run = { promptId: null, wake: null, alive: null, pairs, saved: new Map(), missed: null };
     watchProgress(id, run, socket, prompt);
+    if (["canceling", "canceled"].includes(jobs.get(id)?.status)) {
+      setTerminalJob(id, { status: "canceled" });
+      updateGalleryJob(id, { status: "canceled" });
+      socket?.close();
+      forgetTemporaryInputs(body);
+      return;
+    }
+    submissionStarted = true;
     const queued = await comfy("/prompt", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -600,15 +610,14 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         },
       }),
     });
-    if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
-      // It may already have started on an idle ComfyUI; this stops it either way, and only it.
-      await cancelPrompt(queued.prompt_id).catch(() => null);
-      updateGalleryJob(id, { status: "canceled" });
-      setTerminalJob(id, { status: "canceled", promptId: queued.prompt_id });
-      return;
-    }
+    if (!queued?.prompt_id)
+      throw new Error("The worker did not acknowledge the generation with a prompt ID.");
     run.promptId = queued.prompt_id;
-    jobs.set(id, { ...jobs.get(id), status: "running", promptId: queued.prompt_id });
+    jobs.set(id, {
+      ...jobs.get(id),
+      status: ["canceling", "canceled"].includes(jobs.get(id)?.status) ? "canceling" : "running",
+      promptId: queued.prompt_id,
+    });
     // The provider keeps working through a Studio restart; the restarted server resumes from this record.
     if (isCloudGraph(prompt))
       cloudJobs.remember(id, {
@@ -693,28 +702,20 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         const output = run.saved.get(pair.base);
         return output ? pairRunOutputs({ [pair.base]: output }, [pair]) : [];
       });
+    let cancelSent = false;
     while (true) {
-      if (
-        (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") &&
-        run.saved.size
-      ) {
-        // Stopped while upscaling: the pictures are done, so they stay.
-        await cancelPrompt(queued.prompt_id).catch(() => null);
-        await deliver(savedResults(), { canceled: true });
-        return;
-      }
       if (run.missed && run.saved.size) {
         await deliver(savedResults(), run.missed);
         return;
       }
       if (jobs.get(id)?.status === "canceling" || jobs.get(id)?.status === "canceled") {
-        // The cancel route already asked; asking again covers a ComfyUI that was out of reach then.
-        await cancelPrompt(queued.prompt_id).catch(() => null);
-        updateGalleryJob(id, { status: "canceled" });
-        setTerminalJob(id, { status: "canceled" });
-        socket?.close();
-        forgetTemporaryInputs(body);
-        return;
+        // A cancel acknowledgement does not prove execution stopped. Track the own prompt to its end.
+        if (!cancelSent)
+          await cancelPrompt(queued.prompt_id)
+            .then(() => {
+              cancelSent = true;
+            })
+            .catch(() => null);
       }
       // The socket already recorded the failure; history would only add an empty result.
       if (jobs.get(id)?.status === "error") {
@@ -722,7 +723,27 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         forgetTemporaryInputs(body);
         return;
       }
-      const checked = await tracker.check();
+      const checked = await tracker
+        .check({
+          verify: ["canceling", "canceled"].includes(jobs.get(id)?.status),
+        })
+        .catch((error) => {
+          if (["canceling", "canceled"].includes(jobs.get(id)?.status)) {
+            if (error.lostConnection) return { state: "reconnecting", delayMs: 5000 };
+            if (error.droppedRun) return { state: "cancelled" };
+          }
+          throw error;
+        });
+      if (checked.state === "cancelled") {
+        if (run.saved.size) await deliver(savedResults(), { canceled: true });
+        else {
+          updateGalleryJob(id, { status: "canceled" });
+          setTerminalJob(id, { status: "canceled" });
+          socket?.close();
+          forgetTemporaryInputs(body);
+        }
+        return;
+      }
       if (checked.state === "reconnecting") {
         showReconnecting(id, run, true);
         await pause(run, checked.delayMs);
@@ -743,6 +764,17 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         }
       }
       const entry = checked.state === "done" ? checked.entry : null;
+      if (entry && ["canceling", "canceled"].includes(jobs.get(id)?.status)) {
+        const results = pairRunOutputs(entry.outputs, pairs);
+        if (results.length) await deliver(results, { canceled: true });
+        else {
+          updateGalleryJob(id, { status: "canceled" });
+          setTerminalJob(id, { status: "canceled" });
+          socket?.close();
+          forgetTemporaryInputs(body);
+        }
+        return;
+      }
       // Stopped or failed after its pictures were saved (and the socket missed it): keep them.
       if (entry?.status?.status_str === "error" && pairs.length) {
         const results = pairRunOutputs(entry.outputs, pairs).filter((result) => result.paired);
@@ -782,6 +814,25 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       await pause(run, 1600);
     }
   } catch (error) {
+    if (
+      submissionStarted &&
+      ["canceling", "canceled"].includes(jobs.get(id)?.status) &&
+      !error.comfyFailure &&
+      !error.noOutput &&
+      !(error.status >= 400 && error.status < 500)
+    ) {
+      // A lost acknowledgement is not a stopped provider. Recovery follows only this recorded job.
+      jobs.set(id, {
+        ...jobs.get(id),
+        status: "canceling",
+        recovered: true,
+        terminalAt: undefined,
+        error: "Checking the recorded generation before confirming cancellation.",
+      });
+      updateGalleryJob(id, { status: "pending" });
+      socket?.close();
+      return;
+    }
     // The socket may already have recorded the richer failure for this job.
     const known = jobs.get(id)?.failure;
     // ComfyUI's own words stay in the detail (a missing module's name, say); the plain version leads.

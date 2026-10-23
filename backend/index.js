@@ -536,6 +536,7 @@ const recoverRunningJobs = createJobRecovery({
   setGallery,
   visible: filterVisibleGallery,
   withBackend: withComfyBackend,
+  cancel: cancelPrompt,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : []),
 });
 // Cloud runs accepted before a restart are live again before any status check or gallery cleanup.
@@ -2422,7 +2423,7 @@ const queueAdapter = createLegacyQueueAdapter({
   },
   cancelPrompt: ({ promptId, backend }) => withComfyBackend(backend, () => cancelPrompt(promptId)),
   recover: async (job) => {
-    if (job.providerJobId && !jobs.has(job.id))
+    if ((job.providerJobId || job.cancelRequested) && !jobs.has(job.id))
       jobs.set(job.id, {
         status: job.cancelRequested ? "canceling" : "running",
         recovered: true,

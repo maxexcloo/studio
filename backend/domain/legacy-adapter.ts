@@ -51,7 +51,7 @@ export function createLegacyQueueAdapter(options: LegacyAdapterOptions): QueueAd
           live.status === "queued"
             ? "Accepted by the worker; waiting for execution."
             : live.status === "canceling"
-              ? "Cancelling the recorded generation."
+              ? live.error || "Cancelling the recorded generation."
               : "",
       };
     return undefined;
