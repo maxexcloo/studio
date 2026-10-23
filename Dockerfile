@@ -23,10 +23,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/LICENSE ./LICENSE
-COPY --from=build /app/scripts ./scripts
-COPY --from=build /app/server ./server
+COPY --from=build /app/backend ./backend
 COPY --from=build /app/shared ./shared
-COPY --from=build /app/workflows ./workflows
 
 # Slim omits OpenSSL's default CA path; point apt at the trusted build image's bundle.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
@@ -41,4 +39,4 @@ USER node
 EXPOSE 8787
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \
     CMD node -e 'fetch("http://127.0.0.1:" + process.env.PORT + "/api/ping").then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))'
-CMD ["node", "server/index.js"]
+CMD ["node", "backend/index.js"]

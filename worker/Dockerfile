@@ -12,7 +12,7 @@ RUN command -v flock \
     && rm -rf /root/ComfyUI
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
 RUN python3 /opt/studio/install_nodes.py /opt/studio/source.json /opt/studio/sources.json /root/ComfyUI
-COPY comfyui/ /root/ComfyUI/custom_nodes/
+COPY worker/comfyui/ /root/ComfyUI/custom_nodes/
 COPY worker/patches/ /opt/studio/patches/
 COPY worker/entrypoint.sh worker/gpu-lease.sh /opt/studio/
 RUN python3 /opt/studio/patches/patch_minimax.py /root/ComfyUI \

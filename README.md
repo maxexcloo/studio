@@ -27,10 +27,10 @@ npm run test:browser
 
 The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Deploy an exact verified version. The worker image has explicit `media` and `text` launch modes and preserves the existing shared GPU leases.
 
-Mount a writable Studio data directory and a read-only `ai` configuration directory. Configure worker URLs and server-side credentials as described in [Configuration](docs/guides/CONFIGURATION.md). See [container operations](docs/guides/DOCKER.md), [worker operations](worker/README.md) and [models and workflows](docs/guides/MODELS.md).
+Mount a writable Studio data directory for media and editable definitions, and a read-only `ai` configuration directory for workload metadata and missing-definition seeds. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [container operations](DOCKER.md), [worker operations](worker/README.md) and [models and workflows](MODELS.md).
 
-Existing runtime state requires an offline [migration rehearsal and restore check](docs/guides/CONFIGURATION.md#sqlite-migration--rollback). Keep the current deployment until retained workflows and migration have been verified. Production remains single-replica with `Recreate` deployment behaviour.
+Existing runtime state requires an offline [migration rehearsal and restore check](CONFIGURATION.md#sqlite-migration--rollback). Keep the current deployment until retained workflows and migration have been verified. Production remains single-replica with `Recreate` deployment behaviour.
 
 ## Credits & Licence
 
-Studio is a hard fork of [HEISS UI](https://github.com/tristmeister/HEISS-UI), based on [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Their MIT copyright and licence notices remain in [LICENSE](LICENSE). The MantineHub theme is adapted under MIT from RubixCube Innovations. Native MCP modules retain their [AGPL-3.0 notice](server/mcp.LICENSE).
+Studio is a hard fork of [HEISS UI](https://github.com/tristmeister/HEISS-UI), based on [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Their MIT copyright and licence notices remain in [LICENSE](LICENSE). The MantineHub theme is adapted under MIT from RubixCube Innovations. Native MCP modules retain their [AGPL-3.0 notice](backend/mcp.LICENSE).

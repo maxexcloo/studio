@@ -3,6 +3,8 @@
 Build from the Studio checkout with `docker build -f worker/Dockerfile -t studio-worker .`.
 The image contains ComfyUI, the Radiance bridge, Studio custom nodes and isolated
 Radiance libraries. `source.json` pins ComfyUI; `sources.json` pins custom nodes.
+Studio's custom nodes live in `comfyui/` and are copied directly from this
+checkout into `/root/ComfyUI/custom_nodes/` during the worker build.
 
 Deployment configuration belongs to `ai`. Run an ordinary container with a fixed
 GPU placement, mounted model directories and the existing shared lease directory
@@ -54,7 +56,7 @@ requires all three explicit values: `STUDIO_RUNTIME_AUTOMATIC=1`,
 not settings exposed to app users. Runtime status is administrator-only at
 `/api/runtime`; text admission uses its own bearer authentication.
 
-CPU checks: `node --test server/runtime/*.test.ts` and
+CPU checks: `node --test backend/runtime/*.test.ts` and
 `python3 -m unittest discover -s worker -p 'test_*.py'`. Lease tests require Linux
 `flock`; no GPU is needed. The worker workflow performs packaging smoke checks
 and image scanning before publication. A GPU startup and actual inference remain
