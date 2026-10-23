@@ -7,7 +7,7 @@ export type QueueStatus =
   | "completed"
   | "failed"
   | "cancelled";
-export type GenerationOperation = "image" | "refine" | "animate";
+export type GenerationOperation = "image" | "refine" | "animate" | "upscale";
 export type GenerationInput = Record<string, unknown>;
 export type QueueMedia = Record<string, unknown> & { id?: string; url?: string };
 

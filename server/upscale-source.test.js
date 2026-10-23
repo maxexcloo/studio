@@ -12,7 +12,7 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 
 // Real native routes and staging, with PNG bytes behind a stand-in ComfyUI.
 test(
-  "existing-image upscale probes zero gallery dimensions and the active source",
+  "upscale probes owned sources and resumes the accepted prompt after restart",
   { timeout: 30000 },
   async () => {
     const here = path.dirname(fileURLToPath(import.meta.url));
@@ -95,12 +95,22 @@ test(
     fs.writeFileSync(path.join(dataDir, "gallery.json"), JSON.stringify(items));
     const uploads = [];
     const viewRequests = [];
+    let outputAvailable = false;
     const tunnels = new Set();
     const proxy = http.createServer(async (req, res) => {
       const url = new URL(req.url, "http://localhost");
       if (url.pathname === "/view") {
         viewRequests.push(url.searchParams.get("filename"));
-        const buffer = images.get(url.searchParams.get("filename"));
+        if (url.searchParams.get("filename") === "upscaled.png" && !outputAvailable) {
+          res.writeHead(503);
+          res.end();
+          return;
+        }
+        const buffer = images.get(
+          url.searchParams.get("filename") === "upscaled.png"
+            ? "square.png"
+            : url.searchParams.get("filename"),
+        );
         if (!buffer) {
           res.writeHead(404);
           res.end();
@@ -157,7 +167,7 @@ test(
     await new Promise((resolve) => proxy.listen(0, "127.0.0.1", resolve));
     const comfyUrl = "http://127.0.0.1:" + proxy.address().port;
     let server;
-    try {
+    async function start() {
       server = fork(path.join(here, "index.js"), [], {
         cwd: path.join(here, ".."),
         env: {
@@ -166,6 +176,7 @@ test(
           HOST: "127.0.0.1",
           COMFY_URL: comfyUrl,
           STUDIO_DATA_DIR: dataDir,
+          STUDIO_OUTPUT_STORAGE: "studio",
           STUDIO_SEEDVR2_MODEL_DIR: modelDir,
           COMFY_OUTPUT_DIR: "",
           COMFY_INPUT_DIR: "",
@@ -182,7 +193,27 @@ test(
         server.once("message", resolve);
         server.once("exit", (code) => reject(new Error("Server exited " + code + ": " + errors)));
       });
-      const base = message.url.replace("localhost", "127.0.0.1");
+      return message.url.replace("localhost", "127.0.0.1");
+    }
+    async function stop() {
+      if (!server || server.exitCode !== null) return;
+      const exited = new Promise((resolve) => server.once("exit", resolve));
+      server.kill("SIGTERM");
+      await exited;
+    }
+    async function waitFor(base, predicate) {
+      const deadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        const { jobs } = await (await fetch(base + "/api/queue")).json();
+        const match = jobs.find(predicate);
+        if (match) return match;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw new Error("Recorded upscale did not reach the expected state.");
+    }
+    try {
+      let base = await start();
+      const accepted = [];
       for (const [id, width, height] of [
         ["square", 640, 640],
         ["landscape", 960, 640],
@@ -195,6 +226,7 @@ test(
         });
         const result = await response.json();
         assert.equal(response.status, 200, JSON.stringify(result));
+        accepted.push(result.jobId);
         assert.deepEqual(result.plan, upscalePlan({ width, height, quality: "fast" }));
         assert.equal(result.plan.sourceWidth, width);
         assert.equal(result.plan.sourceHeight, height);
@@ -215,12 +247,49 @@ test(
         assert.equal(item.width, 0);
         assert.equal(item.height, 0);
       }
+      const first = await waitFor(base, (job) => job.id === accepted[0] && job.providerJobId);
+      assert.equal(first.operation, "upscale");
+      assert.equal(fake.prompts.length, 1, "conflicting accepted work remains serial");
+      await stop();
+      base = await start();
+      fake.finish(first.providerJobId, {
+        outputs: { 9: { images: [{ filename: "upscaled.png", subfolder: "", type: "output" }] } },
+      });
+      const saving = await waitFor(base, (job) => job.id === first.id && job.reason);
+      assert.equal(saving.status, "running");
+      assert.equal(
+        fake.prompts.length,
+        1,
+        "failed output copying retains the conflicting worker admission",
+      );
+      outputAvailable = true;
+      const completed = await waitFor(
+        base,
+        (job) => job.id === first.id && job.status === "completed",
+      );
+      assert.equal(completed.outputs.length, 1);
+      assert.equal(new URL(completed.outputs[0].url, base).searchParams.get("type"), "media");
+      assert.equal(
+        fake.prompts.filter((prompt) => prompt.client_id === first.id).length,
+        1,
+        "restart follows the recorded prompt without submitting again",
+      );
+      const reopened = await (await fetch(base + "/api/gallery")).json();
+      const square = reopened.items.find((item) => item.id === "square");
+      assert.equal(square.upscaleActive, true);
+      assert.equal(square.upscale.url, completed.outputs[0].url);
+      const saved = await fetch(base + square.upscale.url);
+      assert.equal(saved.status, 200);
+      assert.equal((await sharp(Buffer.from(await saved.arrayBuffer())).metadata()).width, 640);
+      const cancellation = await fetch(base + "/api/upscale/cancel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ galleryItemId: "active" }),
+      });
+      assert.equal(cancellation.status, 200);
+      await waitFor(base, (job) => job.id === accepted[2] && job.status === "cancelled");
     } finally {
-      if (server && server.exitCode === null) {
-        const exited = new Promise((resolve) => server.once("exit", resolve));
-        server.kill("SIGTERM");
-        await exited;
-      }
+      await stop();
       for (const socket of tunnels) socket.destroy();
       proxy.closeAllConnections();
       await new Promise((resolve) => proxy.close(resolve));

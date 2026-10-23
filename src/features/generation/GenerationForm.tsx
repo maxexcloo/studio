@@ -6,7 +6,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  FileButton,
   Group,
   Image,
   NumberInput,
@@ -21,21 +20,25 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, failure, post } from "../../api";
-import type { GenerationInput, ReferenceAsset, Session } from "../../types";
+import type { GenerationInput, Session } from "../../types";
 import { useGeneration } from "./GenerationProvider";
 import { ModelPicker } from "./ModelPicker";
 import { LoraPicker } from "./LoraPicker";
 import { PresetEditor } from "./PresetEditor";
+import { generationInput } from "./payload";
+import { ReferencePicker } from "./ReferencePicker";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
 export function GenerationForm({
   onSubmitted,
   compact = false,
   onControls,
+  autoFocusPrompt = false,
 }: {
   onSubmitted?: () => void;
   compact?: boolean;
   onControls?: () => void;
+  autoFocusPrompt?: boolean;
 }) {
   const { form, draft, setDraft, input, update, profile, profiles, selectProfile, models } =
     useGeneration();
@@ -43,7 +46,6 @@ export function GenerationForm({
   const navigate = useNavigate();
   const location = useLocation();
   const [maskOpen, setMaskOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const assistant = useQuery({
     queryKey: ["assistant"],
     queryFn: () =>
@@ -62,19 +64,7 @@ export function GenerationForm({
       if (form.validate().hasErrors) throw new Error("Describe what you want to create.");
       if (!profile) throw new Error("Choose an available model first.");
       const payload = {
-        ...input,
-        profileId: profile.id,
-        model: profile.model,
-        workflow: profile.workflow,
-        provider: profile.provider,
-        profileName: profile.displayName || profile.label,
-        referenceAssets: draft.references.length
-          ? draft.references.map((asset, i) => ({
-              assetId: asset.id,
-              slot: profile.mediaInputs?.[i]?.id || profile.mediaInputs?.[0]?.id || "image",
-            }))
-          : input.referenceAssets,
-        referenceDetails: draft.references,
+        ...generationInput(input, profile, draft.references),
         operation: draft.operation,
         parentJobId: draft.parentJobId,
       };
@@ -115,23 +105,6 @@ export function GenerationForm({
     },
     onError: failure,
   });
-  async function upload(file: File | null) {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const form = new FormData();
-      form.append("image", file);
-      const result = await api<{ asset: ReferenceAsset }>("/api/reference-assets/upload", {
-        method: "POST",
-        body: form,
-      });
-      setDraft((value) => ({ ...value, references: [...value.references, result.asset] }));
-    } catch (error) {
-      failure(error);
-    } finally {
-      setUploading(false);
-    }
-  }
   const number = (
     key: keyof GenerationInput,
     label: string,
@@ -159,7 +132,7 @@ export function GenerationForm({
       >
         <Stack gap="xs">
           {draft.parentJobId && (
-            <Group gap="xs">
+            <Group gap="xs" wrap="nowrap">
               <Badge variant="light">{draft.operation === "animate" ? "Animate" : "Refine"}</Badge>
               <Text size="xs" c="dimmed">
                 Continue from the selected result
@@ -181,11 +154,16 @@ export function GenerationForm({
             </Group>
           )}
           {draft.references.length > 0 && (
-            <Group gap="xs">
+            <Group gap="xs" wrap="nowrap" style={{ overflowX: "auto", paddingBottom: 2 }}>
               {draft.references.map((asset) => (
-                <Group gap={4} key={asset.id}>
+                <Group
+                  gap={4}
+                  key={asset.id}
+                  wrap="nowrap"
+                  style={{ flexShrink: 0, maxWidth: 200 }}
+                >
                   <Image src={asset.thumbnailUrl} alt={asset.name} h={36} w={36} radius="sm" />
-                  <Text size="xs" c="dimmed">
+                  <Text size="xs" c="dimmed" truncate>
                     {asset.name}
                   </Text>
                 </Group>
@@ -199,8 +177,8 @@ export function GenerationForm({
               input.kind === "video" ? "Describe the motion…" : "Describe it. Make it yours."
             }
             autosize
-            minRows={2}
-            maxRows={5}
+            minRows={1}
+            maxRows={1}
             variant="unstyled"
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
@@ -208,20 +186,7 @@ export function GenerationForm({
           />
           <Group justify="space-between" wrap="nowrap" className="studio-composer-actions">
             <Group gap="xs" wrap="nowrap" className="studio-composer-tools">
-              <FileButton onChange={(file) => void upload(file)} accept="image/*">
-                {(props) => (
-                  <Button
-                    {...props}
-                    aria-label="Upload Reference"
-                    variant="subtle"
-                    size="compact-sm"
-                    loading={uploading}
-                  >
-                    <span className="studio-generation-label-wide">+ Reference</span>
-                    <span className="studio-generation-label-narrow">+</span>
-                  </Button>
-                )}
-              </FileButton>
+              <ReferencePicker compact />
               <Button
                 data-generation-controls
                 variant="default"
@@ -318,6 +283,8 @@ export function GenerationForm({
         )}
         {models.error && <Alert color="red">{models.error.message}</Alert>}
         <Textarea
+          data-expanded-prompt
+          data-autofocus={autoFocusPrompt || undefined}
           label="Prompt"
           placeholder={
             input.kind === "image"
@@ -370,13 +337,7 @@ export function GenerationForm({
               <Text size="sm" fw={500}>
                 References
               </Text>
-              <FileButton onChange={(file) => void upload(file)} accept="image/*">
-                {(props) => (
-                  <Button {...props} size="compact-sm" variant="default" loading={uploading}>
-                    Upload Reference
-                  </Button>
-                )}
-              </FileButton>
+              <ReferencePicker />
             </Group>
             {draft.references.map((asset) => (
               <Paper key={asset.id} p="xs">

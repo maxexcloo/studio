@@ -4,6 +4,7 @@ import { api, failure } from "../../api";
 import type { MediaItem, QueueJob } from "../../types";
 import { useMediaAction } from "../gallery/useMediaAction";
 import { terminal } from "../generation/Queue";
+import { GenerationCard } from "./GenerationCard";
 function SessionResult({
   item,
   sessionId,
@@ -105,16 +106,18 @@ export function SessionIteration({
   );
   return (
     <article className="studio-thread-iteration" aria-label={`Iteration ${index + 1}`}>
-      <div className="studio-thread-prompt">
+      <div>
         <Text size="xs" c="dimmed" mb={6}>
           {job.operation === "refine"
             ? "Refine"
             : job.operation === "animate"
               ? "Animate"
-              : "Image"}
+              : job.operation === "upscale"
+                ? "Upscale"
+                : "Image"}
           {parentIndex >= 0 ? ` · from iteration ${parentIndex + 1}` : ""}
         </Text>
-        <Text style={{ whiteSpace: "pre-wrap" }}>{job.input.prompt}</Text>
+        <GenerationCard job={job} />
       </div>
       <Stack gap="md">
         <Group gap="xs">

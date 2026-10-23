@@ -3,6 +3,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useMediaQuery } from "@mantine/hooks";
 import { Badge, Group, Text } from "@mantine/core";
 import type { MediaItem } from "../../types";
+import { galleryReferenceType } from "../generation/references";
 export function MediaGrid({
   items,
   open,
@@ -55,6 +56,14 @@ export function MediaGrid({
               transform: `translateY(${placement.start - virtual.options.scrollMargin}px)`,
             }}
             aria-label={`Open ${item.type}: ${item.prompt || item.filename || "Result"}`}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = "copy";
+              event.dataTransfer.setData(
+                galleryReferenceType,
+                JSON.stringify({ id: item.id, type: item.type }),
+              );
+            }}
             onClick={() => open(item)}
           >
             {!source ? (
@@ -78,6 +87,7 @@ export function MediaGrid({
                 width={item.width || 1024}
                 height={item.height || 1024}
                 loading="lazy"
+                draggable={false}
                 onError={(event) => {
                   event.currentTarget.style.visibility = "hidden";
                 }}

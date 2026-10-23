@@ -6,7 +6,7 @@ import {
   removeComfyFiles,
   temporaryInputFiles,
 } from "./media-store.js";
-import { dataDir, flushGallery } from "./gallery-store.js";
+import { dataDir, flushGalleryStrict } from "./gallery-store.js";
 import { createCloudJobStore, isCloudGraph } from "./cloud-jobs.js";
 import { currentComfyBackend, withComfyBackend } from "./comfy-backends.js";
 import { defaultWorkerId } from "./workers.js";
@@ -679,7 +679,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
       if (mediaStorageEnabled) {
-        await flushGallery();
+        await flushGalleryStrict();
         noteIngested([id]);
         await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
         if (comfyCopies.length)

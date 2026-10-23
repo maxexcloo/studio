@@ -13,7 +13,7 @@ export function MediaComparison({
 }) {
   const [position, setPosition] = useState(50);
   return (
-    <Stack gap="sm">
+    <Stack gap="sm" className="studio-comparison-layout">
       <Group justify="space-between">
         <Text size="xs" c="dimmed">
           Original

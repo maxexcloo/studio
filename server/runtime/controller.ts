@@ -27,6 +27,8 @@ export interface RuntimeLease {
 export class RuntimeController {
   readonly workloads: Workload[];
   readonly automaticLifecycle: boolean;
+  /** Recovery can hold a recorded legacy operation through durable output saving. */
+  beforeStop?: (workload: Workload) => Promise<void>;
   private active = new Map<string, number>();
   private startingDevices = new Set<string>();
   private engine: RuntimeEngine;
@@ -76,6 +78,7 @@ export class RuntimeController {
           throw new RuntimeUnavailable(
             "The selected worker is offline; automatic lifecycle control is disabled.",
           );
+        for (const other of runningConflicts) await this.beforeStop?.(other);
         for (const other of runningConflicts) await this.engine.stop(other.container);
         await this.engine.start(workload.container);
         if (!(await this.engine.running(workload.container)))

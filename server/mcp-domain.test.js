@@ -71,6 +71,43 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
     const generated = await media.request("POST", "/api/generate", input, "alice");
     assert.deepEqual(generated, httpResult.payload);
     assert.equal(store.jobs("alice").length, 1);
+    const sessionId = httpResult.payload.sessionId;
+    const foreignSession = store.createSession("bob");
+    assert.equal(
+      (
+        await admit({ prompt: "Refine" }, accounts.get("alice"), {
+          sessionId: foreignSession.id,
+          operation: "refine",
+        })
+      ).status,
+      404,
+    );
+    const anotherSession = store.createSession("alice");
+    assert.equal(
+      (
+        await admit({ prompt: "Refine" }, accounts.get("alice"), {
+          sessionId: anotherSession.id,
+          operation: "refine",
+          parentJobId: input.clientJobId,
+        })
+      ).status,
+      400,
+    );
+    const scoped = await admit(
+      { prompt: "Refine", clientJobId: "session-turn" },
+      accounts.get("alice"),
+      { sessionId, operation: "refine", parentJobId: input.clientJobId },
+    );
+    assert.equal(scoped.status, 200);
+    assert.equal(scoped.payload.sessionId, sessionId);
+    assert.equal(store.job("alice", "session-turn").parentJobId, input.clientJobId);
+    const duplicateTurn = await admit(
+      { prompt: "Refine", clientJobId: "session-turn" },
+      accounts.get("alice"),
+      { sessionId, operation: "refine", parentJobId: input.clientJobId },
+    );
+    assert.equal(duplicateTurn.payload.jobId, scoped.payload.jobId);
+    assert.equal(store.jobs("alice").length, 2);
     assert.deepEqual(await media.request("GET", "/api/jobs/owned-generation", undefined, "alice"), {
       status: "queued",
     });

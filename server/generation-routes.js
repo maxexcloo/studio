@@ -167,6 +167,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             payload: { ok: false, error: "References are not enabled for this account." },
           };
       }
+      if (demoMode && !workers.length) return { backend: currentComfyBackend() };
       const worker = pinnedBackend
         ? workerById(pinnedBackend)
         : routeProfile(profile, { prefers: input?.autoUpscale ? ["upscale"] : [] });

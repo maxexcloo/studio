@@ -99,13 +99,14 @@ export async function ingestOutput(output, ownerId = "") {
  * The returned `comfyFiles` are removed from ComfyUI only after the gallery
  * has the new addresses (removeComfyFiles).
  */
-export async function ingestRunResults(results, ownerId = "") {
+export async function ingestRunResults(results, ownerId = "", { strict = false } = {}) {
   const move = async (output) => {
     if (!output?.url) return { output, comfyFile: null };
     try {
       const moved = await ingestOutput(output, ownerId);
       return moved || { output, comfyFile: null };
     } catch (error) {
+      if (strict) throw error;
       console.warn(`[Studio] Keeping an output in ComfyUI: ${error.message}`);
       return { output, comfyFile: null };
     }

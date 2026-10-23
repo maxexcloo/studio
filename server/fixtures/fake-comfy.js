@@ -34,6 +34,7 @@ export async function startFakeComfy({
   const requests = [];
   const history = {};
   const sockets = new Map();
+  const connections = new Set();
   const waiting = new Map();
   // Runs that left the queue: finished (into history) or dropped (a restart).
   const ended = new Set();
@@ -126,6 +127,10 @@ export async function startFakeComfy({
     json(res, 404, { error: "not in the fake" });
   });
 
+  server.on("connection", (socket) => {
+    connections.add(socket);
+    socket.on("close", () => connections.delete(socket));
+  });
   server.on("upgrade", (req, socket) => {
     const url = new URL(req.url, "http://localhost");
     const accept = crypto
@@ -145,7 +150,9 @@ export async function startFakeComfy({
     const clientId = url.searchParams.get("clientId") || "";
     sockets.set(clientId, socket);
     socket.on("error", () => {});
-    socket.on("close", () => sockets.delete(clientId));
+    socket.on("close", () => {
+      if (sockets.get(clientId) === socket) sockets.delete(clientId);
+    });
     waiting.get(`socket:${clientId}`)?.();
   });
 
@@ -202,7 +209,7 @@ export async function startFakeComfy({
         : { prompt, outputs, status: { status_str: "success", completed: true, messages: [] } };
     },
     close() {
-      for (const socket of sockets.values()) socket.destroy();
+      for (const socket of connections) socket.destroy();
       return new Promise((resolve) => server.close(resolve));
     },
   };

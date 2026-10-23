@@ -11,11 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> A media-first workspace with visual iteration sessions and a persistent generation queue
+> Media sessions, conversational iteration and durable jobs
 
 ### Changed
 
-- Replace the legacy frontend with Mantine, shared responsive generation controls and Image, Video and Chat views. Gallery generation stays at the bottom; Chat keeps media iterations and session history together.
+- Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
 - Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
 - Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal.
 - Read profiles, guides and catalogue definitions from the ai-owned configuration mount. User presets remain editable; definition editing and approval are deferred.
