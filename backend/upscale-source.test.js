@@ -213,21 +213,30 @@ test(
     }
     try {
       let base = await start();
+      const status = await (await fetch(base + "/api/upscale/status?quality=fast")).json();
+      assert.deepEqual(status.qualities, ["fast", "balanced", "high"]);
+      assert.deepEqual(status.targets, [2048, 4096]);
+      const invalid = await fetch(base + "/api/upscale", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ galleryItemId: "square", quality: "fast", target: 8192 }),
+      });
+      assert.equal(invalid.status, 400);
       const accepted = [];
-      for (const [id, width, height] of [
-        ["square", 640, 640],
-        ["landscape", 960, 640],
+      for (const [id, width, height, target] of [
+        ["square", 640, 640, 4096],
+        ["landscape", 960, 640, 2048],
         ["active", 960, 640],
       ]) {
         const response = await fetch(base + "/api/upscale", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ galleryItemId: id, quality: "fast" }),
+          body: JSON.stringify({ galleryItemId: id, quality: "fast", target }),
         });
         const result = await response.json();
         assert.equal(response.status, 200, JSON.stringify(result));
         accepted.push(result.jobId);
-        assert.deepEqual(result.plan, upscalePlan({ width, height, quality: "fast" }));
+        assert.deepEqual(result.plan, upscalePlan({ width, height, quality: "fast", target }));
         assert.equal(result.plan.sourceWidth, width);
         assert.equal(result.plan.sourceHeight, height);
         assert.ok(result.plan.resolution > 16);
@@ -249,9 +258,15 @@ test(
       }
       const first = await waitFor(base, (job) => job.id === accepted[0] && job.providerJobId);
       assert.equal(first.operation, "upscale");
+      assert.equal(first.input.upscaleBody.target, 4096);
+      assert.equal(first.input.upscalePlan.estimatedWidth, 4096);
+      assert.equal(fake.prompts[0].prompt["5"].inputs.resolution, 4096);
       assert.equal(fake.prompts.length, 1, "conflicting accepted work remains serial");
       await stop();
       base = await start();
+      const restored = await waitFor(base, (job) => job.id === first.id && job.providerJobId);
+      assert.equal(restored.input.upscaleBody.target, 4096);
+      assert.equal(restored.input.upscalePlan.estimatedHeight, 4096);
       fake.finish(first.providerJobId, {
         outputs: { 9: { images: [{ filename: "upscaled.png", subfolder: "", type: "output" }] } },
       });

@@ -1,18 +1,27 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useMediaQuery } from "@mantine/hooks";
 import { Badge, Box, Checkbox, Group, Text, UnstyledButton } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { galleryReferenceType } from "../generation/references";
 import type { GallerySelection } from "./useGallerySelection";
+import { mediaSource } from "./mediaSource";
 export function MediaGrid({
   items,
   open,
   selection,
+  focusItem,
+  renderActions,
 }: {
   items: MediaItem[];
   open: (item: MediaItem) => void;
   selection?: GallerySelection;
+  focusItem?: string | null;
+  renderActions?: (
+    item: MediaItem,
+    opened: boolean,
+    onOpenedChange: (opened: boolean) => void,
+  ) => ReactNode;
 }) {
   const phone = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
   const compact = useMediaQuery("(max-width: 75em)", false, { getInitialValueInEffect: false });
@@ -20,6 +29,7 @@ export function MediaGrid({
   const host = useRef<HTMLDivElement>(null),
     [width, setWidth] = useState(0);
   const pendingFocus = useRef<string | null>(null);
+  const [contextItemId, setContextItemId] = useState<string | null>(null);
   useLayoutEffect(() => {
     if (!pendingFocus.current) return;
     const button = host.current?.querySelector<HTMLButtonElement>(
@@ -49,18 +59,40 @@ export function MediaGrid({
     estimateSize: (index) =>
       (columnWidth * (items[index].height || 1024)) / (items[index].width || 1024),
     getItemKey: (index) => items[index].id,
-    overscan: columns * 2,
+    overscan: 2,
     scrollMargin: host.current?.offsetTop || 0,
   });
   useLayoutEffect(() => virtual.measure(), [width, columns, dimensions, virtual]);
+  useLayoutEffect(() => {
+    if (!focusItem || !width) return;
+    const index = items.findIndex((item) => item.id === focusItem);
+    if (index < 0) return;
+    pendingFocus.current = focusItem;
+    virtual.scrollToIndex(index, { align: "auto" });
+    const button = host.current?.querySelector<HTMLButtonElement>(
+      `[data-media-id="${CSS.escape(focusItem)}"]`,
+    );
+    if (button) {
+      button.focus({ preventScroll: true });
+      button.scrollIntoView({ block: "nearest" });
+      pendingFocus.current = null;
+    }
+  }, [focusItem, width, virtual]);
   return (
     <div ref={host} style={{ height: virtual.getTotalSize(), position: "relative" }}>
       {virtual.getVirtualItems().map((placement) => {
         const item = items[placement.index],
-          source = item.thumbnailUrl || item.preview || item.url;
+          media = mediaSource(item),
+          source = media.thumbnailUrl || item.preview || media.url;
         return (
           <Box
             key={item.id}
+            className="studio-media-tile"
+            onContextMenu={(event) => {
+              if (!renderActions || selection?.selecting) return;
+              event.preventDefault();
+              setContextItemId(item.id);
+            }}
             style={{
               position: "absolute",
               top: 0,
@@ -124,8 +156,8 @@ export function MediaGrid({
               ) : item.type === "video" ? (
                 <video
                   className="studio-preview"
-                  src={item.url || undefined}
-                  poster={item.thumbnailUrl}
+                  src={media.url || undefined}
+                  poster={media.thumbnailUrl}
                   preload="none"
                   muted
                   playsInline
@@ -137,8 +169,8 @@ export function MediaGrid({
                   className="studio-preview"
                   src={source}
                   alt={item.prompt || "Generated Image"}
-                  width={item.width || 1024}
-                  height={item.height || 1024}
+                  width={media.width || 1024}
+                  height={media.height || 1024}
                   loading="lazy"
                   draggable={false}
                   onError={(event) => {
@@ -167,6 +199,10 @@ export function MediaGrid({
                 </Group>
               </div>
             </UnstyledButton>
+            {!selection?.selecting &&
+              renderActions?.(item, contextItemId === item.id, (opened) =>
+                setContextItemId(opened ? item.id : null),
+              )}
             {selection?.selecting && (item.status === "done" || item.status === "error") && (
               <Checkbox
                 pos="absolute"

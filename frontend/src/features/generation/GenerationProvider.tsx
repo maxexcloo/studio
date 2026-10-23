@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useForm } from "@mantine/form";
 import { useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
@@ -57,44 +65,57 @@ const empty: Draft = {
   presetId: undefined,
   presetTitle: undefined,
 };
-function useGenerationState() {
+const emptyProfiles: Profile[] = [];
+type Workspace = "chat" | "gallery";
+function useGenerationState(workspace: Workspace) {
   const [prepared, setPrepared] = useState(false);
-  const drafts = useRef<Record<MediaKind, Draft>>({
+  const initialDrafts: Record<MediaKind, Draft> = {
     image: empty,
     video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
-  });
-  const form = useForm<Draft>({
-    mode: "controlled",
+  };
+  const drafts = useRef({ chat: { ...initialDrafts }, gallery: { ...initialDrafts } });
+  const options = {
+    mode: "controlled" as const,
     initialValues: empty,
     validate: {
-      input: { prompt: (value) => (value.trim() ? null : "Describe what you want to create.") },
+      input: {
+        prompt: (value: string) => (value.trim() ? null : "Describe what you want to create."),
+      },
     },
-  });
+  };
+  const chatForm = useForm<Draft>(options);
+  const galleryForm = useForm<Draft>(options);
+  const form = workspace === "chat" ? chatForm : galleryForm;
   const draft = form.values;
-  const formRef = useRef(form);
-  formRef.current = form;
-  const setDraft = useCallback((value: Draft | ((previous: Draft) => Draft)) => {
-    const previous = formRef.current.getValues();
-    const next = {
-      ...empty,
-      ...(typeof value === "function" ? value(previous) : value),
-    };
-    drafts.current[previous.input.kind] = previous;
-    drafts.current[next.input.kind] = next;
-    formRef.current.setValues(next);
-  }, []);
-  const changeKind = useCallback(
-    (kind: MediaKind) => {
-      if (formRef.current.getValues().input.kind !== kind) setDraft(drafts.current[kind]);
+  const forms = useRef({ chat: chatForm, gallery: galleryForm });
+  forms.current = { chat: chatForm, gallery: galleryForm };
+  const setDraft = useCallback(
+    (value: Draft | ((previous: Draft) => Draft), target: Workspace = workspace) => {
+      const targetForm = forms.current[target];
+      const previous = targetForm.getValues();
+      const next = {
+        ...empty,
+        ...(typeof value === "function" ? value(previous) : value),
+      };
+      drafts.current[target][previous.input.kind] = previous;
+      drafts.current[target][next.input.kind] = next;
+      targetForm.setValues(next);
     },
-    [setDraft],
+    [workspace],
+  );
+  const changeKind = useCallback(
+    (kind: MediaKind, target: Workspace = workspace) => {
+      if (forms.current[target].getValues().input.kind !== kind)
+        setDraft(drafts.current[target][kind], target);
+    },
+    [setDraft, workspace],
   );
   const models = useQuery({
     queryKey: ["models"],
     queryFn: () => api<Models>("/api/models"),
     refetchInterval: 15000,
   });
-  const profiles = models.data?.profiles ?? [];
+  const profiles = models.data?.profiles ?? emptyProfiles;
   const selectedDefault =
     draft.input.kind === "image"
       ? models.data?.defaults?.imageModel
@@ -137,9 +158,37 @@ function useGenerationState() {
   };
 }
 const Context = createContext<ReturnType<typeof useGenerationState> | null>(null);
-export function GenerationProvider({ children }: { children: ReactNode }) {
-  const value = useGenerationState();
-  return <Context.Provider value={value}>{children}</Context.Provider>;
+const GenerationActionsContext = createContext<Pick<
+  ReturnType<typeof useGenerationState>,
+  "profiles" | "setDraft" | "changeKind" | "setPrepared"
+> | null>(null);
+export function GenerationProvider({
+  children,
+  workspace,
+}: {
+  children: ReactNode;
+  workspace: Workspace;
+}) {
+  const value = useGenerationState(workspace);
+  const actions = useMemo(
+    () => ({
+      profiles: value.profiles,
+      setDraft: value.setDraft,
+      changeKind: value.changeKind,
+      setPrepared: value.setPrepared,
+    }),
+    [value.profiles, value.setDraft, value.changeKind, value.setPrepared],
+  );
+  return (
+    <GenerationActionsContext.Provider value={actions}>
+      <Context.Provider value={value}>{children}</Context.Provider>
+    </GenerationActionsContext.Provider>
+  );
+}
+export function useGenerationActions() {
+  const context = useContext(GenerationActionsContext);
+  if (!context) throw new Error("GenerationProvider is required");
+  return context;
 }
 export function useGeneration() {
   const context = useContext(Context);

@@ -88,16 +88,6 @@ select {
     opacity: 0;
   }
 }
-.studio-media-button .studio-preview,
-.studio-thread-media img,
-.studio-thread-media video {
-  transition: filter var(--studio-motion-duration) ease;
-}
-.studio-media-button:active .studio-preview,
-.studio-thread-media:active img,
-.studio-thread-media:active video {
-  filter: brightness(0.88);
-}
 .studio-media-status {
   position: absolute;
   top: 0.75rem;

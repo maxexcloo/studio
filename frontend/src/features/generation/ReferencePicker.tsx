@@ -8,6 +8,7 @@ import {
   FileButton,
   Group,
   Image,
+  Modal,
   Pill,
   Popover,
   ScrollArea,
@@ -19,8 +20,8 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
-import { ImagePlus, ArrowLeft, Upload } from "lucide-react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../types";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -35,7 +36,7 @@ import {
 } from "../gallery/GalleryFilters";
 import { addReference, referenceDetails, referencePatch } from "./payload";
 import { useGeneration } from "./GenerationProvider";
-import { useGalleryReference } from "./references";
+import { referenceLabel, useGalleryReference } from "./references";
 import { useReferenceUpload } from "./useReferenceUpload";
 
 export function ReferencePicker({
@@ -86,6 +87,7 @@ export function ReferencePicker({
     slotLimit > 1 && references.filter((asset) => asset.slot === slot).length >= slotLimit;
   const [query, setQuery] = useState("");
   const [source, setSource] = useState<"gallery" | "uploads">("gallery");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search] = useDebouncedValue(query, 250);
   const client = useQueryClient();
   const [filters, setFilters] = useState<GalleryFilterValues>(emptyGalleryFilters);
@@ -105,7 +107,51 @@ export function ReferencePicker({
   }
   const adopt = (asset: ReferenceAsset) =>
     setReferences(addReference(currentReferences.current, asset, profile, slot));
-  const select = useGalleryReference(undefined, adopt);
+  const deletion = useMutation({
+    mutationFn: (id: string) =>
+      api(`/api/reference-assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    onSuccess: async (_result, id) => {
+      setReferences(currentReferences.current.filter((asset) => asset.id !== id));
+      await client.invalidateQueries({ queryKey: ["reference-uploads"] });
+      setDeleteId(null);
+    },
+  });
+  function dismissDelete() {
+    if (deletion.isPending) return;
+    setDeleteId(null);
+    deletion.reset();
+  }
+  const deleteDialog = (
+    <Modal
+      opened={deleteId !== null}
+      onClose={dismissDelete}
+      title="Delete Upload"
+      centered
+      closeOnClickOutside={!deletion.isPending}
+      closeOnEscape={!deletion.isPending}
+      closeButtonProps={{ disabled: deletion.isPending }}
+    >
+      <Stack>
+        <Text>
+          Delete this uploaded image from Studio? References using it will need another image.
+        </Text>
+        {deletion.error && <Alert color="red">{deletion.error.message}</Alert>}
+        <Group justify="flex-end">
+          <Button variant="default" disabled={deletion.isPending} onClick={dismissDelete}>
+            Cancel
+          </Button>
+          <Button
+            color="red"
+            loading={deletion.isPending}
+            onClick={() => deleteId && deletion.mutate(deleteId)}
+          >
+            Delete Upload
+          </Button>
+        </Group>
+      </Stack>
+    </Modal>
+  );
+  const select = useGalleryReference(adopt);
   const { upload, uploading } = useReferenceUpload((asset) => {
     adopt(asset);
     void client.invalidateQueries({ queryKey: ["reference-uploads"] });
@@ -144,9 +190,10 @@ export function ReferencePicker({
   const listing = source === "uploads" ? uploads : gallery;
   const choices =
     source === "uploads"
-      ? (uploads.data?.pages.flatMap((page) => page.items) || []).map((asset) => ({
+      ? (uploads.data?.pages.flatMap((page) => page.items) || []).map((asset, index) => ({
           id: asset.id,
-          name: asset.name,
+          name: `Reference ${index + 1}`,
+          deleteId: asset.id,
           thumbnailUrl: asset.thumbnailUrl || asset.url,
           choose: () => adopt(asset),
         }))
@@ -155,6 +202,7 @@ export function ReferencePicker({
           .map((item) => ({
             id: item.id,
             name: item.prompt || "Result",
+            deleteId: undefined,
             thumbnailUrl: item.thumbnailUrl || item.url,
             choose: () => select.mutate(item),
           }));
@@ -235,23 +283,25 @@ export function ReferencePicker({
           kind="references"
           items={references}
           identity={(asset) => `${asset.slot}:${asset.id}`}
-          label={(asset) =>
-            `${asset.name} (${slots.find((slot) => slot.id === asset.slot)?.label || asset.slot})`
-          }
+          label={(asset) => referenceLabel(asset, references.indexOf(asset), profile)}
           onChange={setReferences}
         >
-          {(asset) => (
+          {(asset, index) => (
             <Group gap="xs" wrap="nowrap">
               <Image
                 src={asset.thumbnailUrl || asset.url}
-                alt={asset.name}
+                alt={referenceLabel(asset, index, profile)}
                 h={32}
                 w={32}
                 radius="sm"
               />
               <Pill
                 withRemoveButton
-                removeButtonProps={{ "aria-label": `Remove ${asset.name} From ${asset.slot}` }}
+                removeButtonProps={{
+                  "aria-label": `Remove ${referenceLabel(asset, index, profile)}`,
+                  "aria-hidden": false,
+                  tabIndex: 0,
+                }}
                 onRemove={() =>
                   setReferences(
                     references.filter(
@@ -260,10 +310,7 @@ export function ReferencePicker({
                   )
                 }
               >
-                {asset.name}
-                {slots.length > 1
-                  ? ` · ${slots.find((slot) => slot.id === asset.slot)?.label || asset.slot}`
-                  : ""}
+                {referenceLabel(asset, index, profile)}
               </Pill>
             </Group>
           )}
@@ -306,21 +353,37 @@ export function ReferencePicker({
           <Alert color="red">{listing.error.message}</Alert>
         ) : choices.length ? (
           <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
-            {choices.map((item) => (
-              <UnstyledButton
-                key={item.id}
-                aria-label={`Use reference: ${item.name}`}
-                onClick={item.choose}
-                disabled={select.isPending || slotFull}
-                style={{
-                  borderRadius: "var(--mantine-radius-md)",
-                  overflow: "hidden",
-                  aspectRatio: "1",
-                  border: "1px solid var(--mantine-color-default-border)",
-                }}
-              >
-                <Image src={item.thumbnailUrl} alt={item.name} h="100%" w="100%" fit="cover" />
-              </UnstyledButton>
+            {choices.map((item, index) => (
+              <Stack key={item.id} gap={4}>
+                <UnstyledButton
+                  aria-label={`Use reference: ${item.name}`}
+                  onClick={item.choose}
+                  disabled={select.isPending || slotFull}
+                  style={{
+                    borderRadius: "var(--mantine-radius-md)",
+                    overflow: "hidden",
+                    aspectRatio: "1",
+                    border: "1px solid var(--mantine-color-default-border)",
+                  }}
+                >
+                  <Image src={item.thumbnailUrl} alt={item.name} h="100%" w="100%" fit="cover" />
+                </UnstyledButton>
+                {item.deleteId && (
+                  <Group justify="flex-end">
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      aria-label={`Delete Upload ${index + 1}`}
+                      onClick={() => {
+                        deletion.reset();
+                        setDeleteId(item.deleteId);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </ActionIcon>
+                  </Group>
+                )}
+              </Stack>
             ))}
           </SimpleGrid>
         ) : (
@@ -356,7 +419,7 @@ export function ReferencePicker({
       {references[0] ? (
         <Image
           src={references[0].thumbnailUrl || references[0].url}
-          alt={references[0].name}
+          alt={referenceLabel(references[0], 0, profile)}
           h={36}
           w={36}
           radius="sm"
@@ -375,7 +438,13 @@ export function ReferencePicker({
       Add Reference
     </Button>
   );
-  if (inline && opened) return content;
+  if (inline && opened)
+    return (
+      <>
+        {content}
+        {deleteDialog}
+      </>
+    );
   if (narrow)
     return (
       <>
@@ -387,22 +456,28 @@ export function ReferencePicker({
           position="bottom"
           size="100%"
           transitionProps={{ duration: motionDuration }}
+          trapFocus={deleteId === null}
         >
           {content}
         </Drawer>
+        {deleteDialog}
       </>
     );
   return (
-    <Popover
-      opened={opened}
-      onChange={setOpened}
-      width={560}
-      position="top-start"
-      trapFocus
-      shadow="md"
-    >
-      <Popover.Target>{trigger}</Popover.Target>
-      <Popover.Dropdown aria-label="References">{content}</Popover.Dropdown>
-    </Popover>
+    <>
+      <Popover
+        opened={opened}
+        onChange={setOpened}
+        width={560}
+        position="top-start"
+        trapFocus={deleteId === null}
+        closeOnClickOutside={deleteId === null}
+        shadow="md"
+      >
+        <Popover.Target>{trigger}</Popover.Target>
+        <Popover.Dropdown aria-label="References">{content}</Popover.Dropdown>
+      </Popover>
+      {deleteDialog}
+    </>
   );
 }

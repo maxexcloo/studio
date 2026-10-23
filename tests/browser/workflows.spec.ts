@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, openNav, openTheme, profiles, section, stamp } from "./fixtures";
+import {
+  create,
+  fixtures,
+  image,
+  openNav,
+  openTheme,
+  profiles,
+  section,
+  stamp,
+  viewerAction,
+} from "./fixtures";
 
 test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
   const state = await fixtures(page);
@@ -52,7 +62,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
   await page.getByRole("button", { name: "Use References", exact: true }).click();
   await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
-  await expect(page.getByRole("img", { name: "reference.png", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Paint the Area to Refine" })).toBeVisible();
   await page.locator("canvas").click({ position: { x: 40, y: 40 } });
@@ -177,7 +187,7 @@ test("The compact composer expands on interaction and keeps picked or dragged re
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Preserve the working direction",
   );
-  await expect(page.getByRole("img", { name: "Generated Reference", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   expect(state.referenceRequests[0].galleryItemId).toBe("reference-0");
   if (testInfo.project.use.isMobile) await page.keyboard.press("Escape");
   else await page.getByRole("link", { name: "Images", exact: true }).first().click();
@@ -419,6 +429,38 @@ test("Generation controls preserve the draft and return keyboard focus with redu
 
 test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await fixtures(page);
+  await page.route("**/api/models", (route) =>
+    route.fulfill({
+      json: {
+        profiles: [
+          profiles[0],
+          {
+            ...profiles[0],
+            id: "image:other",
+            label: "Other Quality",
+            family: "other",
+            familyName: "Other Images",
+            options: { loras: ["other-detail.safetensors"] },
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/loras/info", (route) =>
+    route.fulfill({
+      json: {
+        loras: {
+          "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
+          "detail.safetensors": { title: "Detail Slider", families: ["test"], type: "slider" },
+          "other-detail.safetensors": {
+            title: "Other Detail",
+            families: ["other"],
+            type: "slider",
+          },
+        },
+      },
+    }),
+  );
   await create(page);
   await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
   await page.getByRole("combobox", { name: "LoRA Type", exact: true }).click();
@@ -426,6 +468,15 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
   await page.getByRole("option", { name: "Soft Style", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Soft Style", exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Profile", exact: true }).click();
+  await page.getByRole("option", { name: "Other Quality", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "LoRA Type", exact: true })).toHaveValue("");
+  await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
+  await page.getByRole("option", { name: "Other Detail", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
+  ).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Enable Soft Style", exact: true })).toBeChecked();
 });
 
 test("Waiting jobs show their reason and cancellation is scoped to the recorded job", async ({
@@ -485,7 +536,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
 
 test("Upscale comparison uses one bounded slider and preserves the original result", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "original",
@@ -502,9 +553,7 @@ test("Upscale comparison uses one bounded slider and preserves the original resu
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Comparison Study", exact: true }).click();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  await viewerAction(page, "Compare");
   const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
   await expect(slider).toBeVisible();
   await slider.focus();
@@ -964,7 +1013,7 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
 
 test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile settings", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "legacy-item",
@@ -985,11 +1034,9 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await page.getByRole("button", { name: "Recreate", exact: true }).click();
+  await viewerAction(page, "Recreate");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await expect(page.getByRole("img", { name: "Saved Reference", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
@@ -1024,7 +1071,7 @@ test("Generation size presets and custom dimensions preserve profile constraints
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
   await page.getByRole("button", { name: "Image Size", exact: true }).click();
-  await page.getByRole("button", { name: "Landscape", exact: true }).click();
+  await page.getByRole("button", { name: "Landscape 1536 × 1024", exact: true }).click();
   await page.getByText("Custom", { exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1536");
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1600");
@@ -1105,9 +1152,7 @@ test("Retry pending state is shared while unrelated jobs remain cancellable", as
   }
 });
 
-test("Viewer deletion retains failed media and waits for confirmed removal", async ({
-  page,
-}, testInfo) => {
+test("Viewer deletion retains failed media and waits for confirmed removal", async ({ page }) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "delete-study",
@@ -1134,9 +1179,7 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
     await page.goto("/images");
     await page.getByRole("button", { name: "Open image: Delete Study", exact: true }).click();
     const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-    if (testInfo.project.use.isMobile)
-      await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
-    await viewer.getByRole("button", { name: "Delete", exact: true }).click();
+    await viewerAction(page, "Delete");
     const confirmation = page.getByRole("dialog", { name: "Delete Item", exact: true });
     await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(confirmation.getByText("Some Items Remain", { exact: true })).toBeVisible();
@@ -1170,6 +1213,9 @@ test("Desktop status inspects endpoint health without changing the queue", async
   await expect(panel.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
     "Image Worker",
   );
+  await panel.getByRole("combobox", { name: "Images Endpoint", exact: true }).click();
+  await page.getByRole("option", { name: "Image Worker", exact: true }).click();
+  await expect(panel).toBeVisible();
   await expect(panel.getByText("Fixture GPU", { exact: false })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
@@ -1207,7 +1253,7 @@ test("Owned uploaded references can be reused without another upload", async ({ 
     .fill("Reuse an earlier photograph");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await page.getByText("Uploads", { exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Past Upload", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
   await page.getByRole("button", { name: "Use References", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -1289,7 +1335,10 @@ test("Prompt history reuses positive and negative prompts independently and pers
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
-  await panel.getByRole("button", { name: "Use Prompt: Earlier landscape", exact: true }).click();
+  const historySearch = panel.getByRole("textbox", { name: "Search Prompt History", exact: true });
+  await historySearch.fill("landscape");
+  await historySearch.press("ArrowDown");
+  await historySearch.press("Enter");
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Earlier landscape",
   );
@@ -1298,7 +1347,7 @@ test("Prompt history reuses positive and negative prompts independently and pers
   );
   await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
   panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
-  await panel.getByRole("button", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
+  await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Earlier landscape",
   );

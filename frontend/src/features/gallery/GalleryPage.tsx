@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionIcon, Alert, Button, Stack, Tooltip, VisuallyHidden } from "@mantine/core";
+import { ActionIcon, Alert, Button, Stack, Text, Tooltip, VisuallyHidden } from "@mantine/core";
 import { SquareCheck } from "lucide-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useSearchParams, useLocation } from "react-router";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useLocation } from "react-router";
+import { useGenerationActions } from "../generation/GenerationProvider";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { MediaGrid } from "./MediaGrid";
+import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -28,15 +29,18 @@ interface Page {
 export function GalleryPage() {
   const [query, setQuery] = useState("");
   const [search] = useDebouncedValue(query, 250);
-  const [params] = useSearchParams();
   const kind = useLocation().pathname === "/video" ? "video" : "image";
-  const { changeKind } = useGeneration();
+  const { changeKind } = useGenerationActions();
   useEffect(() => {
     changeKind(kind);
   }, [kind, changeKind]);
   const [starred, setStarred] = useState(false);
   const [filters, setFilters] = useState(emptyGalleryFilters);
   const hasFilters = starred || hasGalleryFilters(filters);
+  const [pagingFailed, setPagingFailed] = useState(false);
+  useEffect(() => setPagingFailed(false), [search, kind, starred, filters]);
+  const [focusItem, setFocusItem] = useState<string | null>(null);
+  const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const gallery = useInfiniteQuery({
     queryKey: ["gallery", search, kind, starred, filters],
@@ -55,6 +59,38 @@ export function GalleryPage() {
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     refetchInterval: 3000,
   });
+  useEffect(() => {
+    const trigger = loadTrigger.current;
+    if (
+      !trigger ||
+      !gallery.hasNextPage ||
+      gallery.isFetching ||
+      pagingFailed ||
+      gallery.isFetchNextPageError ||
+      selected
+    )
+      return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          void gallery
+            .fetchNextPage()
+            .then((result) => setPagingFailed(result.isFetchNextPageError));
+        }
+      },
+      { rootMargin: "800px" },
+    );
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [
+    gallery.hasNextPage,
+    gallery.isFetching,
+    gallery.isFetchNextPageError,
+    pagingFailed,
+    gallery.fetchNextPage,
+    selected,
+  ]);
   const items = gallery.data?.pages.flatMap((page) => page.items) || [];
   const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
   const selectionButton = useRef<HTMLButtonElement>(null);
@@ -64,7 +100,7 @@ export function GalleryPage() {
   }
   return (
     <Stack
-      gap="xl"
+      gap="sm"
       className="studio-gallery-page"
       onKeyDown={(event) => {
         if (
@@ -113,7 +149,7 @@ export function GalleryPage() {
       )}
       {gallery.isPending ? (
         <LoadingState fill label="Loading Gallery" />
-      ) : gallery.error ? (
+      ) : gallery.error && !gallery.data ? (
         <Alert color="red" title="Couldn’t Load the Gallery">
           {gallery.error.message}
           <Button variant="subtle" onClick={() => void gallery.refetch()}>
@@ -121,20 +157,43 @@ export function GalleryPage() {
           </Button>
         </Alert>
       ) : items.length ? (
-        <MediaGrid items={items} open={setSelected} selection={selection} />
+        <MediaGrid
+          items={items}
+          focusItem={focusItem}
+          open={(item) => {
+            setFocusItem(null);
+            setSelected(item);
+          }}
+          selection={selection}
+          renderActions={(item, opened, onOpenedChange) => (
+            <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />
+          )}
+        />
       ) : (
         <EmptyState fill title={kind === "video" ? "No Videos" : "No Images"}>
           {search || hasFilters ? "Try another search or clear your filters." : undefined}
         </EmptyState>
       )}
       {gallery.hasNextPage && (
-        <Button
-          variant="default"
-          loading={gallery.isFetchingNextPage}
-          onClick={() => void gallery.fetchNextPage()}
-        >
-          Load More
-        </Button>
+        <Stack gap="xs">
+          <div ref={loadTrigger} aria-hidden="true" />
+          {pagingFailed && (
+            <Text size="sm" c="red">
+              More results could not be loaded. Try again.
+            </Text>
+          )}
+          <Button
+            variant="default"
+            loading={gallery.isFetchingNextPage}
+            onClick={() =>
+              void gallery
+                .fetchNextPage()
+                .then((result) => setPagingFailed(result.isFetchNextPageError))
+            }
+          >
+            Load More
+          </Button>
+        </Stack>
       )}
       {!selection.selecting && <ComposerDock />}
       {selected && (
@@ -142,6 +201,7 @@ export function GalleryPage() {
           item={items.find((i) => i.id === selected.id) || selected}
           items={items}
           navigate={setSelected}
+          onReturnFocus={(item) => setFocusItem(item.id)}
           close={() => setSelected(null)}
         />
       )}

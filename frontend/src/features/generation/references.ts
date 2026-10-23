@@ -1,10 +1,14 @@
 import { useMutation } from "@tanstack/react-query";
 import { failure, post } from "../../api";
-import type { MediaItem, ReferenceAsset } from "../../types";
+import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { addReference, referenceDetails, referencePatch } from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import { useReferenceUpload } from "./useReferenceUpload";
 export const galleryReferenceType = "application/x-studio-gallery-item";
+export function referenceLabel(asset: ReferenceAsset, index: number, profile?: Profile) {
+  const role = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.label;
+  return `Reference ${index + 1}${role ? ` · ${role}` : ""}`;
+}
 function useAdoptReference() {
   const { setDraft, profile } = useGeneration();
   return (asset: ReferenceAsset) =>
@@ -31,16 +35,17 @@ export function useReferenceFiles() {
   async function uploadFiles(files: File[]) {
     const slot = profile?.mediaInputs?.[0];
     const limit = slot?.max || (slot ? 1 : 8);
-    const used = form
-      .getValues()
-      .references.filter((asset) => asset.slot === (slot?.id || "image")).length;
+    const current = form.getValues();
+    const used = referenceDetails(current.references, current.input, profile).filter(
+      (asset) => asset.slot === (slot?.id || "image"),
+    ).length;
     const remaining = limit === 1 ? 1 : Math.max(0, limit - used);
     for (const file of files.filter((file) => file.type.startsWith("image/")).slice(0, remaining))
       await upload(file);
   }
   return { uploadFiles, uploading };
 }
-export function useGalleryReference(added?: () => void, adopt?: (asset: ReferenceAsset) => void) {
+export function useGalleryReference(adopt?: (asset: ReferenceAsset) => void) {
   const add = useAdoptReference();
   return useMutation({
     mutationFn: ({ id, type }: Pick<MediaItem, "id" | "type">) =>
@@ -51,7 +56,6 @@ export function useGalleryReference(added?: () => void, adopt?: (asset: Referenc
     onSuccess: ({ asset }) => {
       if (adopt) adopt(asset);
       else add(asset);
-      added?.();
     },
     onError: failure,
   });

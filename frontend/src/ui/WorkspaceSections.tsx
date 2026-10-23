@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { Box, Grid, Group, NavLink, Select, Stack, Text } from "@mantine/core";
 import { Link, useLocation, useNavigate } from "react-router";
+import { LoadingState } from "./LoadingState";
 
 interface SectionOption {
   value: string;
@@ -58,6 +59,8 @@ export function WorkspaceSections({
   sections: (SectionOption & { content: ReactNode })[];
 }) {
   const { location, active } = useWorkspaceSection(sections);
+  const [visited, setVisited] = useState(() => new Set([active]));
+  if (!visited.has(active)) setVisited(new Set([...visited, active]));
   return (
     <Grid gap="xl" mih={{ base: 0, sm: "24rem" }}>
       <Grid.Col span={3} visibleFrom="sm">
@@ -88,7 +91,11 @@ export function WorkspaceSections({
             aria-label={`${label}: ${section.label}`}
             hidden={section.value !== active}
           >
-            {section.content}
+            {visited.has(section.value) && (
+              <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
+                {section.content}
+              </Suspense>
+            )}
           </Box>
         ))}
       </Grid.Col>

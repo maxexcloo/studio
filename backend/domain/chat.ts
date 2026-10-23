@@ -77,7 +77,6 @@ function generationContext(input: GenerationInput) {
   }
   if (Array.isArray(input.referenceAssets))
     result.referenceAssets = input.referenceAssets
-      .slice(0, 8)
       .filter((item) => item && typeof item === "object")
       .map((item) => ({ assetId: item.assetId, source: item.source, slot: item.slot }));
   if (Array.isArray(input.loras))
@@ -196,11 +195,9 @@ export class ChatService {
       throw failure("Enter a message of up to 32,000 characters.", 400);
     if (
       input.references !== undefined &&
-      (!Array.isArray(input.references) ||
-        input.references.length > 8 ||
-        input.references.some((id) => typeof id !== "string"))
+      (!Array.isArray(input.references) || input.references.some((id) => typeof id !== "string"))
     )
-      throw failure("Choose up to eight reference images.", 400);
+      throw failure("Choose owned reference image identifiers.", 400);
     if (input.modelId !== undefined && (typeof input.modelId !== "string" || !input.modelId))
       throw failure("Choose a text model approved for this account.", 400);
     const key = `${ownerId}:${sessionId}`;

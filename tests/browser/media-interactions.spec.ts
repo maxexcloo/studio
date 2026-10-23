@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, image, stamp } from "./fixtures";
+import { fixtures, image, stamp, viewerAction, viewerOptions } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -65,7 +65,7 @@ test("Prompt paste and Chat file drop attach owned references before submission"
       .fill("Discuss the dropped reference");
     await page.locator(".studio-composer-dock").dispatchEvent("dragover", { dataTransfer: files });
     await page.locator(".studio-composer-dock").dispatchEvent("drop", { dataTransfer: files });
-    await expect(page.getByRole("img", { name: "Reference 2", exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Send Message", exact: true }).click();
     await expect.poll(() => state.chatRequests.length).toBe(1);
     expect(state.chatRequests[0].references).toEqual(["upload-2"]);
@@ -128,17 +128,16 @@ test("Media transfer actions honour the shared metadata preference", async ({ pa
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Transfer Study", exact: true }).click();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
+  await viewerOptions(page);
   await page.getByRole("switch", { name: /^Share Without Settings/ }).check();
   await expect(page.getByRole("link", { name: "Download", exact: true })).toHaveAttribute(
     "href",
     "/api/fixture-media.png?clean=1",
   );
-  await page.getByRole("button", { name: "Copy Image", exact: true }).click();
+  await viewerAction(page, "Copy Image");
   await expect.poll(() => page.evaluate(() => (window as any).copiedMedia?.type)).toBe("image/png");
   if (testInfo.project.use.isMobile) {
-    await page.getByRole("button", { name: "Share", exact: true }).click();
+    await viewerAction(page, "Share");
     await expect
       .poll(() => page.evaluate(() => (window as any).sharedMedia?.[0]?.type))
       .toBe("image/png");

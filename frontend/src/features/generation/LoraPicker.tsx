@@ -1,6 +1,7 @@
 import { MultiSelect, NumberInput, Select, Stack, Switch, Text } from "@mantine/core";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { api } from "../../api";
@@ -47,12 +48,20 @@ export function LoraPicker({
   const types = [
     ...new Set(compatible.map((file) => metadata[file]?.type || "unclassified")),
   ].sort();
+  const activeType = type && types.includes(type) ? type : null;
   const shown = compatible.filter(
-    (file) => !type || (metadata[file]?.type || "unclassified") === type,
+    (file) => !activeType || (metadata[file]?.type || "unclassified") === activeType,
   );
   const selected = input.loras.map((l) => l.name);
   return (
     <Stack gap="xs">
+      <LoraStacks
+        key={family}
+        family={family}
+        profileId={profile?.id || ""}
+        loras={input.loras}
+        onLoad={(loras) => update({ loras })}
+      />
       <Text size="sm" fw={500}>
         LoRAs · {modelFamilyLabel(family, profile?.familyName)}
       </Text>
@@ -63,7 +72,7 @@ export function LoraPicker({
         placeholder="All Types"
         clearable
         data={types.map((value) => ({ value, label: names[value] || value }))}
-        value={type}
+        value={activeType}
         onChange={setType}
       />
       <MultiSelect

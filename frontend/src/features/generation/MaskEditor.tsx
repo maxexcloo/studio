@@ -13,7 +13,10 @@ import {
   Text,
 } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
+import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
+import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import type { ReferenceAsset } from "../../types";
+import { useMotionDuration } from "../../ui/Appearance";
 
 type Snapshot = { pixels: ImageData; error: string | null };
 
@@ -29,6 +32,11 @@ export default function MaskEditor({
   save: (data: string) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const transform = useRef<ReactZoomPanPinchRef>(null);
+  const percentage = useRef<HTMLSpanElement>(null);
+  const pinching = useRef(false);
+  const [spaceHand, setSpaceHand] = useState(false);
+  const duration = useMotionDuration();
   const [brush, setBrush] = useState(50);
   const [tool, setTool] = useState("paint");
   const [loading, setLoading] = useState(Boolean(initialMask));
@@ -36,6 +44,11 @@ export default function MaskEditor({
   const [history, setHistory] = useState({ undo: 0, redo: 0 });
   const undoStack = useRef<Snapshot[]>([]);
   const redoStack = useRef<Snapshot[]>([]);
+  const touchStroke = useRef<{
+    snapshot: Snapshot;
+    undo: Snapshot[];
+    redo: Snapshot[];
+  } | null>(null);
   const drawing = useRef<number | null>(null);
   const previous = useRef<{ x: number; y: number } | null>(null);
   const ratio = Math.min(1, 1024 / Math.max(asset.width || 1024, asset.height || 1024));
@@ -49,10 +62,12 @@ export default function MaskEditor({
     setHistory({ undo: undoStack.current.length, redo: redoStack.current.length });
   }
   function remember() {
-    undoStack.current.push(snapshot());
+    const saved = snapshot();
+    undoStack.current.push(saved);
     if (undoStack.current.length > historyLimit) undoStack.current.shift();
     redoStack.current = [];
     historyChanged();
+    return saved;
   }
   function restore(from: Snapshot[], to: Snapshot[]) {
     if (loading || drawing.current !== null || !from.length) return;
@@ -108,6 +123,33 @@ export default function MaskEditor({
     };
   }, [initialMask, width, height]);
 
+  const hand = tool === "hand" || spaceHand;
+  useEffect(() => {
+    function down(event: KeyboardEvent) {
+      if (
+        event.code !== "Space" ||
+        (event.target as HTMLElement).closest(
+          'input,textarea,select,button,a,[role="slider"],[role="radio"],[contenteditable="true"]',
+        )
+      )
+        return;
+      event.preventDefault();
+      setSpaceHand(true);
+    }
+    function up(event: KeyboardEvent) {
+      if (event.code === "Space") setSpaceHand(false);
+    }
+    const reset = () => setSpaceHand(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", reset);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", reset);
+    };
+  }, []);
+
   function draw(event: PointerEvent<HTMLCanvasElement>) {
     if (drawing.current !== event.pointerId) return;
     const el = event.currentTarget;
@@ -140,6 +182,7 @@ export default function MaskEditor({
     if (drawing.current !== event.pointerId) return;
     drawing.current = null;
     previous.current = null;
+    touchStroke.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
   }
@@ -150,6 +193,7 @@ export default function MaskEditor({
       title="Paint the Area to Refine"
       closeButtonProps={{ "aria-label": "Close Mask Editor" }}
       size="xl"
+      removeScrollProps={{ allowPinchZoom: true }}
     >
       <Stack>
         <Text size="sm" c="dimmed">
@@ -160,38 +204,128 @@ export default function MaskEditor({
             {error}
           </Alert>
         )}
-        <Box
-          className="studio-mask-wrap"
-          style={{ aspectRatio: `${width}/${height}`, width: "100%" }}
-        >
+        <Box pos="relative" h="min(55dvh, 600px)" w="100%" aria-label="Mask Viewport">
           <LoadingOverlay visible={loading} />
-          <img
-            src={asset.url || asset.thumbnailUrl}
-            alt="Reference to Mask"
-            onError={(event) => {
-              event.currentTarget.hidden = true;
+          <TransformWrapper
+            ref={transform}
+            fitOnInit
+            minScale={0.0001}
+            maxScale={8}
+            centerZoomedOut
+            limitToBounds
+            disablePadding
+            disabled={loading}
+            panning={{ disabled: !hand, velocityDisabled: true }}
+            doubleClick={{ disabled: true }}
+            zoomAnimation={{ disabled: duration === 0, animationTime: duration }}
+            autoAlignment={{ animationTime: duration, velocityAlignmentTime: duration }}
+            onPinchStart={() => {
+              pinching.current = true;
+              // A second finger changes a tentative paint stroke into a pinch, not a mask edit.
+              const stroke = touchStroke.current;
+              if (stroke) {
+                context().putImageData(stroke.snapshot.pixels, 0, 0);
+                undoStack.current = stroke.undo;
+                redoStack.current = stroke.redo;
+                historyChanged();
+                drawing.current = null;
+                previous.current = null;
+                touchStroke.current = null;
+              }
             }}
-          />
-          <canvas
-            ref={canvas}
-            className="studio-mask"
-            aria-label="Mask Painting"
-            width={width}
-            height={height}
-            onPointerDown={(event) => {
-              if (loading || error || event.button !== 0 || drawing.current !== null) return;
-              remember();
-              drawing.current = event.pointerId;
-              previous.current = null;
-              event.currentTarget.setPointerCapture(event.pointerId);
-              draw(event);
+            onPinchStop={() => {
+              pinching.current = false;
             }}
-            onPointerMove={draw}
-            onPointerUp={finish}
-            onPointerCancel={finish}
-            onLostPointerCapture={finish}
-          />
+            onTransform={(_, state) => {
+              if (percentage.current)
+                percentage.current.textContent = `${Math.round(state.scale * 100)}%`;
+            }}
+          >
+            <TransformComponent
+              wrapperStyle={{ width: "100%", height: "100%", overflow: "clip" }}
+              contentStyle={{ width, height }}
+            >
+              <Box
+                className="studio-mask-wrap"
+                style={{ width, height, maxWidth: "none", margin: 0 }}
+              >
+                <img
+                  src={asset.url || asset.thumbnailUrl}
+                  alt="Reference to Mask"
+                  onError={(event) => {
+                    event.currentTarget.hidden = true;
+                  }}
+                />
+                <canvas
+                  ref={canvas}
+                  className="studio-mask"
+                  aria-label="Mask Painting"
+                  tabIndex={0}
+                  style={{ cursor: hand ? "grab" : "crosshair" }}
+                  width={width}
+                  height={height}
+                  onPointerDown={(event) => {
+                    if (
+                      loading ||
+                      error ||
+                      hand ||
+                      pinching.current ||
+                      event.button !== 0 ||
+                      drawing.current !== null
+                    )
+                      return;
+                    event.currentTarget.focus({ preventScroll: true });
+                    const undo = [...undoStack.current],
+                      redo = [...redoStack.current];
+                    const saved = remember();
+                    touchStroke.current =
+                      event.pointerType === "touch" ? { snapshot: saved, undo, redo } : null;
+                    drawing.current = event.pointerId;
+                    previous.current = null;
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    draw(event);
+                  }}
+                  onPointerMove={draw}
+                  onPointerUp={finish}
+                  onPointerCancel={finish}
+                  onLostPointerCapture={finish}
+                />
+              </Box>
+            </TransformComponent>
+          </TransformWrapper>
         </Box>
+        <Group justify="center" gap="xs" aria-label="Mask Zoom">
+          <Button
+            variant="default"
+            size="compact-sm"
+            aria-label="Zoom Mask Out"
+            disabled={loading}
+            onClick={() => void transform.current?.zoomOut(0.2, duration)}
+          >
+            −
+          </Button>
+          <Button
+            variant="default"
+            size="compact-sm"
+            aria-label="Fit Mask"
+            disabled={loading}
+            onClick={() => {
+              if (canvas.current)
+                void transform.current?.zoomToElement(canvas.current, undefined, duration);
+            }}
+          >
+            Fit · <span ref={percentage}>100%</span>
+          </Button>
+          <Button
+            variant="default"
+            size="compact-sm"
+            aria-label="Zoom Mask In"
+            disabled={loading}
+            onClick={() => void transform.current?.zoomIn(0.2, duration)}
+          >
+            +
+          </Button>
+        </Group>
         <Group justify="space-between">
           <SegmentedControl
             aria-label="Mask Tool"
@@ -201,6 +335,7 @@ export default function MaskEditor({
             data={[
               { label: "Paint", value: "paint" },
               { label: "Erase", value: "erase" },
+              { label: "Hand", value: "hand" },
             ]}
           />
           <Group gap="xs">

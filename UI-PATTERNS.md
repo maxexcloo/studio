@@ -42,10 +42,13 @@ primary component reference and verify APIs against the installed version.
 - Library and Settings are route-backed Mantine modals with blurred overlays.
   Keep the same bounded dimensions and title typography across both workspaces,
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
-  Section Select in the phone modal header. Keep inactive forms mounted to
-  preserve edits. Use Mantine Table for dense records; preview cards are for
+  Section Select in the phone modal header. Mount sections on first visit and
+  keep visited forms mounted to preserve edits. Use Mantine Table for dense records; preview cards are for
   visual content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
+- Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
+  with `comboboxProps.withinPortal: false`; choosing an option must preserve the
+  parent controls and keyboard focus.
 - Use shared `EmptyState` for centred, subdued welcome/empty copy without a
   decorative card or redundant creation button. Use the exact empty copy
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
@@ -85,18 +88,26 @@ primary component reference and verify APIs against the installed version.
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.
   Explicit slot IDs survive reordering; optional End-only inputs and one asset
-  used in several roles must work. Phones show the shared filtered gallery
+  used in several roles must work. Display numbered thumbnails and profile roles,
+  never filenames; submission and Chat use owned asset IDs. Phones show the shared filtered gallery
   inside generation controls, desktop uses an anchored popover.
 - Profile and size controls share the gallery/card implementation. The footer
   places the Image/Video toggle left and Clear/Generate right. Size uses
-  profile-provided aspect presets and constrained custom dimensions. Selected
+  a vertical list of profile-provided aspect presets with their resolution,
+  alongside constrained custom dimensions. Selected
   LoRAs retain enable, weight and drag/keyboard ordering controls even when
   catalogue filters hide them; suggested strength ranges remain visible hints.
+  Saved LoRA stacks reuse the account-owned library and preserve exact family
+  keys, order, strengths and disabled entries; legacy profile groups remain explicit.
+  Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 
 ## Data & Feedback
 
 - TanStack Query owns server data, polling and invalidation; drafts stay within
-  their feature. Keep account data and credentials out of browser storage.
+  their feature. Chat and gallery generation drafts are independent; switching
+  modes preserves unsent prompts, references and settings. Typing must not rerender an unchanged gallery or conversation
+  history; shared provider commands retain their identity. Keep account data
+  and credentials out of browser storage.
 - Account access groups own model grants and Cloud Models/NSFW permissions.
   Read back saved changes. Studio owns editable runtime definitions, with
   administrator approval and conflict handling; user presets support updates and copies.
@@ -123,9 +134,24 @@ primary component reference and verify APIs against the installed version.
   media, native video controls and details/actions remain interactive. Keep
   focus trapping, Escape and return focus. Image zoom and bottom details are
   domain behaviour; retain the common generation actions and full settings.
+  Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
+  zoom and panning preserve mask pixels and undo history.
+- Viewer actions share one bottom area with consistent 36px controls; secondary
+  actions use More Viewer Actions and display/sharing switches use Viewer Options.
+  Keep the current decoded image visible while another saved version loads,
+  then refit its new dimensions before painting.
+- Display, thumbnails, copy, sharing and downloads use the saved original/upscale
+  choice through `mediaSource`. Video upscales stay videos; comparison is an
+  image action. Upscale quality, size and optional face detail use the worker’s
+  reported capabilities and the durable queue.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and
   avoid autoplaying gallery videos. Closing a viewer releases its player;
-  hiding the tab pauses playback. Heavy tools load only when opened.
+  hiding the tab pauses playback. Heavy tools load only when opened. Near-bottom
+  paging preserves loaded results and exposes a retry after failure. Closing
+  after viewer navigation reveals and focuses the current gallery item.
+- Tiles share one Mantine actions menu for More and context clicks. Desktop
+  reveals quick controls on hover/focus; phones keep More visible and show a
+  persistent star for favourites. Selection replaces these controls.
 - Use semantic buttons/links and accessible names for icons. Preserve drafts
   and keyboard focus through expansion. Honour the phone keyboard and safe
   areas. Failed images must not expose broken-image icons.

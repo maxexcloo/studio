@@ -1,7 +1,7 @@
 import { ActionIcon, AppShell, Group, Modal, Title, Tooltip } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Library, Settings } from "lucide-react";
 import { AccountGate } from "./features/auth/AccountGate";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
@@ -11,11 +11,20 @@ import { AppearanceMenu, useAppearance } from "./ui/Appearance";
 import { ServiceStatus, RuntimeStatusAction, ModeSwitcher } from "./ui/ServiceStatus";
 import { HeaderOptions } from "./ui/HeaderOptions";
 import { AccountMenu } from "./features/auth/AccountMenu";
-import { ChatPage } from "./features/sessions/SessionsPage";
-import { LibraryPage, LibraryTitle } from "./features/library/LibraryPage";
+import { ChatWorkspace } from "./features/sessions/ChatWorkspace";
+import { LibraryTitle } from "./features/library/LibraryNavigation";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
-import { SettingsPage, SettingsTitle } from "./features/settings/SettingsPage";
+import { SettingsTitle } from "./features/settings/SettingsNavigation";
+const ChatPage = lazy(() =>
+  import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
+);
+const LibraryPage = lazy(() =>
+  import("./features/library/LibraryPage").then((module) => ({ default: module.LibraryPage })),
+);
+const SettingsPage = lazy(() =>
+  import("./features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
+);
 const navigation = [
   { to: "/library", label: "Library", icon: Library },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -53,7 +62,7 @@ function Workspace() {
   if (location.pathname === "/library" && !library.pending && !library.allowed)
     return <Navigate to="/images" replace />;
   return (
-    <GenerationProvider>
+    <GenerationProvider workspace={chatRoute ? "chat" : "gallery"}>
       <ChatProvider>
         <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
           <AppShell.Header>
@@ -118,7 +127,20 @@ function Workspace() {
               <Routes location={overlay ? background : location}>
                 <Route path="/images" element={<GalleryPage />} />
                 <Route path="/video" element={<GalleryPage />} />
-                <Route path="/chat/:id?" element={<ChatPage />} />
+                <Route
+                  path="/chat/:id?"
+                  element={
+                    <Suspense
+                      fallback={
+                        <ChatWorkspace>
+                          <LoadingState fill label="Loading Chat" />
+                        </ChatWorkspace>
+                      }
+                    >
+                      <ChatPage />
+                    </Suspense>
+                  }
+                />
                 <Route path="*" element={<Navigate to="/images" replace />} />
               </Routes>
             </div>
@@ -156,15 +178,24 @@ function Workspace() {
             }}
             fullScreen={narrow}
           >
-            {panel === "library" ? (
-              library.allowed ? (
-                <LibraryPage />
+            <Suspense
+              fallback={
+                <LoadingState
+                  label={`Loading ${panel === "library" ? "Library" : "Settings"}`}
+                  fill
+                />
+              }
+            >
+              {panel === "library" ? (
+                library.allowed ? (
+                  <LibraryPage />
+                ) : (
+                  <LoadingState label="Loading Library" fill />
+                )
               ) : (
-                <LoadingState label="Loading Library" fill />
-              )
-            ) : (
-              <SettingsPage />
-            )}
+                <SettingsPage />
+              )}
+            </Suspense>
           </Modal>
         </AppShell>
       </ChatProvider>

@@ -5,10 +5,10 @@ import { Link, useMatch } from "react-router";
 import { EmptyState } from "../../ui/EmptyState";
 import { api } from "../../api";
 import type { Session } from "../../types";
-import { initialInput, useGeneration } from "../generation/GenerationProvider";
+import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 export function SessionList({ close = () => {} }: { close?: () => void }) {
   const id = useMatch("/chat/:id")?.params.id,
-    { setDraft } = useGeneration();
+    { setDraft } = useGenerationActions();
   const sessions = useQuery({
     queryKey: ["sessions"],
     queryFn: () => api<{ sessions: Session[] }>("/api/sessions"),

@@ -14,7 +14,7 @@ export function useQueue() {
 }
 const queueActionKey = ["queue-action"];
 type QueueAction = { id: string; action: "cancel" | "retry" | "cancel-all" };
-function useQueueAction(jobId?: string) {
+export function useQueueAction(jobId?: string) {
   const client = useQueryClient();
   const pending = useIsMutating({
     mutationKey: queueActionKey,
@@ -29,6 +29,7 @@ function useQueueAction(jobId?: string) {
       Promise.all([
         client.invalidateQueries({ queryKey: ["queue"] }),
         client.invalidateQueries({ queryKey: ["session"] }),
+        client.invalidateQueries({ queryKey: ["gallery"] }),
       ]),
     onError: failure,
   });

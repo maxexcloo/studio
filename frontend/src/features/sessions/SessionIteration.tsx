@@ -6,6 +6,7 @@ import { QueueJobAction, terminal } from "../generation/Queue";
 import { GenerationCard } from "./GenerationCard";
 import { mediaDownload } from "../gallery/download";
 import { useShareWithoutSettings } from "../gallery/mediaShare";
+import { mediaSource } from "../gallery/mediaSource";
 function SessionResult({
   item,
   sessionId,
@@ -17,6 +18,7 @@ function SessionResult({
 }) {
   const action = useMediaAction(item, sessionId);
   const [withoutSettings] = useShareWithoutSettings();
+  const source = mediaSource(item);
   return (
     <Stack gap="sm" className="studio-thread-result">
       <button
@@ -29,10 +31,10 @@ function SessionResult({
       >
         {item.type === "video" ? (
           <video
-            src={item.url}
-            width={item.width || 1024}
-            height={item.height || 1024}
-            poster={item.thumbnailUrl}
+            src={source.url}
+            width={source.width || 1024}
+            height={source.height || 1024}
+            poster={source.thumbnailUrl}
             preload="none"
             muted
             playsInline
@@ -40,9 +42,9 @@ function SessionResult({
           />
         ) : (
           <img
-            src={item.url}
-            width={item.width || 1024}
-            height={item.height || 1024}
+            src={source.url}
+            width={source.width || 1024}
+            height={source.height || 1024}
             alt={item.prompt || "Generated Image"}
             loading="lazy"
             onError={(event) => {

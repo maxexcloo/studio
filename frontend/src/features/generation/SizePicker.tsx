@@ -1,6 +1,5 @@
 import {
   Button,
-  Group,
   NumberInput,
   Popover,
   SegmentedControl,
@@ -72,12 +71,20 @@ export function SizePicker({
                 size="xs"
               />
               {mode === "presets" ? (
-                <Group gap="xs">
+                <Stack gap="xs">
                   {presets.length ? (
                     presets.map((preset) => (
                       <Button
                         key={`${preset.w}:${preset.h}`}
-                        size="compact-sm"
+                        size="sm"
+                        fullWidth
+                        justify="space-between"
+                        aria-pressed={input.width === preset.w && input.height === preset.h}
+                        rightSection={
+                          <Text component="span" size="xs" c="dimmed">
+                            {preset.w} × {preset.h}
+                          </Text>
+                        }
                         variant={
                           input.width === preset.w && input.height === preset.h
                             ? "light"
@@ -93,7 +100,7 @@ export function SizePicker({
                       This profile has no size presets. Set a custom size.
                     </Text>
                   )}
-                </Group>
+                </Stack>
               ) : (
                 <SimpleGrid cols={2}>
                   {(["width", "height"] as const).map((key) => (
