@@ -64,7 +64,7 @@ const stableJson = (value) =>
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
 const mediaInstructions = (writing) =>
-  `Studio makes images and videos. For each one the user asks for, follow their instructions: call Generate once with request (the user's words, with anything they refer back to), kind and tier (${tierWords}). ${
+  `Studio makes images and videos. For each set sharing a profile and LoRAs, follow the user's instructions: call Generate once for the whole set. Use request (the user's words, with anything they refer back to) OR prompts (distinct exact prompts), never both; use count for variants. Submit different sets serially. Set kind and tier (${tierWords}). ${
     writing
       ? "Studio writes the prompt; don't expand the request."
       : "Write request as one clear prompt that keeps the user's subjects and scene."
