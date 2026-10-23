@@ -148,6 +148,47 @@ test("truncated gateway response keeps partial text failed and never submits an 
   assert.equal(fixture.admissions.length, 0);
   fixture.db.close();
 });
+test("card revisions preserve exact settings after a complete text answer and never run after a failed answer", async () => {
+  for (const complete of [true, false]) {
+    const fixture = setup([
+      frame({
+        model: "actual-text",
+        choices: [{ delta: { content: "I changed the seed and prompt." } }],
+      }),
+      ...(complete ? ["data: [DONE]\n\n"] : []),
+    ]);
+    fixture.service.options.revision = async (_owner, _session, value) => ({
+      ...value,
+      previousInput: { prompt: "Old prompt", seed: 1 },
+    });
+    const revision = {
+      sourceJobId: "existing-card",
+      operation: "image" as const,
+      input: {
+        prompt: "Exact prompt",
+        profileId: "chosen",
+        seed: 2,
+        inpaint: { mask: "private-mask-bytes" },
+      },
+    };
+    const run = fixture.service.stream(
+      "alice",
+      fixture.session.id,
+      { content: "Submit this edited card", revision },
+      new AbortController().signal,
+      () => {},
+    );
+    if (complete) await run;
+    else await assert.rejects(run, /disconnected/);
+    const messages = fixture.service.messages("alice", fixture.session.id);
+    assert.deepEqual(messages[0].revision?.changes?.seed, { before: 1, after: 2 });
+    assert.equal(fixture.admissions.length, complete ? 1 : 0);
+    if (complete) assert.deepEqual(messages[1].draft?.input, revision.input);
+    assert.equal(messages[1].actualModelId, "actual-text");
+    assert.doesNotMatch(JSON.stringify(fixture.requests), /private-mask-bytes/);
+    fixture.db.close();
+  }
+});
 test("disconnect aborts upstream, persists cancelled partial text and releases session admission", async () => {
   const fixture = setup([]);
   let upstreamSignal: AbortSignal | undefined;

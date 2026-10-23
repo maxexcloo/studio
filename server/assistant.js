@@ -467,7 +467,7 @@ export function createAssistant(
   }
 
   /** The gateway's model names, for Settings; empty when it can't be asked. */
-  async function listModels() {
+  async function listModelDetails() {
     return lookup(
       "models",
       "/v1/models",
@@ -478,9 +478,28 @@ export function createAssistant(
               .map((item) => String(item?.id || ""))
               .filter(Boolean),
           ),
-        ].sort((a, b) => a.localeCompare(b)),
+        ]
+          .sort((a, b) => a.localeCompare(b))
+          .map((id) => {
+            const item = answer.data.find((entry) => String(entry?.id || "") === id);
+            const provider =
+              typeof item.provider === "string"
+                ? item.provider
+                : typeof item.owned_by === "string"
+                  ? item.owned_by
+                  : "";
+            return {
+              id,
+              label: typeof item.name === "string" ? item.name : id,
+              ...(provider ? { provider } : {}),
+            };
+          }),
       [],
     );
+  }
+
+  async function listModels() {
+    return (await listModelDetails()).map((model) => model.id);
   }
 
   /**
@@ -982,6 +1001,7 @@ export function createAssistant(
     settings,
     supportsVision,
     listModels,
+    listModelDetails,
     chat,
     rewrite,
     negative,

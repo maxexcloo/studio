@@ -11,11 +11,12 @@ export function createChatRouter(
   const router = Router();
   router.get("/chat/status", async (request, response) => {
     try {
-      await authorize(request);
-      response.json(service.status());
+      const owner = await authorize(request);
+      response.json(await service.status(owner));
     } catch (error) {
       response.json({
         available: false,
+        models: [],
         reason: error instanceof Error ? error.message : "Chat is unavailable.",
       });
     }
@@ -24,7 +25,7 @@ export function createChatRouter(
     try {
       const owner = await authorize(request);
       response.json({
-        ...service.status(),
+        ...(await service.status(owner)),
         messages: service.messages(owner, String(request.params.id)),
       });
     } catch (error) {
