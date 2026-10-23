@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { Download, Ellipsis, ImagePlus, Pencil, Play, RotateCw, Star, Trash2 } from "lucide-react";
 import type { MediaItem } from "../../types";
+import { ReferenceMediaAction } from "./ReferenceMediaAction";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { useShareWithoutSettings } from "./mediaShare";
@@ -107,6 +108,7 @@ export function MediaTileActions({
                 )}
               </>
             )}
+            {opened && <ReferenceMediaAction item={item} onApplied={() => onOpenedChange(false)} />}
             <Menu.Item
               leftSection={<ImagePlus size={16} />}
               disabled={action.isPending}
