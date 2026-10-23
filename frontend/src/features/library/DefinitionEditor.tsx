@@ -22,6 +22,7 @@ import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
+import { WorkflowConnections } from "./WorkflowConnections";
 
 export type DefinitionKind = "profile" | "guide";
 export interface DefinitionMeta {
@@ -196,6 +197,7 @@ function DefinitionForm({
         <Tabs value={tab} onChange={setTab} keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="details">Details</Tabs.Tab>
+            {kind === "profile" && <Tabs.Tab value="connections">Connections</Tabs.Tab>}
             <Tabs.Tab value="advanced">Advanced JSON</Tabs.Tab>
             {!creating && <Tabs.Tab value="versions">Versions</Tabs.Tab>}
           </Tabs.List>
@@ -364,6 +366,22 @@ function DefinitionForm({
               )}
             </Stack>
           </Tabs.Panel>
+          {kind === "profile" && (
+            <Tabs.Panel value="connections" pt="md">
+              {raw && metadata ? (
+                <WorkflowConnections
+                  id={form.values.id}
+                  raw={raw}
+                  metadata={metadata}
+                  onChange={field}
+                />
+              ) : (
+                <Alert color="yellow">
+                  Repair the profile metadata in Advanced JSON before editing connections.
+                </Alert>
+              )}
+            </Tabs.Panel>
+          )}
           <Tabs.Panel value="advanced" pt="md">
             <Stack gap="sm">
               <Text size="sm" c="dimmed">

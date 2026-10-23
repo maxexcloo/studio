@@ -1,6 +1,6 @@
 # Custom Workflows
 
-Studio reads ComfyUI workflow profiles from the mounted ai configuration directory. This folder retains standalone compatibility examples; deployed definitions belong in ai.
+Studio owns ComfyUI workflow profiles in its runtime data directory. The mounted ai configuration supplies missing-definition seeds and backups. This folder retains standalone compatibility examples.
 
 Use ComfyUI's API workflow JSON format, then add a `heissUi` block that tells the simple UI which node inputs map to common controls.
 
@@ -35,7 +35,7 @@ Only mapped controls are changed by Studio. Everything else stays exactly as it 
 
 The controls it can map are `prompt`, `negative`, `seed`, `steps`, `cfg`, `sampler`, `scheduler`, `denoise`, `width`, `height`, `count` (batch size), `frames`, `fps` and `startImage`, plus the loader choices `model`, `textEncoder`, `vae`, `clipType` and `weightDtype`. Each points at one input on one node. A second sampler or prompt encoder keeps its saved values unless you feed both from one node (a core `PrimitiveInt` or `PrimitiveString`) and map that.
 
-For existing unannotated imports, the retained parser can infer common mappings from node types and order. Production profiles should declare their inputs explicitly in ai so control behaviour is reviewable. In-app definition editing and draft approval are deferred.
+For existing unannotated imports, the retained parser can infer common mappings from node types and order. Review these mappings before saving. Administrators edit profiles in **Library › Profiles**: Connections edits existing control and reference mappings using separate Node and Input selectors; Advanced JSON edits the graph or adds declarations. Check and Save retain version-conflict handling, and AI-drafted definitions require approval.
 
 Smart upscale's 2K and 4K picks work with imported workflows too: the upscale runs in the same ComfyUI job, after the workflow's own output. Inpainting doesn't: an imported workflow gets reference and start images, not the brush.
 
@@ -72,6 +72,11 @@ node:
 The user prompt stays unchanged in gallery history. Prefix and suffix text are
 applied only to the graph input. Existing workflows with `controls.startImage`
 are automatically exposed as an optional single-image media input.
+
+Each custom mapping writes one image filename and accepts one reference. Declare
+separate mapped inputs for multiple images. The picker groups slots linked by
+`follows` when their roles match, fills their declared capacity and preserves
+explicit slot IDs when references are reordered.
 
 Visual workflow imports prefer ComfyUI's `widgets_values_named` map when it is
 available. This avoids positional drift from UI-only widget values such as
