@@ -451,6 +451,7 @@ app.use((error, _req, res, next) => {
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 // Each worker's latest ComfyUI answer (node list and stats), by worker id.
 const emptyContext = { info: null, stats: null, fetchedAt: 0 };
+const rewriteStore = new RewriteStore(path.join(dataDir, "studio.sqlite"));
 const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
@@ -1179,6 +1180,10 @@ async function backendModels(backend, force = false) {
       if (known?.fetchedAt === context.fetchedAt) return { ...context, models: known.models };
       const models = inferModels(context.info, context.stats);
       inferredModels.set(backend, { fetchedAt: context.fetchedAt, models });
+      rewriteStore.saveWorkerModels(backend, workerById(backend).url, {
+        info: context.info,
+        stats: context.stats,
+      });
       // What this worker has, so a job for one of its profiles goes to it (routeJob).
       noteWorkerProfiles(backend, models.profiles || []);
       return { ...context, models };
@@ -1211,11 +1216,37 @@ async function mediaModels(force = false) {
       result: settled[index].status === "fulfilled" ? settled[index].value : null,
     }))
     .filter((entry) => entry.result);
-  if (!answered.length && !direct.length)
-    throw settled[0]?.reason || new Error("No worker is available.");
+  const configured = inferModels({}, {}, { configuredOnly: true });
+  const catalogues = workers
+    .map((worker) => {
+      const online = answered.find((entry) => entry.worker.id === worker.id);
+      if (online) return online;
+      const observed = rewriteStore.workerModels(worker.id, worker.url);
+      // Persist worker observations, not ai-owned profiles: project current catalogue metadata on each read.
+      const cached = observed?.info && inferModels(observed.info, observed.stats);
+      // Current ai-owned definitions replace cached custom profiles, including their permissions and defaults.
+      const profiles = [
+        ...(cached?.profiles || []).filter((profile) => !profile.id.startsWith("custom:")),
+        ...configured.profiles,
+      ]
+        .filter((profile) => worker.capabilities.includes(capabilityForProfile(profile)))
+        .map((profile) => ({
+          ...profile,
+          ready: undefined,
+          availability: "offline",
+          readiness: "unknown",
+        }));
+      return { worker, result: { models: { ...(cached || configured), profiles } } };
+    })
+    .sort(
+      (left, right) =>
+        Number(answered.some((item) => item.worker.id === right.worker.id)) -
+        Number(answered.some((item) => item.worker.id === left.worker.id)),
+    );
   const backends = workerAvailability(new Set(answered.map(({ worker }) => worker.id)), workers);
   const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result ||
-    answered[0]?.result || { models: offlineModelResult() };
+    answered[0]?.result ||
+    catalogues[0]?.result || { models: offlineModelResult() };
   const complete =
     workers.length === 1 &&
     ["image", "video"].every((capability) => workers[0].capabilities.includes(capability));
@@ -1223,14 +1254,14 @@ async function mediaModels(force = false) {
     ? { ...primary.models, backends }
     : {
         ...mergeWorkerModels(
-          answered.map(({ worker, result }) => ({ worker, models: result.models })),
+          catalogues.map(({ worker, result }) => ({ worker, models: result.models })),
           inferModels({}, {}),
         ),
         backends,
       };
   models.profiles = (models.profiles || []).map((profile) => ({
     ...profile,
-    workerIds: answered
+    workerIds: catalogues
       .filter(({ result }) =>
         result.models.profiles?.some((candidate) => candidate.id === profile.id),
       )
@@ -1239,16 +1270,25 @@ async function mediaModels(force = false) {
   if (direct.length) {
     const ids = new Set(direct.map((profile) => profile.id));
     models.profiles = [...models.profiles.filter((profile) => !ids.has(profile.id)), ...direct];
-    for (const kind of ["image", "video"])
-      models[`${kind}Models`] = models.profiles
-        .filter((profile) => profile.kind === kind)
-        .map((profile) => ({ label: profile.label, value: profile.id }));
-    models.capabilities = {
-      ...models.capabilities,
-      image: models.profiles.some((profile) => profile.kind === "image"),
-      video: models.profiles.some((profile) => profile.kind === "video"),
-    };
   }
+  for (const kind of ["image", "video"]) {
+    models[`${kind}Models`] = models.profiles
+      .filter((profile) => profile.kind === kind)
+      .map((profile) => ({ label: profile.label, value: profile.id }));
+    if (!models.profiles.some((profile) => profile.id === models.defaults?.[`${kind}Model`]))
+      models.defaults = {
+        ...models.defaults,
+        [`${kind}Model`]: models.profiles.find((profile) => profile.kind === kind)?.id || "",
+      };
+  }
+  models.capabilities = {
+    ...models.capabilities,
+    image: models.profiles.some((profile) => profile.kind === "image"),
+    video: models.profiles.some((profile) => profile.kind === "video"),
+  };
+  if (!answered.length && workers.length)
+    models.reason =
+      "Configured workers are offline. Selected jobs wait until their worker is available.";
   models.workers = workers.map((worker) => {
     const workload = runtime?.controller.workloads.find(
       (item) => item.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""),
@@ -2239,7 +2279,6 @@ const generationRoutes = registerGenerationRoutes(app, {
 });
 
 // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
-const rewriteStore = new RewriteStore(path.join(dataDir, "studio.sqlite"));
 const accountJobLimit = configuredAccountJobLimit();
 const mediaLeases = new Map();
 async function queueResourceFor(input) {
@@ -2500,10 +2539,22 @@ const generationQueue = new GenerationQueue(
     upscaleQueueAdapter,
   ),
 );
+async function validateGenerationInput(input, account) {
+  if (directCloud?.isProfile(input)) {
+    try {
+      await directCloud.resolve({ ownerId: account?.userId || "", input });
+      return { status: 200, payload: { ok: true } };
+    } catch (error) {
+      return { status: error.status || 400, payload: { ok: false, error: error.message } };
+    }
+  }
+  return generationRoutes.validateInput(input, account);
+}
 registerRewriteRoutes(app, {
   store: rewriteStore,
   queue: generationQueue,
   resourceFor: queueResourceFor,
+  validate: validateGenerationInput,
   jobLimit: accountJobLimit,
 });
 const admitGeneration = createGenerationAdmission({
@@ -2513,17 +2564,7 @@ const admitGeneration = createGenerationAdmission({
   pendingItems: makePendingItems,
   revision: galleryRevisionValue,
   jobLimit: accountJobLimit,
-  validate: async (input, account) => {
-    if (directCloud?.isProfile(input)) {
-      try {
-        await directCloud.resolve({ ownerId: account?.userId || "", input });
-        return { status: 200, payload: { ok: true } };
-      } catch (error) {
-        return { status: error.status || 400, payload: { ok: false, error: error.message } };
-      }
-    }
-    return generationRoutes.validateInput(input, account);
-  },
+  validate: validateGenerationInput,
 });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
@@ -2594,7 +2635,16 @@ const sessionChat = new ChatService({
       if (parent && parent.sessionId !== sessionId)
         throw new Error("Parent generation must belong to this session.");
       parentJobId = parent?.id;
-      if (!Array.isArray(input.referenceAssets) || !input.referenceAssets.length) {
+      const references = Array.isArray(input.referenceAssets) ? input.referenceAssets : [];
+      const inheritedPrimary = parent?.input.referenceAssets?.[0]?.assetId;
+      const replaceInherited = Boolean(
+        inheritedPrimary && references[0]?.assetId === inheritedPrimary,
+      );
+      if (!references.length || replaceInherited) {
+        if (parent && parent.status !== "completed")
+          throw new Error(
+            "The selected result is still rendering. Wait for it to finish before refining it.",
+          );
         const source =
           parent &&
           gallery.find(
@@ -2616,6 +2666,7 @@ const sessionChat = new ChatService({
             source: asset.source,
             slot: profile.mediaInputs?.[0]?.id || "reference",
           },
+          ...references.slice(replaceInherited ? 1 : 0),
         ];
         input.referenceRole = "edit";
       }

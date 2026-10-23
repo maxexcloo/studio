@@ -33,7 +33,7 @@ import { markWorkflowUsed } from "./workflow-catalog.js";
 
 import { forgetComfyRun } from "./comfy-traces.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
-import { stageReferenceAssets } from "./reference-assets.js";
+import { referenceExistsForAccount, stageReferenceAssets } from "./reference-assets.js";
 import { comfyRestarting } from "./comfy-restart.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
@@ -96,7 +96,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
    * one with Upscale when Smart upscale is asked for. Nothing runs on a worker
    * without the capability, and nothing falls back to the cloud.
    */
-  async function routeGeneration(input, account, pinnedBackend) {
+  async function routeGeneration(input, account, pinnedBackend, admission = false) {
     const accountUser = account?.role === "user";
     const workers = listWorkers();
     const kindCapability = input?.kind === "video" ? "video" : "image";
@@ -107,6 +107,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       };
     if (
       !accountUser &&
+      !(admission && (input?.profileId || input?.model)) &&
       (workers.length === 0 ||
         (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))
     )
@@ -185,7 +186,12 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             error: noWorkerMessage(capabilityForProfile(profile)),
           },
         };
-      return { backend: worker.id };
+      return {
+        backend: worker.id,
+        profile,
+        offline:
+          available.models.workers?.find((item) => item.id === worker.id)?.available === false,
+      };
     } catch (error) {
       return {
         status: 503,
@@ -507,8 +513,90 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       admission = handler;
     },
     async validateInput(input, account) {
-      const routed = await routeGeneration(input, account);
+      const routed = await routeGeneration(input, account, input?.backendId, true);
       if (routed.payload) return routed;
+      if (routed.offline) {
+        if (!String(input?.prompt || "").trim())
+          return { status: 400, payload: { ok: false, error: "Enter a prompt." } };
+        if (input.kind && input.kind !== routed.profile.kind)
+          return {
+            status: 400,
+            payload: { ok: false, error: "The selected profile does not support this media kind." },
+          };
+        if (input.model && input.model !== routed.profile.model)
+          return {
+            status: 400,
+            payload: {
+              ok: false,
+              error: "The requested model does not match the selected profile.",
+            },
+          };
+        for (const [field, ceiling] of Object.entries({
+          count: 4096,
+          width: 16384,
+          height: 16384,
+          steps: 10000,
+          frames: 16384,
+          fps: 120,
+          variationCount: 8,
+        })) {
+          const maximum = Math.min(
+            Number(routed.profile.constraints?.[field]?.max) || ceiling,
+            ceiling,
+          );
+          const minimum = Math.max(Number(routed.profile.constraints?.[field]?.min) || 1, 1);
+          if (
+            input[field] !== undefined &&
+            (!Number.isFinite(Number(input[field])) ||
+              Number(input[field]) < minimum ||
+              Number(input[field]) > maximum)
+          )
+            return {
+              status: 400,
+              payload: { ok: false, error: `${field} must be between ${minimum} and ${maximum}.` },
+            };
+        }
+        const references = input.referenceAssets || [];
+        if (
+          !Array.isArray(references) ||
+          references.length > 8 ||
+          references.some(
+            (reference) => !reference || !referenceExistsForAccount(account, reference.assetId),
+          )
+        )
+          return {
+            status: 400,
+            payload: {
+              ok: false,
+              error: "Choose up to eight reference images belonging to this account.",
+            },
+          };
+        const start = input.startImageId || input.startImage;
+        if (start && !referenceExistsForAccount(account, start))
+          return {
+            status: 400,
+            payload: { ok: false, error: "The start image does not belong to this account." },
+          };
+        if (routed.profile.capabilities?.startImageRequired && !references.length && !start)
+          return {
+            status: 400,
+            payload: { ok: false, error: "A reference image is required for this workflow." },
+          };
+        for (const [index, slot] of (routed.profile.mediaInputs || []).entries()) {
+          const count =
+            references.filter((reference) => reference.slot === slot.id).length ||
+            (index === 0 && start ? 1 : 0);
+          if (count < (slot.min || (slot.required ? 1 : 0)) || count > (slot.max || 1))
+            return {
+              status: 400,
+              payload: {
+                ok: false,
+                error: `${slot.label || slot.id} requires between ${slot.min || (slot.required ? 1 : 0)} and ${slot.max || 1} references.`,
+              },
+            };
+        }
+        return { status: 200, payload: { ok: true, backend: routed.backend, waiting: true } };
+      }
       return withComfyBackend(routed.backend, async () => {
         const prepared = await prepareGenerationBody(input);
         return prepared.payload

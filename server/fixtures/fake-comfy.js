@@ -29,6 +29,7 @@ export async function startFakeComfy({
   objectInfo = {},
   systemStats = {},
   version = "0.34.1",
+  outputFiles = new Map(),
 } = {}) {
   const prompts = [];
   const requests = [];
@@ -66,6 +67,14 @@ export async function startFakeComfy({
     requests.push({ method: req.method, pathname: url.pathname });
     // Out of reach, the way a proxy in front of a stopped ComfyUI answers.
     if (down) return json(res, 503, { error: "down" });
+    if (
+      req.method === "GET" &&
+      url.pathname === "/view" &&
+      outputFiles.has(url.searchParams.get("filename"))
+    ) {
+      res.writeHead(200, { "content-type": "image/png" });
+      return res.end(outputFiles.get(url.searchParams.get("filename")));
+    }
     if (req.method === "POST" && url.pathname === "/prompt") {
       const body = await readBody(req);
       count += 1;

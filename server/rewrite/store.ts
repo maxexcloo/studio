@@ -24,6 +24,7 @@ export class RewriteStore {
     if (filename !== ":memory:") mkdirSync(path.dirname(filename), { recursive: true });
     this.db = new DatabaseSync(filename);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+      CREATE TABLE IF NOT EXISTS studio_worker_models (id TEXT PRIMARY KEY, url TEXT NOT NULL, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_sessions (
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, updated_at TEXT NOT NULL, record TEXT NOT NULL
       );
@@ -182,6 +183,21 @@ export class RewriteStore {
 
   close() {
     this.db.close();
+  }
+
+  workerModels(id: string, url: string): Record<string, any> | undefined {
+    const row = this.db
+      .prepare("SELECT record FROM studio_worker_models WHERE id = ? AND url = ?")
+      .get(id, url);
+    return row ? JSON.parse(row.record as string) : undefined;
+  }
+
+  saveWorkerModels(id: string, url: string, models: unknown) {
+    this.db
+      .prepare(
+        "INSERT INTO studio_worker_models VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET url = excluded.url, record = excluded.record",
+      )
+      .run(id, url, JSON.stringify(models));
   }
 
   providerRecord<T>(ownerId: string, id: string): T | undefined {

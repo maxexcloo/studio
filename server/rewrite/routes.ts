@@ -34,11 +34,16 @@ export function registerRewriteRoutes(
     store,
     queue,
     resourceFor = () => "local-media",
+    validate,
     jobLimit,
   }: {
     store: RewriteStore;
     queue: GenerationQueue;
     resourceFor?: (input: GenerationInput) => string | Promise<string>;
+    validate?: (
+      input: GenerationInput,
+      account?: Request["studioAccount"],
+    ) => Promise<{ status: number; payload: unknown }>;
     jobLimit?: number;
   },
 ) {
@@ -107,6 +112,8 @@ export function registerRewriteRoutes(
     )
       return res.status(400).json({ error: "Parent generation must belong to this session." });
     let job;
+    const checked = await validate?.(input, req.studioAccount);
+    if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);
     try {
       job = store.enqueue(
         owner(req),

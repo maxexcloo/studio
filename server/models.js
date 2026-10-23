@@ -275,14 +275,14 @@ export function sizedRange(range, familyStep) {
   };
 }
 
-export function inferModels(info, stats = {}) {
+export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
   const missingCoreImageNodes = missingNodes(info, [
     "KSampler",
     "CLIPTextEncode",
     "VAEDecode",
     "SaveImage",
   ]);
-  if (missingCoreImageNodes.length) {
+  if (!configuredOnly && missingCoreImageNodes.length) {
     return emptyModelResult({
       reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
     });
@@ -328,7 +328,8 @@ export function inferModels(info, stats = {}) {
 
   for (const workflow of loadCustomWorkflows()) {
     const missing = missingNodes(info, workflow.requiredNodes);
-    if (missing.length || workflowOptionIssues(workflow, info).length) continue;
+    if (!configuredOnly && (missing.length || workflowOptionIssues(workflow, info).length))
+      continue;
     const defaults = workflow.defaults || {};
     const controls = workflow.controls || {};
     const familyStep = workflowFamilyStep(workflow);
@@ -501,11 +502,11 @@ export function inferModels(info, stats = {}) {
     );
   }
 
-  // Saved display metadata preserves the native profile IDs and generation settings.
+  // Legacy runtime titles stay readable only when ai is not the configuration owner.
   try {
-    const saved = JSON.parse(
-      fs.readFileSync(path.join(dataDir, "per-model-workflows.json"), "utf8"),
-    );
+    const saved = process.env.STUDIO_CONFIG_DIR
+      ? []
+      : JSON.parse(fs.readFileSync(path.join(dataDir, "per-model-workflows.json"), "utf8"));
     for (const row of saved) {
       const profile =
         profiles.find((item) => item.id === row.id) ||
