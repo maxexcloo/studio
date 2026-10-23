@@ -1,0 +1,56 @@
+[
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-ClipProj",
+    "revision": "c01ba8fb8f41b4f2094dbd0b185cdc238fb6134c",
+    "url": "https://github.com/NicoLab28/ComfyUI-ClipProj.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-GGUF",
+    "revision": "6ea2651e7df66d7585f6ffee804b20e92fb38b8a",
+    "url": "https://github.com/city96/ComfyUI-GGUF.git"
+  },
+  {
+    "branch": "Main",
+    "path": "custom_nodes/ComfyUI-Impact-Pack",
+    "revision": "429d0159ad429e64d2b3916e6e7be9c22d025c3c",
+    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-Impact-Subpack",
+    "revision": "50c7b71a6a224734cc9b21963c6d1926816a97f1",
+    "url": "https://github.com/ltdrdata/ComfyUI-Impact-Subpack.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-KJNodes",
+    "revision": "f4bae1f9960e5d643573a2ecf7abd56453a21821",
+    "url": "https://github.com/kijai/ComfyUI-KJNodes.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-Manager",
+    "revision": "a74929c65b49d7d7d81b9a6f140de878a818b893",
+    "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-MiniMax-H3-PDD-Acc",
+    "revision": "311a65dd53832d8a5f8177a9d5fb923c09e35a90",
+    "url": "https://github.com/Jalen-Brunson/ComfyUI-MiniMax-H3-PDD-Acc.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/ComfyUI-SeedVR2_VideoUpscaler",
+    "revision": "4490bd1f482e026674543386bb2a4d176da245b9",
+    "url": "https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git"
+  },
+  {
+    "branch": "main",
+    "path": "custom_nodes/rgthree-comfy",
+    "revision": "d7297b42f0fa78bec1c0411478f887423c249502",
+    "url": "https://github.com/rgthree/rgthree-comfy.git"
+  }
+]
