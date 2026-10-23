@@ -47,6 +47,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   for (const [method, path] of [
     ["GET", "/api/gallery"],
     ["GET", "/api/gallery/delta"],
+    ["GET", "/api/gallery/filters"],
     ["POST", "/api/generate"],
     ["GET", "/api/jobs/abc-1"],
     ["POST", "/api/jobs/abc-1/cancel"],

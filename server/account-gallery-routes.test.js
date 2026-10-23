@@ -200,3 +200,44 @@ test("repeated gallery filters match any of their values and combine across filt
     ["job-flux2"],
   );
 });
+
+test("gallery filter options cover the owned gallery without exposing other accounts or media kinds", () => {
+  galleryStore.setGallery([
+    ...Array.from({ length: 65 }, (_, index) => ({
+      ...item("account-a", `page-${index}`),
+      model: "shared-model",
+    })),
+    {
+      ...item("account-a", "last-page"),
+      model: "late-model",
+      settings: { modelName: "base-model", loras: [{ name: "detail.safetensors" }] },
+    },
+    {
+      ...item("account-b", "private"),
+      model: "private-model",
+      settings: { loras: [{ name: "private-lora" }] },
+    },
+    { ...item("account-a", "video"), type: "video", model: "video-model" },
+  ]);
+  const request = {
+    studioAccount: {
+      userId: "account-a",
+      role: "user",
+      authenticated: true,
+      features: { gallery: true },
+    },
+    query: { type: "image", limit: "60", q: "no-match" },
+  };
+  const facets = call(routes["/api/gallery/filters"], request);
+  assert.deepEqual(facets.models, ["base-model", "late-model", "shared-model"]);
+  assert.deepEqual(facets.loras, ["detail.safetensors"]);
+  assert.equal(facets.sizes[0].value, "up-to-1k");
+  assert.equal(facets.aspects.at(-1).value, "other");
+  assert.deepEqual(
+    call(routes["/api/gallery/filters"], {
+      ...request,
+      studioAccount: { ...request.studioAccount, features: { gallery: false } },
+    }),
+    { ok: false, error: "Gallery access is disabled for this account." },
+  );
+});

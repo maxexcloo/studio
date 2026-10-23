@@ -34,7 +34,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["POST", /^\/api\/queue\/cancel$/],
-  ["GET", /^\/api\/gallery(\/delta|\/export|\/jobs\/[\w-]+)?$/],
+  ["GET", /^\/api\/gallery(\/delta|\/export|\/filters|\/jobs\/[\w-]+)?$/],
   ["POST", /^\/api\/gallery\/(favorite|errors\/clear)$/],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/chat$/],

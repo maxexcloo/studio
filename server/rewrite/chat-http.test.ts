@@ -26,6 +26,7 @@ test(
               { id: "fixture-text-model", owned_by: "Fixture Gateway" },
               { id: "alternate-text", name: "Alternate Text", provider: "Fixture Provider" },
               { id: "restricted-text", owned_by: "Fixture Provider" },
+              { id: "not-alternate-text", owned_by: "Fixture Provider" },
             ],
           }),
         );
@@ -63,6 +64,7 @@ test(
     let server: ChildProcess | undefined;
     let base = "";
     let cookie = "";
+    let allowedModels = "alternate-*,fixture-text-model,restricted-text,unadvertised-model";
     async function start() {
       server = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
         env: {
@@ -79,9 +81,12 @@ test(
           STUDIO_TEXT_ADMISSION_TOKEN: "",
           STUDIO_CLIPROXYAPI_URL: "",
           CLIPROXYAPI_URL: "",
-          STUDIO_PROMPT_WRITER_URL: gatewayUrl,
-          STUDIO_PROMPT_WRITER_KEY: "fixture",
-          STUDIO_PROMPT_WRITER_MODEL: "fixture-text-model",
+          STUDIO_CHAT_GATEWAY_URL: gatewayUrl,
+          STUDIO_CHAT_GATEWAY_KEY: "fixture",
+          STUDIO_CHAT_GATEWAY_MODELS: allowedModels,
+          STUDIO_PROMPT_WRITER_URL: "http://127.0.0.1:1",
+          STUDIO_PROMPT_WRITER_KEY: "unrelated-fixture",
+          STUDIO_PROMPT_WRITER_MODEL: "unrelated-writer-model",
           STUDIO_ASSISTANT_SPICY_MODEL: "restricted-text",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -201,7 +206,7 @@ test(
       const artistCookie = cookie;
       const chatStatus = await api("/api/chat/status");
       assert.equal(chatStatus.available, true);
-      assert.equal(chatStatus.defaultModelId, "fixture-text-model");
+      assert.equal(chatStatus.defaultModelId, "alternate-text");
       assert.deepEqual(
         chatStatus.models.map((model: any) => model.id),
         ["alternate-text", "fixture-text-model"],
@@ -285,7 +290,7 @@ test(
         seed: 123,
       };
       const revised = await chat(session.id, "Submit edited card.", undefined, undefined, {
-        modelId: "alternate-text",
+        modelId: "fixture-text-model",
         revision: { sourceJobId: third.id, operation: "refine", input: revisionInput },
       });
       assert.equal(revised.filter((event) => event.event === "generation").length, 1);
@@ -300,14 +305,14 @@ test(
       assert.equal(fourth.input.steps, 3);
       assert.deepEqual(fourth.input.referenceAssets, revisionInput.referenceAssets);
       assert.equal(fourth.parentJobId, third.id);
-      assert.equal(requests.at(-1).model, "alternate-text");
+      assert.equal(requests.at(-1).model, "fixture-text-model");
       const revisionContext = requests.at(-1).messages.at(-1).content;
       assert.match(revisionContext, /Exact edited card prompt/);
       assert.match(revisionContext, /"steps":\{"before":2,"after":3\}/);
       const savedRevision = (await api(`/api/sessions/${session.id}/chat`)).messages;
       const editedReply = savedRevision.find((message: any) => message.jobId === fourthId);
-      assert.equal(editedReply.actualModelId, "actual-alternate-text");
-      assert.equal(editedReply.provider, "Fixture Provider");
+      assert.equal(editedReply.actualModelId, "actual-fixture-text-model");
+      assert.equal(editedReply.provider, "Fixture Gateway");
       const aliasJobIds: string[] = [];
       for (const alias of ["startImage", "startImageId"]) {
         const legacyInput = {
@@ -333,6 +338,8 @@ test(
       for (const payload of [
         { content: "Not allowed", modelId: "restricted-text" },
         { content: "Unknown", modelId: "not-in-gateway" },
+        { content: "Not advertised", modelId: "unadvertised-model" },
+        { content: "Outside allowlist", modelId: "not-alternate-text" },
         {
           content: "Foreign revision",
           revision: { sourceJobId: "missing", operation: "image", input },
@@ -368,7 +375,7 @@ test(
         requests.at(-1).messages.at(-1).content[1].image_url.url,
         /^data:image\/jpeg;base64,/,
       );
-      assert.equal(requests.at(-1).model, "fixture-text-model");
+      assert.equal(requests.at(-1).model, "alternate-text");
       cookie = adminCookie;
       assert.equal((await request(`/api/sessions/${session.id}/chat`)).status, 404);
       assert.equal(
@@ -410,6 +417,24 @@ test(
           ...aliasJobIds.map((id) => [id, "completed"]),
         ],
       );
+      await stop();
+      allowedModels = "";
+      await start();
+      const unconfigured = await api("/api/chat/status");
+      assert.equal(unconfigured.available, false);
+      assert.deepEqual(unconfigured.models, []);
+      assert.match(unconfigured.reason, /STUDIO_CHAT_GATEWAY_MODELS/);
+      const beforeDisabled = requests.length;
+      assert.equal(
+        (
+          await request(`/api/sessions/${session.id}/chat`, "POST", {
+            content: "No allowed models",
+          })
+        ).status,
+        503,
+      );
+      assert.equal(requests.length, beforeDisabled);
+      assert.deepEqual((await api(`/api/sessions/${session.id}/chat`)).messages, messages);
     } finally {
       await stop();
       gateway.closeAllConnections();
