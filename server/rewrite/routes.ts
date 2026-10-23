@@ -1,5 +1,9 @@
-import type { GenerationInput, GenerationOperation } from "../../shared/queue.ts";
-import { GenerationQueue } from "./queue.ts";
+import type {
+  GenerationInput,
+  GenerationOperation,
+  QueueCancelAllResponse,
+} from "../../shared/queue.ts";
+import { GenerationQueue, terminalStatuses } from "./queue.ts";
 import { publicJob, RewriteStore } from "./store.ts";
 
 interface Request {
@@ -143,6 +147,30 @@ export function registerRewriteRoutes(
       if ((await queue.cancel(owner(req), job.id))?.status === "cancelled") cancelled++;
     }
     return res.json({ cancelled });
+  });
+  app.post("/api/queue/cancel-all", async (req, res) => {
+    const ownerId = owner(req);
+    const outcomes = await Promise.all(
+      store
+        .jobs(ownerId)
+        .filter((job) => !terminalStatuses.has(job.status))
+        .map(async (initial) => {
+          let error: string | undefined;
+          try {
+            await queue.cancel(ownerId, initial.id);
+          } catch {
+            error =
+              "Cancellation could not be confirmed. The recorded job remains available for recovery.";
+          }
+          const job = store.job(ownerId, initial.id)!;
+          return {
+            job: publicJob(job),
+            cancelRequested: job.cancelRequested === true,
+            ...(error ? { error } : {}),
+          };
+        }),
+    );
+    return res.json({ outcomes } satisfies QueueCancelAllResponse);
   });
   app.post("/api/queue/:id/cancel", async (req, res) => {
     const job = await queue.cancel(owner(req), req.params.id);

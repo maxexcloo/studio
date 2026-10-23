@@ -36,3 +36,7 @@ export interface QueueJob {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface QueueCancelAllResponse {
+  outcomes: { job: QueueJob; cancelRequested: boolean; error?: string }[];
+}
