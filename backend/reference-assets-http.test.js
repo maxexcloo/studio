@@ -105,6 +105,18 @@ test(
     const upload = (await uploaded.json()).asset;
     const metadata = (id) => api(`/api/reference-assets/${encodeURIComponent(id)}`);
     assert.deepEqual((await metadata(upload.id)).asset, upload);
+    const saveRoute = `/api/reference-assets/${encodeURIComponent(upload.id)}/gallery`;
+    const saved = (await api(saveRoute, "POST")).item;
+    assert.equal((await api(saveRoute, "POST")).item.id, saved.id);
+    const savedItems = (await api("/api/gallery")).items.filter((item) => item.id === saved.id);
+    assert.equal(savedItems.length, 1);
+    assert.deepEqual(
+      [savedItems[0].type, savedItems[0].width, savedItems[0].height],
+      ["image", 32, 16],
+    );
+    const savedMedia = await request(saved.url);
+    assert.equal(savedMedia.status, 200);
+    assert.deepEqual(Buffer.from(await savedMedia.arrayBuffer()), bytes);
     const generated = [];
     for (const kind of ["image", "video"]) {
       const ack = await api("/api/generate", "POST", {
@@ -146,6 +158,7 @@ test(
       assert.equal((await request(`/api/reference-assets/${encodeURIComponent(id)}`)).status, 404);
     await profile({ gallery: false });
     cookie = artistCookie;
+    assert.equal((await request(saveRoute, "POST")).status, 403);
     assert.equal((await metadata(upload.id)).asset.id, upload.id);
     assert.equal(
       (await request(`/api/reference-assets/${encodeURIComponent(imageAsset.id)}`)).status,
