@@ -282,7 +282,7 @@ export function ExpertSettings({
   );
   if (inline)
     return (
-      <Stack gap="md" role="region" aria-label="Expert Settings" data-composer-layer>
+      <Stack gap="md" flex={1} role="region" aria-label="Expert Settings" data-composer-layer>
         <Group gap="xs">
           <Button
             autoFocus
