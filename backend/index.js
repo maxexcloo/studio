@@ -62,6 +62,7 @@ import {
   downscaleReferences,
   registerAssistantRoutes,
 } from "./assistant-routes.js";
+import { registerAnimatePromptRoute } from "./prompt-animate.js";
 import { guideStore, livePrompting, profileStore } from "./profile-store.js";
 
 import { requireAdmin, requireLocal } from "./route-access.js";
@@ -1768,15 +1769,16 @@ const assistantLoras = async (req) => {
     return [];
   }
 };
+const assistantGuide = (profile) => {
+  try {
+    return assistantGuides(profile, true);
+  } catch {
+    return null;
+  }
+};
 const assistantEngine = registerAssistantRoutes(app, {
   profiles: assistantProfiles,
-  guide: (profile) => {
-    try {
-      return assistantGuides(profile, true);
-    } catch {
-      return null;
-    }
-  },
+  guide: assistantGuide,
   loras: assistantLoras,
   // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
   starred: async (req, profile) => {
@@ -1826,6 +1828,11 @@ const assistantEngine = registerAssistantRoutes(app, {
     }
   },
   requireAdmin,
+});
+registerAnimatePromptRoute(app, {
+  engine: assistantEngine,
+  profiles: assistantProfiles,
+  guide: assistantGuide,
 });
 
 app.delete("/api/workflows/:id", (req, res) => {
