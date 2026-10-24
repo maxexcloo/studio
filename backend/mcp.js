@@ -50,14 +50,21 @@ import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assista
 import { adminInstructions, registerAdminTools } from "./mcp-admin.js";
 import fs from "node:fs";
 
-// Most images return inline instead of through a separate Result call; a cold model load or a slow one hands back its link sooner, so the chat never waits near its own timeout.
+// Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
+// How long Generate reads the first job for its end time while the queue picks it up.
+const etaProbeMilliseconds = 2000;
 // An identical Generate from the same conversation within this window is the same request (see Generate).
 export const generateDedupeWindowMs = 120_000;
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
-// Only a small set waits for its images; a bigger batch hands back its links at once.
-const maxWaitedJobs = 4;
+/** A set's expected wait for the reply: "about 40 s", "about 3 min". */
+const aboutTime = (ms) =>
+  ms < 55_000
+    ? `about ${Math.max(5, Math.round(ms / 5000) * 5)} s`
+    : ms < 90 * 60_000
+      ? `about ${Math.round(ms / 60_000)} min`
+      : `about ${Math.round(ms / 3_600_000)} h`;
 /** JSON with sorted keys and undefined left out, so equal arguments give equal text. */
 const stableJson = (value) =>
   JSON.stringify(value, (_key, item) =>
@@ -171,6 +178,7 @@ export function registerMcpRoutes(
     baseUrl,
     environment = process.env,
     imageWaitSeconds = generateWaitSeconds,
+    etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
     fetchImpl = fetch,
     allowedHost = (req) => hostAllowed(req.headers.host),
@@ -399,10 +407,18 @@ export function registerMcpRoutes(
       const label = profile.label || profile.id;
       // Iterations that rebuild a whole Generate call drift from the result; Reuse keeps its settings.
       const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and the change as request.`;
-      // Quick images come back finished, so the agent needs no Result call; videos and big batches hand back their links at once.
+      // A set Studio expects to finish within the wait comes back finished, so the agent needs no Result call;
+      // anything longer, or with no trusted estimate, hands back its links at once.
+      const [endsAt] = await media.finishTimes(owner, [submission], {
+        probeMs: etaProbeMs,
+        signal,
+      });
+      const expected = endsAt === null ? null : Math.max(0, endsAt - Date.now());
       const seconds =
-        profile.kind === "video" || submission.jobs.length > maxWaitedJobs ? 0 : imageWaitSeconds;
-      const markdown = await media.settle(owner, submission, seconds, { signal });
+        expected !== null && expected <= imageWaitSeconds * 1000 ? imageWaitSeconds : 0;
+      // A set that outlasted its wait has no ETA left worth giving.
+      const left = seconds ? 0 : expected;
+      const markdown = await media.settle(owner, submission, seconds, { scope: refs, signal });
       const structured = {
         status: markdown ? "done" : submission.status,
         profile: {
@@ -412,6 +428,7 @@ export function registerMcpRoutes(
           ...(isCloudProfile(profile) ? { remote: true } : {}),
         },
         prompt_source: promptSource,
+        ...(!markdown && left ? { eta_seconds: Math.round(left / 1000) } : {}),
         jobs: submission.jobs.map(({ job_id, ref, link, status }) => ({
           job_id,
           ref,
@@ -455,7 +472,7 @@ export function registerMcpRoutes(
       ].join(" · ");
       const message =
         submission.status === "queued"
-          ? `Queued on ${label}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. When the user later asks to see results, call Result. Never poll or resubmit. ${followUp}`
+          ? `Queued on ${label}${left ? `, ready in ${aboutTime(left)}` : ""}. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. When the user later asks to see results, call Result. Never poll or resubmit. ${followUp}`
           : `${submission.error} ${note}Share the links; never resubmit.`;
       return {
         content: [{ type: "text", text: `${message}\n\n${pending}${prompts}` }, ...extra],
@@ -465,12 +482,20 @@ export function registerMcpRoutes(
         },
       };
     };
-    /** Several models' sets as one reply: a line of result links per model, without waiting for any. */
-    const respondSets = (sets, note = "") => {
+    /** Several models' sets as one reply: a line of result links per model with its expected wait, without waiting for any. */
+    const respondSets = async (sets, note = "", signal) => {
       const link = ({ ref, link: url }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${url})`;
+      const now = Date.now();
+      const left = (
+        await media.finishTimes(
+          owner,
+          sets.map(({ queued }) => queued),
+          { probeMs: etaProbeMs, signal },
+        )
+      ).map((endsAt) => (endsAt === null ? 0 : Math.max(0, endsAt - now)));
       const lines = sets.map(
-        ({ profile, queued }) =>
-          `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}`,
+        ({ profile, queued }, index) =>
+          `${profile.label || profile.id}: ${queued.error || queued.jobs.map(link).join(" · ")}${left[index] ? ` (${aboutTime(left[index])})` : ""}`,
       );
       const first =
         sets.find(({ queued }) => queued.jobs?.length)?.queued.jobs[0].ref || "result 1";
@@ -483,8 +508,9 @@ export function registerMcpRoutes(
         ],
         structuredContent: {
           status: "queued",
-          sets: sets.map(({ profile, queued }) => ({
+          sets: sets.map(({ profile, queued }, index) => ({
             profile: { id: profile.id, label: profile.label || profile.id },
+            ...(left[index] ? { eta_seconds: Math.round(left[index] / 1000) } : {}),
             jobs: (queued.jobs || []).map(({ job_id, ref, link: url }) => ({
               job_id,
               ref,
@@ -493,6 +519,22 @@ export function registerMcpRoutes(
             ...(queued.error ? { error: queued.error } : {}),
           })),
         },
+      };
+    };
+    /**
+     * Without a named model, the writer picks from Studio's choices by the request; otherwise the usual
+     * pick stands. With several to choose from, the note says which and why, in one line.
+     */
+    const picked = async ({ pool, profile }, request, signal) => {
+      if (pool.length < 2) return { profile, note: "" };
+      const choice =
+        writer && request
+          ? await writer.pick({ request, profiles: pool, preferred: profile, signal })
+          : null;
+      const chosen = choice?.profile || profile;
+      return {
+        profile: chosen,
+        note: `Chose ${chosen.label || chosen.id}${choice ? `: ${choice.reason}` : ", the default"}. `,
       };
     };
     /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
@@ -927,16 +969,17 @@ export function registerMcpRoutes(
             args.profile_id === undefined
               ? fits
                 ? fromRequest
-                : {
-                    profile: await media.choose(owner, {
+                : await picked(
+                    await media.choices(owner, {
                       kind,
                       tier: wanted,
                       references,
                       loras: args.loras || [],
                       cloud,
                     }),
-                    note: "",
-                  }
+                    request,
+                    signal,
+                  )
               : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
           ];
         }
@@ -1050,7 +1093,7 @@ export function registerMcpRoutes(
               queued: (await submit(item.profile, item.plan, recordOf(item), { guide: false }))
                 .queued,
             });
-          return respondSets(sets, contextNote);
+          return respondSets(sets, contextNote, signal);
         }
         const [{ profile, note: tierNote, plan, source }] = plans;
         // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.
@@ -1592,10 +1635,15 @@ export function registerMcpRoutes(
             })
             .send(html);
         }
-        const original = accountMode
-          ? await media.signedResult(claims.owner, claims.jobId, claims.index)
-          : await media.download(claims.owner, claims.jobId, claims.index);
-        const result = claims.preview ? await media.previewOf(original) : original;
+        const read = (jobId, index) =>
+          accountMode
+            ? media.signedResult(claims.owner, jobId, index)
+            : media.download(claims.owner, jobId, index);
+        const result = claims.sheet
+          ? await media.sheet(claims.sheet, read)
+          : claims.preview
+            ? await media.previewOf(await read(claims.jobId, claims.index))
+            : await read(claims.jobId, claims.index);
         res
           .set({
             "Cache-Control": "private, no-store",

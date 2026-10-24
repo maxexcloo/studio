@@ -178,5 +178,44 @@ export function createPromptWriter(
       );
       return { prompts: fallback, source: "request", ms: Date.now() - started };
     },
+    /**
+     * The profile in `profiles` that suits the request best, with a one-line reason, or null when the
+     * reply is unusable or slow (8 s), so Studio's usual pick stands. `preferred` is that usual pick.
+     */
+    async pick({ request, profiles, preferred, signal }) {
+      const line = (profile) =>
+        `- ${profile.id}: ${profile.label || profile.id}${profile.id === preferred?.id ? " (default)" : ""}. ${clean(profile.description).slice(0, 300)}${profile.prompting?.summary ? ` Prompting: ${clean(profile.prompting.summary).slice(0, 200)}` : ""}`;
+      try {
+        const reply = await engine.chat({
+          model: settings.model,
+          messages: [
+            {
+              role: "system",
+              content: [
+                "Choose the model that suits this generation request best.",
+                'Reply with JSON only: {"id": "<model id>", "reason": "<why, in at most 12 words>"}.',
+                "Keep the default unless another model clearly suits the request better, such as for legible text or explicit content.",
+                `Models:\n${profiles.map(line).join("\n")}`,
+              ].join("\n"),
+            },
+            { role: "user", content: `Request: ${clean(request)}` },
+          ],
+          temperature: 0,
+          maxTokens: 300,
+          timeout: 8000,
+          signal,
+        });
+        const json = /\{[\s\S]*\}/.exec(stripThinking(reply.text))?.[0];
+        const { id, reason } = json ? JSON.parse(json) : {};
+        const profile = profiles.find((item) => item.id === id);
+        const why = clean(reason)
+          .replace(/[.\s]+$/, "")
+          .slice(0, 120);
+        return profile && why ? { profile, reason: why } : null;
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        return null;
+      }
+    },
   };
 }

@@ -78,6 +78,8 @@ async function fixture(
   t,
   {
     imageWaitSeconds = 0,
+    // When each job is expected to end, as Studio's progress reports it; none by default, so Generate never waits.
+    jobEtaMs,
     generateDedupeMs = 0,
     environment: extra = {},
     dataDir: existingDir,
@@ -151,9 +153,14 @@ async function fixture(
       kind: req.body.kind,
       outputs: completeOnSubmit ? [{ url: "/comfy/view?filename=immediate.png" }] : [],
       settings: req.body,
+      ...(jobEtaMs === undefined ? {} : { progress: { endsAt: Date.now() + jobEtaMs } }),
     });
     res.json({ jobId: id, status: "queued" });
   });
+  // Studio's estimate for a set: jobEtaMs per run once given, like a model with trusted timings.
+  app.get("/api/estimate", (req, res) =>
+    res.json({ ok: true, ...(jobEtaMs ? { ms: jobEtaMs * Number(req.query.runs) } : {}) }),
+  );
   app.get("/api/jobs/:id", (req, res) =>
     jobLookupFails
       ? res.status(503).json({ error: "Fixture result retrieval offline" })
@@ -261,6 +268,7 @@ async function fixture(
     authenticateAccountToken,
     // Most tests check the queued response; inline waits have their own tests.
     imageWaitSeconds,
+    etaProbeMs: 0,
     generateDedupeMs,
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
@@ -1042,10 +1050,8 @@ test("Generate returns immediately with one saved-size image and passes explicit
   assert.deepEqual(f.submitted[0].autoUpscale, { quality: "balanced", faceDetail: true });
   assert.equal(f.submitted[0].sampler, "euler");
   assert.equal(f.submitted[0].scheduler, "simple");
-  assert.equal(
-    f.requests.some((request) => request.path.startsWith("/jobs/")),
-    false,
-  );
+  // One status read asks for the job's end time; with no estimate there is no wait.
+  assert.equal(f.requests.filter((request) => request.path.startsWith("/jobs/")).length, 1);
 });
 
 test("a full-body person turns face detail on only beside a requested upscale, and the reply says so", async (t) => {
@@ -1543,10 +1549,10 @@ test("Generate without a wait never fetches results, and unavailable retrieval f
     false,
   );
   assert.equal(f.submitted.length, 1);
+  // Only the read for its end time, which fails here, so the links return at once.
+  assert.equal(f.requests.filter((request) => request.path.startsWith("/jobs/")).length, 1);
   assert.equal(
-    f.requests.some(
-      (request) => request.path.startsWith("/jobs/") || request.path.startsWith("/gallery"),
-    ),
+    f.requests.some((request) => request.path.startsWith("/gallery")),
     false,
   );
   assert.equal(f.downloads.length, 0);
@@ -2745,7 +2751,7 @@ test("a finished video notification names its result and profile beside View Vid
 });
 
 test("Generate returns quick images inline as finished markdown, so no background Result is needed", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   const client = await f.client();
   const started = performance.now();
   const pending = call(client, "Generate", { kind: "image", prompts: ["An egg"], count: 2 });
@@ -2776,11 +2782,11 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
     })),
   });
   assert.equal(result.content.length, 1);
-  // The same markdown a background notification returns, one block per job: only the instruction and the markdown.
-  // Each linked preview sits directly under its header, in one paragraph; jobs are separated by a blank line.
+  // The same markdown a background notification returns: only the instruction and the markdown. The run's
+  // images share one contact sheet directly under its header, in one paragraph, linking to All Results.
   assert.match(
     result.content[0].text,
-    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Results 1–2\*\* · Fixture Image\n\[!\[Results 1–2\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\((https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10})\)\n\n\[All Results\]\(\1\)\n\nPrompt: An egg$/,
   );
   assert.ok(result.content[0].text.length < 660, `${result.content[0].text.length} characters`);
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
@@ -2788,14 +2794,21 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
     result.content[0].text,
     /call Reuse with its ref \(such as "result 1"\) and the change as request/,
   );
-  const original = await fetch(localLink(f, links(result)[0]));
-  assert.equal(original.status, 200);
-  assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
-  assert.equal(f.downloads.length, 1, "only the link fetch downloads the output");
+  assert.equal(f.downloads.length, 0, "nothing is downloaded until the sheet is fetched");
+  const sheet = await fetch(localLink(f, previews(result)[0]));
+  assert.equal(sheet.status, 200);
+  assert.equal(sheet.headers.get("content-type"), "image/jpeg");
+  // Two 64×48 images side by side in equal cells shaped like the first, 1024 px wide in all.
+  const { width, height } = await sharp(Buffer.from(await sheet.arrayBuffer())).metadata();
+  assert.deepEqual([width, height], [1024, 381]);
+  assert.equal(f.downloads.length, 2);
+  // A sheet link is an image only: without .jpg it opens nothing.
+  const bare = await fetch(localLink(f, previews(result)[0].replace(/\.jpg$/, "")));
+  assert.equal(bare.status, 404);
 });
 
 test("Generate falls back to the queued response when a job outlasts the wait or fails", async (t) => {
-  const short = await fixture(t, { imageWaitSeconds: 1 });
+  const short = await fixture(t, { imageWaitSeconds: 1, jobEtaMs: 500 });
   let started = performance.now();
   const slowResult = await call(await short.client(), "Generate", {
     kind: "image",
@@ -2811,7 +2824,7 @@ test("Generate falls back to the queued response when a job outlasts the wait or
     texts(slowResult),
     /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now or in the background\. When the user later asks to see results, call Result\. Never poll or resubmit\. To change or animate one later, call Reuse with its ref \(such as "result 1"\) and the change as request\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
-  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   started = performance.now();
   const pending = call(await f.client(), "Generate", {
     kind: "image",
@@ -2832,7 +2845,7 @@ test("Generate falls back to the queued response when a job outlasts the wait or
 });
 
 test("the Generate wait ends promptly when the client cancels, without cancelling the generation", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   const lookups = () => f.requests.filter((request) => request.path.startsWith("/jobs/")).length;
   const client = await f.client();
   const controller = new AbortController();
@@ -2856,20 +2869,38 @@ test("the Generate wait ends promptly when the client cancels, without cancellin
   );
 });
 
-test("Generate does not wait for videos by default", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 30 });
-  const client = await f.client();
-  const started = performance.now();
-  const queued = data(
-    await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 }),
-  );
+test("Generate waits only when Studio expects the set to finish within the wait, otherwise it gives each set's ETA at once", async (t) => {
+  // A five-minute video returns its link and ETA at once.
+  const slow = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 5 * 60_000 });
+  let started = performance.now();
+  const video = await call(await slow.client(), "Generate", { kind: "video", prompts: ["A wave"] });
   assert.ok(performance.now() - started < 1500);
-  assert.equal(queued.status, "queued");
-  assert.equal(queued.profile.id, videoProfile.id);
-  assert.equal(
-    f.requests.some((request) => request.path.startsWith("/jobs/")),
-    false,
+  assert.equal(data(video).status, "queued");
+  assert.equal(data(video).eta_seconds, 300);
+  assert.match(texts(video), /^Queued on Fixture Video, ready in about 5 min\. Share the links/);
+  // Three 12 s images: the first job's end time, then two more runs by the set's estimate, outlast 30 s.
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 12_000 });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  started = performance.now();
+  const three = await call(client, "Generate", {
+    profile_id: imageProfile.id,
+    prompts: ["One", "Two", "Three"],
+  });
+  assert.ok(performance.now() - started < 1500, "no wait when the set outlasts it");
+  assert.equal(data(three).eta_seconds, 36);
+  assert.match(texts(three), /^Queued on Fixture Image, ready in about 35 s\. /);
+  // Several models: each set follows the one before it.
+  const sets = await call(client, "Generate", {
+    prompts: ["A nest"],
+    profile_ids: [imageProfile.id, "Other Image"],
+  });
+  assert.deepEqual(
+    data(sets).sets.map((set) => set.eta_seconds),
+    [12, 24],
   );
+  assert.match(texts(sets), /^Fixture Image: \[Result 4\]\([^)]+\) \(about 10 s\)$/m);
+  assert.match(texts(sets), /^Other Image: \[Result 5\]\([^)]+\) \(about 25 s\)$/m);
 });
 
 const finish = (f, extension = "png") => {
@@ -3550,7 +3581,7 @@ test('a family name such as "flux 3" picks its Fast profile, and near misses lis
 });
 
 test("one Generate call queues one job per prompt, reads count beside equal prompts as one each and says how to fix an excess", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 30 });
+  const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   const client = await f.client();
   const prompts = ["A plush bear", "A plush fox", "A plush owl", "A plush whale"];
   const started = performance.now();
@@ -3623,7 +3654,7 @@ test("ten images in one Generate call queue ten separate jobs, and the account j
 });
 
 test("the Generate wait is one shared deadline for every job of the call", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 2 });
+  const f = await fixture(t, { imageWaitSeconds: 2, jobEtaMs: 400 });
   const client = await f.client();
   const started = performance.now();
   const result = await call(client, "Generate", {
@@ -3818,11 +3849,16 @@ test('replies label links Result N with one All Results page, and Result "all" s
     body,
     /^2 results are ready, 1 still running\. Reply with the markdown below exactly/,
   );
-  assert.match(body, /\*\*Result 1\*\*[^\n]*\n\[!\[Result 1\]/);
-  assert.match(body, /\*\*Result 2\*\*[^\n]*\n\[!\[Result 2\]/);
+  // Results queued together share one contact sheet.
+  assert.match(body, /\*\*Results 1–2\*\*[^\n]*\n\[!\[Results 1–2\]/);
   assert.match(body, /\[Result 3\]\(https:[^)]+\) · \[All Results\]\(https:[^)]+\)$/);
   assert.equal(/Watch/i.test(body), false);
-  assert.equal(previews(shown).length, 2);
+  assert.equal(previews(shown).length, 1);
+  // A result asked for by number still shows its own preview.
+  assert.match(
+    texts(await call(client, "Result", { job_id: "result 2" })),
+    /\*\*Result 2\*\*[^\n]*\n\[!\[Result 2\]\([^)]+\.jpg\)\]/,
+  );
   // Another conversation and another account see only their own results.
   await failure(await chat(t, f, "alice", "other-chat"), "Result", { job_id: "all" });
   assert.equal((await fetch(page.replace(/[A-Za-z0-9]{10}$/, "AAAAAAAAAA"))).status, 404);
@@ -3840,6 +3876,9 @@ const writerEnvironment = {
   STUDIO_PROMPT_WRITER_KEY: "fixture-writer-key",
   STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
 };
+/** The writer calls that wrote prompts, without model picks. */
+const written = (f) =>
+  f.writerRequests.filter(({ body }) => !/^Choose the model/.test(body.messages[0].content));
 const guidedCatalogue = () => [
   {
     ...structuredClone(imageProfile),
@@ -3863,8 +3902,14 @@ const guidedCatalogue = () => [
     prompting: { id: "motion-guide", summary: "Describe the motion." },
   },
 ];
-/** A mocked writer: each prompt numbers itself and repeats the request and changes it was given. */
+/** A mocked writer: each prompt numbers itself and repeats the request and changes it was given; a model pick keeps the default. */
 const writes = (body) => {
+  if (/^Choose the model/.test(body.messages[0].content)) {
+    const id = /^- (\S+): .* \(default\)\./m.exec(body.messages[0].content)[1];
+    return Response.json({
+      choices: [{ message: { content: JSON.stringify({ id, reason: "it suits the scene" }) } }],
+    });
+  }
   const count = Number(/exactly (\d+)/.exec(body.messages[0].content)[1]);
   const user = body.messages[1].content.replace(/\n/g, " | ");
   const prompt = (index) =>
@@ -3900,8 +3945,8 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
   assert.equal(result.prompt_source, "studio");
   assert.equal(guideOf(reply), undefined, "no guide reaches the chat");
   assert.equal(reply.content.length, 1);
-  assert.equal(f.writerRequests.length, 1, "one call writes every prompt");
-  const [{ url, authorization, body }] = f.writerRequests;
+  assert.equal(written(f).length, 1, "one call writes every prompt");
+  const [{ url, authorization, body }] = written(f);
   assert.equal(url, "http://fixture-writer.invalid:4000/v1/chat/completions");
   assert.equal(authorization, "Bearer fixture-writer-key");
   assert.equal(body.model, "ai/text-quick");
@@ -3940,8 +3985,52 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
   const prompts = data(await call(client, "Generate", { kind: "image", prompts: ["A nest"] }));
   assert.equal(prompts.prompt_source, "exact");
   assert.equal(f.submitted.at(-1).prompt, "A nest");
-  assert.equal(f.writerRequests.length, 2);
+  assert.equal(written(f).length, 2);
   await failure(client, "Generate", { kind: "image" });
+});
+
+test("without a named model, Studio picks a suitable one from the request and says why in one line", async (t) => {
+  const picks = (body) =>
+    /^Choose the model/.test(body.messages[0].content)
+      ? Response.json({
+          choices: [
+            {
+              message: {
+                content: '{"id": "fixture-other", "reason": "it renders the sign text cleanly."}',
+              },
+            },
+          ],
+        })
+      : writes(body);
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: picks });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  const reply = await call(client, "Generate", {
+    kind: "image",
+    request: 'a neon sign that says "OPEN"',
+  });
+  assert.equal(data(reply).profile.id, "fixture-other");
+  assert.match(
+    texts(reply),
+    /^Queued on Other Image\. Chose Other Image: it renders the sign text cleanly\. /,
+  );
+  const [pick] = f.writerRequests;
+  assert.match(pick.body.messages[0].content, /^- fixture-image: Fixture Image \(default\)\./m);
+  assert.match(pick.body.messages[0].content, /^- fixture-other: Other Image\./m);
+  assert.equal(pick.body.messages[1].content, 'Request: a neon sign that says "OPEN"');
+  // The picked model's guide writes the prompt.
+  assert.match(written(f)[0].body.messages[0].content, /Tags, comma separated\./);
+  // A named model is used as named, with no pick.
+  const before = f.writerRequests.length;
+  await call(client, "Generate", { profile_id: imageProfile.id, request: "a quiet harbour" });
+  assert.equal(f.writerRequests.length, before + 1);
+  // Without a writer the usual pick stands, and the reply still says which.
+  const plain = await fixture(t);
+  await plain.profiles(guidedCatalogue());
+  assert.match(
+    texts(await call(await plain.client(), "Generate", { kind: "image", request: "a harbour" })),
+    /^Queued on Fixture Image\. Chose Fixture Image, the default\. /,
+  );
 });
 
 test("six individual photos are one Generate call: six jobs, each with its own written prompt", async (t) => {
@@ -3961,7 +4050,7 @@ test("six individual photos are one Generate call: six jobs, each with its own w
     }),
   );
   assert.equal(result.jobs.length, 6);
-  assert.equal(f.writerRequests.length, 1, "one writer call for all six");
+  assert.equal(written(f).length, 1, "one writer call for all six");
   assert.equal(new Set(f.submitted.map((item) => item.prompt)).size, 6, "no copies of one prompt");
   assert.deepEqual(
     f.submitted.map((item) => item.count),

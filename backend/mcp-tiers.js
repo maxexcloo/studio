@@ -207,18 +207,13 @@ const fits = (profile, references) => {
 };
 
 /**
- * The profile Studio uses when Generate names a kind and tier instead of a profile_id. Without a
- * tier, the first preferred tier (Fast, Super Fast, Standard, Quality) that fits. Within it, the
- * deployment default, then its family, then unrestricted, then catalogue order. `firstFrame`
- * (animating an image) prefers first-frame profiles. `profiles` is already limited to this
- * account's ready profiles of the kind.
+ * The profiles Studio may use when Generate names a kind and tier instead of a profile_id: without a
+ * tier, the first preferred tier (Fast, Super Fast, Standard, Quality) that fits. `firstFrame`
+ * (animating an image) prefers first-frame profiles. `profiles` is already limited to this account's
+ * ready profiles of the kind.
  */
-export function chooseProfile(
-  profiles,
-  { kind, tier, defaultId, references = 0, firstFrame = false },
-) {
+export function choicePool(profiles, { kind, tier, references = 0, firstFrame = false }) {
   if (!profiles.length) throw new Error(`No ready ${kind} profile is available to this account.`);
-  const fallback = profiles.find((profile) => profile.id === defaultId);
   const usable = (tier ? profilesForTier(profiles, tier) : profiles).filter((profile) =>
     fits(profile, references),
   );
@@ -229,15 +224,22 @@ export function chooseProfile(
     );
   }
   const frames = firstFrame ? usable.filter(takesFirstFrame) : [];
-  let pool = frames.length ? frames : usable;
-  if (!tier) pool = fastestTier(pool);
+  const pool = frames.length ? frames : usable;
+  return tier ? pool : fastestTier(pool);
+}
+
+/** The pool's usual pick: the deployment default, then its family, then unrestricted, then catalogue order. */
+export function chooseProfile(profiles, { defaultId, ...options }) {
+  const fallback = profiles.find((profile) => profile.id === defaultId);
   const score = (profile) =>
     [
       profile.id === defaultId,
       Boolean(fallback?.family) && profile.family === fallback.family,
       !profile.restricted,
     ].reduce((total, value) => total * 2 + Number(value), 0);
-  return pool.reduce((best, profile) => (score(profile) > score(best) ? profile : best));
+  return choicePool(profiles, options).reduce((best, profile) =>
+    score(profile) > score(best) ? profile : best,
+  );
 }
 
 // From a wanted tier, the order of the nearest others.

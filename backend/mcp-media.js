@@ -16,7 +16,7 @@ import {
 } from "./mcp-controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
-import { chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
+import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
 import { isLocalVideoProfile } from "./comfy-backends.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
@@ -46,6 +46,10 @@ const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
 // The chat shows result links at this size; Review's inline image, which the model reads, is smaller.
 const previewSize = 1024;
 const reviewSize = 512;
+// A run's contact sheet: its images in a grid, this wide at most, on a neutral ground.
+const sheetWidth = 1024;
+const sheetGap = 8;
+const sheetGround = "#18181b";
 // The All Results page and an "all" Result cover a conversation's most recent results.
 const maxListedResults = 24;
 const maxShownResults = 8;
@@ -127,6 +131,15 @@ export function mcpOutputPath(value) {
   }
 }
 
+/** A run's header: "Results 3–6" for consecutive numbers, else its labels in order; one job's several images say how many. */
+function runCaption(labels, images) {
+  if (labels.length === 1) return `${labels[0]} (${images} images)`;
+  const numbers = labels.map((label) => Number(/^Result (\d+)$/.exec(label)?.[1]));
+  return numbers.every((number, index) => number && (!index || number === numbers[index - 1] + 1))
+    ? `Results ${numbers[0]}–${numbers.at(-1)}`
+    : labels.join(", ");
+}
+
 export class McpMedia {
   constructor({
     dataDir,
@@ -189,7 +202,14 @@ export class McpMedia {
       Object.entries(this.state.links).map(([id, link]) => [
         link.all
           ? this.linkKey(link.audience, link.owner, `refs:${link.scope}`, "all")
-          : this.linkKey(link.audience, link.owner, link.jobId, link.index),
+          : link.sheet
+            ? this.linkKey(
+                link.audience,
+                link.owner,
+                `sheet:${JSON.stringify(link.sheet)}`,
+                "sheet",
+              )
+            : this.linkKey(link.audience, link.owner, link.jobId, link.index),
         id,
       ]),
     );
@@ -334,7 +354,11 @@ export class McpMedia {
    * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
    * unavailable, video is refused with what to tell the user, never sent to the cloud by itself.
    */
-  async choose(
+  async choose(owner, options = {}) {
+    return (await this.choices(owner, options)).profile;
+  }
+  /** The profiles choose() picks from (`pool`) and its usual pick (`profile`), so Generate can pick by the request. */
+  async choices(
     owner,
     { kind = "image", tier, references = 0, firstFrame = false, loras = [], cloud = false } = {},
   ) {
@@ -366,7 +390,11 @@ export class McpMedia {
         );
     }
     const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
-    return chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
+    const options = { kind, tier, references, firstFrame };
+    return {
+      pool: choicePool(profiles, options),
+      profile: chooseProfile(profiles, { ...options, defaultId }),
+    };
   }
   async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
@@ -543,6 +571,12 @@ export class McpMedia {
     )
       body.tiledDecode = true;
     const preparedPrompts = prompts.map(styled);
+    // How long the set should take, asked alongside submission; it never holds up or fails the set.
+    const estimate = this.runEstimate(
+      owner,
+      { ...body, family: profile.family },
+      prompts.length * runs,
+    );
     // A call owns the enqueue phase until its whole set is acknowledged, even across MCP clients.
     // Preparation and result waiting remain independent; a refused or uncertain set releases the next.
     const previous = this.enqueuePhase;
@@ -588,6 +622,7 @@ export class McpMedia {
             // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
             this.recordPrompt(result.jobId, {
               prompt,
+              set: queueSet,
               ...(record.request ? { request: record.request } : {}),
               ...(record.changes?.length ? { changes: record.changes } : {}),
               ...(record.assistant ? { assistant: record.assistant } : {}),
@@ -625,10 +660,77 @@ export class McpMedia {
             throw error;
           }
         }
-      return { status: "queued", jobs: queued };
+      return { status: "queued", jobs: queued, estimate: await estimate };
     } finally {
       release();
     }
+  }
+  /**
+   * What `runs` jobs of `body` should take, from Studio's estimate (generation-timing.js): the first as
+   * things stand (`firstMs`) and each later one with the model loaded (`nextMs`); null until trusted.
+   */
+  async runEstimate(owner, body, runs) {
+    const query = (count) =>
+      new URLSearchParams({
+        kind: body.kind,
+        model: body.model || "",
+        profileId: body.profileId,
+        family: body.family || "",
+        width: body.width || 0,
+        height: body.height || 0,
+        steps: body.steps || 0,
+        frames: body.frames || 0,
+        refs: body.referenceAssets.length,
+        tiled: body.tiledDecode ? "1" : "",
+        upscale: body.autoUpscale?.quality || "",
+        faceDetail: body.autoUpscale?.faceDetail ? "1" : "",
+        runs: count,
+      });
+    try {
+      const [one, two] = await Promise.all(
+        (runs > 1 ? [1, 2] : [1]).map((count) =>
+          this.request("GET", `/api/estimate?${query(count)}`, undefined, owner, {
+            timeoutMs: 3000,
+          }),
+        ),
+      );
+      if (!one?.ms || (runs > 1 && !(two?.ms > one.ms))) return null;
+      return { firstMs: one.ms, nextMs: runs > 1 ? two.ms - one.ms : 0 };
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * When each submitted set should be done (epoch ms, in the order given), or null where Studio cannot
+   * say. The first job's end time anchors the chain once Studio knows it (the job has started, or its
+   * turn is known), read for up to `probeMs` while the queue picks it up; later jobs add the sets'
+   * estimates. Sets queue in order and a started set stays together, so each follows the last.
+   */
+  async finishTimes(owner, sets, { probeMs = 0, signal } = {}) {
+    const first = sets[0]?.jobs?.[0];
+    let cursor = null;
+    const until = Date.now() + probeMs;
+    while (first && cursor === null) {
+      let job;
+      try {
+        job = await this.job(owner, first.job_id, 0, { signal });
+      } catch (error) {
+        if (signal?.aborted) throw error;
+        break;
+      }
+      if (terminal.has(job.status)) cursor = Date.now();
+      else if (Number.isFinite(job.progress?.endsAt)) cursor = job.progress.endsAt;
+      else if (Date.now() >= until) break;
+      else await pause(Math.min(250, until - Date.now()), signal);
+    }
+    return sets.map(({ jobs = [], estimate }, position) => {
+      if (cursor === null || !jobs.length) return null;
+      // The anchor already covers the first set's first job.
+      if (!position && jobs.length === 1) return cursor;
+      if (!estimate) return (cursor = null);
+      cursor += (position ? estimate.firstMs : 0) + (jobs.length - 1) * estimate.nextMs;
+      return cursor;
+    });
   }
   recordPrompt(jobId, record) {
     const keys = Object.keys(this.state.prompts);
@@ -833,8 +935,16 @@ export class McpMedia {
   /** The All Results page of a conversation's result numbers (the account's without a conversation), reused per scope. */
   allUrl(owner, scope) {
     const key = scope || this.referenceScope(owner);
+    return `${this.publicUrl}/mcp/results/${this.groupLink(owner, `refs:${key}`, "all", { scope: key, all: true })}`;
+  }
+  /** One contact-sheet JPEG of a run's image outputs (`items` as [jobId, index] pairs), reused for the same outputs. */
+  sheetUrl(owner, items) {
+    return `${this.publicUrl}/mcp/results/${this.groupLink(owner, `sheet:${JSON.stringify(items)}`, "sheet", { sheet: items })}.jpg`;
+  }
+  /** A short link id for several results at once (a page or a sheet), reused for the same key. */
+  groupLink(owner, key, kind, record) {
     const audience = this.publicUrl;
-    const linkKey = this.linkKey(audience, owner, `refs:${key}`, "all");
+    const linkKey = this.linkKey(audience, owner, key, kind);
     let id = this.linkIds.get(linkKey);
     if (!id) {
       do
@@ -843,11 +953,11 @@ export class McpMedia {
           () => shortAlphabet[crypto.randomInt(shortAlphabet.length)],
         ).join("");
       while (Object.hasOwn(this.state.links, id));
-      this.state.links[id] = { audience, owner, scope: key, all: true };
+      this.state.links[id] = { audience, owner, ...record };
       this.linkIds.set(linkKey, id);
       this.save();
     }
-    return `${this.publicUrl}/mcp/results/${id}`;
+    return id;
   }
   /** A finished image's chat-sized JPEG preview. */
   previewUrl(owner, jobId, index) {
@@ -857,9 +967,18 @@ export class McpMedia {
     const short = shortPattern.exec(String(token || ""));
     if (short) {
       const link = Object.hasOwn(this.state.links, short[1]) ? this.state.links[short[1]] : null;
-      if (!link || link.audience !== this.publicUrl || (short[2] && (link.page || link.all)))
+      if (
+        !link ||
+        link.audience !== this.publicUrl ||
+        (short[2] && (link.page || link.all)) ||
+        (link.sheet && !short[2])
+      )
         throw new Error("Invalid result link.");
       if (link.all) return { owner: link.owner, scope: link.scope, all: true };
+      if (link.sheet) {
+        for (const [jobId] of link.sheet) this.own(link.owner, jobId);
+        return { owner: link.owner, sheet: link.sheet };
+      }
       this.own(link.owner, link.jobId);
       return {
         owner: link.owner,
@@ -1105,6 +1224,49 @@ export class McpMedia {
       .toBuffer();
     return { content, mime: "image/jpeg" };
   }
+  /**
+   * A run's contact sheet: its still-available images in order, in a near-square grid of equal cells
+   * shaped like the first. `read(jobId, index)` returns one original; outputs deleted since are left out.
+   */
+  async sheet(items, read) {
+    const images = (await Promise.allSettled(items.map(([jobId, index]) => read(jobId, index))))
+      .filter((item) => item.status === "fulfilled")
+      .map((item) => item.value)
+      .filter((item) => ["image/png", "image/jpeg", "image/webp"].includes(item.mime));
+    if (!images.length) throw new Error("The sheet's images are unavailable.");
+    const open = (image) => sharp(image.content, { limitInputPixels: 80000000 }).rotate();
+    const { info } = await open(images[0]).toBuffer({ resolveWithObject: true });
+    const columns = Math.ceil(Math.sqrt(images.length));
+    const rows = Math.ceil(images.length / columns);
+    const width = Math.floor((sheetWidth - sheetGap * (columns - 1)) / columns);
+    const height = Math.round(width * Math.min(2, Math.max(0.5, info.height / info.width)));
+    const tiles = await Promise.all(
+      images.map((image) =>
+        open(image)
+          .resize({ width, height, fit: "contain", background: sheetGround })
+          .flatten({ background: sheetGround })
+          .toBuffer(),
+      ),
+    );
+    const content = await sharp({
+      create: {
+        width: columns * width + sheetGap * (columns - 1),
+        height: rows * height + sheetGap * (rows - 1),
+        channels: 3,
+        background: sheetGround,
+      },
+    })
+      .composite(
+        tiles.map((input, position) => ({
+          input,
+          left: (position % columns) * (width + sheetGap),
+          top: Math.floor(position / columns) * (height + sheetGap),
+        })),
+      )
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    return { content, mime: "image/jpeg" };
+  }
   async readOutput(output, owner = "") {
     const response = await this.response("GET", output.url, undefined, owner);
     const chunks = [];
@@ -1256,7 +1418,7 @@ export class McpMedia {
         structuredContent: { ...named, status: job.status || "running" },
       };
     }
-    const { outputs, markdown } = await this.markdown(owner, jobId, job, label);
+    const { outputs, markdown } = await this.markdown(owner, [{ jobId, job, label }], scope);
     if (!outputs.length) throw new Error("This completed job has no available output.");
     return {
       content: [text(`${label} is ready. ${replyRule}\n\n${markdown}`)],
@@ -1264,14 +1426,20 @@ export class McpMedia {
     };
   }
   /**
-   * A finished job's markdown: per output, a header naming its ref and profile, then its image
-   * as a preview that links to the original (a View Video link for videos). The header and image
-   * share one paragraph so renderers add no gap; outputs are blank-line separated.
+   * One run's markdown (`entries` of { jobId, job, label }, in order): a header naming its results and
+   * profile, then one image. A single image is its preview and several share one contact sheet, both
+   * linking onward; videos get a View Video link each. The header and image share one paragraph so
+   * renderers add no gap; videos are blank-line separated.
    */
-  async markdown(owner, jobId, job, label) {
-    const outputs = (job.outputs || []).flatMap((item, index) =>
-      mcpOutputPath(item?.url) ? [{ output_index: index, url: this.url(owner, jobId, index) }] : [],
+  async markdown(owner, entries, scope = "") {
+    const outputs = entries.flatMap(({ jobId, job, label }) =>
+      (job.outputs || []).flatMap((item, index) =>
+        mcpOutputPath(item?.url)
+          ? [{ jobId, label, output_index: index, url: this.url(owner, jobId, index) }]
+          : [],
+      ),
     );
+    const [{ job }] = entries;
     const profile = job.profileId
       ? (await this.profiles("all", owner).catch(() => [])).find(
           (item) => item.id === job.profileId,
@@ -1281,22 +1449,49 @@ export class McpMedia {
     const name = String(profile?.displayName || profile?.label || "")
       .split(/\s*·\s*/)[0]
       .trim();
-    const markdown = outputs
-      .map(({ output_index, url }, position) => {
-        const caption =
-          outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label;
-        if (job.kind === "video")
-          return [`**${caption}**`, name, `[View Video](${url})`].filter(Boolean).join(" · ");
-        return `${[`**${caption}**`, name].filter(Boolean).join(" · ")}\n[![${caption}](${this.previewUrl(owner, jobId, output_index)})](${url})`;
-      })
-      .join("\n\n");
-    return { outputs, markdown };
+    const header = (caption) => [`**${caption}**`, name].filter(Boolean).join(" · ");
+    if (job.kind === "video")
+      return {
+        outputs,
+        markdown: outputs
+          .map(({ label, url }, position) =>
+            [
+              header(
+                outputs.length > 1 ? `${label} (${position + 1} of ${outputs.length})` : label,
+              ),
+              `[View Video](${url})`,
+            ].join(" · "),
+          )
+          .join("\n\n"),
+      };
+    if (outputs.length < 2)
+      return {
+        outputs,
+        markdown: outputs
+          .map(
+            ({ jobId, label, output_index, url }) =>
+              `${header(label)}\n[![${label}](${this.previewUrl(owner, jobId, output_index)})](${url})`,
+          )
+          .join(""),
+      };
+    const caption = runCaption(
+      entries.map(({ label }) => label),
+      outputs.length,
+    );
+    const sheet = this.sheetUrl(
+      owner,
+      outputs.map(({ jobId, output_index }) => [jobId, output_index]),
+    );
+    return {
+      outputs,
+      markdown: `${header(caption)}\n[![${caption}](${sheet})](${this.allUrl(owner, scope)})`,
+    };
   }
   /**
    * Waits up to `seconds` for every job of a submission. Returns their markdown once all
    * finished with outputs; null when one is still running, failed, or the wait was cancelled.
    */
-  async settle(owner, submission, seconds, { signal } = {}) {
+  async settle(owner, submission, seconds, { scope = "", signal } = {}) {
     if (!seconds || submission.status !== "queued") return null;
     // One unfinished job sends the whole submission to Result, so stop waiting for the rest.
     const stop = new AbortController();
@@ -1319,18 +1514,15 @@ export class McpMedia {
       return null;
     });
     if (!jobs) return null;
-    const blocks = await Promise.all(
-      jobs.map((job, position) => {
-        const { job_id, ref } = submission.jobs[position];
-        return this.markdown(
-          owner,
-          job_id,
-          job,
-          ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result",
-        );
-      }),
-    );
-    return blocks.map((block) => block.markdown).join("\n\n");
+    const entries = jobs.map((job, position) => {
+      const { job_id, ref } = submission.jobs[position];
+      return {
+        jobId: job_id,
+        job,
+        label: ref ? `${ref[0].toUpperCase()}${ref.slice(1)}` : "Studio result",
+      };
+    });
+    return (await this.markdown(owner, entries, scope)).markdown;
   }
   /** A conversation's most recent results by number, each with its job status; unreadable jobs are skipped. */
   async scopeJobs(owner, scope, { signal, credential } = {}) {
@@ -1365,8 +1557,16 @@ export class McpMedia {
     );
     const pending = jobs.filter(({ job }) => !terminal.has(job.status));
     const shown = done.slice(-maxShownResults);
+    // One block per run: results queued together share their contact sheet.
+    const runs = [];
+    for (const { number, jobId, job } of shown) {
+      const set = this.promptRecord(jobId)?.set;
+      const entry = { jobId, job, label: `Result ${number}` };
+      if (set && runs.at(-1)?.set === set) runs.at(-1).entries.push(entry);
+      else runs.push({ set, entries: [entry] });
+    }
     const blocks = await Promise.all(
-      shown.map(({ number, jobId, job }) => this.markdown(owner, jobId, job, `Result ${number}`)),
+      runs.map(({ entries }) => this.markdown(owner, entries, scope)),
     );
     const all =
       done.length > 1 || pending.length ? `[All Results](${this.allUrl(owner, scope)})` : "";
