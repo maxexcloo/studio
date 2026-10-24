@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { Alert, Button, FocusTrap, Group, Modal, Stack, Text } from "@mantine/core";
 
 /** Destructive confirmation that stays open and locked while the action runs. */
 export function ConfirmDialog({
@@ -39,6 +39,7 @@ export function ConfirmDialog({
       closeOnEscape={!pending}
       closeButtonProps={{ disabled: pending }}
     >
+      <FocusTrap.InitialFocus />
       <Stack>
         <Text size="sm" component="div">
           {children}

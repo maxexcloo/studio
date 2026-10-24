@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  FocusTrap,
   Group,
   Menu,
   Modal,
@@ -367,6 +368,7 @@ export function GroupsAdmin() {
         title={editing === "new" ? "New Group" : `Edit ${editing?.name || "Group"}`}
         size="lg"
       >
+        <FocusTrap.InitialFocus />
         {editing && (
           <GroupEditor
             key={editing === "new" ? "new" : editing.id}

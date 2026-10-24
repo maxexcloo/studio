@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Badge,
   Drawer,
+  FocusTrap,
   Group,
   Modal,
   ScrollArea,
@@ -409,6 +410,7 @@ export function MediaViewer({
             title={mediaTitle(item)}
             closeButtonProps={{ "aria-label": "Close Details" }}
           >
+            <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
               <Text size="xs" c="dimmed" mt={-8}>
                 {subtitle}

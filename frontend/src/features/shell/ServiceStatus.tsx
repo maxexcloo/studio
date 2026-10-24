@@ -1,4 +1,14 @@
-import { ActionIcon, Button, Divider, Drawer, Group, Loader, Stack, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Button,
+  Divider,
+  Drawer,
+  FocusTrap,
+  Group,
+  Loader,
+  Stack,
+  Tooltip,
+} from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Server } from "lucide-react";
@@ -44,6 +54,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
         closeButtonProps={{ "aria-label": `Close ${title}` }}
         classNames={{ content: classes.content, body: classes.body }}
       >
+        <FocusTrap.InitialFocus />
         <div className={classes.list}>{chat ? <SessionList close={close} /> : <Queue />}</div>
         <Divider />
         <Stack gap="xs" pt="md">
