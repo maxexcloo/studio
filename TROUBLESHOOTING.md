@@ -76,7 +76,7 @@ Check that the workflow ends in an output node such as Save Image. If the provid
 
 ### Needs a separate part
 
-The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in **Library › Profiles**.
+The selected checkpoint needs an external text encoder or VAE. Add the required file to the worker and update the profile's references in **Settings › Profiles**.
 
 ### Generation failed
 
@@ -92,7 +92,7 @@ For missing or gated Library downloads, verify the catalogue link, model licence
 
 ## Accounts & Devices
 
-Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage approval, disabled accounts and permissions in **Settings › Accounts**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
+Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage approval and disabled accounts in **Settings › Users** and permissions in **Settings › Groups**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
 
 Single-user development and access from another device use the options described in [Configuration](CONFIGURATION.md). Keep container port bindings, proxy configuration and host validation consistent.
 

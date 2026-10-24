@@ -1,9 +1,40 @@
-import { useSettingsNavigation } from "./SettingsNavigation";
-import { Badge, Button, Group, Paper, Stack, Text } from "@mantine/core";
+import { Badge, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
+import { AboutStudio } from "./AboutStudio";
+import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
+import { MaintenanceSettings } from "./MaintenanceSettings";
+import { ModelSettings } from "./ModelSettings";
 import { OwnAccount } from "./OwnAccount";
-import { AccountAdmin } from "./AccountAdmin";
+import { ProfileDefinitions } from "./ProfileDefinitions";
+import { useSettingsNavigation } from "./SettingsNavigation";
+import { StudioPreferences } from "./StudioPreferences";
+
+const servicesKey = ["services-status"];
+function WorkerSettings() {
+  const client = useQueryClient();
+  const refreshing = useIsFetching({ queryKey: servicesKey }) > 0;
+  return (
+    <Stack gap="md">
+      <Group justify="flex-end">
+        <Tooltip label="Check every service again">
+          <Button
+            variant="default"
+            size="compact-sm"
+            leftSection={<RefreshCw size={16} />}
+            loading={refreshing}
+            onClick={() => void client.refetchQueries({ queryKey: servicesKey })}
+          >
+            Refresh
+          </Button>
+        </Tooltip>
+      </Group>
+      <RuntimePanel />
+    </Stack>
+  );
+}
 export function SettingsPage() {
   const { admin, multi, options } = useSettingsNavigation();
   return (
@@ -12,42 +43,39 @@ export function SettingsPage() {
       sections={options}
       content={{
         account: (
-          <Paper component="section" aria-label="Your Account" id="account">
-            <Stack>
-              <Group>
-                <Badge>
-                  {multi ? (admin ? "Administrator" : "User") : "Single-User Development"}
-                </Badge>
-              </Group>
+          <Stack component="section" aria-label="Your Account" id="account">
+            <Group gap="xs">
+              <Badge variant="light">
+                {multi ? (admin ? "Administrator" : "User") : "Single-User Mode"}
+              </Badge>
+            </Group>
+            {multi ? (
+              <>
+                {!admin && (
+                  <Text size="sm" c="dimmed">
+                    Your access group decides which models, cloud models and NSFW content you can
+                    use.
+                  </Text>
+                )}
+                <OwnAccount />
+              </>
+            ) : (
               <Text size="sm" c="dimmed">
-                Cloud model and NSFW permissions are enforced by Studio for your account.
+                Studio is running for one person on this computer, so there is no sign-in and every
+                feature is available. Accounts, groups and personal MCP access come with multi-user
+                mode.
               </Text>
-              {multi && <OwnAccount />}
-            </Stack>
-          </Paper>
+            )}
+          </Stack>
         ),
-        accounts: <AccountAdmin />,
-        workers: <RuntimePanel />,
-        about: (
-          <Paper>
-            <Stack>
-              <Text>Studio is an independent hard fork of HEISS UI.</Text>
-              <Text size="sm" c="dimmed">
-                Includes work from HEISS UI and J-AI Studio under the MIT licence. The MantineHub
-                theme includes MIT-licensed work by RubixCube Innovations. Native MCP modules are
-                licensed under AGPL-3.0. Licence notices are included with the application source.
-              </Text>
-              <Button
-                component="a"
-                href="https://github.com/maxexcloo/studio"
-                variant="subtle"
-                style={{ alignSelf: "start" }}
-              >
-                Source & Licences
-              </Button>
-            </Stack>
-          </Paper>
-        ),
+        groups: <GroupsAdmin />,
+        models: <ModelSettings />,
+        profiles: <ProfileDefinitions />,
+        studio: <StudioPreferences />,
+        users: <UsersAdmin />,
+        workers: <WorkerSettings />,
+        maintenance: <MaintenanceSettings />,
+        about: <AboutStudio />,
       }}
     />
   );

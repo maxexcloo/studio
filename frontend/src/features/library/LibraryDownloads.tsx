@@ -3,13 +3,13 @@ import {
   ActionIcon,
   Alert,
   Badge,
-  Button,
   Group,
   Menu,
   Progress,
   Stack,
   Table,
   Text,
+  VisuallyHidden,
 } from "@mantine/core";
 import { Ellipsis } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +46,12 @@ const statusLabel = (status: string) =>
     paused: "Paused",
     queued: "Queued",
   })[status] || status;
+const statusColours: Record<string, string> = {
+  done: "green",
+  downloading: "blue",
+  error: "red",
+  paused: "yellow",
+};
 const bytes = (value = 0) =>
   value >= 1024 ** 3
     ? `${(value / 1024 ** 3).toFixed(1)} GiB`
@@ -98,133 +104,116 @@ export function LibraryDownloads({ active }: { active: boolean }) {
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
     },
   });
+  if (query.isPending) return <LoadingState label="Loading Downloads" />;
   return (
-    <Stack>
-      <Group justify="space-between">
-        <Text size="sm" c="dimmed">
-          Model files only. Cancelling keeps partial files available to resume.
-        </Text>
-        <Button
-          variant="default"
-          size="compact-sm"
-          loading={query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          Refresh Downloads
-        </Button>
-      </Group>
+    <Stack gap="md">
       {query.error && <Alert color="red">{query.error.message}</Alert>}
-      {query.isPending ? (
-        <LoadingState label="Loading Downloads" />
-      ) : downloads.length ? (
-        <Table.ScrollContainer minWidth={520}>
-          <Table aria-label="Model Downloads" verticalSpacing="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>File</Table.Th>
-                <Table.Th>Progress & Status</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {downloads.map((item) => {
-                const running = ["downloading", "queued"].includes(item.status);
-                const retry =
-                  ["error", "canceled", "paused"].includes(item.status) &&
-                  item.retryable !== false &&
-                  !!item.id;
-                return (
-                  <Table.Tr key={item.id || `${item.folder}/${item.file}`}>
-                    <Table.Td>
-                      <Stack gap={2}>
-                        <Text size="sm" fw={500}>
-                          {item.label || item.file}
-                        </Text>
-                        <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
-                          {item.folder}/{item.file}
-                        </Text>
-                        {item.error && (
-                          <Text size="sm" c="red">
-                            {item.error}
-                          </Text>
-                        )}
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td>
-                      <Stack gap="xs">
-                        <Badge
-                          color={
-                            item.status === "error"
-                              ? "red"
-                              : item.status === "done"
-                                ? "green"
-                                : "gray"
+      {downloads.length ? (
+        <Table aria-label="Model Downloads" verticalSpacing="xs">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>File</Table.Th>
+              <Table.Th>Status</Table.Th>
+              <Table.Th w={44}>
+                <VisuallyHidden>Actions</VisuallyHidden>
+              </Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {downloads.map((item) => {
+              const running = ["downloading", "queued"].includes(item.status);
+              const retry =
+                ["error", "canceled", "paused"].includes(item.status) &&
+                item.retryable !== false &&
+                !!item.id;
+              const progress = ["downloading", "paused"].includes(item.status);
+              return (
+                <Table.Tr key={item.id || `${item.folder}/${item.file}`}>
+                  <Table.Td maw={0} w="100%">
+                    <Text size="sm" fw={500} truncate>
+                      {item.label || item.file}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate>
+                      {item.folder}/{item.file}
+                    </Text>
+                    {progress && (
+                      <Group gap="xs" wrap="nowrap" mt={4}>
+                        <Progress
+                          aria-label={`Downloading ${item.file}`}
+                          flex={1}
+                          size="sm"
+                          value={
+                            item.totalBytes
+                              ? Math.min(100, (100 * (item.receivedBytes || 0)) / item.totalBytes)
+                              : 0
                           }
-                          style={{ alignSelf: "start" }}
-                        >
-                          {statusLabel(item.status)}
-                        </Badge>
-                        {["downloading", "paused"].includes(item.status) && (
-                          <>
-                            <Progress
-                              aria-label={`Downloading ${item.file}`}
-                              value={
-                                item.totalBytes
-                                  ? Math.min(
-                                      100,
-                                      (100 * (item.receivedBytes || 0)) / item.totalBytes,
-                                    )
-                                  : 0
-                              }
-                            />
-                            <Text size="xs" c="dimmed">
-                              {bytes(item.receivedBytes)}
-                              {item.totalBytes ? ` / ${bytes(item.totalBytes)}` : " received"}
-                            </Text>
-                          </>
-                        )}
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td>
-                      {(running || retry) && (
-                        <Menu position="bottom-end">
-                          <Menu.Target>
-                            <ActionIcon
-                              variant="subtle"
-                              aria-label={`Download Actions for ${item.file}`}
-                              disabled={action.isPending}
+                        />
+                        <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                          {bytes(item.receivedBytes)}
+                          {item.totalBytes ? ` / ${bytes(item.totalBytes)}` : ""}
+                        </Text>
+                      </Group>
+                    )}
+                    {item.error && (
+                      <Text size="xs" c="red">
+                        {item.error}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      miw="max-content"
+                      variant="light"
+                      size="sm"
+                      color={statusColours[item.status] || "gray"}
+                    >
+                      {statusLabel(item.status)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {(running || retry) && (
+                      <Menu position="bottom-end">
+                        <Menu.Target>
+                          <ActionIcon
+                            variant="subtle"
+                            color="gray"
+                            aria-label={`Download Actions for ${item.file}`}
+                            disabled={action.isPending}
+                          >
+                            <Ellipsis size={18} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          {running && (
+                            <Menu.Item
+                              color="red"
+                              onClick={() => action.mutate({ id: item.id, cancel: true })}
                             >
-                              <Ellipsis size={18} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {running && (
-                              <Menu.Item
-                                color="red"
-                                onClick={() => action.mutate({ id: item.id, cancel: true })}
-                              >
-                                Cancel Download
-                              </Menu.Item>
-                            )}
-                            {retry && (
-                              <Menu.Item
-                                onClick={() => action.mutate({ id: item.id, cancel: false })}
-                              >
-                                {item.status === "paused" ? "Resume Download" : "Retry Download"}
-                              </Menu.Item>
-                            )}
-                          </Menu.Dropdown>
-                        </Menu>
-                      )}
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+                              Cancel Download
+                            </Menu.Item>
+                          )}
+                          {retry && (
+                            <Menu.Item
+                              onClick={() => action.mutate({ id: item.id, cancel: false })}
+                            >
+                              {item.status === "paused" ? "Resume Download" : "Retry Download"}
+                            </Menu.Item>
+                          )}
+                        </Menu.Dropdown>
+                      </Menu>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              );
+            })}
+          </Table.Tbody>
+        </Table>
       ) : (
-        !query.error && <EmptyState>No model downloads.</EmptyState>
+        !query.error && (
+          <EmptyState title="No Downloads">
+            Model files you download from imports or updates show here.
+          </EmptyState>
+        )
       )}
     </Stack>
   );

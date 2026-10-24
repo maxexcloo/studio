@@ -2,18 +2,19 @@ import { useState } from "react";
 import {
   ActionIcon,
   Badge,
-  Group,
   Menu,
   Select,
   Stack,
   Table,
   Text,
-  UnstyledButton,
+  Tooltip,
+  VisuallyHidden,
 } from "@mantine/core";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Ellipsis } from "lucide-react";
+import { Ellipsis, RefreshCw } from "lucide-react";
+import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
-import { SearchInput } from "../../ui/SearchInput";
 import { modelFamilyLabel } from "../../ui/modelFamily";
+import { SectionToolbar } from "../../ui/SectionToolbar";
 
 export interface LibraryItem {
   key: string;
@@ -28,6 +29,7 @@ export interface LibraryItem {
   kind?: string;
   folder?: string;
   modelType?: "original" | "finetune";
+  links?: { civitaiCom?: string; civitaiRed?: string; hf?: string };
   update?: {
     state: string;
     note?: string;
@@ -62,6 +64,7 @@ const loraTypes: Record<string, string> = {
   slider: "Slider",
   style: "Style",
 };
+const modelTypes: Record<string, string> = { original: "Original", finetune: "Finetune" };
 export function libraryItemCategory(item: LibraryItem) {
   const kind = item.kind === "lora" ? "loras" : modelKinds[item.kind || ""] ? "models" : undefined;
   const folder =
@@ -73,8 +76,19 @@ const canUpdate = (item: LibraryItem) =>
   item.installed &&
   item.update?.state === "available" &&
   !["downloading", "kept", "removed"].includes(item.applied?.state || "");
+const updating = (item: LibraryItem) =>
+  canUpdate(item) || (item.installed && !!item.applied && item.applied.state !== "removed");
 const familiesOf = (item: LibraryItem) =>
-  item.families?.length ? item.families : ["Unclassified"];
+  item.families?.length
+    ? item.families.map((family) => modelFamilyLabel(family))
+    : ["Unclassified"];
+/** Shared files (a VAE many families use) name the first two and count the rest. */
+function familySummary(item: LibraryItem) {
+  const families = familiesOf(item);
+  return families.length > 2
+    ? `${families.slice(0, 2).join(", ")} +${families.length - 2}`
+    : families.join(", ");
+}
 function resourceType(item: LibraryItem) {
   if (libraryItemCategory(item) === "unclassified") return "Unclassified";
   if (libraryItemCategory(item) === "loras")
@@ -83,311 +97,314 @@ function resourceType(item: LibraryItem) {
     modelKinds[item.kind || ""] || modelKinds[modelFolders[item.folder || ""]] || "Unclassified"
   );
 }
-const modelTypeName = (item: LibraryItem) =>
-  item.modelType === "original"
-    ? "Original"
-    : item.modelType === "finetune"
-      ? "Finetune"
-      : "Unclassified";
-type SortField = "resource" | "family" | "modelType" | "type" | "status";
-const columns: { field: SortField; label: string }[] = [
-  { field: "resource", label: "Resource" },
-  { field: "family", label: "Family" },
-  { field: "type", label: "Type" },
-  { field: "status", label: "Status" },
+const statusOf = (item: LibraryItem) =>
+  item.applied?.state === "downloading"
+    ? { label: "Updating", color: "blue" }
+    : canUpdate(item)
+      ? { label: "Update Available", color: "yellow" }
+      : item.installed
+        ? { label: "Installed", color: "green" }
+        : { label: "Not Installed", color: "gray" };
+const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
+const views = [
+  { value: "installed", label: "Installed" },
+  { value: "available", label: "Available" },
+  { value: "updates", label: "Updates" },
 ];
 
-/** Both catalogues use the same dense searchable, filterable and sortable table. */
+/** Models and LoRAs share one compact catalogue: views, search, filters and row actions. */
 export function LibraryCatalogueTable({
   items,
   label,
   onUpdate,
+  onCheckUpdates,
+  checkingUpdates = false,
+  onEdit,
   updatePending = false,
 }: {
   items: LibraryItem[];
   label: "Models" | "LoRAs";
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
+  onCheckUpdates?: () => void;
+  checkingUpdates?: boolean;
+  onEdit?: (item: LibraryItem) => void;
   updatePending?: boolean;
 }) {
+  const [view, setView] = useState("installed");
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
-  const [installed, setInstalled] = useState<string | null>(null);
   const [modelType, setModelType] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortField>("resource");
-  const [descending, setDescending] = useState(false);
-  const unique = (values: string[]) => [...new Set(values)].sort((a, b) => a.localeCompare(b));
-  const displayFamilies = (item: LibraryItem) =>
-    familiesOf(item).map((family) => modelFamilyLabel(family));
-  const families = unique(items.flatMap(displayFamilies));
-  const visibleColumns =
-    label === "Models"
-      ? [
-          ...columns.slice(0, 2),
-          { field: "modelType" as const, label: "Model Type" },
-          ...columns.slice(2),
-        ]
-      : columns;
-  const types = unique(items.map(resourceType));
-  const sortValue = (item: LibraryItem) =>
-    ({
-      resource: resourceName(item),
-      family: displayFamilies(item).join(", "),
-      modelType: modelTypeName(item),
-      type: resourceType(item),
-      status: item.installed ? "Installed" : "Not Installed",
-    })[sort];
+  const models = label === "Models";
+  // Whether a model is an original or a finetune is shown only where the catalogue says so.
+  const withModelType = models && items.some((item) => item.modelType);
+  const typeLabel = (item: LibraryItem) =>
+    [resourceType(item), item.modelType && modelTypes[item.modelType]].filter(Boolean).join(" · ");
+  const inView = items.filter((item) =>
+    view === "updates" ? updating(item) : item.installed === (view === "installed"),
+  );
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = items
-    .filter((item) => {
-      if (family && !displayFamilies(item).includes(family)) return false;
-      if (label === "Models" && modelType && (item.modelType || "unclassified") !== modelType)
-        return false;
-      if (type && resourceType(item) !== type) return false;
-      if (
-        installed === "updates"
-          ? !canUpdate(item) &&
-            !(item.installed && item.applied && item.applied.state !== "removed")
-          : installed && item.installed !== (installed === "installed")
-      )
-        return false;
-      const text = [
-        resourceName(item),
-        item.file,
-        item.key,
-        item.description,
-        item.note,
-        familiesOf(item).join(" "),
-        displayFamilies(item).join(" "),
-        ...(label === "Models" ? [modelTypeName(item)] : []),
-        resourceType(item),
-        item.installed ? "Installed" : "Not Installed",
-      ]
-        .join(" ")
-        .toLowerCase();
-      return terms.every((term) => text.includes(term));
-    })
-    .sort(
-      (a, b) =>
-        (descending ? -1 : 1) *
-        sortValue(a).localeCompare(sortValue(b), undefined, { numeric: true }),
-    );
+  const rows = inView.filter((item) => {
+    if (family && !familiesOf(item).includes(family)) return false;
+    if (type && resourceType(item) !== type) return false;
+    if (modelType && (item.modelType || "unclassified") !== modelType) return false;
+    const text = [
+      resourceName(item),
+      item.file,
+      item.description,
+      item.note,
+      ...(item.families || []),
+      ...familiesOf(item),
+      typeLabel(item),
+      statusOf(item).label,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return terms.every((term) => text.includes(term));
+  });
+  const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
+  const noun = label === "LoRAs" ? "LoRAs" : "Models";
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;
   return (
     <Stack gap="md">
-      <SearchInput
-        aria-label={`Search ${label}`}
-        placeholder={`Search ${label}…`}
-        value={query}
-        onClear={() => setQuery("")}
-        onChange={(event) => setQuery(event.currentTarget.value)}
+      <SectionToolbar
+        label={label}
+        views={views}
+        view={view}
+        onViewChange={setView}
+        query={query}
+        onQueryChange={setQuery}
+        filters={
+          <>
+            <Select
+              label="Family"
+              placeholder="All Families"
+              data={unique(items.flatMap(familiesOf))}
+              value={family}
+              onChange={setFamily}
+              clearable
+              searchable
+              openOnFocus={false}
+              comboboxProps={{ withinPortal: false }}
+              data-mantine-stop-propagation
+            />
+            <Select
+              label="Type"
+              placeholder="All Types"
+              data={unique(items.map(resourceType))}
+              value={type}
+              onChange={setType}
+              clearable
+              comboboxProps={{ withinPortal: false }}
+              data-mantine-stop-propagation
+            />
+            {withModelType && (
+              <Select
+                label="Model Type"
+                placeholder="All Model Types"
+                data={[
+                  { value: "original", label: "Original" },
+                  { value: "finetune", label: "Finetune" },
+                  { value: "unclassified", label: "Unclassified" },
+                ]}
+                value={modelType}
+                onChange={setModelType}
+                clearable
+                comboboxProps={{ withinPortal: false }}
+                data-mantine-stop-propagation
+              />
+            )}
+          </>
+        }
+        filterCount={filterCount}
+        onResetFilters={() => {
+          setFamily(null);
+          setType(null);
+          setModelType(null);
+        }}
+        actions={
+          onCheckUpdates && (
+            <Tooltip label="Check Updates">
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                aria-label="Check Updates"
+                loading={checkingUpdates}
+                disabled={updatePending}
+                onClick={onCheckUpdates}
+              >
+                <RefreshCw size={18} />
+              </ActionIcon>
+            </Tooltip>
+          )
+        }
       />
-      <Group align="end" grow>
-        <Select
-          label="Family"
-          aria-label={`${label} Family`}
-          placeholder="All Families"
-          data={families}
-          value={family}
-          onChange={setFamily}
-          clearable
-          searchable
-          style={{ minWidth: 140 }}
-        />
-        <Select
-          label="Type"
-          aria-label={`${label} Type`}
-          placeholder="All Types"
-          data={types}
-          value={type}
-          onChange={setType}
-          clearable
-          style={{ minWidth: 140 }}
-        />
-        {label === "Models" && (
-          <Select
-            label="Model Type"
-            aria-label="Models Model Type"
-            placeholder="All Model Types"
-            data={[
-              { value: "original", label: "Original" },
-              { value: "finetune", label: "Finetune" },
-              { value: "unclassified", label: "Unclassified" },
-            ]}
-            value={modelType}
-            onChange={setModelType}
-            clearable
-          />
-        )}
-        <Select
-          label="Status"
-          aria-label={`${label} Status`}
-          placeholder="All Statuses"
-          data={[
-            { value: "installed", label: "Installed" },
-            { value: "not-installed", label: "Not Installed" },
-            { value: "updates", label: "Updates" },
-          ]}
-          value={installed}
-          onChange={setInstalled}
-          clearable
-          style={{ minWidth: 140 }}
-        />
-      </Group>
       {unclassified > 0 && (
-        <Text c="dimmed" size="sm">
-          {unclassified} unclassified {unclassified === 1 ? "resource has" : "resources have"}{" "}
-          missing or conflicting model/LoRA metadata.
+        <Text c="dimmed" size="xs">
+          {unclassified} {unclassified === 1 ? "resource has" : "resources have"} missing or
+          conflicting model or LoRA metadata.
         </Text>
       )}
-      <Table.ScrollContainer minWidth={label === "Models" ? 680 : 560}>
-        <Table
-          aria-label={`Library ${label}`}
-          verticalSpacing="xs"
-          horizontalSpacing="sm"
-          highlightOnHover
-        >
+      {rows.length ? (
+        <Table aria-label={`Library ${label}`} verticalSpacing="xs" highlightOnHover>
           <Table.Thead>
             <Table.Tr>
-              {visibleColumns.map((column) => {
-                const active = sort === column.field;
-                const Icon = active ? (descending ? ArrowDown : ArrowUp) : ChevronsUpDown;
-                return (
-                  <Table.Th
-                    key={column.field}
-                    aria-sort={active ? (descending ? "descending" : "ascending") : "none"}
-                  >
-                    <UnstyledButton
-                      aria-label={`Sort ${label} by ${column.label}`}
-                      onClick={() => {
-                        setDescending(active ? !descending : false);
-                        setSort(column.field);
-                      }}
-                      style={{ width: "100%" }}
-                    >
-                      <Group gap="xs" justify="space-between" wrap="nowrap">
-                        <Text size="sm" fw={600}>
-                          {column.label}
-                        </Text>
-                        <Icon size={14} aria-hidden="true" />
-                      </Group>
-                    </UnstyledButton>
-                  </Table.Th>
-                );
-              })}
-              {onUpdate && <Table.Th>Actions</Table.Th>}
+              <Table.Th>Name</Table.Th>
+              <Table.Th visibleFrom="sm" w={170}>
+                Family
+              </Table.Th>
+              <Table.Th visibleFrom="sm" w={150}>
+                Type
+              </Table.Th>
+              <Table.Th w={130}>Status</Table.Th>
+              <Table.Th w={44}>
+                <VisuallyHidden>Actions</VisuallyHidden>
+              </Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {rows.length ? (
-              rows.map((item) => (
+            {rows.map((item) => {
+              const name = resourceName(item);
+              const status = statusOf(item);
+              const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
+              const latest = item.update?.latest;
+              const free = item.update?.freeAlternative;
+              return (
                 <Table.Tr key={item.key}>
-                  <Table.Td>
-                    <Stack gap={2}>
-                      <Text size="sm" fw={500}>
-                        {resourceName(item)}
+                  <Table.Td maw={0} w="100%">
+                    <Text size="sm" fw={500} truncate>
+                      {name}
+                    </Text>
+                    <Text size="xs" c="dimmed" truncate hiddenFrom="sm">
+                      {[familySummary(item), typeLabel(item)]
+                        .filter((part) => part !== "Unclassified")
+                        .join(" · ")}
+                    </Text>
+                    {(item.description || item.note) && (
+                      <Text size="xs" c="dimmed" lineClamp={1}>
+                        {item.description || item.note}
                       </Text>
-                      {item.description && (
-                        <Text size="xs" c="dimmed">
-                          {item.description}
-                        </Text>
-                      )}
-                      {item.note && (
-                        <Text size="xs" c="dimmed">
-                          {item.note}
-                        </Text>
-                      )}
-                      {canUpdate(item) && (
-                        <Text size="xs">
-                          Update Available: {item.update?.latest?.name}
-                          {item.update?.note ? ` · ${item.update.note}` : ""}
-                        </Text>
-                      )}
-                      {item.update?.state === "error" && item.update.note && (
-                        <Text size="xs" c="red">
-                          {item.update.note}
-                        </Text>
-                      )}
-                      {item.applied?.note && (
-                        <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
-                          {item.applied.note}
-                        </Text>
-                      )}
-                    </Stack>
+                    )}
+                    {canUpdate(item) && (
+                      <Text size="xs">
+                        Update Available: {latest?.name}
+                        {item.update?.note ? ` · ${item.update.note}` : ""}
+                      </Text>
+                    )}
+                    {item.update?.state === "error" && item.update.note && (
+                      <Text size="xs" c="red">
+                        {item.update.note}
+                      </Text>
+                    )}
+                    {item.applied?.note && (
+                      <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
+                        {item.applied.note}
+                      </Text>
+                    )}
+                  </Table.Td>
+                  <Table.Td visibleFrom="sm">
+                    <Text
+                      size="sm"
+                      lineClamp={2}
+                      title={familiesOf(item).join(", ")}
+                      c={item.families?.length ? undefined : "dimmed"}
+                    >
+                      {familySummary(item)}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td visibleFrom="sm">
+                    <Text
+                      size="sm"
+                      c={typeLabel(item) === "Unclassified" ? "dimmed" : undefined}
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {typeLabel(item)}
+                    </Text>
                   </Table.Td>
                   <Table.Td>
-                    <Text size="sm">{displayFamilies(item).join(", ")}</Text>
-                  </Table.Td>
-                  {label === "Models" && (
-                    <Table.Td>
-                      <Text size="sm">{modelTypeName(item)}</Text>
-                    </Table.Td>
-                  )}
-                  <Table.Td>
-                    <Text size="sm">{resourceType(item)}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={item.installed ? "green" : "gray"} size="sm">
-                      {item.applied?.state === "downloading"
-                        ? "Updating"
-                        : canUpdate(item)
-                          ? "Update Available"
-                          : item.installed
-                            ? "Installed"
-                            : "Not Installed"}
+                    <Badge color={status.color} variant="light" size="sm" miw="max-content">
+                      {status.label}
                     </Badge>
                   </Table.Td>
-                  {onUpdate && (
-                    <Table.Td>
-                      {canUpdate(item) && (
-                        <Menu position="bottom-end">
-                          <Menu.Target>
-                            <ActionIcon
-                              variant="subtle"
-                              aria-label={`Update Actions for ${resourceName(item)}`}
+                  <Table.Td>
+                    <Menu position="bottom-end">
+                      <Menu.Target>
+                        <ActionIcon
+                          variant="subtle"
+                          color="gray"
+                          aria-label={`Actions for ${name}`}
+                        >
+                          <Ellipsis size={18} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        {onUpdate &&
+                          canUpdate(item) &&
+                          (latest?.downloadable && !latest.unavailable ? (
+                            <Menu.Item disabled={updatePending} onClick={() => onUpdate(item)}>
+                              Update to {latest.name}
+                            </Menu.Item>
+                          ) : free?.downloadable && !free.unavailable ? (
+                            <Menu.Item
                               disabled={updatePending}
+                              onClick={() => onUpdate(item, true)}
                             >
-                              <Ellipsis size={18} />
-                            </ActionIcon>
-                          </Menu.Target>
-                          <Menu.Dropdown>
-                            {item.update?.latest?.downloadable &&
-                            !item.update.latest.unavailable ? (
-                              <Menu.Item onClick={() => onUpdate(item)}>
-                                Update to {item.update.latest.name}
-                              </Menu.Item>
-                            ) : item.update?.freeAlternative?.downloadable &&
-                              !item.update.freeAlternative.unavailable ? (
-                              <Menu.Item onClick={() => onUpdate(item, true)}>
-                                Update to {item.update.freeAlternative.name}
-                              </Menu.Item>
-                            ) : (
-                              <Menu.Item disabled>
-                                {item.update?.latest?.unavailable?.note ||
-                                  "This update cannot be downloaded."}
-                              </Menu.Item>
-                            )}
-                          </Menu.Dropdown>
-                        </Menu>
-                      )}
-                    </Table.Td>
-                  )}
+                              Update to {free.name}
+                            </Menu.Item>
+                          ) : (
+                            <Menu.Item disabled>
+                              {latest?.unavailable?.note || "This update cannot be downloaded."}
+                            </Menu.Item>
+                          ))}
+                        <Menu.Item
+                          onClick={() => void copyText(item.file || item.key, "File name")}
+                        >
+                          Copy File Name
+                        </Menu.Item>
+                        {source && (
+                          <Menu.Item
+                            component="a"
+                            href={source}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open Source Page
+                          </Menu.Item>
+                        )}
+                        {onEdit && (
+                          <Menu.Item onClick={() => onEdit(item)}>Edit Catalogue Entry</Menu.Item>
+                        )}
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Table.Td>
                 </Table.Tr>
-              ))
-            ) : (
-              <Table.Tr>
-                <Table.Td colSpan={visibleColumns.length + (onUpdate ? 1 : 0)}>
-                  <EmptyState>
-                    {items.length
-                      ? `No ${label.toLowerCase()} match your filters.`
-                      : `No ${label.toLowerCase()} to show.`}
-                  </EmptyState>
-                </Table.Td>
-              </Table.Tr>
-            )}
+              );
+            })}
           </Table.Tbody>
         </Table>
-      </Table.ScrollContainer>
+      ) : (
+        <EmptyState
+          title={
+            inView.length
+              ? `No Matching ${noun}`
+              : view === "updates"
+                ? "Everything Is Up to Date"
+                : view === "installed"
+                  ? `No ${noun} Installed`
+                  : `No Other ${noun} Catalogued`
+          }
+        >
+          {inView.length
+            ? "Try another search or reset the filters."
+            : view === "updates"
+              ? onCheckUpdates
+                ? "Check for updates to see newer versions of installed files."
+                : "Installed files have no newer versions."
+              : view === "installed"
+                ? `${noun} on the workers show here.`
+                : `Catalogued ${noun} that are not installed show here.`}
+        </EmptyState>
+      )}
     </Stack>
   );
 }

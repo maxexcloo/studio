@@ -1,12 +1,4 @@
-import {
-  BookOpen,
-  Boxes,
-  Download,
-  HardDriveDownload,
-  Layers,
-  Sparkles,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Boxes, Download, HardDriveDownload, Layers, Sparkles } from "lucide-react";
 import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
@@ -27,7 +19,7 @@ export const librarySections = {
   },
   models: {
     label: "Models",
-    description: "Base models installed or available to download.",
+    description: "Checkpoints, diffusion models, text encoders and VAEs, with their families.",
     icon: Boxes,
   },
   loras: {
@@ -37,21 +29,9 @@ export const librarySections = {
   },
   downloads: {
     label: "Downloads",
-    description: "Model downloads in progress and recently finished.",
-    icon: HardDriveDownload,
-    admin: true,
-  },
-  profiles: {
-    label: "Profiles",
     description:
-      "Generation profiles that connect models to workflows. Every saved version is kept.",
-    icon: SlidersHorizontal,
-    admin: true,
-  },
-  guides: {
-    label: "Guides",
-    description: "Prompting guides for the prompt assistant. Every saved version is kept.",
-    icon: BookOpen,
+      "Model downloads in progress and recently finished. Cancelling keeps partial files to resume.",
+    icon: HardDriveDownload,
     admin: true,
   },
 };
