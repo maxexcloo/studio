@@ -152,9 +152,7 @@ test("Media transfer actions honour the shared metadata preference", async ({ pa
   expect(reads.some((url) => new URL(url).searchParams.get("clean") === "1")).toBe(true);
 });
 
-test("An unfinished gallery entry shows the recorded failure and retries its durable job", async ({
-  page,
-}) => {
+test("Retrying a failed entry in the viewer replaces it with the new run", async ({ page }) => {
   const state = await fixtures(page);
   const job = {
     id: "failed-job",
@@ -179,11 +177,18 @@ test("An unfinished gallery entry shows the recorded failure and retries its dur
     settings: job.input,
   });
   let retries = 0;
+  // Like the durable queue, a retry admits a new job whose pending item joins the gallery.
   await page.route("**/api/queue/failed-job/retry", async (route) => {
     retries++;
-    job.status = "running";
-    job.reason = "Generation resumed";
-    await route.fulfill({ json: { job } });
+    const retried = { ...job, id: "retried-job", status: "running", reason: "Generation resumed" };
+    state.jobs.push(retried);
+    state.gallery.unshift({
+      ...state.gallery[0],
+      id: "retried-item",
+      jobId: retried.id,
+      status: "running",
+    });
+    await route.fulfill({ json: { job: retried } });
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Failed Study", exact: true }).click();
@@ -193,4 +198,5 @@ test("An unfinished gallery entry shows the recorded failure and retries its dur
   await expect(status).toContainText("Generation resumed");
   expect(retries).toBe(1);
   await expect(status.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+  expect(state.gallery.map((item) => item.id)).toEqual(["retried-item"]);
 });

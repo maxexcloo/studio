@@ -6,16 +6,17 @@ import { useQueueAction } from "../generation/Queue";
 /**
  * Retries failed jobs once each through the shared queue command. An accepted retry's new
  * pending tiles replace the job's failed tiles; failures are reported by the queue command and
- * their tiles remain. Returns the accepted job IDs.
+ * their tiles remain. Resolves to each accepted job's replacement job ID.
  */
 export function useTryAgain(items: MediaItem[]) {
   const retry = useQueueAction();
   const client = useQueryClient();
   return async (jobIds: string[]) => {
-    const accepted = new Set<string>();
+    const accepted = new Map<string, string>();
     for (const id of new Set(jobIds)) {
       try {
-        if (await retry.mutateAsync({ id, action: "retry" })) accepted.add(id);
+        const result = await retry.mutateAsync({ id, action: "retry" });
+        if (result) accepted.set(id, result.job?.id || "");
       } catch {
         // Reported by the queue command's default notification.
       }

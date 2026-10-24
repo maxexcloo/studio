@@ -104,6 +104,14 @@ export function MediaViewer({
   const [queued, setQueued] = useState<string[]>([]);
   const family = useRunFamily(item, queued);
   const iteration = useMediaIteration(item, sessionId);
+  // An accepted retry removes the failed item; the viewer follows its replacement once listed.
+  const [replacement, setReplacement] = useState("");
+  useEffect(() => {
+    const next = replacement && items.find((candidate) => candidate.jobId === replacement);
+    if (!next) return;
+    setReplacement("");
+    navigate?.(next);
+  }, [replacement, items, navigate]);
   const [draft, setDraft] = useState({ id: item.id, prompt: item.prompt || "" });
   const prompt = draft.id === item.id ? draft.prompt : item.prompt || "";
   function iterate(next: Parameters<typeof iteration.mutate>[0]) {
@@ -287,7 +295,7 @@ export function MediaViewer({
                 </Group>
               )}
               {!item.url ? (
-                <MediaJobStatus item={item} />
+                <MediaJobStatus item={item} onRetried={setReplacement} />
               ) : item.type === "video" ? (
                 <video
                   ref={video}
@@ -354,6 +362,7 @@ export function MediaViewer({
                   iterating={iteration.isPending ? iteration.variables?.kind : undefined}
                   onCompare={() => setCompare((value) => !value)}
                   onDelete={() => setDeleting(true)}
+                  onRetried={setReplacement}
                   onVersionChange={(id, active) => setVersion({ id, active })}
                   onApplied={() => {
                     restoreFocus.current = false;

@@ -61,6 +61,7 @@ export function MediaViewerActions({
   onApplied,
   onCompare,
   onDelete,
+  onRetried,
   onVersionChange,
 }: {
   item: MediaItem;
@@ -71,6 +72,7 @@ export function MediaViewerActions({
   onApplied: () => void;
   onCompare: () => void;
   onDelete: () => void;
+  onRetried: (jobId: string) => void;
   onVersionChange: (id: string, active: boolean) => void;
 }) {
   const phone = usePhone();
@@ -301,6 +303,7 @@ export function MediaViewerActions({
             onApplied={onApplied}
             onCompare={onCompare}
             onDelete={onDelete}
+            onRetried={onRetried}
           />
         </Menu.Dropdown>
       </Menu>
