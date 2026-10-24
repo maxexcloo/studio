@@ -152,8 +152,8 @@ export function importState(record) {
   const resources = record.resources || [];
   if (resources.some((resource) => resource.status === "downloading")) return "downloading";
   if (record.input?.kind === "described") return "ready";
-  // A recipe is ready once every file it needs is there, a stand-in included.
-  if (record.recipe)
+  // A recipe or saved image is ready once every file it needs is there, a stand-in included.
+  if (record.recipe || record.input?.kind === "civitai-image")
     return resources
       .filter((resource) => !resource.optional)
       .every((resource) => ["installed", "substitute"].includes(resource.status))
@@ -285,36 +285,74 @@ export function createImportEngine({
         ? await resolvePreset(record.input.presetId, { verify }).catch(() => null)
         : null;
       if (preset) {
-        record.grade = presetGrade(preset);
         record.title = preset.name || record.title;
-        record.resources = (preset.resources || []).map((resource) => ({
-          role: ["checkpoints", "diffusion_models"].includes(resource.folder)
-            ? "checkpoint"
-            : catalogueKinds[resource.folder] || "model",
-          name: resource.name,
-          version: resource.version || "",
-          want: {
-            file: resource.file || "",
-            folder: resource.folder || "",
-            sha256: resource.sha256 || "",
-            bytes: resource.bytes || 0,
-            source: { provider: "civitai", url: resource.sourceUrl || "" },
-          },
-          status:
-            resource.status === "installed"
-              ? "installed"
-              : resource.status === "conflict"
-                ? "conflict"
-                : resource.unavailable
-                  ? "unavailable"
-                  : resource.status === "unsupported"
-                    ? "unsupported"
-                    : "missing",
-          ...(resource.unavailable ? { unavailable: resource.unavailable } : {}),
-          ...(resource.unverified ? { unverified: true } : {}),
-          ...(resource.nameOnly ? { nameOnly: true } : {}),
-          note: resource.note || "",
-        }));
+        record.preset = {
+          prompt: preset.prompt || "",
+          negative: preset.negative || "",
+          settings: preset.settings || {},
+          warnings: preset.warnings || [],
+        };
+        record.resources = [];
+        for (const resource of preset.resources || []) {
+          const item = {
+            role: ["checkpoints", "diffusion_models"].includes(resource.folder)
+              ? "checkpoint"
+              : catalogueKinds[resource.folder] || "model",
+            name: resource.name,
+            version: resource.version || "",
+            ...(resource.folder === "loras" ? { strength: resource.weight ?? null } : {}),
+            want: {
+              file: resource.file || "",
+              folder: resource.folder || "",
+              sha256: resource.sha256 || "",
+              bytes: resource.bytes || 0,
+              source: { provider: "civitai", url: resource.sourceUrl || "" },
+            },
+            status:
+              resource.status === "installed"
+                ? "installed"
+                : resource.status === "conflict"
+                  ? "conflict"
+                  : resource.unavailable
+                    ? "unavailable"
+                    : resource.status === "unsupported"
+                      ? "unsupported"
+                      : "missing",
+            ...(resource.localName ? { localName: resource.localName } : {}),
+            ...(resource.profileId ? { profileId: resource.profileId } : {}),
+            ...(resource.unavailable ? { unavailable: resource.unavailable } : {}),
+            ...(resource.unverified ? { unverified: true } : {}),
+            ...(resource.nameOnly ? { nameOnly: true } : {}),
+            note: resource.note || "",
+          };
+          // As for a dropped image: a missing file gets the nearest installed stand-in until the exact one is installed.
+          if (item.status !== "installed" && item.status !== "conflict") {
+            const stand = await Promise.resolve(substituteFor(item, record)).catch(() => null);
+            if (stand?.file) {
+              item.substitute = stand;
+              item.status = "substitute";
+              item.profileId =
+                stand.profileId ||
+                (modelRoles.has(item.role)
+                  ? (await Promise.resolve(profileFor(stand.file)).catch(() => "")) || ""
+                  : "");
+            }
+          }
+          record.resources.push(item);
+        }
+        record.grade = presetGrade({
+          ...preset,
+          resources: (preset.resources || []).map((resource, at) => ({
+            ...resource,
+            ...(record.resources[at].substitute
+              ? {
+                  status: "substitute",
+                  substitute: record.resources[at].substitute,
+                  profileId: record.resources[at].profileId,
+                }
+              : {}),
+          })),
+        });
         record.state = importState(record);
       }
       return record;

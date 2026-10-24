@@ -57,6 +57,7 @@ export interface ImportRecord {
     profileId?: string;
     folderGuessed?: boolean;
     exactInstalled?: boolean;
+    localName?: string;
     substitute?: { file: string; folder?: string; reason: string; profileId?: string };
     want?: { file: string; folder: string; source?: { url?: string } };
     progress?: { receivedBytes: number; totalBytes: number };
@@ -171,7 +172,7 @@ export function LibraryImportReview({
               resource.status === "substitute"
                 ? resource.substitute?.file
                 : resource.status === "installed"
-                  ? resource.want?.file
+                  ? resource.localName || resource.want?.file
                   : undefined,
             profileId: resource.substitute?.profileId || resource.profileId,
             status: resource.status,
