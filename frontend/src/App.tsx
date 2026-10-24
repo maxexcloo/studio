@@ -9,18 +9,15 @@ import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
 import { ChatWorkspace } from "./features/sessions/ChatWorkspace";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
+// Library and Settings load with the app so their first open shows the sections, not a loader.
+import { LibraryPage } from "./features/library/LibraryPage";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import { usePhone } from "./ui/usePhone";
 const ChatPage = lazy(() =>
   import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
-);
-const LibraryPage = lazy(() =>
-  import("./features/library/LibraryPage").then((module) => ({ default: module.LibraryPage })),
-);
-const SettingsPage = lazy(() =>
-  import("./features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
 function Workspace() {
   const { appearance } = useAppearance();
@@ -117,24 +114,15 @@ function Workspace() {
             }}
             fullScreen={phone}
           >
-            <Suspense
-              fallback={
-                <LoadingState
-                  label={`Loading ${panel === "library" ? "Library" : "Settings"}`}
-                  fill
-                />
-              }
-            >
-              {panel === "library" ? (
-                library.allowed ? (
-                  <LibraryPage />
-                ) : (
-                  <LoadingState label="Loading Library" fill />
-                )
+            {panel === "library" ? (
+              library.allowed ? (
+                <LibraryPage />
               ) : (
-                <SettingsPage />
-              )}
-            </Suspense>
+                <LoadingState label="Loading Library" fill />
+              )
+            ) : (
+              <SettingsPage />
+            )}
           </Modal>
         </AppShell>
       </ChatProvider>
