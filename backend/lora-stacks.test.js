@@ -80,8 +80,19 @@ test("rename, update, strengths, recents and the active stack all apply", () => 
     { op: "strengths", workflowId: "krea2", values: { "b.safetensors": 0.9 } },
     { op: "strengths", workflowId: "krea2", values: { "c.safetensors": 1.1 } },
     { op: "recents", names: ["b.safetensors"] },
-    { op: "active", workflowId: "krea2", loras: [{ name: "b.safetensors", strength: 0.9 }] },
+    {
+      op: "active",
+      workflowId: "krea2",
+      loras: [
+        { name: "b.safetensors", strength: 0.9 },
+        { name: "c.safetensors", strength: 1, triggers: false },
+      ],
+    },
   ]);
+  assert.deepEqual(
+    loadLoraStack("krea2").map((item) => item.triggers),
+    [true, false],
+  );
   const library = loadLoraLibrary();
   assert.equal(library.snapshots[key][0].name, "Krea");
   assert.equal(library.snapshots[key][0].loras[0].name, "b.safetensors");

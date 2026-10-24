@@ -46,6 +46,7 @@ function cleanStack(value) {
           name,
           enabled: item?.enabled !== false,
           strength: Number.isFinite(Number(item?.strength)) ? Number(item.strength) : 0.7,
+          triggers: item?.triggers !== false,
         },
       ];
     })

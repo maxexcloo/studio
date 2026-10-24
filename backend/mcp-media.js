@@ -15,7 +15,7 @@ import {
   resolveLoraName,
 } from "./mcp-controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
-import { recommendedNegative, withLoraPrompting } from "./lora-prompts.js";
+import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
 import { chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
 import { isLocalVideoProfile } from "./comfy-backends.js";
 
@@ -491,13 +491,9 @@ export class McpMedia {
       });
       if (filled) controls.negative = filled;
     }
-    // Every prompt carries each LoRA's missing triggers; prompts Studio wrote also get tag-trained LoRAs' line of tags.
+    // Prompts Studio wrote get tag-trained LoRAs' line of tags; /api/generate adds the trigger words.
     const styled = (prompt) =>
-      stack.length
-        ? withLoraPrompting(prompt, stack, infos, record.request || "", {
-            tags: Boolean(record.styled),
-          })
-        : prompt;
+      record.styled ? withLoraTags(prompt, stack, infos, record.request || "") : prompt;
     const slots = profile.mediaInputs || [];
     if (
       reference_asset_ids.length > slots.length ||

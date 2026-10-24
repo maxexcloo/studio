@@ -41,6 +41,10 @@ const video = await startFakeComfy({ objectInfo: videoInfo });
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backend-routes-"));
 fs.mkdirSync(path.join(dataDir, "workflows"));
 fs.writeFileSync(
+  path.join(dataDir, "lora-catalogue.json"),
+  JSON.stringify({ "private-lora.safetensors": { triggers: ["privfx"] } }),
+);
+fs.writeFileSync(
   path.join(dataDir, "workflows/grok-video.json"),
   JSON.stringify({
     heissUi: {
@@ -243,6 +247,40 @@ test("a model type choice shows in the cached catalogue straight away", async ()
   }
   assert.equal((await file()).choice, original);
 });
+
+test(
+  "generate leads with enabled LoRAs’ trigger words unless their toggle is off, and the run keeps that prompt",
+  { timeout: 10000 },
+  async () => {
+    const sdxl = (await api("/api/models")).body.profiles.find(
+      (profile) => profile.capabilities?.lora && profile.kind === "image" && profile.ready,
+    );
+    assert.ok(sdxl);
+    const run = async (lora) => {
+      const queued = primary.nextPrompt();
+      const accepted = await api("/api/generate", {
+        ...generation(sdxl),
+        loras: [{ name: "private-lora.safetensors", strength: 0.7, ...lora }],
+      });
+      assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+      const sent = await queued;
+      await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
+      primary.drop(sent.id);
+      const texts = Object.values(sent.prompt)
+        .filter((node) => node.class_type === "CLIPTextEncode")
+        .map((node) => node.inputs.text);
+      const item = (await api("/api/gallery?limit=200")).body.items.find(
+        (entry) => entry.jobId === accepted.body.jobId,
+      );
+      return { texts, prompt: item.prompt };
+    };
+    const on = await run({});
+    assert.equal(on.prompt, "privfx, a red ceramic teapot");
+    assert.ok(on.texts.includes("privfx, a red ceramic teapot"));
+    assert.equal((await run({ triggers: false })).prompt, "a red ceramic teapot");
+    assert.equal((await run({ enabled: false })).prompt, "a red ceramic teapot");
+  },
+);
 
 test(
   "HTTP catalogue and generate select the video node schema, keep Grok primary and cancel only target",

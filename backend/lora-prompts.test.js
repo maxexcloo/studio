@@ -6,7 +6,8 @@ import {
   negativeUnused,
   recommendedNegative,
   relevantTags,
-  withLoraPrompting,
+  withLoraTags,
+  withLoraTriggers,
 } from "./lora-prompts.js";
 
 test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negative", () => {
@@ -27,18 +28,30 @@ test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negati
   assert.equal(loraPromptStyle({ promptStyle: "tags" }), "tags");
 });
 
-test("triggers go first when the note says so, otherwise last, never twice", () => {
+test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, unless already said", () => {
   const infos = {
-    first: { triggers: ["ohwx"], note: "Put the trigger first." },
-    last: { triggers: ["glowfx", "[]"] },
-    said: { triggers: ["dusk"] },
+    first: { triggers: ["ohwx"] },
+    second: { triggers: ["glowfx", "[]", "OHWX"] },
+    said: { triggers: ["Dusk"] },
+    off: { triggers: ["offword"] },
+    disabled: { triggers: ["unused"] },
   };
-  const stack = [{ name: "first" }, { name: "last" }, { name: "said" }];
+  const stack = [
+    { name: "second" },
+    { name: "first", triggers: true },
+    { name: "said" },
+    { name: "off", triggers: false },
+    { name: "disabled", enabled: false },
+  ];
   assert.equal(
-    withLoraPrompting("A harbour at dusk.", stack, infos, "a harbour"),
-    "ohwx, A harbour at dusk, glowfx",
+    withLoraTriggers("A harbour at dusk.", stack, infos),
+    "glowfx, OHWX, A harbour at dusk.",
   );
-  assert.equal(withLoraPrompting("A harbour", [], infos), "A harbour");
+  assert.equal(
+    withLoraTriggers("ohwx, a harbour at dusk", stack, infos),
+    "glowfx, ohwx, a harbour at dusk",
+  );
+  assert.equal(withLoraTriggers("A harbour", [], infos), "A harbour");
 });
 
 test("tag-trained LoRAs add one short line of the tags that fit the request; natural ones add none", () => {
@@ -50,25 +63,13 @@ test("tag-trained LoRAs add one short line of the tags that fit the request; nat
   assert.deepEqual(relevantTags(infos.tags, "a rainy portrait", ""), ["portrait"]);
   assert.deepEqual(relevantTags(infos.tags, "a cat", ""), ["film grain", "portrait", "neon sign"]);
   assert.equal(
-    withLoraPrompting(
+    withLoraTags(
       "A woman under a neon sign in the rain",
       [{ name: "tags" }, { name: "natural" }, { name: "mixed" }],
       infos,
       "neon rain portrait",
     ),
     "A woman under a neon sign in the rain\nportrait",
-  );
-});
-
-test("a caller’s own prompt gets only the missing triggers, no tag line", () => {
-  const infos = { tags: { promptStyle: "tags", triggers: ["inkstyle"], tags: ["portrait"] } };
-  assert.equal(
-    withLoraPrompting("A portrait", [{ name: "tags" }], infos, "", { tags: false }),
-    "A portrait, inkstyle",
-  );
-  assert.equal(
-    withLoraPrompting("inkstyle, a portrait", [{ name: "tags" }], infos, "", { tags: false }),
-    "inkstyle, a portrait",
   );
 });
 

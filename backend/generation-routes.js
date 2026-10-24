@@ -1,5 +1,6 @@
 import { loraInfos } from "./lora-info.js";
 import { optionalLoraIssue } from "./lora-catalogue.js";
+import { withLoraTriggers } from "./lora-prompts.js";
 import {
   currentComfyBackend,
   isDefaultBackend,
@@ -344,6 +345,14 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       } catch {
         /* a run matters more than its history */
       }
+    // The one place every path (gallery, Chat, MCP) gets its LoRAs' trigger words; history keeps
+    // what was typed, the run and its gallery record keep the prompt that ran.
+    if (body.loras?.length)
+      body.prompt = withLoraTriggers(
+        body.prompt,
+        body.loras,
+        await loraInfos(body.loras.map((item) => item.name)),
+      );
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {

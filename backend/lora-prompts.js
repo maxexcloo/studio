@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // What a stacked LoRA adds to a written prompt, and the negative a profile's guide recommends.
-// The base prompt stays natural language: triggers go in as words, tag-trained LoRAs get one short line of tags.
+// The base prompt stays natural language: triggers lead as words, tag-trained LoRAs get one short line of tags.
 import { cleanTriggers } from "./lora-catalogue.js";
 
 const maxTagLine = 6;
@@ -14,10 +14,6 @@ const has = (prompt, text) => String(prompt).toLowerCase().includes(String(text)
 export function loraPromptStyle(info) {
   return ["tags", "mixed"].includes(info?.promptStyle) ? info.promptStyle : "natural";
 }
-
-/** Whether the LoRA's note or guidance asks for its trigger at the very start. */
-const triggerFirst = (info) =>
-  /put the trigger (?:word )?first/i.test(`${info?.note || ""} ${info?.guidance || ""}`);
 
 /**
  * A tag-trained LoRA's tags that fit the request: those sharing a word with it, else its first few
@@ -36,33 +32,31 @@ export function relevantTags(info, request, prompt = "") {
 }
 
 /**
- * The prompt with each stacked LoRA's triggers (first when its note says so, otherwise at the end) and,
- * for "tags" or "mixed" LoRAs, one comma-separated line of the tags relevant to the request. `tags: false`
- * (a caller's own prompt) adds only the missing triggers.
+ * The prompt with the trigger words of each enabled LoRA whose Trigger Words toggle is on
+ * (`triggers !== false`) at the start, in stack order, once each, skipping any the prompt already
+ * says. Studio applies it once for every generation path, when it prepares the run (generation-routes.js).
  */
-export function withLoraPrompting(
-  prompt,
-  stack = [],
-  infos = {},
-  request = "",
-  { tags = true } = {},
-) {
-  let text = String(prompt || "").trim();
+export function withLoraTriggers(prompt, stack = [], infos = {}) {
+  const text = String(prompt || "").trim();
   const lead = [];
-  const tail = [];
-  const tagLine = [];
-  for (const { name } of stack) {
-    const info = infos[name] || {};
-    const triggers = cleanTriggers(info.triggers).filter((trigger) => !has(text, trigger));
-    (triggerFirst(info) ? lead : tail).push(...triggers);
-    if (tags && loraPromptStyle(info) !== "natural")
-      for (const tag of relevantTags(info, request, text))
-        if (!tagLine.includes(tag)) tagLine.push(tag);
+  for (const item of stack) {
+    if (item?.enabled === false || item?.triggers === false) continue;
+    for (const trigger of cleanTriggers(infos[item.name]?.triggers))
+      if (!has(text, trigger) && !lead.some((word) => word.toLowerCase() === trigger.toLowerCase()))
+        lead.push(trigger);
   }
-  if (lead.length) text = `${[...new Set(lead)].join(", ")}, ${text}`;
-  if (tail.length) text = `${text.replace(/[.,;\s]+$/, "")}, ${[...new Set(tail)].join(", ")}`;
-  if (tagLine.length) text = `${text}\n${tagLine.slice(0, maxTagLine).join(", ")}`;
-  return text;
+  return lead.length ? `${lead.join(", ")}, ${text}` : text;
+}
+
+/** A prompt Studio wrote, with one comma-separated line of the tags "tags" or "mixed" LoRAs find relevant to the request. */
+export function withLoraTags(prompt, stack = [], infos = {}, request = "") {
+  const text = String(prompt || "").trim();
+  const tagLine = [];
+  for (const { name } of stack)
+    if (loraPromptStyle(infos[name]) !== "natural")
+      for (const tag of relevantTags(infos[name], request, text))
+        if (!tagLine.includes(tag)) tagLine.push(tag);
+  return tagLine.length ? `${text}\n${tagLine.slice(0, maxTagLine).join(", ")}` : text;
 }
 
 /**
