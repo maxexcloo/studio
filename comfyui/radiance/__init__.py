@@ -67,6 +67,9 @@ def image_request(values, references=None):
         "n": values["count"],
         "output_format": "png",
     }
+    # Krea 2's ConditioningKrea2Rebalance; Radiance refuses it for other models.
+    if values.get("rebalance"):
+        body["rebalance"] = True
     # Turbo owns its eight-step, guidance-1 schedule. Ignore tuning carried over
     # from another UI profile rather than failing an otherwise valid job.
     if "turbo" not in model:
@@ -91,6 +94,8 @@ def image_request(values, references=None):
     boundary = "ai-" + uuid.uuid4().hex
     chunks = []
     for name, value in body.items():
+        if isinstance(value, bool):
+            value = json.dumps(value)
         chunks.append(
             (
                 f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
@@ -192,6 +197,7 @@ class RadianceImageGenerate:
             "optional": {
                 "reference_image": ("IMAGE",),
                 "loras": ("STRING", {"default": "[]"}),
+                "rebalance": ("BOOLEAN", {"default": False}),
             },
         }
 
