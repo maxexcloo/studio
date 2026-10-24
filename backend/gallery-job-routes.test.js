@@ -13,7 +13,7 @@ const { registerGalleryReadRoutes } = await import("./gallery-routes.js");
 
 test("exact job results exclude unrelated and deleted outputs and expose prompts only on request", async (t) => {
   const app = express();
-  registerGalleryReadRoutes(app);
+  registerGalleryReadRoutes(app, { jobChats: () => new Map() });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   t.after(async () => {

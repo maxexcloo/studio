@@ -1847,7 +1847,17 @@ app.delete("/api/workflows/:id", (req, res) => {
   }
 });
 
-registerGalleryReadRoutes(app);
+registerGalleryReadRoutes(app, {
+  jobChats: (req) => {
+    const ownerId = ownerIdForRequest(req);
+    const titles = new Map(rewriteStore.sessions(ownerId).map((chat) => [chat.id, chat.title]));
+    return new Map(
+      rewriteStore
+        .jobs(ownerId)
+        .map((job) => [job.id, { id: job.sessionId, title: titles.get(job.sessionId) }]),
+    );
+  },
+});
 // Refine in Chat: the chat's address, and handing a result the account owns to its chat.
 registerChatRoutes(app, {
   store: chatHandovers,

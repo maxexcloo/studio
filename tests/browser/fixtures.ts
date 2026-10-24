@@ -70,6 +70,7 @@ export async function fixtures(page: Page) {
     const item = {
       id: `${id}:0`,
       jobId: id,
+      sessionId,
       status: "done",
       type: body.kind,
       url: image,
@@ -402,12 +403,16 @@ export async function fixtures(page: Page) {
           { value: "1:1", label: "1:1" },
           { value: "other", label: "Other" },
         ],
+        chats: sessions.map((session) => ({ value: session.id, label: session.title })),
       });
     if (path === "/api/gallery") {
       galleryRequests.push(url.search);
       return respond({
         items: gallery.filter(
-          (i) => !url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q")),
+          (i) =>
+            (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
+            (!url.searchParams.has("chat") ||
+              url.searchParams.getAll("chat").includes(i.sessionId)),
         ),
         hasMore: false,
         nextCursor: "",

@@ -57,18 +57,22 @@ export function galleryJobResponse(account, id, settings = false) {
   };
 }
 
-export function registerGalleryReadRoutes(app) {
+/**
+ * `jobChats(req)` maps the account's job IDs to the Chat that ran them, `{ id, title }`; items
+ * carry it as `sessionId`, and `chat` (repeatable) filters by it.
+ */
+export function registerGalleryReadRoutes(app, { jobChats }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`
    * and `aspect` may repeat (any of them matches); `q` and `workflow` are
    * single values.
    */
+  const many = (value) =>
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item ?? "").slice(0, 200))
+      .filter(Boolean)
+      .slice(0, 50);
   function searchFilter(req) {
-    const many = (value) =>
-      (Array.isArray(value) ? value : [value])
-        .map((item) => String(item ?? "").slice(0, 200))
-        .filter(Boolean)
-        .slice(0, 50);
     const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
     return galleryFilter({
       q: one(req.query.q),
@@ -92,6 +96,7 @@ export function registerGalleryReadRoutes(app) {
     const items = filterVisibleGallery(recordsForRequest(gallery, req)).filter(
       (item) => !type || item.type === type,
     );
+    const chats = jobChats(req);
     const unique = (values) =>
       [...new Set(values.filter((value) => typeof value === "string" && value.trim()))].sort(
         (a, b) => a.localeCompare(b),
@@ -114,6 +119,14 @@ export function registerGalleryReadRoutes(app) {
         ...galleryAspects.map((aspect) => ({ value: aspect.id, label: aspect.id })),
         { value: otherAspect, label: "Other" },
       ],
+      chats: [
+        ...new Map(
+          items
+            .map((item) => chats.get(item.jobId))
+            .filter(Boolean)
+            .map((chat) => [chat.id, { value: chat.id, label: chat.title }]),
+        ).values(),
+      ],
     });
   });
 
@@ -132,16 +145,24 @@ export function registerGalleryReadRoutes(app) {
     const limit = Number(req.query.limit || 0);
     const cursor = String(req.query.cursor || "");
     const includeFailed = req.query.includeFailed !== "0";
+    const chats = jobChats(req);
+    const chatIds = many(req.query.chat);
+    const search = searchFilter(req);
     const page = pageGallery({
       type,
       limit: limit || 200,
       cursor,
       includeFailed,
       filter: (item) =>
-        recordBelongsToRequest(item, req) && (!searchFilter(req) || searchFilter(req)(item)),
+        recordBelongsToRequest(item, req) &&
+        (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
+        (!search || search(item)),
     });
     res.json({
       ...page,
+      items: page.items.map((item) =>
+        chats.has(item.jobId) ? { ...item, sessionId: chats.get(item.jobId).id } : item,
+      ),
       // The whole list, for callers from before paging. A page is in `items` already.
       ...(cursor || limit
         ? {}
