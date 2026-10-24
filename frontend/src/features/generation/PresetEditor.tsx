@@ -10,7 +10,8 @@ interface Preset {
   title: string;
   input: GenerationInput;
 }
-export function PresetEditor() {
+/** Saved composer presets: loading one replaces the draft, then `onLoad` runs. */
+export function PresetEditor({ onLoad }: { onLoad: () => void }) {
   const { draft, input, profile, setDraft } = useGeneration(),
     client = useQueryClient();
   const presets = useQuery({
@@ -54,7 +55,7 @@ export function PresetEditor() {
         <Group key={preset.id} justify="space-between">
           <Button
             variant={preset.id === draft.presetId ? "light" : "subtle"}
-            onClick={() =>
+            onClick={() => {
               setDraft((value) => ({
                 ...value,
                 presetId: preset.id,
@@ -66,8 +67,9 @@ export function PresetEditor() {
                 references: Array.isArray(preset.input.referenceDetails)
                   ? preset.input.referenceDetails
                   : [],
-              }))
-            }
+              }));
+              onLoad();
+            }}
           >
             {preset.title}
           </Button>

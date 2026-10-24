@@ -160,7 +160,7 @@ export function GenerationForm({
         draft.presetId,
         draft.operation,
       ])}
-      presets={<PresetEditor />}
+      presets={(close) => <PresetEditor onLoad={close} />}
       autoFocusPrompt={autoFocusPrompt}
       fill={fill}
     />

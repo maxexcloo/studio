@@ -1,12 +1,13 @@
-import type { ReactNode } from "react";
-import { Button, ComboboxPopover, Popover } from "@mantine/core";
+import { useState, type ReactNode } from "react";
+import { Button, ComboboxPopover, Popover, Tooltip } from "@mantine/core";
 import { Bookmark, ChevronDown, X } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
-import { chipProps } from "./chip";
+import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
+import { usePhone } from "../../ui/usePhone";
 import classes from "./GenerationInputControls.module.css";
 
 /** The wrapping chip rail shared by the gallery composer and timeline cards. */
@@ -25,10 +26,12 @@ export function GenerationInputControls({
   onChange: (patch: Partial<GenerationInput>) => void;
   references?: ReactNode;
   mask?: ReactNode;
-  presets?: ReactNode;
+  presets?: (close: () => void) => ReactNode;
   loraPicker: LoraPickerState;
   expert: { opened: boolean; onOpenedChange: (opened: boolean) => void; hasReferences: boolean };
 }) {
+  const phone = usePhone();
+  const [presetsOpened, setPresetsOpened] = useState(false);
   const countMax = Math.min(profile?.constraints?.count?.max ?? 8, 8);
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
   return (
@@ -60,14 +63,26 @@ export function GenerationInputControls({
         <LoraPicker value={input} onChange={onChange} picker={loraPicker} />
       )}
       {presets && (
-        <Popover position="top" width={320} trapFocus>
-          <Popover.Target>
-            <Button {...chipProps} leftSection={<Bookmark size={15} />}>
-              Presets
-            </Button>
-          </Popover.Target>
+        <Popover
+          position="top"
+          width={320}
+          trapFocus
+          opened={presetsOpened}
+          onChange={setPresetsOpened}
+        >
+          <Tooltip label="Presets" disabled={phone || presetsOpened}>
+            <Popover.Target>
+              <Button
+                {...iconChipProps}
+                aria-label="Presets"
+                onClick={() => setPresetsOpened((opened) => !opened)}
+              >
+                <Bookmark size={16} />
+              </Button>
+            </Popover.Target>
+          </Tooltip>
           <Popover.Dropdown data-composer-layer aria-label="Presets">
-            {presets}
+            {presets(() => setPresetsOpened(false))}
           </Popover.Dropdown>
         </Popover>
       )}

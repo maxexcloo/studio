@@ -13,12 +13,40 @@
     border-color var(--studio-motion-duration) ease;
 }
 
+.iconChip {
+  aspect-ratio: 1;
+  padding-inline: 0;
+}
+
 .label {
   display: block;
   max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Desktop chips stay compact so the rail fits one row where the composer width allows. */
+@media (min-width: 48em) {
+  .rail {
+    gap: 6px;
+  }
+
+  .rail .chip:not(.iconChip) {
+    padding-inline: var(--mantine-spacing-sm);
+  }
+
+  .chipSection[data-position="left"] {
+    margin-inline-end: 6px;
+  }
+
+  .chipSection[data-position="right"] {
+    margin-inline-start: 4px;
+  }
+
+  .label {
+    max-width: 10rem;
+  }
 }
 
 @media (max-width: 48em) {

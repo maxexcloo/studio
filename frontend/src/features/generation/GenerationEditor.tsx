@@ -134,7 +134,8 @@ export function GenerationEditor({
   blockedReason?: string;
   error?: unknown;
   assistantScope: string;
-  presets?: ReactNode;
+  /** The Presets popover's content; `close` dismisses it after a preset loads. */
+  presets?: (close: () => void) => ReactNode;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount and again after a phone inline picker closes. */

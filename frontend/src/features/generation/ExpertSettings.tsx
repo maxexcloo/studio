@@ -16,7 +16,7 @@ import {
 } from "@mantine/core";
 import { ArrowLeft, Dices, SlidersHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
-import { chipProps } from "./chip";
+import { iconChipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
 import { controlRange, stepsRange } from "./payload";
 import { PromptHistory } from "./PromptHistory";
@@ -308,13 +308,12 @@ export function ExpertSettings({
     );
   const trigger = (
     <Button
-      {...chipProps}
+      {...iconChipProps}
       aria-label="Expert Settings"
       aria-expanded={opened}
-      leftSection={<SlidersHorizontal size={16} />}
       onClick={() => onOpenedChange(!opened)}
     >
-      Expert
+      <SlidersHorizontal size={16} />
     </Button>
   );
   if (phone) return trigger;
@@ -327,7 +326,9 @@ export function ExpertSettings({
       trapFocus
       returnFocus
     >
-      <Popover.Target>{trigger}</Popover.Target>
+      <Tooltip label="Expert Settings" disabled={opened}>
+        <Popover.Target>{trigger}</Popover.Target>
+      </Tooltip>
       <Popover.Dropdown
         data-composer-layer
         aria-label="Expert Settings"
