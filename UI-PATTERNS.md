@@ -9,6 +9,27 @@ use custom components. Do not add another primitive or styling framework.
 Use [Mantine’s LLM documentation index](https://mantine.dev/llms.txt) as the
 primary component reference and verify APIs against the installed version.
 
+## Code Structure
+
+- `frontend/src/features/<area>/` owns each area's components, hooks and server
+  access; `features/shell/` owns the header, status, queue entry and mode tabs.
+  `ui/` holds feature-independent primitives only and never imports features.
+- Each server resource has one exported TanStack `queryOptions` (key, fetcher
+  and response type) beside its owner; consumers import it rather than
+  redeclaring keys or types. Shared types have one owner (`types.ts` or `shared/`).
+- Derive repeated checks once: `useIsAdmin()`, `usePhone()` from the theme
+  breakpoints, a single submit label and blocked reason per editor.
+- Failed forms render their mutation error inline; other action failures use the
+  `MutationCache` default notification. Do not add per-call duplicate surfaces.
+- Recurring UI has one owner: `GenerationEditor` for gallery and timeline
+  editing, one item-actions list for every media surface, `ConfirmDialog`,
+  `EmptyState`, `LoadingState`, `StudioLogo` and `copyText`.
+- Style with Mantine props and theme `extend` defaults first; component-specific
+  CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
+  global class rules and per-call sizes that the theme should own.
+- Browser specs are organised by topic with shared mocks in `fixtures.ts`;
+  `workflows.spec.ts` holds only cross-feature journeys.
+
 ## Theme & Layout
 
 - `frontend/src/theme.ts` owns the MantineHub Shadcn-inspired theme, shared radii,
