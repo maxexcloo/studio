@@ -37,14 +37,14 @@ export class RewriteStore {
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
-      CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS studio_chat_messages (
+        id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES studio_sessions(id), record TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS studio_chat_session ON studio_chat_messages(owner_id, session_id);`);
   }
 
-  createSession(
-    ownerId: string,
-    title = "Untitled Session",
-    inputs: GenerationInput = {},
-  ): StudioSession {
+  createSession(ownerId: string, title = "New Chat", inputs: GenerationInput = {}): StudioSession {
     const stamp = now();
     const session = { id: randomUUID(), title, inputs, createdAt: stamp, updatedAt: stamp };
     this.db
@@ -74,13 +74,63 @@ export class RewriteStore {
   ): StudioSession | undefined {
     const session = this.session(ownerId, id);
     if (!session) return;
-    const next = { ...session, ...patch, updatedAt: now() };
+    // A title set here is the user's rename; generated titles never replace it.
+    const next = {
+      ...session,
+      ...patch,
+      ...(patch.title === undefined ? {} : { titleSource: "user" }),
+      updatedAt: now(),
+    };
     this.db
       .prepare(
         "UPDATE studio_sessions SET record = ?, updated_at = ? WHERE id = ? AND owner_id = ?",
       )
       .run(JSON.stringify(next), next.updatedAt, id, ownerId);
     return next;
+  }
+
+  /** Work that must finish or be cancelled before the chat can be deleted. */
+  sessionActivity(ownerId: string, id: string): "active-jobs" | "active-chat" | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM studio_queue WHERE owner_id = ?1 AND session_id = ?2 AND status NOT IN ('completed', 'failed', 'cancelled')) AS jobs,
+          (SELECT COUNT(*) FROM studio_chat_messages WHERE owner_id = ?1 AND session_id = ?2 AND json_extract(record, '$.status') = 'streaming') AS chat`,
+      )
+      .get(ownerId, id)!;
+    return Number(row.jobs) ? "active-jobs" : Number(row.chat) ? "active-chat" : undefined;
+  }
+
+  /** Removes a chat with its messages and job records; its results stay in the gallery. */
+  deleteSession(
+    ownerId: string,
+    id: string,
+  ): "deleted" | "missing" | "active-jobs" | "active-chat" {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      let outcome: ReturnType<RewriteStore["deleteSession"]> = "deleted";
+      const activity = this.sessionActivity(ownerId, id);
+      if (!this.session(ownerId, id)) outcome = "missing";
+      else if (activity) outcome = activity;
+      else {
+        this.db
+          .prepare(
+            "DELETE FROM studio_provider_jobs WHERE id IN (SELECT id FROM studio_queue WHERE owner_id = ? AND session_id = ?)",
+          )
+          .run(ownerId, id);
+        for (const table of ["studio_queue", "studio_chat_messages"])
+          this.db
+            .prepare(`DELETE FROM ${table} WHERE owner_id = ? AND session_id = ?`)
+            .run(ownerId, id);
+        this.db
+          .prepare("DELETE FROM studio_sessions WHERE id = ? AND owner_id = ?")
+          .run(id, ownerId);
+      }
+      this.db.exec("COMMIT");
+      return outcome;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   enqueue(

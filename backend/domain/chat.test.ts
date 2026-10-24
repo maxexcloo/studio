@@ -203,7 +203,11 @@ test("all ten selected reference identities reach vision, media admission and la
     new AbortController().signal,
     () => {},
   );
-  const later = fixture.requests[1].messages as { role: string; content: string }[];
+  // The first reply also asked for a title; only streamed requests carry the conversation.
+  const later = fixture.requests.filter((request) => request.stream)[1].messages as {
+    role: string;
+    content: string;
+  }[];
   const previous = later.find((message) => message.role === "assistant")!.content;
   for (const reference of references) assert.ok(previous.includes(JSON.stringify(reference)));
   assert.equal(fixture.admissions.length, 1, "discussion does not create a second generation");
@@ -443,4 +447,46 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
     );
     fixture.db.close();
   }
+});
+test("new chats get a model title, fall back to the first clause and never replace a rename", async () => {
+  const db = new RewriteStore(":memory:");
+  let reply: (() => Response) | undefined;
+  const requests: Record<string, unknown>[] = [];
+  const service = new ChatService({
+    store: new ChatStore(db.db),
+    session: (owner, id) => db.session(owner, id),
+    settings: () => ({ endpoint: "http://gateway.invalid", key: "fixture", model: "text" }),
+    admit: async () => {
+      throw new Error("No media.");
+    },
+    fetchImpl: async (_url, options) => {
+      requests.push(JSON.parse(String(options?.body)));
+      if (!reply) throw new Error("Gateway offline.");
+      return reply();
+    },
+  });
+  const generated = db.createSession("alice", "a cosy cabin, snow");
+  reply = () =>
+    Response.json({
+      choices: [{ message: { content: '"Cosy Cabin In Snowy Woods At Dusk Tonight."' } }],
+    });
+  await service.title("alice", generated.id, "a cosy cabin, snow");
+  assert.equal(db.session("alice", generated.id)?.title, "Cosy Cabin In Snowy Woods At");
+  assert.equal(requests[0].model, "text");
+  await service.title("alice", generated.id, "something else");
+  assert.equal(requests.length, 1);
+
+  reply = undefined;
+  const fallback = db.createSession("alice");
+  await service.title("alice", fallback.id, "  an old lighthouse (storm:1.2), waves crashing");
+  assert.equal(db.session("alice", fallback.id)?.title, "An old lighthouse storm");
+
+  const renamed = db.createSession("alice");
+  reply = () => {
+    db.updateSession("alice", renamed.id, { title: "My Name" });
+    return Response.json({ choices: [{ message: { content: "Model Name" } }] });
+  };
+  await service.title("alice", renamed.id, "anything");
+  assert.equal(db.session("alice", renamed.id)?.title, "My Name");
+  db.close();
 });

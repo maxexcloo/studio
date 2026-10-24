@@ -103,3 +103,60 @@ test("Cancel All isolates the owner and retains accepted work until cancellation
     store.close();
   }
 });
+
+test("Deleting a chat is owner scoped, waits for active work and deletes only chosen results", async () => {
+  const store = new RewriteStore(":memory:");
+  const chat = store.createSession("alice"),
+    other = store.createSession("bob");
+  const done = store.enqueue("alice", chat.id, {}, "image");
+  store.save({ ...done, status: "completed", outputs: [{ id: "kept" }, { id: "chosen" }] });
+  const active = store.save({ ...store.enqueue("alice", chat.id, {}, "image"), status: "running" });
+  store.enqueue("bob", other.id, {}, "image");
+  const deleted: string[][] = [];
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]) } });
+    next();
+  });
+  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+    deleteMedia: (ownerId, ids) => {
+      deleted.push([ownerId, ...ids]);
+      return { removed: ids, files: { deleted: ids.length, skipped: 0 } };
+    },
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const remove = (user: string, id: string, mediaIds?: unknown) =>
+    fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/sessions/${id}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "X-User": user },
+      body: JSON.stringify({ mediaIds }),
+    });
+  try {
+    assert.equal((await remove("bob", chat.id, ["chosen"])).status, 404);
+    const refused = await remove("alice", chat.id, ["chosen"]);
+    assert.equal(refused.status, 409);
+    assert.equal(((await refused.json()) as { reason: string }).reason, "active-jobs");
+    assert.deepEqual(deleted, []);
+    store.save({ ...active, status: "cancelled" });
+    const response = await remove("alice", chat.id, ["chosen", "foreign"]);
+    assert.equal(response.status, 200);
+    assert.deepEqual(((await response.json()) as { media: unknown }).media, {
+      removed: ["chosen"],
+      failed: [{ id: "foreign", error: "Not a result of this chat." }],
+      files: { deleted: 1, skipped: 0 },
+    });
+    assert.deepEqual(deleted, [["alice", "chosen"]]);
+    assert.equal(store.session("alice", chat.id), undefined);
+    assert.deepEqual(store.jobs("alice"), []);
+    assert.equal(store.jobs("bob").length, 1);
+    assert.ok(store.session("bob", other.id));
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
