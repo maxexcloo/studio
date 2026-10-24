@@ -87,7 +87,9 @@ export function useMediaZoom({
     return () => observer.disconnect();
   }, [disabled, width, height]);
   useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
+  // Before paint: a key pressed as soon as the loaded image shows must not reach the stale
+  // listener that still sees it as loading.
+  useLayoutEffect(() => {
     function key(event: KeyboardEvent) {
       if (
         disabled ||
