@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, stamp } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 async function seed(page: Page) {
   const state = await fixtures(page);
@@ -70,6 +70,24 @@ test("The viewer prompt bar queues variations into a strip and choosing one make
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2]).toMatchObject({ parentJobId: state.jobs[1].id, input: { count: 1 } });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
+});
+
+test("Recreate and New Seed draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
+  const { state, viewer } = await seed(page);
+  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New Seed", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
+  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(3);
+  expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
+  await viewerAction(page, "Recreate");
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird",
+  );
+  await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
 });
 
 test("Animate themes write the motion prompt and queue a video from the image", async ({

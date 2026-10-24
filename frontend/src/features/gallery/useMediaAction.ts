@@ -89,6 +89,7 @@ async function mediaDraft(
     : references;
   return {
     profile,
+    seed: (item.settings?.seed ?? saved.seed) as string | number | undefined,
     draft: {
       sessionId: sourceSession,
       operation: (operation === "extend" ? "animate" : operation) as "image" | "refine" | "animate",
@@ -108,6 +109,8 @@ async function mediaDraft(
             : typeof item.settings?.comfyBackend === "string"
               ? item.settings.comfyBackend
               : source?.backend || source?.input.backendId || profile.workerIds?.[0],
+        // Reused drafts draw a new seed; only Exact Repeat keeps the recorded one.
+        seed: "",
         prompt: item.prompt || "",
         negative: item.negative || "",
         ...(item.width ? { width: item.width, height: item.height || item.width } : {}),
@@ -167,7 +170,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
-      const { profile, draft } = await mediaDraft(
+      const { profile, seed, draft } = await mediaDraft(
         item,
         animate ? "animate" : "image",
         profiles,
@@ -193,7 +196,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
           {
             ...draft.input,
             prompt,
-            seed: repeat ? (item.settings?.seed as string | number) || draft.input.seed : "",
+            seed: repeat ? (seed ?? "") : "",
             count: repeat || animate ? 1 : composer.count,
           },
           profile,
