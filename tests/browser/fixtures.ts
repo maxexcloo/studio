@@ -54,6 +54,7 @@ export async function fixtures(page: Page) {
   const messages: any[] = [];
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
+  const uploads: any[] = [];
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -444,17 +445,38 @@ export async function fixtures(page: Page) {
         },
       });
     }
-    if (path === "/api/reference-assets/upload")
-      return respond({
-        asset: {
-          id: "asset-upload",
-          name: "reference.png",
-          thumbnailUrl: image,
-          url: image,
-          width: 1024,
-          height: 1024,
-        },
-      });
+    if (path === "/api/reference-assets" && method === "GET")
+      return respond({ items: uploads, hasMore: false, nextCursor: "" });
+    if (path === "/api/reference-assets/upload") {
+      const asset = {
+        id: uploads.length ? `asset-upload-${uploads.length + 1}` : "asset-upload",
+        source: "upload",
+        name: "reference.png",
+        thumbnailUrl: image,
+        url: image,
+        width: 1024,
+        height: 1024,
+      };
+      uploads.unshift(asset);
+      return respond({ asset });
+    }
+    const saved = path.match(/^\/api\/reference-assets\/([^/]+)\/gallery$/);
+    if (saved && method === "POST") {
+      const item = {
+        id: `saved-${saved[1]}`,
+        jobId: `upload-${saved[1]}`,
+        type: "image",
+        status: "done",
+        prompt: "",
+        url: image,
+        thumbnailUrl: image,
+        width: 1024,
+        height: 1024,
+        createdAt: nextStamp(),
+      };
+      if (!gallery.some((entry) => entry.id === item.id)) gallery.unshift(item);
+      return respond({ ok: true, item });
+    }
     if (path.match(/^\/api\/user-presets\/[^/]+$/) && method === "PATCH") {
       const preset = presets.find((preset) => preset.id === path.split("/")[3]);
       Object.assign(preset, body);
@@ -532,6 +554,7 @@ export async function fixtures(page: Page) {
     messages,
     chatRequests,
     referenceRequests,
+    uploads,
     galleryRequests,
     loraLibrary,
     loraOperations,
@@ -625,4 +648,17 @@ export async function withExpertSettings(page: Page, steps: () => Promise<void>)
   if (await done.isVisible()) await done.click();
   else await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Expert Settings", exact: true })).toBeHidden();
+}
+
+/** Phones confirm the reference sheet; desktop closes the popover with Escape, leaving the composer open. */
+export async function closeReferences(page: Page) {
+  const done = page.getByRole("button", { name: "Use References", exact: true });
+  const references = page.getByRole("region", { name: "References", exact: true });
+  if (await done.isVisible()) await done.click();
+  else
+    await references
+      .getByRole("radiogroup", { name: "Reference Source", exact: true })
+      .getByRole("radio", { checked: true })
+      .press("Escape");
+  await expect(references).toBeHidden();
 }

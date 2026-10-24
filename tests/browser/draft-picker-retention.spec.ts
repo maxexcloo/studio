@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, fixtures, image, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, stamp } from "./fixtures";
 
 function referenceItem() {
   return {
@@ -18,7 +18,7 @@ function referenceItem() {
 }
 async function finishReferences(page: Page) {
   const references = page.getByRole("region", { name: "References", exact: true });
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await expect(references).toBeHidden();
 }
 async function referenceSearch(page: Page) {

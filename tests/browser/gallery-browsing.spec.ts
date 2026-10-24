@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, stamp } from "./fixtures";
+import { closeReferences, fixtures, image, stamp } from "./fixtures";
 const results = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
     id: `browse-${index}`,
@@ -129,7 +129,7 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
     picker.getByRole("button", { name: "Use reference: Browse Result 0", exact: true }),
   ).toBeVisible();
   await picker.getByRole("button", { name: "Use reference: Browse Result 0", exact: true }).click();
-  await picker.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await expect(picker).toBeHidden();
   await expect(prompt).toHaveValue("Keep typing/");
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();

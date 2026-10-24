@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures } from "./fixtures";
+import { closeReferences, create, fixtures } from "./fixtures";
 
 test("Mask zoom and Hand pan preserve painting history and saved masks", async ({
   page,
@@ -8,11 +8,12 @@ test("Mask zoom and Hand pan preserve painting history and saved masks", async (
   await create(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   const upload = page.waitForEvent("filechooser");
+  await page.getByText("Uploads", { exact: true }).click();
   await page.getByRole("button", { name: "Upload Reference", exact: true }).click();
   await (
     await upload
   ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Paint the Area to Refine", exact: true });
   const canvas = dialog.locator('canvas[aria-label="Mask Painting"]');

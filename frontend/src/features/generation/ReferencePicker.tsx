@@ -1,19 +1,19 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import {
   ActionIcon,
   Alert,
+  Box,
   Button,
   Drawer,
   FileButton,
   Group,
   Image,
   Indicator,
-  Pill,
+  Loader,
   Popover,
   ScrollArea,
   SegmentedControl,
-  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -22,29 +22,44 @@ import {
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { api } from "../../api";
 import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../types";
-import { OrderedItems } from "../../ui/OrderedItems";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
 import { GalleryFilterToolbar, appendGalleryFilters } from "../gallery/GalleryFilters";
-import {
-  addReference,
-  referenceDetails,
-  referencePatch,
-  referenceGroups,
-  referenceGroupAssets,
-  referenceCapacity,
-} from "./payload";
+import { referenceDetails, referenceGroup } from "./payload";
 import { useGeneration } from "./GenerationProvider";
-import { referenceLabel, useGalleryReference } from "./references";
-import { useReferenceUpload } from "./useReferenceUpload";
+import {
+  galleryReferenceType,
+  nextReferenceTarget,
+  orderedReferences,
+  placeReference,
+  referenceKey,
+  referenceLabel,
+  uploadReferenceType,
+  useReferenceList,
+  useReferencePlacement,
+  useSaveUploadToImages,
+  type ReferenceTarget,
+} from "./references";
+import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { chipProps } from "./chip";
+import editorClasses from "./GenerationEditor.module.css";
+import classes from "./ReferencePicker.module.css";
+
+/** Nested pickers, menus and open comboboxes inside the panel handle their own Escape. */
+const nestedLayers =
+  '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [role="combobox"][aria-expanded="true"]';
 
 export function ReferencePicker({
   compact = false,
@@ -77,54 +92,41 @@ export function ReferencePicker({
   };
   const close = () => setOpened(false);
   const phone = usePhone();
+  // Phones show the panel as a full-height sheet with its action at the safe bottom.
+  const sheet = inline || phone;
   const motionDuration = useMotionDuration();
-  const context = useGeneration(),
-    { draft, setDraft } = context;
-  const profile = selectedProfile || context.profile;
-  const references = referenceDetails(
-    value || draft.references,
-    selectedInput || draft.input,
+  const { draft } = useGeneration();
+  const list = useReferenceList({
+    value,
+    onChange,
+    profile: selectedProfile,
+    input: selectedInput,
+  });
+  const { profile } = list;
+  const references = orderedReferences(
+    referenceDetails(value || draft.references, selectedInput || draft.input, profile),
     profile,
   );
-  const currentReferences = useRef<ReferenceAsset[]>(references);
-  currentReferences.current = references;
+  const placement = useReferencePlacement(list);
+  const save = useSaveUploadToImages();
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
-  const { chosenSlot, query, source, filters, starred } = browser.state;
+  const { target: chosen, query, source, filters, starred } = browser.state;
+  const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
-    if (!("chosenSlot" in patch)) browser.scroll.current = 0;
+    if (!("target" in patch)) browser.scroll.current = 0;
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
-  const groups = referenceGroups(profile);
-  const group = groups.find((items) => items.some((input) => input.id === chosenSlot)) || groups[0];
-  const slot = group[0].id;
-  const slotLimit = referenceCapacity(group);
-  const selectedCount = referenceGroupAssets(references, group).length;
-  const slotFull = slotLimit > 1 && selectedCount >= slotLimit;
+  const settle = () => browse({ target: null });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search] = useDebouncedValue(query, 250);
   const client = useQueryClient();
-  function setReferences(references: ReferenceAsset[]) {
-    currentReferences.current = references;
-    if (onChange) onChange(references);
-    else
-      setDraft((previous) => ({
-        ...previous,
-        references,
-        input: {
-          ...previous.input,
-          ...referencePatch(previous.input, previous.references, references, profile),
-        },
-      }));
-  }
-  const adopt = (asset: ReferenceAsset) =>
-    setReferences(addReference(currentReferences.current, asset, profile, slot));
   const deletion = useMutation({
     meta: { inlineError: true },
     mutationFn: (id: string) =>
       api(`/api/reference-assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: async (_result, id) => {
-      setReferences(currentReferences.current.filter((asset) => asset.id !== id));
+      list.set(list.get().filter((asset) => asset.id !== id));
       await client.invalidateQueries({ queryKey: ["reference-uploads"] });
       setDeleteId(null);
     },
@@ -148,22 +150,43 @@ export function ReferencePicker({
       Delete this uploaded image from Studio? References using it will need another image.
     </ConfirmDialog>
   );
-  const select = useGalleryReference(adopt);
-  const { upload, uploading } = useReferenceUpload((asset) => {
-    adopt(asset);
-    void client.invalidateQueries({ queryKey: ["reference-uploads"] });
-  });
-  async function uploadFiles(files: File[]) {
-    const remaining =
-      slotLimit === 1
-        ? 1
-        : Math.max(0, slotLimit - referenceGroupAssets(currentReferences.current, group).length);
-    for (const file of files.filter((file) => file.type.startsWith("image/")).slice(0, remaining))
-      await upload(file);
+  function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
+    void placement.uploadFiles(files, into);
+    settle();
+  }
+  /** A placed reference dropped on another slot moves there; within its role it swaps places. */
+  function moveReference(key: string, into: ReferenceTarget) {
+    const current = list.get();
+    const asset = current.find((reference) => referenceKey(reference) === key);
+    if (!asset || into.replace === key) return;
+    if (referenceGroup(profile, asset.slot)[0].id === into.slot) {
+      const other = current.findIndex((reference) => referenceKey(reference) === into.replace);
+      if (other < 0) return;
+      const next = [...current];
+      [next[current.indexOf(asset)], next[other]] = [next[other], next[current.indexOf(asset)]];
+      list.set(next);
+      return;
+    }
+    const rest = current.filter((reference) => reference !== asset);
+    const next = placeReference(rest, { ...asset, slot: undefined }, profile, into);
+    if (next !== rest) list.set(next);
+  }
+  function dropData(data: DataTransfer, into: ReferenceTarget | null = chosen) {
+    const cell = data.getData(referenceCellType);
+    const upload = data.getData(uploadReferenceType);
+    const gallery = data.getData(galleryReferenceType);
+    if (cell) {
+      if (into) moveReference(cell, into);
+    } else if (upload) placement.place(JSON.parse(upload), into);
+    else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
+    else if (data.files.length) void placement.uploadFiles([...data.files], into);
+    settle();
   }
   const gallery = useInfiniteQuery({
     queryKey: ["reference-gallery", search, filters, starred],
     enabled: opened && source === "gallery",
+    // Searching and filtering keep the current tiles until the new ones arrive.
+    placeholderData: keepPreviousData,
     initialPageParam: "",
     queryFn: ({ pageParam }) =>
       api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
@@ -174,6 +197,7 @@ export function ReferencePicker({
   const uploads = useInfiniteQuery({
     queryKey: ["reference-uploads", search],
     enabled: opened && source === "uploads",
+    placeholderData: keepPreviousData,
     initialPageParam: "",
     queryFn: ({ pageParam }) =>
       api<{ items: ReferenceAsset[]; hasMore: boolean; nextCursor: string }>(
@@ -189,7 +213,8 @@ export function ReferencePicker({
           name: `Reference ${index + 1}`,
           deleteId: asset.id,
           thumbnailUrl: asset.thumbnailUrl || asset.url,
-          choose: () => adopt(asset),
+          drag: [uploadReferenceType, JSON.stringify(asset)],
+          choose: () => placement.place(asset, chosen),
         }))
       : (gallery.data?.pages.flatMap((page) => page.items) || [])
           .filter((item) => item.type === "image" && item.status === "done")
@@ -198,7 +223,8 @@ export function ReferencePicker({
             name: item.prompt || "Result",
             deleteId: undefined,
             thumbnailUrl: item.thumbnailUrl || item.url,
-            choose: () => select.mutate(item),
+            drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })],
+            choose: () => placement.addGalleryItem(item, chosen),
           }));
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
   const restoreScroll = useRef(true);
@@ -209,117 +235,100 @@ export function ReferencePicker({
       restoreScroll.current = false;
     }
   }, [viewport, choices.length, browser.scroll]);
+  function escape(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
+    const layer = (event.target as Element).closest(nestedLayers);
+    if (layer && layer !== event.currentTarget.closest(".mantine-Popover-dropdown")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  }
+  const uploadTile = (
+    <FileButton
+      accept="image/png,image/jpeg,image/webp"
+      multiple
+      onChange={(files) => uploadFiles(files)}
+    >
+      {(props) => (
+        <UnstyledButton
+          {...props}
+          className={classes.tile}
+          data-upload
+          aria-label="Upload Reference"
+          disabled={!target}
+        >
+          {placement.uploading ? (
+            <Loader size="sm" />
+          ) : (
+            <Stack gap={4} align="center">
+              <Upload size={20} aria-hidden />
+              <Text size="xs">Upload</Text>
+            </Stack>
+          )}
+        </UnstyledButton>
+      )}
+    </FileButton>
+  );
   const content = (
     <Stack
       component="section"
       aria-label="References"
       data-composer-layer
+      onKeyDown={escape}
       onPaste={(event) => {
-        if (event.clipboardData.files.length) {
-          event.preventDefault();
-          void uploadFiles([...event.clipboardData.files]);
-        }
+        if (event.defaultPrevented || !event.clipboardData.files.length) return;
+        event.preventDefault();
+        uploadFiles([...event.clipboardData.files]);
       }}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("Files")) event.preventDefault();
       }}
       onDrop={(event) => {
-        if (event.dataTransfer.files.length) {
-          event.preventDefault();
-          void uploadFiles([...event.dataTransfer.files]);
-        }
+        if (event.defaultPrevented || !event.dataTransfer.files.length) return;
+        event.preventDefault();
+        dropData(event.dataTransfer);
       }}
       gap="sm"
       style={{
         minHeight: 0,
-        // Inline fills the phone Drawer below its header so the listing owns its scroll position.
-        height: inline ? "calc(100dvh - 6rem)" : "min(70dvh, 640px)",
+        // The sheet fills the phone Drawer below its 3.75rem header, so the grid owns scrolling
+        // and keeps its position while the footer stays at the safe bottom.
+        height: sheet ? "calc(100dvh - 3.75rem)" : "min(70dvh, 620px)",
       }}
     >
-      <Group justify="space-between" wrap="nowrap">
-        <Button
-          size="compact-sm"
-          variant="subtle"
-          color="gray"
-          leftSection={<ArrowLeft size={16} />}
-          onClick={close}
-        >
-          Back
-        </Button>
-        <FileButton
-          accept="image/png,image/jpeg,image/webp"
-          multiple
-          onChange={(files) => void uploadFiles(files)}
-        >
-          {(props) => (
-            <Button
-              {...props}
-              disabled={slotFull}
-              size="compact-sm"
-              variant="subtle"
-              loading={uploading}
-              leftSection={<Upload size={16} />}
-            >
-              Upload Reference
-            </Button>
-          )}
-        </FileButton>
-      </Group>
-      {groups.length > 1 && (
-        <Select
-          comboboxProps={{ withinPortal: false }}
-          label="Reference Slot"
-          value={slot}
-          onChange={(chosenSlot) => browse({ chosenSlot })}
-          allowDeselect={false}
-          data={groups.map((items) => ({
-            value: items[0].id,
-            label: `${items[0].label || items[0].id}${items.some((input) => input.required) ? " · Required" : " · Optional"}${referenceCapacity(items) > 1 || items[0].max ? ` · Up to ${referenceCapacity(items)}` : ""}`,
-          }))}
-        />
-      )}
-      <Text size="xs" c="dimmed">
-        {group[0].label || slot}: {selectedCount} / {slotLimit}
-      </Text>
-      {!!references.length && (
-        <ScrollArea.Autosize mah="25dvh" style={{ flexShrink: 0 }}>
-          <OrderedItems
-            kind="references"
-            items={references}
-            identity={(asset) => `${asset.slot}:${asset.id}`}
-            label={(asset) => referenceLabel(asset, references.indexOf(asset), profile)}
-            onChange={setReferences}
+      {inline && (
+        <Group justify="space-between">
+          <Button
+            autoFocus
+            size="compact-sm"
+            variant="subtle"
+            color="gray"
+            leftSection={<ArrowLeft size={16} />}
+            onClick={close}
           >
-            {(asset, index) => (
-              <Group gap="xs" wrap="nowrap">
-                <Image
-                  src={asset.thumbnailUrl || asset.url}
-                  alt={referenceLabel(asset, index, profile)}
-                  h={32}
-                  w={32}
-                  radius="sm"
-                />
-                <Pill
-                  withRemoveButton
-                  removeButtonProps={{
-                    "aria-label": `Remove ${referenceLabel(asset, index, profile)}`,
-                    "aria-hidden": false,
-                    tabIndex: 0,
-                  }}
-                  onRemove={() =>
-                    setReferences(
-                      references.filter(
-                        (reference) => reference.id !== asset.id || reference.slot !== asset.slot,
-                      ),
-                    )
-                  }
-                >
-                  {referenceLabel(asset, index, profile)}
-                </Pill>
-              </Group>
-            )}
-          </OrderedItems>
-        </ScrollArea.Autosize>
+            Back
+          </Button>
+          <Text size="sm" fw={500}>
+            References
+          </Text>
+        </Group>
+      )}
+      <ReferenceSlots
+        references={references}
+        profile={profile}
+        target={target}
+        onChoose={(target) => browse({ target })}
+        onChange={(next) => {
+          list.set(next);
+          settle();
+        }}
+        onDrop={dropData}
+        onSave={(asset) => save.mutate(asset.id)}
+      />
+      {!target && (
+        <Text size="xs" c="dimmed">
+          All slots are filled. Choose a reference to replace it.
+        </Text>
       )}
       <SegmentedControl
         aria-label="Reference Source"
@@ -353,6 +362,7 @@ export function ReferencePicker({
       )}
       <ScrollArea.Autosize
         style={{ flex: 1, minHeight: 0 }}
+        offsetScrollbars="present"
         viewportRef={setViewport}
         onScrollPositionChange={({ y }) => {
           if (!restoreScroll.current) browser.scroll.current = y;
@@ -362,49 +372,60 @@ export function ReferencePicker({
           <LoadingState label="Loading References" />
         ) : listing.error ? (
           <Alert color="red">{listing.error.message}</Alert>
-        ) : choices.length ? (
+        ) : choices.length || source === "uploads" ? (
           <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
+            {source === "uploads" && uploadTile}
             {choices.map((item, index) => (
-              <Stack key={item.id} gap={4}>
+              <div key={item.id} className={classes.tileWrap} style={{ position: "relative" }}>
                 <UnstyledButton
+                  className={classes.tile}
                   aria-label={`Use reference: ${item.name}`}
-                  onClick={item.choose}
-                  disabled={select.isPending || slotFull}
-                  style={{
-                    borderRadius: "var(--mantine-radius-md)",
-                    overflow: "hidden",
-                    aspectRatio: "1",
-                    border: "1px solid var(--mantine-color-default-border)",
+                  onClick={() => {
+                    item.choose();
+                    settle();
+                  }}
+                  disabled={!target}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "copy";
+                    event.dataTransfer.setData(item.drag[0], item.drag[1]);
                   }}
                 >
-                  <Image src={item.thumbnailUrl} alt={item.name} h="100%" w="100%" fit="cover" />
+                  <Image
+                    src={item.thumbnailUrl}
+                    alt=""
+                    h="100%"
+                    w="100%"
+                    fit="cover"
+                    fallbackSrc=""
+                    draggable={false}
+                  />
                 </UnstyledButton>
                 {item.deleteId && (
-                  <Group justify="flex-end">
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      aria-label={`Delete Upload ${index + 1}`}
-                      onClick={() => {
-                        deletion.reset();
-                        setDeleteId(item.deleteId);
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </ActionIcon>
-                  </Group>
+                  <ActionIcon
+                    className={classes.tileAction}
+                    size="sm"
+                    variant="default"
+                    color="red"
+                    aria-label={`Delete Upload ${index + 1}`}
+                    onClick={() => {
+                      deletion.reset();
+                      setDeleteId(item.deleteId);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </ActionIcon>
                 )}
-              </Stack>
+              </div>
             ))}
           </SimpleGrid>
         ) : (
-          <EmptyState fill>
-            {search
-              ? "No matching references."
-              : source === "uploads"
-                ? "No Uploads"
-                : "Your images will appear here."}
-          </EmptyState>
+          <EmptyState fill>{search ? "No Matching Images" : "No Images"}</EmptyState>
+        )}
+        {source === "uploads" && !choices.length && !listing.isPending && (
+          <Text size="xs" c="dimmed" ta="center" mt="sm">
+            {search ? "No matching uploads." : "Upload, paste or drop images to use them here."}
+          </Text>
         )}
         {listing.hasNextPage && (
           <Button
@@ -416,7 +437,13 @@ export function ReferencePicker({
           </Button>
         )}
       </ScrollArea.Autosize>
-      <Button onClick={close}>Use References</Button>
+      {sheet && (
+        <Box className={editorClasses.footer} data-sticky>
+          <Button fullWidth onClick={close}>
+            Use References
+          </Button>
+        </Box>
+      )}
     </Stack>
   );
   const missing = profile?.mediaInputs?.some(
@@ -428,7 +455,7 @@ export function ReferencePicker({
       variant="subtle"
       color="gray"
       size={44}
-      onClick={() => setOpened(true)}
+      onClick={() => setOpened(!opened)}
     >
       {references[0] ? (
         <Image
@@ -437,6 +464,7 @@ export function ReferencePicker({
           h={36}
           w={36}
           radius="sm"
+          fallbackSrc=""
         />
       ) : (
         <ImagePlus size={20} />
@@ -446,16 +474,17 @@ export function ReferencePicker({
     <Button
       {...chipProps}
       aria-label="Choose References"
+      aria-expanded={opened}
       color={missing ? "yellow" : undefined}
       variant={missing ? "outline" : chipProps.variant}
       leftSection={<ImagePlus size={16} />}
-      onClick={() => setOpened(true)}
+      onClick={() => setOpened(!opened)}
     >
       {references.length ? (
         <Group gap={6} wrap="nowrap" component="span">
           {references.map((asset, index) => (
             <Indicator
-              key={`${asset.slot}:${asset.id}`}
+              key={referenceKey(asset)}
               component="span"
               label={index + 1}
               size={14}
@@ -499,6 +528,7 @@ export function ReferencePicker({
           size="100%"
           transitionProps={{ duration: motionDuration }}
           trapFocus={deleteId === null}
+          styles={{ body: { paddingBottom: 0 } }}
         >
           {content}
         </Drawer>
@@ -514,6 +544,9 @@ export function ReferencePicker({
         position="top-start"
         trapFocus={deleteId === null}
         closeOnClickOutside={deleteId === null}
+        // Escape closes nested layers first; the panel's own handler closes it last.
+        closeOnEscape={false}
+        returnFocus
         shadow="md"
       >
         <Popover.Target>{trigger}</Popover.Target>

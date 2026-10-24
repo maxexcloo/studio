@@ -2,7 +2,6 @@ import { lazy, Suspense, useLayoutEffect, useRef, useState, type ReactNode } fro
 import {
   ActionIcon,
   Alert,
-  Box,
   Button,
   Center,
   Group,
@@ -204,8 +203,7 @@ export function GenerationEditor({
   const inlinePanel = !phone ? null : loraPicker.opened ? (
     <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
   ) : referenceOpen ? (
-    // The reference panel's own actions sit above the phone's safe bottom.
-    <Box pb="env(safe-area-inset-bottom)">{referencePicker(true)}</Box>
+    referencePicker(true)
   ) : expertOpen ? (
     <ExpertSettings inline input={input} profile={profile} onChange={onChange} {...expert} />
   ) : null;

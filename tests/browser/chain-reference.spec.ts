@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, profiles, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, profiles, stamp } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 const workflow = JSON.parse(
@@ -77,14 +77,11 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .fill("Combine all ten references");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   const picker = page.getByRole("region", { name: "References", exact: true });
-  const roles = picker.getByRole("combobox", { name: "Reference Slot", exact: true });
-  await roles.click();
-  await expect(page.getByRole("option")).toHaveCount(3);
-  await page
-    .getByRole("option", { name: "Reference Image · Optional · Up to 10", exact: true })
-    .click();
+  const cells = picker.getByRole("group", { name: "Reference Slots", exact: true });
+  await expect(cells.getByRole("button", { name: /^Slot / })).toHaveText(["1", "2", "3"]);
+  await picker.getByText("Uploads", { exact: true }).click();
   await picker.locator('input[type="file"]').setInputFiles(
-    Array.from({ length: 11 }, (_, index) => ({
+    Array.from({ length: 13 }, (_, index) => ({
       name: `input-${index + 1}.png`,
       mimeType: "image/png",
       buffer: Buffer.from(
@@ -93,23 +90,30 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
       ),
     })),
   );
-  await expect(picker.getByText("Reference Image: 10 / 10", { exact: true })).toBeVisible();
-  expect(uploaded).toBe(10);
+  // The stack fills its ten declared slots, then Start and End; nothing is left for the 13th.
+  await expect(picker.getByText("Reference Image · 10/10", { exact: true })).toBeVisible();
+  await expect(
+    cells.getByRole("button", { name: "Reference 12 · End", exact: true }),
+  ).toBeVisible();
+  expect(uploaded).toBe(12);
   await expect(
     picker.getByRole("button", { name: "Upload Reference", exact: true }),
   ).toBeDisabled();
-  await expect(
-    picker.getByRole("button", { name: "Use reference: Shared frame", exact: true }),
-  ).toBeDisabled();
-  await picker
-    .getByRole("button", { name: "Move Reference 10 · Reference Image Earlier", exact: true })
+  await cells.getByRole("button", { name: "Reference 10 · Reference Image", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Reference 10 · Reference Image", exact: true })
+    .getByRole("menuitem", { name: "Move Earlier", exact: true })
     .click();
-  for (const label of ["Start", "End"]) {
-    await roles.click();
-    await page.getByRole("option", { name: `${label} · Optional`, exact: true }).click();
+  await picker.getByText("Gallery", { exact: true }).click();
+  for (const label of ["Reference 11 · Start", "Reference 12 · End"]) {
+    await cells.getByRole("button", { name: label, exact: true }).click();
+    await page
+      .getByRole("menu", { name: label, exact: true })
+      .getByRole("menuitem", { name: "Replace", exact: true })
+      .click();
     await picker.getByRole("button", { name: "Use reference: Shared frame", exact: true }).click();
   }
-  await picker.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const expected = slots.map((slot, index) => ({ assetId: `upload-${index + 1}`, slot: slot.id }));
