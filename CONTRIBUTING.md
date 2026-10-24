@@ -2,9 +2,7 @@
 
 ## Local Development
 
-Run `mise run setup` once, then `mise run dev`. The preview uses Vite HMR, API watch mode and isolated development data. `npm run dev:demo` provides sample output without a GPU. Worker lifecycle changes remain disabled in development.
-
-Run `mise run check`, `mise run build` and `mise run test:browser` before submitting a change. Install browsers with `npx playwright install chromium webkit`. Browser scenarios use isolated fixtures and cover desktop and phone interactions; real generation needs separate verification against the intended worker.
+Set up, run and check Studio as described in [Development](README.md#development).
 
 `frontend` owns React features, shared UI components, public assets and the Vite build. `backend` owns the API, domain operations, persistence, providers, CLI commands and bundled workflows. `shared` holds API contracts. `worker` owns the GPU image and its ComfyUI custom nodes. Root `dev.mjs` coordinates local development; release automation lives in `.github`. Follow [UI Patterns](UI-PATTERNS.md) for shared interaction rules.
 

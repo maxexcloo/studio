@@ -17,6 +17,8 @@ Open <http://localhost:5173>. Vite provides HMR and the API watches its source o
 
 `npm run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference. `npm run dev -- --lan` exposes the preview to the local network.
 
+Before submitting a change, run the checks, build the frontend and run the browser scenarios against that build. Install the browsers once with `npx playwright install chromium webkit`. Browser scenarios use isolated fixtures and cover desktop and phone interactions; real generation needs separate verification against the intended worker.
+
 ```sh
 mise run check
 mise run build
