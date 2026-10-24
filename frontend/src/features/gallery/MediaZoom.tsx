@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Transition } from "@mantine/core";
-import { useFocusWithin } from "@mantine/hooks";
+import { useFocusWithin, useHover, useMergedRef } from "@mantine/hooks";
 import { Minus, Plus } from "lucide-react";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import { useMotionDuration } from "../../ui/Appearance";
@@ -138,10 +138,13 @@ export function useMediaZoom({
 }
 
 export function MediaZoomControls({ zoom }: { zoom: ReturnType<typeof useMediaZoom> }) {
-  const { ref, focused } = useFocusWithin<HTMLDivElement>();
+  const { ref: focusRef, focused } = useFocusWithin<HTMLDivElement>();
+  // The controls stay while the pointer rests on them, not only for a moment after it arrives.
+  const { ref: hoverRef, hovered } = useHover<HTMLDivElement>();
+  const ref = useMergedRef(focusRef, hoverRef);
   return (
     <Transition
-      mounted={zoom.recent || focused}
+      mounted={zoom.recent || focused || hovered}
       transition="fade"
       duration={zoom.duration}
       keepMounted
