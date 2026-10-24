@@ -145,6 +145,9 @@ primary component reference and verify APIs against the installed version.
   Saved LoRA stacks reuse the account-owned library and preserve exact family
   keys, order, strengths and disabled entries; legacy profile groups remain explicit.
   Trigger words use copy controls and source links use the published catalogue URL.
+  Each stacked LoRA has a Trigger Words toggle (on by default); Studio inserts
+  enabled LoRAs' trigger words at the start of the prompt in stack order, on
+  every generation path.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 
 ## Dream & Taste
