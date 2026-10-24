@@ -118,6 +118,13 @@ class ImageRequestTests(unittest.TestCase):
             self.assertNotIn("negative_prompt", body)
             self.assertNotIn("true_cfg_scale", body)
 
+    def test_rebalance_is_sent_only_when_requested(self):
+        (self.models / "krea-2-turbo-fp8.rad").touch()
+        values = dict(self.values, model="krea-2-turbo-fp8.rad")
+        self.assertNotIn("rebalance", json.loads(image_request(values)[1]))
+        body = json.loads(image_request(dict(values, rebalance=True))[1])
+        self.assertIs(body["rebalance"], True)
+
     def test_flux3_stays_under_two_megapixels(self):
         (self.models / "flux-3-klein-fp8.rad").touch()
         image_request(
