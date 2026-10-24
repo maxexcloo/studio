@@ -6,10 +6,7 @@ export class ChatStore {
   readonly db: DatabaseSync;
   constructor(db: DatabaseSync) {
     this.db = db;
-    db.exec(`CREATE TABLE IF NOT EXISTS studio_chat_messages (
-      id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES studio_sessions(id), record TEXT NOT NULL
-    ); CREATE INDEX IF NOT EXISTS studio_chat_session ON studio_chat_messages(owner_id, session_id);`);
-    // A stream cannot survive an application restart. Keep its partial answer visible.
+    // RewriteStore owns the schema. A stream cannot survive an application restart. Keep its partial answer visible.
     db.exec(
       "UPDATE studio_chat_messages SET record = json_set(record, '$.status', 'failed') WHERE json_extract(record, '$.status') = 'streaming'",
     );
@@ -37,6 +34,16 @@ export class ChatStore {
       )
       .run(message.createdAt, message.createdAt, sessionId, ownerId);
     return message;
+  }
+  /** Titles a chat once, unless the user renamed it first (`RewriteStore.updateSession`). */
+  generatedTitle(ownerId: string, sessionId: string, title: string): boolean {
+    return (
+      this.db
+        .prepare(
+          "UPDATE studio_sessions SET record = json_set(record, '$.title', ?, '$.titleSource', 'generated') WHERE id = ? AND owner_id = ? AND json_extract(record, '$.titleSource') IS NULL",
+        )
+        .run(title, sessionId, ownerId).changes > 0
+    );
   }
   save(ownerId: string, message: ChatMessage) {
     this.db

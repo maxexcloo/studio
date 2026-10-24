@@ -26,6 +26,7 @@ import {
   galleryTime,
 } from "./gallery-order.js";
 import { currentDataDir } from "./data-dir.js";
+import { recordBelongsToAccount } from "./account-ownership.js";
 
 export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
@@ -904,6 +905,21 @@ export function removeGalleryItems(items) {
   const keys = new Set(items.map(galleryKey).filter(Boolean));
   if (!keys.size) return;
   setGallery(gallery.filter((item) => !keys.has(galleryKey(item))));
+}
+
+/** Viewer deletion for several of one owner's items: files, delete markers and records. */
+export function deleteOwnedGalleryItems(ownerId, ids) {
+  const wanted = new Set(ids);
+  const account = ownerId ? { userId: ownerId } : undefined;
+  const removed = gallery.filter(
+    (item) => wanted.has(item.id) && recordBelongsToAccount(item, account),
+  );
+  const files = deleteGalleryFiles(removed);
+  hideGalleryItems(removed);
+  const gone = new Set(removed);
+  setGallery(gallery.filter((item) => !gone.has(item)));
+  if (removed.length) saveGallery();
+  return { removed: removed.map((item) => item.id), files };
 }
 
 /** Items added or put back, newest first like everything else. */

@@ -132,6 +132,32 @@ const tool = {
   },
 };
 
+/** A chat's title from its first prompt: the first clause, without weights or tags. */
+export function fallbackTitle(text: string) {
+  const prompt = text
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[()[\]{}]/g, "")
+    .replace(/:\s*-?\d+(\.\d+)?/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const clause = prompt.split(/[,.;|!?]/)[0].trim() || prompt;
+  const title = clause.length > 64 ? `${clause.slice(0, 61).replace(/\s+\S*$/, "")}…` : clause;
+  return title ? title[0].toUpperCase() + title.slice(1) : "New Chat";
+}
+function modelTitle(text: unknown) {
+  const title = String(text || "")
+    .trim()
+    .split("\n")[0]
+    .replace(/^title:\s*/i, "")
+    .replace(/["'“”‘’*_`#]/g, "")
+    .replace(/[\s.,;:!?-]+$/, "")
+    .split(/\s+/)
+    .slice(0, 6)
+    .join(" ")
+    .slice(0, 64);
+  return title ? title[0].toUpperCase() + title.slice(1) : "";
+}
+
 /** Session-scoped discussion and media requests share admission with the normal composer. */
 export class ChatService {
   readonly active = new Set<string>();
@@ -171,6 +197,55 @@ export class ChatService {
     return this.options.models
       ? this.options.models(ownerId)
       : Promise.resolve([{ id: settings.model, label: settings.model }]);
+  }
+  /**
+   * Titles a new chat from its first request. `modelId: null` skips the text model. A user
+   * rename always wins; failures fall back to the first clause and never reject.
+   */
+  async title(ownerId: string, sessionId: string, text: string, modelId?: string | null) {
+    try {
+      const session = this.options.session(ownerId, sessionId) as { titleSource?: string };
+      if (!session || session.titleSource) return;
+      let title = "";
+      const settings = modelId === null ? null : this.options.settings();
+      if (settings) {
+        const models = await this.models(ownerId, settings).catch(() => []);
+        const model =
+          models.find((item) => item.id === (modelId || settings.model)) ||
+          (modelId ? undefined : models[0]);
+        if (model) {
+          const response = await (this.options.fetchImpl || fetch)(settings.endpoint, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${settings.key}`,
+              "Content-Type": "application/json",
+            },
+            signal: AbortSignal.timeout(20_000),
+            redirect: "error",
+            body: JSON.stringify({
+              model: model.id,
+              stream: false,
+              max_tokens: 24,
+              messages: [
+                {
+                  role: "system",
+                  content:
+                    "Name this chat. Reply with a short Title Case title of at most six words, without quotes or punctuation.",
+                },
+                { role: "user", content: text.slice(0, 4000) },
+              ],
+            }),
+          }).catch(() => undefined);
+          if (response?.ok)
+            title = modelTitle(
+              (await response.json().catch(() => undefined))?.choices?.[0]?.message?.content,
+            );
+        }
+      }
+      this.options.store.generatedTitle(ownerId, sessionId, title || fallbackTitle(text));
+    } catch {
+      // Titling is cosmetic; the chat keeps its current title.
+    }
   }
   messages(ownerId: string, sessionId: string) {
     if (!this.options.session(ownerId, sessionId)) throw failure("Session not found.", 404);
@@ -402,6 +477,10 @@ export class ChatService {
       this.options.store.save(ownerId, assistant);
       emit({ event: "message", data: assistant });
       emit({ event: "done", data: {} });
+      if (
+        !history.some((message) => message.role === "assistant" && message.status === "completed")
+      )
+        void this.title(ownerId, sessionId, user.content, modelId);
     } catch (error) {
       if (assistant) {
         assistant.status = signal.aborted ? "cancelled" : "failed";

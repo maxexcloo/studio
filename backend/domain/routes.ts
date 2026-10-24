@@ -40,6 +40,8 @@ export function registerRewriteRoutes(
     resourceFor = () => "local-media",
     validate,
     jobLimit,
+    deleteMedia,
+    title,
   }: {
     store: RewriteStore;
     queue: GenerationQueue;
@@ -49,6 +51,13 @@ export function registerRewriteRoutes(
       account?: Request["studioAccount"],
     ) => Promise<{ status: number; payload: unknown }>;
     jobLimit?: number;
+    /** Viewer deletion of the owner's gallery items; returns the IDs it removed. */
+    deleteMedia?: (
+      ownerId: string,
+      ids: string[],
+    ) => { removed: string[]; files: { deleted: number; skipped: number } };
+    /** Titles a chat started by its first generation; must not reject. */
+    title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
   },
 ) {
   app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
@@ -104,6 +113,51 @@ export function registerRewriteRoutes(
     const session = store.updateSession(owner(req), req.params.id, patch);
     return session ? res.json({ session }) : missing(res);
   });
+  // Deletes the chat; `mediaIds` names results of this chat to delete from the gallery as well.
+  app.delete("/api/sessions/:id", (req, res) => {
+    const ownerId = owner(req);
+    if (!store.session(ownerId, req.params.id)) return missing(res);
+    const requested = req.body?.mediaIds ?? [];
+    if (!Array.isArray(requested) || requested.some((id) => typeof id !== "string"))
+      return res.status(400).json({ error: "Media IDs must be a list of result IDs." });
+    const busy = (reason: string | undefined) =>
+      reason &&
+      res.status(409).json({
+        reason,
+        error:
+          reason === "active-jobs"
+            ? "This chat has generations in progress. Cancel them before deleting the chat."
+            : "This chat is still responding. Stop it before deleting the chat.",
+      });
+    const refused = busy(store.sessionActivity(ownerId, req.params.id));
+    if (refused) return refused;
+    const results = new Set(
+      store
+        .jobs(ownerId, req.params.id)
+        .flatMap((job) => [...job.items, ...job.outputs].map((item) => item.id)),
+    );
+    const ids = [...new Set(requested as string[])];
+    const media = { removed: [] as string[], failed: [] as { id: string; error: string }[] };
+    const deletable = ids.filter((id) => results.has(id));
+    for (const id of ids)
+      if (!results.has(id)) media.failed.push({ id, error: "Not a result of this chat." });
+    let files;
+    if (deletable.length) {
+      if (!deleteMedia) return res.status(501).json({ error: "Media deletion is unavailable." });
+      const outcome = deleteMedia(ownerId, deletable);
+      files = outcome.files;
+      media.removed = outcome.removed;
+      for (const id of deletable)
+        if (!outcome.removed.includes(id))
+          media.failed.push({ id, error: "That item was not found." });
+    }
+    const outcome = store.deleteSession(ownerId, req.params.id);
+    if (outcome === "missing") return missing(res);
+    return (
+      busy(outcome === "deleted" ? undefined : outcome) ||
+      res.json({ ok: true, media: { ...media, ...(files ? { files } : {}) } })
+    );
+  });
   app.post("/api/sessions/:id/generations", async (req, res) => {
     if (!store.session(owner(req), req.params.id)) return missing(res);
     const { operation = "image", parentJobId, ...input } = req.body || {};
@@ -134,6 +188,13 @@ export function registerRewriteRoutes(
     }
     // The scheduler is also driven by its timer; responses acknowledge durable acceptance.
     void queue.tick().catch(() => undefined);
+    if (
+      title &&
+      typeof input.prompt === "string" &&
+      input.prompt.trim() &&
+      store.jobs(owner(req), req.params.id).length === 1
+    )
+      void title(req.studioAccount, req.params.id, input.prompt);
     return res
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
