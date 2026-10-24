@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { X, RotateCw } from "lucide-react";
 import { EmptyState } from "../../ui/EmptyState";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
 export const terminal = new Set(["completed", "failed", "cancelled"]);
 export const queueQuery = queryOptions({
@@ -38,7 +38,6 @@ export function useQueueAction(jobId?: string) {
         client.invalidateQueries({ queryKey: ["session"] }),
         client.invalidateQueries({ queryKey: ["gallery"] }),
       ]),
-    onError: failure,
   });
   function matching(value: QueueAction) {
     return client.isMutating({

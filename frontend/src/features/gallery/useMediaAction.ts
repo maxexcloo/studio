@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
 import type { MediaItem, ReferenceAsset } from "../../types";
 import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery } from "../generation/Queue";
@@ -116,6 +116,5 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
           ?.focus({ preventScroll: true }),
       );
     },
-    onError: failure,
   });
 }

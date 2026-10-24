@@ -118,6 +118,7 @@ export function ReferencePicker({
   const adopt = (asset: ReferenceAsset) =>
     setReferences(addReference(currentReferences.current, asset, profile, slot));
   const deletion = useMutation({
+    meta: { inlineError: true },
     mutationFn: (id: string) =>
       api(`/api/reference-assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: async (_result, id) => {

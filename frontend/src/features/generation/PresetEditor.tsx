@@ -1,7 +1,7 @@
-import { Button, Group, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Button, Group, Stack, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, failure } from "../../api";
+import { api } from "../../api";
 import type { GenerationInput } from "../../types";
 import { initialInput, useGeneration } from "./GenerationProvider";
 import { generationInput } from "./payload";
@@ -18,6 +18,7 @@ export function PresetEditor() {
     queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
   });
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: (existing: boolean) =>
       api<{ preset: Preset }>(
         existing ? `/api/user-presets/${draft.presetId}` : "/api/user-presets",
@@ -34,7 +35,6 @@ export function PresetEditor() {
       void client.invalidateQueries({ queryKey: ["user-presets"] });
       notifications.show({ message: "Preset saved" });
     },
-    onError: failure,
   });
   const remove = useMutation({
     mutationFn: (id: string) => api(`/api/user-presets/${id}`, { method: "DELETE" }),
@@ -43,7 +43,6 @@ export function PresetEditor() {
         setDraft((value) => ({ ...value, presetId: undefined, presetTitle: "" }));
       void client.invalidateQueries({ queryKey: ["user-presets"] });
     },
-    onError: failure,
   });
   function savePreset(existing: boolean) {
     if (save.isPending || !draft.presetTitle?.trim()) return;
@@ -106,6 +105,7 @@ export function PresetEditor() {
           setDraft((value) => ({ ...value, presetTitle }));
         }}
       />
+      {save.error && <Alert color="red">{save.error.message}</Alert>}
       <Group>
         {draft.presetId && (
           <Button

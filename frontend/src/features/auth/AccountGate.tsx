@@ -12,8 +12,8 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, failure, post } from "../../api";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api, post } from "../../api";
 import type { Account } from "../../types";
 import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 import { StudioLogo } from "../../ui/StudioLogo";
@@ -64,7 +64,6 @@ export function AccountGate({ children }: { children: ReactNode }) {
     [password, setPassword] = useState(""),
     [setupToken, setSetupToken] = useState(""),
     [displayName, setDisplayName] = useState("");
-  const [pending, setPending] = useState(false);
   const [outcome] = useState(
     () =>
       ({
@@ -83,6 +82,26 @@ export function AccountGate({ children }: { children: ReactNode }) {
     window.addEventListener("studio:signed-out", signOut);
     return () => window.removeEventListener("studio:signed-out", signOut);
   }, [client]);
+  const multi = status.data?.mode === "multi-user",
+    bootstrap = !!status.data?.needsRecoveryAdmin;
+  const signIn = useMutation({
+    meta: { inlineError: true },
+    mutationFn: () =>
+      multi
+        ? post(bootstrap ? "/api/accounts/bootstrap" : "/api/accounts/sign-in", {
+            username,
+            password,
+            ...(bootstrap ? { setupToken, displayName } : {}),
+          })
+        : post("/api/access/sign-in", { password }),
+    onSuccess: async () => {
+      setPassword("");
+      setSetupToken("");
+      client.clear();
+      await status.refetch();
+      if (!multi) await access.refetch();
+    },
+  });
   if (status.isPending || (status.data?.mode === "single-user" && access.isPending))
     return (
       <Container py="xl">
@@ -106,8 +125,6 @@ export function AccountGate({ children }: { children: ReactNode }) {
         </Alert>
       </Container>
     );
-  const multi = status.data?.mode === "multi-user",
-    bootstrap = !!status.data?.needsRecoveryAdmin;
   if (multi ? status.data?.signedIn : access.data?.signedIn) return children;
   return (
     <Stack mih="100dvh" justify="center" py="xl" px="md">
@@ -148,34 +165,9 @@ export function AccountGate({ children }: { children: ReactNode }) {
                 </Alert>
               ) : (
                 <form
-                  onSubmit={async (event) => {
+                  onSubmit={(event) => {
                     event.preventDefault();
-                    setPending(true);
-                    try {
-                      await post(
-                        multi
-                          ? bootstrap
-                            ? "/api/accounts/bootstrap"
-                            : "/api/accounts/sign-in"
-                          : "/api/access/sign-in",
-                        multi
-                          ? {
-                              username,
-                              password,
-                              ...(bootstrap ? { setupToken, displayName } : {}),
-                            }
-                          : { password },
-                      );
-                      setPassword("");
-                      setSetupToken("");
-                      client.clear();
-                      await status.refetch();
-                      if (!multi) await access.refetch();
-                    } catch (error) {
-                      failure(error);
-                    } finally {
-                      setPending(false);
-                    }
+                    signIn.mutate();
                   }}
                 >
                   <Stack>
@@ -213,7 +205,8 @@ export function AccountGate({ children }: { children: ReactNode }) {
                         onChange={(e) => setSetupToken(e.currentTarget.value)}
                       />
                     )}
-                    <Button type="submit" loading={pending} fullWidth mt="sm">
+                    {signIn.error && <Alert color="red">{signIn.error.message}</Alert>}
+                    <Button type="submit" loading={signIn.isPending} fullWidth mt="sm">
                       {bootstrap ? "Create Administrator" : "Sign In"}
                     </Button>
                   </Stack>

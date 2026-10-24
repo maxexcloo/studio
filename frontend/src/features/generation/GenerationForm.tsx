@@ -3,7 +3,7 @@ import { ActionIcon, Avatar, Group, Text, Textarea, Tooltip } from "@mantine/cor
 import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
-import { failure, post } from "../../api";
+import { post } from "../../api";
 import type { ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
@@ -29,6 +29,7 @@ export function GenerationForm({
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
   const submit = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       if (form.validate().hasErrors) throw new Error("Describe what you want to create.");
       if (!profile) throw new Error("Choose an available model first.");
@@ -56,7 +57,6 @@ export function GenerationForm({
       onSubmitted?.();
       if (!["/images", "/video"].includes(location.pathname)) navigate(`/chat/${sessionId}`);
     },
-    onError: failure,
   });
   const { label, blockedReason } = useSubmitState({
     input,

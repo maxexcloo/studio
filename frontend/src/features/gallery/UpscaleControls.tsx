@@ -23,6 +23,7 @@ export function UpscaleControls({ item }: { item: MediaItem }) {
     enabled: opened,
   });
   const upscale = useMutation({
+    meta: { inlineError: true },
     mutationFn: () =>
       post<UpscaleResponse>("/api/upscale", {
         galleryItemId: item.id,

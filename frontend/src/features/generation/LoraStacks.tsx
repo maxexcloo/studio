@@ -61,6 +61,7 @@ export function LoraStacks({
   );
   const current = records.find((record) => record.value === selected);
   const change = useMutation({
+    meta: { inlineError: true },
     mutationFn: ({ ops }: { ops: Operation[]; deleted?: typeof current }) =>
       post<{ library: Library }>("/api/loras/library/ops", { ops }),
     onSuccess: ({ library }, request) => {

@@ -28,6 +28,7 @@ export function LibraryDefinitions({ kind }: { kind: DefinitionKind }) {
   const records = list.data?.profiles || list.data?.packs || [];
   const ids = records.map((entry) => entry.id || entry.packId!);
   const importing = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (file: File) => {
       const workflow = JSON.parse(await file.text());
       const result = await post<{

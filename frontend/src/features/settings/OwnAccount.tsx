@@ -1,17 +1,9 @@
-import {
-  Accordion,
-  Alert,
-  Button,
-  Loader,
-  PasswordInput,
-  Stack,
-  Text,
-  TextInput,
-} from "@mantine/core";
+import { Accordion, Alert, Button, PasswordInput, Stack, Text, TextInput } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, failure } from "../../api";
+import { api } from "../../api";
+import { LoadingState } from "../../ui/LoadingState";
 import type { Account } from "../../types";
 import { ownAccountQuery } from "../auth/AccountGate";
 import { PersonalMcpToken } from "./PersonalMcpToken";
@@ -22,6 +14,7 @@ function AccountForm({ account }: { account: Account }) {
     initialValues: { username: account.username, currentPassword: "", newPassword: "" },
   });
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: (kind: "name" | "security") => {
       const current = security.getValues();
       const changes =
@@ -44,7 +37,6 @@ function AccountForm({ account }: { account: Account }) {
       void client.invalidateQueries({ queryKey: ["account-admin"] });
       notifications.show({ message: "Account updated" });
     },
-    onError: failure,
     onSettled: (_, __, kind) => {
       if (kind === "security") security.setValues({ currentPassword: "", newPassword: "" });
     },
@@ -71,6 +63,9 @@ function AccountForm({ account }: { account: Account }) {
             required
             {...name.getInputProps("displayName")}
           />
+          {save.error && save.variables === "name" && (
+            <Alert color="red">{save.error.message}</Alert>
+          )}
           <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
             Save Display Name
           </Button>
@@ -114,6 +109,9 @@ function AccountForm({ account }: { account: Account }) {
                   <Text size="xs" c="dimmed">
                     Changing your password signs out your other browser sessions.
                   </Text>
+                  {save.error && save.variables === "security" && (
+                    <Alert color="red">{save.error.message}</Alert>
+                  )}
                   <Button
                     type="submit"
                     disabled={!securityChanged}
@@ -137,7 +135,7 @@ function AccountForm({ account }: { account: Account }) {
 }
 export function OwnAccount() {
   const account = useQuery(ownAccountQuery);
-  if (account.isPending) return <Loader aria-label="Loading Your Account" />;
+  if (account.isPending) return <LoadingState label="Loading Your Account" />;
   if (account.error) return <Alert color="red">{account.error.message}</Alert>;
   return (
     <Stack>

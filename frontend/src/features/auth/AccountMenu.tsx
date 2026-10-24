@@ -3,7 +3,7 @@ import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { failure, post } from "../../api";
+import { post } from "../../api";
 import { ownAccountQuery, useAccess, useAccount } from "./AccountGate";
 
 export function AccountMenuContent({
@@ -25,7 +25,6 @@ export function AccountMenuContent({
       client.clear();
       window.location.assign("/");
     },
-    onError: failure,
   });
   const name = multi
     ? own.data?.account.displayName || own.data?.account.username || "Your Account"

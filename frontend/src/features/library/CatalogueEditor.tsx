@@ -67,6 +67,7 @@ function CatalogueForm({
     close();
   };
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => {
       const patch: Record<string, unknown> = {};
       for (const key of [
@@ -112,6 +113,7 @@ function CatalogueForm({
     onSuccess: refresh,
   });
   const undo = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post("/api/library/catalogue/undo", { key: item.key }),
     onSuccess: refresh,
   });

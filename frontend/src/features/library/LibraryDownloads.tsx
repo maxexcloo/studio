@@ -97,7 +97,6 @@ export function LibraryDownloads({ active }: { active: boolean }) {
       client.setQueryData(["library-downloads"], state);
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
     },
-    onError: failure,
   });
   return (
     <Stack>

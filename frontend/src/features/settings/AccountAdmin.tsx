@@ -5,8 +5,6 @@ import {
   Badge,
   Button,
   Checkbox,
-  Group,
-  Loader,
   MultiSelect,
   Paper,
   PasswordInput,
@@ -20,7 +18,8 @@ import {
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
+import { LoadingState } from "../../ui/LoadingState";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
@@ -73,13 +72,13 @@ function GroupEditor({
     },
   });
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post<{ profile: AccessGroup }>("/api/accounts/profiles", form.values),
     onSuccess: (result) => {
       form.setValues(result.profile);
       saved(result.profile);
       notifications.show({ message: "Access group saved" });
     },
-    onError: failure,
   });
   const ids = [...new Set([...admin.availableProfiles, ...form.values.generationProfiles])].filter(
     (id) => {
@@ -139,6 +138,7 @@ function GroupEditor({
             />
           ))}
         </SimpleGrid>
+        {save.error && <Alert color="red">{save.error.message}</Alert>}
         <Button type="submit" style={{ alignSelf: "start" }} loading={save.isPending}>
           Save Access Group
         </Button>
@@ -156,13 +156,13 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
     },
   });
   const create = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post("/api/accounts/users", form.values),
     onSuccess: () => {
       form.reset();
       saved();
       notifications.show({ message: "User account created" });
     },
-    onError: failure,
   });
   return (
     <form
@@ -200,6 +200,7 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
             {...form.getInputProps("accessProfileId")}
           />
         </SimpleGrid>
+        {create.error && <Alert color="red">{create.error.message}</Alert>}
         <Button type="submit" loading={create.isPending} style={{ alignSelf: "start" }}>
           Create User
         </Button>
@@ -215,12 +216,12 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
     },
   });
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post("/api/accounts/default-profile", form.values),
     onSuccess: () => {
       saved();
       notifications.show({ message: "New account policy saved" });
     },
-    onError: failure,
   });
   return (
     <form
@@ -242,6 +243,7 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
           description="Assign a group to approve a pending account."
           {...form.getInputProps("requireApproval", { type: "checkbox" })}
         />
+        {save.error && <Alert color="red">{save.error.message}</Alert>}
         <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
           Save New Account Policy
         </Button>
@@ -267,9 +269,8 @@ export function AccountAdmin() {
         body: JSON.stringify(patch),
       }),
     onSuccess: refresh,
-    onError: failure,
   });
-  if (admin.isPending) return <Loader aria-label="Loading Account Administration" />;
+  if (admin.isPending) return <LoadingState label="Loading Account Administration" />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
   return (

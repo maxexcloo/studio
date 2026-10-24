@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { api, failure } from "../../api";
+import { api } from "../../api";
 import type { ReferenceAsset } from "../../types";
 
 export function useReferenceUpload(adopt: (asset: ReferenceAsset) => void) {
@@ -15,7 +15,6 @@ export function useReferenceUpload(adopt: (asset: ReferenceAsset) => void) {
       return asset;
     },
     onSuccess: adopt,
-    onError: failure,
   });
   async function upload(file: File | null) {
     if (file) return mutation.mutateAsync(file).catch(() => undefined);

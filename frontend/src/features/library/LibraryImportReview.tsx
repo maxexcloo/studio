@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
-import { api, failure, post } from "../../api";
+import { api, post } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { SectionHeading } from "../../ui/SectionHeading";
@@ -130,7 +130,6 @@ export function LibraryImportReview({
         });
       if (result.import.id !== id) onOpen(result.import.id);
     },
-    onError: failure,
   });
   const record = query.data?.import;
   const run = (actionName: string, body?: unknown) => action.mutate({ action: actionName, body });

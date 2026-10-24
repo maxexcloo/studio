@@ -216,9 +216,6 @@ export function PromptAssistant({
         if (!usable.length) notifications.show({ message: "No LoRAs fit this prompt." });
       }
     },
-    onError: (error) => {
-      if (mounted.current && error.name !== "AbortError") failure(error);
-    },
     onSettled: () => {
       controller.current = null;
     },
