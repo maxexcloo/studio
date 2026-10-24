@@ -9,6 +9,7 @@ import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import type { GallerySelection } from "./useGallerySelection";
+import type { useTryAgain } from "./useTryAgain";
 
 interface SelectionAction {
   id: string;
@@ -38,7 +39,7 @@ export function GallerySelectionBar({
   onMenuClose,
 }: {
   selection: GallerySelection;
-  tryAgain: (jobIds: string[]) => Promise<Set<string>>;
+  tryAgain: ReturnType<typeof useTryAgain>;
   menu: { x: number; y: number } | null;
   onMenuClose: () => void;
 }) {
@@ -255,7 +256,7 @@ export function GallerySelectionBar({
             ),
         )}
         <Group gap={4} ml="auto" wrap="nowrap">
-          <Tooltip label="Clear Selection">
+          <Tooltip label="Clear Selection" disabled={phone}>
             <ActionIcon
               aria-label="Clear Selection"
               variant="subtle"
@@ -266,7 +267,7 @@ export function GallerySelectionBar({
               <SquareX size={18} />
             </ActionIcon>
           </Tooltip>
-          <Tooltip label="Done Selecting">
+          <Tooltip label="Done Selecting" disabled={phone}>
             <ActionIcon
               aria-label="Done Selecting"
               variant="subtle"
