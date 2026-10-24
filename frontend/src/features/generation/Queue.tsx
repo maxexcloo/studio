@@ -1,4 +1,14 @@
-import { ActionIcon, Alert, Button, Group, Loader, Stack, Text, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Loader,
+  RingProgress,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core";
 import {
   queryOptions,
   useIsMutating,
@@ -6,8 +16,10 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { X, RotateCw } from "lucide-react";
+import { CircleAlert, Image, RotateCw, Video, X } from "lucide-react";
 import { EmptyState } from "../../ui/EmptyState";
+import { LoadingState } from "../../ui/LoadingState";
+import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
 export const terminal = new Set(["completed", "failed", "cancelled"]);
@@ -72,7 +84,6 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
         aria-label={label}
         variant="subtle"
         color="gray"
-        size={36}
         loading={action.isPending}
         disabled={action.isPending}
         onClick={onClick}
@@ -94,6 +105,55 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
     </Button>
   );
 }
+const statusLabels: Record<QueueJob["status"], string> = {
+  queued: "Queued",
+  waiting: "Waiting",
+  starting: "Starting",
+  running: "Generating",
+  saving: "Saving",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+function QueueRow({ job }: { job: QueueJob }) {
+  const failed = job.status === "failed";
+  const { progress } = job;
+  const percent =
+    progress && progress.max > 0 ? Math.min(100, (progress.value / progress.max) * 100) : 0;
+  const Kind = failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
+  return (
+    <Group wrap="nowrap" gap="sm" py="xs" className={classes.row}>
+      <Kind
+        size={18}
+        aria-hidden
+        color={failed ? "var(--mantine-color-red-6)" : "var(--mantine-color-dimmed)"}
+        style={{ flexShrink: 0 }}
+      />
+      <Stack gap={2} flex={1} miw={0}>
+        <Text size="sm" lineClamp={1}>
+          {String(job.input?.prompt || "Generation")}
+        </Text>
+        <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
+          {[statusLabels[job.status], progress?.phase, job.reason].filter(Boolean).join(" · ")}
+        </Text>
+      </Stack>
+      {!terminal.has(job.status) &&
+        (percent ? (
+          <RingProgress
+            size={28}
+            thickness={3}
+            roundCaps
+            rootColor="var(--mantine-color-default-border)"
+            sections={[{ value: percent, color: "var(--mantine-color-dimmed)" }]}
+            aria-label={`${Math.round(percent)}% Complete`}
+          />
+        ) : (
+          <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
+        ))}
+      <QueueJobAction job={job} compact />
+    </Group>
+  );
+}
 export function Queue() {
   const queue = useQueue();
   const action = useQueueAction();
@@ -101,8 +161,10 @@ export function Queue() {
     (job) => !["completed", "cancelled"].includes(job.status),
   );
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
+  if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
+  if (!jobs.length) return <EmptyState fill>Empty Queue</EmptyState>;
   return (
-    <Stack gap="md" flex={1} mih={0} aria-label="Queue">
+    <Stack gap={0} aria-label="Queue">
       {jobs.some((job) => !terminal.has(job.status)) && (
         <Button
           variant="subtle"
@@ -116,29 +178,8 @@ export function Queue() {
           Cancel All
         </Button>
       )}
-      {!jobs.length && <EmptyState fill>Empty Queue</EmptyState>}
       {jobs.map((job) => (
-        <Group
-          key={job.id}
-          wrap="nowrap"
-          align="start"
-          gap="sm"
-          style={{
-            paddingBlock: "var(--mantine-spacing-xs)",
-            borderBottom: "1px solid var(--mantine-color-default-border)",
-          }}
-        >
-          {!terminal.has(job.status) && <Loader size={16} color="gray" mt={4} />}
-          <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
-            <Text size="sm" lineClamp={1}>
-              {String(job.input?.prompt || "Generation")}
-            </Text>
-            <Text size="xs" c={job.status === "failed" ? "red" : "dimmed"}>
-              {job.reason || job.status}
-            </Text>
-          </Stack>
-          <QueueJobAction job={job} compact />
-        </Group>
+        <QueueRow key={job.id} job={job} />
       ))}
     </Stack>
   );
