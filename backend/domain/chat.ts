@@ -204,8 +204,9 @@ export class ChatService {
       : Promise.resolve([{ id: settings.model, label: settings.model }]);
   }
   /**
-   * Titles a new chat from its first request. `modelId: null` skips the text model. A user
-   * rename always wins; failures fall back to the first clause and never reject.
+   * Titles a new chat from its first request. `modelId: null` skips the text model and uses the
+   * first clause. A user rename always wins; while the text model is unavailable the chat stays
+   * New Chat, and nothing here rejects.
    */
   async title(ownerId: string, sessionId: string, text: string, modelId?: string | null) {
     try {
@@ -247,7 +248,8 @@ export class ChatService {
             );
         }
       }
-      this.options.store.generatedTitle(ownerId, sessionId, title || fallbackTitle(text));
+      if (modelId === null) title = fallbackTitle(text);
+      if (title) this.options.store.generatedTitle(ownerId, sessionId, title);
     } catch {
       // Titling is cosmetic; the chat keeps its current title.
     }

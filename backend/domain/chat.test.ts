@@ -448,7 +448,7 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
     fixture.db.close();
   }
 });
-test("new chats get a model title, fall back to the first clause and never replace a rename", async () => {
+test("new chats get a model title, stay New Chat while it is offline and never replace a rename", async () => {
   const db = new RewriteStore(":memory:");
   let reply: (() => Response) | undefined;
   const requests: Record<string, unknown>[] = [];
@@ -479,6 +479,9 @@ test("new chats get a model title, fall back to the first clause and never repla
   reply = undefined;
   const fallback = db.createSession("alice");
   await service.title("alice", fallback.id, "  an old lighthouse (storm:1.2), waves crashing");
+  assert.equal(db.session("alice", fallback.id)?.title, "New Chat");
+  // Without the prompt assistant the prompt never reaches the text model: the first clause.
+  await service.title("alice", fallback.id, "  an old lighthouse (storm:1.2), waves", null);
   assert.equal(db.session("alice", fallback.id)?.title, "An old lighthouse storm");
 
   const renamed = db.createSession("alice");

@@ -208,12 +208,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
       };
       const session =
         draft.sessionId ||
-        (
-          await post<{ session: Session }>("/api/sessions", {
-            title: prompt.slice(0, 80),
-            inputs: payload,
-          })
-        ).session.id;
+        (await post<{ session: Session }>("/api/sessions", { inputs: payload })).session.id;
       const result = await post<{ jobId: string; job?: QueueJob }>(
         `/api/sessions/${session}/generations`,
         payload,

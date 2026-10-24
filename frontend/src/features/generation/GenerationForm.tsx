@@ -44,10 +44,7 @@ export function GenerationForm({
       };
       let sessionId = draft.sessionId;
       if (!sessionId) {
-        const result = await post<{ session: Session }>("/api/sessions", {
-          title: input.prompt.slice(0, 80),
-          inputs: payload,
-        });
+        const result = await post<{ session: Session }>("/api/sessions", { inputs: payload });
         sessionId = result.session.id;
         setDraft((value) => ({ ...value, sessionId }));
       }
