@@ -9,7 +9,15 @@ import type {
   StudioSession,
 } from "../../shared/queue.ts";
 
-export type OwnedJob = QueueJob & { ownerId: string; resource: string; cancelRequested?: boolean };
+/** Queue tiers on one resource, lower first; Dream background work will add a tier below `mcp`. */
+export const queuePriority = { manual: 0, mcp: 1 } as const;
+/** Where a job was admitted from: its tier and, for an MCP call, the set it was enqueued with. */
+export interface QueueOrigin {
+  priority?: number;
+  queueSet?: string;
+}
+export type OwnedJob = QueueJob &
+  QueueOrigin & { ownerId: string; resource: string; cancelRequested?: boolean };
 export interface UserPreset {
   id: string;
   title: string;
@@ -142,6 +150,7 @@ export class RewriteStore {
     resource = "local-media",
     requestedId?: string,
     jobLimit?: number,
+    origin: QueueOrigin = {},
   ): OwnedJob {
     if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
     if (parentJobId && !this.job(ownerId, parentJobId))
@@ -175,6 +184,8 @@ export class RewriteStore {
       sessionId,
       parentJobId,
       operation,
+      priority: origin.priority ?? queuePriority.manual,
+      queueSet: origin.queueSet,
       status: "queued",
       reason: "",
       input: { ...input, clientJobId: id },
@@ -309,6 +320,8 @@ export function publicJob({
   ownerId: _ownerId,
   resource: _resource,
   cancelRequested: _cancelRequested,
+  priority: _priority,
+  queueSet: _queueSet,
   ...job
 }: OwnedJob): QueueJob {
   return job;

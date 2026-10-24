@@ -1,5 +1,5 @@
 import type { QueueMedia, QueueStatus } from "../../shared/queue.ts";
-import { RewriteStore, type OwnedJob } from "./store.ts";
+import { queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;
@@ -125,6 +125,20 @@ export class GenerationQueue {
         .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
         .map((job) => job.resource),
     );
+    // A started MCP set finishes before anything else on its resource, so its jobs stay contiguous.
+    const startedSets = new Set(
+      this.store
+        .jobs()
+        .filter(
+          (job) =>
+            job.queueSet &&
+            (this.acceptedIds.has(job.id) ||
+              !["queued", "waiting", "cancelled"].includes(job.status)),
+        )
+        .map((job) => job.queueSet),
+    );
+    const rank = (job: OwnedJob) =>
+      job.queueSet && startedSets.has(job.queueSet) ? -1 : (job.priority ?? queuePriority.manual);
     const groups = new Map<string, OwnedJob[]>();
     for (const job of this.store
       .jobs()
@@ -143,6 +157,8 @@ export class GenerationQueue {
         groups.set(job.resource, group);
       }
     }
+    // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
+    for (const candidates of groups.values()) candidates.sort((a, b) => rank(a) - rank(b));
     await Promise.all(
       [...groups].map(async ([resource, candidates]) => {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.

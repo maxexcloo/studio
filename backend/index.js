@@ -21,7 +21,7 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
-import { publicJob, RewriteStore } from "./domain/store.ts";
+import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
 import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
@@ -2723,7 +2723,9 @@ async function mcpGenerationRequest(method, route, input, owner) {
       decodeURIComponent(galleryMatch[1]),
       url.searchParams.get("settings") === "1",
     );
-  return admitGeneration(input || {}, account);
+  // External chat work queues after manual Studio requests; its set keeps it together once started.
+  const { queueSet, ...body } = input || {};
+  return admitGeneration(body, account, undefined, { priority: queuePriority.mcp, queueSet });
 }
 generationQueue.start();
 
