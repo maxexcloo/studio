@@ -32,7 +32,8 @@ export function GenerationCard({
   title: string;
   /** The short user message recorded for this request, such as "Edit iteration 2". */
   request: string;
-  onClose?: () => void;
+  /** Closes the editor; `submitted` once its request started a generation. */
+  onClose?: (submitted?: boolean) => void;
 }) {
   const submitting = useRef(false);
   const { profiles } = useGenerationActions();
@@ -76,7 +77,7 @@ export function GenerationCard({
       );
       if (generated) {
         form.reset();
-        onClose?.();
+        onClose?.(true);
       }
     } finally {
       submitting.current = false;
@@ -88,7 +89,7 @@ export function GenerationCard({
         <Text size="sm" fw={600}>
           {title}
         </Text>
-        {onClose && <CloseButton aria-label="Close Editor" onClick={onClose} />}
+        {onClose && <CloseButton aria-label="Close Editor" onClick={() => onClose()} />}
       </Group>
       <GenerationEditor
         input={form.values}
