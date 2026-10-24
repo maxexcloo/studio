@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Up to four reference images for Radiance image profiles
+
+### Changed
+- **Radiance node:** reference images arrive through four optional `images.image_1` to `images.image_4` inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
+
 ## [0.49.0] - 2026-10-24
 
 > Krea 2 rebalance for Radiance image generation

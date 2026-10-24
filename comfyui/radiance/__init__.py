@@ -195,7 +195,8 @@ class RadianceImageGenerate:
                 "count": ("INT", {"default": 1, "min": 1, "max": 8}),
             },
             "optional": {
-                "reference_image": ("IMAGE",),
+                # Studio's optional reference slots drop unused `images.*` inputs (workflow-modes.js).
+                **{f"images.image_{index}": ("IMAGE",) for index in range(1, 5)},
                 "loras": ("STRING", {"default": "[]"}),
                 "rebalance": ("BOOLEAN", {"default": False}),
             },
@@ -205,15 +206,18 @@ class RadianceImageGenerate:
     FUNCTION = "generate"
     CATEGORY = "Radiance"
 
-    def generate(self, reference_image=None, **values):
+    def generate(self, **values):
         import comfy.model_management
         import numpy as np
         import torch
         from PIL import Image
 
         references = []
-        if reference_image is not None:
-            for tensor in reference_image:
+        images = [values.pop(f"images.image_{index}", None) for index in range(1, 5)]
+        for batch in images:
+            if batch is None:
+                continue
+            for tensor in batch:
                 array = (
                     (tensor.detach().cpu().numpy().clip(0, 1) * 255)
                     .round()
