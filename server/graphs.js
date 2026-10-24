@@ -213,10 +213,12 @@ function applyRgthreeLoraStack(graph, body, config) {
 }
 
 // Radiance takes the stack as one JSON string and adds the LoRA tags itself, so the prompt text stays as written.
+// LoRAs the profile itself names (a speed LoRA such as Lightning) stay first; the request's stack follows.
 function applyRadianceLoraStack(graph, body, config) {
   const node = graph[config.node];
   if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
-  (node.inputs ||= {}).loras = JSON.stringify(enabledLoras(body, config.max).map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) })));
+  const fixed = JSON.parse(node.inputs?.loras || "[]");
+  (node.inputs ||= {}).loras = JSON.stringify([...fixed, ...enabledLoras(body, config.max).map((lora) => ({ name: lora.name, strength: Number(lora.strength ?? 0.7) }))]);
 }
 
 /**
