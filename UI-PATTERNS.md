@@ -185,7 +185,8 @@ primary component reference and verify APIs against the installed version.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header.
 - Use notifications for action outcomes and inline alerts for failed forms or
-  views. Avoid duplicate error surfaces. Use Title Case for headings, labels
+  views. Generation is the exception: submitting and completing show in the
+  gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
   and actions, and Australian English for explanatory prose.
 
 ## Media, Motion & Accessibility
