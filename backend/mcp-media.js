@@ -1007,7 +1007,11 @@ export class McpMedia {
     const saved = controls.loras
       ? (settings.loras || [])
           .filter((lora) => lora?.enabled !== false && profile.options?.loras?.includes(lora.name))
-          .map(({ name, strength }) => ({ name, strength }))
+          .map(({ name, strength, triggers }) => ({
+            name,
+            strength,
+            ...(triggers === false ? { triggers } : {}),
+          }))
       : [];
     // A LoRA for another model family would be refused on submit, so a rerun leaves it out and says so.
     const infos = saved.length ? await this.loraInfos(owner) : {};

@@ -199,6 +199,9 @@ test("Generate LoRA names resolve without folder, extension or case and take the
     prepareLoras(subject, infos, [{ name: "ink wash" }, { name: "Ink-Wash", strength: 0.5 }]),
     [{ name: "styles/Ink-Wash.safetensors", strength: 1.1 }],
   );
+  assert.deepEqual(prepareLoras(subject, infos, [{ name: "ink wash", triggers: false }]), [
+    { name: "styles/Ink-Wash.safetensors", strength: 1.1, triggers: false },
+  ]);
   assert.throws(
     () => prepareLoras(subject, infos, [{ name: "oil paint" }]),
     /^Error: No LoRA named oil paint for SDXL\. Call Models with lora_query to look one up\.$/,

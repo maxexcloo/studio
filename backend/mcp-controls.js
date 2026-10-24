@@ -401,7 +401,7 @@ export function prepareLoras(profile, infos = {}, loras = []) {
   if (loras.length > max)
     throw new Error(`${label} takes at most ${max} LoRAs; pass ${max} or fewer.`);
   const stack = [];
-  for (const { name: value, strength } of loras) {
+  for (const { name: value, strength, triggers } of loras) {
     const name = resolveLoraName(profile, value);
     const entry = candidates.find((item) => item.name === name);
     if (!entry) {
@@ -420,7 +420,12 @@ export function prepareLoras(profile, infos = {}, loras = []) {
     }
     if (stack.some((item) => item.name === name)) continue;
     const range = strengthRange(entry.info);
-    stack.push({ name, strength: Number.isFinite(strength) ? strength : (range?.default ?? 0.7) });
+    stack.push({
+      name,
+      strength: Number.isFinite(strength) ? strength : (range?.default ?? 0.7),
+      // A reused run keeps Trigger Words off; MCP callers never set it themselves.
+      ...(triggers === false ? { triggers } : {}),
+    });
   }
   return stack;
 }
