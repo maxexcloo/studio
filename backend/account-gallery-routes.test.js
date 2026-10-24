@@ -14,11 +14,15 @@ const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
 ]);
 
 const routes = {};
-registerGalleryReadRoutes({
-  get: (route, handler) => {
-    routes[route] = handler;
+const jobChats = new Map();
+registerGalleryReadRoutes(
+  {
+    get: (route, handler) => {
+      routes[route] = handler;
+    },
   },
-});
+  { jobChats: () => jobChats },
+);
 
 function call(handler, req) {
   const res = {
@@ -240,4 +244,36 @@ test("gallery filter options cover the owned gallery without exposing other acco
     }),
     { ok: false, error: "Gallery access is disabled for this account." },
   );
+});
+
+test("gallery items carry their Chat, which filters pages and lists as a facet", () => {
+  galleryStore.setGallery([item("account-a", "job-a"), item("account-a", "job-b")]);
+  jobChats.set("job-a", { id: "chat-a", title: "Teapots" });
+  const request = (query) => ({
+    studioAccount: {
+      userId: "account-a",
+      role: "user",
+      authenticated: true,
+      features: { gallery: true },
+    },
+    query,
+  });
+  try {
+    const page = call(routes["/api/gallery"], request({ limit: "50" }));
+    assert.deepEqual(page.items.map((record) => [record.jobId, record.sessionId]).sort(), [
+      ["job-a", "chat-a"],
+      ["job-b", undefined],
+    ]);
+    assert.deepEqual(
+      call(routes["/api/gallery"], request({ limit: "50", chat: "chat-a" })).items.map(
+        (record) => record.jobId,
+      ),
+      ["job-a"],
+    );
+    assert.deepEqual(call(routes["/api/gallery/filters"], request({})).chats, [
+      { value: "chat-a", label: "Teapots" },
+    ]);
+  } finally {
+    jobChats.clear();
+  }
 });

@@ -83,6 +83,10 @@ export interface MediaItem {
   settings?: Record<string, unknown>;
   model?: string;
   filename?: string;
+  /** The saved file's name, for downloads. */
+  outputName?: string;
+  /** The Chat whose generation made this item. */
+  sessionId?: string;
   startImageId?: string;
   referenceImage?: string;
   upscaleActive?: boolean;
