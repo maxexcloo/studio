@@ -17,13 +17,14 @@ import {
   useComputedColorScheme,
   useMantineTheme,
 } from "@mantine/core";
-import { useLocalStorage, useReducedMotion } from "@mantine/hooks";
+import { useLocalStorage, useMediaQuery, useReducedMotion } from "@mantine/hooks";
 import { Check, Palette } from "lucide-react";
 import {
   backgrounds,
   motionSpeeds,
   type MotionSpeed,
   type Background,
+  type Rounding,
   cssVariablesResolver,
   studioTheme,
 } from "../theme";
@@ -44,7 +45,7 @@ interface Appearance {
   colour: (typeof colours)[number];
   background: Background;
   motion: MotionSpeed;
-  rounding: "square" | "soft" | "round";
+  rounding: Rounding;
   layout: "fixed" | "full";
 }
 const defaults: Appearance = {
@@ -68,9 +69,19 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   const resolved = { ...defaults, ...appearance };
   const reduced = useReducedMotion();
   const duration = reduced ? 0 : motionSpeeds[resolved.motion];
+  const opaque = useMediaQuery("(prefers-reduced-transparency: reduce)", false, {
+    getInitialValueInEffect: false,
+  });
   const configured = useMemo(
-    () => studioTheme(resolved.colour, resolved.rounding, resolved.background, duration),
-    [resolved.colour, resolved.rounding, resolved.background, duration],
+    () =>
+      studioTheme({
+        primaryColor: resolved.colour,
+        rounding: resolved.rounding,
+        background: resolved.background,
+        motionDuration: duration,
+        transparency: !opaque,
+      }),
+    [resolved.colour, resolved.rounding, resolved.background, duration, opaque],
   );
   return (
     <Context.Provider value={{ appearance: resolved, setAppearance }}>
@@ -87,7 +98,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
 }
 export const useAppearance = () => useContext(Context);
 export function useMotionDuration() {
-  return useMantineTheme().other.studioMotionDuration as number;
+  return useMantineTheme().other.motionDuration as number;
 }
 export function AppearanceControls() {
   const { appearance, setAppearance } = useAppearance();
@@ -200,7 +211,7 @@ export function AppearanceControls() {
             onChange={(rounding) =>
               setAppearance((previous) => ({
                 ...previous,
-                rounding: rounding as Appearance["rounding"],
+                rounding: rounding as Rounding,
               }))
             }
             data={[
