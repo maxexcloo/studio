@@ -27,7 +27,7 @@ import { WorkflowConnections } from "./WorkflowConnections";
 import { usePhone } from "../../ui/usePhone";
 
 export type DefinitionKind = "profile" | "guide";
-export interface DefinitionMeta {
+interface DefinitionMeta {
   version: number;
   aiDrafted?: boolean;
   origin?: string;
@@ -48,7 +48,7 @@ interface Check {
   errors: string[];
   warnings: string[];
 }
-export const definitionPath = (kind: DefinitionKind, id: string) =>
+const definitionPath = (kind: DefinitionKind, id: string) =>
   `/api/profiles/${kind === "profile" ? "editable" : "guides"}/${encodeURIComponent(id)}`;
 const pretty = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 function object(value: unknown): value is Record<string, unknown> {
