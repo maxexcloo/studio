@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, profiles, stamp, withExpertSettings } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  profiles,
+  stamp,
+  withExpertSettings,
+} from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 test("Changing the second encoder and weight type preserves the first encoder in generation", async ({
@@ -106,7 +114,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   await page
     .getByRole("button", { name: "Use reference: Portrait framing source", exact: true })
     .click();
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await expect(size).toHaveText("Reference · 2:3");
   await size.click();
   await expect(
@@ -170,10 +178,9 @@ test("A saved End-only preset restores its explicit slot without creating a Star
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Arrive at the closing frame");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "End · Optional", exact: true }).click();
+  await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Closing frame", exact: true }).click();
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("End Frame Only");
   await page.getByRole("button", { name: "Save Preset", exact: true }).click();
@@ -454,12 +461,12 @@ test("Generation actions stay in place while the prompt grows and pickers open",
       exact: true,
     })
     .click();
-  await expect(useReferences).toBeInViewport();
   if (isMobile) {
+    await expect(useReferences).toBeInViewport();
     const footer = await useReferences.boundingBox();
     expect(footer!.y + footer!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
-  }
-  await useReferences.click();
+  } else await expect(useReferences).toHaveCount(0);
+  await closeReferences(page);
   await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toHaveLength(1);

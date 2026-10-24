@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, openNav, profiles, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, openNav, profiles, stamp } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 test("Multiple owned references preserve order, role identity and capacity through generation and Chat", async ({
@@ -49,40 +49,30 @@ test("Multiple owned references preserve order, role identity and capacity throu
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Combine these reference compositions");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: second study", exact: true }).click();
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  const slots = picker.getByRole("group", { name: "Reference Slots", exact: true });
+  // Taps fill the next empty slot: both Inputs, then End.
+  for (const name of ["first", "second", "third"])
+    await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
+  await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Use reference: third study", exact: true }),
+    picker.getByRole("button", { name: "Use reference: first study", exact: true }),
   ).toBeDisabled();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "End · Optional", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "Inputs · Optional · Up to 2", exact: true }).click();
-  const remove = page.getByRole("button", { name: "Remove Reference 1 · Inputs", exact: true });
-  await expect(remove).toHaveAttribute("tabindex", "0");
-  await remove.focus();
-  await remove.press("Enter");
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await expect(
-    page.getByRole("listitem", { name: "references Reference 1 · Inputs", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("listitem", { name: "references Reference 2 · End", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("listitem", { name: "references Reference 3 · Inputs", exact: true }),
-  ).toBeVisible();
+  await slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }).click();
   await page
-    .getByRole("button", { name: "Move Reference 3 · Inputs Earlier", exact: true })
+    .getByRole("menu", { name: "Reference 1 · Inputs", exact: true })
+    .getByRole("menuitem", { name: "Move Later", exact: true })
+    .click();
+  await slots.getByRole("button", { name: "Reference 3 · End", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Reference 3 · End", exact: true })
+    .getByRole("menuitem", { name: "Replace", exact: true })
     .click();
   await expect(
-    page.getByRole("listitem", { name: "references Reference 2 · Inputs", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("listitem", { name: "references Reference 3 · End", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+    slots.getByRole("button", { name: "Reference 3 · End", exact: true }),
+  ).toHaveAttribute("data-target", "true");
+  await picker.getByRole("button", { name: "Use reference: first study", exact: true }).click();
+  await closeReferences(page);
   await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
   await expect(page.getByRole("img", { name: "Reference 1 · Inputs", exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Reference 3 · End", exact: true })).toBeVisible();
@@ -102,12 +92,9 @@ test("Multiple owned references preserve order, role identity and capacity throu
   ).toEqual(expected);
   await openNav(page, "Chat");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: second study", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "End · Optional", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  for (const name of ["second", "first", "first"])
+    await page.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
+  await closeReferences(page);
   await page
     .getByRole("textbox", { name: "Message", exact: true })
     .fill("Explain how the selected references fit together");
@@ -181,18 +168,18 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
     .click();
   await expect(page.getByRole("button", { name: "Delete Upload 1", exact: true })).toHaveCount(0);
   await page.getByText("Uploads", { exact: true }).click();
+  const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
+  await slots.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "End · Optional", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
-  await page.getByRole("button", { name: "Remove Reference 2 · Inputs", exact: true }).click();
+  await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
+  await slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true }).click();
+  await page
+    .getByRole("menu", { name: "Reference 2 · Inputs", exact: true })
+    .getByRole("menuitem", { name: "Remove", exact: true })
+    .click();
   expect(deleted).toEqual([]);
-  await expect(
-    page.getByRole("button", { name: "Use reference: Reference 1", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("combobox", { name: "Reference Slot", exact: true }).click();
-  await page.getByRole("option", { name: "Inputs · Optional · Up to 2", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  await expect(slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Delete Upload 1", exact: true }).click();
   const confirmation = page.getByRole("dialog", { name: "Delete Upload", exact: true });
   await confirmation.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -209,11 +196,11 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
   await expect(confirmation).toBeHidden();
   expect(deleted).toEqual(["owned-upload", "owned-upload"]);
   expect(uploads.map((asset) => asset.id)).toEqual(["another-upload"]);
+  await expect(slots.getByRole("button", { name: /^Reference / })).toHaveCount(1);
   await expect(
-    page.getByRole("listitem", { name: "references Reference 1 · Inputs", exact: true }),
+    slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("listitem")).toHaveCount(1);
-  await page.getByRole("button", { name: "Use References", exact: true }).click();
+  await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "asset-kept", slot: "images" }]);

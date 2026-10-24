@@ -43,6 +43,7 @@ export interface Profile {
 export interface ReferenceAsset {
   id: string;
   slot?: string;
+  source?: "upload" | "generation";
   name: string;
   thumbnailUrl: string;
   url?: string;
