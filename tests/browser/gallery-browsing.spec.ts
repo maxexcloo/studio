@@ -88,7 +88,11 @@ test("Single-item viewer keyboard actions star and request deletion through the 
   await expect(confirm).toBeVisible();
   expect(state.gallery).toHaveLength(1);
   await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(viewer).toBeVisible();
+  // Focus stays in the fading confirmation until its exit transition ends, then returns.
+  await expect(confirm).toBeHidden();
+  await expect
+    .poll(() => viewer.evaluate((element) => element.contains(document.activeElement)))
+    .toBe(true);
   await page.keyboard.press("Delete");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(viewer).toBeHidden();
