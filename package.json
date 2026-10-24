@@ -16,7 +16,6 @@
     "build": "vite build --config frontend/vite.config.ts",
     "dev": "node dev.mjs",
     "dev:demo": "node dev.mjs --demo",
-    "dev:lan": "node dev.mjs --lan",
     "preview": "vite preview --config frontend/vite.config.ts --host 127.0.0.1 --port 5173",
     "release": "node .github/release.mjs",
     "start": "node backend/index.js",
