@@ -40,6 +40,7 @@ import { loadSharp } from "./sharp-loader.js";
 import { startLibraryDownload } from "./library-downloads.js";
 import { createImportEngine, importStore, publicImport } from "./library-imports.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./library-sources.js";
+import { familyFromName } from "./family-catalog.js";
 import { downloadState } from "./model-downloads.js";
 import { fromChat, requireLocal } from "./route-access.js";
 import { libraryPlacement, lookupLibrary } from "./library-lookup.js";
@@ -303,11 +304,29 @@ const itemFields = [
   "aiDrafted",
 ];
 
+// Model files whose name alone can say their family when no profile uses them.
+const namedSources = { checkpoints: "checkpoint", diffusion_models: "unet" };
+
+/**
+ * The families of an uncatalogued model file: those of the profiles whose definition names it
+ * (`profiles`: [{family, text}]), else a family read from a checkpoint's or diffusion model's name.
+ */
+function modelFileFamilies(folder, file, profiles) {
+  const quoted = JSON.stringify(file);
+  const used = profiles.filter((profile) => profile.family && profile.text.includes(quoted));
+  if (used.length) return [...new Set(used.map((profile) => profile.family))].sort();
+  if (!namedSources[folder]) return [];
+  const named = familyFromName(file, namedSources[folder]);
+  if (named === "sdxl_or_sd15") return [/1[._]?5|sd15|v1[-_]5/i.test(file) ? "sd15" : "sdxl"];
+  return named ? [named] : [];
+}
+
 /**
  * Installed files (`installed`: {folder: names}) joined with the catalogue (`entries`), plus
- * catalogue entries that aren't installed. `loraInfo` fills a LoRA's role and base from its file.
+ * catalogue entries that aren't installed. `loraInfo` fills a LoRA's role and base from its file;
+ * `profiles` ([{family, text}], each saved profile's definition) the families of other model files.
  */
-export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
+export function libraryItems({ installed = {}, entries = {}, loraInfo = {}, profiles = [] }) {
   const items = new Map();
   const add = (folder, file, isInstalled) => {
     const key = `${folder}/${file}`;
@@ -330,6 +349,10 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {} }) {
       item.families = info.families;
     if ((!item.triggers || !item.triggers.length) && info.triggers?.length)
       item.triggers = info.triggers;
+    if (folder !== "loras" && !item.families?.length) {
+      const found = modelFileFamilies(folder, file, profiles);
+      if (found.length) item.families = found;
+    }
     if (!item.note && info.note) item.note = info.note;
     if (entry.description) item.description = String(entry.description).slice(0, 600);
     if (!item.links?.civitaiCom && !item.links?.hf && info.sourceUrl)
@@ -377,6 +400,8 @@ export function registerLibraryRoutes(
     gguf = async () => false,
     /** The prompt assistant engine (assistant.js), or null while it is unset. */
     assistant = () => null,
+    /** Each saved profile's family and definition text, [{family, text}]: which model files it names. */
+    profileDefinitions = async () => [],
     /** What still uses a model file: ['the Flux Dev profile', …] (update clean-up, Decision 4). */
     references = async () => [],
     removeFile = removeInstalled,
@@ -679,12 +704,16 @@ export function registerLibraryRoutes(
     route(
       async (_req, res) => {
         const files = await installed().catch(() => ({}));
-        const info = await loraInfo(files.loras || []).catch(() => ({}));
+        const [info, definitions] = await Promise.all([
+          loraInfo(files.loras || []).catch(() => ({})),
+          profileDefinitions().catch(() => []),
+        ]);
         const state = await updates.settle().catch(() => updates.summary());
         const items = libraryItems({
           installed: files,
           entries: catalogue().entries({ throttleMs: 5000 }),
           loraInfo: info,
+          profiles: definitions,
         }).map((item) => {
           const update = item.installed ? state.byEntry[item.key] : null;
           const applied = state.applied[item.key];

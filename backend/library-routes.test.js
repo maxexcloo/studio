@@ -294,3 +294,42 @@ test("a recorded file matches its catalogue checksum first, then the exact name,
   );
   assert.deepEqual([none.unsourced, none.want.folder, none.want.file], [true, "vae", ""]);
 });
+
+test("uncatalogued model files take their family from the profiles naming them, else their name", () => {
+  const items = libraryItems({
+    installed: {
+      diffusion_models: [
+        "fibo2_dev.safetensors",
+        "z_image_turbo.safetensors",
+        "mystery.safetensors",
+      ],
+      checkpoints: ["dreamshaper_xl.safetensors"],
+      vae: ["flux2-vae.safetensors", "spare-vae.safetensors"],
+      loras: ["unknown.safetensors"],
+    },
+    entries: { "diffusion_models/z_image_turbo.safetensors": { families: ["custom"] } },
+    profiles: [
+      {
+        family: "fibo2",
+        text: '{"unet_name":"fibo2_dev.safetensors","vae_name":"flux2-vae.safetensors"}',
+      },
+      { family: "flux2_klein_9b", text: '{"vae_name":"flux2-vae.safetensors"}' },
+    ],
+  });
+  const families = Object.fromEntries(items.map((item) => [item.key, item.families]));
+  assert.deepEqual(families["diffusion_models/fibo2_dev.safetensors"], ["fibo2"]);
+  assert.deepEqual(families["vae/flux2-vae.safetensors"], ["fibo2", "flux2_klein_9b"]);
+  assert.deepEqual(
+    families["diffusion_models/z_image_turbo.safetensors"],
+    ["custom"],
+    "the catalogue wins",
+  );
+  assert.deepEqual(families["checkpoints/dreamshaper_xl.safetensors"], ["sdxl"]);
+  assert.equal(families["diffusion_models/mystery.safetensors"], undefined);
+  assert.equal(
+    families["vae/spare-vae.safetensors"],
+    undefined,
+    "a name never guesses a component",
+  );
+  assert.equal(families["loras/unknown.safetensors"], undefined, "LoRAs keep their own metadata");
+});

@@ -1477,22 +1477,37 @@ const presetModels = async () => {
   const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
   return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
 };
+/** Each saved profile definition: its name, declared family and text. */
+async function profileDefinitions() {
+  const names = await fs.promises.readdir(userWorkflowsDir).catch(() => []);
+  const definitions = [];
+  for (const name of names) {
+    if (!name.endsWith(".json") || name.startsWith(".")) continue;
+    const text = await fs.promises
+      .readFile(path.join(userWorkflowsDir, name), "utf8")
+      .catch(() => "");
+    let block = {};
+    try {
+      const parsed = JSON.parse(text);
+      block = parsed.studio || parsed.heissUi || {};
+    } catch {
+      /* Unreadable definitions still count as naming the files they mention. */
+    }
+    definitions.push({
+      name: name.replace(/\.json$/, ""),
+      family: String(block.family || ""),
+      text,
+    });
+  }
+  return definitions;
+}
 /** What still uses a model file, so an update removes the old one only when nothing does (Decision 4). */
 async function modelFileReferences({ file }) {
   if (!file) return [];
-  const users = [];
   const quoted = JSON.stringify(file);
-  try {
-    for (const name of await fs.promises.readdir(userWorkflowsDir)) {
-      if (!name.endsWith(".json") || name.startsWith(".")) continue;
-      const text = await fs.promises
-        .readFile(path.join(userWorkflowsDir, name), "utf8")
-        .catch(() => "");
-      if (text.includes(quoted)) users.push(`the ${name.replace(/\.json$/, "")} profile`);
-    }
-  } catch {
-    /* No profile folder. */
-  }
+  const users = (await profileDefinitions())
+    .filter((definition) => definition.text.includes(quoted))
+    .map((definition) => `the ${definition.name} profile`);
   for (const profile of (await presetModels().catch(() => ({ profiles: [] }))).profiles || []) {
     if (
       [profile.defaults?.model, profile.model, profile.baseModel].includes(file) &&
@@ -1555,6 +1570,7 @@ const library = registerLibraryRoutes(app, {
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
   references: modelFileReferences,
+  profileDefinitions,
   schedule: !demoMode,
 });
 libraryUpdates = library.updates;
