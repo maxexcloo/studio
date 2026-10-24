@@ -19,6 +19,7 @@ version opens with a `> ` summary line.
 
 ### Changed
 
+- Keep LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, ahead of the request's LoRA stack instead of replacing them.
 - Take Radiance reference images through four optional `images.image_1` to `images.image_4` node inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
 - Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
 - Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
