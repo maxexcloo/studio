@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import { useId, useRef, useState, type PointerEvent } from "react";
 import {
   ActionIcon,
   Button,
@@ -17,24 +17,13 @@ import {
 } from "@mantine/core";
 import { ChevronDown, ChevronUp, Download, Ellipsis, SlidersHorizontal } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { notifications } from "@mantine/notifications";
-import { failure, post } from "../../api";
+import { post } from "../../api";
 import type { MediaItem } from "../../types";
-import { copyText } from "../../ui/clipboard";
 import { useMotionDuration } from "../../ui/Appearance";
 import { useMediaAction } from "./useMediaAction";
-import { ReferenceMediaAction } from "./ReferenceMediaAction";
-import { mediaDownload } from "./download";
-import { useMediaFavorite } from "./useMediaFavorite";
+import { MediaActionItems } from "./MediaActions";
 import { UpscaleControls } from "./UpscaleControls";
-import {
-  canCopyMediaImage,
-  canShareMedia,
-  copyMediaImage,
-  prepareMediaShare,
-  sharePreparedMedia,
-  useShareWithoutSettings,
-} from "./mediaShare";
+import { useMediaTransfer, useShareWithoutSettings } from "./mediaShare";
 import classes from "./MediaViewer.module.css";
 import { usePhone } from "../../ui/usePhone";
 
@@ -69,80 +58,11 @@ export function MediaDetails({
   const phone = usePhone();
   const motionDuration = useMotionDuration();
   const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
-  const download = mediaDownload(item, withoutSettings);
-  const transferKey = `${download.href}
-${download.download}`;
-  const [preparedShare, setPreparedShare] = useState<{ key: string; file: File } | null>(null);
-  const shareFile = preparedShare?.key === transferKey ? preparedShare.file : null;
-  const preparation = useRef<AbortController | null>(null);
-  const [preparingShare, setPreparingShare] = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const shareSupported = canShareMedia(item.type);
-  useEffect(() => {
-    preparation.current?.abort();
-    const controller = new AbortController();
-    preparation.current = controller;
-    setPreparedShare(null);
-    setPreparingShare(false);
-    if (phone && item.type === "image" && shareSupported && download.href) {
-      setPreparingShare(true);
-      void prepareMediaShare(download, controller.signal)
-        .then((file) => {
-          if (!controller.signal.aborted) setPreparedShare({ key: transferKey, file });
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (!controller.signal.aborted) setPreparingShare(false);
-        });
-    }
-    return () => preparation.current?.abort();
-  }, [transferKey, item.type, phone, shareSupported]);
-  async function share() {
-    if (!shareFile) {
-      setPreparingShare(true);
-      const controller = preparation.current || new AbortController();
-      preparation.current = controller;
-      try {
-        const file = await prepareMediaShare(download, controller.signal);
-        if (!controller.signal.aborted) setPreparedShare({ key: transferKey, file });
-      } catch (error) {
-        if (!controller.signal.aborted) failure(error);
-      } finally {
-        if (!controller.signal.aborted) setPreparingShare(false);
-      }
-      return;
-    }
-    setSharing(true);
-    try {
-      const result = await sharePreparedMedia(shareFile, download);
-      if (result === "downloaded")
-        notifications.show({ message: "Sharing is unavailable. Download started." });
-    } catch (error) {
-      failure(error);
-    } finally {
-      setSharing(false);
-    }
-  }
-  async function copyImage() {
-    setCopying(true);
-    try {
-      const result = await copyMediaImage(download, withoutSettings);
-      notifications.show({
-        message: result === "copied" ? "Image copied" : "Clipboard unavailable. Download started.",
-      });
-    } catch (error) {
-      failure(error);
-    } finally {
-      setCopying(false);
-    }
-  }
-
+  const transfer = useMediaTransfer(item, true);
   const [details, setDetails] = useState(false);
   const detailsId = useId();
   const swipe = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const action = useMediaAction(item, sessionId, onAction);
-  const favorite = useMediaFavorite(item);
   const cache = useQueryClient();
   const version = useMutation({
     mutationFn: (body: { galleryItemId: string; active: boolean }) =>
@@ -266,7 +186,7 @@ ${download.download}`;
               <Tooltip label="Download">
                 <ActionIcon
                   component="a"
-                  {...download}
+                  {...transfer.download}
                   aria-label="Download"
                   variant="default"
                   size={36}
@@ -303,35 +223,16 @@ ${download.download}`;
               </ActionIcon>
             </Menu.Target>
             <Menu.Dropdown>
-              {item.url && item.type === "image" && canCopyMediaImage() && (
-                <Menu.Item h={36} disabled={copying} onClick={() => void copyImage()}>
-                  Copy Image
-                </Menu.Item>
-              )}
-              {item.url && phone && shareSupported && (
-                <Menu.Item h={36} disabled={preparingShare || sharing} onClick={() => void share()}>
-                  {shareFile ? "Share" : "Prepare Share"}
-                </Menu.Item>
-              )}
-              <Menu.Item h={36} onClick={() => void copyText(item.prompt || "", "Prompt")}>
-                Copy Prompt
-              </Menu.Item>
-              <ReferenceMediaAction item={item} onApplied={onAction} />
-              <Menu.Item h={36} disabled={action.isPending} onClick={() => action.mutate("image")}>
-                Recreate
-              </Menu.Item>
-              <Menu.Item h={36} disabled={favorite.isPending} onClick={() => favorite.mutate()}>
-                {item.favorite ? "Unstar" : "Star"}
-              </Menu.Item>
-              {item.type === "image" && item.upscale?.url && !item.upscale.withRun && (
-                <Menu.Item h={36} onClick={onCompare}>
-                  {compare ? "Close Comparison" : "Compare"}
-                </Menu.Item>
-              )}
-              <Menu.Divider />
-              <Menu.Item h={36} color="red" onClick={onDelete}>
-                Delete
-              </Menu.Item>
+              <MediaActionItems
+                item={item}
+                transfer={transfer}
+                sessionId={sessionId}
+                omit={["refine", "animate", "upscale", "download"]}
+                compare={compare}
+                onApplied={onAction}
+                onCompare={onCompare}
+                onDelete={onDelete}
+              />
             </Menu.Dropdown>
           </Menu>
           <Popover position="top-end" width={280} trapFocus>

@@ -166,7 +166,15 @@ export function GalleryPage() {
           }}
           selection={selection}
           renderActions={(item, opened, onOpenedChange) => (
-            <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />
+            <MediaTileActions
+              item={item}
+              opened={opened}
+              onOpenedChange={onOpenedChange}
+              onSelect={() => {
+                selection.start();
+                selection.toggle(item);
+              }}
+            />
           )}
         />
       ) : (
