@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, section } from "./fixtures";
+import { fixtures, image, section, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -53,4 +53,29 @@ test("Settings follow the settled section order and run maintenance and worker r
   const before = statusReads;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect.poll(() => statusReads).toBeGreaterThan(before);
+});
+
+test("Tile Captions in Settings › Studio pin phone tile captions", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Desktop shows captions on hover.");
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "captioned",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A quiet harbour, dawn light",
+    createdAt: stamp,
+  });
+  await page.goto("/images");
+  const caption = page.getByText("A quiet harbour", { exact: true });
+  await expect(
+    page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }),
+  ).toBeVisible();
+  await expect(caption).toHaveCount(0);
+  await page.goto("/settings#studio");
+  // The unlabelled track sits over the input; the row's accessible name is on the input.
+  await page.getByRole("switch", { name: "Tile Captions", exact: true }).check({ force: true });
+  await page.getByRole("button", { name: "Close Settings", exact: true }).click();
+  await expect(caption).toBeVisible();
 });
