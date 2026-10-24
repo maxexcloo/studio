@@ -98,4 +98,4 @@ Single-user development and access from another device use the options described
 
 ## Updating & Rollback
 
-Follow [Container Operations](DOCKER.md#updating--rollback). Back up and rehearse migration and restoration before cutover. Reverting an image alone does not restore SQLite metadata; stop Studio and restore the matching protected metadata backup with its media. Keep the previous deployment until the rewritten workflows and existing result links are verified.
+Follow [Container Operations](DOCKER.md#updating--rollback).
