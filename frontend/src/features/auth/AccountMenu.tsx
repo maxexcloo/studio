@@ -7,11 +7,9 @@ import { api, failure, post } from "../../api";
 import { useAccess, useAccount } from "./AccountGate";
 
 export function AccountMenuContent({
-  onNavigate,
   accountFirst = false,
   children,
 }: {
-  onNavigate?: () => void;
   accountFirst?: boolean;
   children?: ReactNode;
 }) {
@@ -39,49 +37,29 @@ export function AccountMenuContent({
       ? "Studio User"
       : "Single-User Development";
   const canSignOut = multi || (access.data?.signedIn && access.data.thisComputer === false);
+  const label = <Menu.Label>{name}</Menu.Label>;
   return (
     <>
-      {!accountFirst && (
-        <Menu.Item
-          component={Link}
-          to="/settings#account"
-          state={{ backgroundLocation: location }}
-          onClick={onNavigate}
-        >
-          {name}
-        </Menu.Item>
-      )}
+      {!accountFirst && label}
       <Menu.Item
         component={Link}
         to="/settings#account"
         state={{ backgroundLocation: location }}
         leftSection={<UserRound size={16} />}
-        onClick={onNavigate}
       >
         Account
       </Menu.Item>
       {children}
       {(canSignOut || accountFirst) && <Menu.Divider />}
-      {accountFirst && (
-        <Menu.Item
-          component={Link}
-          to="/settings#account"
-          state={{ backgroundLocation: location }}
-          onClick={onNavigate}
-        >
-          {name}
-        </Menu.Item>
-      )}
+      {accountFirst && label}
       {canSignOut && (
-        <>
-          <Menu.Item
-            leftSection={<LogOut size={16} />}
-            disabled={signOut.isPending}
-            onClick={() => signOut.mutate()}
-          >
-            Sign Out
-          </Menu.Item>
-        </>
+        <Menu.Item
+          leftSection={<LogOut size={16} />}
+          disabled={signOut.isPending}
+          onClick={() => signOut.mutate()}
+        >
+          Sign Out
+        </Menu.Item>
       )}
     </>
   );

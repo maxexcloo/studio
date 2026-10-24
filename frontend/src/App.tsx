@@ -1,16 +1,13 @@
-import { ActionIcon, AppShell, Group, Modal, Title, Tooltip } from "@mantine/core";
+import { AppShell, Modal } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Library, Settings } from "lucide-react";
 import { AccountGate } from "./features/auth/AccountGate";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
 import { ChatProvider } from "./features/sessions/ChatProvider";
-import { AppearanceMenu, useAppearance } from "./ui/Appearance";
-import { ServiceStatus, RuntimeStatusAction, ModeSwitcher } from "./ui/ServiceStatus";
-import { HeaderOptions } from "./ui/HeaderOptions";
-import { AccountMenu } from "./features/auth/AccountMenu";
+import { useAppearance } from "./ui/Appearance";
+import { AppHeader } from "./features/shell/AppHeader";
 import { ChatWorkspace } from "./features/sessions/ChatWorkspace";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
@@ -25,10 +22,6 @@ const LibraryPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("./features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
-const navigation = [
-  { to: "/library", label: "Library", icon: Library },
-  { to: "/settings", label: "Settings", icon: Settings },
-];
 function Workspace() {
   const { appearance } = useAppearance();
   const library = useLibraryAccess();
@@ -51,14 +44,8 @@ function Workspace() {
     hash: "",
   };
   const panel = overlay || lastPanel;
-  const chatRoute = (overlay ? background.pathname : location.pathname).startsWith("/chat");
-  const modeLocation = overlay ? background : location;
-
-  const active = (to: string) =>
-    (to === "/library" || to === "/settings"
-      ? location.pathname
-      : modeLocation.pathname
-    ).startsWith(to);
+  const mode = (overlay ? background : location).pathname;
+  const chatRoute = mode.startsWith("/chat");
   if (location.pathname === "/library" && !library.pending && !library.allowed)
     return <Navigate to="/images" replace />;
   return (
@@ -66,55 +53,7 @@ function Workspace() {
       <ChatProvider>
         <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
           <AppShell.Header>
-            <Group
-              h="100%"
-              px={{ base: "sm", sm: "lg" }}
-              gap="xs"
-              justify="space-between"
-              wrap="nowrap"
-              w="100%"
-              mx="auto"
-              maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
-            >
-              <Group gap="xs" wrap="nowrap">
-                <ServiceStatus
-                  chat={chatRoute}
-                  kind={modeLocation.pathname === "/video" ? "video" : "image"}
-                />
-                <Link to="/images" className="studio-home-link" style={{ textDecoration: "none" }}>
-                  <Title className="studio-logo" order={2}>
-                    Studio<span style={{ color: "var(--mantine-primary-color-filled)" }}>.</span>
-                  </Title>
-                </Link>
-              </Group>
-              <ModeSwitcher active={active} />
-              <Group gap="xs" visibleFrom="sm">
-                <RuntimeStatusAction />
-                {navigation
-                  .filter((item) => item.to !== "/library" || library.allowed)
-                  .map((item) => (
-                    <Tooltip key={item.to} label={item.label}>
-                      <ActionIcon
-                        component={Link}
-                        to={item.to}
-                        state={{ backgroundLocation: location }}
-                        variant={active(item.to) ? "light" : "subtle"}
-                        color={active(item.to) ? undefined : "gray"}
-                        aria-label={item.label}
-                        size="lg"
-                        radius="xl"
-                      >
-                        <item.icon size={19} />
-                      </ActionIcon>
-                    </Tooltip>
-                  ))}
-                <AppearanceMenu />
-                <AccountMenu />
-              </Group>
-              <Group hiddenFrom="sm">
-                <HeaderOptions />
-              </Group>
-            </Group>
+            <AppHeader chat={chatRoute} mode={mode} />
           </AppShell.Header>
           <AppShell.Main className={chatRoute ? "studio-chat-shell" : undefined}>
             <div

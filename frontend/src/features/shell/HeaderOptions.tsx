@@ -1,10 +1,10 @@
 import { forwardRef, useState } from "react";
 import { ActionIcon, Menu, Popover } from "@mantine/core";
-import { Library, MoreHorizontal, Settings } from "lucide-react";
+import { Library, MoreHorizontal, Palette, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { AccountMenuContent } from "../features/auth/AccountMenu";
-import { AppearanceControls } from "./Appearance";
-import { useLibraryAccess } from "../features/library/useLibraryAccess";
+import { AppearanceControls } from "../../ui/Appearance";
+import { AccountMenuContent } from "../auth/AccountMenu";
+import { useLibraryAccess } from "../library/useLibraryAccess";
 
 // The outer popover and inner menu each retain a ref to the same DOM anchor.
 const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(function OptionsTarget(
@@ -42,6 +42,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
             Settings
           </Menu.Item>
           <Menu.Item
+            leftSection={<Palette size={18} />}
             onClick={() => {
               setOpened(false);
               onStyle();
