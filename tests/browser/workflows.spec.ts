@@ -418,7 +418,8 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   if (testInfo.project.use.isMobile)
     await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  await expect(page.getByRole("link", { name: /An amber bird/ }).first()).toBeVisible();
+  // The Chat stays New Chat until the text model titles it.
+  await expect(page.getByRole("link", { name: /New Chat/ }).first()).toBeVisible();
 });
 
 test("Generation controls preserve the draft and return keyboard focus with reduced motion", async ({
