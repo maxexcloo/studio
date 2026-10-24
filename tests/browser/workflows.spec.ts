@@ -534,7 +534,7 @@ test("Waiting jobs show their reason and cancellation is scoped to the recorded 
   await expect(page.getByText("Waiting for Media Worker to become available.")).toBeVisible();
   await page.getByRole("button", { name: "Cancel Waiting bird", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await expect(page.getByText("Generation Cancelled", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
 });
 
 test("Administrator accounts retain worker visibility and attribution", async ({ page }) => {
