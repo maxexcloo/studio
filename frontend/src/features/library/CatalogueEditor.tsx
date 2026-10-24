@@ -14,13 +14,13 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useMediaQuery } from "@mantine/hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { libraryItemCategory, type LibraryItem } from "./LibraryCatalogueTable";
+import { usePhone } from "../../ui/usePhone";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;
   role?: string;
@@ -231,10 +231,10 @@ function CatalogueForm({
 }
 export function CatalogueEditor({ items, close }: { items: LibraryItem[]; close: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const item = items.find((entry) => entry.key === selected);
   return (
-    <Modal opened onClose={close} title="Edit Catalogue" size="lg" fullScreen={narrow}>
+    <Modal opened onClose={close} title="Edit Catalogue" size="lg" fullScreen={phone}>
       <Stack>
         <Select
           label="Catalogue Resource"

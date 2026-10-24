@@ -13,7 +13,6 @@ import {
   Textarea,
   Tooltip,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
 import { useIsMutating } from "@tanstack/react-query";
 import { ArrowUp } from "lucide-react";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
@@ -29,6 +28,7 @@ import { ReferencePicker } from "./ReferencePicker";
 import { ReferenceRoleControl } from "./ReferenceRoleControl";
 import { referenceLabel } from "./references";
 import { useReferenceBrowser } from "./useReferenceBrowser";
+import { usePhone } from "../../ui/usePhone";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
 /** The one submit label and blocked reason shared by every generation editor. */
@@ -148,7 +148,7 @@ export function GenerationEditor({
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const { label, blockedReason, requiredReference } = useSubmitState({
     input,
     profile,
@@ -187,9 +187,9 @@ export function GenerationEditor({
     />
   );
   const inlinePanel =
-    narrow && loraPicker.opened ? (
+    phone && loraPicker.opened ? (
       <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
-    ) : narrow && referenceOpen ? (
+    ) : phone && referenceOpen ? (
       referencePicker(true)
     ) : null;
   return (

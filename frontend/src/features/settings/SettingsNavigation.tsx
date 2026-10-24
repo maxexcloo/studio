@@ -1,5 +1,5 @@
 import { Info, Server, UserRound, UsersRound } from "lucide-react";
-import { useAccount } from "../auth/AccountGate";
+import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 
 const settingSections = {
@@ -24,11 +24,11 @@ const settingSections = {
   about: { label: "About", description: "Credits and licences.", icon: Info },
 };
 export function useSettingsNavigation() {
-  const account = useAccount();
-  const multi = account.data?.mode === "multi-user";
-  const admin = !multi || account.data?.account?.role === "administrator";
+  const multi = useAccount().data?.mode === "multi-user";
+  const admin = useIsAdmin();
   return {
-    account,
+    admin,
+    multi,
     options: visibleSections(settingSections, admin, (key) => key !== "accounts" || multi),
   };
 }

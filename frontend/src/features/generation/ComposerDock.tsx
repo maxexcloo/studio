@@ -1,11 +1,12 @@
 import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Transition, Drawer, Paper, ScrollArea, type ScrollAreaProps } from "@mantine/core";
-import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
+import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { failure } from "../../api";
+import { usePhone } from "../../ui/usePhone";
 function GenerationScrollArea(props: ScrollAreaProps) {
   return (
     <ScrollArea
@@ -21,7 +22,7 @@ const composerLayers =
 export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const [opened, { open, close }] = useDisclosure(!chat && params.get("compose") === "1");
-  const narrow = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const motionDuration = useMotionDuration();
   const dock = useRef<HTMLDivElement>(null);
   const returningFocus = useRef(false);
@@ -108,11 +109,11 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     },
     ["mousedown", "touchstart"],
     undefined,
-    !chat && !narrow && opened,
+    !chat && !phone && opened,
   );
   const dockRef = useMergedRef(dock, outside);
   useEffect(() => {
-    if (narrow) return;
+    if (phone) return;
     const frame = requestAnimationFrame(() => {
       if (opened)
         dock.current
@@ -121,13 +122,13 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
       else focusCompact();
     });
     return () => cancelAnimationFrame(frame);
-  }, [opened, narrow]);
+  }, [opened, phone]);
   return (
     <>
       <div
         ref={dockRef}
         className="studio-composer-dock"
-        hidden={!chat && narrow && opened}
+        hidden={!chat && phone && opened}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
         onDragOver={dragReferences}
@@ -136,7 +137,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         }}
         onDrop={dropReferences}
         onBlurCapture={(event) => {
-          if (chat || narrow || !opened) return;
+          if (chat || phone || !opened) return;
           const next = event.relatedTarget;
           const keyboardDeparture = tabbing.current;
           tabbing.current = false;
@@ -165,7 +166,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             return;
           }
           if (
-            !narrow &&
+            !phone &&
             opened &&
             event.key === "Escape" &&
             !event.defaultPrevented &&
@@ -203,7 +204,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             {chat || <GenerationForm compact />}
           </Paper>
         )}
-        {!chat && !narrow && (
+        {!chat && !phone && (
           <Transition
             mounted={opened}
             transition="slide-up"
@@ -233,7 +234,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           </Transition>
         )}
       </div>
-      {!chat && narrow && (
+      {!chat && phone && (
         <Drawer
           onPaste={pasteReferences}
           onDragOver={dragReferences}

@@ -14,7 +14,6 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { useMediaQuery } from "@mantine/hooks";
 import { ArrowLeft } from "lucide-react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
@@ -25,6 +24,7 @@ import { copyText } from "../../ui/clipboard";
 import { api, failure } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
+import { usePhone } from "../../ui/usePhone";
 interface LoraInfo {
   title?: string;
   sourceUrl?: string;
@@ -76,7 +76,7 @@ interface LoraPickerProps {
 export function LoraPicker({ value, onChange, picker, inline = false }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const close = () => picker.setOpened(false);
   const controls = (
     <LoraControls
@@ -148,7 +148,7 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
   );
   if (inline) return content;
   // Phones show the controls inline in place of the form (see GenerationEditor).
-  if (narrow) return trigger;
+  if (phone) return trigger;
   return (
     <Popover
       opened={picker.opened}

@@ -1,5 +1,4 @@
 import { AppShell, Modal } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AccountGate } from "./features/auth/AccountGate";
@@ -13,6 +12,7 @@ import { LibraryTitle } from "./features/library/LibraryNavigation";
 import { useLibraryAccess } from "./features/library/useLibraryAccess";
 import { LoadingState } from "./ui/LoadingState";
 import { SettingsTitle } from "./features/settings/SettingsNavigation";
+import { usePhone } from "./ui/usePhone";
 const ChatPage = lazy(() =>
   import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
 );
@@ -27,7 +27,7 @@ function Workspace() {
   const library = useLibraryAccess();
   const location = useLocation();
   const navigate = useNavigate();
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const overlay =
     location.pathname === "/library"
       ? "library"
@@ -93,7 +93,7 @@ function Workspace() {
             }
             aria-label={panel === "library" ? "Library" : "Settings"}
             title={
-              narrow ? (
+              phone ? (
                 <>{panel === "library" ? <LibraryTitle /> : <SettingsTitle />}</>
               ) : panel === "library" ? (
                 "Library"
@@ -107,7 +107,7 @@ function Workspace() {
             size={1200}
             styles={{
               content: {
-                height: narrow ? "100dvh" : "min(90dvh, 960px)",
+                height: phone ? "100dvh" : "min(90dvh, 960px)",
                 display: "flex",
                 flexDirection: "column",
               },
@@ -115,7 +115,7 @@ function Workspace() {
               title: { fontSize: "var(--mantine-font-size-xl)", fontWeight: 600 },
               body: { flex: 1, minHeight: 0, overflowY: "auto" },
             }}
-            fullScreen={narrow}
+            fullScreen={phone}
           >
             <Suspense
               fallback={
