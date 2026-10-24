@@ -13,7 +13,8 @@ import type { useHoldToSelect } from "./useGalleryLayout";
 import classes from "./MediaTile.module.css";
 
 /** Saved, failed or cancelled; anything else is still generating. */
-export const finished = (item: MediaItem) => ["done", "error", "canceled"].includes(item.status);
+export const finished = (item: { status?: unknown }) =>
+  ["done", "error", "canceled"].includes(String(item.status));
 const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
 
 function useItemJob(item: MediaItem) {
@@ -53,7 +54,10 @@ function TileStatus({
     : active && job?.status === "waiting"
       ? job.reason
       : "";
-  const cancellable = active && job && !terminal.has(job.status);
+  // A multi-output run shows one Cancel, on its first unfinished placeholder.
+  const owner = job?.items.find((entry) => !finished(entry));
+  const cancellable =
+    active && job && !terminal.has(job.status) && (!owner || owner.id === item.id);
   const retryable = failed && job?.status === "failed" && onTryAgain;
   return (
     <>

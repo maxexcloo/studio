@@ -319,11 +319,18 @@ test("Running tiles show progress with Cancel and Try Again replaces a failed ti
     ...extra,
   });
   state.jobs.push(
-    job("live-job", "running", { progress: { value: 5, max: 10, phase: "Sampling" } }),
+    job("live-job", "running", {
+      progress: { value: 5, max: 10, phase: "Sampling" },
+      items: [
+        { id: "live", status: "pending" },
+        { id: "live-2", status: "pending" },
+      ],
+    }),
     job("failed-job", "failed", { reason: "The worker ran out of memory." }),
   );
   state.gallery.push(
     { ...results(1)[0], id: "live", jobId: "live-job", prompt: "Live study", status: "pending" },
+    { ...results(1)[0], id: "live-2", jobId: "live-job", prompt: "Live study", status: "pending" },
     {
       ...results(1)[0],
       id: "failed",
@@ -345,8 +352,10 @@ test("Running tiles show progress with Cancel and Try Again replaces a failed ti
     await route.fulfill({ json: { job: retried } });
   });
   await page.goto("/images");
-  await expect(page.getByText("Sampling · 50%", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);
   await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
+  // One Cancel for the two-output run.
+  await expect(page.getByRole("button", { name: "Cancel Live study", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "Cancel Live study", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await page.getByRole("button", { name: "Try Again: Failed study", exact: true }).click();
