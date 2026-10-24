@@ -6,8 +6,9 @@ import { StudioLogo } from "../../ui/StudioLogo";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useLibraryAccess } from "../library/useLibraryAccess";
 import { HeaderOptions } from "./HeaderOptions";
-import { RuntimeStatusAction, ServiceStatus } from "./ServiceStatus";
+import { StatusAction } from "./ServiceStatus";
 import { usePhone } from "../../ui/usePhone";
+import classes from "./AppHeader.module.css";
 
 const modes = [
   { to: "/chat", label: "Chat", icon: MessageCircle },
@@ -25,7 +26,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
       gap={2}
       component="nav"
       aria-label="Creative Modes"
-      className="studio-mode-tabs"
+      className={classes.modes}
       wrap="nowrap"
     >
       {modes.map((item) => {
@@ -56,6 +57,7 @@ function ModeSwitcher({ mode }: { mode: string }) {
 /** `mode` is the creative-mode path, which stays behind Library and Settings. */
 export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
   const { appearance } = useAppearance();
+  const phone = usePhone();
   const library = useLibraryAccess();
   const location = useLocation();
   return (
@@ -70,14 +72,13 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
       <Group gap="xs" wrap="nowrap">
-        <ServiceStatus chat={chat} kind={mode === "/video" ? "video" : "image"} />
-        <Link to="/images" className="studio-home-link" style={{ textDecoration: "none" }}>
-          <StudioLogo order={2} />
+        <StatusAction chat={chat} />
+        <Link to="/images" replace={mode === "/images"} className={classes.home}>
+          <StudioLogo order={phone ? 3 : 2} />
         </Link>
       </Group>
       <ModeSwitcher mode={mode} />
       <Group gap="xs" visibleFrom="sm">
-        <RuntimeStatusAction />
         {navigation
           .filter((item) => item.to !== "/library" || library.allowed)
           .map((item) => {
@@ -91,8 +92,6 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
                   variant={active ? "light" : "subtle"}
                   color={active ? undefined : "gray"}
                   aria-label={item.label}
-                  size="lg"
-                  radius="xl"
                 >
                   <item.icon size={19} />
                 </ActionIcon>

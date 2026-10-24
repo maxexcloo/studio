@@ -1,0 +1,20 @@
+.content {
+  display: flex;
+  flex-direction: column;
+}
+/* The list scrolls while the service summary stays at the safe bottom edge. */
+.body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+}
+.list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--mantine-spacing-md);
+}

@@ -1,6 +1,6 @@
 import { Alert, Anchor, Badge, Group, Select, Stack, Text } from "@mantine/core";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { CircleDot } from "lucide-react";
 import type {
   ServiceEndpoint,
@@ -9,6 +9,7 @@ import type {
   ServicesStatus,
 } from "../../../../shared/services";
 import { api } from "../../api";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 
 const services = [
@@ -16,61 +17,68 @@ const services = [
   { kind: "image", label: "Images" },
   { kind: "video", label: "Videos" },
 ] as const;
-export const healthColour = (state: ServiceHealth) =>
+const healthColour = (state: ServiceHealth) =>
   state === "healthy" ? "green" : state === "offline" ? "red" : "yellow";
 const healthLabel = (state: ServiceHealth) =>
   ({ healthy: "Healthy", offline: "Offline", unknown: "Unknown", waiting: "Waiting" })[state];
-export function useServicesStatus() {
-  return useQuery({
-    queryKey: ["services-status"],
-    queryFn: () => api<ServicesStatus>("/api/services/status"),
-    refetchInterval: 15000,
-  });
-}
-export function summaryHealth(data?: ServicesStatus): ServiceHealth {
+export const servicesStatusQuery = queryOptions({
+  queryKey: ["services-status"],
+  queryFn: () => api<ServicesStatus>("/api/services/status"),
+  refetchInterval: 15000,
+});
+/** Header summary: partial readiness is yellow and nothing is green until it is observed. */
+export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) {
   const states = Object.values(data?.services || {}).map((service) => service.state);
-  if (states.length === services.length && states.every((state) => state === "healthy"))
-    return "healthy";
-  return states.length && states.every((state) => state === "offline") ? "offline" : "unknown";
+  if (error) return { colour: "yellow", label: "Service Status Unavailable" };
+  if (!states.length) return { colour: "gray", label: "Checking Services" };
+  if (states.every((state) => state === "healthy"))
+    return { colour: "green", label: "Services Healthy" };
+  if (states.every((state) => state === "offline"))
+    return { colour: "red", label: "Services Offline" };
+  return { colour: "yellow", label: "Services Partly Available" };
 }
 export function ServiceHealthSummary() {
-  const status = useServicesStatus();
-  if (status.isPending) return <LoadingState label="Checking Services" fill />;
+  const status = useQuery(servicesStatusQuery);
   if (status.error)
     return (
       <Text size="xs" c="red">
         {status.error.message}
       </Text>
     );
+  const available = services.filter(({ kind }) => status.data?.services[kind]);
   return (
     <Stack gap={6} component="section" aria-label="Service Status">
-      {services
-        .filter(({ kind }) => status.data.services[kind])
-        .map(({ kind, label }) => {
-          const service = status.data.services[kind]!;
-          return (
-            <Group
-              key={kind}
-              justify="space-between"
-              gap="xs"
-              aria-label={`${label}: ${healthLabel(service.state)}`}
-            >
-              <Group gap={6}>
-                <CircleDot
-                  size={12}
-                  color={`var(--mantine-color-${healthColour(service.state)}-6)`}
-                />
-                <Text size="xs">{label}</Text>
-              </Group>
-              <Text size="xs" c="dimmed">
-                {healthLabel(service.state)}
-              </Text>
-            </Group>
-          );
-        })}
-      {!Object.keys(status.data.services).length && (
+      {status.isPending && (
         <Text size="xs" c="dimmed">
-          No services are available for this account.
+          Checking Services
+        </Text>
+      )}
+      {available.map(({ kind, label }) => {
+        const service = status.data!.services[kind]!;
+        return (
+          <Group
+            key={kind}
+            justify="space-between"
+            gap="xs"
+            wrap="nowrap"
+            aria-label={`${label}: ${healthLabel(service.state)}`}
+          >
+            <Group gap={6} wrap="nowrap">
+              <CircleDot
+                size={12}
+                color={`var(--mantine-color-${healthColour(service.state)}-6)`}
+              />
+              <Text size="xs">{label}</Text>
+            </Group>
+            <Text size="xs" c="dimmed">
+              {healthLabel(service.state)}
+            </Text>
+          </Group>
+        );
+      })}
+      {status.data && !available.length && (
+        <Text size="xs" c="dimmed">
+          No Services
         </Text>
       )}
     </Stack>
@@ -126,50 +134,71 @@ function EndpointDetails({ endpoint }: { endpoint: ServiceEndpoint }) {
     </Stack>
   );
 }
+// Several text workloads may share a display label; the workload ID tells them apart.
+const endpointLabel = (endpoint: ServiceEndpoint, endpoints: ServiceEndpoint[]) =>
+  endpoints.filter((other) => other.label === endpoint.label).length > 1
+    ? `${endpoint.label} · ${endpoint.id}`
+    : endpoint.label;
 function ServiceEndpointRow({ label, service }: { label: string; service: ServiceStatus }) {
   const [selection, setSelection] = useState<string | null>(null);
   const endpoint =
-    service.endpoints.find((endpoint) => endpoint.id === selection) || service.endpoints[0];
-  const state = endpoint?.state || "unknown";
+    service.endpoints.find((endpoint) => endpoint.id === selection) ||
+    service.endpoints.find((endpoint) => endpoint.state === service.state) ||
+    service.endpoints[0];
   return (
-    <Stack gap="xs">
-      <Group gap="sm" align="end" wrap="nowrap">
-        <Select
-          label={label}
-          aria-label={`${label} Endpoint`}
-          placeholder="Unknown"
-          disabled={!service.endpoints.length}
-          data={service.endpoints.map((endpoint) => ({
-            value: endpoint.id,
-            label: endpoint.label,
-          }))}
-          value={endpoint?.id || null}
-          onChange={setSelection}
-          allowDeselect={false}
-          comboboxProps={{ withinPortal: false }}
-          style={{ flex: 1, minWidth: 0 }}
-        />
-        <Badge variant="light" color={healthColour(state)} mb={8}>
-          {healthLabel(state)}
+    <Stack gap="xs" component="section" aria-label={label}>
+      <Group gap="xs" justify="space-between">
+        <Text fw={600}>{label}</Text>
+        <Badge variant="light" color={healthColour(service.state)}>
+          {healthLabel(service.state)}
         </Badge>
       </Group>
-      {endpoint ? (
-        <EndpointDetails endpoint={endpoint} />
-      ) : (
-        <Text size="xs" c="dimmed">
-          {service.reason}
-        </Text>
+      <Text size="xs" c="dimmed">
+        {service.reason}
+      </Text>
+      {endpoint && (
+        <>
+          <Select
+            aria-label={`${label} Endpoint`}
+            data={service.endpoints.map((option) => ({
+              value: option.id,
+              label: endpointLabel(option, service.endpoints),
+            }))}
+            value={endpoint.id}
+            onChange={setSelection}
+            allowDeselect={false}
+            leftSection={
+              <CircleDot
+                size={12}
+                color={`var(--mantine-color-${healthColour(endpoint.state)}-6)`}
+              />
+            }
+            renderOption={({ option }) => {
+              const state = service.endpoints.find((item) => item.id === option.value)!.state;
+              return (
+                <Group gap="xs" wrap="nowrap">
+                  <CircleDot size={12} color={`var(--mantine-color-${healthColour(state)}-6)`} />
+                  <Text size="sm">{option.label}</Text>
+                  <Text size="xs" c="dimmed" ml="auto">
+                    {healthLabel(state)}
+                  </Text>
+                </Group>
+              );
+            }}
+          />
+          <EndpointDetails endpoint={endpoint} />
+        </>
       )}
     </Stack>
   );
 }
-export function RuntimePanel({ compact = false }: { compact?: boolean }) {
-  const status = useServicesStatus();
-  if (status.isPending) return <LoadingState label="Loading Runtime" fill={compact} />;
+export function RuntimePanel() {
+  const status = useQuery(servicesStatusQuery);
+  if (status.isPending) return <LoadingState label="Loading Workers" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
   const available = services.filter(({ kind }) => status.data.services[kind]);
   return (
-    <Stack gap={compact ? "sm" : "md"} aria-label="Runtime">
+    <Stack gap="lg" aria-label="Runtime">
       <Group gap="xs">
         <Badge color="gray" variant="light">
           {status.data.runtime.configured ? "Runtime Configured" : "Observe Only"}
@@ -184,11 +213,7 @@ export function RuntimePanel({ compact = false }: { compact?: boolean }) {
       {available.map(({ kind, label }) => (
         <ServiceEndpointRow key={kind} label={label} service={status.data.services[kind]!} />
       ))}
-      {!available.length && (
-        <Text size="sm" c="dimmed">
-          No services are available for this account.
-        </Text>
-      )}
+      {!available.length && <EmptyState>No Services</EmptyState>}
     </Stack>
   );
 }
