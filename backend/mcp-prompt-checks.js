@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// Checks Generate applies to prompt text: a full-body person gets face detail, and an exact prompt must not carry instructions.
+// Checks Generate applies to prompt text: a full-body person gets face detail, and exact prompts must not carry instructions.
 import { maxJobsPerCall } from "./mcp-media.js";
 
 const numberWords = {
@@ -46,8 +46,8 @@ const instructionPatterns = [
  * The refusal for an exact prompt that holds generation instructions, or '' when it reads as a finished prompt.
  * Refusing, rather than rewriting, keeps the caller's prompt exactly what runs.
  */
-export function exactPromptInstructions(request) {
-  const text = String(request || "");
+export function exactPromptInstructions(prompt) {
+  const text = String(prompt || "");
   let found = null;
   for (const pattern of instructionPatterns) {
     const match = pattern.exec(text);
@@ -62,5 +62,5 @@ export function exactPromptInstructions(request) {
   const count = found[1] ? numberOf(found[1]) : 0;
   const quoted = found[0].trim().replace(/\s+/g, " ");
   const counted = count ? `count: ${count}` : "count (the number of images)";
-  return `exact_prompt is for a finished prompt only, and this request holds instructions ("${quoted}"). Call Generate again with ${counted} (1–${maxJobsPerCall} per call) and request set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or leave exact_prompt off so Studio writes from your words.`;
+  return `prompts run verbatim, and this one holds instructions ("${quoted}"). Call Generate again with ${counted} (1–${maxJobsPerCall} per call) and prompts set to just the plain prompt, without the instructions${count ? "" : " or a number of images"}; or pass the user's words as request so Studio writes the prompts.`;
 }

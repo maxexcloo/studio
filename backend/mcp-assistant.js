@@ -129,7 +129,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     server,
     "RewritePrompt",
     "Rewrite Prompt",
-    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; Spicy needs NSFW access), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate as prompts with exact_prompt.`,
+    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; Spicy needs NSFW access), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
     {
       prompt,
       profile_id: profileId,

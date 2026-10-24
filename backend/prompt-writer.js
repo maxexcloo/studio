@@ -59,7 +59,24 @@ export function parseWrittenPrompts(content, count) {
   return Array.from({ length: count }, (_, index) => prompts[index % prompts.length]);
 }
 
-function instructions({ profile, guide, count, references, role }) {
+/** Up to three concept suggestions from a reply's JSON "suggestions", or none. */
+export function parseSuggestions(content) {
+  try {
+    const json = /\{[\s\S]*\}/.exec(stripThinking(content))?.[0];
+    const list = json ? JSON.parse(json).suggestions : null;
+    return Array.isArray(list)
+      ? list
+          .filter((item) => typeof item === "string")
+          .map((item) => clean(item).slice(0, 200))
+          .filter(Boolean)
+          .slice(0, 3)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function instructions({ profile, guide, count, references, role, suggest }) {
   const label = profile.label || profile.id;
   const media = profile.kind === "video" ? "video" : "image";
   const lines = [
@@ -76,13 +93,17 @@ function instructions({ profile, guide, count, references, role }) {
         ? "The supplied image is the first frame: describe the motion, action and camera from that frame without re-describing what is already visible."
         : `${references} reference image${references > 1 ? "s are" : " is"} supplied${role ? ` as ${role}` : ""}; follow the guide's editing advice.`
       : "",
+    suggest
+      ? 'Also add "suggestions": 2 or 3 one-sentence ideas that would improve the concept; they are shown to the user, not put in the prompts.'
+      : "",
     `Prompting guide: ${guide || "(none; write a clear, specific natural-language prompt)"}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
 
 /**
- * A prompt writer, or null when prompt writing is off. write() returns { prompts, source, ms }:
+ * A prompt writer, or null when prompt writing is off. write() returns { prompts, source, ms }, with
+ * `suggestions` for the concept when asked (`suggest`):
  * source "studio" for written prompts, "request" when it fell back to the given prompts.
  * Generate keeps the prompt writer's own model (STUDIO_PROMPT_WRITER_MODEL), a fast one.
  * A chat waits on it before anything queues, so a slow gateway falls back to the request itself after 15 s.
@@ -104,6 +125,7 @@ export function createPromptWriter(
       count = 1,
       references = 0,
       role = "",
+      suggest = false,
       fallback,
       signal,
     }) {
@@ -125,12 +147,13 @@ export function createPromptWriter(
                 count,
                 references,
                 role,
+                suggest,
               }),
             },
             { role: "user", content: user },
           ],
           temperature: 0.7,
-          maxTokens: 400 * count + 200,
+          maxTokens: 400 * count + (suggest ? 350 : 200),
           signal,
         });
         const prompts = parseWrittenPrompts(reply.text, count);
@@ -138,7 +161,12 @@ export function createPromptWriter(
           log.info?.(
             `MCP prompt writer: ${count} prompt${count > 1 ? "s" : ""} for ${profile.id} in ${Date.now() - started} ms`,
           );
-          return { prompts, source: "studio", ms: Date.now() - started };
+          return {
+            prompts,
+            source: "studio",
+            ms: Date.now() - started,
+            ...(suggest ? { suggestions: parseSuggestions(reply.text) } : {}),
+          };
         }
         reason = "unusable reply";
       } catch (error) {

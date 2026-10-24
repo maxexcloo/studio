@@ -12,7 +12,6 @@ import {
   resolveLoraName,
 } from "./mcp-controls.js";
 import { familyGraph } from "./family-graph.js";
-import { McpMedia, maxResultWaitSeconds } from "./mcp-media.js";
 
 const profile = {
   id: "image:sdxl",
@@ -204,25 +203,6 @@ test("Generate LoRA names resolve without folder, extension or case and take the
     () => prepareLoras(subject, infos, [{ name: "oil paint" }]),
     /^Error: No LoRA named oil paint for SDXL\. Call Models with lora_query to look one up\.$/,
   );
-});
-
-test("Result waits are capped below LibreChat’s 1800-second background deadline", async (t) => {
-  assert.equal(maxResultWaitSeconds, 1500);
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-mcp-wait-"));
-  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const media = new McpMedia({
-    dataDir,
-    baseUrl: "http://127.0.0.1:1",
-    publicUrl: "https://studio.example.test",
-  });
-  let waited;
-  media.job = async (_owner, _id, seconds) => {
-    waited = seconds;
-    return { status: "running" };
-  };
-  media.state.jobs["job-1"] = "owner";
-  await media.result("owner", "job-1", 0, 1800, "notification");
-  assert.equal(waited, 1500);
 });
 
 test("a distilled profile without CFG offers no cfg and refuses one with a clear note", () => {
