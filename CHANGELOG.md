@@ -27,6 +27,7 @@ version opens with a `> ` summary line.
 - Keep live profiles, guides and catalogue definitions editable in Studio, with administrator approval and version conflicts. The ai mount supplies missing-definition seeds and backups. Existing workflow connections can be edited with node and input selectors alongside Advanced JSON.
 - Build a separate shared media/text worker image with GPU leases, Docker admission and authenticated local text streaming. Automatic lifecycle control remains disabled until ownership and traffic cutover are verified.
 - Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
+- Queue MCP (external chat) generations after manual Studio requests waiting for the same worker or provider, first-in first-out within each, without splitting an MCP set once it has started. The order is stored with each job and survives restarts.
 - Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
 
 ## [0.48.2] - 2026-10-23

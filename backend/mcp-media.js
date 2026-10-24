@@ -562,6 +562,7 @@ export class McpMedia {
     await previous;
     try {
       const queued = [];
+      const queueSet = crypto.randomUUID();
       for (const prompt of preparedPrompts)
         for (let variant = 0; variant < runs; variant++) {
           const id = crypto.randomUUID();
@@ -575,6 +576,7 @@ export class McpMedia {
               {
                 ...body,
                 clientJobId: id,
+                queueSet,
                 prompt,
                 seed: seed === undefined ? "" : String(seed + queued.length),
               },

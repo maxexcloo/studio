@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { GenerationQueue, type JobObservation, type QueueAdapter } from "./queue.ts";
-import { RewriteStore } from "./store.ts";
+import { queuePriority, RewriteStore } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -141,6 +141,77 @@ test("restart follows only recorded provider jobs and never resubmits uncertain 
     });
     await restored.queue.tick();
     assert.deepEqual(restored.submitted, [queued.id]);
+  } finally {
+    restored.store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** Completes running work tick by tick until the queue is idle. */
+async function drain({ store, queue, observations }: ReturnType<typeof fixture>) {
+  for (let pass = 0; pass < 20; pass++) {
+    for (const job of store.jobs())
+      if (job.status === "running") observations.set(job.id, { status: "completed" });
+    await queue.tick();
+    if (!store.jobs().some((job) => !["completed", "failed", "cancelled"].includes(job.status)))
+      return;
+  }
+}
+const mcp = (queueSet: string) => ({ priority: queuePriority.mcp, queueSet });
+
+test("manual requests run before queued MCP work, FIFO within each tier", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (origin = {}) =>
+      store.enqueue(
+        "alice",
+        session.id,
+        {},
+        "image",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        origin,
+      ).id;
+    const order = [enqueue(mcp("a")), enqueue(mcp("b")), enqueue(), enqueue()];
+    await drain(queue);
+    assert.deepEqual(queue.submitted, [order[2], order[3], order[0], order[1]]);
+  } finally {
+    store.close();
+  }
+});
+
+test("a started MCP set stays contiguous and its order survives restart", async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
+  const filename = path.join(dir, "studio.sqlite");
+  const first = fixture(filename);
+  const session = first.store.createSession("alice");
+  const enqueue = (store: RewriteStore, origin = {}) =>
+    store.enqueue(
+      "alice",
+      session.id,
+      {},
+      "image",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      origin,
+    ).id;
+  const a1 = enqueue(first.store, mcp("a"));
+  const a2 = enqueue(first.store, mcp("a"));
+  const b1 = enqueue(first.store, mcp("b"));
+  await first.queue.tick();
+  assert.deepEqual(first.submitted, [a1]);
+  const manual = enqueue(first.store);
+  first.store.close();
+  const restored = fixture(filename);
+  try {
+    await drain(restored);
+    assert.deepEqual(restored.submitted, [a2, manual, b1]);
   } finally {
     restored.store.close();
     rmSync(dir, { recursive: true, force: true });

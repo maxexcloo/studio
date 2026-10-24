@@ -1,6 +1,6 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { GenerationQueue } from "./queue.ts";
-import { RewriteStore } from "./store.ts";
+import { RewriteStore, type QueueOrigin } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;
@@ -33,6 +33,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
     input: GenerationInput,
     account?: GenerationAccount,
     scope?: GenerationScope,
+    origin?: QueueOrigin,
   ): Promise<DomainResponse> => {
     if (account?.authenticated === false)
       return { status: 401, payload: { ok: false, error: "This account no longer has access." } };
@@ -79,6 +80,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             await options.resourceFor(input),
             clientId || undefined,
             account?.role === "user" ? options.jobLimit : undefined,
+            origin,
           );
         } catch (error) {
           const failure = error as Error & { code?: string; status?: number; reason?: string };
