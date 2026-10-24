@@ -75,7 +75,7 @@ jobs:
           name: frontend
           path: dist
       - name: Check Studio Interactions
-        run: npm run test:browser
+        run: mise run test:browser
       - name: Save Browser Failure Traces
         if: failure()
         uses: actions/upload-artifact@v7

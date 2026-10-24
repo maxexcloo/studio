@@ -25,6 +25,9 @@ run = "npm run dev"
 [tasks.test]
 run = "npm test"
 
+[tasks."test:browser"]
+run = "playwright test"
+
 # Setup
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"

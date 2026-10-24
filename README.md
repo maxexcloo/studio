@@ -20,7 +20,7 @@ Open <http://localhost:5173>. Vite provides HMR and the API watches its source o
 ```sh
 mise run check
 mise run build
-npm run test:browser
+mise run test:browser
 ```
 
 ## Running Studio
