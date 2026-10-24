@@ -6,6 +6,10 @@ for (const kind of ["image", "video"] as const) {
     page,
   }) => {
     const state = await fixtures(page);
+    // Native sharing replaces the row's Download on phones; this checks the downloaded version.
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined }),
+    );
     const originalExtension = kind === "image" ? "webp" : "webm";
     const upscaleExtension = kind === "image" ? "png" : "mp4";
     const originalUrl = `/test-media/original.${originalExtension}`;

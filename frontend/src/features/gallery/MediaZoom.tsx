@@ -58,6 +58,18 @@ export function useMediaZoom({
     layout(next);
     revealControls();
   }
+  function toggleAt(x: number, y: number) {
+    const api = transform.current;
+    if (!api) return;
+    if (modeRef.current === "Fit") {
+      changeMode("Custom");
+      void api.zoomToPoint(api.state.scale * 2.5, x, y, duration);
+    } else {
+      changeMode("Fit");
+      layout("Fit");
+    }
+    revealControls();
+  }
   function manualZoom() {
     changeMode("Custom");
     revealControls();
@@ -117,6 +129,7 @@ export function useMediaZoom({
     disabled,
     recent,
     cycle,
+    toggleAt,
     manualZoom,
     revealControls,
     zoom,

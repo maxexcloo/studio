@@ -1,33 +1,12 @@
-import { useId, useRef, useState, type PointerEvent } from "react";
-import {
-  ActionIcon,
-  Button,
-  Menu,
-  Popover,
-  Tooltip,
-  Collapse,
-  Group,
-  Paper,
-  Stack,
-  Switch,
-  Table,
-  Text,
-  Title,
-  UnstyledButton,
-} from "@mantine/core";
-import { ChevronDown, ChevronUp, Download, Ellipsis, SlidersHorizontal } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { post } from "../../api";
-import type { MediaItem } from "../../types";
-import { useMotionDuration } from "../../ui/Appearance";
-import { useMediaAction } from "./useMediaAction";
-import { MediaActionItems } from "./MediaActions";
-import { UpscaleControls } from "./UpscaleControls";
-import { useMediaTransfer, useShareWithoutSettings } from "./mediaShare";
-import classes from "./MediaViewer.module.css";
-import { usePhone } from "../../ui/usePhone";
+import { Badge, Group, Image, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { useQuery } from "@tanstack/react-query";
+import type { MediaItem, Profile, ReferenceAsset } from "../../types";
+import { useGenerationActions } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
+import { referenceLabel } from "../generation/references";
+import { mediaSource } from "./mediaSource";
 
-function generationTitle(prompt = "") {
+export function generationTitle(prompt = "") {
   const plain = prompt
     .replace(/<[^>]*>/g, " ")
     .replace(/[()[\]{}]/g, "")
@@ -38,235 +17,241 @@ function generationTitle(prompt = "") {
   return text ? text[0].toUpperCase() + text.slice(1) : "Untitled Generation";
 }
 
-export function MediaDetails({
-  item,
-  sessionId,
-  compare,
-  onAction,
-  onCompare,
-  onDelete,
-  onVersionChange,
-}: {
-  item: MediaItem;
-  sessionId?: string;
-  compare: boolean;
-  onAction: () => void;
-  onCompare: () => void;
-  onDelete: () => void;
-  onVersionChange: (id: string, active: boolean) => void;
-}) {
-  const phone = usePhone();
-  const motionDuration = useMotionDuration();
-  const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
-  const transfer = useMediaTransfer(item, true);
-  const [details, setDetails] = useState(false);
-  const detailsId = useId();
-  const swipe = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const action = useMediaAction(item, sessionId, onAction);
-  const cache = useQueryClient();
-  const version = useMutation({
-    mutationFn: (body: { galleryItemId: string; active: boolean }) =>
-      post<{ upscaleActive: boolean }>("/api/upscale/toggle", body),
-    onSuccess: (result, body) => {
-      onVersionChange(body.galleryItemId, result.upscaleActive);
-      void cache.invalidateQueries({ queryKey: ["gallery"] });
-      void cache.invalidateQueries({ queryKey: ["session"] });
-    },
+const fileStem = (name: unknown) =>
+  String(name || "")
+    .split(/[\\/]/)
+    .pop()!
+    .replace(/\.(safetensors|ckpt|pt|pth|bin|gguf|sft)$/i, "");
+const elapsed = (ms?: number) => {
+  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "";
+  const seconds = Math.round(ms / 1000);
+  return seconds >= 60
+    ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+    : `${seconds}s`;
+};
+const bytes = (value = 0) => {
+  if (!value) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  const unit = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1000)));
+  const scaled = value / 1000 ** unit;
+  return `${scaled >= 10 || !unit ? Math.round(scaled) : scaled.toFixed(1)} ${units[unit]}`;
+};
+const time = (value?: string) => {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+    : "";
+};
+
+type Row = [label: string, value: string];
+interface Details {
+  profile: string;
+  loras: { name: string; strength: string }[];
+  references: ReferenceAsset[];
+  settings: Row[];
+  output: Row[];
+  timing: Row[];
+}
+
+/** The curated generation record shared by Details and Copy Settings; empty values are left out. */
+function generationDetails(
+  item: MediaItem,
+  {
+    profiles,
+    loraTitle,
+    size = 0,
+  }: { profiles: Profile[]; loraTitle: (file: string) => string; size?: number },
+): Details {
+  const settings = item.settings || {};
+  const rows = (entries: [string, unknown][]): Row[] =>
+    entries
+      .filter(([, value]) => value !== "" && value !== undefined && value !== null && value !== 0)
+      .map(([label, value]) => [label, String(value)]);
+  const recorded = profiles.find((profile) => profile.id === settings.profileId);
+  const references = Array.isArray(settings.referenceDetails)
+    ? (settings.referenceDetails as ReferenceAsset[])
+    : [];
+  const shown = mediaSource(item);
+  const video = item.type === "video";
+  return {
+    profile: String(
+      settings.profileName ||
+        recorded?.displayName ||
+        recorded?.label ||
+        fileStem(settings.modelName || (item.model?.startsWith("custom:") ? "" : item.model)),
+    ),
+    loras: (Array.isArray(settings.loras) ? settings.loras : [])
+      .filter((lora) => lora?.name && lora.enabled !== false)
+      .map((lora) => ({
+        name: loraTitle(String(lora.name)),
+        strength: Number(lora.strength ?? 1).toFixed(2),
+      })),
+    references,
+    settings: rows([
+      ["Seed", settings.seed],
+      ["Steps", settings.steps],
+      ["CFG", settings.cfg],
+      ["Sampler", settings.sampler],
+      ["Scheduler", settings.scheduler],
+      ["Denoise", !video && references.length ? settings.denoise : ""],
+    ]),
+    output: rows([
+      ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
+      ["Drawn At", shown.upscaled && item.width ? `${item.width} × ${item.height}` : ""],
+      ["Duration", video && settings.duration ? `${settings.duration}s` : ""],
+      ["Frames", video ? settings.frames : ""],
+      ["FPS", video ? settings.fps : ""],
+      ["File", item.outputName || item.filename],
+      ["Size", bytes(size)],
+      ["Time", time(item.createdAt)],
+    ]),
+    timing: rows([
+      ["Active", elapsed(item.timing?.runMs)],
+      ["Total", elapsed(item.durationMs || undefined)],
+      ["Queue", elapsed(item.timing?.queueMs)],
+      ["Setup", elapsed(item.timing?.setupMs)],
+      ["Sampling", elapsed(item.timing?.samplingMs)],
+      ["Finishing", elapsed(item.timing?.finishMs)],
+    ]),
+  };
+}
+
+function useGenerationDetails(item: MediaItem, size?: number) {
+  const { profiles } = useGenerationActions();
+  const info = useQuery(loraInfoQuery);
+  return generationDetails(item, {
+    profiles,
+    size,
+    loraTitle: (file) => info.data?.loras[file]?.title || fileStem(file),
   });
+}
+
+/** Copy Settings: the prompt and only the inputs that were set, as plain text. */
+export function useSettingsText(item: MediaItem) {
+  const details = useGenerationDetails(item);
+  return () =>
+    [
+      item.prompt?.trim(),
+      item.negative?.trim() && `Negative Prompt: ${item.negative.trim()}`,
+      details.profile && `Profile: ${details.profile}`,
+      details.loras.length &&
+        `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,
+      [
+        ...details.settings,
+        ...details.output.filter(([label]) =>
+          ["Dimensions", "Frames", "FPS", "Duration"].includes(label),
+        ),
+      ]
+        .map(([label, value]) => `${label}: ${value}`)
+        .join(" · "),
+    ]
+      .filter(Boolean)
+      .join("\n");
+}
+
+/** The shown file's size from a one-byte range request; gallery records do not store it. */
+function useMediaSize(url: string) {
+  return useQuery({
+    queryKey: ["media-size", url],
+    enabled: Boolean(url),
+    staleTime: Infinity,
+    queryFn: async ({ signal }) => {
+      const response = await fetch(url, { headers: { Range: "bytes=0-0" }, signal });
+      const range = Number(response.headers.get("content-range")?.match(/\/(\d+)\s*$/)?.[1]);
+      if (range) return range;
+      if (/^(data|blob):/i.test(url)) return (await response.blob()).size;
+      return response.status === 200 ? Number(response.headers.get("content-length")) || 0 : 0;
+    },
+  }).data;
+}
+
+function Section({ title, rows }: { title: string; rows: Row[] }) {
+  if (!rows.length) return null;
   return (
-    <Paper
-      withBorder
-      radius="lg"
-      p="sm"
-      className={classes.rail}
-      onClick={(event) => event.stopPropagation()}
-    >
-      <Stack gap="xs" className={classes.railContent}>
-        <UnstyledButton
-          component={phone ? "button" : "div"}
-          className={classes.handle}
-          aria-label={phone ? "Generation Details" : undefined}
-          aria-expanded={phone ? details : undefined}
-          aria-controls={phone ? detailsId : undefined}
-          onPointerDown={(event: PointerEvent<HTMLElement>) => {
-            if (!phone) return;
-            swipe.current = { x: event.clientX, y: event.clientY, moved: false };
-            event.currentTarget.setPointerCapture(event.pointerId);
-          }}
-          onPointerUp={(event: PointerEvent<HTMLElement>) => {
-            const start = swipe.current;
-            if (!start) return;
-            const dy = event.clientY - start.y;
-            if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(event.clientX - start.x)) {
-              setDetails(dy < 0);
-              start.moved = true;
-            }
-            if (event.currentTarget.hasPointerCapture(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-          }}
-          onPointerCancel={() => {
-            swipe.current = null;
-          }}
-          onClick={() => {
-            if (phone && !swipe.current?.moved) setDetails((value) => !value);
-            swipe.current = null;
-          }}
-        >
-          <div className={classes.handleLine} />
-          <Group justify="space-between" wrap="nowrap">
-            <Stack gap={2} style={{ minWidth: 0 }}>
-              <Text fw={600} size="sm" lineClamp={1}>
-                {generationTitle(item.prompt)}
-              </Text>
-              <Text size="xs" c="dimmed" lineClamp={1}>
-                {item.type === "video" ? "Video" : "Image"}
-                {item.width ? ` · ${item.width} × ${item.height}` : ""}
-                {item.model ? ` · ${item.model}` : ""}
-              </Text>
-            </Stack>
-            {phone && (details ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
-          </Group>
-        </UnstyledButton>
-        <Collapse
-          expanded={!phone || details}
-          id={detailsId}
-          transitionDuration={motionDuration}
-          className={classes.detailsCollapse}
-        >
-          <Stack className={classes.details} gap="md">
-            <Stack gap="sm">
-              <Title order={5}>Prompt</Title>
-              <Text style={{ whiteSpace: "pre-wrap" }}>{item.prompt}</Text>
-              {item.negative && (
-                <>
-                  <Title order={5}>Negative Prompt</Title>
-                  <Text>{item.negative}</Text>
-                </>
-              )}
-              <Title order={5}>Model & Settings</Title>
-              <Text size="sm">{item.model}</Text>
-              <Table.ScrollContainer minWidth={360}>
-                <Table aria-label="Generation Settings" verticalSpacing="xs">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Setting</Table.Th>
-                      <Table.Th>Value</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {Object.entries(item.settings || {})
-                      .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([key, value]) => (
-                        <Table.Tr key={key}>
-                          <Table.Td>
-                            <Text size="sm" c="dimmed">
-                              {key}
-                            </Text>
-                          </Table.Td>
-                          <Table.Td>
-                            <Text size="sm" style={{ overflowWrap: "anywhere" }}>
-                              {String(value)}
-                            </Text>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
-              <Text size="xs" c="dimmed">
-                {item.createdAt}
-              </Text>
-            </Stack>
-          </Stack>
-        </Collapse>
-        <Group gap={4} className={classes.actions} role="group" aria-label="Generation Actions">
-          {item.url && (
-            <>
-              <Tooltip label="Download">
-                <ActionIcon
-                  component="a"
-                  {...transfer.download}
-                  aria-label="Download"
-                  variant="default"
-                  size={36}
-                >
-                  <Download size={17} />
-                </ActionIcon>
-              </Tooltip>
-              <Button
-                size="sm"
-                px="sm"
-                loading={action.isPending}
-                onClick={() => action.mutate(item.type === "video" ? "extend" : "refine")}
-              >
-                {item.type === "video" ? "Extend" : "Refine"}
-              </Button>
-              {item.type === "image" && (
-                <Button
-                  size="sm"
-                  px="sm"
-                  variant="light"
-                  loading={action.isPending}
-                  onClick={() => action.mutate("animate")}
-                >
-                  Animate
-                </Button>
-              )}
-            </>
-          )}
-          {item.url && item.status === "done" && <UpscaleControls key={item.id} item={item} />}
-          <Menu position="top-end" width={220}>
-            <Menu.Target>
-              <ActionIcon aria-label="More Viewer Actions" variant="default" size={36}>
-                <Ellipsis size={18} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <MediaActionItems
-                item={item}
-                transfer={transfer}
-                sessionId={sessionId}
-                omit={["refine", "animate", "upscale", "download"]}
-                compare={compare}
-                onApplied={onAction}
-                onCompare={onCompare}
-                onDelete={onDelete}
-              />
-            </Menu.Dropdown>
-          </Menu>
-          <Popover position="top-end" width={280} trapFocus>
-            <Popover.Target>
-              <ActionIcon aria-label="Viewer Options" variant="default" size={36}>
-                <SlidersHorizontal size={17} />
-              </ActionIcon>
-            </Popover.Target>
-            <Popover.Dropdown>
-              <Stack gap="md">
-                {item.upscale?.url && !item.upscale.withRun && (
-                  <Switch
-                    label="Show Upscale"
-                    checked={Boolean(item.upscaleActive)}
-                    disabled={version.isPending}
-                    onChange={(event) =>
-                      version.mutate({
-                        galleryItemId: item.id,
-                        active: event.currentTarget.checked,
-                      })
-                    }
-                  />
-                )}
-                <Switch
-                  label="Share Without Settings"
-                  description="Leave the prompt, seed and workflow out of downloaded or shared files."
-                  checked={withoutSettings}
-                  onChange={(event) => setWithoutSettings(event.currentTarget.checked)}
-                />
-              </Stack>
-            </Popover.Dropdown>
-          </Popover>
-        </Group>
+    <Stack gap={6}>
+      <Title order={6}>{title}</Title>
+      <Table
+        variant="vertical"
+        layout="fixed"
+        withRowBorders={false}
+        verticalSpacing={4}
+        horizontalSpacing={0}
+      >
+        <Table.Tbody>
+          {rows.map(([label, value]) => (
+            <Table.Tr key={label}>
+              <Table.Th w={96} bg="transparent" fw={400} c="dimmed">
+                {label}
+              </Table.Th>
+              <Table.Td style={{ overflowWrap: "anywhere" }}>{value}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Stack>
+  );
+}
+
+/** Details › Prompt, Model, References, Settings, Output and Timing for one result. */
+export function MediaDetails({ item }: { item: MediaItem }) {
+  const size = useMediaSize(item.status === "done" ? mediaSource(item).url : "");
+  const details = useGenerationDetails(item, size);
+  const { profiles } = useGenerationActions();
+  const profile = profiles.find((candidate) => candidate.id === item.settings?.profileId);
+  return (
+    <Stack gap="lg" fz="sm">
+      <Stack gap={6}>
+        <Title order={6}>Prompt</Title>
+        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+          {item.prompt || "No prompt recorded."}
+        </Text>
+        {item.negative && (
+          <Text size="sm" c="dimmed">
+            Negative: {item.negative}
+          </Text>
+        )}
       </Stack>
-    </Paper>
+      {(details.profile || !!details.loras.length) && (
+        <Stack gap={6}>
+          <Title order={6}>Model</Title>
+          {details.profile && <Text size="sm">{details.profile}</Text>}
+          {details.loras.map((lora) => (
+            <Group key={lora.name} justify="space-between" wrap="nowrap" gap="xs">
+              <Text size="sm" truncate>
+                {lora.name}
+              </Text>
+              <Badge variant="default" radius="sm" style={{ flexShrink: 0 }}>
+                {lora.strength}
+              </Badge>
+            </Group>
+          ))}
+        </Stack>
+      )}
+      {!!details.references.length && (
+        <Stack gap={6}>
+          <Title order={6}>References</Title>
+          <Group gap="xs">
+            {details.references.map((asset, index) => (
+              <Tooltip
+                key={`${asset.slot}:${asset.id}`}
+                label={referenceLabel(asset, index, profile)}
+              >
+                <Image
+                  src={asset.thumbnailUrl || asset.url}
+                  alt={referenceLabel(asset, index, profile)}
+                  w={48}
+                  h={48}
+                  radius="sm"
+                  fallbackSrc=""
+                />
+              </Tooltip>
+            ))}
+          </Group>
+        </Stack>
+      )}
+      <Section title="Settings" rows={details.settings} />
+      <Section title="Output" rows={details.output} />
+      <Section title="Timing" rows={details.timing} />
+    </Stack>
   );
 }

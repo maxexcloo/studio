@@ -87,6 +87,14 @@ export interface MediaItem {
   outputName?: string;
   /** The Chat whose generation made this item. */
   sessionId?: string;
+  durationMs?: number;
+  timing?: {
+    runMs?: number;
+    queueMs?: number;
+    setupMs?: number;
+    samplingMs?: number;
+    finishMs?: number;
+  };
   startImageId?: string;
   referenceImage?: string;
   upscaleActive?: boolean;

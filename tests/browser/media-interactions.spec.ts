@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, image, stamp, viewerAction, viewerOptions } from "./fixtures";
+import { fixtures, image, stamp, viewerOptions } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -130,14 +130,21 @@ test("Media transfer actions honour the shared metadata preference", async ({ pa
   await page.getByRole("button", { name: "Open image: Transfer Study", exact: true }).click();
   await viewerOptions(page);
   await page.getByRole("switch", { name: /^Share Without Settings/ }).check();
-  await expect(page.getByRole("link", { name: "Download", exact: true })).toHaveAttribute(
-    "href",
-    "/api/fixture-media.png?clean=1",
-  );
-  await viewerAction(page, "Copy Image");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  // Phones that share natively show Share in the row and keep Download under More.
+  const phone = testInfo.project.use.isMobile;
+  if (phone) await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
+  await expect(
+    phone
+      ? page.getByRole("menuitem", { name: "Download", exact: true })
+      : viewer.getByRole("link", { name: "Download", exact: true }),
+  ).toHaveAttribute("href", "/api/fixture-media.png?clean=1");
+  if (phone) await page.keyboard.press("Escape");
+  await viewer.getByRole("button", { name: "Copy", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Copy Image", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copiedMedia?.type)).toBe("image/png");
-  if (testInfo.project.use.isMobile) {
-    await viewerAction(page, "Share");
+  if (phone) {
+    await viewer.getByRole("button", { name: "Share", exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => (window as any).sharedMedia?.[0]?.type))
       .toBe("image/png");

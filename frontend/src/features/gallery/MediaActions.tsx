@@ -5,7 +5,7 @@ import {
   Copy,
   Download,
   ImagePlus,
-  Maximize2,
+  ImageUpscale,
   Pencil,
   Play,
   RotateCcw,
@@ -27,7 +27,14 @@ import { useMediaAction } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 
 /** Actions a surface already shows as its own buttons. */
-export type PrimaryAction = "refine" | "animate" | "upscale" | "download";
+export type PrimaryAction =
+  | "refine"
+  | "animate"
+  | "upscale"
+  | "download"
+  | "share"
+  | "copy"
+  | "star";
 
 function FailedRetry({ jobId }: { jobId: string }) {
   const queue = useQueue();
@@ -161,7 +168,7 @@ export function MediaActionItems({
       {shown("upscale") && onUpscale && (
         <Menu.Item
           h={36}
-          leftSection={<Maximize2 size={16} />}
+          leftSection={<ImageUpscale size={16} />}
           disabled={upscaling(item)}
           onClick={onUpscale}
         >
@@ -173,14 +180,16 @@ export function MediaActionItems({
           {compare ? "Close Comparison" : "Compare"}
         </Menu.Item>
       )}
-      <Menu.Item
-        h={36}
-        leftSection={<Copy size={16} />}
-        onClick={() => void copyText(item.prompt || "", "Prompt")}
-      >
-        Copy Prompt
-      </Menu.Item>
-      {transfer.canCopy && (
+      {!omit.includes("copy") && (
+        <Menu.Item
+          h={36}
+          leftSection={<Copy size={16} />}
+          onClick={() => void copyText(item.prompt || "", "Prompt")}
+        >
+          Copy Prompt
+        </Menu.Item>
+      )}
+      {transfer.canCopy && !omit.includes("copy") && (
         <Menu.Item
           h={36}
           leftSection={<ClipboardCopy size={16} />}
@@ -195,7 +204,7 @@ export function MediaActionItems({
           Download
         </Menu.Item>
       )}
-      {transfer.canShare && (
+      {transfer.canShare && !omit.includes("share") && (
         <Menu.Item
           h={36}
           leftSection={<Share size={16} />}
@@ -206,14 +215,16 @@ export function MediaActionItems({
           {transfer.shareReady ? "Share" : "Prepare Share"}
         </Menu.Item>
       )}
-      <Menu.Item
-        h={36}
-        leftSection={<Star size={16} fill={item.favorite ? "currentColor" : "none"} />}
-        disabled={favorite.isPending}
-        onClick={() => favorite.mutate()}
-      >
-        {item.favorite ? "Unstar" : "Star"}
-      </Menu.Item>
+      {!omit.includes("star") && (
+        <Menu.Item
+          h={36}
+          leftSection={<Star size={16} fill={item.favorite ? "currentColor" : "none"} />}
+          disabled={favorite.isPending}
+          onClick={() => favorite.mutate()}
+        >
+          {item.favorite ? "Unstar" : "Star"}
+        </Menu.Item>
+      )}
       {onSelect && (item.status === "done" || item.status === "error") && (
         <Menu.Item h={36} leftSection={<SquareCheck size={16} />} onClick={onSelect}>
           Select

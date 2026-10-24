@@ -678,6 +678,10 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   page,
 }, testInfo) => {
   const state = await fixtures(page);
+  // Native sharing would replace the row's Download on WebKit phones.
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined }),
+  );
   state.gallery.push({
     id: "viewer",
     jobId: "job-viewer",
@@ -761,9 +765,14 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   ).toBeVisible();
   await dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "Zoom: Fit", exact: true })).toBeVisible();
-  if (testInfo.project.use.isMobile)
+  // Desktop details are open beside the image; phones open them as a sheet.
+  if (testInfo.project.use.isMobile) {
     await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
-  await expect(dialog.getByText("Prompt", { exact: true })).toBeVisible();
+    const sheet = page.getByRole("dialog", { name: "Viewer Study", exact: true });
+    await expect(sheet.getByText("Prompt", { exact: true })).toBeVisible();
+    await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
+    await expect(sheet).toBeHidden();
+  } else await expect(dialog.getByText("Prompt", { exact: true })).toBeVisible();
   await expect
     .poll(async () => {
       const picture = await dialog

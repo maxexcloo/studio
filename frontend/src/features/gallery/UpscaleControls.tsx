@@ -1,6 +1,18 @@
 import { useState } from "react";
-import { Alert, Button, Loader, Modal, Popover, Select, Stack, Switch, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Loader,
+  Modal,
+  Popover,
+  Select,
+  Stack,
+  Switch,
+  Text,
+  Tooltip,
+} from "@mantine/core";
+import { ImageUpscale } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   UpscaleQuality,
@@ -31,7 +43,6 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
       } satisfies UpscaleRequest),
     onSuccess: () => {
       onQueued();
-      notifications.show({ message: "Upscale queued" });
       void Promise.all(
         ["gallery", "queue", "session", "sessions"].map((key) =>
           cache.invalidateQueries({ queryKey: [key] }),
@@ -128,23 +139,25 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
 }
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
-/** The viewer's Upscale button and its settings popover. */
-export function UpscaleControls({ item }: { item: MediaItem }) {
+/** The viewer's Upscale action and its settings popover; `size` keeps phone touch targets. */
+export function UpscaleControls({ item, size }: { item: MediaItem; size?: number }) {
   const [opened, setOpened] = useState(false);
   const busy = upscaling(item);
   return (
-    <Popover opened={opened} onChange={setOpened} position="top-start" width={300} trapFocus>
-      <Popover.Target>
-        <Button
-          variant="subtle"
-          size="sm"
-          px="sm"
-          disabled={busy}
-          onClick={() => setOpened((value) => !value)}
-        >
-          {busy ? "Upscaling…" : "Upscale"}
-        </Button>
-      </Popover.Target>
+    <Popover opened={opened} onChange={setOpened} position="top" width={300} trapFocus>
+      <Tooltip label={busy ? "Upscaling…" : "Upscale"} disabled={opened}>
+        <Popover.Target>
+          <ActionIcon
+            variant="default"
+            size={size}
+            aria-label="Upscale"
+            loading={busy}
+            onClick={() => setOpened((value) => !value)}
+          >
+            <ImageUpscale size={18} />
+          </ActionIcon>
+        </Popover.Target>
+      </Tooltip>
       <Popover.Dropdown>
         <Stack gap="sm">
           <Text fw={600}>Upscale</Text>
