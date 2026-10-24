@@ -35,7 +35,7 @@ Only mapped controls are changed by Studio. Everything else stays exactly as it 
 
 The controls it can map are `prompt`, `negative`, `seed`, `steps`, `cfg`, `sampler`, `scheduler`, `denoise`, `width`, `height`, `count` (batch size), `frames`, `fps` and `startImage`, plus the loader choices `model`, `textEncoder`, `vae`, `clipType` and `weightDtype`. Each points at one input on one node. A second sampler or prompt encoder keeps its saved values unless you feed both from one node (a core `PrimitiveInt` or `PrimitiveString`) and map that.
 
-For existing unannotated imports, the retained parser can infer common mappings from node types and order. Review these mappings before saving. Administrators edit profiles in **Library › Profiles**: Connections edits existing control and reference mappings using separate Node and Input selectors; Advanced JSON edits the graph or adds declarations. Check and Save retain version-conflict handling, and AI-drafted definitions require approval.
+For existing unannotated imports, the retained parser can infer common mappings from node types and order. Review these mappings before saving. Administrators edit profiles in **Settings › Profiles**: Connections edits existing control and reference mappings using separate Node and Input selectors; Advanced JSON edits the graph or adds declarations. Check and Save retain version-conflict handling, and AI-drafted definitions require approval.
 
 Smart upscale's 2K and 4K picks work with imported workflows too: the upscale runs in the same ComfyUI job, after the workflow's own output. Inpainting doesn't: an imported workflow gets reference and start images, not the brush.
 

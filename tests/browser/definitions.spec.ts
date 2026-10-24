@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, openNav, profiles, section } from "./fixtures";
+import { editDefinition, fixtures, openNav, profiles, section } from "./fixtures";
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
   page,
@@ -59,11 +59,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
       },
     });
   });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Edit Profile", exact: true });
+  const editor = await editDefinition(page, "Profile");
   await editor.getByRole("textbox", { name: "Name", exact: true }).fill("My Edited Profile");
   await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
   await expect(editor.getByRole("alert")).toContainText("changed while you were editing");
@@ -77,7 +73,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   expect(requests[0].baseHash).toBe("opened-hash");
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).toBeHidden();
-  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
+  await editDefinition(page, "Profile");
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "Changed by Another Editor",
   );
@@ -85,7 +81,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(requests[1].baseHash).toBe("latest-hash");
-  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
+  await editDefinition(page, "Profile");
   await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
     "My Edited Profile",
   );
@@ -140,16 +136,12 @@ test("Guide editing and restoring an earlier version create distinct saved revis
       json: { packId: "owned", pack, hash: `hash-${version}`, meta: { version, origin: "studio" } },
     });
   });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Guides");
-  await page.getByRole("button", { name: "Edit Guide", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Edit Guide", exact: true });
+  const editor = await editDefinition(page, "Guide");
   await editor.getByRole("textbox", { name: "Summary", exact: true }).fill("Updated guidance.");
   await editor.getByRole("button", { name: "Save Guide", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(saved[1]).toEqual({ ...original, summary: "Updated guidance." });
-  await page.getByRole("button", { name: "Edit Guide", exact: true }).click();
+  await editDefinition(page, "Guide");
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Updated guidance.",
   );
@@ -165,7 +157,7 @@ test("Guide editing and restoring an earlier version create distinct saved revis
   await editor.getByRole("button", { name: "Restore Version 1", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(saved).toEqual([original, { ...original, summary: "Updated guidance." }, original]);
-  await page.getByRole("button", { name: "Edit Guide", exact: true }).click();
+  await editDefinition(page, "Guide");
   await expect(editor.getByRole("textbox", { name: "Summary", exact: true })).toHaveValue(
     "Original guidance.",
   );
@@ -212,18 +204,18 @@ test("Model classification saves and reads back while definition administration 
   await page.goto("/images");
   await openNav(page, "Library");
   await section(page, "Library", "Models");
-  await page.getByRole("button", { name: "Edit Catalogue", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Edit Catalogue", exact: true });
-  await editor.getByRole("combobox", { name: "Catalogue Resource", exact: true }).click();
-  await page.getByRole("option", { name: "Base Model", exact: true }).click();
+  const edit = async () => {
+    await page.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Edit Catalogue Entry", exact: true }).click();
+  };
+  await edit();
+  const editor = page.getByRole("dialog", { name: "Edit Base Model", exact: true });
   await editor.getByRole("combobox", { name: "Model Type", exact: true }).click();
   await page.getByRole("option", { name: "Original", exact: true }).click();
   await editor.getByRole("button", { name: "Save Catalogue Entry", exact: true }).click();
   await expect(editor).toBeHidden();
   expect(writes).toEqual([{ key: item.key, patch: { modelType: "original" } }]);
-  await page.getByRole("button", { name: "Edit Catalogue", exact: true }).click();
-  await editor.getByRole("combobox", { name: "Catalogue Resource", exact: true }).click();
-  await page.getByRole("option", { name: "Base Model", exact: true }).click();
+  await edit();
   await expect(editor.getByRole("combobox", { name: "Model Type", exact: true })).toHaveValue(
     "Original",
   );

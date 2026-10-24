@@ -1,0 +1,13 @@
+/* Switching between the toolbar and its search field fades in place without moving the rows below. */
+.enter {
+  animation: enter var(--studio-motion-duration) ease-out;
+}
+.views {
+  min-width: 0;
+  overflow-x: auto;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+  }
+}

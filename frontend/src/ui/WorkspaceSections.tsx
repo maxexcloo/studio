@@ -1,16 +1,21 @@
 import { Suspense, useState, type ReactNode } from "react";
-import { Box, Grid, Group, NavLink, Select, Stack, Text } from "@mantine/core";
+import { Box, Divider, Grid, Group, NavLink, Select, Stack, Text } from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { LoadingState } from "./LoadingState";
 import { SectionHeading } from "./SectionHeading";
+import classes from "./WorkspaceSections.module.css";
 
-/** One Library or Settings section; `admin` sections are hidden from other accounts. */
+/**
+ * One Library or Settings section; `admin` sections are hidden from other accounts and `apart`
+ * sections (About) follow a divider in the desktop navigation.
+ */
 export interface SectionDefinition {
   label: string;
   description: string;
   icon: LucideIcon;
   admin?: boolean;
+  apart?: boolean;
 }
 export type WorkspaceSection = SectionDefinition & { value: string };
 
@@ -80,27 +85,31 @@ export function WorkspaceSections({
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
   if (!visited.has(active)) setVisited(new Set([...visited, active]));
+  const link = (section: WorkspaceSection) => (
+    <NavLink
+      key={section.value}
+      component={Link}
+      to={{ pathname: location.pathname, search: location.search, hash: `#${section.value}` }}
+      replace
+      state={location.state}
+      label={section.label}
+      leftSection={<section.icon size={16} />}
+      active={section.value === active}
+      aria-current={section.value === active ? "page" : undefined}
+    />
+  );
+  const apart = sections.filter((section) => section.apart);
   return (
     <Grid gap="xl" mih={{ base: 0, sm: "24rem" }}>
       <Grid.Col span={3} visibleFrom="sm">
-        <Stack component="nav" aria-label={`${label} Sections`} gap={4}>
-          {sections.map((section) => (
-            <NavLink
-              key={section.value}
-              component={Link}
-              to={{
-                pathname: location.pathname,
-                search: location.search,
-                hash: `#${section.value}`,
-              }}
-              replace
-              state={location.state}
-              label={section.label}
-              leftSection={<section.icon size={16} />}
-              active={section.value === active}
-              aria-current={section.value === active ? "page" : undefined}
-            />
-          ))}
+        <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
+          {sections.filter((section) => !section.apart).map(link)}
+          {apart.length > 0 && (
+            <>
+              <Divider my="xs" />
+              {apart.map(link)}
+            </>
+          )}
         </Stack>
       </Grid.Col>
       <Grid.Col span={{ base: 12, sm: 9 }} style={{ minWidth: 0 }}>
@@ -110,6 +119,7 @@ export function WorkspaceSections({
             component="section"
             aria-label={`${label}: ${section.label}`}
             hidden={section.value !== active}
+            className={classes.section}
           >
             <Stack>
               <div>

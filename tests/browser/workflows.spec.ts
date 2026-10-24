@@ -544,7 +544,11 @@ test("Administrator accounts retain worker visibility and attribution", async ({
     "Image Worker",
   );
   await section(page, "Settings", "About");
-  await expect(page.getByText(/MantineHub theme includes MIT/)).toBeVisible();
+  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Licence", exact: true })).toHaveAttribute(
+    "href",
+    /\/LICENSE$/,
+  );
 });
 
 test("Upscale comparison uses one bounded slider and preserves the original result", async ({
@@ -586,8 +590,8 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
     }),
   );
   await page.goto("/settings");
-  await section(page, "Settings", "Accounts");
-  await page.getByRole("button", { name: "Access Groups", exact: true }).click();
+  await section(page, "Settings", "Groups");
+  await page.getByRole("button", { name: "New Group", exact: true }).click();
   await page.getByRole("textbox", { name: "Group Name", exact: true }).fill("Member Cloud");
   await page.getByRole("textbox", { name: "Group ID", exact: true }).fill("member-cloud");
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
@@ -601,12 +605,14 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
           .cloudModels,
     )
     .toBe(true);
+  await section(page, "Settings", "Users");
   const member = page.getByRole("row", { name: "Account Member", exact: true });
   await member.getByRole("combobox", { name: "Access Group for Member", exact: true }).click();
   await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
   await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
   await expect(member.getByText("NSFW Models On", { exact: true })).toBeVisible();
-  await member.getByRole("button", { name: "Disable Account", exact: true }).click();
+  await member.getByRole("button", { name: "Actions for Member", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Disable Account", exact: true }).click();
   await expect(member.getByText("Disabled", { exact: true })).toBeVisible();
   expect(state.administration.accounts.find((account) => account.id === "member")?.disabled).toBe(
     true,

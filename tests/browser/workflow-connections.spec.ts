@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, openNav, section } from "./fixtures";
+import { editDefinition, fixtures } from "./fixtures";
 
 function profile() {
   return {
@@ -124,11 +124,7 @@ async function setup(page: Page, { failPreview = false, conflict = false } = {})
       },
     });
   });
-  await page.goto("/images");
-  await openNav(page, "Library");
-  await section(page, "Library", "Profiles");
-  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
-  const editor = page.getByRole("dialog", { name: "Edit Profile", exact: true });
+  const editor = await editDefinition(page, "Profile");
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   return { state, editor };
 }
@@ -168,7 +164,7 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   expect(state.document).toEqual(expected);
   expect(state.writes[0].baseHash).toBe("opened-hash");
   expect(state.previews).toBe(1);
-  await page.getByRole("button", { name: "Edit Profile", exact: true }).click();
+  await editDefinition(page, "Profile");
   await editor.getByRole("tab", { name: "Connections", exact: true }).click();
   await expect(
     editor.getByRole("combobox", { name: "Control prompt Node", exact: true }),

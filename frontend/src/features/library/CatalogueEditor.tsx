@@ -1,9 +1,9 @@
-import { useState } from "react";
 import {
   Alert,
   Button,
   Group,
   Modal,
+  MultiSelect,
   NumberInput,
   Select,
   SimpleGrid,
@@ -130,10 +130,14 @@ function CatalogueForm({
         </Text>
         <TextInput label="Title" {...form.getInputProps("title")} />
         <TextInput label="Base Model" {...form.getInputProps("baseModel")} />
-        <TagsInput
+        <MultiSelect
           label="Families"
-          data={families.map((family) => ({ value: family, label: modelFamilyLabel(family) }))}
-          description="Use the exact family identifiers declared by your profiles."
+          description="The family identifiers your profiles declare."
+          data={[...new Set([...families, ...form.values.families])].map((family) => ({
+            value: family,
+            label: `${modelFamilyLabel(family)} (${family})`,
+          }))}
+          searchable
           {...form.getInputProps("families")}
         />
         <Select
@@ -231,32 +235,26 @@ function CatalogueForm({
     </form>
   );
 }
-export function CatalogueEditor({ items, close }: { items: LibraryItem[]; close: () => void }) {
-  const [selected, setSelected] = useState<string | null>(null);
+/** Edits one catalogue entry; families offer the canonical identifiers already in use. */
+export function CatalogueEditor({
+  item,
+  families,
+  close,
+}: {
+  item: LibraryItem;
+  families: string[];
+  close: () => void;
+}) {
   const phone = usePhone();
-  const item = items.find((entry) => entry.key === selected);
   return (
-    <Modal opened onClose={close} title="Edit Catalogue" size="lg" fullScreen={phone}>
-      <Stack>
-        <Select
-          label="Catalogue Resource"
-          searchable
-          data={items.map((entry) => ({
-            value: entry.key,
-            label: entry.title || entry.name || entry.file || entry.key,
-          }))}
-          value={selected}
-          onChange={setSelected}
-        />
-        {item && (
-          <CatalogueForm
-            key={item.key}
-            item={item}
-            families={[...new Set(items.flatMap((entry) => entry.families || []))].sort()}
-            close={close}
-          />
-        )}
-      </Stack>
+    <Modal
+      opened
+      onClose={close}
+      title={`Edit ${item.title || item.name || item.file || item.key}`}
+      size="lg"
+      fullScreen={phone}
+    >
+      <CatalogueForm item={item} families={families} close={close} />
     </Modal>
   );
 }

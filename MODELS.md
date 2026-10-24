@@ -216,7 +216,7 @@ A new family states its own `native`; leaving it out means none.
 
 Studio's runtime profiles define the supported catalogue for a deployment; the ai mount seeds missing definitions. The retained native family detectors and graph builders are defined in `backend/family-catalog.js`; only offer a profile after its required nodes and files are verified on its worker.
 
-Administrators edit profiles in **Library › Profiles**. The Connections tab maps existing controls and reference inputs to separate node and input choices, preserving the saved graph and other metadata. Use Advanced JSON to add mappings or change the graph; Check validates the edited definition before saving.
+Administrators edit profiles in **Settings › Profiles**. The Connections tab maps existing controls and reference inputs to separate node and input choices, preserving the saved graph and other metadata. Use Advanced JSON to add mappings or change the graph; Check validates the edited definition before saving.
 
 ## Formats
 

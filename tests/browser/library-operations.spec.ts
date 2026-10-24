@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, openNav, profiles, section } from "./fixtures";
+import { chooseView, fixtures, openNav, profiles, section } from "./fixtures";
 
 test("Model downloads cancel only the chosen file and explicitly resume or retry", async ({
   page,
@@ -225,12 +225,10 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
     "Update Available",
   );
   expect(applied).toEqual([]);
-  await table.getByRole("button", { name: "Update Actions for Base Model", exact: true }).click();
+  await table.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
   await page.getByRole("menuitem", { name: "Update to Version 2", exact: true }).click();
   await expect(table.getByRole("row").filter({ hasText: "Base Model" })).toContainText("Updating");
-  await table
-    .getByRole("button", { name: "Update Actions for Paid Version Model", exact: true })
-    .click();
+  await table.getByRole("button", { name: "Actions for Paid Version Model", exact: true }).click();
   await page.getByRole("menuitem", { name: "Update to Free 2", exact: true }).click();
   await expect(table.getByRole("row").filter({ hasText: "Paid Version Model" })).toContainText(
     "Updating",
@@ -243,9 +241,9 @@ test("Catalogue checks updates and queues only the explicitly chosen available o
     "Replacement verified; existing file retained because a profile still uses it.",
   );
   await expect(original.getByText("Installed", { exact: true })).toBeVisible();
-  await expect(
-    original.getByRole("button", { name: "Update Actions for Base Model", exact: true }),
-  ).toBeHidden();
+  await original.getByRole("button", { name: "Actions for Base Model", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /^Update to / })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   expect(applied).toHaveLength(2);
 });
 
@@ -295,7 +293,8 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   });
   await page.goto("/images");
   await openNav(page, "Library");
-  await page.getByRole("button", { name: "Review Import", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Imported Checkpoint", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Review Import", exact: true }).click();
   const button = page.getByRole("button", { name: "Draft Profile", exact: true });
   await button.click();
   await expect(
@@ -305,7 +304,7 @@ test("A checkpoint profile draft can be retried after failure and refreshed into
   const previousReads = modelReads;
   await button.click();
   await expect(
-    page.getByText("Profile drafted. Review it in Library › Profiles.", { exact: true }).first(),
+    page.getByText("Profile drafted. Review it in Settings › Profiles.", { exact: true }).first(),
   ).toBeVisible();
   await expect(button).toBeHidden();
   await expect.poll(() => modelReads).toBeGreaterThan(previousReads);
@@ -342,6 +341,7 @@ for (const ordinary of [true, false])
       await page.goto("/images");
       await openNav(page, "Library");
       await section(page, "Library", "Models");
+      await chooseView(page, "Models", "Available");
       await expect(
         page
           .getByRole("table", { name: "Library Models", exact: true })
@@ -367,3 +367,54 @@ for (const ordinary of [true, false])
       expect(unavailableReads).toBe(0);
     },
   );
+
+test("Catalogue views, search and filters narrow the list and reset without losing the query", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const model = (key: string, title: string, families: string[], installed = true) => ({
+    key: `diffusion_models/${key}.safetensors`,
+    title,
+    file: `${key}.safetensors`,
+    folder: "diffusion_models",
+    kind: "diffusion_model",
+    installed,
+    families,
+  });
+  await page.route("**/api/library/items", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          model("flux", "Flux Base", ["flux2_dev"]),
+          model("xl", "XL Base", ["sdxl"]),
+          model("later", "Later Model", ["sdxl"], false),
+        ],
+      },
+    }),
+  );
+  await page.goto("/library#models");
+  const table = page.getByRole("table", { name: "Library Models", exact: true });
+  await expect(table.getByRole("row")).toHaveCount(3);
+  await page.getByRole("button", { name: "Filter Models", exact: true }).click();
+  await page.getByRole("combobox", { name: "Family", exact: true }).click();
+  await page.getByRole("option", { name: "SDXL", exact: true }).click();
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("XL Base");
+  await page.getByRole("button", { name: "Reset Filters", exact: true }).click();
+  await expect(table.getByRole("row")).toHaveCount(3);
+  await page.getByRole("button", { name: "Filter Models", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Models Filters", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Search Models", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search Models", exact: true }).fill("flux");
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Search Models", exact: true })).toBeFocused();
+  await expect(table).toContainText("Flux Base");
+  await expect(table).not.toContainText("XL Base");
+  await page.getByRole("button", { name: "Search Models", exact: true }).click();
+  await page.getByRole("button", { name: "Clear Search", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await chooseView(page, "Models", "Available");
+  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table).toContainText("Later Model");
+});

@@ -120,7 +120,7 @@ export function LibraryImportReview({
       if (variables.action === "draft-profile") {
         void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
         void client.invalidateQueries({ queryKey: ["definition-list", "profile"] });
-        notifications.show({ message: "Profile drafted. Review it in Library › Profiles." });
+        notifications.show({ message: "Profile drafted. Review it in Settings › Profiles." });
       }
       if (result.failures?.length)
         notifications.show({
@@ -221,7 +221,7 @@ export function LibraryImportReview({
           )}
           {record.results?.profileId && (
             <Text size="sm" c="dimmed">
-              Profile drafted. Review it in Library › Profiles.
+              Profile drafted. Review it in Settings › Profiles.
             </Text>
           )}
           {record.grade?.reasons.map((reason) => (

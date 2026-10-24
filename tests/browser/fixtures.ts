@@ -586,3 +586,28 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
       .getByRole("link", { name: label, exact: true })
       .click();
 }
+
+/** Opens a Settings › Profiles view and the editor of its first listed definition. */
+export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
+  const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
+  if (!(await page.getByRole("table", { name: `Editable ${kind}s`, exact: true }).isVisible())) {
+    await page.goto("/images");
+    await openNav(page, "Settings");
+    await section(page, "Settings", "Profiles");
+    if (kind === "Guide") await chooseView(page, "Profiles", "Guides");
+  }
+  await page
+    .getByRole("button", { name: new RegExp(`^${kind} Actions for `) })
+    .first()
+    .click();
+  await page.getByRole("menuitem", { name: `Edit ${kind}`, exact: true }).click();
+  return editor;
+}
+
+/** Chooses one of a Library or Settings list's segmented views, such as Models › Available. */
+export async function chooseView(page: Page, list: string, view: string) {
+  await page
+    .getByRole("radiogroup", { name: `${list} View`, exact: true })
+    .getByText(view, { exact: true })
+    .click();
+}

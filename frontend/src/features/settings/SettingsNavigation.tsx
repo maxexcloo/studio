@@ -1,4 +1,14 @@
-import { Info, Server, UserRound, UsersRound } from "lucide-react";
+import {
+  Boxes,
+  FileCog,
+  Info,
+  Server,
+  Shield,
+  SlidersHorizontal,
+  UserRound,
+  UsersRound,
+  Wrench,
+} from "lucide-react";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 
@@ -8,10 +18,33 @@ const settingSections = {
     description: "Your role, sign-in details and personal MCP access.",
     icon: UserRound,
   },
-  accounts: {
-    label: "Accounts",
+  groups: {
+    label: "Groups",
     description:
-      "Access groups control each user’s local models, cloud models and NSFW access; administrators have all permissions.",
+      "Access groups choose each user’s local models, cloud models and NSFW access; administrators have every permission.",
+    icon: Shield,
+    admin: true,
+  },
+  models: {
+    label: "Models",
+    description: "Default profiles, catalogue features and integrations.",
+    icon: Boxes,
+    admin: true,
+  },
+  profiles: {
+    label: "Profiles",
+    description: "Generation profiles and prompting guides. Every saved version is kept.",
+    icon: FileCog,
+    admin: true,
+  },
+  studio: {
+    label: "Studio",
+    description: "How Studio works for you.",
+    icon: SlidersHorizontal,
+  },
+  users: {
+    label: "Users",
+    description: "Accounts, their access groups, chat identities and the new-account policy.",
     icon: UsersRound,
     admin: true,
   },
@@ -21,15 +54,26 @@ const settingSections = {
     icon: Server,
     admin: true,
   },
-  about: { label: "About", description: "Credits and licences.", icon: Info },
+  maintenance: {
+    label: "Maintenance",
+    description: "Clean up the gallery and gather details for a bug report.",
+    icon: Wrench,
+  },
+  about: {
+    label: "About",
+    description: "Version, licences and credits.",
+    icon: Info,
+    apart: true,
+  },
 };
+const multiUserOnly = new Set(["groups", "users"]);
 export function useSettingsNavigation() {
   const multi = useAccount().data?.mode === "multi-user";
   const admin = useIsAdmin();
   return {
     admin,
     multi,
-    options: visibleSections(settingSections, admin, (key) => key !== "accounts" || multi),
+    options: visibleSections(settingSections, admin, (key) => multi || !multiUserOnly.has(key)),
   };
 }
 export function SettingsTitle() {
