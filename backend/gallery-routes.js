@@ -130,6 +130,23 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
     });
   });
 
+  // The newest finished image the account made with each LoRA, shown as its picker preview.
+  app.get("/api/loras/previews", (req, res) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
+      return res.json({ previews: {} });
+    const newest = {};
+    for (const item of filterVisibleGallery(recordsForRequest(gallery, req))) {
+      if (item.status !== "done" || !item.thumbnailUrl) continue;
+      const time = Date.parse(item.createdAt || "") || 0;
+      for (const lora of Array.isArray(item.settings?.loras) ? item.settings.loras : [])
+        if (lora?.name && lora.enabled !== false && !(newest[lora.name]?.time >= time))
+          newest[lora.name] = { time, url: item.thumbnailUrl };
+    }
+    res.json({
+      previews: Object.fromEntries(Object.entries(newest).map(([name, { url }]) => [name, url])),
+    });
+  });
+
   app.get("/api/gallery", (req, res) => {
     if (!requireGalleryAccess(req, res))
       return res.json({
