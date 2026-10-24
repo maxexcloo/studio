@@ -4,7 +4,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeading } from "../../ui/SectionHeading";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 interface DefinitionRow {
@@ -65,48 +64,41 @@ export function LibraryDefinitions({ kind }: { kind: DefinitionKind }) {
   };
   return (
     <Stack gap="md">
-      <Group justify="space-between">
-        <SectionHeading>{kind === "profile" ? "Profiles" : "Guides"}</SectionHeading>
-        <Group gap="xs">
-          <Button
-            component="a"
-            href="/api/profiles/export"
-            download
-            variant="default"
-            size="compact-sm"
+      <Group gap="xs" justify="flex-end">
+        <Button
+          component="a"
+          href="/api/profiles/export"
+          download
+          variant="default"
+          size="compact-sm"
+        >
+          Export Definitions
+        </Button>
+        {kind === "profile" ? (
+          <FileButton
+            accept="application/json,.json"
+            onChange={(file) => {
+              if (file) importing.mutate(file);
+            }}
           >
-            Export Definitions
+            {(props) => (
+              <Button {...props} size="compact-sm" loading={importing.isPending}>
+                Import Workflow
+              </Button>
+            )}
+          </FileButton>
+        ) : (
+          <Button
+            size="compact-sm"
+            onClick={() => {
+              setSelected("");
+              setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
+            }}
+          >
+            New Guide
           </Button>
-          {kind === "profile" ? (
-            <FileButton
-              accept="application/json,.json"
-              onChange={(file) => {
-                if (file) importing.mutate(file);
-              }}
-            >
-              {(props) => (
-                <Button {...props} size="compact-sm" loading={importing.isPending}>
-                  Import Workflow
-                </Button>
-              )}
-            </FileButton>
-          ) : (
-            <Button
-              size="compact-sm"
-              onClick={() => {
-                setSelected("");
-                setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
-              }}
-            >
-              New Guide
-            </Button>
-          )}
-        </Group>
+        )}
       </Group>
-      <Text size="sm" c="dimmed">
-        Studio owns these definitions and keeps every saved version. Unreviewed AI drafts are
-        visible only to administrators.
-      </Text>
       {importing.error && <Alert color="red">{importing.error.message}</Alert>}
       {list.isPending ? (
         <LoadingState label="Loading Definitions" />

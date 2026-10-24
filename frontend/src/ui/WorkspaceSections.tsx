@@ -1,13 +1,30 @@
 import { Suspense, useState, type ReactNode } from "react";
 import { Box, Grid, Group, NavLink, Select, Stack, Text } from "@mantine/core";
+import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { LoadingState } from "./LoadingState";
+import { SectionHeading } from "./SectionHeading";
 
-interface SectionOption {
-  value: string;
+/** One Library or Settings section; `admin` sections are hidden from other accounts. */
+export interface SectionDefinition {
   label: string;
+  description: string;
+  icon: LucideIcon;
+  admin?: boolean;
 }
-function useWorkspaceSection(sections: SectionOption[]) {
+export type WorkspaceSection = SectionDefinition & { value: string };
+
+/** Lists the sections the account may open, in definition order. */
+export function visibleSections<Key extends string>(
+  sections: Record<Key, SectionDefinition>,
+  admin: boolean,
+  available: (key: Key) => boolean = () => true,
+): WorkspaceSection[] {
+  return (Object.entries(sections) as [Key, SectionDefinition][])
+    .filter(([key, section]) => (admin || !section.admin) && available(key))
+    .map(([value, section]) => ({ value, ...section }));
+}
+function useWorkspaceSection(sections: WorkspaceSection[]) {
   const location = useLocation();
   const active =
     sections.find((section) => `#${section.value}` === location.hash)?.value || sections[0].value;
@@ -20,7 +37,7 @@ export function WorkspaceSectionSelect({
   sections,
 }: {
   label: string;
-  sections: SectionOption[];
+  sections: WorkspaceSection[];
 }) {
   const { location, active } = useWorkspaceSection(sections);
   const navigate = useNavigate();
@@ -54,9 +71,11 @@ export function WorkspaceSectionSelect({
 export function WorkspaceSections({
   label,
   sections,
+  content,
 }: {
   label: string;
-  sections: (SectionOption & { content: ReactNode })[];
+  sections: WorkspaceSection[];
+  content: Record<string, ReactNode>;
 }) {
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
@@ -77,6 +96,7 @@ export function WorkspaceSections({
               replace
               state={location.state}
               label={section.label}
+              leftSection={<section.icon size={16} />}
               active={section.value === active}
               aria-current={section.value === active ? "page" : undefined}
             />
@@ -91,11 +111,19 @@ export function WorkspaceSections({
             aria-label={`${label}: ${section.label}`}
             hidden={section.value !== active}
           >
-            {visited.has(section.value) && (
-              <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
-                {section.content}
-              </Suspense>
-            )}
+            <Stack>
+              <div>
+                <SectionHeading>{section.label}</SectionHeading>
+                <Text size="sm" c="dimmed">
+                  {section.description}
+                </Text>
+              </div>
+              {visited.has(section.value) && (
+                <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
+                  {content[section.value]}
+                </Suspense>
+              )}
+            </Stack>
           </Box>
         ))}
       </Grid.Col>

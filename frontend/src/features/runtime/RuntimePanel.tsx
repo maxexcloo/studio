@@ -10,7 +10,6 @@ import type {
 } from "../../../../shared/services";
 import { api } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeading } from "../../ui/SectionHeading";
 
 const services = [
   { kind: "text", label: "Text" },
@@ -171,7 +170,6 @@ export function RuntimePanel({ compact = false }: { compact?: boolean }) {
   const available = services.filter(({ kind }) => status.data.services[kind]);
   return (
     <Stack gap={compact ? "sm" : "md"} aria-label="Runtime">
-      <SectionHeading>Runtime</SectionHeading>
       <Group gap="xs">
         <Badge color="gray" variant="light">
           {status.data.runtime.configured ? "Runtime Configured" : "Observe Only"}
