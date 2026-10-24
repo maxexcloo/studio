@@ -46,6 +46,7 @@ import {
   profileIdTaken,
   readEditableProfile,
   registerProfileEditorRoutes,
+  repointProfiles,
   validateProfileText,
 } from "./profile-editor.js";
 import { registerProfileRoutes } from "./profile-routes.js";
@@ -1570,6 +1571,7 @@ const library = registerLibraryRoutes(app, {
   gguf: async () => Boolean((await loadComfyContext()).info?.UnetLoaderGGUF),
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
+  repoint: async (from, to) => repointProfiles(from.file, to.file),
   references: modelFileReferences,
   profileDefinitions,
   schedule: !demoMode,

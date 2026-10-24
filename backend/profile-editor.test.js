@@ -140,3 +140,14 @@ test("saving backs up the old file, records the edit and refuses a stale base or
   // The edits list sits beside the profiles but isn't one.
   assert.equal(editor.listEditableProfiles().length, 1);
 });
+
+test("an updated model file moves the profiles that named it, each as a new version", () => {
+  const before = editor.readEditableProfile("image-test");
+  assert.deepEqual(editor.repointProfiles("model.safetensors", "model-v2.safetensors"), [
+    "Edited Image",
+  ]);
+  const after = editor.readEditableProfile("image-test");
+  assert.match(after.text, /"unet_name": "model-v2.safetensors"/);
+  assert.equal(after.version.version, before.version.version + 1);
+  assert.deepEqual(editor.repointProfiles("model.safetensors", "model-v2.safetensors"), []);
+});

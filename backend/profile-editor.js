@@ -269,6 +269,34 @@ export function saveEditableProfile(
   return { ...readEditableProfile(id), warnings: checked.warnings, version: store.meta(id) };
 }
 
+/**
+ * Points every profile that names `from` at `to` instead (a Library update's new file), each as a
+ * new version that keeps its AI-Drafted marker. Returns the names of the profiles it moved.
+ */
+export function repointProfiles(from, to, { by = "update" } = {}) {
+  if (!from || !to || from === to) return [];
+  const versions = profileStore({ workflowsDir: userWorkflowsDir }).metas();
+  const moved = [];
+  for (const profile of listEditableProfiles()) {
+    const current = readEditableProfile(profile.id);
+    if (!current.text.includes(JSON.stringify(from))) continue;
+    try {
+      saveEditableProfile(
+        profile.id,
+        current.text.replaceAll(JSON.stringify(from), JSON.stringify(to)),
+        { baseHash: current.hash, by, aiDrafted: versions[profile.id]?.aiDrafted === true },
+      );
+      moved.push(profile.name);
+    } catch (error) {
+      // It keeps the old file, which then stays for it.
+      console.warn(
+        `[library] Couldn’t move the ${profile.name} profile to ${to}: ${error.message}`,
+      );
+    }
+  }
+  return moved;
+}
+
 /** Restores an earlier version as a new version, checked like any edit. */
 export function revertEditableProfile(
   id,

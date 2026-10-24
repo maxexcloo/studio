@@ -5,9 +5,9 @@
  * as Update Available (and puts a dot on the Library's dock icon); nothing downloads on its own.
  *
  * Update downloads the new file under its own name. Once it is installed and verified, the
- * catalogue entry moves to the new file. If nothing references the old file any more (no
- * profile, no saved LoRA stack), the old file is removed through the worker model API; otherwise
- * it stays, and the update says what still uses it.
+ * catalogue entry and every profile that named the old file move to the new one. If nothing
+ * references the old file any more (no profile, no saved LoRA stack), the old file is removed
+ * through the worker model API; otherwise it stays, and the update says what still uses it.
  *
  * Paid and early-access versions are never downloaded: they show with the reason and the newest
  * free version, when there is one, to update to instead.
@@ -150,6 +150,7 @@ export function publicUpdate(item) {
  *   familiesOf(baseModel)       family ids
  *   startDownload(spec)         library-downloads.js; downloads() model-downloads.js state
  *   inspect(want, {verify})     library-routes.js inspectInstalled
+ *   repoint(from, to)           moves profiles from the old file to the new one: their names
  *   references({folder, file})  what still uses a file: ['Profile Flux Dev', …]
  *   removeFile(want)            removes an installed file (the worker model API), checking its hash
  */
@@ -163,6 +164,7 @@ export function createUpdateChecker({
   startDownload,
   downloads = () => ({ active: null, queued: [], recent: [] }),
   inspect,
+  repoint = async () => [],
   references = async () => [],
   removeFile,
   now = Date.now,
@@ -390,6 +392,13 @@ export function createUpdateChecker({
       } catch (error) {
         log.warn?.(`[library] Couldn’t move the catalogue entry for ${key}: ${error.message}`);
       }
+      const moved = await Promise.resolve(repoint(applied.from, applied.to)).catch((error) => {
+        log.warn?.(`[library] Couldn’t move profiles off ${applied.from.file}: ${error.message}`);
+        return [];
+      });
+      const movedNote = moved.length
+        ? ` Moved ${moved.length === 1 ? `the ${moved[0]} profile` : `${moved.length} profiles`} to it.`
+        : "";
       const users = await references(applied.from).catch(() => ["an unreadable reference"]);
       if (users.length)
         Object.assign(applied, {
@@ -401,12 +410,12 @@ export function createUpdateChecker({
           await removeFile(applied.from);
           Object.assign(applied, {
             state: "removed",
-            note: `Updated to ${applied.to.name}. The old file was removed.`,
+            note: `Updated to ${applied.to.name}.${movedNote} The old file was removed.`,
           });
         } catch (error) {
           Object.assign(applied, {
             state: "kept",
-            note: `Updated to ${applied.to.name}. The old file couldn’t be removed: ${error.message}`,
+            note: `Updated to ${applied.to.name}.${movedNote} The old file couldn’t be removed: ${error.message}`,
           });
         }
       }
