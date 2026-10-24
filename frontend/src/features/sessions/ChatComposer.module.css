@@ -1,0 +1,15 @@
+.writing textarea {
+  padding: 10px 0;
+  min-height: 44px;
+  line-height: 1.5;
+}
+
+.model input {
+  padding-inline: 0;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.model input:disabled {
+  background: transparent;
+}

@@ -26,17 +26,25 @@ test("Image → Refine → Animate retains one session and can reopen saved work
     .getByRole("article", { name: "Iteration 1", exact: true })
     .getByRole("button", { name: "Refine", exact: true })
     .click();
-  const variationPrompt = page.getByRole("textbox", { name: "Variation Prompt", exact: true });
-  await expect(variationPrompt).toBeVisible();
-  await variationPrompt.fill("An amber bird with silver wings");
-  await page.getByRole("button", { name: "Generate Variation", exact: true }).click();
+  // Refine and Animate stage their own card; the Chat composer keeps its references.
+  const refine = page.getByRole("region", { name: "Refine Iteration 1", exact: true });
+  await refine
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("An amber bird with silver wings");
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toHaveCount(1);
+  await refine.getByRole("button", { name: "Refine Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
+  await expect(refine).toBeHidden();
+  await expect(page.getByText("Refined iteration 1", { exact: true })).toBeVisible();
   await page
     .getByRole("article", { name: "Iteration 2", exact: true })
     .getByRole("button", { name: "Animate", exact: true })
     .click();
-  await variationPrompt.fill("The bird spreads its wings");
-  await page.getByRole("button", { name: "Generate Variation", exact: true }).click();
+  const animate = page.getByRole("region", { name: "Animate Iteration 2", exact: true });
+  await animate
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("The bird spreads its wings");
+  await animate.getByRole("button", { name: "Generate Video", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs.map((j) => j.operation)).toEqual(["image", "refine", "animate"]);
   expect(state.jobs[1].parentJobId).toBe("job-1");
@@ -141,7 +149,7 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   ).toBeVisible();
   expect(state.chatRequests[1].generation.input.profileId).toBe("image:test");
   expect(state.chatRequests[1].generation.input.backendId).toBe("worker-a");
-  await first.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  await first.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   // The card's output switch picks a profile like the gallery and explains why Generate waits.
   const output = first.getByRole("radiogroup", { name: "Generation Output", exact: true });
   await output.locator("label").filter({ hasText: "Video" }).click();
@@ -149,13 +157,13 @@ test("Chat keeps discussion, requested generation inputs and variation results t
     "Motion Quality",
   );
   await expect(
-    first.getByRole("button", { name: "Generate Variation", exact: true }),
+    first.getByRole("button", { name: "Generate Video", exact: true }),
   ).toHaveAccessibleDescription("This workflow requires a reference image.");
   await output.locator("label").filter({ hasText: "Image" }).click();
   await first
-    .getByRole("textbox", { name: "Variation Prompt", exact: true })
+    .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("A blue bird in watercolour");
-  await first.getByRole("button", { name: "Generate Variation", exact: true }).click();
+  await first.getByRole("button", { name: "Generate Image", exact: true }).click();
   const variation = page.getByRole("article", { name: "Iteration 2", exact: true });
   await expect(
     variation.getByRole("button", { name: "Open image: A blue bird in watercolour", exact: true }),
@@ -524,9 +532,9 @@ test("Waiting jobs show their reason and cancellation is scoped to the recorded 
   });
   await page.goto("/chat/session-1");
   await expect(page.getByText("Waiting for Media Worker to become available.")).toBeVisible();
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel Waiting bird", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await expect(page.getByText("cancelled", { exact: true })).toBeVisible();
+  await expect(page.getByText("Generation Cancelled", { exact: true })).toBeVisible();
 });
 
 test("Administrator accounts retain worker visibility and attribution", async ({ page }) => {
@@ -813,17 +821,17 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   await openTheme(page);
   await page.getByText("Fixed Width", { exact: true }).click();
   await page.keyboard.press("Escape");
-  const fixed = await page.locator(".studio-chat-workspace").boundingBox();
+  const fixed = await page.locator("[data-chat-workspace]").boundingBox();
   if (!testInfo.project.use.isMobile) {
     expect(fixed?.width).toBe(1600);
-    const side = await page.locator(".studio-session-sidebar").boundingBox();
+    const side = await page.getByRole("complementary", { name: "Chats" }).boundingBox();
     expect(side?.y).toBe(68);
     expect(side!.height + side!.y).toBe(1000);
   }
   await openTheme(page);
   await page.getByText("Full Width", { exact: true }).click();
   await page.keyboard.press("Escape");
-  const full = await page.locator(".studio-chat-workspace").boundingBox();
+  const full = await page.locator("[data-chat-workspace]").boundingBox();
   if (!testInfo.project.use.isMobile) expect(full!.width).toBeGreaterThan(fixed!.width);
   const composer = await page.locator("[data-composer-dock]").boundingBox();
   expect(composer!.width).toBeLessThanOrEqual(780);

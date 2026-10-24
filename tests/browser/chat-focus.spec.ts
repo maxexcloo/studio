@@ -76,8 +76,17 @@ test("Switching creative modes preserves unsent gallery inputs and the Chat mess
   await expect(prompt).toHaveValue("An unsent panoramic landscape");
 });
 
-async function savedChat(page: Page, count: number) {
+async function savedChat(page: Page, count: number, replying = false) {
   const state = await fixtures(page);
+  if (replying)
+    state.messages.push({
+      id: "later-reply",
+      sessionId: "session-focus",
+      role: "assistant",
+      content: "",
+      status: "streaming",
+      createdAt: new Date(Date.parse(stamp) + 10000).toISOString(),
+    });
   const sessionId = "session-focus";
   for (let index = 0; index < count; index++) {
     const createdAt = new Date(Date.parse(stamp) + index * 1000).toISOString();
@@ -164,26 +173,22 @@ test("A message typed while the previous request is being accepted remains in th
 test("Editing a scrolled older iteration reveals its prompt and keeps focus through later replies", async ({
   page,
 }) => {
-  const state = await savedChat(page, 9);
+  const state = await savedChat(page, 9, true);
   const latest = page.getByRole("article", { name: "Iteration 9", exact: true });
   await expect(latest).toBeInViewport();
   const first = page.getByRole("article", { name: "Iteration 1", exact: true });
-  const edit = first.getByRole("button", { name: "Edit & Rerun", exact: true });
+  const edit = first.getByRole("button", { name: "Edit Iteration 1", exact: true });
   await edit.scrollIntoViewIfNeeded();
   await edit.click();
-  const prompt = first.getByRole("textbox", { name: "Variation Prompt", exact: true });
+  const prompt = first.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toBeFocused();
   await expect(prompt).toBeInViewport({ ratio: 1 });
   await prompt.fill("A revised older composition\nWith softer light\nAnd a warmer background");
-  state.messages.push({
-    id: "later-reply",
-    sessionId: "session-focus",
-    role: "assistant",
+  Object.assign(state.messages[0], {
     content: "A later reply arrived while the earlier composition was being edited.",
     status: "completed",
-    createdAt: new Date(Date.parse(stamp) + 10000).toISOString(),
   });
-  // The real history poll appends content and resizes the feed while the older editor is active.
+  // The history poll follows a reply streaming elsewhere and resizes the feed while editing.
   await expect(page.getByText(state.messages[0].content, { exact: true })).toBeAttached();
   await expect(prompt).toBeFocused();
   await expect(prompt).toBeInViewport({ ratio: 1 });
@@ -198,13 +203,11 @@ for (const modifier of ["Control", "Meta"]) {
   }) => {
     const state = await savedChat(page, 1);
     const first = page.getByRole("article", { name: "Iteration 1", exact: true });
-    await first.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
-    const prompt = first.getByRole("textbox", { name: "Variation Prompt", exact: true });
+    await first.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
+    const prompt = first.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toBeFocused();
     await prompt.fill(`One ${modifier} variation`);
-    await expect(
-      first.getByRole("button", { name: "Generate Variation", exact: true }),
-    ).toBeEnabled();
+    await expect(first.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     let release!: () => void;
     const pending = new Promise<void>((resolve) => {
       release = resolve;
@@ -221,7 +224,7 @@ for (const modifier of ["Control", "Meta"]) {
       await prompt.press(`${modifier}+Enter`);
       await expect.poll(() => requests.length).toBe(1);
       await expect(
-        first.getByRole("button", { name: "Generate Variation", exact: true }),
+        first.getByRole("button", { name: "Generate Image", exact: true }),
       ).toBeDisabled();
       await prompt.press(`${modifier}+Enter`);
       expect(requests).toHaveLength(1);

@@ -1,21 +1,32 @@
-import { Alert, Group, Loader, Stack, Text } from "@mantine/core";
+import { Alert, Group, Loader, Paper, Stack, Text } from "@mantine/core";
+import { Pencil } from "lucide-react";
 import type { ChatMessage } from "../../../../shared/chat";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GenerationCard } from "./GenerationCard";
+import classes from "./SessionsPage.module.css";
 
-export function ChatTurn({ message }: { message: ChatMessage }) {
+/**
+ * One message. A card's request (`quiet`, such as "Edited iteration 1") is one dimmed line, since
+ * the new iteration below shows its prompt and settings.
+ */
+export function ChatTurn({ message, quiet }: { message: ChatMessage; quiet?: string }) {
   if (message.role === "user")
-    return (
-      <div className="studio-thread-prompt">
+    return quiet ? (
+      <Group gap={6} justify="flex-end" c="dimmed" className={classes.quiet}>
+        <Pencil size={13} aria-hidden />
+        <Text size="xs">{quiet}</Text>
+      </Group>
+    ) : (
+      <div className={classes.message}>
         <Text style={{ whiteSpace: "pre-wrap" }}>{message.content}</Text>
       </div>
     );
   return (
     <Stack
       gap="sm"
-      className="studio-assistant-turn"
       aria-label="Studio Reply"
       aria-busy={message.status === "streaming"}
+      className={classes.reply}
     >
       <Group gap="xs">
         <Text size="xs" fw={600} c="dimmed">
@@ -40,7 +51,14 @@ export function ChatTurn({ message }: { message: ChatMessage }) {
         </Alert>
       )}
       {message.actionError && message.draft && (
-        <GenerationCard draft={message.draft} sessionId={message.sessionId} />
+        <Paper withBorder radius="lg" p="md">
+          <GenerationCard
+            draft={message.draft}
+            sessionId={message.sessionId}
+            title="New Generation"
+            request="Generate with these settings"
+          />
+        </Paper>
       )}
     </Stack>
   );

@@ -14,6 +14,8 @@ export type QueueMedia = Record<string, unknown> & { id?: string; url?: string }
 export interface StudioSession {
   id: string;
   title: string;
+  /** Set once the title is generated or the user renames the chat; unset while it is New Chat. */
+  titleSource?: "generated" | "user";
   inputs: GenerationInput;
   createdAt: string;
   updatedAt: string;

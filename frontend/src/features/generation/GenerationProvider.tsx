@@ -61,7 +61,7 @@ export function defaultProfile(models: Models | undefined, kind: MediaKind) {
     profiles.find((profile) => profile.kind === kind)
   );
 }
-interface Draft {
+export interface Draft {
   input: GenerationInput;
   references: ReferenceAsset[];
   sessionId: string;
@@ -82,7 +82,8 @@ const empty: Draft = {
 const emptyProfiles: Profile[] = [];
 type Workspace = "chat" | "gallery";
 function useGenerationState(workspace: Workspace) {
-  const [prepared, setPrepared] = useState(false);
+  // A Chat card staged by Refine, Animate or Recreate keeps its own input beside the composer's.
+  const [staged, setStaged] = useState<Draft | null>(null);
   const initialDrafts: Record<MediaKind, Draft> = {
     image: empty,
     video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
@@ -147,14 +148,14 @@ function useGenerationState(workspace: Workspace) {
     profile,
     models,
     selectProfile,
-    prepared,
-    setPrepared,
+    staged,
+    setStaged,
   };
 }
 const Context = createContext<ReturnType<typeof useGenerationState> | null>(null);
 const GenerationActionsContext = createContext<Pick<
   ReturnType<typeof useGenerationState>,
-  "profiles" | "setDraft" | "changeKind" | "setPrepared"
+  "profiles" | "setDraft" | "changeKind" | "setStaged"
 > | null>(null);
 export function GenerationProvider({
   children,
@@ -169,9 +170,9 @@ export function GenerationProvider({
       profiles: value.profiles,
       setDraft: value.setDraft,
       changeKind: value.changeKind,
-      setPrepared: value.setPrepared,
+      setStaged: value.setStaged,
     }),
-    [value.profiles, value.setDraft, value.changeKind, value.setPrepared],
+    [value.profiles, value.setDraft, value.changeKind, value.setStaged],
   );
   return (
     <GenerationActionsContext.Provider value={actions}>
