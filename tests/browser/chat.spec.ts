@@ -138,6 +138,8 @@ test("Chats can be renamed and deleted with an opt-in results checklist", async 
 }) => {
   const state = await savedChat(page);
   await page.goto("/chat/chat-a");
+  // The Chat settles its focus once loaded; open row menus after that.
+  await expect(page.getByText("Three watercolour variations.")).toBeVisible();
   let list = await chats(page, isMobile);
   await list
     .getByRole("button", { name: "Chat Options for Blue Bird Studies", exact: true })
