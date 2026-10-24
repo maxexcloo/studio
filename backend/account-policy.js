@@ -18,7 +18,7 @@ export { isCloudProfile };
 
 export const accountRoles = Object.freeze({ administrator: "administrator", user: "user" });
 
-export const accessFeatures = Object.freeze([
+const accessFeatures = Object.freeze([
   "loras",
   "imageGeneration",
   "videoGeneration",

@@ -8,14 +8,14 @@
  * reach AI Control.
  */
 
-export class ControlError extends Error {
+class ControlError extends Error {
   constructor(message, status = 502) {
     super(message);
     this.status = status;
   }
 }
 
-export function controlConfigured(environment = process.env) {
+function controlConfigured(environment = process.env) {
   return Boolean(environment.CONTROL_URL && environment.CONTROL_API_KEY);
 }
 

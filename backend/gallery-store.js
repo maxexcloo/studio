@@ -31,7 +31,7 @@ import { hasReferenceImage } from "./workflow-modes.js";
 
 export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
-export const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
+const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
 export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
 const changeLogLimit = Number(process.env.STUDIO_GALLERY_CHANGELOG_LIMIT || 10000);
@@ -115,7 +115,7 @@ export function markerOf(key) {
   return marker;
 }
 
-export let hiddenGalleryIds = loadHiddenGalleryIds();
+let hiddenGalleryIds = loadHiddenGalleryIds();
 
 function loadHiddenGalleryIds() {
   const database = usesRuntimeDatabase(dataDir);
@@ -340,7 +340,7 @@ function pageStart(entry, cursor) {
 const searchTexts = new WeakMap();
 
 /** What a gallery search looks through: the prompts, the model and LoRAs, and the file's name. */
-export function gallerySearchText(item) {
+function gallerySearchText(item) {
   if (!item || typeof item !== "object") return "";
   let text = searchTexts.get(item);
   if (text === undefined) {
@@ -880,7 +880,7 @@ function persistHiddenMarkers(value) {
 }
 
 /** Writes the gallery at once, blocking: for when the process is about to exit. */
-export function writeGalleryNow() {
+function writeGalleryNow() {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
@@ -935,7 +935,7 @@ export function addGalleryItems(items) {
   setGallery(dedupeGallery([...items, ...gallery]));
 }
 
-export function saveHiddenGalleryIds() {
+function saveHiddenGalleryIds() {
   hiddenVersion += 1;
   fs.mkdirSync(dataDir, { recursive: true });
   const entries = [...hiddenGalleryIds.entries()].slice(-galleryLimit * 2);
@@ -1018,7 +1018,7 @@ export function storedChatRecord(value) {
   return id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id) ? { conversationId: id } : null;
 }
 
-export function storedAssistantRecord(value) {
+function storedAssistantRecord(value) {
   if (
     !value ||
     typeof value !== "object" ||

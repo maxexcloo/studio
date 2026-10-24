@@ -19,7 +19,7 @@ import { envFileKeys } from "./env.js";
 const tokenKeys = ["HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"];
 
 /** The token in use and where it came from ("file" when read from .env, "environment" when set outside). */
-export function hfToken(env = process.env) {
+function hfToken(env = process.env) {
   for (const key of tokenKeys) {
     const value = String(env[key] || "").trim();
     if (value) return { token: value, source: envFileKeys.has(key) ? "file" : "environment", key };
@@ -34,7 +34,7 @@ export function hfTokenStatus(env = process.env) {
 }
 
 /** The mirror downloads go to instead of huggingface.co, or null. */
-export function hfEndpoint(env = process.env) {
+function hfEndpoint(env = process.env) {
   const raw = String(env.HF_ENDPOINT || "").trim();
   if (!raw) return null;
   try {

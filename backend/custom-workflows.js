@@ -9,7 +9,7 @@ import { workflowIds } from "./workflow-registry.js";
 import { writeJsonFile } from "./json-store.js";
 import { builtInProfilesEnabled, grokEnabled, modelFamilyEnabled } from "./features.js";
 
-export const bundledWorkflowsDir = path.join(root, "backend", "workflows");
+const bundledWorkflowsDir = path.join(root, "backend", "workflows");
 export const userWorkflowsDir = path.join(dataDir, "workflows");
 
 // Windows keeps these names for devices, with any extension: `con.json` can never be a file.

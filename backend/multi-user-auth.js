@@ -39,7 +39,7 @@ import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
 
 export const multiUserEnabled = process.env.STUDIO_MULTI_USER === "1";
-export const accountCookieName = "studio_account";
+const accountCookieName = "studio_account";
 const oidcStateCookie = `${accountCookieName}_oidc`;
 const limiter = createGuessLimiter();
 
@@ -69,7 +69,7 @@ const mcpBearerRoutes = [
   ["GET", /^\/comfy\/view$/],
 ];
 
-export function mcpBearerRouteAllowed(method, routePath) {
+function mcpBearerRouteAllowed(method, routePath) {
   return mcpBearerRoutes.some(
     ([allowedMethod, pattern]) => allowedMethod === method && pattern.test(routePath),
   );

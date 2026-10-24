@@ -112,8 +112,8 @@ const presets = {
   high: { preScale: 0.7, targetScale: 3, maxShort: 2816, blocksToSwap: 36, tileSize: 512 },
 };
 
-export const upscaleNodeClasses = nodePacks.seedvr2.nodes;
-export const faceDetailNodeClasses = ["FaceDetailer", "UltralyticsDetectorProvider", "SAMLoader"];
+const upscaleNodeClasses = nodePacks.seedvr2.nodes;
+const faceDetailNodeClasses = ["FaceDetailer", "UltralyticsDetectorProvider", "SAMLoader"];
 
 const repoOverride = process.env.STUDIO_SEEDVR2_HF_REPO || "";
 
@@ -135,7 +135,7 @@ function downloadUrl(file) {
  * only Comfy path Studio already knows, so derive the sibling models folder from
  * it unless an explicit override is set.
  */
-export function seedvr2ModelDir() {
+function seedvr2ModelDir() {
   const override = String(process.env.STUDIO_SEEDVR2_MODEL_DIR || "").trim();
   if (override) return path.resolve(override);
   const models = comfyModelsDir();
@@ -232,7 +232,7 @@ function resolveVae(have) {
 }
 
 /** The files this tier would download: its preferred DiT (unless a tier alternate is here) and the VAE. */
-export function requiredModelsFor(quality, info, dir = seedvr2ModelDir()) {
+function requiredModelsFor(quality, info, dir = seedvr2ModelDir()) {
   const tier = ditTiers[normalizeQuality(quality)];
   const have = available(info, dir);
   const ditPresent = tier.some((file) => byBase(have.dit, file));
@@ -481,7 +481,7 @@ async function downloadWithRetry(entry, dir, onProgress, signal) {
   }
 }
 
-export function downloadPlan(quality, info) {
+function downloadPlan(quality, info) {
   const dir = seedvr2ModelDir();
   const files = requiredModelsFor(quality, info, dir)
     .filter((model) => !model.present)

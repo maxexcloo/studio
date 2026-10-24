@@ -25,7 +25,7 @@ import path from "node:path";
 import { configurationDirectory } from "./config-directory.js";
 
 const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(id) && !id.includes("..");
-export const seedConfigFiles = Object.freeze([
+const seedConfigFiles = Object.freeze([
   "catalogue.json",
   "prompting.json",
   "lora-catalogue.json",

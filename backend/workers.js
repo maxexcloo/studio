@@ -137,7 +137,7 @@ const fromDeployment = (environment, key) =>
   Boolean(environment[key]) && !(environment === process.env && envFileKeys.has(key));
 
 /** The legacy pair as workers: COMFY_URL runs images, upscales and model downloads (and video unless a video worker exists). */
-export function legacyWorkers({ imageUrl = "", videoUrl = "", videoElsewhere = false } = {}) {
+function legacyWorkers({ imageUrl = "", videoUrl = "", videoElsewhere = false } = {}) {
   const workers = [];
   const image = normalizeWorkerUrl(imageUrl);
   const video = normalizeWorkerUrl(videoUrl);
@@ -280,7 +280,7 @@ export const listWorkers = () => state().workers;
 export const workerById = (id) => state().workers.find((worker) => worker.id === id) || null;
 export const workerHas = (id, capability) =>
   Boolean(workerById(id)?.capabilities.includes(capability));
-export const workersWith = (capability) =>
+const workersWith = (capability) =>
   state().workers.filter((worker) => worker.capabilities.includes(capability));
 /** The variable the deployment defines workers with, if any. */
 export const workersVariable = () => state().variable;

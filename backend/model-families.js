@@ -31,7 +31,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
  *                 match nothing known ask for their type instead
  */
 
-export const modelSources = ["unet", "checkpoint"];
+const modelSources = ["unet", "checkpoint"];
 
 // ComfyUI folder kind and its subfolders under models/, per source.
 const sourceFolders = {
@@ -54,7 +54,7 @@ function choiceKey(source, name) {
   return `${source}:${name}`;
 }
 
-export function loadModelChoices() {
+function loadModelChoices() {
   if (choicesCache) return choicesCache;
   try {
     const raw = readJsonFile(choicesPath());
@@ -176,7 +176,7 @@ export function modelFileBytes(source, name) {
 }
 
 /** The local header of a model file, cached by size and mtime; null when out of reach. */
-export function modelHeader(source, name) {
+function modelHeader(source, name) {
   const file = localModelFile(source, name);
   if (!file) return null;
   let stat;
@@ -202,7 +202,7 @@ export function modelHeader(source, name) {
  * Which parts an all-in-one checkpoint carries, from its tensor prefixes
  * (ComfyUI's text_encoder_key_prefix / vae_key_prefix). null when unreadable.
  */
-export function bundledParts(header) {
+function bundledParts(header) {
   if (!header) return null;
   const keys = Object.keys(header);
   const encoder = keys.some(

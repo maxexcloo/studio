@@ -17,7 +17,7 @@ export class RuntimeUnavailable extends Error {
   status = 503;
 }
 
-export interface RuntimeLease {
+interface RuntimeLease {
   workload: Workload;
   /** Call only after outputs have been saved, or the operation has failed/cancelled. */
   release(): void;

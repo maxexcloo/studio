@@ -32,7 +32,7 @@ function crc32(...buffers) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export function isPng(buffer) {
+function isPng(buffer) {
   return Buffer.isBuffer(buffer) && buffer.length >= 8 && buffer.subarray(0, 8).equals(signature);
 }
 

@@ -43,7 +43,7 @@ const inventories = new Map();
 export const noteWorkerReachable = (id, up) => {
   if (id) reachable.set(id, Boolean(up));
 };
-export const workerReachable = (id) => (reachable.has(id) ? reachable.get(id) : null);
+const workerReachable = (id) => (reachable.has(id) ? reachable.get(id) : null);
 export const noteWorkerProfiles = (id, profiles = []) => {
   if (id)
     inventories.set(

@@ -22,7 +22,7 @@ const GiB = 1024 ** 3;
  * limit is set. Metal's own recommendedMaxWorkingSetSize lands at about 74–78%
  * on recent Macs; a little under that leaves room for macOS and the apps around.
  */
-export const APPLE_UNIFIED_SHARE = 0.7;
+const APPLE_UNIFIED_SHARE = 0.7;
 
 const gigabytes = (bytes) => Math.round(((Number(bytes) || 0) / GiB) * 10) / 10;
 
@@ -180,7 +180,7 @@ export async function localHardware({
 
 /** `sysctl iogpu.wired_limit_mb`: 0 (the macOS default) unless someone raised the GPU's share. */
 let wiredLimitCache = null;
-export async function macWiredLimitMb(run = runQuiet) {
+async function macWiredLimitMb(run = runQuiet) {
   if (process.platform !== "darwin") return 0;
   if (wiredLimitCache && Date.now() - wiredLimitCache.at < 60_000) return wiredLimitCache.value;
   const value =

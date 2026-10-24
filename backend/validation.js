@@ -8,7 +8,7 @@ import { getCustomWorkflow } from "./custom-workflows.js";
 import { inpaintingEnabled } from "./features.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
-export function clampNumber(value, fallback, min, max) {
+function clampNumber(value, fallback, min, max) {
   const number = Number(value);
   const safeFallback = Number.isFinite(Number(fallback)) ? Number(fallback) : 0;
   const safeMin = Number.isFinite(Number(min)) ? Number(min) : -Number.MAX_SAFE_INTEGER;
@@ -17,11 +17,11 @@ export function clampNumber(value, fallback, min, max) {
   return Math.max(safeMin, Math.min(safeMax, number));
 }
 
-export function clampInteger(value, fallback, min, max) {
+function clampInteger(value, fallback, min, max) {
   return Math.round(clampNumber(value, fallback, min, max));
 }
 
-export function snapNumber(value, fallback, range = {}) {
+function snapNumber(value, fallback, range = {}) {
   const step = Number(range.step || 1) || 1;
   const min = Number.isFinite(Number(range.min)) ? Number(range.min) : -Number.MAX_SAFE_INTEGER;
   const max = Number.isFinite(Number(range.max)) ? Number(range.max) : Number.MAX_SAFE_INTEGER;
@@ -31,11 +31,11 @@ export function snapNumber(value, fallback, range = {}) {
   return Math.max(min, Math.min(max, snapped));
 }
 
-export function snapInteger(value, fallback, range = {}) {
+function snapInteger(value, fallback, range = {}) {
   return Math.round(snapNumber(value, fallback, range));
 }
 
-export function ensureOption(info, node, key, value, label) {
+function ensureOption(info, node, key, value, label) {
   const selected = String(value || "");
   if (!selected) throw new Error(`${label} is required for this workflow.`);
   const options = optionsFor(info, node, key);

@@ -24,9 +24,9 @@ import os from "node:os";
  * and are not a cross-site risk; they still need the header or JSON.
  */
 
-export const studioHeader = "x-studio";
+const studioHeader = "x-studio";
 /** The header's name before Studio's hard fork, still accepted from pages and scripts made before it. */
-export const legacyStudioHeader = "x-heiss";
+const legacyStudioHeader = "x-heiss";
 /** On a 401 that a sign-in would fix; the page then shows its sign-in. */
 export const signInHeader = "X-Studio-Sign-In";
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -72,7 +72,7 @@ function machineNames() {
 }
 
 /** STUDIO_ALLOWED_HOSTS: names a person put in front of the studio themselves (a home DNS name, a tailnet name). */
-export function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
+function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
   return String(value || "")
     .split(/[\s,]+/)
     .map((name) => hostnameOf(name.replace(/^https?:\/\//i, "").replace(/\/.*$/, "")))

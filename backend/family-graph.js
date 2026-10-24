@@ -791,7 +791,7 @@ function upsamplePrompt(add, family, body) {
  * Ideogram 4's schedule follows how many steps you give it, like Comfy-Org's
  * presets: Turbo (12 steps) shifts toward detail, Quality (48) narrows the spread.
  */
-export function ideogram4Preset(steps) {
+function ideogram4Preset(steps) {
   if (steps <= 14) return { mu: 0.5, std: 1.75 };
   if (steps >= 36) return { mu: 0, std: 1.5 };
   return { mu: 0, std: 1.75 };

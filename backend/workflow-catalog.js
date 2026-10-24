@@ -54,7 +54,7 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
   writeJsonFile(preferencesPath, preferences);
 }
 
-export function updateWorkflowPreferencePatch(patch = {}) {
+function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {
     favorites: Array.isArray(patch.favorites) ? patch.favorites : current.favorites,

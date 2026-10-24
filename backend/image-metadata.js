@@ -89,7 +89,7 @@ export function imageFormat(buffer) {
 }
 
 /** A PNG's size and text chunks, keyword → value (the first one wins). */
-export function pngMetadata(buffer) {
+function pngMetadata(buffer) {
   const info = { width: 0, height: 0, text: {} };
   let offset = 8;
   while (offset + 12 <= buffer.length) {
@@ -201,7 +201,7 @@ function userComment(data) {
 }
 
 /** A WebP's size and its EXIF and XMP chunks. */
-export function webpMetadata(buffer) {
+function webpMetadata(buffer) {
   const info = { width: 0, height: 0, exif: null, xmp: "" };
   let offset = 12;
   while (offset + 8 <= buffer.length) {
@@ -228,7 +228,7 @@ export function webpMetadata(buffer) {
 }
 
 /** A JPEG's size, its EXIF block and its comments. */
-export function jpegMetadata(buffer) {
+function jpegMetadata(buffer) {
   const info = { width: 0, height: 0, exif: null, comments: [] };
   let offset = 2;
   while (offset + 4 <= buffer.length) {

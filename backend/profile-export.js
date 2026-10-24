@@ -20,7 +20,7 @@ import { zipBuffer } from "./gallery-export.js";
 import { profileBlock } from "./profile-block.js";
 import { hashOf } from "./profile-store.js";
 
-export const exportsKept = 20;
+const exportsKept = 20;
 const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(id) && !id.includes("..");
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const sorted = (value) =>

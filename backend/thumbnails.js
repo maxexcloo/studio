@@ -36,7 +36,7 @@ const pending = new Map();
  * is a memory spike here and a flood of /view requests there. Cached
  * thumbnails don't wait; only building does.
  */
-export const BUILD_SLOTS = 4;
+const BUILD_SLOTS = 4;
 let building = 0;
 const waiting = [];
 export function buildStats() {
@@ -469,7 +469,7 @@ export function viewParams(url = "") {
  * nothing of it in the open, and a thumbnail is a small copy of it.
  * Returns how many files went.
  */
-export function forgetThumbnail(filename, subfolder = "", type = "output") {
+function forgetThumbnail(filename, subfolder = "", type = "output") {
   if (!filename) return 0;
   // Every rendition: the viewer's display copy is as much a copy as the thumbnail.
   const keys = Object.keys(RENDITIONS).map((size) => cacheKey(filename, subfolder, type, size));

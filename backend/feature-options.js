@@ -7,7 +7,7 @@
  * profile once, then drops it from Studio's .env, so nobody gains or loses access.
  * A value the deployment sets stays where it is, as the lock.
  */
-export const retiredFeatureSwitches = Object.freeze([
+const retiredFeatureSwitches = Object.freeze([
   ["loras", "STUDIO_ENABLE_LORAS"],
   ["cloudModels", "STUDIO_ENABLE_GROK"],
 ]);

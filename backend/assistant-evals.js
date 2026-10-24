@@ -35,7 +35,7 @@ const hasPhrase = (text, phrase) =>
     "iu",
   ).test(text);
 /** Text inside straight or curly double quotes. */
-export const quotedText = (value) =>
+const quotedText = (value) =>
   [...String(value || "").matchAll(/["“]([^"”]+)["”]/g)].map((match) => match[1]);
 
 // Words that show a preset's tone; a rewrite needs at least one (cases may give their own).

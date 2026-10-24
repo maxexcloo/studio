@@ -112,7 +112,7 @@ function flattenStrings(value, out = []) {
  * Ask ComfyUI where it writes, then fall back to the usual install spots. Each
  * candidate is inspected so the best one can be adopted without guessing.
  */
-export async function detectOutputDirs() {
+async function detectOutputDirs() {
   const found = new Map();
   const add = (dir, source) => {
     const resolved = normalizeFolderInput(dir);

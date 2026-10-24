@@ -7,7 +7,7 @@ import { isThisComputer } from "./hardware.js";
  * does not answer and points at this computer, Studio looks at these too and
  * keeps whichever answers, so nobody has to know about ports.
  */
-export const usualComfyAddresses = ["http://127.0.0.1:8188", "http://127.0.0.1:8000"];
+const usualComfyAddresses = ["http://127.0.0.1:8188", "http://127.0.0.1:8000"];
 
 const SEARCH_EVERY_MS = 8000;
 

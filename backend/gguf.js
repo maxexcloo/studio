@@ -229,7 +229,7 @@ const gemma3Keys = [
   ["post_attention_norm", "post_attention_layernorm"],
 ];
 // loader.py TXT_ARCH_LIST: what CLIPLoaderGGUF accepts, and how it renames each.
-export const ggufTextArchitectures = {
+const ggufTextArchitectures = {
   t5: t5Keys,
   t5encoder: t5Keys,
   llama: llamaKeys,
@@ -286,7 +286,7 @@ export function ggufEncoderNames(info) {
 /* ------------------------------------------------------------ Graph */
 
 // Each core loader's ComfyUI-GGUF twin and the inputs the twin does not take.
-export const ggufLoaders = {
+const ggufLoaders = {
   UNETLoader: { node: "UnetLoaderGGUF", files: ["unet_name"], drop: ["weight_dtype"] },
   CLIPLoader: { node: "CLIPLoaderGGUF", files: ["clip_name"], drop: ["device"] },
   DualCLIPLoader: {

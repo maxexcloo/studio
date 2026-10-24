@@ -79,7 +79,7 @@ function storedName(filename) {
 }
 
 /** One output into Studio media: the rewritten output, and the ComfyUI file to remove, or null when it stays put. */
-export async function ingestOutput(output, ownerId = "") {
+async function ingestOutput(output, ownerId = "") {
   const ref = comfyRef(output?.url);
   if (!ref) return null;
   const bytes = Buffer.from(await comfy(`/view?${new URLSearchParams(ref)}`, { timeout: 120_000 }));

@@ -503,7 +503,7 @@ function learnFromFailure(body, message = "") {
  * Waits before the next look at ComfyUI; a finished-run message on the socket ends the wait early.
  * Once the run has finished, history can lag the message by a moment, so it is checked again soon.
  */
-export const FINISHED_POLL_MS = 150;
+const FINISHED_POLL_MS = 150;
 async function pause(run, ms) {
   if (run.finished) ms = Math.min(ms, FINISHED_POLL_MS);
   await new Promise((resolve) => {
@@ -908,7 +908,7 @@ function hashString(str = "") {
   return hash;
 }
 
-export function generateMockImageDataUrl(prompt = "", width = 1024, height = 1024, kind = "image") {
+function generateMockImageDataUrl(prompt = "", width = 1024, height = 1024, kind = "image") {
   const colorPalettes = [
     ["#1e1b4b", "#312e81", "#4338ca", "#6366f1", "#818cf8"],
     ["#0f172a", "#1e293b", "#334155", "#0284c7", "#38bdf8"],

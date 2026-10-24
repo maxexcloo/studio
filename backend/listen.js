@@ -23,9 +23,9 @@ export function listenPlan({ host, tls = startupTls }) {
   };
 }
 
-export let httpsListening = false;
+let httpsListening = false;
 /** Why HTTPS isn't running although it was set up: the certificate, or its port. Settings shows it. */
-export let httpsProblem = "";
+let httpsProblem = "";
 
 /**
  * Starts the servers. Plain HTTP moves to the next free port when another
