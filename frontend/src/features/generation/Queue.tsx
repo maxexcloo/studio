@@ -43,7 +43,9 @@ export function useQueueAction(jobId?: string) {
   const action = useMutation({
     mutationKey: queueActionKey,
     mutationFn: ({ id, action }: QueueAction) =>
-      post(id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`),
+      post<{ job?: QueueJob }>(
+        id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`,
+      ),
     onSuccess: () =>
       Promise.all([
         client.invalidateQueries({ queryKey: queueQuery.queryKey }),
@@ -65,11 +67,9 @@ export function useQueueAction(jobId?: string) {
     mutate: (value: QueueAction) => {
       if (!matching(value)) action.mutate(value);
     },
-    mutateAsync: async (value: QueueAction) => {
-      if (matching(value)) return false;
-      await action.mutateAsync(value);
-      return true;
-    },
+    /** Resolves to the response (a retry's new job), or `undefined` when already in flight. */
+    mutateAsync: async (value: QueueAction) =>
+      matching(value) ? undefined : action.mutateAsync(value),
   };
 }
 export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {

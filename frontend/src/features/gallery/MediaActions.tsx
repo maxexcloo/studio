@@ -25,6 +25,7 @@ import type { MediaTransferActions } from "./mediaShare";
 import { upscaling } from "./UpscaleControls";
 import { useMediaAction } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
+import { useTryAgain } from "./useTryAgain";
 
 /** Actions a surface already shows as its own buttons. */
 export type PrimaryAction =
@@ -36,10 +37,18 @@ export type PrimaryAction =
   | "copy"
   | "star";
 
-function FailedRetry({ jobId }: { jobId: string }) {
+/** Retries a failed item's job; the new pending tile replaces it (`onRetried` gets the new job). */
+function FailedRetry({
+  item,
+  onRetried,
+}: {
+  item: MediaItem & { jobId: string };
+  onRetried?: (jobId: string) => void;
+}) {
   const queue = useQueue();
-  const retry = useQueueAction(jobId);
-  const job = queue.data?.jobs.find((job) => job.id === jobId);
+  const retry = useQueueAction(item.jobId);
+  const tryAgain = useTryAgain([item]);
+  const job = queue.data?.jobs.find((job) => job.id === item.jobId);
   if (queue.error)
     return (
       <Menu.Item h={36} onClick={() => void queue.refetch()}>
@@ -58,7 +67,10 @@ function FailedRetry({ jobId }: { jobId: string }) {
       leftSection={<RotateCw size={16} />}
       disabled={retry.isPending}
       closeMenuOnClick={false}
-      onClick={() => retry.mutate({ id: job.id, action: "retry" })}
+      onClick={async () => {
+        const replacement = (await tryAgain([job.id])).get(job.id);
+        if (replacement) onRetried?.(replacement);
+      }}
     >
       Retry
     </Menu.Item>
@@ -115,6 +127,7 @@ export function MediaActionItems({
   onApplied = () => {},
   onCompare,
   onDelete,
+  onRetried,
   onSelect,
   onUpscale,
 }: {
@@ -126,6 +139,7 @@ export function MediaActionItems({
   onApplied?: () => void;
   onCompare?: () => void;
   onDelete: () => void;
+  onRetried?: (jobId: string) => void;
   onSelect?: () => void;
   onUpscale?: () => void;
 }) {
@@ -135,7 +149,9 @@ export function MediaActionItems({
   const shown = (id: PrimaryAction) => ready && !omit.includes(id);
   return (
     <>
-      {item.status === "error" && item.jobId && <FailedRetry jobId={item.jobId} />}
+      {item.status === "error" && item.jobId && (
+        <FailedRetry item={{ ...item, jobId: item.jobId }} onRetried={onRetried} />
+      )}
       {shown("refine") && (
         <Menu.Item
           h={36}
@@ -225,7 +241,7 @@ export function MediaActionItems({
           {item.favorite ? "Unstar" : "Star"}
         </Menu.Item>
       )}
-      {onSelect && (item.status === "done" || item.status === "error") && (
+      {onSelect && (
         <Menu.Item h={36} leftSection={<SquareCheck size={16} />} onClick={onSelect}>
           Select
         </Menu.Item>
