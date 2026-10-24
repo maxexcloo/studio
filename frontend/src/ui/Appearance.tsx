@@ -60,6 +60,10 @@ const Context = createContext<{
   setAppearance: (next: Appearance | ((previous: Appearance) => Appearance)) => void;
 }>(null!);
 const colourSchemeManager = localStorageColorSchemeManager({ key: "studio-colour-scheme" });
+// Glass needs backdrop blur; without it, translucent surfaces would show the page through text.
+const blurs =
+  CSS.supports("backdrop-filter", "blur(1px)") ||
+  CSS.supports("-webkit-backdrop-filter", "blur(1px)");
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearance] = useLocalStorage<Appearance>({
     key: "studio-appearance",
@@ -79,7 +83,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         rounding: resolved.rounding,
         background: resolved.background,
         motionDuration: duration,
-        transparency: !opaque,
+        transparency: blurs && !opaque,
       }),
     [resolved.colour, resolved.rounding, resolved.background, duration, opaque],
   );
