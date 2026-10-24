@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
 import { api, failure, post } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
+import { modelsQuery } from "../generation/GenerationProvider";
 import { SectionHeading } from "../../ui/SectionHeading";
 import { InspirationPreset, type LibraryPreset } from "./InspirationPreset";
 
@@ -117,7 +118,7 @@ export function LibraryImportReview({
       void client.invalidateQueries({ queryKey: ["library"] });
       void client.invalidateQueries({ queryKey: ["presets"] });
       if (variables.action === "draft-profile") {
-        void client.invalidateQueries({ queryKey: ["models"] });
+        void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
         void client.invalidateQueries({ queryKey: ["definition-list", "profile"] });
         notifications.show({ message: "Profile drafted. Review it in Library › Profiles." });
       }

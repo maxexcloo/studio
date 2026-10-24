@@ -15,6 +15,7 @@ import { api, post, request } from "../../api";
 import type { Session } from "../../types";
 import { useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
+import { queueQuery } from "../generation/Queue";
 
 interface ChatHistory {
   messages: ChatMessage[];
@@ -127,7 +128,7 @@ function useChatState() {
           setPrepared(false);
           setDraft((previous) => ({ ...previous, parentJobId: event.data.job.id }));
           void client.invalidateQueries({ queryKey: ["session", sessionId] });
-          void client.invalidateQueries({ queryKey: ["queue"] });
+          void client.invalidateQueries({ queryKey: queueQuery.queryKey });
           void client.invalidateQueries({ queryKey: ["gallery"] });
         } else if (event.event === "error") setError(event.data.error);
       });

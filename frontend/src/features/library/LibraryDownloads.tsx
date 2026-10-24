@@ -17,6 +17,7 @@ import { api, failure, post } from "../../api";
 import type { Models } from "../../types";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { modelsQuery } from "../generation/GenerationProvider";
 
 interface ModelDownload {
   id: string;
@@ -80,7 +81,7 @@ export function LibraryDownloads({ active }: { active: boolean }) {
     );
     if ([...completed].some((key) => !seenCompleted.current.has(key))) {
       void api<Models>("/api/models")
-        .then((models) => client.setQueryData(["models"], models))
+        .then((models) => client.setQueryData(modelsQuery.queryKey, models))
         .catch(failure);
       for (const queryKey of [["library"], ["imports"]])
         void client.invalidateQueries({ queryKey });

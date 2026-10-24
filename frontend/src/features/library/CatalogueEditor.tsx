@@ -18,6 +18,8 @@ import { useMediaQuery } from "@mantine/hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { modelFamilyLabel } from "../../ui/modelFamily";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { libraryItemCategory, type LibraryItem } from "./LibraryCatalogueTable";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;
@@ -60,8 +62,8 @@ function CatalogueForm({
     },
   });
   const refresh = () => {
-    for (const key of ["library", "lora-info", "models"])
-      void client.invalidateQueries({ queryKey: [key] });
+    for (const queryKey of [["library"], loraInfoQuery.queryKey, modelsQuery.queryKey])
+      void client.invalidateQueries({ queryKey });
     close();
   };
   const save = useMutation({

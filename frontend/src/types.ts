@@ -1,4 +1,5 @@
 import type { QueueJob as SharedQueueJob, StudioSession } from "../../shared/queue";
+import type { UpscaleQuality } from "../../shared/upscale";
 export type MediaKind = "image" | "video";
 export interface Profile {
   id: string;
@@ -93,7 +94,7 @@ export interface MediaItem {
     height?: number;
     status?: string;
     outputName?: string;
-    quality?: "fast" | "balanced" | "high";
+    quality?: UpscaleQuality;
     faceDetail?: boolean;
     scale?: number;
     jobId?: string;
@@ -106,6 +107,21 @@ export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "pro
   progress?: { value: number; max: number; phase?: string };
 };
 export type Session = Omit<StudioSession, "inputs"> & { inputs: Partial<GenerationInput> };
+export interface Account {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "administrator" | "user";
+  features?: Record<string, boolean>;
+  accessProfileId?: string;
+  accessProfile?: { name: string } | null;
+  disabled?: boolean;
+  pending?: boolean;
+  signInLinked?: boolean;
+  provider?: string;
+  canChangeEmail?: boolean;
+  canChangePassword?: boolean;
+}
 export interface Models {
   features?: { library?: boolean; presets?: boolean };
   profiles: Profile[];

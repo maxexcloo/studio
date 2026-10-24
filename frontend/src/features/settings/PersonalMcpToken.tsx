@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
+import { ownAccountQuery } from "../auth/AccountGate";
 
 export interface McpTokenStatus {
   endpoint: string;
@@ -48,7 +49,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
         if (active.current && startedVisit === visit.current) setIssuedToken(result.token);
       }
       await client.invalidateQueries({ queryKey: ["personal-mcp-status"] });
-      await client.invalidateQueries({ queryKey: ["own-account"] });
+      await client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
     } catch (error) {
       if (active.current)
         setError(error instanceof Error ? error.message : "Couldn’t update the MCP token");

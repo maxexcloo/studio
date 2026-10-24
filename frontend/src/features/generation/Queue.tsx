@@ -1,16 +1,23 @@
 import { ActionIcon, Alert, Button, Group, Loader, Stack, Text, Tooltip } from "@mantine/core";
-import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { X, RotateCw } from "lucide-react";
 import { EmptyState } from "../../ui/EmptyState";
 import { api, failure, post } from "../../api";
 import type { QueueJob } from "../../types";
 export const terminal = new Set(["completed", "failed", "cancelled"]);
+export const queueQuery = queryOptions({
+  queryKey: ["queue"],
+  queryFn: () => api<{ jobs: QueueJob[] }>("/api/queue"),
+  refetchInterval: 1500,
+});
 export function useQueue() {
-  return useQuery({
-    queryKey: ["queue"],
-    queryFn: () => api<{ jobs: QueueJob[] }>("/api/queue"),
-    refetchInterval: 1500,
-  });
+  return useQuery(queueQuery);
 }
 const queueActionKey = ["queue-action"];
 type QueueAction = { id: string; action: "cancel" | "retry" | "cancel-all" };
@@ -27,7 +34,7 @@ export function useQueueAction(jobId?: string) {
       post(id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`),
     onSuccess: () =>
       Promise.all([
-        client.invalidateQueries({ queryKey: ["queue"] }),
+        client.invalidateQueries({ queryKey: queueQuery.queryKey }),
         client.invalidateQueries({ queryKey: ["session"] }),
         client.invalidateQueries({ queryKey: ["gallery"] }),
       ]),

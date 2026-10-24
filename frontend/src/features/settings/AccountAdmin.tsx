@@ -21,7 +21,8 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
-import { useGenerationActions } from "../generation/GenerationProvider";
+import type { Account } from "../../types";
+import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   cloudModels: "Cloud Models",
@@ -42,16 +43,6 @@ interface AccessGroup {
   allModels: boolean;
   generationProfiles: string[];
   features: Record<string, boolean>;
-}
-interface Account {
-  id: string;
-  username: string;
-  displayName: string;
-  role: "administrator" | "user";
-  accessProfileId?: string;
-  disabled: boolean;
-  pending?: boolean;
-  signInLinked?: boolean;
 }
 interface Administration {
   gateway?: GatewayAccounts;
@@ -267,7 +258,7 @@ export function AccountAdmin() {
   });
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["account-admin"] });
-    void client.invalidateQueries({ queryKey: ["models"] });
+    void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
   };
   const change = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>

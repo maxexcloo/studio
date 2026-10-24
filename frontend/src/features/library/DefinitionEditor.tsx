@@ -22,6 +22,8 @@ import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { LoadingState } from "../../ui/LoadingState";
+import { modelsQuery } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { WorkflowConnections } from "./WorkflowConnections";
 
 export type DefinitionKind = "profile" | "guide";
@@ -102,9 +104,9 @@ function DefinitionForm({
   }
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["definition-list"] });
-    void client.invalidateQueries({ queryKey: ["models"] });
+    void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
     void client.invalidateQueries({ queryKey: ["library"] });
-    void client.invalidateQueries({ queryKey: ["lora-info"] });
+    void client.invalidateQueries({ queryKey: loraInfoQuery.queryKey });
     void client.invalidateQueries({ queryKey: ["definition", kind, id] });
     void client.invalidateQueries({ queryKey: ["definition-versions", kind, id] });
   };
