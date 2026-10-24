@@ -47,6 +47,16 @@ export function inputForProfile(previous: GenerationInput, profile: Profile): Ge
     loras: previous.loras,
   };
 }
+/** The configured default for an output, else its first ready profile, else any. */
+export function defaultProfile(models: Models | undefined, kind: MediaKind) {
+  const profiles = models?.profiles ?? emptyProfiles;
+  const selected = kind === "image" ? models?.defaults?.imageModel : models?.defaults?.videoModel;
+  return (
+    profiles.find((profile) => profile.id === selected && profile.kind === kind) ||
+    profiles.find((profile) => profile.kind === kind && profile.ready !== false) ||
+    profiles.find((profile) => profile.kind === kind)
+  );
+}
 interface Draft {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -116,17 +126,9 @@ function useGenerationState(workspace: Workspace) {
     refetchInterval: 15000,
   });
   const profiles = models.data?.profiles ?? emptyProfiles;
-  const selectedDefault =
-    draft.input.kind === "image"
-      ? models.data?.defaults?.imageModel
-      : models.data?.defaults?.videoModel;
   const profile = draft.input.profileId
     ? profiles.find((profile) => profile.id === draft.input.profileId)
-    : profiles.find(
-        (profile) => profile.id === selectedDefault && profile.kind === draft.input.kind,
-      ) ||
-      profiles.find((profile) => profile.kind === draft.input.kind && profile.ready !== false) ||
-      profiles.find((profile) => profile.kind === draft.input.kind);
+    : defaultProfile(models.data, draft.input.kind);
   function update(patch: Partial<GenerationInput>) {
     setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));
   }

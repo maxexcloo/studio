@@ -1,9 +1,10 @@
 import { ActionIcon, Alert, Group, Select, Stack, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp, Square } from "lucide-react";
+import { ComposerDock } from "../generation/ComposerDock";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { useChat } from "./ChatProvider";
 import { useIsMutating } from "@tanstack/react-query";
-export function ChatComposer() {
+function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId, selectModel } = useChat();
   const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
   const unavailable =
@@ -92,11 +93,19 @@ export function ChatComposer() {
     </form>
   );
 }
-export function ChatComposerStatus() {
+function ChatComposerStatus() {
   const { error } = useChat();
   return error ? (
     <Alert color="red" mt="xs">
       {error}
     </Alert>
   ) : null;
+}
+export function ChatDock() {
+  return (
+    <>
+      <ComposerDock chat={<ChatComposer />} />
+      <ChatComposerStatus />
+    </>
+  );
 }

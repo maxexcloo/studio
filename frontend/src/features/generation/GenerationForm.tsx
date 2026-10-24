@@ -1,40 +1,15 @@
-import { lazy, Suspense, useEffect, useState } from "react";
-import {
-  ActionIcon,
-  Avatar,
-  Tooltip,
-  Alert,
-  AspectRatio,
-  Button,
-  Group,
-  Image,
-  Paper,
-  Box,
-  Stack,
-  Text,
-  Textarea,
-} from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
+import { useEffect } from "react";
+import { ActionIcon, Avatar, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
-import { useIsMutating, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { failure, post } from "../../api";
-import type { Session } from "../../types";
+import type { ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
-import { LoadingState } from "../../ui/LoadingState";
-import { GenerationInputControls } from "./GenerationInputControls";
-import { PromptAssistant } from "./PromptAssistant";
-import { GenerationSettingsFields } from "./GenerationSettingsFields";
-import { PromptHistory } from "./PromptHistory";
+import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
 import { PresetEditor } from "./PresetEditor";
-import { GenerationFooter } from "./GenerationFooter";
-import { generationInput, referenceDetails, primaryReference, referencePatch } from "./payload";
-import { ReferenceRoleControl } from "./ReferenceRoleControl";
-import { ReferencePicker } from "./ReferencePicker";
-import { useReferenceBrowser } from "./useReferenceBrowser";
-import { LoraPicker, useLoraPicker } from "./LoraPicker";
+import { generationInput, referencePatch } from "./payload";
 import { referenceLabel } from "./references";
-const MaskEditor = lazy(() => import("./MaskEditor"));
 
 export function GenerationForm({
   onSubmitted,
@@ -45,18 +20,10 @@ export function GenerationForm({
   compact?: boolean;
   autoFocusPrompt?: boolean;
 }) {
-  const { form, draft, setDraft, input, update, profile, profiles, selectProfile, models } =
-    useGeneration();
+  const { form, draft, setDraft, input, update, profile, selectProfile } = useGeneration();
   const client = useQueryClient();
-  const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
-  const assisting = useIsMutating({ mutationKey: ["prompt-assistance"] }) > 0;
   const navigate = useNavigate();
   const location = useLocation();
-  const [maskOpen, setMaskOpen] = useState(false);
-  const [referenceOpen, setReferenceOpen] = useState(false);
-  const referenceBrowser = useReferenceBrowser();
-  const loraPicker = useLoraPicker();
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
   useEffect(() => {
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
@@ -90,50 +57,19 @@ export function GenerationForm({
     },
     onError: failure,
   });
-  const requiredReference = profile?.mediaInputs?.some(
-    (slot) =>
-      slot.required &&
-      !referenceDetails(draft.references, input, profile).some((asset) => asset.slot === slot.id) &&
-      !input.referenceAssets.some((asset) => asset.slot === slot.id),
-  );
-  function keyboardSubmit(event: React.KeyboardEvent<HTMLFormElement>) {
-    if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey) || event.nativeEvent.isComposing)
-      return;
-    event.preventDefault();
-    if (
-      submit.isPending ||
-      uploadingReferences ||
-      assisting ||
-      !profile ||
-      profile.ready === false ||
-      !input.prompt.trim() ||
-      requiredReference
-    )
-      return;
-    event.currentTarget.requestSubmit();
-  }
-  const primary = primaryReference(referenceDetails(draft.references, input, profile), profile);
-  const supportsReferences = Boolean(
-    profile?.mediaInputs?.length ||
-    profile?.capabilities?.img2img ||
-    profile?.capabilities?.imageInput,
-  );
-  const inpaint = input.inpaint as
-    | { assetId?: string; mask?: string; strength?: number; feather?: number }
-    | undefined;
-  const submitLabel =
-    draft.operation === "refine"
-      ? "Refine Image"
-      : input.kind === "video"
-        ? "Generate Video"
-        : "Generate Image";
+  const { label, blockedReason } = useSubmitState({
+    input,
+    profile,
+    references: draft.references,
+    operation: draft.operation,
+  });
   if (compact)
     return (
       <form
-        onKeyDown={keyboardSubmit}
+        onKeyDown={(event) => submitShortcut(event, !!blockedReason || submit.isPending)}
         onSubmit={(event) => {
           event.preventDefault();
-          submit.mutate();
+          if (!blockedReason && !submit.isPending) submit.mutate();
         }}
       >
         <Group wrap="nowrap" gap="xs" className="studio-compact-composer">
@@ -172,23 +108,16 @@ export function GenerationForm({
               )}
             </Avatar.Group>
           )}
-          <Tooltip label={submitLabel}>
+          <Tooltip label={blockedReason || label}>
             <ActionIcon
               type="submit"
-              aria-label={submitLabel}
+              aria-label={label}
               className="studio-generate-button"
               size={44}
               radius="xl"
               variant="filled"
               loading={submit.isPending}
-              disabled={
-                !profile ||
-                profile.ready === false ||
-                !input.prompt.trim() ||
-                requiredReference ||
-                assisting ||
-                uploadingReferences
-              }
+              {...blockedProps(blockedReason)}
             >
               <ArrowUp size={20} />
             </ActionIcon>
@@ -201,252 +130,49 @@ export function GenerationForm({
         )}
       </form>
     );
-  if (models.isPending) return <LoadingState label="Loading Profiles" />;
-  const inlinePanel =
-    narrow && loraPicker.opened ? (
-      <LoraPicker inline value={input} onChange={update} picker={loraPicker} />
-    ) : narrow && referenceOpen ? (
-      <ReferencePicker inline opened browser={referenceBrowser} onOpenedChange={setReferenceOpen} />
-    ) : null;
+  const setReferences = (references: ReferenceAsset[]) =>
+    setDraft((value) => ({
+      ...value,
+      references,
+      input: {
+        ...value.input,
+        ...referencePatch(value.input, value.references, references, profile),
+      },
+    }));
   return (
-    <>
-      {inlinePanel}
-      <form
-        style={{ display: inlinePanel ? "none" : undefined }}
-        className="studio-generation-form"
-        onKeyDown={keyboardSubmit}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit.mutate();
-        }}
-      >
-        <Box className="studio-generation-fields" aria-label="Generation Fields">
-          <Stack gap="md" pr={4}>
-            {profile?.ready === false && (
-              <Alert color="yellow">
-                This model needs additional files or worker nodes before it can run.
-              </Alert>
-            )}
-            {!models.isPending && !profile && (
-              <Alert color="yellow">
-                {input.profileId && profiles.length
-                  ? "The selected profile is unavailable. Choose another model explicitly."
-                  : "No models are available. Check your worker and mounted configuration."}
-              </Alert>
-            )}
-            {models.error && <Alert color="red">{models.error.message}</Alert>}
-            <Textarea
-              data-expanded-prompt
-              variant="unstyled"
-              rightSection={
-                <PromptHistory
-                  kind="positive"
-                  value={input.prompt}
-                  onPick={(prompt) => update({ prompt })}
-                />
-              }
-              rightSectionPointerEvents="all"
-              rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 8 } }}
-              data-autofocus={autoFocusPrompt || undefined}
-              label="Prompt"
-              placeholder={
-                input.kind === "image"
-                  ? "Describe the image you want to create…"
-                  : "Describe the motion and camera…"
-              }
-              autosize
-              minRows={3}
-              maxRows={10}
-              value={input.prompt}
-              onChange={(event) => update({ prompt: event.currentTarget.value })}
-              required
-            />
-            <GenerationInputControls
-              loraPicker={loraPicker}
-              input={input}
-              profile={profile}
-              onChange={update}
-              references={
-                supportsReferences ? (
-                  <ReferencePicker
-                    embedded
-                    browser={referenceBrowser}
-                    opened={referenceOpen}
-                    onOpenedChange={setReferenceOpen}
-                  />
-                ) : undefined
-              }
-            />
-            <PromptAssistant
-              scopeKey={JSON.stringify([
-                input.kind,
-                draft.sessionId,
-                draft.parentJobId,
-                draft.presetId,
-                draft.operation,
-              ])}
-              input={input}
-              profile={profile}
-              references={draft.references}
-              onChange={update}
-            />
-            {supportsReferences && (draft.references.length > 0 || requiredReference) ? (
-              <Stack gap="xs">
-                {!!draft.references.length && (
-                  <ReferenceRoleControl
-                    locked={Boolean(input.inpaint)}
-                    value={input.referenceRole}
-                    onChange={(referenceRole) => update({ referenceRole })}
-                  />
-                )}
-                {draft.references.map((asset, index) => (
-                  <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
-                    <Group wrap="nowrap">
-                      <AspectRatio ratio={1} w={52}>
-                        <Image
-                          src={asset.thumbnailUrl}
-                          alt={referenceLabel(asset, index, profile)}
-                          fallbackSrc=""
-                        />
-                      </AspectRatio>
-                      <Text size="sm" lineClamp={1} flex={1}>
-                        {referenceLabel(asset, index, profile)}
-                      </Text>
-                      <Button
-                        variant="subtle"
-                        size="compact-xs"
-                        onClick={() =>
-                          setDraft((value) => {
-                            const references = value.references.filter(
-                              (a) => a.id !== asset.id || a.slot !== asset.slot,
-                            );
-                            return {
-                              ...value,
-                              references,
-                              input: {
-                                ...value.input,
-                                ...referencePatch(
-                                  value.input,
-                                  value.references,
-                                  references,
-                                  profile,
-                                ),
-                              },
-                            };
-                          })
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </Group>
-                  </Paper>
-                ))}
-                {requiredReference && (
-                  <Text size="xs" c="dimmed">
-                    This workflow requires a reference image.
-                  </Text>
-                )}
-                {primary && profile?.capabilities?.inpaint && (
-                  <Group>
-                    <Button variant="default" size="compact-sm" onClick={() => setMaskOpen(true)}>
-                      {input.inpaint ? "Edit Mask" : "Paint Mask"}
-                    </Button>
-                    {!!input.inpaint && (
-                      <Button
-                        variant="subtle"
-                        size="compact-sm"
-                        onClick={() => update({ inpaint: null })}
-                      >
-                        Remove Mask
-                      </Button>
-                    )}
-                  </Group>
-                )}
-              </Stack>
-            ) : null}
-            <GenerationSettingsFields
-              input={input}
-              profile={profile}
-              onChange={update}
-              presets={<PresetEditor />}
-            />
-            {!!submit.error && (
-              <Alert color="red">
-                {submit.error instanceof Error ? submit.error.message : String(submit.error)}
-              </Alert>
-            )}
-          </Stack>
-        </Box>
-        <Box className="studio-generation-footer">
-          <GenerationFooter
-            kind={input.kind}
-            onKindChange={(kind) => {
-              const next = profiles.find((profile) => profile.kind === kind);
-              if (next) selectProfile(next);
-              else update({ kind, profileId: "" });
-            }}
-            onClear={() =>
-              setDraft((previous) => ({
-                ...previous,
-                references: [],
-                input: {
-                  ...(profile
-                    ? inputForProfile(
-                        { ...initialInput, backendId: previous.input.backendId },
-                        profile,
-                      )
-                    : { ...initialInput, kind: previous.input.kind }),
-                  seed: "",
-                },
-              }))
-            }
-          >
-            <Button
-              type="submit"
-              rightSection={<ArrowUp size={18} />}
-              size="sm"
-              loading={submit.isPending}
-              disabled={
-                !profile ||
-                profile.ready === false ||
-                !input.prompt.trim() ||
-                requiredReference ||
-                uploadingReferences ||
-                assisting
-              }
-            >
-              {draft.operation === "refine"
-                ? "Refine Image"
-                : input.kind === "video"
-                  ? "Generate Video"
-                  : "Generate Image"}
-            </Button>
-          </GenerationFooter>
-        </Box>
-        {maskOpen && primary && (
-          <Suspense fallback={null}>
-            <MaskEditor
-              key={primary.id}
-              asset={primary}
-              initialMask={
-                !inpaint?.assetId || inpaint.assetId === primary.id ? inpaint?.mask : undefined
-              }
-              close={() => setMaskOpen(false)}
-              save={(mask) =>
-                update({
-                  inpaint: {
-                    ...inpaint,
-                    mask,
-                    assetId: primary.id,
-                    strength: inpaint?.strength ?? 1,
-                    feather: inpaint?.feather ?? 0.4,
-                  },
-                })
-              }
-            />
-          </Suspense>
-        )}
-      </form>
-    </>
+    <GenerationEditor
+      className="studio-generation-form"
+      input={input}
+      references={draft.references}
+      profile={profile}
+      onChange={update}
+      onReferencesChange={setReferences}
+      onKindChange={(kind, next) => (next ? selectProfile(next) : update({ kind, profileId: "" }))}
+      onClear={() =>
+        setDraft((previous) => ({
+          ...previous,
+          references: [],
+          input: {
+            ...(profile
+              ? inputForProfile({ ...initialInput, backendId: previous.input.backendId }, profile)
+              : { ...initialInput, kind: previous.input.kind }),
+            seed: "",
+          },
+        }))
+      }
+      onSubmit={() => submit.mutate()}
+      operation={draft.operation}
+      pending={submit.isPending}
+      error={submit.error}
+      assistantScope={JSON.stringify([
+        input.kind,
+        draft.sessionId,
+        draft.parentJobId,
+        draft.presetId,
+        draft.operation,
+      ])}
+      presets={<PresetEditor />}
+      autoFocusPrompt={autoFocusPrompt}
+    />
   );
 }
