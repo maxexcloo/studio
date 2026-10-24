@@ -15,9 +15,9 @@ import {
   registerGalleryErrorRoutes,
   registerGalleryDeleteRoute,
 } from "./gallery-routes.js";
-import { registerComparisonRoutes } from "./comparisons.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
+import { registerCompareRoutes } from "./domain/compare.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
@@ -28,7 +28,7 @@ import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { providerMediaWriter } from "./providers/media.ts";
-import { writeBytesFileAsync } from "./json-store.js";
+import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { configuredAccountJobLimit } from "./account-jobs.js";
@@ -1872,7 +1872,6 @@ registerChatRoutes(app, {
   owned: (req, jobId) =>
     recordsForRequest(gallery, req).some((item) => item.jobId === jobId && item.status === "done"),
 });
-registerComparisonRoutes(app, { dataDir, gallery: () => filterVisibleGallery(gallery) });
 
 app.delete("/api/loras", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -2506,6 +2505,15 @@ async function validateGenerationInput(input, account) {
   }
   return generationRoutes.validateInput(input, account);
 }
+// Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
+function chatTitle(account, sessionId, prompt) {
+  return sessionChat.title(
+    account?.userId || "",
+    sessionId,
+    prompt,
+    !account || mayUseFeature(account, "promptAssistant") ? undefined : null,
+  );
+}
 registerRewriteRoutes(app, {
   store: rewriteStore,
   queue: generationQueue,
@@ -2513,14 +2521,7 @@ registerRewriteRoutes(app, {
   validate: validateGenerationInput,
   jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
-  // Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
-  title: (account, sessionId, prompt) =>
-    sessionChat.title(
-      account?.userId || "",
-      sessionId,
-      prompt,
-      !account || mayUseFeature(account, "promptAssistant") ? undefined : null,
-    ),
+  title: chatTitle,
 });
 const admitGeneration = createGenerationAdmission({
   store: rewriteStore,
@@ -2530,6 +2531,27 @@ const admitGeneration = createGenerationAdmission({
   revision: galleryRevisionValue,
   jobLimit: accountJobLimit,
   validate: validateGenerationInput,
+});
+const comparisonsFile = path.join(dataDir, "comparisons.json");
+registerCompareRoutes(app, {
+  store: rewriteStore,
+  admit: admitGeneration,
+  cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
+  read: () => {
+    try {
+      return readJsonFile(comparisonsFile);
+    } catch (error) {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    }
+  },
+  write: (records) => writeJsonFile(comparisonsFile, records),
+  gallery: (req) =>
+    !req.studioAccount || mayUseFeature(req.studioAccount, "gallery")
+      ? recordsForRequest(filterVisibleGallery(gallery), req)
+      : null,
+  pendingItems: makePendingItems,
+  title: chatTitle,
 });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
