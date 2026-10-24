@@ -10,6 +10,7 @@ export function ConfirmDialog({
   pending,
   error,
   disabled,
+  zIndex,
   onConfirm,
   onClose,
 }: {
@@ -20,6 +21,7 @@ export function ConfirmDialog({
   pending: boolean;
   error?: ReactNode;
   disabled?: boolean;
+  zIndex?: number;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -32,6 +34,7 @@ export function ConfirmDialog({
       onClose={close}
       title={title}
       centered
+      zIndex={zIndex}
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}
       closeButtonProps={{ disabled: pending }}

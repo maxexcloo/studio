@@ -8,7 +8,6 @@ import {
   FileButton,
   Group,
   Image,
-  Modal,
   Pill,
   Popover,
   ScrollArea,
@@ -43,6 +42,7 @@ import { referenceLabel, useGalleryReference } from "./references";
 import { useReferenceUpload } from "./useReferenceUpload";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 
 export function ReferencePicker({
   compact = false,
@@ -132,35 +132,18 @@ export function ReferencePicker({
     deletion.reset();
   }
   const deleteDialog = (
-    <Modal
+    <ConfirmDialog
       opened={deleteId !== null}
-      onClose={dismissDelete}
-      zIndex={getDefaultZIndex("overlay")}
       title="Delete Upload"
-      centered
-      closeOnClickOutside={!deletion.isPending}
-      closeOnEscape={!deletion.isPending}
-      closeButtonProps={{ disabled: deletion.isPending }}
+      action="Delete Upload"
+      pending={deletion.isPending}
+      error={deletion.error?.message}
+      zIndex={getDefaultZIndex("overlay")}
+      onConfirm={() => deleteId && deletion.mutate(deleteId)}
+      onClose={dismissDelete}
     >
-      <Stack>
-        <Text>
-          Delete this uploaded image from Studio? References using it will need another image.
-        </Text>
-        {deletion.error && <Alert color="red">{deletion.error.message}</Alert>}
-        <Group justify="flex-end">
-          <Button variant="default" disabled={deletion.isPending} onClick={dismissDelete}>
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            loading={deletion.isPending}
-            onClick={() => deleteId && deletion.mutate(deleteId)}
-          >
-            Delete Upload
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+      Delete this uploaded image from Studio? References using it will need another image.
+    </ConfirmDialog>
   );
   const select = useGalleryReference(adopt);
   const { upload, uploading } = useReferenceUpload((asset) => {
