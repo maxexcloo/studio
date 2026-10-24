@@ -30,7 +30,7 @@ import { api, post } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 import { usePhone } from "../../ui/usePhone";
-import { chipProps } from "./chip";
+import { chipProps, escapePanel } from "./chip";
 import classes from "./LoraPicker.module.css";
 import railClasses from "./GenerationInputControls.module.css";
 import editorClasses from "./GenerationEditor.module.css";
@@ -181,19 +181,7 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
       closeOnEscape={false}
     >
       <Popover.Target>{trigger}</Popover.Target>
-      <Popover.Dropdown
-        data-composer-layer
-        onKeyDown={(event) => {
-          // Escape in an open nested combobox closes only that dropdown.
-          if (
-            event.key === "Escape" &&
-            !(event.target as HTMLElement).closest('[role="combobox"][aria-expanded="true"]')
-          ) {
-            event.stopPropagation();
-            close();
-          }
-        }}
-      >
+      <Popover.Dropdown data-composer-layer onKeyDown={(event) => escapePanel(event, close)}>
         {content}
       </Popover.Dropdown>
     </Popover>
