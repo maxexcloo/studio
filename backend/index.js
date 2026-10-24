@@ -145,6 +145,7 @@ import { hfTokenStatus } from "./hf-access.js";
 import { primeModelMetadata, setModelChoice } from "./model-families.js";
 import {
   dedupeGallery,
+  deleteOwnedGalleryItems,
   filterVisibleGallery,
   flushGalleryStrict,
   flushPendingGallery,
@@ -2478,6 +2479,15 @@ registerRewriteRoutes(app, {
   resourceFor: queueResourceFor,
   validate: validateGenerationInput,
   jobLimit: accountJobLimit,
+  deleteMedia: deleteOwnedGalleryItems,
+  // Accounts without the prompt assistant get the fallback title; their prompts never reach the text model.
+  title: (account, sessionId, prompt) =>
+    sessionChat.title(
+      account?.userId || "",
+      sessionId,
+      prompt,
+      !account || mayUseFeature(account, "promptAssistant") ? undefined : null,
+    ),
 });
 const admitGeneration = createGenerationAdmission({
   store: rewriteStore,
