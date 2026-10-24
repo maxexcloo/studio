@@ -148,9 +148,10 @@ export function MediaViewerDock({
                 variant="unstyled"
                 autosize
                 minRows={1}
-                maxRows={phone ? 3 : 4}
+                maxRows={phone ? 4 : 6}
                 flex={1}
                 px="sm"
+                classNames={{ wrapper: classes.promptWrapper, input: classes.promptInput }}
                 value={prompt}
                 onChange={(event) => onPromptChange(event.currentTarget.value)}
                 onKeyDown={(event) => {

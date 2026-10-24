@@ -148,6 +148,16 @@
   width: 100%;
 }
 
+/* Padding sits outside the scrolling textarea, so a capped prompt never shows a cut-off line. */
+.promptWrapper {
+  padding-block: 8px;
+}
+
+.promptInput {
+  min-height: 0;
+  padding-block: 0;
+}
+
 .aside {
   flex-shrink: 0;
   width: clamp(300px, 26vw, 380px);
@@ -171,23 +181,9 @@
   }
 }
 
-/* Phones show the media full-bleed under floating chrome. */
+/* Phones show the media edge to edge, filling the space above the strip and controls. */
 @media (max-width: 48em) {
-  .stage {
-    position: absolute;
-    inset: 0;
-  }
-
   .dock {
-    position: absolute;
-    inset-inline: 0;
-    bottom: 0;
-    z-index: 2;
     padding-inline: var(--mantine-spacing-sm);
-    pointer-events: none;
-  }
-
-  .dock > * {
-    pointer-events: auto;
   }
 }
