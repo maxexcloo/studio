@@ -16,6 +16,7 @@ version opens with a `> ` summary line.
 ### Added
 
 - Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
+- Let one MCP Generate call cover several models (`profile_ids`, or `each_profile` with a tier), each with a prompt written from its own guide and its own set, replying at once with a line of links per model. `preview` returns the written prompts and concept suggestions without queuing, and the same call without it queues exactly those prompts; `apply_guide` rewrites supplied prompts for the model's guide.
 
 ### Changed
 
@@ -29,6 +30,8 @@ version opens with a `> ` summary line.
 - Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
 - Queue MCP (external chat) generations after manual Studio requests waiting for the same worker or provider, first-in first-out within each, without splitting an MCP set once it has started. The order is stored with each job and survives restarts.
 - Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
+- Slim the MCP tools for small-context chats: shorter instructions and descriptions that point iteration to Reuse; schema limits that match the 1–10 per call; Models shows a 500-character guide gist (whole guide with `full_guide`) and at most 30 LoRAs; replies carry text only, without repeated structured records or guides. Review sends one 512px preview, with a comparison side by side, and a short record. Generate runs `prompts` when `request` comes too, waits only for sets of four or fewer, dedupes identical calls for two minutes and never upscales unless asked.
+- Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
 
 ## [0.48.2] - 2026-10-23
 

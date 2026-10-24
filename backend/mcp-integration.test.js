@@ -77,7 +77,6 @@ const videoProfile = {
 async function fixture(
   t,
   {
-    foregroundWaitSeconds,
     imageWaitSeconds = 0,
     generateDedupeMs = 0,
     environment: extra = {},
@@ -263,7 +262,6 @@ async function fixture(
     // Most tests check the queued response; inline waits have their own tests.
     imageWaitSeconds,
     generateDedupeMs,
-    ...(foregroundWaitSeconds !== undefined ? { foregroundWaitSeconds } : {}),
     ...(authenticateGatewayIdentity ? { authenticateGatewayIdentity } : {}),
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(internalCredential ? { internalCredential } : {}),
@@ -599,6 +597,17 @@ async function generate(client, args = {}) {
     }),
   );
 }
+/** The prompting guide a Generate reply attaches the first time, if any. */
+const guideOf = (result) =>
+  /apply it to later prompts: ([\s\S]+)$/.exec(
+    (result.content || []).find((item) => item.text?.startsWith("Prompting guide for"))?.text || "",
+  )?.[1];
+/** Review's records: one JSON line per reviewed result after its brief. */
+const reviewed = (result) =>
+  texts(result)
+    .split("\n")
+    .filter((line) => line.startsWith("{"))
+    .map((line) => JSON.parse(line));
 function jobId(result) {
   assert.ok(result.jobs?.length);
   return result.jobs[0].job_id;
@@ -729,19 +738,16 @@ test("media and administrator credentials discover only their own friendly tools
   // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
   assert.match(
     media.getInstructions(),
-    /^Studio makes images and videos\. For each set sharing a profile and LoRAs/,
+    /^Studio makes images and videos\. Pass the user's words to Generate as request/,
   );
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
-  assert.match(
-    media.getInstructions(),
-    /OR prompts \(distinct exact prompts\), never both; use count for variants/,
-  );
-  assert.match(media.getInstructions(), /Submit different sets serially/);
-  assert.match(media.getInstructions(), /call Generate once for the whole set/);
+  assert.match(media.getInstructions(), /Use prompts only for prompts the user gave/);
+  assert.match(media.getInstructions(), /Make one Generate call per set, one after another/);
+  assert.match(media.getInstructions(), /call Reuse with its ref and the change as request/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(
     media.getInstructions(),
-    /share the result links and end the turn\. Call Result only when the user asks/,
+    /share the links and end the turn\. Call Result only when the user asks to see results, never in the background/,
   );
   assert.match(tools.find((tool) => tool.name === "Result").description, /only when the user asks/);
   // Reuse names one result by its ref or job id; "all" belongs to Result alone, and a link id is only a fallback.
@@ -749,8 +755,13 @@ test("media and administrator credentials discover only their own friendly tools
   assert.match(reuse.description, /^Follow up on one finished result\./);
   assert.equal(
     reuse.inputSchema.properties.job_id.description,
-    'Its ref as the reply header shows it ("result 1") or job_id, never "all". Link ids work; refs are preferred.',
+    'Its ref as the reply shows it ("result 1"), or a job_id; never "all".',
   );
+  assert.deepEqual(reuse.inputSchema.properties.mode.enum, ["again", "animate", "reference"]);
+  // Schemas state the per-call limit their descriptions give.
+  const generateSchema = tools.find((tool) => tool.name === "Generate").inputSchema.properties;
+  assert.equal(generateSchema.count.maximum, 10);
+  assert.equal(generateSchema.prompts.maxItems, 10);
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
@@ -873,7 +884,7 @@ test("Models uses only this studio, filters readiness and kind, and returns deta
   assert.equal(detail.controls.scheduler, undefined, "a single scheduler is fixed");
   assert.equal(detail.defaults.count, 1);
   assert.equal(detail.controls.count.default, 1);
-  assert.equal(detail.prompting, null);
+  assert.equal(detail.prompting, undefined);
   await failure(client, "Models", { profile_id: "another-studio-profile" });
   // A guessed id or a label finds the profile; a miss names the closest profiles in one reply.
   assert.equal(
@@ -916,25 +927,27 @@ test("Generate attaches a compact guide once per account unless it read the sele
   await call(alice, "Models", { kind: "image" });
   await call(alice, "Models", { profile_id: videoProfile.id });
   const reply = await call(alice, "Generate", args);
-  const first = data(reply);
-  assert.equal(first.status, "queued");
+  assert.equal(data(reply).status, "queued");
   assert.equal(
-    first.prompting,
+    guideOf(reply),
     "Subject first Describe the subject first",
     "an unread guide accompanies the submission as its essentials",
   );
   assert.equal(texts(reply).includes("example.test/guide"), false, "sources stay in Models");
-  const second = data(await call(alice, "Generate", args));
-  assert.equal(second.prompting, undefined, "the guide is shown once per account");
+  assert.equal(
+    guideOf(await call(alice, "Generate", args)),
+    undefined,
+    "the guide is shown once per account",
+  );
   const bob = await f.client("bob");
   await call(bob, "Models", { profile_id: imageProfile.id });
   assert.equal(
-    data(await call(bob, "Generate", args)).prompting,
+    guideOf(await call(bob, "Generate", args)),
     undefined,
     "a guide read through Models is not repeated",
   );
   assert.ok(
-    data(await call(await f.client("carol"), "Generate", args)).prompting,
+    guideOf(await call(await f.client("carol"), "Generate", args)),
     "another account has not read it",
   );
   assert.equal(f.submitted.length, 4);
@@ -967,23 +980,16 @@ test("Models caches each owner’s catalogue for the TTL instead of rescanning p
   assert.equal(scans(), rescans + 1);
 });
 
-test("foreground Status and Result waits are capped; background notification waits are not", async (t) => {
-  const f = await fixture(t, { foregroundWaitSeconds: 0 });
+test("Status and Result wait 20 seconds at most, so a chat never blocks on a background-style wait", async (t) => {
+  const f = await fixture(t);
   const client = await f.client();
   const id = jobId(await generate(client));
-  let started = performance.now();
-  const pending = await call(client, "Result", {
-    job_id: id,
-    delivery: "preview",
-    wait_seconds: 1800,
-  });
+  const refused = await call(client, "Result", { job_id: id, wait_seconds: 1800 });
+  assert.equal(refused.isError, true);
+  assert.match(texts(refused), /wait_seconds: Too big: expected number to be <=20/);
+  const pending = await call(client, "Result", { job_id: id });
   assert.equal(data(pending).status, "running");
   assert.match(texts(pending), /do not poll/);
-  assert.equal(
-    data(await call(client, "Status", { job_id: id, wait_seconds: 20 })).status,
-    "running",
-  );
-  assert.ok(performance.now() - started < 1500, "foreground waits return at once under a zero cap");
   setTimeout(
     () =>
       Object.assign(f.jobs.get(id), {
@@ -992,11 +998,8 @@ test("foreground Status and Result waits are capped; background notification wai
       }),
     25,
   );
-  assert.equal(
-    data(await call(client, "Result", { job_id: id, delivery: "notification", wait_seconds: 1800 }))
-      .status,
-    "done",
-  );
+  assert.equal(data(await call(client, "Result", { job_id: id, wait_seconds: 5 })).status, "done");
+  assert.equal(data(await call(client, "Status", { job_id: id, wait_seconds: 20 })).status, "done");
 });
 
 test("Generate returns immediately with one saved-size image and passes explicit controls without polling", async (t) => {
@@ -1052,7 +1055,7 @@ test("a full-body person turns face detail on only beside a requested upscale, a
   // Without an upscale nothing changes: face detail never brings one.
   const plain = await call(client, "Generate", { profile_id: imageProfile.id, prompts: [person] });
   assert.doesNotMatch(texts(plain), /Face detail/);
-  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  assert.equal(f.submitted.at(-1).autoUpscale, null);
   // A requested upscale keeps its quality, with face detail added.
   const chosen = await call(client, "Generate", {
     profile_id: imageProfile.id,
@@ -1062,7 +1065,7 @@ test("a full-body person turns face detail on only beside a requested upscale, a
   assert.match(texts(chosen), /^Queued on [^.]+\. Face detail on for the full-body person\. /);
   assert.match(
     (await client.listTools()).tools.find((item) => item.name === "Generate").description,
-    /Face detail turns on for full-body people only with a chosen upscale_quality\./,
+    /upscale_quality only when the user asks to upscale or enlarge \(it adds face detail for full-body people\)\./,
   );
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", faceDetail: true });
   // An explicit false wins, and other prompts are unchanged.
@@ -1076,8 +1079,7 @@ test("a full-body person turns face detail on only beside a requested upscale, a
   assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "fast", faceDetail: false });
   const portrait = await call(client, "Generate", {
     profile_id: imageProfile.id,
-    request: "Close-up portrait of a woman",
-    exact_prompt: true,
+    prompts: ["Close-up portrait of a woman"],
     upscale_quality: "fast",
   });
   assert.doesNotMatch(texts(portrait), /Face detail/);
@@ -1085,25 +1087,25 @@ test("a full-body person turns face detail on only beside a requested upscale, a
   // Video has no face detail.
   const video = await call(client, "Generate", { profile_id: videoProfile.id, prompts: [person] });
   assert.doesNotMatch(texts(video), /Face detail/);
-  assert.equal(f.submitted.at(-1).autoUpscale, undefined);
+  assert.equal(f.submitted.at(-1).autoUpscale, null);
 });
 
-test("an exact prompt holding generation instructions is refused with the count to pass instead", async (t) => {
+test("a prompt holding generation instructions is refused with the count to pass instead", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const refused = await call(client, "Generate", {
     kind: "image",
-    request:
+    prompts: [
       "Generate five distinct amateur-snapshot variations of this scene: a woman reading in a café",
-    exact_prompt: true,
+    ],
   });
   assert.equal(refused.isError, true);
   assert.match(
     texts(refused),
-    /^exact_prompt is for a finished prompt only, and this request holds instructions \("five distinct amateur-snapshot variations"\)\. Call Generate again with count: 5 \(1–10 per call\) and request set to just the plain prompt/,
+    /^prompts run verbatim, and this one holds instructions \("five distinct amateur-snapshot variations"\)\. Call Generate again with count: 5 \(1–10 per call\) and prompts set to just the plain prompt/,
   );
   assert.equal(f.submitted.length, 0);
-  // The same words without exact_prompt are a request, not a refusal.
+  // The same words as a request are not refused.
   assert.equal(
     data(
       await call(client, "Generate", {
@@ -1113,19 +1115,10 @@ test("an exact prompt holding generation instructions is refused with the count 
     ).status,
     "queued",
   );
-  assert.match(
-    (await client.listTools()).tools.find((item) => item.name === "Generate").description,
-    /exact_prompt \(a finished prompt only; for variations use count\)/,
-  );
   // A finished prompt that starts with a verb and a number runs as written.
   assert.equal(
-    data(
-      await call(client, "Generate", {
-        kind: "image",
-        request: "Create two cats on a sofa",
-        exact_prompt: true,
-      }),
-    ).status,
+    data(await call(client, "Generate", { kind: "image", prompts: ["Create two cats on a sofa"] }))
+      .status,
     "queued",
   );
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
@@ -1399,7 +1392,7 @@ test("owned completed results remain available after the transient job expires",
     [`/jobs/${id}`, `/gallery/jobs/${id}`],
   );
   assert.equal(links(result).length, 1);
-  const reused = data(await call(client, "Reuse", { job_id: id }));
+  const reused = data(await call(client, "Reuse", { job_id: id, mode: "reference" }));
   assert.ok(reused.asset?.id || reused.id || reused.asset_id);
 });
 
@@ -1414,8 +1407,6 @@ test("invalid generation controls, references and excessive batches fail before 
     { count: 0 },
     { count: 11 },
     { count: 6, prompts: ["One", "Two"] },
-    { wait_seconds: -1 },
-    { wait_seconds: 61 },
     { cfg: 21 },
     { denoise: 1.1 },
     { sampler: "unsupported" },
@@ -1434,15 +1425,15 @@ test("invalid generation controls, references and excessive batches fail before 
   const invalid = await call(client, "Generate", {
     profile_id: imageProfile.id,
     prompts: ["A tree"],
-    wait_seconds: 61,
+    cfg: "high",
     count: 0,
   });
   assert.equal(invalid.isError, true);
   assert.match(
     invalid.content[0].text,
-    /^Fix the Generate arguments: count: [^\n]+; wait_seconds: [^\n]+\.$/,
+    /^Fix the Generate arguments: count: [^\n]+; cfg: [^\n]+\.$/,
   );
-  // Over the per-call limit, Studio itself names the field and its range and says how to split, instead of a client's generic schema refusal.
+  // Over the per-call limit, the refusal says how to split the set.
   assert.equal(
     texts(
       await call(client, "Generate", {
@@ -1451,16 +1442,7 @@ test("invalid generation controls, references and excessive batches fail before 
         count: 12,
       }),
     ),
-    "count 12 is over the limit: count must be 1–10 per call, each a separate job. For 12 images, make 2 calls of at most 10.",
-  );
-  assert.equal(
-    texts(
-      await call(client, "Generate", {
-        profile_id: imageProfile.id,
-        prompts: Array.from({ length: 11 }, (_, index) => `Prompt ${index}`),
-      }),
-    ),
-    "prompts has 11 entries; one call takes 1–10, one job each. Split them into calls of at most 10 prompts.",
+    "Fix the Generate arguments: count: Too big: expected number to be <=10. One call queues at most 10 images (prompts × count); split a bigger set into calls made one after another.",
   );
   await f.profiles([{ ...imageProfile, capabilities: {} }]);
   await failure(client, "Generate", {
@@ -1481,7 +1463,7 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   const before = f.requests.length;
   for (const [name, maximum] of [
     ["Status", 20],
-    ["Result", 1800],
+    ["Result", 20],
   ])
     for (const wait_seconds of [-1, maximum + 1])
       await failure(client, name, { job_id: id, wait_seconds });
@@ -1520,7 +1502,9 @@ test("deployment prompting packs retain compact discovery, profile modes and rev
   assert.deepEqual(data(await call(client, "Models", { kind: "image" })), {
     image: [`${imageProfile.id} — ${imageProfile.label}`],
   });
-  const detail = data(await call(client, "Models", { profile_id: imageProfile.id })).prompting;
+  const detail = data(
+    await call(client, "Models", { profile_id: imageProfile.id, full_guide: true }),
+  ).prompting;
   assert.equal(detail.mode.id, "reference");
   assert.deepEqual(detail.mode.rules, ["Preserve the subject"]);
   assert.equal(detail.variant.id, "quick");
@@ -1593,8 +1577,7 @@ test("background Result collects a later completion without another submission",
   );
   const result = await call(client, "Result", {
     job_id: id,
-    delivery: "notification",
-    wait_seconds: 1500,
+    wait_seconds: 20,
   });
   assert.notEqual(result.isError, true);
   assert.equal(data(result).status, "done");
@@ -1613,7 +1596,6 @@ test("background Result collects a later completion without another submission",
   assert.equal(data(result).ref, "result 1");
   const preview = await call(client, "Result", {
     job_id: id,
-    delivery: "preview",
     wait_seconds: 0,
   });
   assert.deepEqual(links(preview), links(result), "the same output keeps its short link");
@@ -1891,7 +1873,9 @@ test("Models consumes self-contained profile guidance without a runtime promptin
   const compact = data(await call(client, "Models", { kind: "image" }));
   assert.deepEqual(Object.keys(compact), ["image"]);
   assert.equal(JSON.stringify(compact).includes("Subject first"), false);
-  const detailed = data(await call(client, "Models", { profile_id: imageProfile.id }));
+  const detailed = data(
+    await call(client, "Models", { profile_id: imageProfile.id, full_guide: true }),
+  );
   assert.deepEqual(detailed.prompting, generateGuide);
   assert.deepEqual(detailed.imageModes.reference.prompting, referenceGuide);
   assert.equal(detailed.prompting.modes, undefined);
@@ -1919,7 +1903,7 @@ test("profile-owned prompting overrides a stale compatibility inventory", async 
   await f.profiles([{ ...imageProfile, prompting: owned }]);
   const client = await f.client();
   assert.deepEqual(
-    data(await call(client, "Models", { profile_id: imageProfile.id })).prompting,
+    data(await call(client, "Models", { profile_id: imageProfile.id, full_guide: true })).prompting,
     owned,
   );
 });
@@ -2028,7 +2012,9 @@ test(
         requestInit: { headers: { Authorization: `Bearer ${mediaKey}` } },
       }),
     );
-    const profile = data(await call(client, "Models", { profile_id: "custom:owned-api-guide" }));
+    const profile = data(
+      await call(client, "Models", { profile_id: "custom:owned-api-guide", full_guide: true }),
+    );
     assert.deepEqual(profile.prompting, guide);
     const cachedReads = catalogueReads;
     await call(client, "Models", { profile_id: "custom:owned-api-guide" });
@@ -2071,7 +2057,7 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   });
   assert.equal(f.submitted[0].referenceRole, "reference");
   assert.equal(f.submitted[0].tiledDecode, true);
-  assert.equal(f.submitted[0].autoUpscale, undefined);
+  assert.equal(f.submitted[0].autoUpscale, null);
   assert.deepEqual([f.submitted[0].width, f.submitted[0].height], [2048, 1152]);
   await generate(client, { reference_asset_ids: [assetId], reference_role: "edit" });
   assert.equal(f.submitted[1].referenceRole, "edit");
@@ -2185,7 +2171,7 @@ test("the Result wait ends promptly when the client cancels or disconnects, with
   const id = jobId(await generate(client));
   const controller = new AbortController();
   const waiting = client.callTool(
-    { name: "Result", arguments: { job_id: id, delivery: "notification", wait_seconds: 1500 } },
+    { name: "Result", arguments: { job_id: id, wait_seconds: 20 } },
     undefined,
     { signal: controller.signal, timeout: 60000 },
   );
@@ -2197,11 +2183,9 @@ test("the Result wait ends promptly when the client cancels or disconnects, with
 
   const disconnecting = await f.client();
   const second = disconnecting
-    .callTool(
-      { name: "Result", arguments: { job_id: id, delivery: "notification", wait_seconds: 1500 } },
-      undefined,
-      { timeout: 60000 },
-    )
+    .callTool({ name: "Result", arguments: { job_id: id, wait_seconds: 20 } }, undefined, {
+      timeout: 60000,
+    })
     .catch((error) => error);
   await new Promise((resolve) => setTimeout(resolve, 300));
   await disconnecting.close();
@@ -2589,7 +2573,7 @@ test("Generate with kind and tier needs no Models call, picks the default profil
     tier: "fast",
   });
   assert.deepEqual(Object.keys(result.jobs[0]), ["job_id", "ref", "link"]);
-  assert.equal(result.prompting, "Guide summary A long rule the compact outputs must not repeat");
+  assert.equal(guideOf(fast), "Guide summary A long rule the compact outputs must not repeat");
   assert.equal(
     fast.content[0].text.includes("A long rule"),
     false,
@@ -2625,13 +2609,13 @@ test("Generate with kind and tier needs no Models call, picks the default profil
   );
   // A follow-up with the chosen profile_id does not repeat its guide.
   assert.equal(
-    data(
+    guideOf(
       await call(client, "Generate", {
         profile_id: "qwen-fast",
         prompts: ["Another egg"],
         count: 1,
       }),
-    ).prompting,
+    ),
     undefined,
   );
   const missing = await call(client, "Generate", {
@@ -2719,13 +2703,12 @@ test("tier-based Generate chooses only profiles the account may use", async (t) 
   );
 });
 
-test("a background notification returns only its markdown unless detail is asked for", async (t) => {
+test("Result returns only its markdown, never a settings record", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const id = jobId(await generate(client));
   const pending = await call(client, "Result", {
     job_id: id,
-    delivery: "notification",
     wait_seconds: 0,
   });
   assert.equal(pending.content.length, 1);
@@ -2736,7 +2719,6 @@ test("a background notification returns only its markdown unless detail is asked
   });
   const lean = await call(client, "Result", {
     job_id: id,
-    delivery: "notification",
     wait_seconds: 0,
   });
   assert.equal(lean.content.length, 1);
@@ -2745,15 +2727,6 @@ test("a background notification returns only its markdown unless detail is asked
     /^Result 1 is ready\. .+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\([^)]+\.jpg\)\]\([^)]+\)$/,
   );
   assert.deepEqual(lean.structuredContent, { job_id: id, ref: "result 1", status: "done" });
-  const detailed = await call(client, "Result", {
-    job_id: id,
-    delivery: "notification",
-    wait_seconds: 0,
-    detail: true,
-  });
-  assert.equal(detailed.content.length, 2);
-  assert.equal(detailed.structuredContent.outputs.length, 1);
-  assert.ok(detailed.structuredContent.link && detailed.structuredContent.markdown);
 });
 
 test("a finished video notification names its result and profile beside View Video", async (t) => {
@@ -2766,7 +2739,6 @@ test("a finished video notification names its result and profile beside View Vid
   });
   const result = await call(client, "Result", {
     job_id: "result 1",
-    delivery: "notification",
     wait_seconds: 0,
   });
   assert.match(
@@ -2813,7 +2785,12 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
     result.content[0].text,
     /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1\*\* · Fixture Image\n\[!\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\n\*\*Result 2\*\* · Fixture Image\n\[!\[Result 2\]\([^)]+\)\]\([^)]+\)\n\n\[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
-  assert.ok(result.content[0].text.length < 540, `${result.content[0].text.length} characters`);
+  assert.ok(result.content[0].text.length < 660, `${result.content[0].text.length} characters`);
+  // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
+  assert.match(
+    result.content[0].text,
+    /call Reuse with its ref \(such as "result 1"\) and the change as request/,
+  );
   const original = await fetch(localLink(f, links(result)[0]));
   assert.equal(original.status, 200);
   assert.deepEqual(Buffer.from(await original.arrayBuffer()), png);
@@ -2821,14 +2798,12 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
 });
 
 test("Generate falls back to the queued response when a job outlasts the wait or fails", async (t) => {
-  const f = await fixture(t, { imageWaitSeconds: 30 });
-  const client = await f.client();
+  const short = await fixture(t, { imageWaitSeconds: 1 });
   let started = performance.now();
-  const slowResult = await call(client, "Generate", {
+  const slowResult = await call(await short.client(), "Generate", {
     kind: "image",
     prompts: ["An egg"],
     count: 1,
-    wait_seconds: 1,
   });
   const slow = data(slowResult);
   const elapsed = performance.now() - started;
@@ -2837,16 +2812,17 @@ test("Generate falls back to the queued response when a job outlasts the wait or
   assert.deepEqual(Object.keys(slow.jobs[0]), ["job_id", "ref", "link"]);
   assert.match(
     texts(slowResult),
-    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now\. When the user later asks to see results, call Result\. Never poll or resubmit\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now or in the background\. When the user later asks to see results, call Result\. Never poll or resubmit\. To change or animate one later, call Reuse with its ref \(such as "result 1"\) and the change as request\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
+  const f = await fixture(t, { imageWaitSeconds: 30 });
   started = performance.now();
-  const pending = call(client, "Generate", {
+  const pending = call(await f.client(), "Generate", {
     kind: "image",
     prompts: ["An egg", "A nest"],
     count: 1,
   });
   once(
-    () => f.jobs.size === 3,
+    () => f.jobs.size === 2,
     () => {
       const [, failed] = [...f.jobs.values()].slice(-2);
       failed.status = "failed";
@@ -2922,7 +2898,7 @@ test("Reuse leaves out a saved LoRA made for another model family and says so", 
   // A result made before Studio refused other-family LoRAs can carry one in its saved settings.
   f.submitted[0].loras.push({ name: "fixture-other.safetensors", strength: 0.5, enabled: true });
   finish(f);
-  const again = await call(client, "Reuse", { job_id: "result 1", kind: "image" });
+  const again = await call(client, "Reuse", { job_id: "result 1" });
   assert.equal(again.isError, undefined);
   assert.match(
     texts(again),
@@ -2961,7 +2937,7 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   finish(f);
   const models = () => f.requests.filter((request) => request.path === "/models").length;
   const before = models();
-  const again = data(await call(client, "Reuse", { job_id: "result 1", kind: "image" }));
+  const again = data(await call(client, "Reuse", { job_id: "result 1" }));
   assert.equal(again.status, "queued");
   assert.deepEqual(again.profile, first.profile);
   assert.deepEqual(
@@ -2985,7 +2961,6 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
   const tweaked = data(
     await call(client, "Reuse", {
       job_id: "result 1",
-      kind: "image",
       prompt: "A heron at dusk",
       count: 2,
     }),
@@ -3003,16 +2978,9 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     models() - before <= 1,
     "reads the cached catalogue at most once and needs no Models call",
   );
-  // A follow-up still waits like Generate, so a quick rerun returns finished markdown.
-  f.completeOnSubmit();
-  const quick = await call(client, "Reuse", { job_id: "result 1", kind: "image", wait_seconds: 5 });
-  assert.equal(quick.structuredContent?.status, "done", JSON.stringify(quick.content));
-  assert.match(
-    quick.content[0].text,
-    /^Done on Fixture Image\. .+\n\n\*\*Result 5\*\* · Fixture Image\n\[!\[Result 5\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]/,
-  );
-  // Without kind, Reuse still returns a reference asset for Generate, and a rerun keeps a result's references.
-  const { asset } = data(await call(client, "Reuse", { job_id: "result 1" }));
+  // mode reference returns a reference asset for Generate, and a rerun keeps a result's references.
+  await failure(client, "Reuse", { job_id: "result 1", mode: "reference", request: "bluer" });
+  const { asset } = data(await call(client, "Reuse", { job_id: "result 1", mode: "reference" }));
   assert.match(asset.id, /^fixture-asset-/);
   const edit = data(
     await call(client, "Generate", {
@@ -3023,7 +2991,7 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     }),
   );
   finish(f);
-  data(await call(client, "Reuse", { job_id: edit.jobs[0].ref, kind: "image" }));
+  data(await call(client, "Reuse", { job_id: edit.jobs[0].ref }));
   assert.deepEqual(f.submitted.at(-1).referenceAssets, [{ slot: "reference", assetId: asset.id }]);
 });
 
@@ -3070,7 +3038,7 @@ test("Reuse animates an image from its first frame with the default first-frame 
   const animated = data(
     await call(client, "Reuse", {
       job_id: "result 1",
-      kind: "video",
+      mode: "animate",
       prompt: "The heron takes flight",
     }),
   );
@@ -3091,20 +3059,20 @@ test("Reuse animates an image from its first frame with the default first-frame 
   );
   // The 64×48 fixture image sets a 4:3 frame at the profile's 1344×768 pixel count, on its 32-pixel grid.
   assert.deepEqual([body.width, body.height], [1184, 864]);
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "video", tier: "quality" }));
+  data(await call(client, "Reuse", { job_id: "result 1", mode: "animate", tier: "quality" }));
   assert.equal(f.submitted.at(-1).profileId, "fl-quality");
   assert.equal(f.submitted.at(-1).prompt, "A heron", "the image prompt by default");
-  // A video cannot become an image, another tier needs a profile in it, and tier or prompt need a kind.
+  // A video cannot be animated again, and another tier needs a profile in it.
   finish(f, "mp4");
-  await failure(client, "Reuse", { job_id: "result 2", kind: "image" });
+  const twice = await call(client, "Reuse", { job_id: "result 2", mode: "animate" });
+  assert.equal(twice.isError, true);
+  assert.match(texts(twice), /already a video; call Reuse with mode again instead/);
   const otherTier = await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "image",
     tier: "fast",
   });
   assert.equal(otherTier.isError, true);
   assert.match(texts(otherTier), /No ready image profile in the fast tier/);
-  await failure(client, "Reuse", { job_id: "result 1", prompt: "A heron at dusk" });
 });
 
 test("Reuse follow-ups respect ownership", async (t) => {
@@ -3116,7 +3084,8 @@ test("Reuse follow-ups respect ownership", async (t) => {
   );
   finish(f);
   const submitted = f.submitted.length;
-  for (const kind of ["image", "video"]) await failure(bob, "Reuse", { job_id: id, kind });
+  for (const mode of ["again", "animate", "reference"])
+    await failure(bob, "Reuse", { job_id: id, mode });
   assert.equal(f.submitted.length, submitted);
 });
 
@@ -3265,14 +3234,14 @@ test("Reuse animates on the cloud only when asked while the local video worker i
   finish(f);
   const refused = await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "video",
+    mode: "animate",
     prompt: "The heron takes flight",
   });
   assert.equal(refused.isError, true);
   assert.match(texts(refused), /^Local video is unavailable right now/);
   const animation = await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "video",
+    mode: "animate",
     request: "animate it with Grok",
   });
   // Without a tier, the fastest cloud profile that takes the image.
@@ -3293,7 +3262,7 @@ test("Reuse animates on the cloud only when asked while the local video worker i
     data(
       await call(client, "Reuse", {
         job_id: "result 1",
-        kind: "video",
+        mode: "animate",
         tier: "standard",
         request: "on Grok",
       }),
@@ -3357,7 +3326,7 @@ test("video stays local while the worker is up, and a plain request never reache
   data(await call(full, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
   assert.equal(
-    data(await call(full, "Reuse", { job_id: "result 3", kind: "video" })).profile.id,
+    data(await call(full, "Reuse", { job_id: "result 4", mode: "animate" })).profile.id,
     "fl-fast",
   );
   await f.profiles(videoCatalogue(false), { videoAvailable: false });
@@ -3367,7 +3336,7 @@ test("video stays local while the worker is up, and a plain request never reache
   assert.match(refused.content[0].text, /^Local video is unavailable right now/);
   data(await call(restricted, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
-  await failure(restricted, "Reuse", { job_id: "result 1", kind: "video" });
+  await failure(restricted, "Reuse", { job_id: "result 1", mode: "animate" });
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
     ["fl-fast", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],
@@ -3618,10 +3587,9 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
   assert.match(
     generate.description,
-    /For several different images \("six photos" is count 6; if unsure, separate images\), use one call with count \(1–10\) or prompts; don't make repeated calls\. When the user names a model or family \(MOSS, FLUX\.3, Krea, Qwen, Boogu\), pass it in profile_id; plain names are fine\. .*prompts \(one per different image\)/,
+    /Several images \("six photos" is count 6\) take one call; one call queues at most 10 jobs\./,
   );
-  assert.equal(generate.inputSchema.properties.count.description, "1–10 per prompt; default 1.");
-  assert.equal(generate.inputSchema.properties.prompts.description, "1–10.");
+  assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
 
@@ -3692,43 +3660,39 @@ test("each conversation gets a profile guide once, compact, for tier, fuzzy and 
       call(first, "Generate", { profile_id: "flux 3", prompts: [`Plush ${index}`] }),
     ),
   );
-  const guided = replies.filter((reply) => reply.structuredContent.prompting);
+  const guided = replies.filter((reply) => guideOf(reply));
   assert.equal(guided.length, 1, "concurrent calls attach the guide once");
-  assert.ok(guided[0].structuredContent.prompting.length <= 1200);
-  assert.ok(texts(guided[0]).length < 1750, `${texts(guided[0]).length} characters`);
+  assert.ok(guideOf(guided[0]).length <= 1200);
+  assert.ok(texts(guided[0]).length < 1870, `${texts(guided[0]).length} characters`);
   assert.equal(texts(guided[0]).includes("example.test/guide"), false);
-  for (const reply of replies.filter((reply) => !reply.structuredContent.prompting))
-    assert.ok(texts(reply).length < 450, `${texts(reply).length} characters`);
+  for (const reply of replies.filter((reply) => !guideOf(reply)))
+    assert.ok(texts(reply).length < 570, `${texts(reply).length} characters`);
   // A tier pick of another profile carries that profile's guide, once.
   assert.ok(
-    data(await call(first, "Generate", { kind: "image", tier: "turbo", prompts: ["An egg"] }))
-      .prompting,
+    guideOf(await call(first, "Generate", { kind: "image", tier: "turbo", prompts: ["An egg"] })),
   );
   assert.equal(
-    data(await call(first, "Generate", { profile_id: "krea-turbo", prompts: ["An egg"] }))
-      .prompting,
+    guideOf(await call(first, "Generate", { profile_id: "krea-turbo", prompts: ["An egg"] })),
     undefined,
   );
   // Another conversation of the same account has not seen it; without a conversation, the account and profile decide.
   assert.ok(
-    data(
+    guideOf(
       await call(await chat(t, f, "alice", "chat-2"), "Generate", {
         profile_id: "flux 3",
         prompts: ["A plush"],
       }),
-    ).prompting,
+    ),
   );
   const plain = await chat(t, f, "alice");
-  assert.ok(
-    data(await call(plain, "Generate", { profile_id: "flux 3", prompts: ["A plush"] })).prompting,
-  );
+  assert.ok(guideOf(await call(plain, "Generate", { profile_id: "flux 3", prompts: ["A plush"] })));
   assert.equal(
-    data(
+    guideOf(
       await call(await chat(t, f, "alice"), "Generate", {
         profile_id: "flux 3",
         prompts: ["A plush"],
       }),
-    ).prompting,
+    ),
     undefined,
   );
   // A refused submission delivered nothing, so the next call still carries the guide.
@@ -3738,9 +3702,7 @@ test("each conversation gets a profile guide once, compact, for tier, fuzzy and 
       .isError,
     true,
   );
-  assert.ok(
-    data(await call(third, "Generate", { profile_id: "flux 3", prompts: ["A plush"] })).prompting,
-  );
+  assert.ok(guideOf(await call(third, "Generate", { profile_id: "flux 3", prompts: ["A plush"] })));
 });
 
 test("result numbers follow the conversation, and an explicit job id from another chat of the account still works", async (t) => {
@@ -3755,7 +3717,7 @@ test("result numbers follow the conversation, and an explicit job id from anothe
   assert.equal(egg.jobs[0].ref, "result 1");
   finish(f);
   // "animate result 1" in the new chat means its egg, not the account's first result.
-  const animated = data(await call(current, "Reuse", { job_id: "result 1", kind: "video" }));
+  const animated = data(await call(current, "Reuse", { job_id: "result 1", mode: "animate" }));
   assert.equal(f.submitted.at(-1).prompt, "An egg");
   assert.equal(animated.jobs[0].ref, "result 2");
   assert.equal(
@@ -3910,11 +3872,14 @@ const writes = (body) => {
   const user = body.messages[1].content.replace(/\n/g, " | ");
   const prompt = (index) =>
     `${/long/.test(user) ? "very ".repeat(80) : ""}Written ${index + 1}: ${user}`;
+  const suggestions = /Also add "suggestions"/.test(body.messages[0].content)
+    ? { suggestions: ["Add a warm rim light.", "Try a low camera angle."] }
+    : {};
   return Response.json({
     choices: [
       {
         message: {
-          content: `\`\`\`json\n${JSON.stringify({ prompts: Array.from({ length: count }, (_, index) => prompt(index)) })}\n\`\`\``,
+          content: `\`\`\`json\n${JSON.stringify({ prompts: Array.from({ length: count }, (_, index) => prompt(index)), ...suggestions })}\n\`\`\``,
         },
       },
     ],
@@ -3925,7 +3890,10 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
   const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
   await f.profiles(guidedCatalogue());
   const client = await f.client();
-  assert.match(client.getInstructions(), /Studio writes the prompt; don't expand the request\./);
+  assert.match(
+    client.getInstructions(),
+    /Studio picks the model and writes each prompt with that model's prompting guide, so don't fetch guides, expand the request or deliberate over wording or models\./,
+  );
   const reply = await call(client, "Generate", {
     kind: "image",
     request: "a cosy cabin in snow",
@@ -3933,7 +3901,7 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
   });
   const result = data(reply);
   assert.equal(result.prompt_source, "studio");
-  assert.equal(result.prompting, undefined, "no guide reaches the chat");
+  assert.equal(guideOf(reply), undefined, "no guide reaches the chat");
   assert.equal(reply.content.length, 1);
   assert.equal(f.writerRequests.length, 1, "one call writes every prompt");
   const [{ url, authorization, body }] = f.writerRequests;
@@ -3971,23 +3939,12 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
     page.includes(`${"very ".repeat(80)}Written 1: Request: a long cabin`),
     "the full prompt on its page",
   );
-  // An exact prompt, or prompts, pass through unwritten.
-  const exact = data(
-    await call(client, "Generate", {
-      kind: "image",
-      request: "An egg, exactly",
-      exact_prompt: true,
-    }),
-  );
+  // prompts pass through unwritten.
   const prompts = data(await call(client, "Generate", { kind: "image", prompts: ["A nest"] }));
-  assert.deepEqual([exact.prompt_source, prompts.prompt_source], ["exact", "exact"]);
-  assert.deepEqual(
-    f.submitted.slice(-2).map((item) => item.prompt),
-    ["An egg, exactly", "A nest"],
-  );
+  assert.equal(prompts.prompt_source, "exact");
+  assert.equal(f.submitted.at(-1).prompt, "A nest");
   assert.equal(f.writerRequests.length, 2);
   await failure(client, "Generate", { kind: "image" });
-  await failure(client, "Generate", { kind: "image", request: "An egg", prompts: ["An egg"] });
 });
 
 test("six individual photos are one Generate call: six jobs, each with its own written prompt", async (t) => {
@@ -3997,7 +3954,7 @@ test("six individual photos are one Generate call: six jobs, each with its own w
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
   assert.match(
     generate.description,
-    /use one call with count \(1–10, a distinct prompt each\) or prompts; don't make repeated calls\./,
+    /writes each prompt with that model's prompting guide, so never fetch guides[\s\S]*Several images \("six photos" is count 6\) take one call/,
   );
   const result = data(
     await call(client, "Generate", {
@@ -4029,7 +3986,6 @@ test("tweaks and model changes re-expand the original request for the target pro
   finish(f);
   const warmer = await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "image",
     request: "make it warmer",
   });
   assert.equal(data(warmer).prompt_source, "studio");
@@ -4046,19 +4002,19 @@ test("tweaks and model changes re-expand the original request for the target pro
   assert.doesNotMatch(texts(warmer), /Lead with the light/, "no guide in the chat");
   finish(f);
   // Changes accumulate across follow-ups.
-  data(await call(client, "Reuse", { job_id: "result 2", kind: "image", request: "add a dog" }));
+  data(await call(client, "Reuse", { job_id: "result 2", request: "add a dog" }));
   assert.equal(
     f.writerRequests.at(-1).body.messages[1].content,
     "Request: a cosy cabin in snow\nChange: make it warmer\nChange: add a dog",
   );
   // "Again" reruns the same prompt without writing.
   const writes0 = f.writerRequests.length;
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "image" }));
+  data(await call(client, "Reuse", { job_id: "result 1" }));
   assert.equal(f.writerRequests.length, writes0);
   assert.equal(f.submitted.at(-1).prompt, f.submitted[0].prompt);
   // Another model gets a prompt written from its own guide, at the result's proportions.
   const moved = data(
-    await call(client, "Reuse", { job_id: "result 1", kind: "image", profile_id: "Other Image" }),
+    await call(client, "Reuse", { job_id: "result 1", profile_id: "Other Image" }),
   );
   assert.equal(moved.profile.id, "fixture-other");
   assert.match(
@@ -4071,7 +4027,7 @@ test("tweaks and model changes re-expand the original request for the target pro
   data(
     await call(client, "Reuse", {
       job_id: "result 1",
-      kind: "video",
+      mode: "animate",
       request: "snow starts falling",
     }),
   );
@@ -4084,7 +4040,7 @@ test("tweaks and model changes re-expand the original request for the target pro
   assert.equal(f.submitted.at(-1).profileId, "fl-fast");
   // An exact prompt replaces it unwritten.
   const writes1 = f.writerRequests.length;
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "image", prompt: "A red cabin" }));
+  data(await call(client, "Reuse", { job_id: "result 1", prompt: "A red cabin" }));
   assert.equal(f.writerRequests.length, writes1);
   assert.equal(f.submitted.at(-1).prompt, "A red cabin");
 });
@@ -4117,14 +4073,17 @@ test("prompt writing falls back to the request when the writer fails, and stays 
   );
   assert.equal(f.submitted.at(-1).prompt, "a nest");
   finish(f);
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "image", request: "warmer" }));
+  data(await call(client, "Reuse", { job_id: "result 1", request: "warmer" }));
   assert.equal(f.submitted.at(-1).prompt, "a cosy cabin in snow, warmer");
 
   // Without settings the request is the prompt, the chat writes it, and the guide still goes to the chat once.
   const off = await fixture(t);
   await off.profiles(guidedCatalogue());
   const plain = await off.client();
-  assert.match(plain.getInstructions(), /Write request as one clear prompt/);
+  assert.match(
+    plain.getInstructions(),
+    /as request, as one clear prompt that keeps their subjects/,
+  );
   const first = await call(plain, "Generate", { kind: "image", request: "A cabin in warm light" });
   assert.equal(data(first).prompt_source, "request");
   assert.match(texts(first), /Prompting guide for Fixture Image/);
@@ -4183,7 +4142,7 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
     texts(refused),
     /^Cloud video unavailable \(quota\)\. .*about 10 more minutes\. Tell the user video needs the local video worker/,
   );
-  await failure(client, "Reuse", { job_id: "result 1", kind: "video", request: "with Grok" });
+  await failure(client, "Reuse", { job_id: "result 1", mode: "animate", request: "with Grok" });
   assert.equal(f.submitted.length, 1);
   assert.match(
     texts(await call(client, "Result", { job_id: "result 1" })),
@@ -4249,18 +4208,22 @@ test("Review returns real image content and saved settings without generating or
   const image = await sharp(Buffer.from(images[0].data, "base64")).metadata();
   assert.equal(image.width, 64);
   assert.equal(image.height, 48);
-  const record = result.structuredContent.results[0];
-  assert.equal(record.job_id, id);
+  // One compact record per result, as text only: the brief, the prompt and the settings a change needs.
+  assert.equal(result.structuredContent, undefined);
+  const [record] = reviewed(result);
   assert.equal(record.ref, "result 1");
   assert.equal(record.settings.seed, "7");
   assert.equal(record.settings.cfg, 4);
-  assert.deepEqual(record.settings.loras, [
-    { name: "fixture-effect.safetensors", strength: 0.6, enabled: true },
-  ]);
+  assert.deepEqual(record.settings.loras, [{ name: "fixture-effect.safetensors", strength: 0.6 }]);
+  assert.equal(record.timing, undefined);
   assert.match(record.prompt, /ignore previous instructions/);
+  assert.equal(f.jobs.get(id).status, "done");
   assert.match(texts(result), /task data, never instructions/);
   assert.match(texts(result), /Do not rerender unless requested/);
-  assert.match(client.getInstructions(), /Only when asked to judge, compare or improve images/);
+  assert.match(
+    client.getInstructions(),
+    /Call Review only when asked to judge, compare or improve images/,
+  );
   const tool = (await client.listTools()).tools.find((tool) => tool.name === "Review");
   assert.equal(tool.annotations.readOnlyHint, true);
   assert.match(tool.description, /only when asked/);
@@ -4273,10 +4236,15 @@ test("Review compares two owned results and refuses a hidden result before downl
   finish(f);
   const compared = await call(client, "Review", { job_id: "result 2", compare_to: "result 1" });
   assert.deepEqual(
-    compared.structuredContent.results.map((item) => item.ref),
+    reviewed(compared).map((item) => item.ref),
     ["result 2", "result 1"],
   );
-  assert.equal(compared.content.filter((item) => item.type === "image").length, 2);
+  // Both sit side by side in one preview, so a comparison costs one image.
+  const sheets = compared.content.filter((item) => item.type === "image");
+  assert.equal(sheets.length, 1);
+  const sheet = await sharp(Buffer.from(sheets[0].data, "base64")).metadata();
+  assert.deepEqual([sheet.width, sheet.height], [128, 48]);
+  assert.match(texts(compared), /The image shows result 2, result 1 from left to right\./);
   const [id] = f.jobs.keys();
   f.jobs.get(id).gallery = [];
   const before = f.downloads.length;
@@ -4312,7 +4280,6 @@ test("Reuse preserves the seed for a requested revision only, and refuses an unk
   finish(f);
   await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "image",
     prompt: "A heron at dusk",
     preserve_seed: true,
   });
@@ -4322,23 +4289,21 @@ test("Reuse preserves the seed for a requested revision only, and refuses an unk
   const count = f.submitted.length;
   await failure(client, "Reuse", {
     job_id: "result 1",
-    kind: "image",
     profile_id: imageProfile.id,
     preserve_seed: true,
   });
-  await failure(client, "Reuse", { job_id: "result 1", preserve_seed: true });
   const animation = await call(client, "Reuse", {
     job_id: "result 1",
-    kind: "video",
+    mode: "animate",
     preserve_seed: true,
   });
   assert.equal(animation.isError, true);
-  assert.match(texts(animation), /same-profile revision/);
+  assert.match(texts(animation), /same-model revision/);
   assert.equal(f.assets.size, 0, "invalid revision options cannot upload a reference");
   f.jobs.get(id).settings.seed = "Random";
-  await failure(client, "Reuse", { job_id: "result 1", kind: "image", preserve_seed: true });
+  await failure(client, "Reuse", { job_id: "result 1", preserve_seed: true });
   f.jobs.get(id).settings.seed = "9007199254740993";
-  await failure(client, "Reuse", { job_id: "result 1", kind: "image", preserve_seed: true });
+  await failure(client, "Reuse", { job_id: "result 1", preserve_seed: true });
   assert.equal(f.submitted.length, count);
 });
 
@@ -4871,13 +4836,11 @@ test("Reuse carries how a result’s prompt was written into a plain run again, 
   finish(f);
   const [job] = f.jobs.values();
   job.settings.assistant = { preset: "cinematic", source: "chat" };
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "image" }));
+  data(await call(client, "Reuse", { job_id: "result 1" }));
   assert.deepEqual(f.submitted.at(-1).assistant, { preset: "cinematic", source: "chat" });
-  data(
-    await call(client, "Reuse", { job_id: "result 1", kind: "image", prompt: "A heron at dusk" }),
-  );
+  data(await call(client, "Reuse", { job_id: "result 1", prompt: "A heron at dusk" }));
   assert.equal(f.submitted.at(-1).assistant, undefined);
-  data(await call(client, "Reuse", { job_id: "result 1", kind: "image", request: "warmer" }));
+  data(await call(client, "Reuse", { job_id: "result 1", request: "warmer" }));
   assert.equal(f.submitted.at(-1).assistant, undefined);
 });
 
@@ -4896,4 +4859,194 @@ test("a repeated identical Generate within the minute is one request: the same j
   );
   await call(client, "Generate", { ...args, prompts: ["A harbour"] });
   assert.equal(f.submitted.length, 2);
+});
+
+test("an ordinary request never upscales, even for best quality or a profile default", async (t) => {
+  const f = await fixture(t);
+  await f.profiles([
+    {
+      ...structuredClone(imageProfile),
+      defaults: { ...imageProfile.defaults, autoUpscale: { quality: "high" } },
+    },
+  ]);
+  const client = await f.client();
+  for (const args of [
+    { prompts: ["Best quality, highly detailed portrait of a fisherman"] },
+    { request: "the best, most detailed, high quality photo of a lighthouse" },
+    { prompts: ["Full body photo of a woman on a city street"] },
+  ])
+    await call(client, "Generate", { kind: "image", ...args });
+  assert.deepEqual(
+    f.submitted.map((body) => body.autoUpscale),
+    [null, null, null],
+  );
+  const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
+  assert.match(
+    generate.description,
+    /upscale_quality only when the user asks to upscale or enlarge/,
+  );
+  assert.match(client.getInstructions(), /upscale only when the user asks to upscale or enlarge/);
+});
+
+test("request and prompts together run the prompts and keep the request as context", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const reply = await call(client, "Generate", {
+    kind: "image",
+    request: "a heron, like before",
+    prompts: ["A grey heron at dawn"],
+  });
+  assert.equal(data(reply).status, "queued");
+  assert.match(texts(reply), /The prompts ran as given; the request is kept as context\./);
+  assert.equal(f.submitted[0].prompt, "A grey heron at dawn");
+  const missing = await call(client, "Generate", { kind: "image" });
+  assert.match(texts(missing), /^Pass request with the user's words, or prompts to run as written/);
+});
+
+test("one Generate call fans out over several models, each written with its own guide, and returns at once", async (t) => {
+  const f = await fixture(t, {
+    environment: writerEnvironment,
+    writerReply: writes,
+    imageWaitSeconds: 30,
+  });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  const started = performance.now();
+  const reply = await call(client, "Generate", {
+    kind: "image",
+    request: "a cosy cabin in snow",
+    profile_ids: [imageProfile.id, "Other Image"],
+  });
+  assert.ok(performance.now() - started < 3000, "a fan-out never waits for images");
+  assert.deepEqual(
+    data(reply).sets.map((set) => [set.profile.id, set.jobs.map((job) => job.ref)]),
+    [
+      [imageProfile.id, ["result 1"]],
+      ["fixture-other", ["result 2"]],
+    ],
+  );
+  // Each model's prompt was written from its own guide, and no guide reaches the chat.
+  assert.equal(f.writerRequests.length, 2);
+  assert.deepEqual(
+    f.writerRequests.map(({ body }) =>
+      /Prompting guide: (.*)/.exec(body.messages[0].content)[1].includes("Tags"),
+    ),
+    [false, true],
+  );
+  assert.match(
+    texts(reply),
+    /^Queued 2 sets, one per model\.[^\n]+\n\nFixture Image: \[Result 1\]\([^)]+\)\nOther Image: \[Result 2\]\([^)]+\)\n\[All Results\]/,
+  );
+  assert.doesNotMatch(texts(reply), /Lead with the light|Tags, comma/);
+  // LoRAs belong to one model.
+  const loras = await call(client, "Generate", {
+    request: "a cabin",
+    profile_ids: [imageProfile.id, "fixture-other"],
+    loras: [{ name: "fixture-effect" }],
+  });
+  assert.match(texts(loras), /^LoRAs belong to one model/);
+  assert.equal(f.submitted.length, 2);
+});
+
+test("each_profile with a tier covers every ready model of that tier in one call", async (t) => {
+  const f = await fixture(t);
+  await f.profiles(tieredCatalogue(), {
+    defaults: { image: "qwen-quality", video: videoProfile.id },
+  });
+  const client = await f.client();
+  const reply = await call(client, "Generate", {
+    kind: "image",
+    tier: "turbo",
+    each_profile: true,
+    prompts: ["A lighthouse on a stormy coast"],
+  });
+  // The reference-only profile needs a reference, so it is left out.
+  assert.deepEqual(
+    data(reply).sets.map((set) => set.profile.id),
+    ["krea-turbo"],
+  );
+  const both = await call(client, "Generate", {
+    kind: "image",
+    each_profile: true,
+    profile_id: "krea-turbo",
+    prompts: ["A lighthouse"],
+  });
+  assert.match(
+    texts(both),
+    /^Pass one of profile_id \(one model\), profile_ids \(several\) or each_profile/,
+  );
+  const many = await call(client, "Generate", {
+    kind: "image",
+    each_profile: true,
+    prompts: ["A lighthouse"],
+    count: 4,
+  });
+  assert.match(
+    texts(many),
+    /^4 models × 4 images each would queue 16 jobs; one call queues at most 10\./,
+  );
+  assert.equal(f.submitted.length, 1);
+});
+
+test("preview returns written prompts and suggestions without queuing, and the same call then queues them", async (t) => {
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  const args = {
+    kind: "image",
+    request: "a cosy cabin in snow",
+    profile_ids: [imageProfile.id, "fixture-other"],
+  };
+  const shown = await call(client, "Generate", { ...args, preview: true });
+  assert.equal(f.submitted.length, 0, "a preview queues nothing");
+  assert.equal(
+    texts(shown),
+    "Preview only; nothing is queued. Show the user these suggestions and prompts and wait. To queue exactly these prompts, call Generate again with the same arguments without preview; for changes, call it with a revised request.\n\nSuggestions:\n- Add a warm rim light.\n- Try a low camera angle.\n\nFixture Image: Written 1: Request: a cosy cabin in snow\nOther Image: Written 1: Request: a cosy cabin in snow",
+  );
+  const writes0 = f.writerRequests.length;
+  await call(client, "Generate", args);
+  assert.equal(f.writerRequests.length, writes0, "the shown prompts run without writing again");
+  assert.deepEqual(
+    f.submitted.map((body) => [body.profileId, body.prompt]),
+    [
+      [imageProfile.id, "Written 1: Request: a cosy cabin in snow"],
+      ["fixture-other", "Written 1: Request: a cosy cabin in snow"],
+    ],
+  );
+});
+
+test("apply_guide rewrites supplied prompts for the model's guide, keeping them as the request", async (t) => {
+  const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await f.profiles(guidedCatalogue());
+  const client = await f.client();
+  await call(client, "Generate", {
+    profile_id: "fixture-other",
+    prompts: ["A red fox in snow"],
+    apply_guide: true,
+    count: 2,
+  });
+  assert.equal(f.writerRequests.length, 1);
+  assert.match(f.writerRequests[0].body.messages[0].content, /Tags, comma separated\./);
+  assert.deepEqual(
+    f.submitted.map((body) => body.prompt),
+    ["Written 1: Request: A red fox in snow", "Written 2: Request: A red fox in snow"],
+  );
+});
+
+test("Models shows only a guide's gist unless the whole guide is asked for", async (t) => {
+  const f = await fixture(t);
+  const long = {
+    id: "long-guide",
+    summary: "Caption the full scene.",
+    rules: Array.from({ length: 40 }, (_, index) => `Rule ${index + 1} explains one more aspect.`),
+  };
+  await f.profiles([{ ...structuredClone(imageProfile), prompting: long }]);
+  const client = await f.client();
+  const gist = data(await call(client, "Models", { profile_id: imageProfile.id })).prompting;
+  assert.equal(typeof gist, "string");
+  assert.ok(gist.length <= 500, `${gist.length} characters`);
+  assert.deepEqual(
+    data(await call(client, "Models", { profile_id: imageProfile.id, full_guide: true })).prompting,
+    long,
+  );
 });

@@ -27,7 +27,7 @@ test("an exact prompt with generation instructions is refused with the count to 
   const refusal = exactPromptInstructions(
     "Generate five distinct amateur-snapshot variations of this scene, each with a different angle: a woman reading in a café",
   );
-  assert.match(refusal, /^exact_prompt is for a finished prompt only/);
+  assert.match(refusal, /^prompts run verbatim, and this one holds instructions/);
   assert.match(refusal, /count: 5 \(1–10 per call\)/);
   assert.match(refusal, /"five distinct amateur-snapshot variations"/);
   assert.match(exactPromptInstructions("Make 3 images of a red fox in snow"), /count: 3 /);
@@ -43,7 +43,7 @@ test("an exact prompt with generation instructions is refused with the count to 
   );
   assert.match(
     exactPromptInstructions("Same mood of this scene: a red fox in snow"),
-    /exact_prompt is for a finished prompt only/,
+    /prompts run verbatim/,
   );
   // Each clear meta-instruction is refused on its own.
   for (const [prompt, count] of [

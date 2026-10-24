@@ -197,10 +197,8 @@ test("the tools call the shared engine with the account credential, and Generate
   );
   await call(client, "Generate", {
     prompts: [written.prompt],
-    exact_prompt: true,
     profile_id: profile.id,
     loras: [{ name: "glow.safetensors" }],
-    wait_seconds: 0,
   });
   assert.deepEqual(f.submitted[0].assistant, {
     preset: "cinematic",
@@ -211,7 +209,6 @@ test("the tools call the shared engine with the account credential, and Generate
   await call(client, "Generate", {
     prompts: ["Something the chat wrote itself"],
     profile_id: profile.id,
-    wait_seconds: 0,
   });
   assert.equal(f.submitted[1].assistant, undefined);
 });

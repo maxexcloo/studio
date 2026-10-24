@@ -75,7 +75,10 @@ export function mcpControls(profile) {
       note: "Requires reference_asset_ids.",
     };
   if (profile.kind === "image") {
-    controls.upscale_quality = { options: ["fast", "balanced", "high"] };
+    controls.upscale_quality = {
+      options: ["fast", "balanced", "high"],
+      note: "Only when the user asks to upscale or enlarge.",
+    };
     controls.face_detail = {
       note: "Requires upscale_quality. With upscale_quality set, it turns on by itself for a full-body person.",
     };
@@ -366,7 +369,11 @@ export function mcpLoras(profile, infos = {}, { query = "", names = [] } = {}) {
     loras: matches.slice(0, maxDetails).map((entry) => loraDetail(entry, short(entry.name))),
     total: candidates.length,
     ...(matches.length > maxDetails
-      ? { more: matches.slice(maxDetails).map((entry) => indexLine(entry, short(entry.name))) }
+      ? {
+          more: matches
+            .slice(maxDetails, maxDetails * 5)
+            .map((entry) => indexLine(entry, short(entry.name))),
+        }
       : {}),
     ...(missing.length
       ? {
