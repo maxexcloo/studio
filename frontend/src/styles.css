@@ -1,15 +1,5 @@
 :root {
-  --studio-composer-width: 780px;
   --studio-composer-gap: 1rem;
-}
-:root[data-mantine-color-scheme="dark"] {
-  color-scheme: dark;
-}
-:root[data-mantine-color-scheme="light"] {
-  color-scheme: light;
-}
-body {
-  margin: 0;
 }
 a {
   color: inherit;
@@ -29,11 +19,6 @@ select {
 }
 .studio-logo {
   letter-spacing: -0.055em;
-}
-.mantine-AppShell-header {
-  background: light-dark(rgb(255 255 255 / 0.94), rgb(9 9 11 / 0.94));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
 }
 .studio-mode-tabs {
   border: 1px solid var(--mantine-color-default-border);
@@ -100,12 +85,6 @@ select {
   transform: translateX(-50%);
   width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
 }
-.studio-composer-dock > .mantine-Paper-root {
-  background: light-dark(rgb(255 255 255 / 0.94), rgb(24 24 27 / 0.94));
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-color: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
-}
 .studio-composer-dock textarea {
   font-size: 1rem;
 }
@@ -164,7 +143,7 @@ select {
   bottom: max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
   margin-top: auto;
   padding-top: var(--mantine-spacing-md);
-  background: var(--mantine-color-body);
+  background: var(--studio-glass-raised);
 }
 .studio-chat-workspace {
   display: grid;
