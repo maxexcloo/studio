@@ -148,8 +148,8 @@ test("restart follows only recorded provider jobs and never resubmits uncertain 
 });
 
 /** Completes running work tick by tick until the queue is idle. */
-async function drain({ store, queue, observations }: ReturnType<typeof fixture>) {
-  for (let pass = 0; pass < 20; pass++) {
+async function drain({ store, queue, observations }: ReturnType<typeof fixture>, passes = 20) {
+  for (let pass = 0; pass < passes; pass++) {
     for (const job of store.jobs())
       if (job.status === "running") observations.set(job.id, { status: "completed" });
     await queue.tick();
@@ -215,6 +215,80 @@ test("a started MCP set stays contiguous and its order survives restart", async 
   } finally {
     restored.store.close();
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** Enqueues an image job loading `model` (and optional LoRAs) with an optional queue origin. */
+const loading =
+  (store: RewriteStore, sessionId: string) =>
+  (model: string, origin = {}, loras?: unknown[]) =>
+    store.enqueue(
+      "alice",
+      sessionId,
+      { model, ...(loras ? { loras } : {}) },
+      "image",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      origin,
+    ).id;
+
+test("queued work reusing the loaded model and LoRAs runs first within its tier", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const enqueue = loading(store, store.createSession("alice").id);
+    const first = enqueue("a");
+    await queue.queue.tick();
+    const other = enqueue("b");
+    const withLora = enqueue("a", {}, [{ name: "ink", strength: 1 }]);
+    const reuse = enqueue("a");
+    await drain(queue);
+    assert.deepEqual(queue.submitted, [first, reuse, other, withLora]);
+  } finally {
+    store.close();
+  }
+});
+
+test("reuse overtakes an older job at most three times, also across a restart", async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
+  const filename = path.join(dir, "studio.sqlite");
+  const first = fixture(filename);
+  const enqueue = loading(first.store, first.store.createSession("alice").id);
+  const loaded = enqueue("a");
+  await first.queue.tick();
+  const other = enqueue("b");
+  const reuse = [enqueue("a"), enqueue("a"), enqueue("a"), enqueue("a"), enqueue("a")];
+  await drain(first, 2);
+  assert.deepEqual(first.submitted, [loaded, reuse[0], reuse[1]]);
+  first.store.close();
+  const restored = fixture(filename);
+  try {
+    await drain(restored);
+    assert.deepEqual(restored.submitted, [reuse[2], other, reuse[3], reuse[4]]);
+  } finally {
+    restored.store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("reuse never puts MCP work before manual requests or splits a started MCP set", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const enqueue = loading(store, store.createSession("alice").id);
+    const running = enqueue("a");
+    await queue.queue.tick();
+    const reusingMcp = enqueue("a", mcp("u"));
+    const manual = enqueue("b");
+    const setFirst = enqueue("b", mcp("s"));
+    const setSecond = enqueue("a", mcp("s"));
+    const later = enqueue("b", mcp("t"));
+    await drain(queue);
+    assert.deepEqual(queue.submitted, [running, manual, setFirst, setSecond, reusingMcp, later]);
+  } finally {
+    store.close();
   }
 });
 
