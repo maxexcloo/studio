@@ -47,19 +47,19 @@ primary component reference and verify APIs against the installed version.
   landing page at `/images`; videos use `/video`, conversation uses
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
   (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image and Video icons with
-  accessible names and tooltips. The left status action opens sessions in Chat
-  and active work in gallery modes. Its slideout keeps the compact service
-  summary at the bottom and contextual content above it. The icon reflects the
-  current interface using actual gateway/worker health; cloud configuration
-  alone is not proof of availability. The phone overflow orders Account,
-  Library, Settings, Theme, a divider, the account name and supported Sign
-  Out. Desktop Settings is followed by Theme and the account icon; Studio remains
-  leftmost and the header follows the workspace width. One red, green or yellow
-  status dot sits immediately before Library on desktop. Click opens a flat runtime panel with an endpoint selector and actual status for
-  each service type; Settings reuses its full version. Partial readiness is yellow.
-  Readiness comes from actual text/media endpoints, with unknown placement
-  shown honestly. Queue sits before Studio and opens an anchored popover. The
-  account menu shows the actual name, Account and supported Sign Out.
+  accessible names and tooltips. On every breakpoint one status action sits
+  left of the Studio logo: a spinner while work is generating, otherwise an
+  icon coloured by actual gateway/worker health (partial readiness is yellow;
+  cloud configuration alone is not proof of availability). It opens the same
+  slideout everywhere: Chats in Chat, active and failed generations with Cancel
+  and Retry in gallery modes, and the compact service summary at the bottom.
+  Endpoint selection and full runtime controls live in Settings › Workers, not
+  in the header. Readiness comes from actual text/media endpoints, with unknown
+  placement shown honestly. The phone overflow orders Account, Library,
+  Settings, Theme, a divider, the account name and supported Sign Out. Desktop
+  Library and Settings are followed by Theme and the account icon; the header
+  follows the workspace width. The account menu shows the actual name,
+  Account and supported Sign Out.
 - Full/Fixed controls the workspace. Chat has a structural desktop sessions
   sidebar, flush below the header through the viewport bottom, with a distinct
   neutral surface and divider. Phones use a session Drawer. The Chat composer
@@ -183,7 +183,7 @@ primary component reference and verify APIs against the installed version.
   popovers with scrollable controls. Normal, search, filters and selection
   modes use the same toolbar region. Search/filter actions preserve queries.
   Shared `SearchInput` clears only the query, never a selected model/profile.
-  Queue access has one owner: the header.
+  Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
   views. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
