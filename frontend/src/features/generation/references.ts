@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { failure, post } from "../../api";
+import { post } from "../../api";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import {
   addReference,
@@ -65,6 +65,5 @@ export function useGalleryReference(adopt?: (asset: ReferenceAsset) => void) {
       if (adopt) adopt(asset);
       else add(asset);
     },
-    onError: failure,
   });
 }

@@ -71,19 +71,18 @@ export function LibraryPage() {
     void client.invalidateQueries({ queryKey: ["library"] });
   };
   const importing = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post<{ import: ImportRecord }>("/api/library/imports", { url }),
     onSuccess: (result) => {
       setReviewId(result.import.id);
       setUrl("");
       refresh();
     },
-    onError: failure,
   });
   const action = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) =>
       post(`/api/library/imports/${id}/${action}`),
     onSuccess: refresh,
-    onError: failure,
   });
   const update = useMutation({
     mutationFn: (choice: { key: string; alternative?: boolean } | undefined) =>
@@ -105,7 +104,6 @@ export function LibraryPage() {
             : "Everything is up to date.",
         });
     },
-    onError: failure,
   });
   async function upload(file: File | null) {
     if (!file) return;
@@ -173,6 +171,11 @@ export function LibraryPage() {
                     )}
                   </FileButton>
                 </Group>
+                {importing.error && (
+                  <Alert color="red" mt="sm">
+                    {importing.error.message}
+                  </Alert>
+                )}
               </form>
               <Stack>
                 {imports.isPending ? (

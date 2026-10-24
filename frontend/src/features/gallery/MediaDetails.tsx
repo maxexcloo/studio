@@ -152,7 +152,6 @@ ${download.download}`;
       void cache.invalidateQueries({ queryKey: ["gallery"] });
       void cache.invalidateQueries({ queryKey: ["session"] });
     },
-    onError: failure,
   });
   return (
     <Paper

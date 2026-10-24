@@ -62,6 +62,7 @@ export function PromptHistory({
     enabled: allowed && opened,
   });
   const action = useMutation({
+    meta: { inlineError: true },
     mutationFn: (input: HistoryAction) =>
       post<HistoryData>(`/api/prompts/${input.action}`, {
         ...input,

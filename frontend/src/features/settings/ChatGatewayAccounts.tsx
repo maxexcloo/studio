@@ -24,6 +24,7 @@ export function ChatGatewayAccounts({
   const client = useQueryClient();
   const [choices, setChoices] = useState<Record<string, string>>({});
   const change = useMutation({
+    meta: { inlineError: true },
     mutationFn: (action: Action) => {
       if (action.kind === "admin") return post("/api/accounts/gateway-admin", { on: action.on });
       if (action.kind === "dismiss")

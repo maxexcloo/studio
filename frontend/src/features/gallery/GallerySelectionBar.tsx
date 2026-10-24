@@ -3,7 +3,7 @@ import { ActionBar, ActionIcon, Button, Group, Stack, Text, Tooltip } from "@man
 import { useMotionDuration } from "../../ui/Appearance";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Download, RotateCw, SquareX, Star, Trash2, X } from "lucide-react";
-import { failure, post } from "../../api";
+import { post } from "../../api";
 import type { GallerySelection } from "./useGallerySelection";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -61,7 +61,6 @@ export function GallerySelectionBar({ selection }: { selection: GallerySelection
           favorite: !allStarred,
         });
     },
-    onError: failure,
     onSettled: async () => {
       await Promise.all([
         cache.invalidateQueries({ queryKey: ["gallery"] }),

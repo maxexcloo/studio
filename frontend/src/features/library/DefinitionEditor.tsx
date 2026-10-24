@@ -111,6 +111,7 @@ function DefinitionForm({
     void client.invalidateQueries({ queryKey: ["definition-versions", kind, id] });
   };
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       if (error) throw new Error(error);
       if (!form.values.id.trim()) throw new Error("Choose a definition ID.");
@@ -133,10 +134,12 @@ function DefinitionForm({
     },
   });
   const validate = useMutation({
+    meta: { inlineError: true },
     mutationFn: () => post<{ check: Check }>(`${path}/check`, { text: form.values.text }),
     onSuccess: ({ check }) => setCheck(check),
   });
   const action = useMutation({
+    meta: { inlineError: true },
     mutationFn: ({ action, version }: { action: "approve" | "revert"; version?: number }) =>
       post(`${path}/${action}`, { baseHash: loaded.hash, version }),
     onSuccess: () => {
@@ -150,6 +153,7 @@ function DefinitionForm({
     enabled: !creating && tab === "versions",
   });
   const version = useMutation({
+    meta: { inlineError: true },
     mutationFn: (number: number) =>
       api<{ version: { text?: string; pack?: Record<string, unknown> } }>(
         `${path}/versions/${number}`,
