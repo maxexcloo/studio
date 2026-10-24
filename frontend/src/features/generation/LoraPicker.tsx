@@ -19,9 +19,8 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { notifications } from "@mantine/notifications";
 import { copyText } from "../../ui/clipboard";
-import { api, failure } from "../../api";
+import { api } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 import { usePhone } from "../../ui/usePhone";
@@ -333,11 +332,7 @@ function LoraControls({
                     size="compact-xs"
                     variant="subtle"
                     aria-label={`Copy Trigger Word: ${word}`}
-                    onClick={() =>
-                      void copyText(word)
-                        .then(() => notifications.show({ message: "Trigger word copied" }))
-                        .catch(failure)
-                    }
+                    onClick={() => void copyText(word, "Trigger Word")}
                   >
                     {word}
                   </Button>
