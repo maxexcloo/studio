@@ -1,11 +1,10 @@
-import { ActionIcon, Badge, Button, Group, Progress, Stack, Text, Tooltip } from "@mantine/core";
-import { Download, Info } from "lucide-react";
+import { useState } from "react";
+import { Badge, Box, Button, Group, Progress, Stack, Text } from "@mantine/core";
 import type { MediaItem, QueueJob } from "../../types";
+import { MediaTileActions } from "../gallery/MediaTileActions";
 import { useMediaAction } from "../gallery/useMediaAction";
 import { QueueJobAction, terminal } from "../generation/Queue";
 import { GenerationCard } from "./GenerationCard";
-import { mediaDownload } from "../gallery/download";
-import { useShareWithoutSettings } from "../gallery/mediaShare";
 import { mediaSource } from "../gallery/mediaSource";
 function SessionResult({
   item,
@@ -17,42 +16,59 @@ function SessionResult({
   open: (item: MediaItem) => void;
 }) {
   const action = useMediaAction(item, sessionId);
-  const [withoutSettings] = useShareWithoutSettings();
+  const [menu, setMenu] = useState(false);
   const source = mediaSource(item);
   return (
-    <Stack gap="sm" className="studio-thread-result">
-      <button
-        className="studio-thread-media"
-        aria-label={`Open ${item.type}: ${item.prompt || "Result"}`}
-        onClick={(event) => {
-          event.currentTarget.focus({ preventScroll: true });
-          open(item);
+    <Stack gap="sm">
+      <Box
+        pos="relative"
+        w="fit-content"
+        maw="100%"
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenu(true);
         }}
       >
-        {item.type === "video" ? (
-          <video
-            src={source.url}
-            width={source.width || 1024}
-            height={source.height || 1024}
-            poster={source.thumbnailUrl}
-            preload="none"
-            muted
-            playsInline
-            aria-label={item.prompt || "Generated Video"}
-          />
-        ) : (
-          <img
-            src={source.url}
-            width={source.width || 1024}
-            height={source.height || 1024}
-            alt={item.prompt || "Generated Image"}
-            loading="lazy"
-            onError={(event) => {
-              event.currentTarget.style.visibility = "hidden";
-            }}
-          />
-        )}
-      </button>
+        <button
+          className="studio-thread-media"
+          aria-label={`Open ${item.type}: ${item.prompt || "Result"}`}
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            open(item);
+          }}
+        >
+          {item.type === "video" ? (
+            <video
+              src={source.url}
+              width={source.width || 1024}
+              height={source.height || 1024}
+              poster={source.thumbnailUrl}
+              preload="none"
+              muted
+              playsInline
+              aria-label={item.prompt || "Generated Video"}
+            />
+          ) : (
+            <img
+              src={source.url}
+              width={source.width || 1024}
+              height={source.height || 1024}
+              alt={item.prompt || "Generated Image"}
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.style.visibility = "hidden";
+              }}
+            />
+          )}
+        </button>
+        <MediaTileActions
+          item={item}
+          opened={menu}
+          onOpenedChange={setMenu}
+          sessionId={sessionId}
+          omit={["refine", "animate"]}
+        />
+      </Box>
       <Group gap="xs">
         <Button
           variant="default"
@@ -74,29 +90,6 @@ function SessionResult({
             Animate
           </Button>
         )}
-        <Tooltip label="Download">
-          <ActionIcon
-            component="a"
-            aria-label="Download"
-            {...mediaDownload(item, withoutSettings)}
-            variant="subtle"
-            color="gray"
-            size={36}
-          >
-            <Download size={17} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Generation Details">
-          <ActionIcon
-            aria-label="Details"
-            variant="subtle"
-            color="gray"
-            size={36}
-            onClick={() => open(item)}
-          >
-            <Info size={17} />
-          </ActionIcon>
-        </Tooltip>
       </Group>
     </Stack>
   );
