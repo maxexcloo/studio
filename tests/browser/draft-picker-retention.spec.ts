@@ -66,7 +66,7 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   expect(state.chatRequests[1].references).toEqual(state.chatRequests[0].references);
   expect(state.sessions).toHaveLength(1);
   if (isMobile) await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  await page.getByRole("link", { name: "New Session", exact: true }).click();
+  await page.getByRole("link", { name: "New Chat", exact: true }).click();
   await expect(page).toHaveURL(/\/chat$/);
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   await message.fill("A new independent discussion");
@@ -119,7 +119,7 @@ test("Reference browsing keeps its scroll, query, filters and source in gallery 
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
-  await page.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   await page
     .getByRole("article", { name: "Iteration 1", exact: true })
     .getByRole("button", { name: "Choose References", exact: true })
@@ -137,9 +137,9 @@ test("Reference browsing keeps its scroll, query, filters and source in gallery 
   );
   await finishReferences(page);
   await page
-    .getByRole("textbox", { name: "Variation Prompt", exact: true })
+    .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Keep the picked copper reference");
-  await page.getByRole("button", { name: "Generate Variation", exact: true }).click();
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.referenceAssets).toEqual(state.jobs[0].input.referenceAssets);
 });

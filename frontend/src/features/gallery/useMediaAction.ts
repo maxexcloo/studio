@@ -124,16 +124,17 @@ async function mediaDraft(
 
 /** Prepares the composer (or a Chat card) to refine, animate or recreate a result. */
 export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: () => void) {
-  const { setDraft, profiles, setPrepared } = useGenerationActions();
+  const { setDraft, profiles, setStaged } = useGenerationActions();
   const navigate = useNavigate();
   const location = useLocation();
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (operation: Operation) => {
       const { draft } = await mediaDraft(item, operation, profiles, client, sessionId);
-      setDraft(draft);
+      // Chat stages a card with its own input; the gallery loads the composer.
+      if (location.pathname.startsWith("/chat")) setStaged(draft);
+      else setDraft(draft);
       prepared?.();
-      if (location.pathname.startsWith("/chat")) setPrepared(true);
       if (!["/images", "/video"].includes(location.pathname))
         navigate(draft.sessionId ? `/chat/${draft.sessionId}` : "/images?compose=1");
       requestAnimationFrame(() =>

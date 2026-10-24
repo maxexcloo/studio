@@ -40,7 +40,9 @@ export function ConfirmDialog({
       closeButtonProps={{ disabled: pending }}
     >
       <Stack>
-        <Text size="sm">{children}</Text>
+        <Text size="sm" component="div">
+          {children}
+        </Text>
         {error && <Alert color="red">{error}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" disabled={pending} onClick={close}>

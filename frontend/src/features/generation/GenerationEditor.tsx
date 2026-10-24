@@ -35,14 +35,12 @@ export function useSubmitState({
   profile,
   references,
   operation,
-  variation = false,
   blockedReason,
 }: {
   input: GenerationInput;
   profile?: Profile;
   references: ReferenceAsset[];
   operation?: string;
-  variation?: boolean;
   blockedReason?: string;
 }) {
   const uploading = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
@@ -68,9 +66,8 @@ export function useSubmitState({
               : assisting
                 ? "Wait for the prompt assistant to finish."
                 : undefined);
-  const label = variation
-    ? "Generate Variation"
-    : operation === "refine"
+  const label =
+    operation === "refine"
       ? "Refine Image"
       : input.kind === "video"
         ? "Generate Video"
@@ -108,7 +105,6 @@ export function GenerationEditor({
   onClear,
   onSubmit,
   operation,
-  variation = false,
   pending,
   blockedReason: callerReason,
   error,
@@ -128,7 +124,6 @@ export function GenerationEditor({
   onClear: () => void;
   onSubmit: () => void;
   operation?: string;
-  variation?: boolean;
   pending: boolean;
   blockedReason?: string;
   error?: unknown;
@@ -155,7 +150,6 @@ export function GenerationEditor({
     profile,
     references,
     operation,
-    variation,
     blockedReason: callerReason,
   });
   const assistant = usePromptAssistant({
@@ -256,7 +250,7 @@ export function GenerationEditor({
               input: classes.promptInput,
             }}
             variant="unstyled"
-            aria-label={variation ? "Variation Prompt" : "Prompt"}
+            aria-label="Prompt"
             data-autofocus={autoFocusPrompt || undefined}
             placeholder={
               input.kind === "image"

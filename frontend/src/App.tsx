@@ -7,7 +7,7 @@ import { GalleryPage } from "./features/gallery/GalleryPage";
 import { ChatProvider } from "./features/sessions/ChatProvider";
 import { useAppearance } from "./ui/Appearance";
 import { AppHeader } from "./features/shell/AppHeader";
-import { ChatWorkspace } from "./features/sessions/ChatWorkspace";
+import { ChatWorkspace, chatShellClass } from "./features/sessions/ChatWorkspace";
 import { LibraryTitle } from "./features/library/LibraryNavigation";
 // Library and Settings load with the app so their first open shows the sections, not a loader.
 import { LibraryPage } from "./features/library/LibraryPage";
@@ -52,7 +52,7 @@ function Workspace() {
           <AppShell.Header>
             <AppHeader chat={chatRoute} mode={mode} />
           </AppShell.Header>
-          <AppShell.Main className={chatRoute ? "studio-chat-shell" : undefined}>
+          <AppShell.Main className={chatRoute ? chatShellClass : undefined}>
             <div
               className="studio-page studio-content"
               style={{

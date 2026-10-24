@@ -86,7 +86,7 @@ export class RewriteStore {
     const next = {
       ...session,
       ...patch,
-      ...(patch.title === undefined ? {} : { titleSource: "user" }),
+      ...(patch.title === undefined ? {} : { titleSource: "user" as const }),
       updatedAt: now(),
     };
     this.db

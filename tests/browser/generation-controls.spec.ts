@@ -335,7 +335,7 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   expect(state.jobs[1].sessionId).toBe(state.jobs[0].sessionId);
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   const original = page.getByRole("article", { name: "Iteration 1", exact: true });
-  await original.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  await original.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   await original.getByRole("button", { name: "Expert Settings", exact: true }).click();
   await expect(role.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
   await expect(role.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
@@ -413,7 +413,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
     { name: "detail.safetensors", strength: 0.7, enabled: true },
   ]);
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
-  await page.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await copy.click();
   await expect.poll(() => page.evaluate(() => (window as any).copiedTrigger)).toBe("inkbird");

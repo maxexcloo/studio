@@ -4,6 +4,7 @@ import { ComposerDock } from "../generation/ComposerDock";
 import { ReferencePicker } from "../generation/ReferencePicker";
 import { useChat } from "./ChatProvider";
 import { useIsMutating } from "@tanstack/react-query";
+import classes from "./ChatComposer.module.css";
 function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId, selectModel } = useChat();
   const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
@@ -26,7 +27,7 @@ function ChatComposer() {
           autosize
           minRows={1}
           maxRows={5}
-          className="studio-chat-writing"
+          className={classes.writing}
           style={{ flex: 1, minWidth: 0 }}
           value={text}
           onChange={(event) => setText(event.currentTarget.value)}
@@ -50,7 +51,7 @@ function ChatComposer() {
           searchable={models.length > 8}
           w={{ base: 80, sm: 160 }}
           miw={0}
-          className="studio-chat-model"
+          className={classes.model}
           comboboxProps={{ withinPortal: true, width: 280, position: "top-end" }}
           renderOption={({ option }) => (
             <Stack gap={0}>
@@ -65,13 +66,7 @@ function ChatComposer() {
         />
         {sendingSession ? (
           <Tooltip label="Stop Response">
-            <ActionIcon
-              aria-label="Stop Response"
-              variant="default"
-              size={44}
-              radius="xl"
-              onClick={stop}
-            >
+            <ActionIcon aria-label="Stop Response" variant="default" size={44} onClick={stop}>
               <Square size={17} />
             </ActionIcon>
           </Tooltip>
@@ -82,7 +77,6 @@ function ChatComposer() {
               aria-label="Send Message"
               disabled={!text.trim() || unavailable}
               size={44}
-              radius="xl"
               variant="filled"
             >
               <ArrowUp size={20} />

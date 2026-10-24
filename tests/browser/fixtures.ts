@@ -202,6 +202,7 @@ export async function fixtures(page: Page) {
         role: "user",
         content: body.content,
         status: "completed",
+        revision: body.revision,
         createdAt: nextStamp(),
       };
       const assistant: any = {
@@ -382,7 +383,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/sessions" && method === "POST") {
       const session = {
         id: `session-${sessions.length + 1}`,
-        title: body.title,
+        title: body.title || "New Chat",
         inputs: body.inputs,
         createdAt: stamp,
         updatedAt: stamp,
@@ -397,6 +398,23 @@ export async function fixtures(page: Page) {
     }
     if (path.match(/^\/api\/sessions\/[^/]+$/)) {
       const session = sessions.find((s) => s.id === path.split("/")[3]);
+      if (method === "PATCH") Object.assign(session, { title: body.title, titleSource: "user" });
+      if (method === "DELETE") {
+        const owned = jobs.filter((job) => job.sessionId === session.id);
+        if (owned.some((job) => !["completed", "failed", "cancelled"].includes(job.status)))
+          return respond(
+            {
+              reason: "active-jobs",
+              error: "This chat has generations in progress. Cancel them before deleting the chat.",
+            },
+            409,
+          );
+        const ids: string[] = body.mediaIds || [];
+        sessions.splice(sessions.indexOf(session), 1);
+        for (const job of owned) jobs.splice(jobs.indexOf(job), 1);
+        gallery.splice(0, gallery.length, ...gallery.filter((item) => !ids.includes(item.id)));
+        return respond({ ok: true, media: { removed: ids, failed: [] } });
+      }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
     if (path === "/api/gallery/favorite" && method === "POST") {

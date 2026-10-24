@@ -16,6 +16,7 @@ import type { Session } from "../../types";
 import { useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
+import { sessionQuery, sessionsQuery } from "./queries";
 
 interface ChatHistory {
   messages: ChatMessage[];
@@ -57,7 +58,7 @@ async function readChat(response: Response, receive: (event: ChatEvent) => void)
 function useChatState() {
   const client = useQueryClient(),
     navigate = useNavigate();
-  const { draft, setDraft, profile, setPrepared } = useGeneration();
+  const { draft, setDraft, profile } = useGeneration();
   const [text, setText] = useState("");
   const [sendingSession, setSendingSession] = useState("");
   const [error, setError] = useState("");
@@ -83,13 +84,20 @@ function useChatState() {
     try {
       const input = generationInput(draft.input, profile, draft.references);
       if (!sessionId) {
-        const result = await post<{ session: Session }>("/api/sessions", {
-          title: content.slice(0, 80),
-          inputs: input,
-        });
+        // The chat stays New Chat until its generated title arrives after the first reply.
+        const result = await post<{ session: Session }>("/api/sessions", { inputs: input });
         sessionId = result.session.id;
+        // The new chat opens at once instead of loading what is already known.
+        client.setQueryData(sessionQuery(sessionId).queryKey, {
+          session: result.session,
+          jobs: [],
+        });
+        client.setQueryData<ChatHistory>(["chat", sessionId], { available: true, messages: [] });
+        client.setQueryData(sessionsQuery.queryKey, (data) =>
+          data ? { sessions: [result.session, ...data.sessions] } : data,
+        );
         setDraft((value) => ({ ...value, sessionId }));
-        void client.invalidateQueries({ queryKey: ["sessions"] });
+        void client.invalidateQueries({ queryKey: sessionsQuery.queryKey });
       }
       setSendingSession(sessionId);
       navigate(`/chat/${sessionId}`);
@@ -125,7 +133,6 @@ function useChatState() {
           });
         } else if (event.event === "generation") {
           generated = true;
-          setPrepared(false);
           setDraft((previous) => ({ ...previous, parentJobId: event.data.job.id }));
           void client.invalidateQueries({ queryKey: ["session", sessionId] });
           void client.invalidateQueries({ queryKey: queueQuery.queryKey });
@@ -141,6 +148,7 @@ function useChatState() {
       if (sessionId) {
         void client.invalidateQueries({ queryKey: ["chat", sessionId] });
         void client.invalidateQueries({ queryKey: ["session", sessionId] });
+        void client.invalidateQueries({ queryKey: sessionsQuery.queryKey });
       }
     }
     return generated;
@@ -204,6 +212,11 @@ export function useChatMessages(id?: string) {
     queryFn: () => api<ChatHistory>(`/api/sessions/${id}/chat`),
     enabled: !!id,
     refetchOnWindowFocus: false,
-    refetchInterval: sendingSession === id ? false : 3000,
+    // Follows a reply streaming elsewhere (another tab); idle chats do not poll.
+    refetchInterval: (query) =>
+      sendingSession !== id &&
+      query.state.data?.messages.some((message) => message.status === "streaming")
+        ? 2000
+        : false,
   });
 }
