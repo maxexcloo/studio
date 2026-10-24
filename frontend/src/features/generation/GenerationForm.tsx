@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ActionIcon, Avatar, Group, Text, Textarea, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
@@ -10,18 +10,21 @@ import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "
 import { PresetEditor } from "./PresetEditor";
 import { queueQuery } from "./Queue";
 import { generationInput, referencePatch } from "./payload";
-import { referenceLabel } from "./references";
+import { ReferencePicker } from "./ReferencePicker";
+import classes from "./ComposerDock.module.css";
 
 export function GenerationForm({
   onSubmitted,
   compact = false,
   autoFocusPrompt = false,
+  fill = false,
 }: {
   onSubmitted?: () => void;
   compact?: boolean;
   autoFocusPrompt?: boolean;
+  fill?: boolean;
 }) {
-  const { form, draft, setDraft, input, update, profile, selectProfile } = useGeneration();
+  const { draft, setDraft, input, update, profile, selectProfile } = useGeneration();
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,7 +34,6 @@ export function GenerationForm({
   const submit = useMutation({
     meta: { inlineError: true },
     mutationFn: async () => {
-      if (form.validate().hasErrors) throw new Error("Describe what you want to create.");
       if (!profile) throw new Error("Choose an available model first.");
       const payload = {
         ...generationInput(input, profile, draft.references),
@@ -50,7 +52,9 @@ export function GenerationForm({
       await post(`/api/sessions/${sessionId}/generations`, payload);
       return sessionId;
     },
+    // The pending tile is the confirmation: refresh the gallery now instead of waiting for its poll.
     onSuccess: (sessionId) => {
+      void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["sessions"] });
       void client.invalidateQueries({ queryKey: ["session", sessionId] });
@@ -64,6 +68,11 @@ export function GenerationForm({
     references: draft.references,
     operation: draft.operation,
   });
+  const supportsReferences = Boolean(
+    profile?.mediaInputs?.length ||
+    profile?.capabilities?.img2img ||
+    profile?.capabilities?.imageInput,
+  );
   if (compact)
     return (
       <form
@@ -73,7 +82,8 @@ export function GenerationForm({
           if (!blockedReason && !submit.isPending) submit.mutate();
         }}
       >
-        <Group wrap="nowrap" gap="xs" className="studio-compact-composer">
+        <Group wrap="nowrap" gap="xs">
+          {supportsReferences && <ReferencePicker compact />}
           <Textarea
             data-composer-prompt
             aria-label="Prompt"
@@ -82,40 +92,15 @@ export function GenerationForm({
             minRows={1}
             maxRows={1}
             variant="unstyled"
-            className="studio-compact-prompt"
+            className={classes.compactPrompt}
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
-            required
           />
-          {!!draft.references.length && (
-            <Avatar.Group aria-label="Selected References" spacing={8}>
-              {draft.references.slice(0, 3).map((asset, index) => (
-                <Avatar
-                  key={`${asset.slot}:${asset.id}`}
-                  src={asset.thumbnailUrl || asset.url}
-                  alt={referenceLabel(asset, index, profile)}
-                  size={28}
-                  radius="sm"
-                />
-              ))}
-              {draft.references.length > 3 && (
-                <Avatar
-                  size={28}
-                  radius="sm"
-                  aria-label={`${draft.references.length - 3} More References`}
-                >
-                  +{draft.references.length - 3}
-                </Avatar>
-              )}
-            </Avatar.Group>
-          )}
           <Tooltip label={blockedReason || label}>
             <ActionIcon
               type="submit"
               aria-label={label}
-              className="studio-generate-button"
               size={44}
-              radius="xl"
               variant="filled"
               loading={submit.isPending}
               {...blockedProps(blockedReason)}
@@ -125,7 +110,7 @@ export function GenerationForm({
           </Tooltip>
         </Group>
         {!!submit.error && (
-          <Text c="red" size="xs">
+          <Text c="red" size="xs" px="sm">
             {submit.error instanceof Error ? submit.error.message : String(submit.error)}
           </Text>
         )}
@@ -142,16 +127,19 @@ export function GenerationForm({
     }));
   return (
     <GenerationEditor
-      className="studio-generation-form"
       input={input}
       references={draft.references}
       profile={profile}
       onChange={update}
       onReferencesChange={setReferences}
-      onKindChange={(kind, next) => (next ? selectProfile(next) : update({ kind, profileId: "" }))}
+      // The output toggle switches the gallery; the route restores that output's draft.
+      onKindChange={(kind) =>
+        navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
+      }
       onClear={() =>
         setDraft((previous) => ({
-          ...previous,
+          sessionId: previous.sessionId,
+          operation: previous.input.kind === "video" ? "animate" : "image",
           references: [],
           input: {
             ...(profile
@@ -174,6 +162,7 @@ export function GenerationForm({
       ])}
       presets={<PresetEditor />}
       autoFocusPrompt={autoFocusPrompt}
+      fill={fill}
     />
   );
 }

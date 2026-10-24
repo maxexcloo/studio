@@ -1,6 +1,5 @@
 import {
   Anchor,
-  Badge,
   Box,
   Popover,
   ScrollArea,
@@ -14,7 +13,7 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Layers } from "lucide-react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -24,6 +23,9 @@ import { api } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 import { usePhone } from "../../ui/usePhone";
+import { chipProps } from "./chip";
+import classes from "./GenerationInputControls.module.css";
+import editorClasses from "./GenerationEditor.module.css";
 interface LoraInfo {
   title?: string;
   sourceUrl?: string;
@@ -76,6 +78,7 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
   const context = useGeneration();
   const input = value || context.input;
   const phone = usePhone();
+  const info = useQuery(loraInfoQuery);
   const close = () => picker.setOpened(false);
   const controls = (
     <LoraControls
@@ -118,31 +121,29 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
           {controls}
         </ScrollArea.Autosize>
       )}
-      <Box className="studio-generation-footer">
+      <Box className={editorClasses.footer} data-sticky={inline || undefined}>
         <Button fullWidth onClick={close}>
           Use LoRAs
         </Button>
       </Box>
     </Stack>
   );
+  const enabled = input.loras.filter((lora) => lora.enabled !== false);
+  const first = enabled[0] || input.loras[0];
+  const summary = first
+    ? `${info.data?.loras[first.name]?.title || first.name.replace(/\.[^.]+$/, "")}${input.loras.length > 1 ? ` +${input.loras.length - 1}` : ""}`
+    : "LoRAs";
   const trigger = (
     <Button
       ref={picker.trigger}
+      {...chipProps}
       aria-label="Choose LoRAs"
       aria-expanded={picker.opened}
       aria-controls={picker.controlsId}
-      variant="default"
-      size="md"
-      rightSection={
-        input.loras.length ? (
-          <Badge size="sm" variant="light">
-            {input.loras.length}
-          </Badge>
-        ) : undefined
-      }
+      leftSection={<Layers size={15} />}
       onClick={() => picker.setOpened(!picker.opened)}
     >
-      LoRAs
+      <span className={classes.label}>{summary}</span>
     </Button>
   );
   if (inline) return content;

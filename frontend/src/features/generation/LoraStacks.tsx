@@ -181,7 +181,6 @@ export function LoraStacks({
                   aria-label="Delete LoRA Stack"
                   color="red"
                   variant="subtle"
-                  size={36}
                   disabled={!current || change.isPending}
                   onClick={() => {
                     if (current)

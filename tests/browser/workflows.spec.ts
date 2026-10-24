@@ -9,6 +9,7 @@ import {
   section,
   stamp,
   viewerAction,
+  withExpertSettings,
 } from "./fixtures";
 
 test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
@@ -89,10 +90,11 @@ test("References, masking, expert controls and runtime presets remain editable",
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page.getByRole("button", { name: "Use Mask", exact: true }).click();
 
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
-  await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
-  await page.getByRole("checkbox", { name: "Allow Fallback to Another Worker" }).check();
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await withExpertSettings(page, async () => {
+    await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
+    await page.getByRole("checkbox", { name: "Allow Fallback to Another Worker" }).check();
+  });
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Bird Study");
   await page.getByRole("button", { name: "Save Preset", exact: true }).click();
   await expect.poll(() => state.presets.length).toBe(1);
@@ -139,14 +141,14 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   await first.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
   // The card's output switch picks a profile like the gallery and explains why Generate waits.
   const output = first.getByRole("radiogroup", { name: "Generation Output", exact: true });
-  await output.getByText("Video", { exact: true }).click();
-  await expect(first.getByRole("combobox", { name: "Profile", exact: true })).toHaveValue(
+  await output.locator("label").filter({ hasText: "Video" }).click();
+  await expect(first.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
     "Motion Quality",
   );
   await expect(
     first.getByRole("button", { name: "Generate Variation", exact: true }),
   ).toHaveAccessibleDescription("This workflow requires a reference image.");
-  await output.getByText("Image", { exact: true }).click();
+  await output.locator("label").filter({ hasText: "Image" }).click();
   await first
     .getByRole("textbox", { name: "Variation Prompt", exact: true })
     .fill("A blue bird in watercolour");
@@ -208,9 +210,9 @@ test("The compact composer expands on interaction and keeps picked or dragged re
       .getByRole("button", { name: "Open image: Dragged Study", exact: true })
       .dispatchEvent("dragstart", { dataTransfer: transfer });
     await page
-      .locator(".studio-composer-dock")
+      .locator("[data-composer-dock]")
       .dispatchEvent("dragover", { dataTransfer: transfer });
-    await page.locator(".studio-composer-dock").dispatchEvent("drop", { dataTransfer: transfer });
+    await page.locator("[data-composer-dock]").dispatchEvent("drop", { dataTransfer: transfer });
     await expect.poll(() => state.referenceRequests.length).toBe(2);
     expect(state.referenceRequests[1].galleryItemId).toBe("reference-1");
   }
@@ -819,7 +821,7 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   await page.keyboard.press("Escape");
   const full = await page.locator(".studio-chat-workspace").boundingBox();
   if (!testInfo.project.use.isMobile) expect(full!.width).toBeGreaterThan(fixed!.width);
-  const composer = await page.locator(".studio-composer-dock").boundingBox();
+  const composer = await page.locator("[data-composer-dock]").boundingBox();
   expect(composer!.width).toBeLessThanOrEqual(780);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
@@ -1112,9 +1114,8 @@ test("Generation size presets and custom dimensions preserve profile constraints
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
-  await page.getByRole("button", { name: "Image Size", exact: true }).click();
+  await page.getByRole("button", { name: "Aspect", exact: true }).click();
   await page.getByRole("button", { name: "Landscape 1536 × 1024", exact: true }).click();
-  await page.getByText("Custom", { exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1536");
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1600");
   await page.keyboard.press("Escape");
@@ -1308,11 +1309,12 @@ test("Images and Videos retain independent prompts and expert settings", async (
   await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Image draft");
-  await page
-    .getByRole("textbox", { name: "Negative Prompt", exact: true })
-    .fill("Image exclusions");
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
-  await page.getByRole("textbox", { name: "Seed", exact: true }).fill("777");
+  const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
+  const seed = page.getByRole("textbox", { name: "Seed", exact: true });
+  await withExpertSettings(page, async () => {
+    await negative.fill("Image exclusions");
+    await seed.fill("777");
+  });
   if (testInfo.project.use.isMobile) {
     await page.keyboard.press("Escape");
     await expect(
@@ -1326,12 +1328,10 @@ test("Images and Videos retain independent prompts and expert settings", async (
     "Image draft",
   );
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-    "Image exclusions",
-  );
-  const expert = page.getByRole("button", { name: "Expert Controls", exact: true });
-  if ((await expert.getAttribute("aria-expanded")) !== "true") await expert.click();
-  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("777");
+  await withExpertSettings(page, async () => {
+    await expect(negative).toHaveValue("Image exclusions");
+    await expect(seed).toHaveValue("777");
+  });
   if (testInfo.project.use.isMobile) {
     await page.keyboard.press("Escape");
     await expect(
@@ -1368,9 +1368,9 @@ test("Prompt history reuses positive and negative prompts independently and pers
     return route.fulfill({ json: { prompts: histories[kind], enabled: true } });
   });
   await create(page);
-  await page
-    .getByRole("textbox", { name: "Negative Prompt", exact: true })
-    .fill("Keep these exclusions");
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
+  await withExpertSettings(page, () => negative.fill("Keep these exclusions"));
   await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
@@ -1379,20 +1379,17 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await historySearch.fill("landscape");
   await historySearch.press("ArrowDown");
   await historySearch.press("Enter");
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "Earlier landscape",
-  );
-  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-    "Keep these exclusions",
-  );
-  await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
-  panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
-  await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
-    "Earlier landscape",
-  );
-  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-    "Earlier exclusions",
-  );
+  await expect(prompt).toHaveValue("Earlier landscape");
+  await withExpertSettings(page, async () => {
+    await expect(negative).toHaveValue("Keep these exclusions");
+    await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
+    panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
+    await panel
+      .getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true })
+      .click();
+    // Picking a negative prompt keeps the Expert settings open around it.
+    await expect(negative).toHaveValue("Earlier exclusions");
+  });
+  await expect(prompt).toHaveValue("Earlier landscape");
   expect(histories.positive[0].pinned).toBe(true);
 });

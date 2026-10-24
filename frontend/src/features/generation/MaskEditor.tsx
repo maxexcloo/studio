@@ -17,6 +17,7 @@ import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import type { ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 import type { ReferenceAsset } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
+import classes from "./MaskEditor.module.css";
 
 type Snapshot = { pixels: ImageData; error: string | null };
 
@@ -245,10 +246,7 @@ export default function MaskEditor({
               wrapperStyle={{ width: "100%", height: "100%", overflow: "clip" }}
               contentStyle={{ width, height }}
             >
-              <Box
-                className="studio-mask-wrap"
-                style={{ width, height, maxWidth: "none", margin: 0 }}
-              >
+              <Box className={classes.wrap} style={{ width, height }}>
                 <img
                   src={asset.url || asset.thumbnailUrl}
                   alt="Reference to Mask"
@@ -258,7 +256,7 @@ export default function MaskEditor({
                 />
                 <canvas
                   ref={canvas}
-                  className="studio-mask"
+                  className={classes.mask}
                   aria-label="Mask Painting"
                   tabIndex={0}
                   style={{ cursor: hand ? "grab" : "crosshair" }}

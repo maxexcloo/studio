@@ -1,0 +1,28 @@
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
+}
+
+.chip {
+  max-width: 100%;
+  font-weight: 500;
+  transition:
+    background-color var(--studio-motion-duration) ease,
+    border-color var(--studio-motion-duration) ease;
+}
+
+.label {
+  display: block;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 48em) {
+  .chip {
+    min-height: 44px;
+  }
+}

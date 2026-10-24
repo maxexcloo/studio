@@ -31,7 +31,7 @@ test("Video inspiration opened from Chat fills its own gallery draft", async ({ 
   await page.getByRole("button", { name: "Use Prompt", exact: true }).click();
   await expect(page).toHaveURL(/\/video\?compose=1$/);
   await expect(prompt).toHaveValue("A drifting aerial landscape");
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveValue(
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
     "Motion Quality",
   );
   await page.keyboard.press("Escape");
@@ -49,9 +49,8 @@ test("Switching creative modes preserves unsent gallery inputs and the Chat mess
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("An unsent panoramic landscape");
-  const size = page.getByRole("button", { name: "Image Size", exact: true });
+  const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
-  await page.getByText("Custom", { exact: true }).click();
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
@@ -249,11 +248,10 @@ test("Desktop nested pickers retain gallery controls until keyboard focus leaves
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
   await page.getByRole("option", { name: "Image Fast", exact: true }).click();
-  await expect(profile).toHaveValue("Image Fast");
+  await expect(profile).toHaveText("Image Fast");
   await expect(controls).toBeVisible();
-  const size = page.getByRole("button", { name: "Image Size", exact: true });
+  const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
-  await page.getByText("Custom", { exact: true }).click();
   const width = page.getByRole("textbox", { name: "Width", exact: true });
   await width.fill("1280");
   await expect(width).toBeFocused();
@@ -267,6 +265,6 @@ test("Desktop nested pickers retain gallery controls until keyboard focus leaves
   await expect(controls).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
   expect(
-    await page.locator(":focus").evaluate((element) => !element.closest(".studio-composer-dock")),
+    await page.locator(":focus").evaluate((element) => !element.closest("[data-composer-dock]")),
   ).toBe(true);
 });

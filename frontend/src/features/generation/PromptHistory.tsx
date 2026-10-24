@@ -43,10 +43,13 @@ export function PromptHistory({
   kind,
   value,
   onPick,
+  withinPortal = true,
 }: {
   kind: PromptKind;
   value: string;
   onPick: (text: string) => void;
+  /** False inside another popover, so picking keeps that popover open. */
+  withinPortal?: boolean;
 }) {
   const account = useAccount();
   const admin = useIsAdmin();
@@ -110,6 +113,7 @@ export function PromptHistory({
       width={500}
       position="top-end"
       shadow="md"
+      withinPortal={withinPortal}
       trapFocus
       returnFocus
     >
@@ -121,7 +125,6 @@ export function PromptHistory({
               aria-expanded={opened}
               variant="subtle"
               color="gray"
-              size={30}
               onClick={() => {
                 action.reset();
                 setOpened((previous) => !previous);

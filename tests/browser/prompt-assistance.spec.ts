@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { create, fixtures } from "./fixtures";
+import { create, fixtures, withExpertSettings } from "./fixtures";
 async function assist(page: Page, action: string) {
   await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
   await page.getByRole("menuitem", { name: action, exact: true }).click();
@@ -18,7 +18,7 @@ test("Enter saves and updates a preset without submitting a generation", async (
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.fill("A careful copper bird");
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   const name = page.getByRole("textbox", { name: "Preset Name", exact: true });
   await name.fill("Copper Study");
   await name.press("Enter");
@@ -32,7 +32,7 @@ test("Enter saves and updates a preset without submitting a generation", async (
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);
   await page.reload();
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "Copper Study Updated", exact: true }).click();
   await expect(prompt).toHaveValue("A copper bird with blue wings");
   await expect(name).toHaveValue("Copper Study Updated");
@@ -106,19 +106,22 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await prompt.fill("My original copper bird");
   await assist(page, "Improve Prompt");
   await expect(prompt).toHaveValue("A cinematic amber bird");
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
-  await page.getByRole("textbox", { name: "Seed", exact: true }).fill("33");
+  await withExpertSettings(page, () =>
+    page.getByRole("textbox", { name: "Seed", exact: true }).fill("33"),
+  );
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My original copper bird");
-  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("33");
+  await expect(page.getByRole("button", { name: "Clear Seed 33", exact: true })).toBeVisible();
   await assist(page, "Improve Prompt");
   await expect(prompt).toHaveValue("A cinematic amber bird");
   await prompt.fill("My later direction");
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My later direction");
   await assist(page, "Write Negative");
-  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-    "poor quality",
+  await withExpertSettings(page, () =>
+    expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
+      "poor quality",
+    ),
   );
   await prompt.fill("My later direction in warm light");
   await undoAssistance(page, "Negative prompt written");
@@ -167,7 +170,7 @@ test("Loading a new preset dismisses earlier draft Undo and keeps the preset inp
   await prompt.fill("The earlier working draft");
   await assist(page, "Improve Prompt");
   await expect(prompt).toHaveValue("A cinematic amber bird");
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "Another Working Draft", exact: true }).click();
   await expect(page.getByRole("button", { name: "Undo", exact: true })).toBeHidden();
   await expect(prompt).toHaveValue("A cinematic amber bird");

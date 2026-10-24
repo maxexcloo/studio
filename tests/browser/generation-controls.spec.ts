@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, profiles, stamp } from "./fixtures";
+import { create, fixtures, image, profiles, stamp, withExpertSettings } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 test("Changing the second encoder and weight type preserves the first encoder in generation", async ({
@@ -34,17 +34,16 @@ test("Changing the second encoder and weight type preserves the first encoder in
   );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An encoder comparison");
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "CLIP Encoder", exact: true })).toHaveValue(
-    "clip-exact.safetensors",
-  );
-  await page.getByRole("combobox", { name: "T5 Encoder", exact: true }).click();
-  await page.getByRole("option", { name: "t5-selected.safetensors", exact: true }).click();
-  await page.getByRole("combobox", { name: "Weight Type", exact: true }).click();
-  await page.getByRole("option", { name: "fp8_e4m3fn", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "CLIP Encoder", exact: true })).toHaveValue(
-    "clip-exact.safetensors",
-  );
+  await withExpertSettings(page, async () => {
+    const clip = page.getByRole("combobox", { name: "CLIP Encoder", exact: true });
+    await expect(clip).toHaveValue("clip-exact.safetensors");
+    await page.getByRole("combobox", { name: "T5 Encoder", exact: true }).click();
+    await page.getByRole("option", { name: "t5-selected.safetensors", exact: true }).click();
+    await page.getByRole("combobox", { name: "Weight Type", exact: true }).click();
+    await page.getByRole("option", { name: "fp8_e4m3fn", exact: true }).click();
+    // Choosing nested options keeps the Expert settings open.
+    await expect(clip).toHaveValue("clip-exact.safetensors");
+  });
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.textEncoder).toBe("clip-exact.safetensors");
@@ -98,9 +97,8 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Use this portrait as a composition reference");
-  const size = page.getByRole("button", { name: "Image Size", exact: true });
+  const size = page.getByRole("button", { name: "Aspect", exact: true });
   await size.click();
-  await page.getByText("Custom", { exact: true }).click();
   await page.getByRole("textbox", { name: "Width", exact: true }).fill("1280");
   await page.getByRole("textbox", { name: "Height", exact: true }).fill("768");
   await size.click();
@@ -115,10 +113,14 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     page.getByText("The reference sets the output framing to 2:3.", { exact: true }),
   ).toBeVisible();
   await size.click();
-  await page.getByText("Reference", { exact: true }).click();
+  await withExpertSettings(page, () =>
+    page
+      .getByRole("radiogroup", { name: "Reference Role", exact: true })
+      .getByText("Reference", { exact: true })
+      .click(),
+  );
   await expect(size).toHaveText("1280 × 768");
   await size.click();
-  await page.getByText("Custom", { exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1280");
   await expect(page.getByRole("textbox", { name: "Height", exact: true })).toHaveValue("768");
   await size.click();
@@ -172,7 +174,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   await page.getByRole("option", { name: "End · Optional", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Closing frame", exact: true }).click();
   await page.getByRole("button", { name: "Use References", exact: true }).click();
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("End Frame Only");
   await page.getByRole("button", { name: "Save Preset", exact: true }).click();
   await expect.poll(() => state.presets.length).toBe(1);
@@ -181,6 +183,8 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   ]);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("");
+  await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "End Frame Only", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Arrive at the closing frame",
@@ -287,20 +291,24 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
     },
   });
   await create(page);
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "Masked Study", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Clear Seed 117", exact: true })).toBeVisible();
   const role = page.getByRole("radiogroup", { name: "Reference Role", exact: true });
-  await expect(role.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
-  await expect(role.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
+  await withExpertSettings(page, async () => {
+    await expect(role.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+    await expect(role.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
+  });
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.click();
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(prompt).toHaveValue("");
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
-  await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
+  await withExpertSettings(page, async () => {
+    await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toHaveValue("");
+    await expect(page.getByRole("textbox", { name: "Steps", exact: true })).toHaveValue("20");
+  });
   await prompt.fill("A fresh bird without inherited styling");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -320,9 +328,9 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   const original = page.getByRole("article", { name: "Iteration 1", exact: true });
   await original.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
-  const cardRole = original.getByRole("radiogroup", { name: "Reference Role", exact: true });
-  await expect(cardRole.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
-  await expect(cardRole.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
+  await original.getByRole("button", { name: "Expert Settings", exact: true }).click();
+  await expect(role.getByRole("radio", { name: "Edit", exact: true })).toBeChecked();
+  await expect(role.getByRole("radio", { name: "Reference", exact: true })).toBeDisabled();
 });
 
 test("LoRA trigger copying and published source links work in gallery and timeline editors", async ({
@@ -378,7 +386,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
     },
   });
   await create(page);
-  await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "Trigger Study", exact: true }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   const copy = page.getByRole("button", { name: "Copy Trigger Word: inkbird", exact: true });
@@ -406,7 +414,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   expect(state.chatRequests).toHaveLength(0);
 });
 
-test("Generation actions stay reachable while expert fields and references scroll", async ({
+test("Generation actions stay in place while the prompt grows and pickers open", async ({
   page,
   isMobile,
 }) => {
@@ -424,32 +432,15 @@ test("Generation actions stay reachable while expert fields and references scrol
     createdAt: stamp,
   });
   await create(page);
-  await page
-    .getByRole("textbox", { name: "Prompt", exact: true })
-    .fill("Keep the actions in reach");
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("Keep the actions in reach");
   const generate = page.getByRole("button", { name: "Generate Image", exact: true });
-  if (isMobile) {
-    await expect
-      .poll(async () => {
-        const button = await generate.boundingBox();
-        return button!.y + button!.height;
-      })
-      .toBeGreaterThan(page.viewportSize()!.height - 48);
-  }
-  await page.getByRole("button", { name: "Expert Controls", exact: true }).press("Enter");
-  const fields = page.getByLabel(
-    isMobile ? "Generation Controls Scroll Area" : "Generation Fields",
-    { exact: true },
-  );
-  await expect
-    .poll(() => fields.evaluate((node) => node.scrollHeight > node.clientHeight))
-    .toBe(true);
   await expect(generate).toBeInViewport();
   const initial = await generate.boundingBox();
   if (isMobile)
     expect(initial!.y + initial!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
-  await fields.evaluate((node) => node.scrollTo({ top: node.scrollHeight }));
-  await expect(page.getByRole("textbox", { name: "Seed", exact: true })).toBeInViewport();
+  const long = Array.from({ length: 24 }, (_, line) => `Detail ${line + 1}`).join("\n");
+  await prompt.fill(long);
   await expect(generate).toBeInViewport();
   expect(Math.abs((await generate.boundingBox())!.y - initial!.y)).toBeLessThan(1);
   await page.setViewportSize({ ...page.viewportSize()!, height: 600 });
@@ -472,5 +463,95 @@ test("Generation actions stay reachable while expert fields and references scrol
   await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toHaveLength(1);
-  expect(state.jobs[0].input.prompt).toBe("Keep the actions in reach");
+  expect(state.jobs[0].input.prompt).toBe(long);
+});
+
+test("The chip composer offers supported sizes and settings, follows the output route and Clear ends Refine", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const still: Profile = {
+    ...profiles[0],
+    native: { "2k": "yes" },
+    aspectPresets: [
+      { label: "1:1", w: 1024, h: 1024 },
+      { label: "16:9", w: 1344, h: 768 },
+    ],
+    capabilities: { ...profiles[0].capabilities, variations: true },
+  };
+  const motion: Profile = {
+    ...profiles[1],
+    capabilities: { ...profiles[1].capabilities, duration: true },
+    constraints: { duration: { min: 1, max: 10, step: 1 } },
+  };
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: { profiles: [still, motion], features: { library: true, presets: true } },
+    }),
+  );
+  state.gallery.push({
+    id: "source",
+    jobId: "source-job",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "A copper bird",
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+    settings: { profileId: still.id },
+  });
+  await page.goto("/images");
+  await page
+    .getByRole("button", { name: "Open image: A copper bird", exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Refine", exact: true }).click();
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(page.getByRole("button", { name: "Refine Image", exact: true })).toBeVisible();
+  await prompt.click();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await prompt.fill("A wide copper horizon");
+  const aspect = page.getByRole("button", { name: "Aspect", exact: true });
+  await aspect.click();
+  await page
+    .getByRole("radiogroup", { name: "Resolution", exact: true })
+    .locator("label")
+    .filter({ hasText: "2K" })
+    .click();
+  await page.getByRole("button", { name: "16:9 2048 × 1152", exact: true }).click();
+  await aspect.click();
+  await expect(aspect).toHaveText("16:9 · 2K");
+  await page.getByRole("combobox", { name: "Count", exact: true }).click();
+  await page.getByRole("option", { name: "2 Images", exact: true }).click();
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input).toMatchObject({
+    operation: "image",
+    width: 2048,
+    height: 1152,
+    count: 2,
+    tiledDecode: true,
+    referenceAssets: [],
+  });
+  expect(state.jobs[0].input.parentJobId).toBeUndefined();
+  // Generation reports through its pending tile, never a notification.
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await prompt.click();
+  await page
+    .getByRole("radiogroup", { name: "Generation Output", exact: true })
+    .locator("label")
+    .filter({ hasText: "Video" })
+    .click();
+  await expect(page).toHaveURL(/\/video/);
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
+    "Motion Quality",
+  );
+  await expect(page.getByRole("combobox", { name: "Count", exact: true })).toHaveCount(0);
+  await withExpertSettings(page, async () => {
+    await expect(
+      page.getByRole("textbox", { name: "Duration (Seconds)", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Frames", exact: true })).toHaveCount(0);
+  });
 });
