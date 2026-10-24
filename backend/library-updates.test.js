@@ -74,7 +74,7 @@ test("a Hugging Face file with a new checksum on main is an update under its own
   assert.equal(hfUpdate(entry, { sha: "b".repeat(40), siblings: [] }).state, "error");
 });
 
-function harness(t, { references = async () => [] } = {}) {
+function harness(t, { references = async () => [], repoint } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-updates-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const catalogue = createCatalogueStore({
@@ -105,6 +105,7 @@ function harness(t, { references = async () => [] } = {}) {
     catalogue,
     installed: async () => installed,
     familiesOf,
+    repoint,
     references,
     now: () => now,
     log: quiet,
@@ -215,6 +216,29 @@ test("the old file stays while something still references it, and says what", as
   assert.equal(
     (await h.checker.check()).byEntry["checkpoints/nightfall-v1-fp8.safetensors"],
     undefined,
+  );
+});
+
+test("the profiles naming the old file move to the new one, so it can be removed", async (t) => {
+  const named = new Set(["nightfall-v1-fp8.safetensors"]);
+  const moves = [];
+  const h = harness(t, {
+    repoint: async (from, to) => {
+      moves.push([from.file, to.file]);
+      named.delete(from.file);
+      return ["Nightfall"];
+    },
+    references: async ({ file }) => (named.has(file) ? ["the Nightfall profile"] : []),
+  });
+  await h.checker.check();
+  await h.checker.apply("checkpoints/nightfall-v1-fp8.safetensors", { alternative: true });
+  h.state.queued = [];
+  h.files.set("nightfall-v3-fp8.safetensors", sha("3"));
+  const done = (await h.checker.settle()).applied["checkpoints/nightfall-v1-fp8.safetensors"];
+  assert.deepEqual(moves, [["nightfall-v1-fp8.safetensors", "nightfall-v3-fp8.safetensors"]]);
+  assert.deepEqual(
+    [done.state, done.note],
+    ["removed", "Updated to v3. Moved the Nightfall profile to it. The old file was removed."],
   );
 });
 

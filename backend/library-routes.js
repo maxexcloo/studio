@@ -402,6 +402,8 @@ export function registerLibraryRoutes(
     assistant = () => null,
     /** Each saved profile's family and definition text, [{family, text}]: which model files it names. */
     profileDefinitions = async () => [],
+    /** Moves profiles from an updated file's old name to its new one: the names it moved. */
+    repoint = async () => [],
     /** What still uses a model file: ['the Flux Dev profile', …] (update clean-up, Decision 4). */
     references = async () => [],
     removeFile = removeInstalled,
@@ -533,6 +535,7 @@ export function registerLibraryRoutes(
     startDownload,
     downloads,
     inspect,
+    repoint,
     references,
     removeFile,
   });
