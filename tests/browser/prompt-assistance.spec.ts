@@ -35,6 +35,9 @@ test("Enter saves and updates a preset without submitting a generation", async (
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "Copper Study Updated", exact: true }).click();
   await expect(prompt).toHaveValue("A copper bird with blue wings");
+  // Loading a preset closes the popover; reopening it shows the loaded preset.
+  await expect(name).toBeHidden();
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
   await expect(name).toHaveValue("Copper Study Updated");
 });
 

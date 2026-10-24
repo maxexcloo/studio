@@ -189,6 +189,7 @@ for (const surface of ["tile", "viewer"]) {
     await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
     await page.getByRole("button", { name: "Presets", exact: true }).click();
     await page.getByRole("button", { name: "Current Direction", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();

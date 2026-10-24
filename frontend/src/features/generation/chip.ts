@@ -6,4 +6,11 @@ export const chipProps = {
   size: "sm",
   radius: "xl",
   className: classes.chip,
+  classNames: { section: classes.chipSection },
+} as const;
+
+/** A chip that shows only its icon; callers give it an accessible name and a tooltip. */
+export const iconChipProps = {
+  ...chipProps,
+  className: `${classes.chip} ${classes.iconChip}`,
 } as const;
