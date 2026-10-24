@@ -17,7 +17,7 @@ const keyPattern = /^[a-z0-9_]{1,40}:[a-z0-9_]{1,40}$/;
 let cache = null;
 
 /** Every dismissed key. */
-export function dismissedKeys() {
+function dismissedKeys() {
   if (!cache) {
     let saved = null;
     try {

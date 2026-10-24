@@ -35,7 +35,7 @@ const tailLimit = 4000;
 const stepTimeoutMs = 15 * 60 * 1000;
 
 // What to do about it, since Manager itself only says "not allowed" (TROUBLESHOOTING.md has the steps).
-export const managerRefusedMessage =
+const managerRefusedMessage =
   "ComfyUI-Manager’s security level blocks this install. Set security_level = normal in Manager’s config.ini (ComfyUI/user/__manager/config.ini, or user/default/ComfyUI-Manager/config.ini in older versions), restart ComfyUI and try again, or use the terminal command.";
 
 function snapshot(state) {
@@ -112,7 +112,7 @@ function run(state, command, args, cwd, env = process.env) {
 }
 
 /** The packages a node pack must never replace: what ComfyUI's PyTorch stands on. */
-export const heldPackages = ["torch", "torchvision", "torchaudio", "numpy"];
+const heldPackages = ["torch", "torchvision", "torchaudio", "numpy"];
 
 /**
  * A pip constraints file pinning heldPackages at whatever ComfyUI's Python has

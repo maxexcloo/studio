@@ -2,7 +2,7 @@ import { generationRecord } from "./generation-record.js";
 import { cloudJobExpired, cloudJobFailedMessage, cloudJobLostMessage } from "./cloud-jobs.js";
 
 /** When ComfyUI's history says a run started and ended (ms), from its status messages. */
-export function historyRunTimes(entry) {
+function historyRunTimes(entry) {
   const messages = Array.isArray(entry?.status?.messages) ? entry.status.messages : [];
   const at = (type) => {
     const value = Number(
@@ -36,7 +36,7 @@ const tileFields = [
  * its settings and references, and how long it took, from the run's own start and end in ComfyUI's history.
  * Without the index MCP and signed result links cannot find it; without the times the record shows no elapsed time.
  */
-export function restoreRecoveredRecords(outputs, tiles = [], entry = {}, promptId = "") {
+function restoreRecoveredRecords(outputs, tiles = [], entry = {}, promptId = "") {
   const { startAt, endAt } = historyRunTimes(entry);
   return outputs.map((output, position) => {
     const tile = tiles[position] || tiles[0] || {};

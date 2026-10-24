@@ -13,7 +13,7 @@ import { modelFolders } from "./comfy.js";
 const folderKinds = ["diffusers"];
 
 /** Every models/diffusers folder ComfyUI reads, extra_model_paths.yaml included. */
-export function diffusersRoots() {
+function diffusersRoots() {
   return modelFolders("diffusers", folderKinds);
 }
 
@@ -54,7 +54,7 @@ export function diffusersFolders(classNames = [], roots = diffusersRoots()) {
 }
 
 /** Every weight file a folder's indexes name is there and whole, so a half-finished download never shows as a model. */
-export function diffusersFolderComplete(dir) {
+function diffusersFolderComplete(dir) {
   for (const [part, stem] of [
     ["transformer", "diffusion_pytorch_model"],
     ["text_encoder", "model"],

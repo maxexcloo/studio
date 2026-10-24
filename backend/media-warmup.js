@@ -113,7 +113,7 @@ export async function warmGallery({ items = gallery } = {}) {
 }
 
 /** Starts a pass unless one is running; a change while it runs gets its own pass after. */
-export function warmGalleryNow() {
+function warmGalleryNow() {
   if (warming) return warming;
   warmedRevision = galleryRevisionValue();
   warming = warmGallery()

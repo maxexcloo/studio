@@ -18,7 +18,7 @@ export interface QueueOrigin {
 }
 export type OwnedJob = QueueJob &
   QueueOrigin & { ownerId: string; resource: string; cancelRequested?: boolean };
-export interface UserPreset {
+interface UserPreset {
   id: string;
   title: string;
   input: GenerationInput;

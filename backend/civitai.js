@@ -62,7 +62,7 @@ const scheduleNames = {
 };
 
 /** ComfyUI's sampler as AUTOMATIC1111 names it, where there is a name for it. */
-export function a1111Sampler(sampler = "") {
+function a1111Sampler(sampler = "") {
   return samplerNames[sampler] || String(sampler || "");
 }
 

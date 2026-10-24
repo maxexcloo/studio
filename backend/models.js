@@ -14,7 +14,7 @@ import {
   presetsEnabled,
 } from "./features.js";
 
-export function modelBasename(name = "") {
+function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
 }
 
@@ -56,11 +56,11 @@ export function prettyModelName(name = "") {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export function isNvfp4Model(name = "") {
+function isNvfp4Model(name = "") {
   return /nvfp4/i.test(name);
 }
 
-export function torchVersionAtLeast(version = "", major, minor) {
+function torchVersionAtLeast(version = "", major, minor) {
   const match = String(version).match(/(\d+)\.(\d+)/);
   if (!match) return false;
   const currentMajor = Number(match[1]);
@@ -68,11 +68,11 @@ export function torchVersionAtLeast(version = "", major, minor) {
   return currentMajor > major || (currentMajor === major && currentMinor >= minor);
 }
 
-export function torchSupportsNvfp4(stats = {}) {
+function torchSupportsNvfp4(stats = {}) {
   return torchVersionAtLeast(stats?.system?.pytorch_version, 2, 8);
 }
 
-export function snapDimension(value, meta = {}) {
+function snapDimension(value, meta = {}) {
   const step = Number(meta.step || 1) || 1;
   const min = Number(meta.min || step) || step;
   const max = Number(meta.max || 16384) || 16384;
@@ -80,7 +80,7 @@ export function snapDimension(value, meta = {}) {
   return Math.max(min, Math.min(max, snapped));
 }
 
-export function detectedDefault(meta = {}, fallback) {
+function detectedDefault(meta = {}, fallback) {
   const value = Number(meta.default);
   return Number.isFinite(value) ? value : fallback;
 }

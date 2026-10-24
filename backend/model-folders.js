@@ -214,7 +214,7 @@ function argValues(argv, flag) {
  * folder from: a file it was started with, else
  * extra_model_paths.yaml in its own folder, which ComfyUI always loads.
  */
-export async function comfyModelSetup() {
+async function comfyModelSetup() {
   const [folders, stats] = await Promise.all([
     comfy("/internal/folder_paths").catch(() => null),
     comfy("/system_stats").catch(() => null),
@@ -329,7 +329,7 @@ async function candidateRoots(home, drivesToo = true) {
  * asynchronous with a time limit per folder, so a slow drive never blocks the
  * server while it looks.
  */
-export async function findModelFolders(
+async function findModelFolders(
   knownKinds,
   { home = os.homedir(), drives = true, budget = 6000, deadline } = {},
 ) {

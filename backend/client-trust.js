@@ -17,7 +17,7 @@ import crypto from "node:crypto";
  */
 
 /** Headers a proxy adds. Any one of them means the socket's address is not the client's. */
-export const proxyHeaders = [
+const proxyHeaders = [
   "forwarded",
   "x-forwarded-for",
   "x-forwarded-host",
@@ -34,14 +34,14 @@ export const proxyHeaders = [
 const loopback = new Set(["127.0.0.1", "::1"]);
 
 /** "::ffff:192.168.1.4" and "192.168.1.4" are the same client. */
-export function plainAddress(value = "") {
+function plainAddress(value = "") {
   return String(value || "")
     .trim()
     .replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "")
     .toLowerCase();
 }
 
-export function isLoopbackAddress(value = "") {
+function isLoopbackAddress(value = "") {
   const address = plainAddress(value);
   return loopback.has(address) || /^127\.\d+\.\d+\.\d+$/.test(address);
 }
@@ -66,7 +66,7 @@ export function isPrivateAddress(value = "") {
   return /^f[cd][0-9a-f]{2}:/.test(address) || /^fe[89ab][0-9a-f]:/.test(address);
 }
 
-export function hasProxyHeaders(headers = {}) {
+function hasProxyHeaders(headers = {}) {
   return proxyHeaders.some((name) => headers[name] !== undefined && headers[name] !== "");
 }
 

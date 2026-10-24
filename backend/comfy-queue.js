@@ -106,11 +106,11 @@ const defaultLostAfterMs =
 // A worker that takes the connection but answers slowly is busy (decoding and saving a long video), not gone.
 const defaultBusyLostAfterMs = 20 * 60_000;
 
-export const lostConnectionMessage =
+const lostConnectionMessage =
   "ComfyUI stopped answering for over a minute, so this run was given up.";
-export const busyLostMessage =
+const busyLostMessage =
   "ComfyUI stayed too busy to answer for over 20 minutes, so this run was given up.";
-export const droppedRunMessage =
+const droppedRunMessage =
   "ComfyUI no longer has this run. It may have restarted, or the run was removed from its queue.";
 
 /**

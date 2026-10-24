@@ -9,11 +9,11 @@ export interface CloudRequest {
   count: number;
   reference?: Uint8Array;
 }
-export interface ProviderImage {
+interface ProviderImage {
   b64_json?: string;
   url?: string;
 }
-export interface ProviderVideo {
+interface ProviderVideo {
   status: string;
   video?: { url?: string };
   video_url?: string;

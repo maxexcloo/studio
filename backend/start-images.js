@@ -34,7 +34,7 @@ export function saveStartImage({ dataUrl = "", name = "" } = {}) {
   return { startImageId: id, name: safeName, mime, size: buffer.length };
 }
 
-export function resolveStartImage(id = "") {
+function resolveStartImage(id = "") {
   const key = String(id || "");
   if (!key) return null;
   const cached = memoryCache.get(key);

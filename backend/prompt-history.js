@@ -14,7 +14,7 @@ import crypto from "node:crypto";
 
 export const promptHistoryPath = path.join(dataDir, "prompt-history.json");
 export const historyLimit = 500;
-export const pinnedLimit = 200;
+const pinnedLimit = 200;
 const maxPromptLength = 8000;
 
 /** Two prompts are the same when they only differ in spacing or case. */
@@ -53,7 +53,7 @@ function cleanEntries(value) {
 }
 
 /** Newest first; at most `historyLimit` unpinned and `pinnedLimit` pinned. */
-export function capEntries(entries) {
+function capEntries(entries) {
   const sorted = [...entries].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   let pinned = 0;
   let recent = 0;
@@ -233,7 +233,7 @@ function historiesFor(ownerId = "") {
 const historyFor = (kind, ownerId) =>
   historiesFor(ownerId)[kind === "negative" ? "negative" : "positive"];
 
-export const loadPromptHistory = (seedItems, kind = "positive", ownerId = "") =>
+const loadPromptHistory = (seedItems, kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).loadPromptHistory(ownerId ? [] : seedItems);
 export const listPrompts = (kind = "positive", ownerId = "") =>
   historyFor(kind, ownerId).listPrompts();

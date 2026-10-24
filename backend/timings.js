@@ -9,7 +9,7 @@ import { addUpscale, estimateUpscale } from "./upscale-timing.js";
  * How long things take on this machine, kept only for Studio's own
  * estimates. Nothing here leaves the data folder.
  */
-export const timingsPath = path.join(dataDir, "timings.json");
+const timingsPath = path.join(dataDir, "timings.json");
 
 let timings = null;
 

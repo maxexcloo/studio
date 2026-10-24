@@ -56,7 +56,7 @@ function emptyFileLists(spec) {
   return spec;
 }
 
-export function sanitizeObjectInfo(info) {
+function sanitizeObjectInfo(info) {
   const out = {};
   for (const [name, node] of Object.entries(info || {})) {
     const clean = strip(node);

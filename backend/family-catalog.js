@@ -2258,7 +2258,7 @@ export const sanaRunners = {
   },
 };
 
-export const sanaRunnerFor = (source) =>
+const sanaRunnerFor = (source) =>
   sanaRunners[source === "sana_diffusers" ? "sana_diffusers" : "sana"];
 /** The custom-node runner a family uses for one model source (see `runners`), or null for ComfyUI's own nodes. */
 export function runnerFor(family, source) {
@@ -2449,7 +2449,7 @@ export function familyFromName(name = "", source = "unet") {
 const prefixes = ["model.diffusion_model.", "model.model.", "net."];
 
 /** The diffusion model's own keys, prefix stripped (unet_prefix_from_state_dict). */
-export function diffusionKeys(header) {
+function diffusionKeys(header) {
   const all = Object.keys(header || {}).filter((key) => key !== "__metadata__");
   let best = "";
   let bestCount = 5;

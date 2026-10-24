@@ -1,7 +1,7 @@
 const parsedTimes = new WeakMap();
 
 /** An item whose prompt is unknown (a Civitai import) keeps its chronological position. */
-export function galleryBucket(item) {
+function galleryBucket(item) {
   if (item?.status !== "done" || item.civitai?.imageId) return 0;
   return String(item.prompt || "").trim() ? 0 : 1;
 }

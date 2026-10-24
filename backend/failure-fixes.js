@@ -26,7 +26,7 @@ export function packForNode(classType = "") {
 }
 
 /** The catalog download for a damaged file a loader could not read, or null when Studio cannot fetch it. */
-export function redownloadFor(file = "", nodeType = "") {
+function redownloadFor(file = "", nodeType = "") {
   if (!file) return null;
   const folder = loaderFolders.find(([test]) => test.test(nodeType))?.[1];
   const folders = folder ? [folder] : ["vae", "text_encoders", "diffusion_models", "checkpoints"];

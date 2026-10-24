@@ -524,7 +524,7 @@ export function sendVideoPreview(req, res, file, cacheControl = "private, max-ag
 }
 
 /** Extract a still from the small preview; private frames remain in memory. */
-export async function getVideoPoster(preview) {
+async function getVideoPoster(preview) {
   const file = typeof preview === "string" ? `${preview}.jpg` : "";
   if (file && fs.existsSync(file)) return file;
   const work = () =>

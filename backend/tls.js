@@ -40,7 +40,7 @@ function readPem(file, what) {
 }
 
 /** The names a browser will accept this certificate for: DNS names and IP addresses. */
-export function certificateNames(x509) {
+function certificateNames(x509) {
   return String(x509?.subjectAltName || "")
     .split(/,\s*/)
     .map((entry) => {

@@ -60,7 +60,7 @@ export function parseWrittenPrompts(content, count) {
 }
 
 /** Up to three concept suggestions from a reply's JSON "suggestions", or none. */
-export function parseSuggestions(content) {
+function parseSuggestions(content) {
   try {
     const json = /\{[\s\S]*\}/.exec(stripThinking(content))?.[0];
     const list = json ? JSON.parse(json).suggestions : null;

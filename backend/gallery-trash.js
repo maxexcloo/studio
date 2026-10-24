@@ -142,7 +142,7 @@ export function trashGalleryItems(items, baseDir = ALL) {
 }
 
 /** The batches in the trash, newest first. */
-export function trashBatches(baseDir = ALL, ownerId = "") {
+function trashBatches(baseDir = ALL, ownerId = "") {
   if (baseDir === ALL)
     return trashBases()
       .flatMap((base) => trashBatches(base, ownerId).map((batch) => ({ ...batch, base })))

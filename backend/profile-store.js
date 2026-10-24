@@ -28,7 +28,7 @@ import { currentDataDir } from "./data-dir.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { loadMcpPrompting } from "./mcp-prompting.js";
 
-export const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
+const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
 const validId = (id) =>
   /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
 const validPackId = (id) =>

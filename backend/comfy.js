@@ -15,7 +15,7 @@ import os from "node:os";
 import { isInside } from "./paths.js";
 import { mediaFile, mediaType } from "./media-paths.js";
 
-export const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 // A live binding: importers see the new address as soon as the workers change.
 // It is the default worker's (workers.js), or "" with no workers at all;
@@ -55,7 +55,7 @@ export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
 export const networkListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
 /** The port asked for (PORT, else 8787). */
-export const requestedPort = Number(process.env.PORT || 8787);
+const requestedPort = Number(process.env.PORT || 8787);
 // A live binding: the server may move to the next free port when this one is taken (see launch.js).
 export let port = requestedPort;
 export function setListeningPort(value) {
@@ -255,7 +255,7 @@ export function noteComfyFetchError(error) {
  * Uploads and file reads move whole images or videos; everything else is a
  * small JSON answer, and a ComfyUI that takes a minute for one is hung.
  */
-export function comfyTimeoutFor(pathname = "") {
+function comfyTimeoutFor(pathname = "") {
   if (/^\/(upload\/|view\b)/.test(pathname)) return 5 * 60_000;
   if (/^\/object_info\b/.test(pathname)) return 2 * 60_000;
   return 60_000;

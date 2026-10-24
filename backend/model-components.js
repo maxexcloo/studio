@@ -216,7 +216,7 @@ function cachedHeader(file) {
   return headerCache.get(key);
 }
 
-export function isAbliterated(name = "") {
+function isAbliterated(name = "") {
   return /abliterat|uncensor|heretic/i.test(String(name));
 }
 
