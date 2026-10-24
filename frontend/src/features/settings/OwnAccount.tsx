@@ -12,16 +12,9 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure } from "../../api";
-import { PersonalMcpToken, type McpTokenStatus } from "./PersonalMcpToken";
-interface Account {
-  id: string;
-  username: string;
-  displayName: string;
-  canChangeEmail: boolean;
-  canChangePassword: boolean;
-  provider: string;
-  accessProfile?: { name: string } | null;
-}
+import type { Account } from "../../types";
+import { ownAccountQuery } from "../auth/AccountGate";
+import { PersonalMcpToken } from "./PersonalMcpToken";
 function AccountForm({ account }: { account: Account }) {
   const client = useQueryClient();
   const name = useForm({ initialValues: { displayName: account.displayName } });
@@ -47,7 +40,7 @@ function AccountForm({ account }: { account: Account }) {
     onSuccess: ({ account }, kind) => {
       if (kind === "name") name.setValues({ displayName: account.displayName });
       else security.setValues({ username: account.username, currentPassword: "", newPassword: "" });
-      void client.invalidateQueries({ queryKey: ["own-account"] });
+      void client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["account-admin"] });
       notifications.show({ message: "Account updated" });
     },
@@ -143,10 +136,7 @@ function AccountForm({ account }: { account: Account }) {
   );
 }
 export function OwnAccount() {
-  const account = useQuery({
-    queryKey: ["own-account"],
-    queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
-  });
+  const account = useQuery(ownAccountQuery);
   if (account.isPending) return <Loader aria-label="Loading Your Account" />;
   if (account.error) return <Alert color="red">{account.error.message}</Alert>;
   return (

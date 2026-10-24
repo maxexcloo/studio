@@ -1,12 +1,14 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, failure, post } from "../../api";
-import type { MediaItem, QueueJob, ReferenceAsset } from "../../types";
+import type { MediaItem, ReferenceAsset } from "../../types";
 import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
+import { queueQuery } from "../generation/Queue";
 export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: () => void) {
   const { setDraft, profiles, setPrepared } = useGenerationActions();
   const navigate = useNavigate();
   const location = useLocation();
+  const client = useQueryClient();
   return useMutation({
     mutationFn: async (operation: "image" | "refine" | "animate" | "extend") => {
       const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
@@ -31,7 +33,7 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
             ? "The original profile is unavailable. Choose a model in generation controls."
             : `No ${targetKind} model with reference support is available.`,
         );
-      const queue = await api<{ jobs: QueueJob[] }>("/api/queue");
+      const queue = await client.fetchQuery(queueQuery);
       const source = queue.jobs.find((job) => job.id === item.jobId);
       const sourceSession = sessionId || source?.sessionId || "";
       let asset: ReferenceAsset | undefined;

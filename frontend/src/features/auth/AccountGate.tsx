@@ -12,16 +12,18 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
+import type { Account } from "../../types";
+import type { McpTokenStatus } from "../settings/PersonalMcpToken";
 import { StudioLogo } from "../../ui/StudioLogo";
 
-export interface AccountStatus {
+interface AccountStatus {
   mode: string;
   signedIn: boolean;
   needsRecoveryAdmin?: boolean;
   setupTokenAccepted?: boolean;
-  account?: { id: string; role: "administrator" | "user"; features?: Record<string, boolean> };
+  account?: Pick<Account, "id" | "role" | "features"> | null;
   oidc?: { label: string };
 }
 export function useAccount() {
@@ -31,6 +33,10 @@ export function useAccount() {
     retry: false,
   });
 }
+export const ownAccountQuery = queryOptions({
+  queryKey: ["own-account"],
+  queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
+});
 export function useAccess(enabled: boolean) {
   return useQuery({
     queryKey: ["access"],

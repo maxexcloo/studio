@@ -8,10 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import { useForm } from "@mantine/form";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { api } from "../../api";
 
+export const modelsQuery = queryOptions({
+  queryKey: ["models"],
+  queryFn: () => api<Models>("/api/models?cached=1"),
+});
 export const initialInput: GenerationInput = {
   kind: "image",
   profileId: "",
@@ -120,11 +124,7 @@ function useGenerationState(workspace: Workspace) {
     },
     [setDraft, workspace],
   );
-  const models = useQuery({
-    queryKey: ["models"],
-    queryFn: () => api<Models>("/api/models?cached=1"),
-    refetchInterval: 15000,
-  });
+  const models = useQuery({ ...modelsQuery, refetchInterval: 15000 });
   const profiles = models.data?.profiles ?? emptyProfiles;
   const profile = draft.input.profileId
     ? profiles.find((profile) => profile.id === draft.input.profileId)

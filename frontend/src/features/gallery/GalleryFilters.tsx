@@ -17,6 +17,7 @@ import { api } from "../../api";
 import { SearchInput } from "../../ui/SearchInput";
 import type { MediaKind } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { loraInfoQuery } from "../generation/LoraPicker";
 import { GalleryFilterPicker, type GalleryFilterOption } from "./GalleryFilterPicker";
 
 export interface GalleryFilterValues {
@@ -197,10 +198,7 @@ function GalleryFilters({
     queryFn: () => api<GalleryFacets>(`/api/gallery/filters?type=${kind || ""}`),
     refetchInterval: 3000,
   });
-  const loraInfo = useQuery({
-    queryKey: ["lora-info"],
-    queryFn: () => api<{ loras: Record<string, { title?: string }> }>("/api/loras/info"),
-  });
+  const loraInfo = useQuery(loraInfoQuery);
   const modelLabels = new Map(
     profiles.flatMap((profile) =>
       [profile.model, profile.baseModel, profile.id]

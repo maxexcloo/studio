@@ -8,6 +8,7 @@ import type { ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
 import { PresetEditor } from "./PresetEditor";
+import { queueQuery } from "./Queue";
 import { generationInput, referencePatch } from "./payload";
 import { referenceLabel } from "./references";
 
@@ -49,7 +50,7 @@ export function GenerationForm({
       return sessionId;
     },
     onSuccess: (sessionId) => {
-      void client.invalidateQueries({ queryKey: ["queue"] });
+      void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["sessions"] });
       void client.invalidateQueries({ queryKey: ["session", sessionId] });
       onSubmitted?.();

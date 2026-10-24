@@ -16,7 +16,7 @@ import {
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useMediaQuery } from "@mantine/hooks";
 import { ArrowLeft } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { LoraStacks } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { modelFamilyLabel } from "../../ui/modelFamily";
@@ -35,6 +35,10 @@ interface LoraInfo {
   triggers?: string[];
   strengthRange?: { min: number; max: number; step: number; default?: number };
 }
+export const loraInfoQuery = queryOptions({
+  queryKey: ["lora-info"],
+  queryFn: () => api<{ loras: Record<string, LoraInfo> }>("/api/loras/info"),
+});
 const names: Record<string, string> = {
   slider: "Sliders",
   style: "Style",
@@ -194,10 +198,7 @@ function LoraControls({
     : context.profile;
   const update = (patch: Partial<GenerationInput>) =>
     onChange ? onChange({ ...input, ...patch }) : context.update(patch);
-  const info = useQuery({
-    queryKey: ["lora-info"],
-    queryFn: () => api<{ loras: Record<string, LoraInfo> }>("/api/loras/info"),
-  });
+  const info = useQuery(loraInfoQuery);
   const files = profile?.options?.loras || [];
   const family = profile?.family || "";
   const metadata = info.data?.loras || {};

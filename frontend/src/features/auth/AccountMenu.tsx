@@ -3,8 +3,8 @@ import { ActionIcon, Menu } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { api, failure, post } from "../../api";
-import { useAccess, useAccount } from "./AccountGate";
+import { failure, post } from "../../api";
+import { ownAccountQuery, useAccess, useAccount } from "./AccountGate";
 
 export function AccountMenuContent({
   accountFirst = false,
@@ -18,11 +18,7 @@ export function AccountMenuContent({
   const account = useAccount(),
     multi = account.data?.mode === "multi-user";
   const access = useAccess(!multi);
-  const own = useQuery({
-    queryKey: ["own-account"],
-    queryFn: () => api<{ account: { displayName: string; username: string } }>("/api/accounts/me"),
-    enabled: multi,
-  });
+  const own = useQuery({ ...ownAccountQuery, enabled: multi });
   const signOut = useMutation({
     mutationFn: () => post(multi ? "/api/accounts/sign-out" : "/api/access/sign-out"),
     onSuccess: () => {
