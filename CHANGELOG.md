@@ -11,6 +11,11 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Profiles can carry their own Radiance LoRAs
+
+### Changed
+- **Radiance LoRAs:** LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, stay in place and the request's LoRA stack is added after them, instead of replacing them.
+
 ## [0.50.0] - 2026-10-24
 
 > Up to four reference images for Radiance image profiles
