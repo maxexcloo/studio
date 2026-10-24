@@ -49,7 +49,7 @@ const ordinaryRoutes = [
   ["PUT", /^\/api\/loras\/[^/]+$/],
   ["POST", /^\/api\/loras\/library\/ops$/],
   ["GET", /^\/api\/reference-assets(\/[^/]+(\/[a-z-]+)?)?$/],
-  ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
+  ["POST", /^\/api\/reference-assets\/(upload|from-gallery|[^/]+\/gallery)$/],
   ["DELETE", /^\/api\/reference-assets\/[^/]+$/],
   ["GET", /^\/api\/upscale\/status$/],
   ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],

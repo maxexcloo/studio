@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
-import { mediaFile, mediaParams } from "./media-paths.js";
+import { mediaFile, mediaParams, mediaPath, mediaUrls } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
 import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
 import {
+  addGalleryItems,
   dataDir,
   importedImageFile,
   filterVisibleGallery,
@@ -14,7 +15,8 @@ import {
 } from "./gallery-store.js";
 
 import { extractLastFrame } from "./video-previews.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
+import { mediaSubfolder } from "./media-store.js";
 import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
@@ -339,6 +341,46 @@ export function readUploadedReference(id, variant = "media", ownerId = "") {
     mime: isThumb && record.thumbnail.endsWith(".webp") ? "image/webp" : record.mime,
     name: record.name,
   };
+}
+
+/** Copies an owned upload into the owner's media as a gallery image; saving it again returns the first copy. */
+export async function saveUploadToGallery(id, ownerId = "") {
+  const record = loadManifest().find(
+    (item) =>
+      item.id === String(id || "") &&
+      item.source === "upload" &&
+      String(item.ownerId || "") === ownerId,
+  );
+  if (!record) throw new Error("That reference image is gone.");
+  const saved = gallery.find(
+    (item) => item.savedFromUpload === record.id && String(item.ownerId || "") === ownerId,
+  );
+  if (saved) return saved;
+  const subfolder = mediaSubfolder(ownerId);
+  const filename = `upload-${record.id}.${mimeExtension(record.mime)}`;
+  const file = mediaPath(filename, subfolder);
+  if (!file) throw new Error("This upload's name cannot be stored.");
+  await writeBytesFileAsync(file, fs.readFileSync(path.join(filesDir, record.file)), {
+    mode: 0o600,
+  });
+  const urls = mediaUrls(filename, subfolder);
+  const item = {
+    id: urls.url,
+    ...urls,
+    jobId: `upload-${record.id}`,
+    ...(ownerId ? { ownerId } : {}),
+    type: "image",
+    status: "done",
+    prompt: "",
+    filename: record.name,
+    outputName: filename,
+    width: record.width,
+    height: record.height,
+    createdAt: new Date().toISOString(),
+    savedFromUpload: record.id,
+  };
+  addGalleryItems([item]);
+  return item;
 }
 
 export function deleteUploadedReference(id, ownerId = "") {

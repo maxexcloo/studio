@@ -8,6 +8,7 @@ import {
   referenceAssetFromGallery,
   referenceAssetMetadataForAccount,
   saveUploadedReference,
+  saveUploadToGallery,
 } from "./reference-assets.js";
 import { requireLocal } from "./route-access.js";
 import { saveStartImage } from "./start-images.js";
@@ -81,6 +82,22 @@ export function registerReferenceRoutes(app) {
         frame: req.body?.frame === "last" ? "last" : "",
       });
       res.json({ ok: true, asset });
+    } catch (error) {
+      res.status(404).json({ ok: false, error: error.message });
+    }
+  });
+
+  app.post("/api/reference-assets/:id/gallery", async (req, res) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
+      return res
+        .status(403)
+        .json({ ok: false, error: "The gallery is disabled for this account." });
+    if (!req.studioAccount && !requireLocal(req, res)) return;
+    try {
+      res.json({
+        ok: true,
+        item: await saveUploadToGallery(req.params.id, ownerIdForRequest(req)),
+      });
     } catch (error) {
       res.status(404).json({ ok: false, error: error.message });
     }
