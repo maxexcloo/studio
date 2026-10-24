@@ -45,6 +45,13 @@ for (const failFirst of [false, true]) {
       route.fulfill({ contentType: "image/png", body: original }),
     );
     await page.route("**/test-media/transition-upscaled.png", async (route) => {
+      // Details reads the file size with a one-byte range request; only image loads count.
+      if (route.request().headers().range)
+        return route.fulfill({
+          status: 206,
+          headers: { "content-range": "bytes 0-0/1" },
+          body: "",
+        });
       requested = true;
       const attempt = ++attempts;
       await pending;

@@ -1,9 +1,14 @@
+/* Top centre, clear of the viewer's position and close actions. */
 .controls {
   position: absolute;
-  top: var(--mantine-spacing-md);
-  left: var(--mantine-spacing-md);
-  z-index: 1;
-  background: color-mix(in srgb, var(--mantine-color-body) 80%, transparent);
-  border-radius: var(--mantine-radius-sm);
+  top: calc(var(--mantine-spacing-sm) + env(safe-area-inset-top) + 4px);
+  left: 50%;
+  z-index: 3;
+  translate: -50% 0;
   padding: 2px;
+  border: 1px solid var(--studio-glass-border);
+  border-radius: var(--mantine-radius-xl);
+  background: var(--studio-glass-raised);
+  backdrop-filter: var(--studio-glass-filter);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
 }

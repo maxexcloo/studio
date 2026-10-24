@@ -5,7 +5,7 @@ import { mediaSource } from "./mediaSource";
 export function mediaDownload(item: MediaItem, withoutSettings = false) {
   const extension = item.type === "video" ? "mp4" : "png";
   const base =
-    (item.filename || `studio-${item.id}`)
+    (item.outputName || item.filename || `studio-${item.id}`)
       .replace(/[\\/:*?"<>|]/g, " ")
       .trim()
       .slice(0, 80) || "studio";

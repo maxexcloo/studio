@@ -39,7 +39,7 @@ const capabilities = {
 
 test("Upscale quality, 2K/4K size and face detail reach one submission while pending", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({ ...source });
   const submitted: UpscaleRequest[] = [],
@@ -77,8 +77,6 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-    if (testInfo.project.use.isMobile)
-      await page.getByRole("button", { name: "Generation Details", exact: true }).click();
     await page.getByRole("button", { name: "Upscale", exact: true }).click();
     await page.getByRole("combobox", { name: "Upscale Quality", exact: true }).click();
     await page.getByRole("option", { name: "High", exact: true }).click();
@@ -126,7 +124,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
 
 test("Offline workers and unavailable upscale models explain why submission is disabled", async ({
   page,
-}, testInfo) => {
+}) => {
   const state = await fixtures(page);
   state.gallery.push({ ...source });
   let offline = true;
@@ -155,8 +153,6 @@ test("Offline workers and unavailable upscale models explain why submission is d
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Generation Details", exact: true }).click();
   await page.getByRole("button", { name: "Upscale", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("The selected upscale worker is offline.");
   const queue = page.getByRole("button", { name: "Queue Upscale", exact: true });

@@ -10,13 +10,14 @@ export function ZoomImage({
   alt,
   width,
   height,
-  navigate,
+  swipe,
 }: {
   src: string;
   alt: string;
   width?: number;
   height?: number;
-  navigate?: (direction: -1 | 1) => void;
+  /** Touch swipes at Fit: left/right navigate, down closes, up reveals details. */
+  swipe?: (direction: "left" | "right" | "up" | "down") => void;
 }) {
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
@@ -28,6 +29,8 @@ export function ZoomImage({
   const [failed, setFailed] = useState(false);
   const zoom = useMediaZoom({ ...size, disabled: loading || failed });
   const suppressClick = useRef(false);
+  const touched = useRef(false);
+  const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
   const gesture = useRef<{
     id: number;
     x: number;
@@ -72,6 +75,7 @@ export function ZoomImage({
   // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
   function down(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
+    touched.current = event.pointerType === "touch";
     if ((event.target as Element).closest("[data-zoom-controls]") || event.button !== 0) return;
     if (gesture.current) {
       gesture.current.multiple = true;
@@ -99,19 +103,28 @@ export function ZoomImage({
     gesture.current = null;
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
-    if (event.type === "pointercancel") suppressClick.current = true;
-    else if (
-      navigate &&
-      start.touch &&
-      start.image &&
-      start.fit &&
-      !start.multiple &&
-      zoom.modeRef.current === "Fit" &&
-      Math.abs(dx) > 64 &&
-      Math.abs(dx) > Math.abs(dy) * 1.3
-    ) {
+    if (event.type === "pointercancel" || !start.touch || start.multiple) {
+      if (event.type === "pointercancel") suppressClick.current = true;
+      return;
+    }
+    const horizontal = Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.3;
+    const vertical = Math.abs(dy) > 80 && Math.abs(dy) > Math.abs(dx) * 1.3;
+    if (swipe && start.fit && zoom.modeRef.current === "Fit" && (horizontal || vertical)) {
       suppressClick.current = true;
-      navigate(dx < 0 ? 1 : -1);
+      swipe(horizontal ? (dx < 0 ? "left" : "right") : dy < 0 ? "up" : "down");
+      return;
+    }
+    // A double tap on the picture zooms in at that point, or back to Fit.
+    if (!start.image || suppressClick.current) return;
+    const previous = lastTap.current;
+    lastTap.current = { at: event.timeStamp, x: event.clientX, y: event.clientY };
+    if (
+      previous &&
+      event.timeStamp - previous.at < 320 &&
+      Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 32
+    ) {
+      lastTap.current = null;
+      zoom.toggleAt(event.clientX, event.clientY);
     }
   }
   return (
@@ -132,8 +145,10 @@ export function ZoomImage({
       }}
     >
       <VisuallyHidden id={instructions}>
-        Click to cycle Fit, Fill and Actual Size. Drag to pan. Use the mouse wheel or pinch to zoom.
-        {navigate && " Swipe left or right at Fit to move between generations."}
+        Click to cycle Fit, Fill and Actual Size, or double-tap to zoom. Drag to pan. Use the mouse
+        wheel or pinch to zoom.
+        {swipe &&
+          " At Fit, swipe left or right to move between generations, up for details and down to close."}
       </VisuallyHidden>
       <TransformWrapper
         ref={zoom.transform}
@@ -176,7 +191,8 @@ export function ZoomImage({
             }}
             onClick={(event) => {
               event.stopPropagation();
-              zoom.cycle();
+              // Touch zooms with a double tap; a single tap must not change the zoom.
+              if (!touched.current || event.detail === 0) zoom.cycle();
             }}
           >
             <img
