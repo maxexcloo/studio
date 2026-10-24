@@ -234,7 +234,7 @@ test("a profile’s guide view, guide edits, guide versions, revert and approve"
   fs.rmSync(path.join(userWorkflowsDir, "owned.json"));
 });
 
-test("the export bundle has the ai/profiles layout, says what changed and lists unreviewed drafts", async (t) => {
+test("the export bundle has the ai layout, says what changed and lists unreviewed drafts", async (t) => {
   const { call } = await serve(t);
   // An AI draft that is not yet approved.
   editor.createEditableProfile(
@@ -251,23 +251,20 @@ test("the export bundle has the ai/profiles layout, says what changed and lists 
   const files = unzip(response.body);
   assert.deepEqual(Object.keys(files).sort(), [
     "EXPORT.json",
-    "config/prompting.json",
-    "config/studio/workflows/drafted-one.json",
-    "config/studio/workflows/krea-test.json",
+    "profiles/drafted-one.json",
+    "profiles/krea-test.json",
+    "prompting.json",
   ]);
   assert.equal(
-    files["config/studio/workflows/krea-test.json"],
+    files["profiles/krea-test.json"],
     fs.readFileSync(path.join(userWorkflowsDir, "krea-test.json"), "utf8"),
     "profiles go out exactly as on disk",
   );
-  const prompting = JSON.parse(files["config/prompting.json"]);
+  const prompting = JSON.parse(files["prompting.json"]);
   assert.equal(prompting.meta, undefined, "the seed format has no meta");
   assert.equal(prompting.packs.krea2.summary, "Edited.");
   const report = JSON.parse(files["EXPORT.json"]);
-  assert.deepEqual(
-    [report.format, report.layout, report.studioVersion],
-    [1, "ai/profiles", "0.0.0-test"],
-  );
+  assert.deepEqual([report.format, report.layout, report.studioVersion], [2, "ai", "0.0.0-test"]);
   assert.deepEqual(report.unreviewed, { profiles: ["drafted-one"], guides: [] });
   assert.deepEqual(report.changed.profiles.sort(), ["drafted-one", "krea-test"]);
   assert.deepEqual(
@@ -312,12 +309,12 @@ test("the catalogue and manifest join the bundle when there are any", (t) => {
     manifestFile: manifest,
   });
   const names = Object.fromEntries(built.files.map((file) => [file.name, file.body]));
-  assert.deepEqual(Object.keys(JSON.parse(names["config/lora-catalogue.json"])), [
+  assert.deepEqual(Object.keys(JSON.parse(names["lora-catalogue.json"])), [
     "a.safetensors",
     "b.safetensors",
   ]);
-  assert.equal(names["config/models.json"], fs.readFileSync(manifest, "utf8"));
-  assert.equal(names["config/prompting.json"], undefined);
+  assert.equal(names["models.json"], fs.readFileSync(manifest, "utf8"));
+  assert.equal(names["prompting.json"], undefined);
 });
 
 test("chat edits through the same routes record chat as the origin, and a chat draft stays AI-Drafted", async (t) => {

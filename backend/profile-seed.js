@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Studio's seed. Studio is the only writer of live profiles and
- * guides; the profiles repository (`ai/profiles/`) is their seed and backup, and `profiles:deploy`
+ * guides; the profiles repository (`ai/`) is their seed and backup, and `profiles:deploy`
  * is retired. `STUDIO_CONFIG_DIR` is the read-only ai seed with `profiles/` and the configuration
  * JSON files at its root. `STUDIO_SEED_DIR` can instead name an unpacked
- * Settings › Profiles › Export:
+ * Settings › Profiles › Export, which has the same layout:
  *
- *   config/studio/workflows/*.json   profiles
- *   config/prompting.json            prompting guides
- *   config/lora-catalogue.json       the LoRA catalogue
- *   config/catalogue.json            editable model catalogue metadata
- *   config/models.json               the restore manifest
+ *   profiles/*.json       profiles
+ *   prompting.json        prompting guides
+ *   lora-catalogue.json   the LoRA catalogue
+ *   catalogue.json        editable model catalogue metadata
+ *   models.json           the restore manifest
+ *
+ * An export made before the flat layout keeps them under `config/` (profiles in
+ * `config/studio/workflows/`), and is still read.
  *
  * At each start the seed fills only what is missing: a profile file Studio has never held (no
  * file and no version history, so one removed in Studio never comes back) and a `config/` file

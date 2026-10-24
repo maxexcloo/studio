@@ -14,7 +14,7 @@
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
- *   GET  /api/profiles/export                       the export bundle (zip) in the ai/profiles/ layout
+ *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.

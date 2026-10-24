@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Settings › Profiles › Export: Studio's live profiles, guides and catalogue as one archive in the
- * seed repository's layout (`ai/profiles/`), so a person can unpack it there, review the diff and
- * commit it. Studio never writes Git itself.
+ * seed repository's layout (`ai/`), so a person can unpack it there, review the diff and commit
+ * it. Studio never writes Git itself.
  *
- *   config/studio/workflows/<id>.json   every profile file Studio holds, exactly as on disk
- *   config/prompting.json               the guide store without its `meta`
- *   config/lora-catalogue.json          the LoRA catalogue by file name (seed and admin files plus Studio's edits)
- *   config/catalogue.json               editable metadata for every model file, keyed by folder/file
- *   config/models.json                  the restore manifest, when there is one
- *   EXPORT.json                         what changed, each item's origin and the unreviewed AI drafts
+ *   profiles/<id>.json    every profile file Studio holds, exactly as on disk
+ *   prompting.json        the guide store without its `meta`
+ *   lora-catalogue.json   the LoRA catalogue by file name (seed and admin files plus Studio's edits)
+ *   catalogue.json        editable metadata for every model file, keyed by folder/file
+ *   models.json           the restore manifest, when there is one
+ *   EXPORT.json           what changed, each item's origin and the unreviewed AI drafts
  *
  * Each export is also kept under `<data>/exports/<stamp>.zip` (the 20 newest), and records the
  * hashes it held so the next one can say what changed since.
@@ -71,7 +71,7 @@ export function buildExport({
     } catch {
       /* Exported as it is. */
     }
-    files.push({ name: `config/studio/workflows/${name}`, body: text, date: now });
+    files.push({ name: `profiles/${name}`, body: text, date: now });
     summary.profiles.push({
       id,
       name: label,
@@ -87,7 +87,7 @@ export function buildExport({
   const store = guides.read();
   if (store) {
     const { meta = {}, ...config } = store;
-    files.push({ name: "config/prompting.json", body: json(config), date: now });
+    files.push({ name: "prompting.json", body: json(config), date: now });
     for (const [packId, pack] of Object.entries(config.packs || {})) {
       const item = meta[packId] || {};
       const hash = hashOf(pack);
@@ -106,19 +106,19 @@ export function buildExport({
   }
   if (catalogue)
     files.push({
-      name: "config/lora-catalogue.json",
+      name: "lora-catalogue.json",
       body: json(sorted(catalogue.loraView().catalogue)),
       date: now,
     });
   if (catalogue?.definitions) {
     const definitions = catalogue.definitions();
     if (Object.keys(definitions).length)
-      files.push({ name: "config/catalogue.json", body: json(sorted(definitions)), date: now });
+      files.push({ name: "catalogue.json", body: json(sorted(definitions)), date: now });
   }
   if (manifestFile) {
     try {
       files.push({
-        name: "config/models.json",
+        name: "models.json",
         body: fs.readFileSync(manifestFile, "utf8"),
         date: now,
       });
@@ -128,13 +128,13 @@ export function buildExport({
   }
   const strip = ({ hash: _hash, ...item }) => item;
   const report = {
-    format: 1,
-    layout: "ai/profiles",
+    format: 2,
+    layout: "ai",
     exportedAt: now.toISOString(),
     by: String(by || ""),
     studioVersion,
     adopt:
-      "Unpack into ai/profiles/, review the diff and commit it. Profiles marked aiDrafted are unreviewed: approve them in Studio first, or commit them knowing they are drafts.",
+      "Unpack into ai/, review the diff and commit it. Profiles marked aiDrafted are unreviewed: approve them in Studio first, or commit them knowing they are drafts.",
     changed: {
       profiles: summary.profiles.filter((item) => item.changedSinceExport).map((item) => item.id),
       guides: summary.guides.filter((item) => item.changedSinceExport).map((item) => item.packId),
