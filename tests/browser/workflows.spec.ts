@@ -1023,9 +1023,16 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
       q: "bird",
     });
   await page.getByRole("button", { name: "Clear Filters", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Clear Filters", exact: true })).toBeHidden();
+  // The cleared search is served fresh from cache or requested again, never with the old facets.
   await expect
-    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("model"))
-    .toEqual([]);
+    .poll(() =>
+      state.galleryRequests.some((search) => {
+        const query = new URLSearchParams(search);
+        return query.get("q") === "bird" && !query.has("model") && !query.has("lora");
+      }),
+    )
+    .toBe(true);
   await page.getByRole("button", { name: "Close Filters", exact: true }).click();
   await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(

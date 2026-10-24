@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { SearchInput } from "../../ui/SearchInput";
 import {
-  ActionIcon,
   Badge,
   Button,
   Checkbox,
@@ -12,7 +11,7 @@ import {
   Text,
   Tooltip,
 } from "@mantine/core";
-import { type LucideIcon } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 
 export interface GalleryFilterOption {
   value: string;
@@ -41,6 +40,9 @@ export function GalleryFilterPicker({
   const [opened, setOpened] = useState(false);
   const [query, setQuery] = useState("");
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const chosen = options
+    .filter((option) => value.includes(option.value))
+    .map((option) => option.label);
   const shown = options.filter((option) =>
     terms.every((term) => option.label.toLocaleLowerCase().includes(term)),
   );
@@ -56,34 +58,34 @@ export function GalleryFilterPicker({
     >
       <Popover.Target>
         <Tooltip
-          label={
-            value.length
-              ? `${label}: ${options
-                  .filter((option) => value.includes(option.value))
-                  .map((option) => option.label)
-                  .join(", ")}`
-              : `Filter By ${label}`
-          }
+          label={`${label}: ${chosen.join(", ")}`}
+          disabled={!chosen.length}
+          multiline
+          maw={280}
         >
-          <ActionIcon
+          <Button
             aria-label={`Filter By ${label}`}
             aria-expanded={opened}
-            variant={value.length ? "light" : "subtle"}
-            color={value.length ? undefined : "gray"}
-            size={36}
+            variant={value.length ? "light" : "default"}
+            size="compact-md"
+            radius="xl"
+            leftSection={<Icon size={15} />}
+            rightSection={
+              value.length > 0 ? (
+                <Badge size="xs" circle aria-hidden>
+                  {value.length}
+                </Badge>
+              ) : (
+                <ChevronDown size={14} />
+              )
+            }
             onClick={() => {
               setQuery("");
               setOpened(!opened);
             }}
-            pos="relative"
           >
-            <Icon size={19} />
-            {value.length > 0 && (
-              <Badge size="xs" circle pos="absolute" top={0} right={0} aria-hidden>
-                {value.length}
-              </Badge>
-            )}
-          </ActionIcon>
+            {label}
+          </Button>
         </Tooltip>
       </Popover.Target>
       <Popover.Dropdown>
@@ -130,7 +132,7 @@ export function GalleryFilterPicker({
               ))}
               {!shown.length && (
                 <Text ta="center" c="dimmed" size="sm" py="sm">
-                  {query ? "No matches" : "Nothing to filter yet"}
+                  {query ? "No Matches" : "Nothing to Filter Yet"}
                 </Text>
               )}
             </Stack>

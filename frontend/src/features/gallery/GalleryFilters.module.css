@@ -1,0 +1,19 @@
+/* Search, filters and the normal row replace one another in place. */
+.mode {
+  animation: reveal var(--studio-motion-duration) ease-out;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+  }
+}
+
+.facets {
+  flex: 1;
+  min-width: 0;
+}
+
+.clear {
+  flex: none;
+}
