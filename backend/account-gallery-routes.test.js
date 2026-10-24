@@ -107,6 +107,39 @@ test("access profiles without gallery permission cannot read pages or exact job 
   );
 });
 
+test("LoRA previews use the account's newest finished image made with each LoRA", () => {
+  const made = (ownerId, jobId, createdAt, loras, status = "done") => ({
+    ...item(ownerId, jobId),
+    status,
+    createdAt,
+    thumbnailUrl: `/thumbs/${jobId}.webp`,
+    settings: { loras },
+  });
+  const detail = { name: "detail.safetensors", strength: 1 };
+  galleryStore.setGallery([
+    made("account-a", "old", "2026-10-18T00:00:00.000Z", [detail]),
+    made("account-a", "new", "2026-10-19T00:00:00.000Z", [detail]),
+    made("account-a", "off", "2026-10-20T00:00:00.000Z", [{ ...detail, enabled: false }]),
+    made("account-a", "failed", "2026-10-21T00:00:00.000Z", [detail], "error"),
+    made("account-b", "foreign", "2026-10-22T00:00:00.000Z", [
+      detail,
+      { name: "private.safetensors" },
+    ]),
+  ]);
+  const request = {
+    studioAccount: {
+      userId: "account-a",
+      role: "user",
+      authenticated: true,
+      features: { gallery: true },
+    },
+    query: {},
+  };
+  assert.deepEqual(call(routes["/api/loras/previews"], request).previews, {
+    "detail.safetensors": "/thumbs/new.webp",
+  });
+});
+
 test("account deltas carry only the owner's own upserts and removes", () => {
   galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b")]);
   const request = (since) => ({
