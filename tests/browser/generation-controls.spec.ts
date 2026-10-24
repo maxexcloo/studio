@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   closeReferences,
+  closeLoras,
   create,
   fixtures,
   image,
@@ -225,11 +226,11 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   await page.getByRole("button", { name: "Load LoRA Stack", exact: true }).click();
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
-  await expect(page.getByRole("textbox", { name: "Detail Slider", exact: true })).toHaveValue(
-    "0.35",
-  );
+  await expect(
+    page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }),
+  ).toHaveValue("0.35");
   await enabled.check();
-  await page.getByRole("textbox", { name: "Detail Slider", exact: true }).fill("1.25");
+  await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
   await page
     .getByRole("textbox", { name: "LoRA Stack Name", exact: true })
     .fill("Copper Detail Refined");
@@ -250,7 +251,7 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   await page.getByRole("combobox", { name: "Saved LoRA Stack", exact: true }).click();
   await page.getByRole("option", { name: "Copper Detail Refined", exact: true }).click();
   await page.getByRole("button", { name: "Load LoRA Stack", exact: true }).click();
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await closeLoras(page);
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Reuse the refined LoRA stack");
@@ -403,7 +404,7 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   await expect(source).toHaveAttribute("href", sourceUrl);
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
   expect(state.jobs).toHaveLength(0);
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A delicate bird inkbird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
