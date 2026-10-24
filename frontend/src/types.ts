@@ -19,6 +19,8 @@ export interface Profile {
   provider?: string;
   ready?: boolean;
   nsfw?: boolean;
+  /** Drafted by the assistant and not yet approved; only administrators see it. */
+  aiDrafted?: boolean;
   defaults: Record<string, string | number>;
   capabilities: Record<string, boolean>;
   mediaInputs?: {
