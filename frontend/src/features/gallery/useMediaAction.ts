@@ -13,7 +13,7 @@ import { queueQuery } from "../generation/Queue";
 type Operation = "image" | "refine" | "animate" | "extend";
 
 /** The draft that reruns, refines or animates a saved result with its recorded settings. */
-async function mediaDraft(
+export async function mediaDraft(
   item: MediaItem,
   operation: Operation,
   profiles: Profile[],

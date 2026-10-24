@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button, ComboboxPopover, Popover, Tooltip } from "@mantine/core";
-import { Bookmark, ChevronDown, X } from "lucide-react";
+import { Bookmark, ChevronDown, Columns3, X } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
@@ -20,6 +20,7 @@ export function GenerationInputControls({
   presets,
   loraPicker,
   expert,
+  onCompare,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -29,6 +30,8 @@ export function GenerationInputControls({
   presets?: (close: () => void) => ReactNode;
   loraPicker: LoraPickerState;
   expert: { opened: boolean; onOpenedChange: (opened: boolean) => void; hasReferences: boolean };
+  /** Opens Compare Variants from this draft; the gallery composer passes it. */
+  onCompare?: () => void;
 }) {
   const phone = usePhone();
   const [presetsOpened, setPresetsOpened] = useState(false);
@@ -87,6 +90,13 @@ export function GenerationInputControls({
         </Popover>
       )}
       <ExpertSettings input={input} profile={profile} onChange={onChange} {...expert} />
+      {onCompare && input.kind === "image" && (
+        <Tooltip label="Compare Variants" disabled={phone}>
+          <Button {...iconChipProps} aria-label="Compare Variants" onClick={onCompare}>
+            <Columns3 size={16} />
+          </Button>
+        </Tooltip>
+      )}
       {input.seed !== "" && profile?.capabilities.seed !== false && (
         <Button
           {...chipProps}

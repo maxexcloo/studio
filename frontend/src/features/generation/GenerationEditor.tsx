@@ -110,6 +110,7 @@ export function GenerationEditor({
   error,
   assistantScope,
   presets,
+  onCompare,
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
@@ -130,6 +131,7 @@ export function GenerationEditor({
   assistantScope: string;
   /** The Presets popover's content; `close` dismisses it after a preset loads. */
   presets?: (close: () => void) => ReactNode;
+  onCompare?: () => void;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount and again after a phone inline picker closes. */
@@ -287,6 +289,7 @@ export function GenerationEditor({
             mask={mask}
             presets={presets}
             expert={expert}
+            onCompare={onCompare}
           />
           {!!error && (
             <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>

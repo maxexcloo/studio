@@ -11,6 +11,7 @@ import { PresetEditor } from "./PresetEditor";
 import { queueQuery } from "./Queue";
 import { generationInput, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
+import { useCompare } from "../compare/CompareDialog";
 import classes from "./ComposerDock.module.css";
 
 export function GenerationForm({
@@ -28,6 +29,7 @@ export function GenerationForm({
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
+  const compare = useCompare();
   useEffect(() => {
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
@@ -161,6 +163,13 @@ export function GenerationForm({
         draft.operation,
       ])}
       presets={(close) => <PresetEditor onLoad={close} />}
+      onCompare={() =>
+        compare.open({
+          input,
+          references: draft.references,
+          sessionId: draft.sessionId || undefined,
+        })
+      }
       autoFocusPrompt={autoFocusPrompt}
       fill={fill}
     />
