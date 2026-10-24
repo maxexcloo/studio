@@ -39,13 +39,8 @@ import { MediaActionItems } from "./MediaActions";
 import { useSettingsText } from "./MediaDetails";
 import { useMediaTransfer, useShareWithoutSettings } from "./mediaShare";
 import { UpscaleControls } from "./UpscaleControls";
-import {
-  animateThemes,
-  assistantQuery,
-  useMediaAction,
-  type AnimateTheme,
-  type Iteration,
-} from "./useMediaAction";
+import { assistantQuery } from "../generation/PromptAssistant";
+import { animateThemes, useMediaAction, type AnimateTheme, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {

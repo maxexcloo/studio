@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionIcon, Button, Group, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
 import { Sparkles, Square } from "lucide-react";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
@@ -13,6 +13,8 @@ interface AssistantStatus {
   vision?: boolean;
   loras?: boolean;
   noNegative?: string[];
+  /** A Spicy model is configured and the account holds the NSFW grant. */
+  spicy?: boolean;
 }
 interface Suggestion {
   name: string;
@@ -31,6 +33,13 @@ interface Result {
   model?: string;
 }
 type Action = "rewrite" | "negative" | "loras";
+
+/** What the prompt assistant offers this account. */
+export const assistantQuery = queryOptions({
+  queryKey: ["assistant"],
+  queryFn: () => api<AssistantStatus>("/api/assistant"),
+  retry: false,
+});
 
 async function referenceImage(asset: ReferenceAsset, signal: AbortSignal) {
   const response = await request(`/api/reference-assets/${encodeURIComponent(asset.id)}/media`, {
@@ -63,11 +72,7 @@ export function usePromptAssistant({
   references?: ReferenceAsset[];
   scopeKey?: string;
 }) {
-  const status = useQuery({
-    queryKey: ["assistant"],
-    queryFn: () => api<AssistantStatus>("/api/assistant"),
-    retry: false,
-  });
+  const status = useQuery(assistantQuery);
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const controller = useRef<AbortController | null>(null);

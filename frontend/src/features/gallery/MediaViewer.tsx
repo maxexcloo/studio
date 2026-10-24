@@ -20,7 +20,8 @@ import { useMotionDuration } from "../../ui/Appearance";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { generationTitle, MediaDetails } from "./MediaDetails";
+import { MediaDetails } from "./MediaDetails";
+import { mediaTitle } from "./mediaLabels";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
@@ -375,7 +376,7 @@ export function MediaViewer({
                     <Stack gap="lg" p="md" pt="lg">
                       <Stack gap={2}>
                         <Text fw={600} lineClamp={2}>
-                          {generationTitle(item.prompt)}
+                          {mediaTitle(item)}
                         </Text>
                         <Text size="xs" c="dimmed">
                           {subtitle}
@@ -396,7 +397,7 @@ export function MediaViewer({
             position="bottom"
             size="80%"
             radius="lg"
-            title={generationTitle(item.prompt)}
+            title={mediaTitle(item)}
             closeButtonProps={{ "aria-label": "Close Details" }}
           >
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">

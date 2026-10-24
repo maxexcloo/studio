@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, RotateCw, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
-import { queueQuery, terminal, useQueueAction } from "../generation/Queue";
+import { queueQuery, statusLabels, terminal, useQueueAction } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
@@ -12,13 +12,6 @@ import type { GallerySelection } from "./useGallerySelection";
 import type { useHoldToSelect } from "./useGalleryLayout";
 import classes from "./MediaTile.module.css";
 
-const activeLabels: Record<string, string> = {
-  queued: "Queued",
-  waiting: "Waiting for a Worker",
-  starting: "Starting",
-  running: "Generating",
-  saving: "Saving",
-};
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: MediaItem) => ["done", "error", "canceled"].includes(item.status);
 const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (letter) => letter.toUpperCase());
@@ -53,10 +46,8 @@ function TileStatus({
   const label = active
     ? job?.status === "running" && progress?.phase
       ? titleCase(progress.phase)
-      : activeLabels[job?.status || "queued"] || "Generating"
-    : failed
-      ? "Generation Failed"
-      : "Generation Cancelled";
+      : statusLabels[job?.status || "queued"]
+    : statusLabels[failed ? "failed" : "cancelled"];
   const reason = failed
     ? job?.reason || ("error" in item && typeof item.error === "string" ? item.error : "")
     : active && job?.status === "waiting"

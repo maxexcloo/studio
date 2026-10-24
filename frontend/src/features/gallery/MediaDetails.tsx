@@ -6,17 +6,6 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { referenceLabel } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 
-export function generationTitle(prompt = "") {
-  const plain = prompt
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[()[\]{}]/g, "")
-    .replace(/:\s*-?\d+(\.\d+)?/g, "")
-    .trim();
-  const line = plain.split(/[,.;|\n]/)[0].trim() || plain;
-  const text = line.length > 64 ? `${line.slice(0, 61).replace(/\s+\S*$/, "")}…` : line;
-  return text ? text[0].toUpperCase() + text.slice(1) : "Untitled Generation";
-}
-
 const fileStem = (name: unknown) =>
   String(name || "")
     .split(/[\\/]/)
