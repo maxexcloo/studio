@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Badge, Button, Group, Stack, Text, TextInput } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { api, post } from "../../api";
@@ -57,14 +56,6 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       setBusy(false);
     }
   };
-  const copy = async (value: string, label: string) => {
-    try {
-      await copyText(value);
-      notifications.show({ message: `${label} copied` });
-    } catch {
-      setError("Couldn’t copy to the clipboard. Select and copy the field instead.");
-    }
-  };
   return (
     <Stack>
       <Text size="sm" c="dimmed">
@@ -78,7 +69,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
         <Button
           variant="light"
           disabled={!status.data?.endpoint}
-          onClick={() => void copy(status.data!.endpoint, "Endpoint URL")}
+          onClick={() => void copyText(status.data!.endpoint, "Endpoint URL")}
         >
           Copy URL
         </Button>
@@ -114,7 +105,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
           <Button
             variant="light"
             style={{ alignSelf: "start" }}
-            onClick={() => void copy(issuedToken, "Token")}
+            onClick={() => void copyText(issuedToken, "Token")}
           >
             Copy Token
           </Button>

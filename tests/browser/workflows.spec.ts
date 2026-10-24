@@ -1192,7 +1192,9 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
     await viewerAction(page, "Delete");
     const confirmation = page.getByRole("dialog", { name: "Delete Item", exact: true });
     await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
-    await expect(confirmation.getByText("Some Items Remain", { exact: true })).toBeVisible();
+    await expect(
+      confirmation.getByText("1 item could not be deleted. You can try again."),
+    ).toBeVisible();
     await expect(viewer).toBeVisible();
     expect(state.gallery).toHaveLength(1);
     await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
