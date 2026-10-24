@@ -4,7 +4,7 @@ import path from "node:path";
 import { currentDataDir, projectRoot } from "./data-root.js";
 import { applyLegacyEnvNames } from "./env-names.js";
 import { removeJsonFile, writeJsonFile } from "./json-store.js";
-import { readEnvFile } from "./lan.js";
+import { readEnvFile } from "./env-names.js";
 
 /**
  * Why Studio stopped last time, so a studio that "just exited" has a reason

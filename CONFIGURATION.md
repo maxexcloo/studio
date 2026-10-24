@@ -14,7 +14,7 @@ COMFY_OUTPUT_DIR=
 
 `COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). The gallery's clear operation moves finished files to `.heiss-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
 
-For other devices: `STUDIO_ALLOWED_HOSTS` (extra names to answer to, comma-separated), `STUDIO_DEVICE_SESSION_DAYS` (how long a device stays signed in, 1 to 30 days, 7 by default), and `STUDIO_TLS_CERT`, `STUDIO_TLS_KEY` and `STUDIO_HTTPS_PORT` for HTTPS. See [Other devices](./SECURITY.md#other-devices-signing-in-admin-https-and-proxies) and [Phones and other devices](./TROUBLESHOOTING.md#phones-and-other-devices).
+Single-user mode answers only the computer running Studio; other devices need [account mode](#multi-user-mode). `STUDIO_ALLOWED_HOSTS` lists extra names to answer to (comma-separated), and `STUDIO_TLS_CERT`, `STUDIO_TLS_KEY` and `STUDIO_HTTPS_PORT` give Studio its own HTTPS when it listens beyond this computer. See [Security](./SECURITY.md) and [Accounts & Devices](./TROUBLESHOOTING.md#accounts--devices).
 
 With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) workers need no shared storage; with ComfyUI's output folder, they must share input and output storage for local gallery access. See [Workers](#workers) for one or many ComfyUI workers.
 
@@ -165,7 +165,7 @@ Open the **Library** from the navigation. **Imports** accepts a Civitai image or
 
 **Imports** also accepts Civitai model links (including `modelVersionId`) and Hugging Face links to individual SafeTensors or GGUF files. Local downloads use the existing resumable queue and check published SHA-256 values. Hugging Face revisions are pinned to a commit when previewed. A filename conflict is never resolved by replacing the existing file automatically.
 
-Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server environment for resources your account can access. Tokens are kept on the server and are never returned to the browser or forwarded to the image/file CDN. Imports, image deletion and model downloads are available at the server or from a signed-in device. Provider credential changes retain the existing admin boundary; the library does not expose credential controls.
+Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server environment for resources your account can access. Tokens are kept on the server and are never returned to the browser or forwarded to the image/file CDN. Imports, image deletion and model downloads are available to administrators (in single-user mode, the computer running Studio). Provider credential changes retain the existing admin boundary; the library does not expose credential controls.
 
 ## Prompt Assistant
 
@@ -245,7 +245,6 @@ Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STU
 
 | Old                             | New                              |
 | ------------------------------- | -------------------------------- |
-| `HEISS_ALLOW_LAN`               | `STUDIO_ALLOW_LAN`               |
 | `HEISS_ALLOWED_HOSTS`           | `STUDIO_ALLOWED_HOSTS`           |
 | `HEISS_COMFY_LOST_AFTER_MS`     | `STUDIO_COMFY_LOST_AFTER_MS`     |
 | `HEISS_COMFY_ROOT`              | `STUDIO_COMFY_ROOT`              |
@@ -254,7 +253,6 @@ Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STU
 | `HEISS_DEFAULT_COMFY_URL`       | `STUDIO_DEFAULT_COMFY_URL`       |
 | `HEISS_DEMO`                    | `STUDIO_DEMO`                    |
 | `HEISS_DEV_PROXY_TOKEN`         | `STUDIO_DEV_PROXY_TOKEN`         |
-| `HEISS_DEVICE_SESSION_DAYS`     | `STUDIO_DEVICE_SESSION_DAYS`     |
 | `HEISS_DOCKER_HOST_ONLY`        | `STUDIO_DOCKER_HOST_ONLY`        |
 | `HEISS_ENABLE_INPAINT`          | `STUDIO_ENABLE_INPAINT`          |
 | `HEISS_ENV_FILE`                | `STUDIO_ENV_FILE`                |
@@ -263,7 +261,6 @@ Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STU
 | `HEISS_GALLERY_LIMIT`           | `STUDIO_GALLERY_LIMIT`           |
 | `HEISS_GALLERY_SAVE_MS`         | `STUDIO_GALLERY_SAVE_MS`         |
 | `HEISS_HTTPS_PORT`              | `STUDIO_HTTPS_PORT`              |
-| `HEISS_LAN`                     | `STUDIO_LAN`                     |
 | `HEISS_PREVIEW_INTERVAL_MS`     | `STUDIO_PREVIEW_INTERVAL_MS`     |
 | `HEISS_REFERENCE_MAX_BYTES`     | `STUDIO_REFERENCE_MAX_BYTES`     |
 | `HEISS_REFERENCE_MAX_PIXELS`    | `STUDIO_REFERENCE_MAX_PIXELS`    |
@@ -278,11 +275,10 @@ Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STU
 
 The same goes for the names browsers and scripts see. Studio writes only the new ones and reads the old ones until a later release:
 
-| What                                         | Old               | New                | Compatibility                                                                  |
-| -------------------------------------------- | ----------------- | ------------------ | ------------------------------------------------------------------------------ |
-| Request header for changes from scripts      | `X-HEISS`         | `X-Studio`         | Both accepted                                                                  |
-| Sign-in needed (401 response)                | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both                                                            |
-| Device sign-in cookie (single-user LAN mode) | `heiss_device`    | `studio_device`    | The old cookie still signs in and is moved to the new name on the next request |
+| What                                    | Old               | New                | Compatibility       |
+| --------------------------------------- | ----------------- | ------------------ | ------------------- |
+| Request header for changes from scripts | `X-HEISS`         | `X-Studio`         | Both accepted       |
+| Sign-in needed (401 response)           | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both |
 
 The rewritten frontend uses Studio browser preferences. It does not import legacy browser drafts or LoRA favourites; saved gallery records and server-side sessions remain authoritative.
 

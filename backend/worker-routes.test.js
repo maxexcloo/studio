@@ -41,7 +41,6 @@ async function start(environment) {
     HOST: "127.0.0.1",
     STUDIO_DATA_DIR: dataDir,
     COMFY_OUTPUT_DIR: "",
-    STUDIO_LAN: "0",
     STUDIO_COMFY_SEARCH: "0",
     STUDIO_ENABLE_GROK: "0",
     npm_lifecycle_event: "",

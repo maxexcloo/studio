@@ -38,6 +38,10 @@ version opens with a `> ` summary line.
 - Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
 - Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it. Civitai image imports get the same nearest installed stand-ins as dropped images, with Use Prompt and Use Settings.
 
+### Removed
+
+- Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
+
 ## [0.48.2] - 2026-10-23
 
 > Saved results stay complete while worker cleanup finishes

@@ -33,7 +33,7 @@ import {
   verifyAccountMcpToken,
   verifyLocalAccount,
 } from "./account-store.js";
-import { canAdmin, clientOf, endDeviceSession } from "./access.js";
+import { canAdmin, clientOf } from "./access.js";
 import { grokEnabled, lorasEnabled, presetsEnabled } from "./features.js";
 import { createGuessLimiter, waitWords } from "./guess-limit.js";
 import { createOidcClient, oidcConfigFromEnv } from "./oidc.js";
@@ -417,11 +417,10 @@ export function registerMultiUserAuthRoutes(
     }
   });
 
-  // Every session this browser holds ends: the account's, and a studio-password device session left from single-user mode.
+  // The account's session ends.
   post("/api/accounts/sign-out", (req, res) => {
     revokeAccountSession(cookieToken(req));
     appendCookie(res, accountCookie(req, ""));
-    endDeviceSession(req, res);
     req.studioAccount = null;
     res.json({ ok: true });
   });

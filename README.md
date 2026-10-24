@@ -15,7 +15,7 @@ mise run dev
 
 Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. When the sibling `ai` checkout exists, development reads its definitions and worker addresses. Automatic worker lifecycle control is disabled.
 
-`npm run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference. `npm run dev -- --lan` exposes the preview to the local network.
+`npm run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference.
 
 Before submitting a change, run the checks, build the frontend and run the browser scenarios against that build. Install the browsers once with `npx playwright install chromium webkit`. Browser scenarios use isolated fixtures and cover desktop and phone interactions; real generation needs separate verification against the intended worker.
 

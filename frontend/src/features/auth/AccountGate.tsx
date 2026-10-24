@@ -42,24 +42,9 @@ export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
 });
-export function useAccess(enabled: boolean) {
-  return useQuery({
-    queryKey: ["access"],
-    queryFn: () =>
-      api<{
-        signedIn: boolean;
-        thisComputer: boolean;
-        canAdmin: boolean;
-        studioPassword: { set: boolean };
-      }>("/api/access/status"),
-    enabled,
-    retry: false,
-  });
-}
 export function AccountGate({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const status = useAccount();
-  const access = useAccess(status.data?.mode === "single-user");
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
     [setupToken, setSetupToken] = useState(""),
@@ -77,7 +62,6 @@ export function AccountGate({ children }: { children: ReactNode }) {
     const signOut = () => {
       client.clear();
       void status.refetch();
-      void access.refetch();
     };
     window.addEventListener("studio:signed-out", signOut);
     return () => window.removeEventListener("studio:signed-out", signOut);
@@ -87,45 +71,35 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const signIn = useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
-      multi
-        ? post(bootstrap ? "/api/accounts/bootstrap" : "/api/accounts/sign-in", {
-            username,
-            password,
-            ...(bootstrap ? { setupToken, displayName } : {}),
-          })
-        : post("/api/access/sign-in", { password }),
+      post(bootstrap ? "/api/accounts/bootstrap" : "/api/accounts/sign-in", {
+        username,
+        password,
+        ...(bootstrap ? { setupToken, displayName } : {}),
+      }),
     onSuccess: async () => {
       setPassword("");
       setSetupToken("");
       client.clear();
       await status.refetch();
-      if (!multi) await access.refetch();
     },
   });
-  if (status.isPending || (status.data?.mode === "single-user" && access.isPending))
+  if (status.isPending)
     return (
       <Container py="xl">
         <Loader aria-label="Loading Studio" />
       </Container>
     );
-  const error = status.error || access.error;
-  if (error)
+  if (status.error)
     return (
       <Container py="xl">
         <Alert color="red" title="Can’t Reach Studio">
-          {error.message}
-          <Button
-            onClick={() => {
-              void status.refetch();
-              void access.refetch();
-            }}
-          >
-            Try Again
-          </Button>
+          {status.error.message}
+          <Button onClick={() => void status.refetch()}>Try Again</Button>
         </Alert>
       </Container>
     );
-  if (multi ? status.data?.signedIn : access.data?.signedIn) return children;
+  // Single-user Studio answers only the computer it runs on, which needs no sign-in.
+  if (!multi || status.data?.signedIn) return children;
   return (
     <Stack mih="100dvh" justify="center" py="xl" px="md">
       <Container size={420} w="100%" px={0}>
@@ -152,66 +126,54 @@ export function AccountGate({ children }: { children: ReactNode }) {
                   <Button component="a" href="/api/accounts/oidc/start" variant="default" fullWidth>
                     Sign In With {status.data.oidc.label}
                   </Button>
-                  <Divider
-                    label={multi ? "Or Continue With Email" : "Or Continue With Password"}
-                    labelPosition="center"
-                  />
+                  <Divider label="Or Continue With Email" labelPosition="center" />
                 </>
               )}
-              {!multi && !access.data?.studioPassword.set ? (
-                <Alert>
-                  Set a Studio password on the computer running Studio before opening it on other
-                  devices.
-                </Alert>
-              ) : (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    signIn.mutate();
-                  }}
-                >
-                  <Stack>
-                    {multi && (
-                      <TextInput
-                        label="Email"
-                        type={bootstrap ? "email" : "text"}
-                        autoComplete="username"
-                        required
-                        value={username}
-                        onChange={(e) => setUsername(e.currentTarget.value)}
-                      />
-                    )}
-                    {bootstrap && (
-                      <TextInput
-                        label="Display Name"
-                        autoComplete="name"
-                        required
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.currentTarget.value)}
-                      />
-                    )}
-                    <PasswordInput
-                      label="Password"
-                      autoComplete={bootstrap ? "new-password" : "current-password"}
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  signIn.mutate();
+                }}
+              >
+                <Stack>
+                  <TextInput
+                    label="Email"
+                    type={bootstrap ? "email" : "text"}
+                    autoComplete="username"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.currentTarget.value)}
+                  />
+                  {bootstrap && (
+                    <TextInput
+                      label="Display Name"
+                      autoComplete="name"
                       required
-                      value={password}
-                      onChange={(e) => setPassword(e.currentTarget.value)}
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.currentTarget.value)}
                     />
-                    {bootstrap && status.data?.setupTokenAccepted && (
-                      <PasswordInput
-                        label="Setup Token"
-                        autoComplete="off"
-                        value={setupToken}
-                        onChange={(e) => setSetupToken(e.currentTarget.value)}
-                      />
-                    )}
-                    {signIn.error && <Alert color="red">{signIn.error.message}</Alert>}
-                    <Button type="submit" loading={signIn.isPending} fullWidth mt="sm">
-                      {bootstrap ? "Create Administrator" : "Sign In"}
-                    </Button>
-                  </Stack>
-                </form>
-              )}
+                  )}
+                  <PasswordInput
+                    label="Password"
+                    autoComplete={bootstrap ? "new-password" : "current-password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.currentTarget.value)}
+                  />
+                  {bootstrap && status.data?.setupTokenAccepted && (
+                    <PasswordInput
+                      label="Setup Token"
+                      autoComplete="off"
+                      value={setupToken}
+                      onChange={(e) => setSetupToken(e.currentTarget.value)}
+                    />
+                  )}
+                  {signIn.error && <Alert color="red">{signIn.error.message}</Alert>}
+                  <Button type="submit" loading={signIn.isPending} fullWidth mt="sm">
+                    {bootstrap ? "Create Administrator" : "Sign In"}
+                  </Button>
+                </Stack>
+              </form>
             </Stack>
           </Paper>
         </Stack>

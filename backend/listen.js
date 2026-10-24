@@ -1,12 +1,12 @@
 import https from "node:https";
 import { listenWithFallback } from "./launch.js";
-import { listensBeyondThisComputer } from "./lan.js";
+import { listensBeyondThisComputer } from "./client-trust.js";
 import { httpsPort, startupTls, watchCertificate } from "./tls.js";
 
 /**
  * Where the server listens.
  *
- * Plain HTTP on `port`, as always. With LAN mode on and a certificate
+ * Plain HTTP on `port`, as always. Listening beyond this computer with a certificate
  * configured (tls.js), other devices get HTTPS on its own port instead, and
  * plain HTTP stays on localhost, where nothing crosses a network: this
  * computer keeps http://localhost:<port> whatever happens to the certificate.

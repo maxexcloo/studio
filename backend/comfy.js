@@ -5,8 +5,8 @@ import {
   noteWorkerReachable,
 } from "./comfy-backends.js";
 import { defaultWorker, onWorkersChanged, saveDefaultWorkerUrl } from "./workers.js";
-import { envFileKeys, writeLocalEnvValue } from "./env.js";
-import { listensBeyondThisComputer, resolveLan } from "./lan.js";
+import { writeLocalEnvValue } from "./env.js";
+import { listensBeyondThisComputer } from "./client-trust.js";
 import { noteComfyState } from "./crash-log.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,12 +48,11 @@ export function setComfyUrl(value = "") {
   comfyUrl = defaultWorker()?.url || next;
   return comfyUrl;
 }
-export const lan = resolveLan({ argv: process.argv, env: process.env, fileKeys: envFileKeys });
-export const host = lan.host;
+export const host = process.env.HOST || "127.0.0.1";
 /** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
 export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
 // Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
-export const lanListening = listensBeyondThisComputer(host) && !dockerHostOnly;
+export const networkListening = listensBeyondThisComputer(host) && !dockerHostOnly;
 
 /** The port asked for (PORT, else 8787). */
 export const requestedPort = Number(process.env.PORT || 8787);
@@ -196,10 +195,6 @@ export function modelFolders(kind, subfolders = [kind]) {
   });
 }
 
-// Whether other devices may use the studio at all. Who a request comes from
-// (this computer, a device, a proxy) is decided in client-trust.js, never
-// from the socket address alone.
-export const allowLanActions = process.env.STUDIO_ALLOW_LAN === "1" || lanListening;
 /** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
 export const demoMode = process.env.STUDIO_DEMO === "1";
 

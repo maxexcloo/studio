@@ -94,7 +94,7 @@ For missing or gated Library downloads, verify the catalogue link, model licence
 
 Use the deployment's published address from `STUDIO_ALLOWED_HOSTS`. Sign in with the account's email and password or configured single sign-on. Administrators manage approval and disabled accounts in **Settings › Users** and permissions in **Settings › Groups**. Password changes invalidate other sessions; too many failed sign-ins temporarily delay further attempts.
 
-Single-user development and access from another device use the options described in [Configuration](CONFIGURATION.md). Keep container port bindings, proxy configuration and host validation consistent.
+Single-user mode answers only the computer running Studio; other devices need account mode ([Configuration](CONFIGURATION.md#multi-user-mode)). Keep container port bindings, proxy configuration and host validation consistent.
 
 ## Updating & Rollback
 

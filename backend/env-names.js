@@ -1,12 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
+
 /**
  * Settings Studio renamed when it became a hard fork of HEISS UI: each
  * `HEISS_<NAME>` became `STUDIO_<NAME>`. The old names still work as
  * deprecated aliases, read only when the new name is unset, so a deployment
  * keeps running until its configuration is updated. Studio writes only the
- * new names. No side effects: the dev launcher reads .env through it too.
+ * new names. No side effects, so .env can be read before env.js loads it.
  */
 export const renamedSettings = Object.freeze([
-  "ALLOW_LAN",
   "ALLOWED_HOSTS",
   "COMFY_LOST_AFTER_MS",
   "COMFY_ROOT",
@@ -15,7 +17,6 @@ export const renamedSettings = Object.freeze([
   "DEFAULT_COMFY_URL",
   "DEMO",
   "DEV_PROXY_TOKEN",
-  "DEVICE_SESSION_DAYS",
   "DOCKER_HOST_ONLY",
   "ENABLE_INPAINT",
   "ENV_FILE",
@@ -24,7 +25,6 @@ export const renamedSettings = Object.freeze([
   "GALLERY_LIMIT",
   "GALLERY_SAVE_MS",
   "HTTPS_PORT",
-  "LAN",
   "PREVIEW_INTERVAL_MS",
   "REFERENCE_MAX_BYTES",
   "REFERENCE_MAX_PIXELS",
@@ -90,4 +90,21 @@ export function legacyEnvNotice(used = [], shadowed = []) {
     .sort()
     .map((legacy) => `${legacy} (ignored: ${currentEnvName(legacy)} is set)`);
   return `Deprecated settings in use; rename them (the old names stop working in a later release): ${[...pairs, ...ignored].join(", ")}.`;
+}
+
+/** .env as it is on disk right now: values, and which keys it sets. */
+export function readEnvFile(root) {
+  const values = {};
+  try {
+    for (const line of fs.readFileSync(path.join(root, ".env"), "utf8").split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+      if (match && !(match[1] in values))
+        values[match[1]] = match[2].replace(/^(["'])(.*)\1$/, "$2");
+    }
+  } catch {
+    // .env is optional.
+  }
+  // Old HEISS_* names fill their unset STUDIO_* ones, as the server reads them.
+  applyLegacyEnvNames(values);
+  return { values, keys: new Set(Object.keys(values)) };
 }
