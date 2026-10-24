@@ -1,6 +1,13 @@
 import { useMotionDuration } from "../../ui/Appearance";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Transition, Drawer, Paper, ScrollArea, type ScrollAreaProps } from "@mantine/core";
+import {
+  Drawer,
+  FocusTrap,
+  Paper,
+  ScrollArea,
+  type ScrollAreaProps,
+  Transition,
+} from "@mantine/core";
 import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
@@ -261,6 +268,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           returnFocus={false}
           onExitTransitionEnd={focusCompact}
         >
+          {/* Without a prompt focus intent, initial focus lands here rather than on Close. */}
+          {focusIntent.current !== "[data-expanded-prompt]" && <FocusTrap.InitialFocus />}
           <div className={classes.panel} aria-hidden={!opened} inert={!opened}>
             <GenerationForm
               fill

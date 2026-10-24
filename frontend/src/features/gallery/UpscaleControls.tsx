@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Alert,
   Button,
+  FocusTrap,
   Loader,
   Modal,
   Popover,
@@ -179,6 +180,7 @@ export function UpscaleDialog({
 }) {
   return (
     <Modal opened={opened} onClose={onClose} title="Upscale" centered size="sm">
+      <FocusTrap.InitialFocus />
       <UpscaleForm item={item} onQueued={onClose} />
     </Modal>
   );

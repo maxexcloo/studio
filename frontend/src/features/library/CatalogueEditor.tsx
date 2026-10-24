@@ -1,6 +1,7 @@
 import {
   Alert,
   Button,
+  FocusTrap,
   Group,
   Modal,
   MultiSelect,
@@ -254,6 +255,7 @@ export function CatalogueEditor({
       size="lg"
       fullScreen={phone}
     >
+      <FocusTrap.InitialFocus />
       <CatalogueForm item={item} families={families} close={close} />
     </Modal>
   );

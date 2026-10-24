@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  FocusTrap,
   Group,
   LoadingOverlay,
   Modal,
@@ -196,6 +197,7 @@ export default function MaskEditor({
       size="xl"
       removeScrollProps={{ allowPinchZoom: true }}
     >
+      <FocusTrap.InitialFocus />
       <Stack>
         <Text size="sm" c="dimmed">
           Paint over the parts that should change. The rest of your image is preserved.

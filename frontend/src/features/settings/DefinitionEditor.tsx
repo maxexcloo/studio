@@ -4,6 +4,7 @@ import {
   Alert,
   Badge,
   Button,
+  FocusTrap,
   Group,
   Modal,
   NumberInput,
@@ -563,6 +564,7 @@ export function DefinitionEditor({
       fullScreen={phone}
       closeButtonProps={{ "aria-label": "Close Definition Editor" }}
     >
+      <FocusTrap.InitialFocus />
       {!data ? (
         loaded.error ? (
           <Alert color="red">{loaded.error.message}</Alert>
