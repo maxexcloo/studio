@@ -63,7 +63,7 @@ export function AccountMenu() {
   return (
     <Menu position="bottom-end" shadow="md" width={240}>
       <Menu.Target>
-        <ActionIcon aria-label="Your Account" variant="subtle" color="gray" size="lg" radius="xl">
+        <ActionIcon aria-label="Your Account" variant="subtle" color="gray">
           <UserRound size={19} />
         </ActionIcon>
       </Menu.Target>

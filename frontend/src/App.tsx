@@ -1,4 +1,4 @@
-import { AppShell, Modal } from "@mantine/core";
+import { AppShell, FocusTrap, Modal } from "@mantine/core";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AccountGate } from "./features/auth/AccountGate";
@@ -114,6 +114,8 @@ function Workspace() {
             }}
             fullScreen={phone}
           >
+            {/* Initial focus lands here, so the close button doesn't show a focus ring on open. */}
+            <FocusTrap.InitialFocus />
             {panel === "library" ? (
               library.allowed ? (
                 <LibraryPage />
