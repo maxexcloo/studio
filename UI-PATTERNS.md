@@ -234,6 +234,11 @@ primary component reference and verify APIs against the installed version.
   Viewer F toggles Star and Delete opens the standard confirmation, including
   single-item viewers. Phone hold-to-select uses Mantine's touch gesture with
   movement cancellation; its release must not also open the viewer.
+- Every interaction should feel fluid and intuitive: state changes (opening,
+  expanding, fanning out run stacks, swiping cards, variations arriving, chips
+  updating) use short, tasteful shared-token transitions rather than jumps, and
+  never shift layout unexpectedly or block input. Treat visible jank, flashes
+  of empty content and layout jumps as defects.
 - Prefer transform/opacity for interaction motion, no decorative hover movement
   or layout animation in hot paths. Respect reduced motion in CSS and Mantine
   transitions. Persist Off/Fast/Standard/Relaxed through one motion token; reduced
