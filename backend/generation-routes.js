@@ -373,8 +373,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           unique: Boolean(body.ownerId),
           generation: body,
         });
-        body.startImageId ||= body.referenceAssets[0]?.assetId || "";
-        body.startImageName ||= body.referenceAssets[0]?.name || "";
       } catch (error) {
         res.status(400).json({ ok: false, error: error.message });
         return;

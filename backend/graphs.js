@@ -168,9 +168,11 @@ async function applyMappedInputs(graph, workflow, body) {
       mappedReference = true;
     }
   }
+  const stagedReference = (body.referenceAssets || []).find((item) => item?.comfyName)?.comfyName;
   if (
     String(workflow.family || "").replaceAll("-", "_") === "minimax_h3" &&
     !mappedReference &&
+    !stagedReference &&
     !body.startImage &&
     !body.startImageId
   ) {
@@ -180,8 +182,10 @@ async function applyMappedInputs(graph, workflow, body) {
       if (node.class_type === "MiniMaxH3ImageToVideo") delete node.inputs.first_frame;
     }
   }
-  if (!mappedReference && (body.startImage || body.startImageId) && controls.startImage) {
-    const imageName = await uploadBodyStartImage(body);
+  if (!mappedReference && controls.startImage) {
+    const imageName =
+      stagedReference ||
+      (body.startImage || body.startImageId ? await uploadBodyStartImage(body) : "");
     if (imageName) setMappedInput(graph, controls.startImage, imageName);
   }
 }
