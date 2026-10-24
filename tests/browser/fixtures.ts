@@ -65,6 +65,20 @@ export async function fixtures(page: Page) {
   const loraOperations: any[] = [];
   let clock = Date.parse(stamp);
   const nextStamp = () => new Date((clock += 1000)).toISOString();
+  const comparisons: any[] = [];
+  const showComparison = (comparison: any) => ({
+    id: comparison.id,
+    seed: comparison.seed,
+    vote: comparison.vote,
+    ...(new Set(comparison.requests.map((variant: any) => variant.input.prompt)).size === 1
+      ? { prompt: comparison.requests[0].input.prompt }
+      : {}),
+    variants: comparison.jobIds.map((jobId: string, index: number) => ({
+      jobId,
+      label: comparison.labels[index],
+      item: gallery.find((item) => item.jobId === jobId) || null,
+    })),
+  });
   function recordGeneration(body: any, sessionId: string) {
     const id = `job-${jobs.length + 1}`,
       createdAt = nextStamp();
@@ -417,6 +431,29 @@ export async function fixtures(page: Page) {
       }
       return respond({ session, jobs: jobs.filter((j) => j.sessionId === session?.id) });
     }
+    if (path === "/api/comparisons/run") {
+      const seed = String(body.variants[0].input.seed || "4242");
+      const sessionId = body.sessionId || "session-compare";
+      const comparison = {
+        id: `compare-${comparisons.length + 1}`,
+        seed,
+        requests: body.variants,
+        jobIds: body.variants.map(
+          (variant: any) =>
+            recordGeneration({ ...variant.input, seed, operation: "image" }, sessionId).id,
+        ),
+        labels: body.variants.map((variant: any) => variant.label),
+        vote: null,
+      };
+      comparisons.push(comparison);
+      return respond(showComparison(comparison), 201);
+    }
+    const comparison = comparisons.find((entry) => entry.id === path.split("/")[3]);
+    if (comparison && path.endsWith("/vote") && method === "PUT") {
+      comparison.vote = body.jobId;
+      return respond(showComparison(comparison));
+    }
+    if (comparison && method === "GET") return respond(showComparison(comparison));
     if (path === "/api/gallery/favorite" && method === "POST") {
       gallery
         .filter((item) => body.ids.includes(item.id))
@@ -591,6 +628,7 @@ export async function fixtures(page: Page) {
     galleryRequests,
     loraLibrary,
     loraOperations,
+    comparisons,
   };
 }
 export async function create(page: Page) {

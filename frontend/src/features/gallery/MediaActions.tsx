@@ -2,6 +2,7 @@ import { Menu } from "@mantine/core";
 import {
   ClipboardCopy,
   Columns2,
+  Columns3,
   Copy,
   Download,
   ImagePlus,
@@ -15,9 +16,11 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
+import { useCompare } from "../compare/CompareDialog";
 import { useGeneration } from "../generation/GenerationProvider";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
@@ -145,6 +148,8 @@ export function MediaActionItems({
 }) {
   const action = useMediaAction(item, sessionId, onApplied);
   const favorite = useMediaFavorite(item);
+  const compareVariants = useCompare();
+  const variants = useMutation({ mutationFn: () => compareVariants.openItem(item) });
   const ready = item.status === "done" && Boolean(item.url);
   const shown = (id: PrimaryAction) => ready && !omit.includes(id);
   return (
@@ -181,6 +186,16 @@ export function MediaActionItems({
       >
         Recreate
       </Menu.Item>
+      {ready && item.type === "image" && (
+        <Menu.Item
+          h={36}
+          leftSection={<Columns3 size={16} />}
+          disabled={variants.isPending}
+          onClick={() => variants.mutate()}
+        >
+          Compare Variants
+        </Menu.Item>
+      )}
       {shown("upscale") && onUpscale && (
         <Menu.Item
           h={36}
