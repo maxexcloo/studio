@@ -1,10 +1,9 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Transition, Drawer, Paper, ScrollArea, type ScrollAreaProps } from "@mantine/core";
 import { useClickOutside, useDisclosure, useMediaQuery, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
-import { ChatComposer, ChatComposerStatus } from "../sessions/ChatComposer";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { failure } from "../../api";
 function GenerationScrollArea(props: ScrollAreaProps) {
@@ -18,7 +17,8 @@ function GenerationScrollArea(props: ScrollAreaProps) {
 }
 const composerLayers =
   '[role="dialog"], [data-composer-layer], .mantine-Combobox-dropdown, .mantine-Popover-dropdown';
-export function ComposerDock({ chat = false }: { chat?: boolean }) {
+/** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
+export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const [opened, { open, close }] = useDisclosure(!chat && params.get("compose") === "1");
   const narrow = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
@@ -200,7 +200,7 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
               open();
             }}
           >
-            {chat ? <ChatComposer /> : <GenerationForm compact />}
+            {chat || <GenerationForm compact />}
           </Paper>
         )}
         {!chat && !narrow && (
@@ -233,7 +233,6 @@ export function ComposerDock({ chat = false }: { chat?: boolean }) {
           </Transition>
         )}
       </div>
-      {chat && <ChatComposerStatus />}
       {!chat && narrow && (
         <Drawer
           onPaste={pasteReferences}

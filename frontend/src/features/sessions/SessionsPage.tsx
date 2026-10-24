@@ -7,7 +7,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { api } from "../../api";
 import type { MediaItem, QueueJob, Session } from "../../types";
 import { useGeneration, initialInput } from "../generation/GenerationProvider";
-import { ComposerDock } from "../generation/ComposerDock";
+import { ChatDock } from "./ChatComposer";
 import { SessionIteration } from "./SessionIteration";
 
 import { MediaViewer } from "../gallery/MediaViewer";
@@ -26,7 +26,7 @@ export function SessionsPage() {
   return (
     <ChatWorkspace>
       <EmptyState fill>No Chat Selected</EmptyState>
-      <ComposerDock chat />
+      <ChatDock />
     </ChatWorkspace>
   );
 }
@@ -102,14 +102,14 @@ export function SessionPage() {
     return (
       <ChatWorkspace>
         <LoadingState fill label="Loading Session" />
-        <ComposerDock chat />
+        <ChatDock />
       </ChatWorkspace>
     );
   if (session.error)
     return (
       <ChatWorkspace>
         <Alert color="red">{session.error.message}</Alert>
-        <ComposerDock chat />
+        <ChatDock />
       </ChatWorkspace>
     );
   const jobs = session.data.jobs;
@@ -173,7 +173,7 @@ export function SessionPage() {
           </Stack>
           {timeline.length === 0 && !prepared && <EmptyState fill>No Chats</EmptyState>}
         </div>
-        <ComposerDock chat />
+        <ChatDock />
         {selected && (
           <MediaViewer
             item={selected}

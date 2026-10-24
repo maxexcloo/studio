@@ -137,6 +137,16 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   expect(state.chatRequests[1].generation.input.profileId).toBe("image:test");
   expect(state.chatRequests[1].generation.input.backendId).toBe("worker-a");
   await first.getByRole("button", { name: "Edit & Rerun", exact: true }).click();
+  // The card's output switch picks a profile like the gallery and explains why Generate waits.
+  const output = first.getByRole("radiogroup", { name: "Generation Output", exact: true });
+  await output.getByText("Video", { exact: true }).click();
+  await expect(first.getByRole("combobox", { name: "Profile", exact: true })).toHaveValue(
+    "Motion Quality",
+  );
+  await expect(
+    first.getByRole("button", { name: "Generate Variation", exact: true }),
+  ).toHaveAccessibleDescription("This workflow requires a reference image.");
+  await output.getByText("Image", { exact: true }).click();
   await first
     .getByRole("textbox", { name: "Variation Prompt", exact: true })
     .fill("A blue bird in watercolour");

@@ -143,7 +143,7 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
     </Button>
   );
   if (inline) return content;
-  // Phones show the controls inline in place of the form (see GenerationForm and GenerationCard).
+  // Phones show the controls inline in place of the form (see GenerationEditor).
   if (narrow) return trigger;
   return (
     <Popover
