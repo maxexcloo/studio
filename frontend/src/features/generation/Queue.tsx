@@ -105,9 +105,10 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
     </Button>
   );
 }
-const statusLabels: Record<QueueJob["status"], string> = {
+/** Title Case job states for the queue, tiles and the viewer. */
+export const statusLabels: Record<QueueJob["status"], string> = {
   queued: "Queued",
-  waiting: "Waiting",
+  waiting: "Waiting for a Worker",
   starting: "Starting",
   running: "Generating",
   saving: "Saving",

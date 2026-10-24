@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
@@ -155,13 +155,6 @@ export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
   | { kind: "animate"; theme: AnimateTheme; instruction?: string };
-
-/** What the prompt assistant offers this account; Spicy needs its model and the NSFW grant. */
-export const assistantQuery = queryOptions({
-  queryKey: ["assistant"],
-  queryFn: () => api<{ available: boolean; spicy?: boolean }>("/api/assistant"),
-  retry: false,
-});
 
 /**
  * Queues a new run from a saved result without leaving the viewer: a variation with a new prompt
