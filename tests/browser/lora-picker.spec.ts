@@ -62,3 +62,36 @@ test("LoRA favourites persist, filters and search narrow the choices, and Trigge
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await expect(star).toHaveAttribute("aria-pressed", "true");
 });
+
+test("Escape inside the LoRA picker closes only its innermost layer", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "The phone panel closes with Back or Use LoRAs");
+  await fixtures(page);
+  await create(page);
+  const chip = page.getByRole("button", { name: "Choose LoRAs", exact: true });
+  await chip.click();
+  const controls = page.getByRole("region", { name: "LoRA Controls", exact: true });
+  const choices = controls.getByRole("list", { name: "Compatible LoRAs", exact: true });
+  for (const name of ["Detail Slider", "Soft Style"])
+    await choices.getByRole("button", { name, exact: true }).click();
+  // A keyboard drag cancels on Escape.
+  const handle = controls.getByRole("button", { name: "Drag Soft Style", exact: true });
+  await expect(handle).toBeEnabled();
+  await handle.focus();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Escape");
+  await expect(controls).toBeVisible();
+  // An open saved-stack list closes first.
+  await controls.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
+  const saved = controls.getByRole("combobox", { name: "Saved LoRA Stack", exact: true });
+  await saved.click();
+  await expect(saved).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(saved).toHaveAttribute("aria-expanded", "false");
+  await expect(controls).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(controls).toBeHidden();
+  await expect(chip).toBeFocused();
+});

@@ -1,5 +1,5 @@
 import { useMotionDuration } from "../../ui/Appearance";
-import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -7,6 +7,8 @@ import {
   Button,
   Drawer,
   FileButton,
+  FocusTrap,
+  getDefaultZIndex,
   Group,
   Image,
   Indicator,
@@ -18,7 +20,6 @@ import {
   Stack,
   Text,
   UnstyledButton,
-  getDefaultZIndex,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
 import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
@@ -53,13 +54,9 @@ import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { chipProps } from "./chip";
+import { chipProps, escapePanel } from "./chip";
 import editorClasses from "./GenerationEditor.module.css";
 import classes from "./ReferencePicker.module.css";
-
-/** Nested pickers, menus and open comboboxes inside the panel handle their own Escape. */
-const nestedLayers =
-  '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [role="combobox"][aria-expanded="true"]';
 
 export function ReferencePicker({
   compact = false,
@@ -235,14 +232,6 @@ export function ReferencePicker({
       restoreScroll.current = false;
     }
   }, [viewport, choices.length, browser.scroll]);
-  function escape(event: KeyboardEvent<HTMLElement>) {
-    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
-    const layer = (event.target as Element).closest(nestedLayers);
-    if (layer && layer !== event.currentTarget.closest(".mantine-Popover-dropdown")) return;
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-  }
   const uploadTile = (
     <FileButton
       accept="image/png,image/jpeg,image/webp"
@@ -274,7 +263,7 @@ export function ReferencePicker({
       component="section"
       aria-label="References"
       data-composer-layer
-      onKeyDown={escape}
+      onKeyDown={(event) => escapePanel(event, close)}
       onPaste={(event) => {
         if (event.defaultPrevented || !event.clipboardData.files.length) return;
         event.preventDefault();
@@ -530,6 +519,7 @@ export function ReferencePicker({
           trapFocus={deleteId === null}
           styles={{ body: { paddingBottom: 0 } }}
         >
+          <FocusTrap.InitialFocus />
           {content}
         </Drawer>
         {deleteDialog}
