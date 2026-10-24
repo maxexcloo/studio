@@ -26,7 +26,10 @@ export const terminal = new Set(["completed", "failed", "cancelled"]);
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[] }>("/api/queue"),
-  refetchInterval: 1500,
+  // Idle queues don't poll: every in-app submit (composer, viewer, Chat stream) invalidates this
+  // query, and work started elsewhere (another tab, MCP) appears on window focus.
+  refetchInterval: (query) =>
+    query.state.data?.jobs.some((job) => !terminal.has(job.status)) ? 1500 : false,
 });
 export function useQueue() {
   return useQuery(queueQuery);
