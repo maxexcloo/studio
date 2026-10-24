@@ -111,7 +111,14 @@ test("LoRAs the profile names stay ahead of the request stack", async () => {
   const fixed = raw({ adapter: "radiance-tags-v1", node: "1" }, "radiance-fixed");
   fixed.graph[1].inputs.loras = '[{"name":"speed/lightning.safetensors","strength":1}]';
   saveCustomWorkflow(fixed);
-  const graph = await customWorkflowGraph({ workflow: "custom:radiance-fixed", prompt, seed: 1, width: 1024, height: 1024, loras: [{ name: "a.safetensors", strength: 0.5 }] });
+  const graph = await customWorkflowGraph({
+    workflow: "custom:radiance-fixed",
+    prompt,
+    seed: 1,
+    width: 1024,
+    height: 1024,
+    loras: [{ name: "a.safetensors", strength: 0.5 }],
+  });
   assert.deepEqual(JSON.parse(graph[1].inputs.loras), [
     { name: "speed/lightning.safetensors", strength: 1 },
     { name: "a.safetensors", strength: 0.5 },
