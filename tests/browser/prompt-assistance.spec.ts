@@ -131,7 +131,11 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await expect(prompt).toHaveValue("My later direction in warm light");
   await assist(page, "Suggest LoRAs");
   await page.getByRole("button", { name: "Apply Detail Slider", exact: true }).click();
-  await expect(prompt).toHaveValue("My later direction in warm light, inkbird");
+  // The backend adds trigger words when it runs; the prompt stays as written.
+  await expect(
+    page.getByRole("button", { name: "Apply Detail Slider", exact: true }),
+  ).toBeDisabled();
+  await expect(prompt).toHaveValue("My later direction in warm light");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Soft Style", exact: true }).click();
   await closeLoras(page);
