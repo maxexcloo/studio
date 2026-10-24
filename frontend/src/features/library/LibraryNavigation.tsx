@@ -7,7 +7,7 @@ import {
   Sparkles,
   SlidersHorizontal,
 } from "lucide-react";
-import { useAccount } from "../auth/AccountGate";
+import { useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
 
@@ -56,11 +56,8 @@ export const librarySections = {
   },
 };
 export function useLibraryNavigation() {
-  const account = useAccount();
+  const admin = useIsAdmin();
   const { presets } = useLibraryAccess();
-  const admin =
-    !!account.data &&
-    (account.data.mode !== "multi-user" || account.data.account?.role === "administrator");
   return {
     admin,
     imports: admin && presets,

@@ -20,7 +20,7 @@ import {
   UnstyledButton,
   getDefaultZIndex,
 } from "@mantine/core";
-import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
+import { useDebouncedValue } from "@mantine/hooks";
 import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
@@ -42,6 +42,7 @@ import { useGeneration } from "./GenerationProvider";
 import { referenceLabel, useGalleryReference } from "./references";
 import { useReferenceUpload } from "./useReferenceUpload";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
+import { usePhone } from "../../ui/usePhone";
 
 export function ReferencePicker({
   compact = false,
@@ -73,7 +74,7 @@ export function ReferencePicker({
     onOpenedChange?.(opened);
   };
   const close = () => setOpened(false);
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const motionDuration = useMotionDuration();
   const context = useGeneration(),
     { draft, setDraft } = context;
@@ -469,7 +470,7 @@ export function ReferencePicker({
         {deleteDialog}
       </>
     );
-  if (narrow)
+  if (phone)
     return (
       <>
         {trigger}

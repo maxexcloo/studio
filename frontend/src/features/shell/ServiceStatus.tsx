@@ -12,7 +12,7 @@ import {
   Button,
 } from "@mantine/core";
 import { Link, useLocation } from "react-router";
-import { useDisclosure, useMediaQuery } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import { ListTodo } from "lucide-react";
 import type { ServiceHealth } from "../../../../shared/services";
 import { Queue, terminal, useQueue } from "../generation/Queue";
@@ -24,6 +24,7 @@ import {
   summaryHealth,
   useServicesStatus,
 } from "../runtime/RuntimePanel";
+import { usePhone } from "../../ui/usePhone";
 
 function StatusDot({ state }: { state: ServiceHealth }) {
   return <Box w={12} h={12} bg={`${healthColour(state)}.6`} style={{ borderRadius: "50%" }} />;
@@ -65,7 +66,7 @@ export function RuntimeStatusAction() {
   );
 }
 export function ServiceStatus({ chat, kind }: { chat: boolean; kind: "image" | "video" }) {
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const [opened, handlers] = useDisclosure(false);
   const location = useLocation();
   const queue = useQueue(),
@@ -76,12 +77,12 @@ export function ServiceStatus({ chat, kind }: { chat: boolean; kind: "image" | "
   const panel = (
     <Stack gap="md" flex={1} mih={0} h="100%">
       <Text size="sm" fw={600}>
-        {narrow && chat ? "Sessions" : "Queue"}
+        {phone && chat ? "Sessions" : "Queue"}
       </Text>
       <Box flex={1} mih={0} style={{ overflowY: "auto", display: "flex", flexDirection: "column" }}>
-        {narrow && chat ? <SessionList close={handlers.close} /> : <Queue />}
+        {phone && chat ? <SessionList close={handlers.close} /> : <Queue />}
       </Box>
-      {narrow && (
+      {phone && (
         <>
           <Divider />
           <ServiceHealthSummary />
@@ -99,7 +100,7 @@ export function ServiceStatus({ chat, kind }: { chat: boolean; kind: "image" | "
       )}
     </Stack>
   );
-  if (narrow)
+  if (phone)
     return (
       <>
         <Tooltip label={current?.reason || "Service Status"}>

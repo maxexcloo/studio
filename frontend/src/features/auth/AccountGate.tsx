@@ -33,6 +33,11 @@ export function useAccount() {
     retry: false,
   });
 }
+/** Unknown until the account status loads, so admin-only UI never flashes in. */
+export function useIsAdmin() {
+  const { data } = useAccount();
+  return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
+}
 export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),

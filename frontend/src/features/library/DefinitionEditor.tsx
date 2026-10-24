@@ -17,7 +17,6 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
@@ -25,6 +24,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { WorkflowConnections } from "./WorkflowConnections";
+import { usePhone } from "../../ui/usePhone";
 
 export type DefinitionKind = "profile" | "guide";
 export interface DefinitionMeta {
@@ -540,7 +540,7 @@ export function DefinitionEditor({
   creating?: LoadedDefinition;
   existingIds?: string[];
 }) {
-  const narrow = useMediaQuery("(max-width:48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const loaded = useQuery({
     queryKey: ["definition", kind, id],
     queryFn: () => api<LoadedDefinition>(definitionPath(kind, id)),
@@ -556,7 +556,7 @@ export function DefinitionEditor({
       onClose={close}
       title={`${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`}
       size="lg"
-      fullScreen={narrow}
+      fullScreen={phone}
       closeButtonProps={{ "aria-label": "Close Definition Editor" }}
     >
       {!data ? (

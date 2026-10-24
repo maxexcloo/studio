@@ -17,7 +17,7 @@ import {
 import { History, Pin, PinOff, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
-import { useAccount } from "../auth/AccountGate";
+import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
@@ -49,11 +49,8 @@ export function PromptHistory({
   onPick: (text: string) => void;
 }) {
   const account = useAccount();
-  const features = account.data?.account?.features;
-  const allowed =
-    account.data?.mode === "single-user" ||
-    account.data?.account?.role === "administrator" ||
-    features?.promptHistory === true;
+  const admin = useIsAdmin();
+  const allowed = admin || account.data?.account?.features?.promptHistory === true;
   const [opened, setOpened] = useState(false),
     [query, setQuery] = useState("");
   const combobox = useCombobox({ opened });

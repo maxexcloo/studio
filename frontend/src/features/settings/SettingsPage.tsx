@@ -5,7 +5,7 @@ import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { OwnAccount } from "./OwnAccount";
 import { AccountAdmin } from "./AccountAdmin";
 export function SettingsPage() {
-  const { account, options } = useSettingsNavigation();
+  const { admin, multi, options } = useSettingsNavigation();
   return (
     <WorkspaceSections
       label="Settings"
@@ -16,17 +16,13 @@ export function SettingsPage() {
             <Stack>
               <Group>
                 <Badge>
-                  {account.data?.mode === "multi-user"
-                    ? account.data.account?.role === "administrator"
-                      ? "Administrator"
-                      : "User"
-                    : "Single-User Development"}
+                  {multi ? (admin ? "Administrator" : "User") : "Single-User Development"}
                 </Badge>
               </Group>
               <Text size="sm" c="dimmed">
                 Cloud model and NSFW permissions are enforced by Studio for your account.
               </Text>
-              {account.data?.mode === "multi-user" && <OwnAccount />}
+              {multi && <OwnAccount />}
             </Stack>
           </Paper>
         ),

@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useLongPress, useMediaQuery } from "@mantine/hooks";
-import { Badge, Box, Checkbox, Group, Text, UnstyledButton } from "@mantine/core";
+import { Badge, Box, Checkbox, Group, Text, UnstyledButton, useMantineTheme } from "@mantine/core";
 import type { MediaItem } from "../../types";
 import { galleryReferenceType } from "../generation/references";
 import type { GallerySelection } from "./useGallerySelection";
 import { mediaSource } from "./mediaSource";
+import { usePhone } from "../../ui/usePhone";
 export function MediaGrid({
   items,
   open,
@@ -23,8 +24,11 @@ export function MediaGrid({
     onOpenedChange: (opened: boolean) => void,
   ) => ReactNode;
 }) {
-  const phone = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
-  const compact = useMediaQuery("(max-width: 75em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
+  const { breakpoints } = useMantineTheme();
+  const compact = useMediaQuery(`(max-width: ${breakpoints.lg})`, false, {
+    getInitialValueInEffect: false,
+  });
   const columns = phone ? 2 : compact ? 3 : 5;
   const host = useRef<HTMLDivElement>(null),
     [width, setWidth] = useState(0);

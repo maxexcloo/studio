@@ -15,7 +15,6 @@ import {
   Title,
   UnstyledButton,
 } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
 import { ChevronDown, ChevronUp, Download, Ellipsis, SlidersHorizontal } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notifications } from "@mantine/notifications";
@@ -37,6 +36,7 @@ import {
   useShareWithoutSettings,
 } from "./mediaShare";
 import classes from "./MediaViewer.module.css";
+import { usePhone } from "../../ui/usePhone";
 
 function generationTitle(prompt = "") {
   const plain = prompt
@@ -66,7 +66,7 @@ export function MediaDetails({
   onDelete: () => void;
   onVersionChange: (id: string, active: boolean) => void;
 }) {
-  const narrow = useMediaQuery("(max-width: 48em)", false, { getInitialValueInEffect: false });
+  const phone = usePhone();
   const motionDuration = useMotionDuration();
   const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
   const download = mediaDownload(item, withoutSettings);
@@ -85,7 +85,7 @@ ${download.download}`;
     preparation.current = controller;
     setPreparedShare(null);
     setPreparingShare(false);
-    if (narrow && item.type === "image" && shareSupported && download.href) {
+    if (phone && item.type === "image" && shareSupported && download.href) {
       setPreparingShare(true);
       void prepareMediaShare(download, controller.signal)
         .then((file) => {
@@ -97,7 +97,7 @@ ${download.download}`;
         });
     }
     return () => preparation.current?.abort();
-  }, [transferKey, item.type, narrow, shareSupported]);
+  }, [transferKey, item.type, phone, shareSupported]);
   async function share() {
     if (!shareFile) {
       setPreparingShare(true);
@@ -164,13 +164,13 @@ ${download.download}`;
     >
       <Stack gap="xs" className={classes.railContent}>
         <UnstyledButton
-          component={narrow ? "button" : "div"}
+          component={phone ? "button" : "div"}
           className={classes.handle}
-          aria-label={narrow ? "Generation Details" : undefined}
-          aria-expanded={narrow ? details : undefined}
-          aria-controls={narrow ? detailsId : undefined}
+          aria-label={phone ? "Generation Details" : undefined}
+          aria-expanded={phone ? details : undefined}
+          aria-controls={phone ? detailsId : undefined}
           onPointerDown={(event: PointerEvent<HTMLElement>) => {
-            if (!narrow) return;
+            if (!phone) return;
             swipe.current = { x: event.clientX, y: event.clientY, moved: false };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
@@ -189,7 +189,7 @@ ${download.download}`;
             swipe.current = null;
           }}
           onClick={() => {
-            if (narrow && !swipe.current?.moved) setDetails((value) => !value);
+            if (phone && !swipe.current?.moved) setDetails((value) => !value);
             swipe.current = null;
           }}
         >
@@ -205,11 +205,11 @@ ${download.download}`;
                 {item.model ? ` · ${item.model}` : ""}
               </Text>
             </Stack>
-            {narrow && (details ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
+            {phone && (details ? <ChevronDown size={16} /> : <ChevronUp size={16} />)}
           </Group>
         </UnstyledButton>
         <Collapse
-          expanded={!narrow || details}
+          expanded={!phone || details}
           id={detailsId}
           transitionDuration={motionDuration}
           className={classes.detailsCollapse}
@@ -309,7 +309,7 @@ ${download.download}`;
                   Copy Image
                 </Menu.Item>
               )}
-              {item.url && narrow && shareSupported && (
+              {item.url && phone && shareSupported && (
                 <Menu.Item h={36} disabled={preparingShare || sharing} onClick={() => void share()}>
                   {shareFile ? "Share" : "Prepare Share"}
                 </Menu.Item>
