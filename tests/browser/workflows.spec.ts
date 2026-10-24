@@ -529,7 +529,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
     page.getByRole("region", { name: "Your Account" }).getByText("Administrator", { exact: true }),
   ).toBeVisible();
   await section(page, "Settings", "Workers");
-  await expect(page.getByRole("heading", { name: "Runtime", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Workers", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
     "Image Worker",
   );

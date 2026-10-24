@@ -16,7 +16,6 @@ import {
   Table,
   Text,
   TextInput,
-  Title,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -285,11 +284,6 @@ export function AccountAdmin() {
   return (
     <Paper>
       <Stack gap="lg">
-        <Title order={3}>Users & Access</Title>
-        <Text c="dimmed" size="sm">
-          Assign access groups to control each user’s local models, cloud models and NSFW access.
-          Administrator accounts have all permissions.
-        </Text>
         <Table.ScrollContainer minWidth={760}>
           <Table aria-label="User Accounts" verticalSpacing="sm" highlightOnHover>
             <Table.Thead>

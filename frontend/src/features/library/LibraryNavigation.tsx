@@ -1,15 +1,59 @@
+import {
+  BookOpen,
+  Boxes,
+  Download,
+  HardDriveDownload,
+  Layers,
+  Sparkles,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useAccount } from "../auth/AccountGate";
-import { WorkspaceSectionSelect } from "../../ui/WorkspaceSections";
+import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 import { useLibraryAccess } from "./useLibraryAccess";
 
 export const librarySections = {
-  imports: { value: "imports", label: "Imports" },
-  presets: { value: "presets", label: "Inspiration" },
-  models: { value: "models", label: "Models" },
-  loras: { value: "loras", label: "LoRAs" },
-  downloads: { value: "downloads", label: "Downloads" },
-  profiles: { value: "profiles", label: "Profiles" },
-  guides: { value: "guides", label: "Guides" },
+  imports: {
+    label: "Imports",
+    description:
+      "Import a Civitai or Hugging Face link, or an image, and review its compatibility.",
+    icon: Download,
+    admin: true,
+  },
+  presets: {
+    label: "Inspiration",
+    description: "Saved prompts and settings to start new work from.",
+    icon: Sparkles,
+    admin: true,
+  },
+  models: {
+    label: "Models",
+    description: "Base models installed or available to download.",
+    icon: Boxes,
+  },
+  loras: {
+    label: "LoRAs",
+    description: "Style and subject adapters for compatible models.",
+    icon: Layers,
+  },
+  downloads: {
+    label: "Downloads",
+    description: "Model downloads in progress and recently finished.",
+    icon: HardDriveDownload,
+    admin: true,
+  },
+  profiles: {
+    label: "Profiles",
+    description:
+      "Generation profiles that connect models to workflows. Every saved version is kept.",
+    icon: SlidersHorizontal,
+    admin: true,
+  },
+  guides: {
+    label: "Guides",
+    description: "Prompting guides for the prompt assistant. Every saved version is kept.",
+    icon: BookOpen,
+    admin: true,
+  },
 };
 export function useLibraryNavigation() {
   const account = useAccount();
@@ -20,10 +64,10 @@ export function useLibraryNavigation() {
   return {
     admin,
     imports: admin && presets,
-    options: Object.values(librarySections).filter((section) =>
-      ["imports", "presets"].includes(section.value)
-        ? admin && presets
-        : admin || !["downloads", "profiles", "guides"].includes(section.value),
+    options: visibleSections(
+      librarySections,
+      admin,
+      (key) => presets || (key !== "imports" && key !== "presets"),
     ),
   };
 }
