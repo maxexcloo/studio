@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-10-24
+
 > Krea 2 rebalance for Radiance image generation
 
 ### Added
@@ -1847,7 +1849,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.2...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.49.0...HEAD
+[0.49.0]: https://github.com/maxexcloo/studio/compare/v0.48.2...v0.49.0
 [0.48.2]: https://github.com/maxexcloo/studio/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/maxexcloo/studio/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
