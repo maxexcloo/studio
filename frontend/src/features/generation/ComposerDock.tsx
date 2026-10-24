@@ -7,6 +7,7 @@ import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
+import classes from "./ComposerDock.module.css";
 function GenerationScrollArea(props: ScrollAreaProps) {
   return (
     <ScrollArea
@@ -127,7 +128,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     <>
       <div
         ref={dockRef}
-        className="studio-composer-dock"
+        className={classes.dock}
+        data-composer-dock
+        data-chat={chat ? true : undefined}
         hidden={!chat && phone && opened}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
@@ -188,7 +191,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             p={8}
             radius="xl"
             shadow="xl"
-            className="studio-composer-surface"
+            className={classes.surface}
             hidden={!chat && opened}
             inert={!chat && opened}
             onClick={(event) => {
@@ -217,7 +220,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
                 p="md"
                 radius="xl"
                 shadow="xl"
-                className="studio-composer-surface"
+                className={classes.surface}
                 style={{ ...styles, position: "absolute", bottom: 0, width: "100%" }}
               >
                 <div
@@ -245,7 +248,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               flex: 1,
               display: "flex",
               flexDirection: "column",
-              paddingBottom: "max(var(--mantine-spacing-md), env(safe-area-inset-bottom))",
+              paddingBottom: 0,
             },
           }}
           opened={opened}
@@ -258,8 +261,9 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           returnFocus={false}
           onExitTransitionEnd={focusCompact}
         >
-          <div className="studio-generation-panel" aria-hidden={!opened} inert={!opened}>
+          <div className={classes.panel} aria-hidden={!opened} inert={!opened}>
             <GenerationForm
+              fill
               onSubmitted={collapse}
               autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}
             />

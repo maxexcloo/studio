@@ -8,6 +8,7 @@ import {
   FileButton,
   Group,
   Image,
+  Indicator,
   Pill,
   Popover,
   ScrollArea,
@@ -43,6 +44,7 @@ import { useReferenceUpload } from "./useReferenceUpload";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { chipProps } from "./chip";
 
 export function ReferencePicker({
   compact = false,
@@ -417,6 +419,9 @@ export function ReferencePicker({
       <Button onClick={close}>Use References</Button>
     </Stack>
   );
+  const missing = profile?.mediaInputs?.some(
+    (slot) => slot.required && !references.some((asset) => asset.slot === slot.id),
+  );
   const trigger = compact ? (
     <ActionIcon
       aria-label="Choose References"
@@ -439,12 +444,40 @@ export function ReferencePicker({
     </ActionIcon>
   ) : (
     <Button
+      {...chipProps}
       aria-label="Choose References"
-      variant="default"
-      size="md"
+      color={missing ? "yellow" : undefined}
+      variant={missing ? "outline" : chipProps.variant}
+      leftSection={<ImagePlus size={16} />}
       onClick={() => setOpened(true)}
     >
-      Add Reference
+      {references.length ? (
+        <Group gap={6} wrap="nowrap" component="span">
+          {references.map((asset, index) => (
+            <Indicator
+              key={`${asset.slot}:${asset.id}`}
+              component="span"
+              label={index + 1}
+              size={14}
+              offset={7}
+              position="bottom-end"
+              color="dark"
+              fz={9}
+            >
+              <Image
+                src={asset.thumbnailUrl || asset.url}
+                alt={referenceLabel(asset, index, profile)}
+                h={24}
+                w={24}
+                radius="sm"
+                fallbackSrc=""
+              />
+            </Indicator>
+          ))}
+        </Group>
+      ) : (
+        "References"
+      )}
     </Button>
   );
   if (inline && opened)

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Group, Menu, Select, Stack, Text } from "@mantine/core";
+import { ActionIcon, Button, Group, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ChevronDown, Square } from "lucide-react";
+import { Sparkles, Square } from "lucide-react";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
@@ -49,7 +49,8 @@ async function referenceImage(asset: ReferenceAsset, signal: AbortSignal) {
   }
 }
 
-export function PromptAssistant({
+/** The prompt box's assistance action and any LoRA suggestions it produced. */
+export function usePromptAssistant({
   input,
   profile,
   onChange,
@@ -243,68 +244,71 @@ export function PromptAssistant({
         : {}),
     });
   }
-  if (!info?.available || !profile || !info.presets.length) return null;
+  if (!info?.available || !profile || !info.presets.length)
+    return { action: null, suggestions: null };
   const disabled = !input.prompt.trim() || assistance.isPending;
-  return (
-    <Stack gap="xs">
-      <Group gap="xs" wrap="nowrap">
-        <Select
-          aria-label="Assistance Style"
-          size="xs"
-          data={info.presets.map(({ id, label }) => ({ value: id, label }))}
-          value={preset?.id || null}
-          onChange={setPresetId}
-          allowDeselect={false}
-          comboboxProps={{ withinPortal: true }}
-          disabled={assistance.isPending}
-          style={{ flex: 1, minWidth: 0 }}
-        />
-        {assistance.isPending ? (
-          <Button
-            size="xs"
-            variant="light"
-            w={170}
-            leftSection={<Square size={13} />}
-            aria-label="Stop Assistance"
-            onClick={() => {
-              controller.current?.abort();
-              notifications.show({ message: "Assistance stopped" });
-            }}
-          >
-            Stop Assistance
-          </Button>
-        ) : (
-          <Menu withinPortal position="bottom-end">
-            <Menu.Target>
-              <Button variant="light" size="xs" rightSection={<ChevronDown size={14} />} w={170}>
-                Prompt Assistance
-              </Button>
-            </Menu.Target>
-            <Menu.Dropdown data-composer-layer>
-              <Menu.Item disabled={disabled} onClick={() => assistance.mutate("rewrite")}>
-                Improve Prompt
-              </Menu.Item>
-              {negativeOffered && (
-                <Menu.Item disabled={disabled} onClick={() => assistance.mutate("negative")}>
-                  Write Negative
-                </Menu.Item>
-              )}
-              {lorasOffered && (
-                <Menu.Item disabled={disabled} onClick={() => assistance.mutate("loras")}>
-                  Suggest LoRAs
-                </Menu.Item>
-              )}
-            </Menu.Dropdown>
-          </Menu>
+  const action = assistance.isPending ? (
+    <Tooltip label="Stop Assistance">
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label="Stop Assistance"
+        onClick={() => {
+          controller.current?.abort();
+          notifications.show({ message: "Assistance stopped" });
+        }}
+      >
+        <Square size={14} />
+      </ActionIcon>
+    </Tooltip>
+  ) : (
+    <Menu position="top-end" width={240}>
+      <Tooltip label="Prompt Assistance">
+        <Menu.Target>
+          <ActionIcon variant="subtle" color="gray" aria-label="Prompt Assistance">
+            <Sparkles size={16} />
+          </ActionIcon>
+        </Menu.Target>
+      </Tooltip>
+      <Menu.Dropdown data-composer-layer>
+        <Menu.Item disabled={disabled} onClick={() => assistance.mutate("rewrite")}>
+          Improve Prompt
+        </Menu.Item>
+        {negativeOffered && (
+          <Menu.Item disabled={disabled} onClick={() => assistance.mutate("negative")}>
+            Write Negative
+          </Menu.Item>
         )}
-      </Group>
-      {!!references.length && (
-        <Text size="xs" c="dimmed">
-          {info.vision
-            ? "Selected references are shared with the assistant when improving the prompt."
-            : "This assistant improves text without reading references."}
-        </Text>
-      )}
+        {lorasOffered && (
+          <Menu.Item disabled={disabled} onClick={() => assistance.mutate("loras")}>
+            Suggest LoRAs
+          </Menu.Item>
+        )}
+        {info.presets.length > 1 && (
+          <>
+            <Menu.Divider />
+            <Menu.Label>Assistance Style</Menu.Label>
+            <Menu.RadioGroup value={preset?.id} onChange={setPresetId}>
+              {info.presets.map((item) => (
+                <Menu.RadioItem key={item.id} value={item.id}>
+                  {item.label}
+                </Menu.RadioItem>
+              ))}
+            </Menu.RadioGroup>
+          </>
+        )}
+        {!!references.length && (
+          <Text size="xs" c="dimmed" px="sm" py={6}>
+            {info.vision
+              ? "Selected references are shared with the assistant when improving the prompt."
+              : "This assistant improves text without reading references."}
+          </Text>
+        )}
+      </Menu.Dropdown>
+    </Menu>
+  );
+  const list = suggestions.length ? (
+    <Stack gap="xs">
       {suggestions.map((item) => {
         const added = input.loras.some((lora) => lora.name === item.name);
         return (
@@ -333,5 +337,6 @@ export function PromptAssistant({
         );
       })}
     </Stack>
-  );
+  ) : null;
+  return { action, suggestions: list };
 }

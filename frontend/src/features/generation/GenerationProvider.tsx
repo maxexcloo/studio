@@ -88,15 +88,7 @@ function useGenerationState(workspace: Workspace) {
     video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
   };
   const drafts = useRef({ chat: { ...initialDrafts }, gallery: { ...initialDrafts } });
-  const options = {
-    mode: "controlled" as const,
-    initialValues: empty,
-    validate: {
-      input: {
-        prompt: (value: string) => (value.trim() ? null : "Describe what you want to create."),
-      },
-    },
-  };
+  const options = { mode: "controlled" as const, initialValues: empty };
   const chatForm = useForm<Draft>(options);
   const galleryForm = useForm<Draft>(options);
   const form = workspace === "chat" ? chatForm : galleryForm;

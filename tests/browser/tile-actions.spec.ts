@@ -187,7 +187,7 @@ for (const surface of ["tile", "viewer"]) {
       },
     });
     await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-    await page.getByRole("button", { name: "Saved Presets", exact: true }).click();
+    await page.getByRole("button", { name: "Presets", exact: true }).click();
     await page.getByRole("button", { name: "Current Direction", exact: true }).click();
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
@@ -202,7 +202,7 @@ for (const surface of ["tile", "viewer"]) {
     const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toHaveValue("Keep this separate visual direction");
     await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
-    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveValue(
+    await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
       "Image Fast",
     );
     await page.getByRole("button", { name: "Generate Image", exact: true }).click();

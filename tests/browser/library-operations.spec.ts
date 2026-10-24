@@ -141,7 +141,7 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
   await page.getByRole("option", { name: "Downloaded Model", exact: true }).click();
-  await expect(profile).toHaveValue("Downloaded Model");
+  await expect(profile).toHaveText("Downloaded Model");
   expect(studio.jobs).toHaveLength(1);
 });
 

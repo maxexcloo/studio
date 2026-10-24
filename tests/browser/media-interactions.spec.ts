@@ -63,8 +63,8 @@ test("Prompt paste and Chat file drop attach owned references before submission"
     await page
       .getByRole("textbox", { name: "Message", exact: true })
       .fill("Discuss the dropped reference");
-    await page.locator(".studio-composer-dock").dispatchEvent("dragover", { dataTransfer: files });
-    await page.locator(".studio-composer-dock").dispatchEvent("drop", { dataTransfer: files });
+    await page.locator("[data-composer-dock]").dispatchEvent("dragover", { dataTransfer: files });
+    await page.locator("[data-composer-dock]").dispatchEvent("drop", { dataTransfer: files });
     await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Send Message", exact: true }).click();
     await expect.poll(() => state.chatRequests.length).toBe(1);

@@ -616,3 +616,13 @@ export async function chooseView(page: Page, list: string, view: string) {
     .getByText(view, { exact: true })
     .click();
 }
+
+/** Runs `steps` with Expert Settings open: a popover on desktop, an inline panel on phones. */
+export async function withExpertSettings(page: Page, steps: () => Promise<void>) {
+  await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
+  await steps();
+  const done = page.getByRole("button", { name: "Done", exact: true });
+  if (await done.isVisible()) await done.click();
+  else await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Expert Settings", exact: true })).toBeHidden();
+}

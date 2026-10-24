@@ -80,8 +80,13 @@ export function generationInput(
   references: ReferenceAsset[],
 ) {
   const details = referenceDetails(references, input, profile);
+  const large =
+    input.kind === "image" &&
+    (Math.max(input.width, input.height) >= 2048 || input.width * input.height >= 2048 * 1152);
   return {
     ...input,
+    // 2K and larger draws decode in tiles, matching MCP's generation path.
+    ...(large ? { tiledDecode: true } : {}),
     profileId: profile?.id || input.profileId,
     model: profile?.model || input.model,
     workflow: profile?.workflow || input.workflow,
@@ -117,3 +122,18 @@ export function referencePatch(
       : {}),
   };
 }
+
+/** An adjustable numeric control's range, or null where the profile fixes or ignores it. */
+export function controlRange(
+  profile: Profile | undefined,
+  key: string,
+  fallback: { min?: number; max?: number; step?: number } = {},
+) {
+  if (profile?.capabilities[key] === false) return null;
+  const range = { ...fallback, ...profile?.constraints?.[key] };
+  return range.min !== undefined && range.min === range.max ? null : range;
+}
+
+/** The one Steps rule for every surface: shown only where the profile lets it change. */
+export const stepsRange = (profile?: Profile) =>
+  controlRange(profile, "steps", { min: 1, max: 200 });

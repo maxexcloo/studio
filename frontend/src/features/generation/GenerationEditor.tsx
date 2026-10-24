@@ -1,34 +1,33 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
+  ActionIcon,
   Alert,
-  AspectRatio,
   Box,
   Button,
+  Center,
   Group,
-  Image,
-  Paper,
   SegmentedControl,
   Stack,
-  Text,
   Textarea,
   Tooltip,
+  VisuallyHidden,
 } from "@mantine/core";
 import { useIsMutating } from "@tanstack/react-query";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Brush, Image as ImageIcon, RotateCcw, Video, X } from "lucide-react";
 import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { defaultProfile, useGeneration } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
-import { GenerationSettingsFields } from "./GenerationSettingsFields";
+import { ExpertSettings } from "./ExpertSettings";
+import { chipProps } from "./chip";
 import { LoraPicker, useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails } from "./payload";
-import { PromptAssistant } from "./PromptAssistant";
+import { usePromptAssistant } from "./PromptAssistant";
 import { PromptHistory } from "./PromptHistory";
 import { ReferencePicker } from "./ReferencePicker";
-import { ReferenceRoleControl } from "./ReferenceRoleControl";
-import { referenceLabel } from "./references";
 import { useReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
+import classes from "./GenerationEditor.module.css";
 const MaskEditor = lazy(() => import("./MaskEditor"));
 
 /** The one submit label and blocked reason shared by every generation editor. */
@@ -77,7 +76,7 @@ export function useSubmitState({
       : input.kind === "video"
         ? "Generate Video"
         : "Generate Image";
-  return { label, blockedReason: reason, requiredReference };
+  return { label, blockedReason: reason };
 }
 
 /** Keeps a blocked Generate focusable so its tooltip and description still explain why. */
@@ -118,7 +117,7 @@ export function GenerationEditor({
   presets,
   autoFocusPrompt = false,
   focusPrompt = false,
-  className,
+  fill = false,
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -140,16 +139,18 @@ export function GenerationEditor({
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount and again after a phone inline picker closes. */
   focusPrompt?: boolean;
-  className?: string;
+  /** Fills a phone Drawer that owns scrolling, keeping the actions at its safe bottom. */
+  fill?: boolean;
 }) {
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
+  const [expertOpen, setExpertOpen] = useState(false);
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
   const phone = usePhone();
-  const { label, blockedReason, requiredReference } = useSubmitState({
+  const { label, blockedReason } = useSubmitState({
     input,
     profile,
     references,
@@ -157,11 +158,19 @@ export function GenerationEditor({
     variation,
     blockedReason: callerReason,
   });
+  const assistant = usePromptAssistant({
+    scopeKey: assistantScope,
+    input,
+    profile,
+    references,
+    onChange,
+  });
+  const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen);
   useLayoutEffect(() => {
-    if (!focusPrompt || referenceOpen || loraPicker.opened) return;
+    if (!focusPrompt || inlineOpen) return;
     prompt.current?.focus({ preventScroll: true });
     prompt.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
-  }, [focusPrompt, referenceOpen, loraPicker.opened, models.isPending]);
+  }, [focusPrompt, inlineOpen, models.isPending]);
   if (models.isPending) return <LoadingState label="Loading Profiles" />;
   const details = referenceDetails(references, input, profile);
   const primary = primaryReference(details, profile);
@@ -186,18 +195,43 @@ export function GenerationEditor({
       onChange={onReferencesChange}
     />
   );
-  const inlinePanel =
-    phone && loraPicker.opened ? (
-      <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
-    ) : phone && referenceOpen ? (
-      referencePicker(true)
-    ) : null;
+  const expert = {
+    opened: expertOpen,
+    onOpenedChange: setExpertOpen,
+    hasReferences: !!details.length,
+  };
+  const inlinePanel = !phone ? null : loraPicker.opened ? (
+    <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
+  ) : referenceOpen ? (
+    // The reference panel's own actions sit above the phone's safe bottom.
+    <Box pb="env(safe-area-inset-bottom)">{referencePicker(true)}</Box>
+  ) : expertOpen ? (
+    <ExpertSettings inline input={input} profile={profile} onChange={onChange} {...expert} />
+  ) : null;
+  const mask = primary && profile?.capabilities?.inpaint && (
+    <Button.Group>
+      <Button {...chipProps} leftSection={<Brush size={15} />} onClick={() => setMaskOpen(true)}>
+        {input.inpaint ? "Edit Mask" : "Paint Mask"}
+      </Button>
+      {!!input.inpaint && (
+        <Button
+          {...chipProps}
+          px="xs"
+          aria-label="Remove Mask"
+          onClick={() => onChange({ inpaint: null })}
+        >
+          <X size={14} />
+        </Button>
+      )}
+    </Button.Group>
+  );
   return (
     <>
       {inlinePanel}
       <form
         data-generation-editor
-        className={className}
+        data-fill={fill || undefined}
+        className={classes.editor}
         style={{ display: inlinePanel ? "none" : undefined }}
         onKeyDown={(event) => submitShortcut(event, !!blockedReason || pending)}
         onSubmit={(event) => {
@@ -205,156 +239,121 @@ export function GenerationEditor({
           if (!blockedReason && !pending) onSubmit();
         }}
       >
-        <Box className="studio-generation-fields" aria-label="Generation Fields">
-          <Stack gap="md" pr={4}>
-            {profile?.ready === false && (
-              <Alert color="yellow">
-                This model needs additional files or worker nodes before it can run.
-              </Alert>
-            )}
-            {!profile && (
-              <Alert color="yellow">
-                {input.profileId && profiles.length
-                  ? "The selected profile is unavailable. Choose another model explicitly."
-                  : "No models are available. Check your worker and mounted configuration."}
-              </Alert>
-            )}
-            {models.error && <Alert color="red">{models.error.message}</Alert>}
-            <Textarea
-              ref={prompt}
-              data-expanded-prompt
-              variant={variation ? undefined : "unstyled"}
-              rightSection={
+        <div className={classes.fields} aria-label="Generation Fields">
+          {!profile && (
+            <Alert color="yellow">
+              {input.profileId && profiles.length
+                ? "The selected profile is unavailable. Choose another model explicitly."
+                : "No models are available. Check your worker and mounted configuration."}
+            </Alert>
+          )}
+          {models.error && <Alert color="red">{models.error.message}</Alert>}
+          <Textarea
+            ref={prompt}
+            data-expanded-prompt
+            classNames={{
+              root: classes.prompt,
+              wrapper: classes.promptWrapper,
+              input: classes.promptInput,
+            }}
+            variant="unstyled"
+            aria-label={variation ? "Variation Prompt" : "Prompt"}
+            data-autofocus={autoFocusPrompt || undefined}
+            placeholder={
+              input.kind === "image"
+                ? "Describe the image you want to create…"
+                : "Describe the motion and camera…"
+            }
+            // The phone editor gives the prompt all the room above the chips.
+            autosize={!fill}
+            minRows={3}
+            maxRows={10}
+            rightSection={
+              <Stack gap={4}>
                 <PromptHistory
                   kind="positive"
                   value={input.prompt}
                   onPick={(prompt) => onChange({ prompt })}
                 />
-              }
-              rightSectionPointerEvents="all"
-              rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 8 } }}
-              data-autofocus={autoFocusPrompt || undefined}
-              label={variation ? "Variation Prompt" : "Prompt"}
-              placeholder={
-                input.kind === "image"
-                  ? "Describe the image you want to create…"
-                  : "Describe the motion and camera…"
-              }
-              autosize
-              minRows={3}
-              maxRows={10}
-              value={input.prompt}
-              onChange={(event) => onChange({ prompt: event.currentTarget.value })}
-              required
-            />
-            <GenerationInputControls
-              loraPicker={loraPicker}
-              input={input}
-              profile={profile}
-              onChange={onChange}
-              references={supportsReferences ? referencePicker(false) : undefined}
-            />
-            <PromptAssistant
-              scopeKey={assistantScope}
-              input={input}
-              profile={profile}
-              references={references}
-              onChange={onChange}
-            />
-            {supportsReferences && (references.length > 0 || requiredReference) ? (
-              <Stack gap="xs">
-                {!!references.length && (
-                  <ReferenceRoleControl
-                    locked={Boolean(input.inpaint)}
-                    value={input.referenceRole}
-                    onChange={(referenceRole) => onChange({ referenceRole })}
-                  />
-                )}
-                {details.map((asset, index) => (
-                  <Paper withBorder key={`${asset.slot}:${asset.id}`} p="xs">
-                    <Group wrap="nowrap">
-                      <AspectRatio ratio={1} w={52}>
-                        <Image
-                          src={asset.thumbnailUrl || asset.url}
-                          alt={referenceLabel(asset, index, profile)}
-                          fallbackSrc=""
-                        />
-                      </AspectRatio>
-                      <Text size="sm" lineClamp={1} flex={1}>
-                        {referenceLabel(asset, index, profile)}
-                      </Text>
-                      <Button
-                        variant="subtle"
-                        size="compact-xs"
-                        onClick={() =>
-                          onReferencesChange(
-                            details.filter((a) => a.id !== asset.id || a.slot !== asset.slot),
-                          )
-                        }
-                      >
-                        Remove
-                      </Button>
-                    </Group>
-                  </Paper>
-                ))}
-                {requiredReference && (
-                  <Text size="xs" c="dimmed">
-                    This workflow requires a reference image.
-                  </Text>
-                )}
-                {primary && profile?.capabilities?.inpaint && (
-                  <Group>
-                    <Button variant="default" size="compact-sm" onClick={() => setMaskOpen(true)}>
-                      {input.inpaint ? "Edit Mask" : "Paint Mask"}
-                    </Button>
-                    {!!input.inpaint && (
-                      <Button
-                        variant="subtle"
-                        size="compact-sm"
-                        onClick={() => onChange({ inpaint: null })}
-                      >
-                        Remove Mask
-                      </Button>
-                    )}
-                  </Group>
-                )}
+                {assistant.action}
               </Stack>
-            ) : null}
-            <GenerationSettingsFields
-              input={input}
-              profile={profile}
-              onChange={onChange}
-              presets={presets}
-            />
-            {!!error && (
-              <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>
-            )}
-          </Stack>
-        </Box>
-        <Box className="studio-generation-footer">
-          <Group justify="space-between" gap="xs" wrap="wrap">
+            }
+            rightSectionWidth={40}
+            rightSectionPointerEvents="all"
+            rightSectionProps={{ style: { alignItems: "flex-start" } }}
+            value={input.prompt}
+            onChange={(event) => onChange({ prompt: event.currentTarget.value })}
+          />
+          {assistant.suggestions}
+          <GenerationInputControls
+            loraPicker={loraPicker}
+            input={input}
+            profile={profile}
+            onChange={onChange}
+            references={supportsReferences ? referencePicker(false) : undefined}
+            mask={mask}
+            presets={presets}
+            expert={expert}
+          />
+          {!!error && (
+            <Alert color="red">{error instanceof Error ? error.message : String(error)}</Alert>
+          )}
+        </div>
+        <div className={classes.footer} data-sticky={fill || undefined}>
+          <Group justify="space-between" gap="xs">
             <SegmentedControl
               aria-label="Generation Output"
-              size="xs"
+              size={phone ? "md" : "sm"}
+              radius="xl"
+              style={{ flexShrink: 0 }}
               value={input.kind}
               onChange={(value) => {
                 const kind = value as MediaKind;
                 onKindChange(kind, defaultProfile(models.data, kind));
               }}
+              // Phones show the mode tabs' icons so the actions fit one row.
               data={[
-                { value: "image", label: "Image" },
-                { value: "video", label: "Video" },
-              ]}
+                { value: "image", label: "Image", icon: ImageIcon },
+                { value: "video", label: "Video", icon: Video },
+              ].map(({ value, label, icon: Icon }) => ({
+                value,
+                label: phone ? (
+                  <Center>
+                    <Icon size={18} aria-hidden />
+                    <VisuallyHidden>{label}</VisuallyHidden>
+                  </Center>
+                ) : (
+                  label
+                ),
+              }))}
             />
-            <Group gap="xs" flex={1} justify="flex-end">
-              <Button variant="subtle" color="gray" size="sm" onClick={onClear}>
-                Clear
-              </Button>
-              <Tooltip label={blockedReason} disabled={!blockedReason}>
+            <Group gap="xs" wrap="nowrap" flex={phone ? "1 0 auto" : undefined} justify="flex-end">
+              {phone ? (
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size={44}
+                  aria-label="Clear"
+                  onClick={onClear}
+                >
+                  <RotateCcw size={18} />
+                </ActionIcon>
+              ) : (
+                <Button variant="subtle" color="gray" size="sm" onClick={onClear}>
+                  Clear
+                </Button>
+              )}
+              <Tooltip
+                label={blockedReason}
+                disabled={!blockedReason}
+                events={{ hover: true, focus: true, touch: true }}
+              >
                 <Button
                   type="submit"
-                  rightSection={<ArrowUp size={18} />}
-                  size="sm"
+                  radius="xl"
+                  rightSection={phone ? undefined : <ArrowUp size={18} />}
+                  size={phone ? "md" : "sm"}
+                  flex={phone ? 1 : undefined}
                   loading={pending}
                   {...blockedProps(blockedReason)}
                 >
@@ -363,7 +362,7 @@ export function GenerationEditor({
               </Tooltip>
             </Group>
           </Group>
-        </Box>
+        </div>
         {maskOpen && primary && (
           <Suspense fallback={null}>
             <MaskEditor

@@ -35,6 +35,8 @@ export interface Profile {
   aspectPolicy?: "manual" | "reference";
   constraints?: Record<string, { min?: number; max?: number; step?: number }>;
   aspectPresets?: { label: string; w: number; h: number }[];
+  /** Output sizes the model draws itself: "yes" or "maybe" per 2K/4K. */
+  native?: Partial<Record<"2k" | "4k", "yes" | "maybe">>;
 }
 export interface ReferenceAsset {
   id: string;
