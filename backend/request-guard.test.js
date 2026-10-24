@@ -37,8 +37,8 @@ function run(guard, { method = "POST", path = "/api/gallery/favorite", headers =
   return result;
 }
 
-const guard = requestGuard({ lan: () => false });
-const lanGuard = requestGuard({ lan: () => true, extraHosts: () => ["studio.tail1234.ts.net"] });
+const guard = requestGuard();
+const networkGuard = requestGuard({ network: true, extraHosts: () => ["studio.tail1234.ts.net"] });
 
 test("the studio's own page gets through: same origin plus the header or JSON", () => {
   assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-studio": "1" } }).passed);
@@ -112,7 +112,7 @@ test("DNS rebinding: a request naming another host is refused before anything ru
   );
 });
 
-test("hosts: loopback always, the machine's own addresses only in LAN mode, extra names when configured", () => {
+test("hosts: loopback always, the machine's own addresses only when listening on the network, extra names when configured", () => {
   for (const host of [
     "localhost:8787",
     "127.0.0.1:8787",
@@ -121,16 +121,16 @@ test("hosts: loopback always, the machine's own addresses only in LAN mode, extr
     "app.localhost",
   ])
     assert.ok(hostAllowed(host), host);
-  const lanAddress = Object.values(os.networkInterfaces())
+  const networkAddress = Object.values(os.networkInterfaces())
     .flat()
     .find((entry) => entry && !entry.internal && entry.family === "IPv4")?.address;
-  if (lanAddress) {
-    assert.equal(hostAllowed(`${lanAddress}:8787`), false);
-    assert.ok(hostAllowed(`${lanAddress}:8787`, { lan: true }));
+  if (networkAddress) {
+    assert.equal(hostAllowed(`${networkAddress}:8787`), false);
+    assert.ok(hostAllowed(`${networkAddress}:8787`, { network: true }));
   }
-  assert.equal(hostAllowed("192.0.2.77:8787", { lan: true }), false);
+  assert.equal(hostAllowed("192.0.2.77:8787", { network: true }), false);
   assert.ok(
-    run(lanGuard, {
+    run(networkGuard, {
       method: "GET",
       path: "/api/gallery",
       headers: { host: "studio.tail1234.ts.net:8788" },
@@ -156,29 +156,20 @@ test("a request through a proxy is never this computer", () => {
     });
     assert.equal(proxied.thisComputer, false, header);
     assert.equal(proxied.proxied, true);
-    assert.equal(proxied.network, false, "LAN mode off: nobody else");
-    assert.equal(
-      classifyClient(
-        { socket: { remoteAddress: "127.0.0.1" }, headers: { [header]: "x" } },
-        { lanActions: true },
-      ).network,
-      true,
-    );
   }
 });
 
-test("devices on the network are only let in with LAN mode on, and never from a public address", () => {
+test("another device is this computer only through a host-only container's private bridge", () => {
   const phone = { socket: { remoteAddress: "::ffff:192.168.1.40" }, headers: {} };
   assert.deepEqual(classifyClient(phone), {
     address: "192.168.1.40",
     proxied: false,
     thisComputer: false,
-    network: false,
   });
-  assert.equal(classifyClient(phone, { lanActions: true }).network, true);
+  assert.equal(classifyClient(phone, { hostOnly: true }).thisComputer, true);
   assert.equal(
-    classifyClient({ socket: { remoteAddress: "8.8.8.8" }, headers: {} }, { lanActions: true })
-      .network,
+    classifyClient({ socket: { remoteAddress: "8.8.8.8" }, headers: {} }, { hostOnly: true })
+      .thisComputer,
     false,
   );
   for (const address of [
@@ -202,7 +193,7 @@ test("only the dev proxy with the right token may say who is behind it", () => {
         socket: { remoteAddress: "127.0.0.1" },
         headers: { "x-studio-dev-token": token, "x-studio-dev-client": client },
       },
-      { lanActions: true, devToken: "secret-token" },
+      { devToken: "secret-token" },
     );
   assert.equal(viaVite("secret-token").thisComputer, false);
   assert.equal(viaVite("secret-token").address, "192.168.1.40");

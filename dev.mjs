@@ -7,11 +7,11 @@ import { parseArgs } from "node:util";
 import { migrateRuntime } from "./backend/persistence/migration.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-const { values } = parseArgs({ options: { demo: { type: "boolean" }, lan: { type: "boolean" } } });
+const { values } = parseArgs({ options: { demo: { type: "boolean" } } });
 const dataDir = path.join(root, "data", values.demo ? "demo" : "development");
 const environment = {
   ...process.env,
-  HOST: values.lan ? "0.0.0.0" : "127.0.0.1",
+  HOST: "127.0.0.1",
   PORT: process.env.STUDIO_DEV_API_PORT || "18787",
   STUDIO_DEV_API_PORT: process.env.STUDIO_DEV_API_PORT || "18787",
   STUDIO_COMFY_SEARCH: "0",
@@ -50,11 +50,11 @@ const migration = migrateRuntime(dataDir, { apply: true });
 if (migration.conflicts.length) throw new Error(migration.conflicts.join("\n"));
 
 const children = [
-  spawn(
-    process.execPath,
-    ["--watch", "--watch-preserve-output", "backend/index.js", ...(values.lan ? ["--lan"] : [])],
-    { cwd: root, env: environment, stdio: "inherit" },
-  ),
+  spawn(process.execPath, ["--watch", "--watch-preserve-output", "backend/index.js"], {
+    cwd: root,
+    env: environment,
+    stdio: "inherit",
+  }),
   spawn(
     process.execPath,
     [

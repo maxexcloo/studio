@@ -171,8 +171,6 @@ export async function fixtures(page: Page) {
       body = request.postDataJSON() || {};
     } catch {}
     const respond = (value: unknown, status = 200) => route.fulfill({ status, json: value });
-    if (path === "/api/access/status")
-      return respond({ signedIn: true, canAdmin: true, studioPassword: { set: false } });
     if (path === "/api/accounts/me") {
       if (method === "PATCH") {
         if (body.displayName) ownAccount.displayName = body.displayName;

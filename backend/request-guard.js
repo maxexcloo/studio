@@ -9,7 +9,7 @@ import os from "node:os";
  * sites out:
  *
  * - The Host header must name this server: localhost, a loopback address, or
- *   (in LAN mode) this machine's own network addresses and names, plus any
+ *   (listening beyond this computer) this machine's own network addresses and names, plus any
  *   STUDIO_ALLOWED_HOSTS and the names on a configured HTTPS certificate. A
  *   page that rebinds its own domain to 127.0.0.1 (DNS rebinding) still sends
  *   its own name, so it gets nothing.
@@ -30,7 +30,7 @@ export const legacyStudioHeader = "x-heiss";
 /** On a 401 that a sign-in would fix; the page then shows its sign-in. */
 export const signInHeader = "X-Studio-Sign-In";
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
-const signOutPaths = new Set(["/api/accounts/sign-out", "/api/access/sign-out"]);
+const signOutPath = "/api/accounts/sign-out";
 
 /** "Localhost.:8787" -> "localhost", "[::1]:8787" -> "::1". "" when it cannot be read. */
 export function hostnameOf(hostHeader = "") {
@@ -44,7 +44,7 @@ export function hostnameOf(hostHeader = "") {
   return plain ? plain[1] : "";
 }
 
-/** This machine's own addresses and names, for LAN mode. Rebuilt every few seconds: Wi-Fi changes. */
+/** This machine's own addresses and names. Rebuilt every few seconds: Wi-Fi changes. */
 let ownNames = { at: 0, names: new Set() };
 function machineNames() {
   if (Date.now() - ownNames.at < 5000) return ownNames.names;
@@ -80,10 +80,10 @@ export function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") 
 }
 
 /**
- * Whether a Host header names this server. `lan`: LAN mode is on, so its
+ * Whether a Host header names this server. `network`: it listens beyond this computer, so its
  * network addresses count. `extra`: more names (the HTTPS certificate's).
  */
-export function hostAllowed(hostHeader, { lan = false, extra = [] } = {}) {
+export function hostAllowed(hostHeader, { network = false, extra = [] } = {}) {
   const name = hostnameOf(hostHeader);
   if (!name) return false;
   if (name === "localhost" || name.endsWith(".localhost")) return true;
@@ -99,7 +99,7 @@ export function hostAllowed(hostHeader, { lan = false, extra = [] } = {}) {
   )
     return true;
   if (configuredHosts().includes(name)) return true;
-  return lan && machineNames().has(name);
+  return network && machineNames().has(name);
 }
 
 /** The browser says the request comes from the studio's own page (or from no page: typed, bookmarked). */
@@ -121,13 +121,13 @@ function refuse(res, reason, error) {
 }
 
 /**
- * The middleware. `lan()` says whether LAN mode is on, `extraHosts()` returns
- * the certificate's names; both are asked per request so they follow changes.
+ * The middleware. `network`: as for hostAllowed. `extraHosts()` returns the certificate's names,
+ * asked per request so they follow changes.
  */
-export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) {
+export function requestGuard({ network = false, extraHosts = () => [] } = {}) {
   return (req, res, next) => {
     if (!gatedPath(req.path)) return next();
-    if (!hostAllowed(req.headers.host, { lan: lan(), extra: extraHosts() })) {
+    if (!hostAllowed(req.headers.host, { network, extra: extraHosts() })) {
       refuse(
         res,
         "host",
@@ -153,7 +153,7 @@ export function requestGuard({ lan = () => false, extraHosts = () => [] } = {}) 
     }
     // Signing out only ever ends the sender's own session, so a plain same-origin POST (a console
     // fetch, a form) may do it; another site was already refused above.
-    const signOut = req.method === "POST" && signOutPaths.has(req.path);
+    const signOut = req.method === "POST" && req.path === signOutPath;
     if (
       !signOut &&
       !req.headers[studioHeader] &&

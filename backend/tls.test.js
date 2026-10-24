@@ -62,7 +62,7 @@ test("with a certificate, other devices get HTTPS and plain HTTP stays on this c
     httpsHost: "0.0.0.0",
     tlsProblem: "",
   });
-  // LAN mode off: nothing about HTTPS, nothing changes.
+  // Listening on localhost only: nothing about HTTPS, nothing changes.
   assert.deepEqual(listenPlan({ host: "127.0.0.1", tls: ready }), {
     httpHost: "127.0.0.1",
     httpsHost: "",

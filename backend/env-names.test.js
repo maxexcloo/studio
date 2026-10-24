@@ -10,10 +10,10 @@ import {
   currentEnvName,
   legacyEnvName,
   legacyEnvNotice,
+  readEnvFile,
   renamedSettings,
   shadowedLegacyEnvNames,
 } from "./env-names.js";
-import { readEnvFile, resolveLan } from "./lan.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,10 +28,10 @@ test("every old HEISS_* setting maps to its STUDIO_* name and back", () => {
 });
 
 test("an old name fills the new one only when the new one is unset", () => {
-  const env = { HEISS_DATA_DIR: "/old", HEISS_LAN: "1", STUDIO_LAN: "0", HEISS_UNKNOWN: "x" };
+  const env = { HEISS_DATA_DIR: "/old", HEISS_DEMO: "1", STUDIO_DEMO: "0", HEISS_UNKNOWN: "x" };
   assert.deepEqual(applyLegacyEnvNames(env), ["HEISS_DATA_DIR"]);
   assert.equal(env.STUDIO_DATA_DIR, "/old");
-  assert.equal(env.STUDIO_LAN, "0", "the new name wins");
+  assert.equal(env.STUDIO_DEMO, "0", "the new name wins");
   assert.equal(env.STUDIO_UNKNOWN, undefined);
   // Limited to one source's keys.
   const limited = { HEISS_DEMO: "1", HEISS_TRASH_DAYS: "5" };
@@ -48,8 +48,8 @@ test("the deprecation notice is one line naming each old and new name", () => {
   const shadowed = shadowedLegacyEnvNames({
     HEISS_DATA_DIR: "/elsewhere",
     STUDIO_DATA_DIR: "/data",
-    HEISS_LAN: "1",
-    STUDIO_LAN: "1",
+    HEISS_DEMO: "1",
+    STUDIO_DEMO: "1",
   });
   assert.deepEqual(shadowed, ["HEISS_DATA_DIR"]);
   assert.match(
@@ -58,15 +58,14 @@ test("the deprecation notice is one line naming each old and new name", () => {
   );
 });
 
-test("the dev launcher's view of .env and the LAN switch read old names too", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lan-env-"));
+test("reading .env without loading it maps old names too", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-read-env-"));
   try {
-    fs.writeFileSync(path.join(dir, ".env"), "HEISS_LAN=1\nHEISS_DATA_DIR=/data\n");
+    fs.writeFileSync(path.join(dir, ".env"), "HEISS_DEMO=1\nHEISS_DATA_DIR=/data\n");
     const file = readEnvFile(dir);
-    assert.equal(file.values.STUDIO_LAN, "1");
+    assert.equal(file.values.STUDIO_DEMO, "1");
     assert.equal(file.values.STUDIO_DATA_DIR, "/data");
-    assert.ok(file.keys.has("STUDIO_LAN"));
-    assert.equal(resolveLan({ env: file.values, fileKeys: file.keys }).host, "0.0.0.0");
+    assert.ok(file.keys.has("STUDIO_DEMO"));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -88,25 +87,25 @@ test("old names from the shell and from Studio's settings file keep working, and
   try {
     fs.writeFileSync(
       file,
-      "HEISS_LAN=1\nHEISS_COMFY_SEARCH=0\nSTUDIO_TRASH_DAYS=9\nHEISS_TRASH_DAYS=3\n",
+      "HEISS_DEMO=1\nHEISS_COMFY_SEARCH=0\nSTUDIO_TRASH_DAYS=9\nHEISS_TRASH_DAYS=3\n",
     );
     const result = inChild(
       { HEISS_ENV_FILE: file, HEISS_DATA_DIR: "/shell-data", STUDIO_COMFY_SEARCH: "1" },
       `
       const env = await import("./backend/env.js");
-      const before = { data: process.env.STUDIO_DATA_DIR, lan: process.env.STUDIO_LAN, search: process.env.STUDIO_COMFY_SEARCH, trash: process.env.STUDIO_TRASH_DAYS,
-        lanFromFile: env.envFileKeys.has("STUDIO_LAN"), dataFromFile: env.envFileKeys.has("STUDIO_DATA_DIR"), used: [...env.legacyEnvInUse].sort() };
-      env.writeLocalEnvValue("STUDIO_LAN", "0");
+      const before = { data: process.env.STUDIO_DATA_DIR, demo: process.env.STUDIO_DEMO, search: process.env.STUDIO_COMFY_SEARCH, trash: process.env.STUDIO_TRASH_DAYS,
+        demoFromFile: env.envFileKeys.has("STUDIO_DEMO"), dataFromFile: env.envFileKeys.has("STUDIO_DATA_DIR"), used: [...env.legacyEnvInUse].sort() };
+      env.writeLocalEnvValue("STUDIO_DEMO", "0");
       env.removeLocalEnvValue("STUDIO_TRASH_DAYS");
-      console.log(JSON.stringify({ before, lan: process.env.STUDIO_LAN, trash: process.env.STUDIO_TRASH_DAYS ?? null, file: (await import("node:fs")).readFileSync(${JSON.stringify(file)}, "utf8") }));
+      console.log(JSON.stringify({ before, demo: process.env.STUDIO_DEMO, trash: process.env.STUDIO_TRASH_DAYS ?? null, file: (await import("node:fs")).readFileSync(${JSON.stringify(file)}, "utf8") }));
     `,
     );
     assert.equal(result.before.data, "/shell-data", "an old name from the shell");
-    assert.equal(result.before.lan, "1", "an old name from the settings file");
+    assert.equal(result.before.demo, "1", "an old name from the settings file");
     assert.equal(result.before.search, "1", "the new name wins over the old one");
     assert.equal(result.before.trash, "9", "the new name in the file wins over the old one there");
     assert.equal(
-      result.before.lanFromFile,
+      result.before.demoFromFile,
       true,
       "an old name from the file stays editable in Settings",
     );
@@ -115,10 +114,10 @@ test("old names from the shell and from Studio's settings file keep working, and
       false,
       "an old name from the shell stays the deployment's",
     );
-    assert.deepEqual(result.before.used, ["HEISS_DATA_DIR", "HEISS_ENV_FILE", "HEISS_LAN"]);
-    assert.equal(result.lan, "0");
+    assert.deepEqual(result.before.used, ["HEISS_DATA_DIR", "HEISS_DEMO", "HEISS_ENV_FILE"]);
+    assert.equal(result.demo, "0");
     assert.equal(result.trash, null);
-    assert.equal(result.file, "STUDIO_LAN=0\nHEISS_COMFY_SEARCH=0\n");
+    assert.equal(result.file, "STUDIO_DEMO=0\nHEISS_COMFY_SEARCH=0\n");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

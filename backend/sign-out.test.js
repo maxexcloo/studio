@@ -44,7 +44,6 @@ test(
         STUDIO_DATA_DIR: data,
         STUDIO_ENV_FILE: path.join(data, "env"),
         STUDIO_DEMO: "1",
-        STUDIO_LAN: "0",
         HOST: "127.0.0.1",
         PORT: String(port),
         STUDIO_ALLOWED_HOSTS: "studio.example",

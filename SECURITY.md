@@ -1,6 +1,6 @@
 # Security
 
-Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuration › Multi-User Mode](CONFIGURATION.md#multi-user-mode)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-user mode](#single-user-mode-lan-and-the-studio-password).
+Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuration › Multi-User Mode](CONFIGURATION.md#multi-user-mode)): every request needs an account, including requests from the computer running it. Without that setting (the default) Studio is a single-user studio that answers only this computer, described at the end under [Single-user mode](#single-user-mode).
 
 ## Who may do what
 
@@ -35,20 +35,6 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 
 Please report security issues privately through a [GitHub security advisory](https://github.com/maxexcloo/studio/security/advisories/new) rather than a public issue.
 
-## Single-user mode: LAN and the studio password
+## Single-user mode
 
-Only without accounts (`STUDIO_MULTI_USER` unset). This mode is kept for a studio on your own computer and may be retired.
-
-By default a single-user studio answers only this computer: it listens on `127.0.0.1`, and nothing about it is reachable from your network.
-
-| Who                                                         | Can use the studio                 | Can look after the computer*                    | Can change the studio password, the admin switch, sign-ins |
-| ----------------------------------------------------------- | ---------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
-| This computer (`http://localhost:8787`)                     | Yes                                | Yes                                             | Yes                                                        |
-| A device signed in with the studio password (LAN mode)      | Yes                                | Only with **Trust other devices with admin** on | No                                                         |
-| A device that hasn't signed in, or LAN mode off             | No                                 | No                                              | No                                                         |
-| Anything reached through a proxy or tunnel on this computer | Like any other device: it signs in | Same as a device                                | No                                                         |
-
-- **Other devices** are only answered in LAN mode (**Settings › Workers › Open on other devices**, or `npm start -- --lan`), only from private network addresses, and only after signing in with the studio password, set on this computer. A sign-in lasts a week (`STUDIO_DEVICE_SESSION_DAYS`); **Sign out all devices** ends every one of them. Wrong passwords lock the device's address out for longer each time, one try at a time; the computer itself is never slowed down by them.
-- **Admin stays at the computer.** Looking after the computer is for the computer running Studio, and other devices don't show those controls. Turn on **Trust other devices with admin** (at the computer) to allow them from signed-in devices too. The studio password, that switch, HTTPS and signing devices out only change at the computer.
-- **Proxies.** A request that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar header is never treated as this computer, even though the proxy connects from it, and signs in like a phone. Only use a single-user studio behind a proxy or tunnel with LAN mode on and a studio password set, and list the name it is reached by in `STUDIO_ALLOWED_HOSTS`.
-- **HTTPS.** Over plain http, what devices send (the studio password too) crosses the network unencrypted. Under **Settings › Workers › Advanced › HTTPS for other devices**, add a certificate that browsers already trust, for example the two files `tailscale cert <machine>.<tailnet>.ts.net` writes (or set `STUDIO_TLS_CERT` and `STUDIO_TLS_KEY`). After a restart, other devices open `https://<that name>:8788` (`STUDIO_HTTPS_PORT`), cookies are marked `Secure`, and this computer keeps `http://localhost:8787`. There's no self-signed option, since a warning people learn to click through doesn't protect anything.
+Only without accounts (`STUDIO_MULTI_USER` unset), for development on your own computer. It answers only the computer running Studio, which also looks after it; there is no sign-in. A request from any other address, or one that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar proxy header, is refused, even when the proxy runs on the same computer. In Docker, publish the port on the host's `127.0.0.1` only and set `STUDIO_DOCKER_HOST_ONLY=1` ([Docker](DOCKER.md)). Use account mode for any other device.

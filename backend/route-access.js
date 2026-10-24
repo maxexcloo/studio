@@ -1,27 +1,23 @@
-import { canAdmin, clientOf, deviceSession } from "./access.js";
+import { canAdmin, clientOf } from "./access.js";
 
 import { multiUserEnabled } from "./multi-user-auth.js";
 
-/** This computer, or another device that signed in (the gate below has already checked). */
+/** This computer in single-user mode; an administrator in account mode. */
 export function requireLocal(req, res) {
   if (multiUserEnabled) {
     if (canAdmin(req)) return true;
     res.status(403).json({ ok: false, error: "This action is restricted to administrators." });
     return false;
   }
-  const client = clientOf(req);
-  if (client.thisComputer || (client.network && deviceSession(req))) return true;
-  res
-    .status(403)
-    .json({ ok: false, error: "Only this computer or a signed-in device can do this." });
+  if (clientOf(req).thisComputer) return true;
+  res.status(403).json({ ok: false, error: "Only this computer can do this." });
   return false;
 }
 
 /**
  * Looking after the computer (model folders and downloads, node installs,
  * ComfyUI's address and restarts, the output folder, updates and workflow
- * files) happens at that computer. A signed-in device may too
- * when the owner turned on "Trust other devices with admin" (access.js).
+ * files) happens at that computer, or by an administrator in account mode.
  * Anywhere else the server refuses them and the app hides them.
  */
 export function requireAdmin(req, res) {
@@ -29,8 +25,7 @@ export function requireAdmin(req, res) {
   res.status(403).json({
     ok: false,
     reason: "computer-only",
-    error:
-      "Do this on the computer running Studio. Other devices can be allowed in Settings › Connection.",
+    error: "Do this on the computer running Studio, or as an administrator.",
   });
   return false;
 }

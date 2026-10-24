@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, UserRound } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { post } from "../../api";
-import { ownAccountQuery, useAccess, useAccount } from "./AccountGate";
+import { ownAccountQuery, useAccount } from "./AccountGate";
 
 export function AccountMenuContent({
   accountFirst = false,
@@ -17,10 +17,9 @@ export function AccountMenuContent({
     client = useQueryClient();
   const account = useAccount(),
     multi = account.data?.mode === "multi-user";
-  const access = useAccess(!multi);
   const own = useQuery({ ...ownAccountQuery, enabled: multi });
   const signOut = useMutation({
-    mutationFn: () => post(multi ? "/api/accounts/sign-out" : "/api/access/sign-out"),
+    mutationFn: () => post("/api/accounts/sign-out"),
     onSuccess: () => {
       client.clear();
       window.location.assign("/");
@@ -28,10 +27,7 @@ export function AccountMenuContent({
   });
   const name = multi
     ? own.data?.account.displayName || own.data?.account.username || "Your Account"
-    : access.data?.thisComputer === false
-      ? "Studio User"
-      : "Single-User Development";
-  const canSignOut = multi || (access.data?.signedIn && access.data.thisComputer === false);
+    : "Single-User Development";
   const label = <Menu.Label>{name}</Menu.Label>;
   return (
     <>
@@ -45,9 +41,9 @@ export function AccountMenuContent({
         Account
       </Menu.Item>
       {children}
-      {(canSignOut || accountFirst) && <Menu.Divider />}
+      {(multi || accountFirst) && <Menu.Divider />}
       {accountFirst && label}
-      {canSignOut && (
+      {multi && (
         <Menu.Item
           leftSection={<LogOut size={16} />}
           disabled={signOut.isPending}

@@ -58,7 +58,6 @@ test.before(async () => {
       STUDIO_DATA_DIR: dataDir,
       STUDIO_ENV_FILE: path.join(dataDir, ".env"),
       STUDIO_OUTPUT_STORAGE: "studio",
-      STUDIO_LAN: "0",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],

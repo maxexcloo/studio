@@ -11,7 +11,6 @@ import sharp from "sharp";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_ENV_FILE = path.join(dir, ".env");
-process.env.STUDIO_LAN = "0";
 process.env.STUDIO_ENABLE_PRESETS = "1";
 delete process.env.CIVITAI_API_TOKEN;
 fs.writeFileSync(

@@ -78,7 +78,6 @@ async function start(
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
       COMFY_OUTPUT_DIR: "",
-      STUDIO_LAN: "0",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],

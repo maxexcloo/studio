@@ -13,10 +13,10 @@ import { normalizeFolderInput } from "./comfy.js";
  *   mkcert <name>                               (a local CA you install)
  *   a certificate for a domain you own
  *
- * STUDIO_TLS_CERT and STUDIO_TLS_KEY name the two PEM files (Settings ›
- * Connection writes them to .env). With both set and LAN mode on, other
- * devices get HTTPS on STUDIO_HTTPS_PORT (8788 unless set) and plain HTTP
- * answers this computer only, on localhost. Without LAN mode nothing changes.
+ * STUDIO_TLS_CERT and STUDIO_TLS_KEY name the two PEM files. With both set and
+ * Studio listening beyond this computer, other devices get HTTPS on
+ * STUDIO_HTTPS_PORT (8788 unless set) and plain HTTP answers this computer
+ * only, on localhost. Listening on localhost only, nothing changes.
  */
 
 export const httpsPort = (() => {

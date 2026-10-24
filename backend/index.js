@@ -96,9 +96,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
-  allowLanActions,
-  lan,
-  lanListening,
+  networkListening,
   demoMode,
   comfy,
   comfyRecentlyUnreachable,
@@ -119,9 +117,8 @@ import {
   setComfyUrl,
   setListeningPort,
 } from "./comfy.js";
-import { canAdmin, clientOf, deviceSession, migrateDeviceCookie } from "./access.js";
-import { registerAccessRoutes } from "./access-routes.js";
-import { hostAllowed, requestGuard, signInHeader } from "./request-guard.js";
+import { canAdmin, clientOf } from "./access.js";
+import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp.js";
 import { createHandoverStore, registerChatRoutes } from "./chat-handover.js";
 import { mcpOutputPath } from "./mcp-media.js";
@@ -321,7 +318,7 @@ const app = express();
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
-app.use(requestGuard({ lan: () => allowLanActions, extraHosts: tlsHostNames }));
+app.use(requestGuard({ network: networkListening, extraHosts: tlsHostNames }));
 async function resolveSignedMcpResult(owner, jobId, index) {
   if (!mayUseFeature(accountAccessForId(owner), "gallery")) return null;
   const item = gallery.find(
@@ -411,7 +408,7 @@ registerMcpRoutes(app, {
   claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) =>
-    hostAllowed(req.headers.host, { lan: allowLanActions, extra: tlsHostNames() }),
+    hostAllowed(req.headers.host, { network: networkListening, extra: tlsHostNames() }),
   accountMode: multiUserEnabled,
   authenticateAccountToken: verifyAccountMcpToken,
   authenticateGatewayIdentity: gatewayAccountAccess,
@@ -606,41 +603,22 @@ async function recoverGalleryFromHistory() {
 }
 
 /**
- * The gate for other devices. This computer goes straight through. Anyone
- * else is answered only in LAN mode, from a private network address (or
- * through a proxy, which always counts as someone else), and only once
- * signed in with the studio password. /api/access is how they sign in.
+ * The gate for everyone else. Account mode needs an account; single-user mode
+ * answers only this computer (a proxy always counts as someone else).
  */
 function requireSignedIn(req, res, next) {
   if (!gatedPath(req.path)) return next();
   if (multiUserEnabled) return enforceMultiUserRequest(req, res, next, { accountForRequest });
-  const client = clientOf(req);
-  if (client.thisComputer) return next();
-  if (!client.network) {
-    res.status(403).json({
-      ok: false,
-      reason: "lan-off",
-      error:
-        "Only this computer can open the studio. To use it on other devices, turn them on in Settings › Connection.",
-    });
-    return;
-  }
-  if (req.path.toLowerCase().startsWith("/api/access/")) return next();
-  if (!deviceSession(req)) {
-    res.setHeader(signInHeader, "1");
-    res.status(401).json({
-      ok: false,
-      reason: "sign-in",
-      error: "Sign in with the studio password to continue.",
-    });
-    return;
-  }
-  migrateDeviceCookie(req, res);
-  next();
+  if (clientOf(req).thisComputer) return next();
+  res.status(403).json({
+    ok: false,
+    reason: "this-computer",
+    error:
+      "Only this computer can open this single-user Studio. Use account mode (STUDIO_MULTI_USER=1) for other devices.",
+  });
 }
 
 app.use(requireSignedIn);
-registerAccessRoutes(app);
 registerRuntimeStatus(app, runtime, (req, res, next) => {
   if (requireAdmin(req, res)) next();
 });
@@ -3779,7 +3757,12 @@ const serverStartup = startServers(app, {
     );
     void (async () => {
       // Listening beyond this computer: say where a phone can open it.
-      if (lanListening && (host === "0.0.0.0" || host === "::") && !plan.tlsProblem) {
+      if (
+        multiUserEnabled &&
+        networkListening &&
+        (host === "0.0.0.0" || host === "::") &&
+        !plan.tlsProblem
+      ) {
         const addresses = plan.httpsHost
           ? startupTls.names
               .filter((name) => !name.startsWith("*."))

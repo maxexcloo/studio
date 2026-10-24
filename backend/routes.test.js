@@ -33,7 +33,6 @@ test.before(async () => {
       COMFY_URL: fake.url,
       STUDIO_DATA_DIR: dataDir,
       COMFY_OUTPUT_DIR: "",
-      STUDIO_LAN: "0",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],

@@ -1,15 +1,15 @@
 import crypto from "node:crypto";
 
 /**
- * Who is asking: this computer, another device on the network, or nobody we
- * answer. Every trust decision in the server goes through clientOf(req).
+ * Who is asking: this computer, or someone else. Every trust decision in the
+ * server goes through clientOf(req).
  *
  * "This computer" means the request arrived over loopback and nothing sat in
  * between. A reverse proxy or tunnel on the same machine (Caddy, nginx,
  * `tailscale serve`, cloudflared, ngrok) also connects over loopback, but for
  * someone else, so any proxy header makes a request remote, whatever its
- * socket says. Remote requests are then treated like any other device: they
- * are answered only in LAN mode, and only after signing in.
+ * socket says. Single-user Studio answers only this computer; account mode
+ * answers anyone with an account.
  *
  * The one proxy trusted to say who is behind it is Vite in `npm run dev`:
  * dev.mjs hands it and the server a random token, and Vite passes the
@@ -77,14 +77,18 @@ function tokenMatches(given, expected) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+/** Whether a server on this host answers other devices, not only this computer. */
+export function listensBeyondThisComputer(host = "") {
+  return !["127.0.0.1", "localhost", "::1", ""].includes(host);
+}
+
 /**
  * The facts about one request, worked out once:
  *   address       who the server thinks the client is
  *   proxied       something between the client and this server added headers
  *   thisComputer  the browser runs on the machine Studio runs on
- *   network       another device Studio may answer once it signs in (LAN mode)
  */
-export function classifyClient(req, { lanActions = false, devToken = "", hostOnly = false } = {}) {
+export function classifyClient(req, { devToken = "", hostOnly = false } = {}) {
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
   // Vite in `npm run dev`, vouched for by the token dev.mjs made.
@@ -97,8 +101,5 @@ export function classifyClient(req, { lanActions = false, devToken = "", hostOnl
   // address (the bridge gateway, 192.168.65.1 on Docker Desktop), never loopback.
   const thisComputer =
     !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
-  // Behind a proxy the real address is unknown (its header can be forged), so
-  // it counts as another device, and only when devices are let in at all.
-  const network = !thisComputer && lanActions && (proxied || isPrivateAddress(address));
-  return { address: proxied ? `proxied:${address}` : address, proxied, thisComputer, network };
+  return { address: proxied ? `proxied:${address}` : address, proxied, thisComputer };
 }
