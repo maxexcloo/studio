@@ -1,4 +1,15 @@
-export function copyText(text: string): Promise<void> {
+import { notifications } from "@mantine/notifications";
+import { failure } from "../api";
+
+/** Copies text and reports the outcome. LoraPicker still omits the label and reports it itself. */
+export function copyText(text: string, label?: string): Promise<void> {
+  const copied = writeText(text);
+  if (!label) return copied;
+  return copied.then(() => {
+    notifications.show({ message: `${label} copied` });
+  }, failure);
+}
+function writeText(text: string): Promise<void> {
   const fallback = () => {
     const input = document.createElement("textarea");
     input.value = text;

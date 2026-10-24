@@ -14,6 +14,7 @@ import {
 } from "@mantine/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, failure, post } from "../../api";
+import { StudioLogo } from "../../ui/StudioLogo";
 
 export interface AccountStatus {
   mode: string;
@@ -102,9 +103,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
       <Container size={420} w="100%" px={0}>
         <Stack gap="xl">
           <Stack gap="xs" align="center">
-            <Title order={1}>
-              Studio<span style={{ color: "var(--mantine-primary-color-filled)" }}>.</span>
-            </Title>
+            <StudioLogo order={1} />
             <Text c="dimmed" ta="center">
               Your creative workspace.
             </Text>

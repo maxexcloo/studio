@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 
 export function DeleteMediaDialog({
   opened,
@@ -41,46 +41,25 @@ export function DeleteMediaDialog({
       if (!failed.length) close();
     },
   });
-  function dismiss() {
-    if (deletion.isPending) return;
-    setFailedCount(0);
-    close();
-  }
   return (
-    <Modal
+    <ConfirmDialog
       opened={opened}
-      onClose={dismiss}
+      onClose={() => {
+        setFailedCount(0);
+        close();
+      }}
       title={ids.length === 1 ? "Delete Item" : "Delete Selected Items"}
-      centered
-      closeOnClickOutside={!deletion.isPending}
-      closeOnEscape={!deletion.isPending}
-      closeButtonProps={{ disabled: deletion.isPending }}
+      action="Delete"
+      pending={deletion.isPending}
+      disabled={!ids.length}
+      onConfirm={() => deletion.mutate(ids)}
+      error={
+        !!failedCount &&
+        `${failedCount} ${failedCount === 1 ? "item could" : "items could"} not be deleted. You can try again.`
+      }
     >
-      <Stack>
-        <Text size="sm">
-          Delete {ids.length} {ids.length === 1 ? "item" : "items"} from your gallery?
-          Studio-managed media files will also be deleted.
-        </Text>
-        {!!failedCount && (
-          <Alert color="red" title="Some Items Remain">
-            {failedCount} {failedCount === 1 ? "item could" : "items could"} not be deleted. You can
-            try again.
-          </Alert>
-        )}
-        <Group justify="flex-end">
-          <Button variant="default" disabled={deletion.isPending} onClick={dismiss}>
-            Cancel
-          </Button>
-          <Button
-            color="red"
-            loading={deletion.isPending}
-            disabled={!ids.length}
-            onClick={() => deletion.mutate(ids)}
-          >
-            Delete
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+      Delete {ids.length} {ids.length === 1 ? "item" : "items"} from your gallery? Studio-managed
+      media files will also be deleted.
+    </ConfirmDialog>
   );
 }

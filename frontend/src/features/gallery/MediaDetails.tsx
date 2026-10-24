@@ -314,14 +314,7 @@ ${download.download}`;
                   {shareFile ? "Share" : "Prepare Share"}
                 </Menu.Item>
               )}
-              <Menu.Item
-                h={36}
-                onClick={() => {
-                  void copyText(item.prompt || "")
-                    .then(() => notifications.show({ message: "Prompt copied" }))
-                    .catch(failure);
-                }}
-              >
+              <Menu.Item h={36} onClick={() => void copyText(item.prompt || "", "Prompt")}>
                 Copy Prompt
               </Menu.Item>
               <ReferenceMediaAction item={item} onApplied={onAction} />
