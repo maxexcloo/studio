@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useShareWithoutSettings } from "../gallery/mediaShare";
+import { useTileCaptions } from "../gallery/useGalleryLayout";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
@@ -35,6 +36,7 @@ export function StudioPreferences() {
     onSettled: () => void client.invalidateQueries({ queryKey: ["prompt-history"] }),
   });
   const [shareWithoutSettings, setShareWithoutSettings] = useShareWithoutSettings();
+  const [tileCaptions, setTileCaptions] = useTileCaptions();
   return (
     <Stack gap="lg">
       <SettingGroup title="Generation">
@@ -59,6 +61,18 @@ export function StudioPreferences() {
             aria-label="Share Without Settings"
             checked={shareWithoutSettings}
             onChange={(event) => setShareWithoutSettings(event.currentTarget.checked)}
+          />
+        </SettingRow>
+      </SettingGroup>
+      <SettingGroup title="Gallery">
+        <SettingRow
+          label="Tile Captions"
+          description="Show each tile’s title and details on phones. Desktop shows them on hover."
+        >
+          <Switch
+            aria-label="Tile Captions"
+            checked={tileCaptions}
+            onChange={(event) => setTileCaptions(event.currentTarget.checked)}
           />
         </SettingRow>
       </SettingGroup>
