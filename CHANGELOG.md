@@ -13,6 +13,10 @@ version opens with a `> ` summary line.
 
 > Media sessions, conversational iteration and durable jobs
 
+### Added
+
+- Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
+
 ### Changed
 
 - Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
