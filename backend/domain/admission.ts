@@ -2,16 +2,16 @@ import type { GenerationInput, GenerationOperation, QueueMedia } from "../../sha
 import { GenerationQueue } from "./queue.ts";
 import { RewriteStore, type QueueOrigin } from "./store.ts";
 
-type GenerationAccount = Record<string, unknown> & {
+export type GenerationAccount = Record<string, unknown> & {
   userId: string;
   role: string;
   authenticated?: boolean;
 };
-interface DomainResponse {
+export interface DomainResponse {
   status: number;
   payload: Record<string, unknown>;
 }
-interface GenerationScope {
+export interface GenerationScope {
   sessionId: string;
   operation: Exclude<GenerationOperation, "upscale">;
   parentJobId?: string;
