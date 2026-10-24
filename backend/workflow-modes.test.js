@@ -171,6 +171,14 @@ test("trusted optional adapter policy validates conditioning and full publisher 
     loras: [{ name: "style.safetensors", strength: 10 }],
   };
   assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
+  // A switched-off Trigger Words toggle stays with the run; anything but a boolean is refused.
+  const toggled = (triggers) => ({
+    ...request,
+    loras: [{ name: "style.safetensors", strength: 10, triggers }],
+  });
+  assert.equal(sanitizeGenerateBody(toggled(false), info).loras[0].triggers, false);
+  assert.equal("triggers" in sanitizeGenerateBody(toggled(true), info).loras[0], false);
+  assert.throws(() => sanitizeGenerateBody(toggled("off"), info), /Trigger Words on or off/);
   assert.throws(
     () =>
       sanitizeGenerateBody(

@@ -64,10 +64,13 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
     const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
     const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), profile);
     if (issue) throw new Error(issue);
+    if (item.triggers !== undefined && typeof item.triggers !== "boolean")
+      throw new Error(`LoRA “${name}” needs Trigger Words on or off.`);
     sanitized.push({
       name,
       enabled: true,
       strength,
+      ...(item.triggers === false ? { triggers: false } : {}),
     });
   }
   return sanitized;

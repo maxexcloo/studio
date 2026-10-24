@@ -83,7 +83,12 @@ function generationContext(input: GenerationInput) {
     result.loras = input.loras
       .slice(0, 8)
       .filter((item) => item && typeof item === "object")
-      .map((item) => ({ name: item.name, strength: item.strength, enabled: item.enabled }));
+      .map((item) => ({
+        name: item.name,
+        strength: item.strength,
+        enabled: item.enabled,
+        triggers: item.triggers,
+      }));
   if (input.inpaint) result.inpaint = { enabled: true };
   return result;
 }

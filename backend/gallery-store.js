@@ -1259,6 +1259,7 @@ export function generationSettings(body) {
           name: String(item.name || ""),
           enabled: true,
           strength: Number(item.strength ?? 0.7),
+          ...(item.triggers === false ? { triggers: false } : {}),
         }))
     : [];
   if (loras.length) settings.loras = loras;

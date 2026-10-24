@@ -2381,7 +2381,7 @@ test("negative prompts reach the submission only where they take effect", async 
   assert.equal(f.submitted.length, 1);
 });
 
-test("every prompt carries missing LoRA triggers, written ones also tags, and a guide’s recommended negative fills in unless the caller gives one", async (t) => {
+test("written prompts carry tag-trained LoRAs’ tags (Studio adds triggers), and a guide’s recommended negative fills in unless the caller gives one", async (t) => {
   const f = await fixture(t);
   const saved = loraInfo["fixture-unknown.safetensors"];
   loraInfo["fixture-unknown.safetensors"] = {
@@ -2413,18 +2413,15 @@ test("every prompt carries missing LoRA triggers, written ones also tags, and a 
   const client = await f.client();
   await call(client, "Models", { profile_id: imageProfile.id });
   const loras = [{ name: "fixture-effect" }, { name: "fixture-unknown" }];
-  // Written from the request (no writer here, so the request itself): triggers in, one line of tags, the guide's negative plus the LoRA's.
+  // Written from the request (no writer here, so the request itself): one line of tags, the guide's negative plus the LoRA's.
   await call(client, "Generate", {
     profile_id: imageProfile.id,
     request: "A lighthouse at dusk in ink",
     loras,
   });
-  assert.equal(
-    f.submitted.at(-1).prompt,
-    "inkstyle, A lighthouse at dusk in ink, glowfx\nink wash",
-  );
+  assert.equal(f.submitted.at(-1).prompt, "A lighthouse at dusk in ink\nink wash");
   assert.equal(f.submitted.at(-1).negative, "blurry, low quality, colour bleed");
-  // The caller's own negative wins, and an exact prompt keeps its words with only the missing triggers added (no tag line).
+  // The caller's own negative wins, and an exact prompt keeps its words (no tag line).
   await call(client, "Generate", {
     profile_id: imageProfile.id,
     request: "A lighthouse at dusk",
@@ -2434,14 +2431,14 @@ test("every prompt carries missing LoRA triggers, written ones also tags, and a 
   });
   assert.deepEqual(
     [f.submitted.at(-1).prompt, f.submitted.at(-1).negative],
-    ["inkstyle, A lighthouse at dusk, glowfx", "people"],
+    ["A lighthouse at dusk", "people"],
   );
   await call(client, "Generate", {
     profile_id: imageProfile.id,
     prompts: ["glowfx, a lighthouse"],
     loras,
   });
-  assert.equal(f.submitted.at(-1).prompt, "inkstyle, glowfx, a lighthouse");
+  assert.equal(f.submitted.at(-1).prompt, "glowfx, a lighthouse");
   // Nothing fills at cfg 1, nor where the guide calls a negative optional.
   await call(client, "Generate", { profile_id: imageProfile.id, request: "A tree", cfg: 1 });
   assert.equal(f.submitted.at(-1).negative, undefined);
@@ -2966,12 +2963,12 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
     }),
   );
   assert.equal(tweaked.jobs.length, 2);
-  // The LoRA's trigger joins the new prompt.
+  // The new prompt goes as written; /api/generate adds the LoRA's trigger.
   assert.deepEqual(
     f.submitted.slice(2).map((body) => [body.prompt, body.cfg]),
     [
-      ["A heron at dusk, glowfx", 4],
-      ["A heron at dusk, glowfx", 4],
+      ["A heron at dusk", 4],
+      ["A heron at dusk", 4],
     ],
   );
   assert.ok(
