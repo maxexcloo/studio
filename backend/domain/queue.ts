@@ -23,6 +23,17 @@ export interface QueueAdapter {
 export const terminalStatuses = new Set<QueueStatus>(["completed", "failed", "cancelled"]);
 const accepted = (job: OwnedJob) =>
   !terminalStatuses.has(job.status) && !["queued", "waiting"].includes(job.status);
+const started = (job: OwnedJob) => !["queued", "waiting", "cancelled"].includes(job.status);
+/** What a job loads on its resource: the model and its enabled LoRAs at their strengths. */
+const loadKey = (job: OwnedJob) =>
+  JSON.stringify([
+    job.input.profileId || job.input.model || "",
+    (Array.isArray(job.input.loras) ? job.input.loras : [])
+      .filter((lora) => lora && lora.enabled !== false)
+      .map((lora) => `${lora.name}@${lora.strength ?? ""}`)
+      .sort(),
+  ]);
+const reuseBypassLimit = 3;
 
 /** Only this database's recorded IDs reach the provider adapter. Restart never resubmits accepted work. */
 export class GenerationQueue {
@@ -32,6 +43,8 @@ export class GenerationQueue {
   private checkingEligibility = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private acceptedIds = new Set<string>();
+  /** Load key of the last job started on each resource. */
+  private loaded = new Map<string, string>();
   private stopped = false;
   readonly store: RewriteStore;
   readonly adapter: QueueAdapter;
@@ -39,9 +52,14 @@ export class GenerationQueue {
   constructor(store: RewriteStore, adapter: QueueAdapter) {
     this.store = store;
     this.adapter = adapter;
+    // One job runs per resource at a time, so after a restart the latest updated started job is what is loaded.
+    const latest = new Map<string, OwnedJob>();
     for (const job of store.jobs()) {
       if (accepted(job) || job.providerJobId) this.acceptedIds.add(job.id);
+      if (started(job) && !(job.updatedAt < (latest.get(job.resource)?.updatedAt ?? "")))
+        latest.set(job.resource, job);
     }
+    for (const [resource, job] of latest) this.loaded.set(resource, loadKey(job));
   }
 
   start() {
@@ -125,26 +143,18 @@ export class GenerationQueue {
         .filter((job) => !terminalStatuses.has(job.status) && this.acceptedIds.has(job.id))
         .map((job) => job.resource),
     );
+    const all = this.store.jobs();
+    const isStarted = (job: OwnedJob) => this.acceptedIds.has(job.id) || started(job);
     // A started MCP set finishes before anything else on its resource, so its jobs stay contiguous.
     const startedSets = new Set(
-      this.store
-        .jobs()
-        .filter(
-          (job) =>
-            job.queueSet &&
-            (this.acceptedIds.has(job.id) ||
-              !["queued", "waiting", "cancelled"].includes(job.status)),
-        )
-        .map((job) => job.queueSet),
+      all.filter((job) => job.queueSet && isStarted(job)).map((job) => job.queueSet),
     );
     const rank = (job: OwnedJob) =>
       job.queueSet && startedSets.has(job.queueSet) ? -1 : (job.priority ?? queuePriority.manual);
     const groups = new Map<string, OwnedJob[]>();
-    for (const job of this.store
-      .jobs()
-      .filter(
-        (item) => ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id),
-      )) {
+    for (const job of all.filter(
+      (item) => ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id),
+    )) {
       if (occupied.has(job.resource)) {
         this.store.save({
           ...job,
@@ -158,7 +168,25 @@ export class GenerationQueue {
       }
     }
     // Lower tiers wait while higher ones are queued (no aging); the stable sort keeps FIFO within a tier.
-    for (const candidates of groups.values()) candidates.sort((a, b) => rank(a) - rank(b));
+    // Within a tier, jobs reusing the loaded model and LoRAs go first, unless an older job of that tier
+    // has already been overtaken reuseBypassLimit times; then the tier runs strictly FIFO. Overtakes are
+    // counted from the stored jobs (later jobs of the same resource and tier that started), so the bound
+    // survives restarts. Started work is never pre-empted.
+    const position = new Map(all.map((job, index) => [job.id, index]));
+    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
+    const overtaken = (job: OwnedJob) =>
+      all
+        .slice(position.get(job.id)! + 1)
+        .filter((later) => later.resource === job.resource && tier(later) === tier(job))
+        .filter(isStarted).length;
+    for (const [resource, candidates] of groups) {
+      const fifo = new Set(
+        candidates.filter((job) => overtaken(job) >= reuseBypassLimit).map(rank),
+      );
+      const reuses = (job: OwnedJob) =>
+        fifo.has(rank(job)) || loadKey(job) !== this.loaded.get(resource) ? 1 : 0;
+      candidates.sort((a, b) => rank(a) - rank(b) || reuses(a) - reuses(b));
+    }
     await Promise.all(
       [...groups].map(async ([resource, candidates]) => {
         // Resource groups run independently. A slow cloud request or offline worker cannot hold the scheduler.
@@ -186,6 +214,7 @@ export class GenerationQueue {
             job = this.store.save({ ...job, status: "starting", reason: "" });
             // Persist starting before crossing the provider boundary: interrupted responses are never resubmitted.
             this.acceptedIds.add(job.id);
+            this.loaded.set(resource, loadKey(job));
             try {
               const observation = await this.adapter.submit(job);
               const latest = this.store.job(job.ownerId, job.id)!;
