@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActionIcon, Alert, Badge, Button, Group, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Group, Scroller, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Boxes,
   Layers,
+  MessageCircle,
   Ratio,
+  RotateCw,
   Ruler,
   Search,
   SlidersHorizontal,
@@ -19,18 +21,21 @@ import type { MediaKind } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { GalleryFilterPicker, type GalleryFilterOption } from "./GalleryFilterPicker";
+import classes from "./GalleryFilters.module.css";
 
 export interface GalleryFilterValues {
   model: string[];
   lora: string[];
   size: string[];
   aspect: string[];
+  chat: string[];
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
   model: [],
   lora: [],
   size: [],
   aspect: [],
+  chat: [],
 };
 export const hasGalleryFilters = (filters: GalleryFilterValues) =>
   Object.values(filters).some((values) => values.length > 0);
@@ -39,12 +44,18 @@ export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFi
     for (const value of values) params.append(key, value);
   return params;
 }
-interface GalleryFacets {
-  models: string[];
-  loras: string[];
-  sizes: GalleryFilterOption[];
-  aspects: GalleryFilterOption[];
-}
+export const galleryFacetsQuery = (kind?: MediaKind) =>
+  queryOptions({
+    queryKey: ["gallery-filters", kind || ""],
+    queryFn: () =>
+      api<{
+        models: string[];
+        loras: string[];
+        sizes: GalleryFilterOption[];
+        aspects: GalleryFilterOption[];
+        chats: GalleryFilterOption[];
+      }>(`/api/gallery/filters?type=${kind || ""}`),
+  });
 
 /** The gallery and reference picker share facets, labels and selection behaviour. */
 interface GalleryFiltersProps {
@@ -55,16 +66,22 @@ interface GalleryFiltersProps {
   onStarredChange: (value: boolean) => void;
   withinPortal?: boolean;
 }
+/**
+ * Normal, search and filter modes share one toolbar row. Search expands into a full-width input;
+ * filters expand into a row of labelled facets that apply as they change.
+ */
 export function GalleryFilterToolbar({
   query,
   onQueryChange,
   filtersInitiallyOpen = false,
+  leading,
   actions,
   ...props
 }: GalleryFiltersProps & {
   query: string;
   onQueryChange: (value: string) => void;
   filtersInitiallyOpen?: boolean;
+  leading?: ReactNode;
   actions?: ReactNode;
 }) {
   const [mode, setMode] = useState<"normal" | "search" | "filters">(
@@ -106,7 +123,7 @@ export function GalleryFilterToolbar({
   }
   if (mode === "search")
     return (
-      <Group ref={toolbar} mih={44} w="100%">
+      <Group key="search" ref={toolbar} mih={44} w="100%" className={classes.mode}>
         <SearchInput
           ref={searchInput}
           aria-label="Search Gallery"
@@ -128,15 +145,9 @@ export function GalleryFilterToolbar({
     );
   if (mode === "filters")
     return (
-      <Group ref={toolbar} gap={4} mih={44} wrap="nowrap">
+      <Group key="filters" ref={toolbar} gap={4} mih={44} wrap="nowrap" className={classes.mode}>
         <Tooltip label="Close Filters">
-          <ActionIcon
-            aria-label="Close Filters"
-            variant="subtle"
-            color="gray"
-            size={36}
-            onClick={dismiss}
-          >
+          <ActionIcon aria-label="Close Filters" variant="subtle" color="gray" onClick={dismiss}>
             <ArrowLeft size={18} />
           </ActionIcon>
         </Tooltip>
@@ -144,7 +155,7 @@ export function GalleryFilterToolbar({
       </Group>
     );
   return (
-    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap">
+    <Group key="normal" ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
       <Tooltip label="Search Gallery">
         <ActionIcon
           ref={searchButton}
@@ -153,12 +164,27 @@ export function GalleryFilterToolbar({
           onClick={() => setMode("search")}
           variant={query ? "light" : "subtle"}
           color={query ? undefined : "gray"}
-          size={36}
         >
           <Search size={19} />
         </ActionIcon>
       </Tooltip>
+      {leading}
       <Group gap="xs" ml="auto" wrap="nowrap">
+        {selectedCount > 0 && (
+          <Tooltip label="Clear Filters">
+            <ActionIcon
+              aria-label="Clear Filters"
+              variant="subtle"
+              color="gray"
+              onClick={() => {
+                props.onStarredChange(false);
+                props.onChange(emptyGalleryFilters);
+              }}
+            >
+              <X size={18} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         <Tooltip label="Gallery Filters">
           <ActionIcon
             ref={filtersButton}
@@ -166,7 +192,6 @@ export function GalleryFilterToolbar({
             aria-expanded={false}
             variant={selectedCount ? "light" : "subtle"}
             color={selectedCount ? undefined : "gray"}
-            size={36}
             pos="relative"
             onClick={() => setMode("filters")}
           >
@@ -193,11 +218,7 @@ function GalleryFilters({
   withinPortal,
 }: GalleryFiltersProps) {
   const { profiles } = useGenerationActions();
-  const facets = useQuery({
-    queryKey: ["gallery-filters", kind || ""],
-    queryFn: () => api<GalleryFacets>(`/api/gallery/filters?type=${kind || ""}`),
-    refetchInterval: 3000,
-  });
+  const facets = useQuery(galleryFacetsQuery(kind));
   const loraInfo = useQuery(loraInfoQuery);
   const modelLabels = new Map(
     profiles.flatMap((profile) =>
@@ -217,78 +238,81 @@ function GalleryFilters({
       label:
         key === "model" ? modelLabels.get(item) || item : loraInfo.data?.loras[item]?.title || item,
     }));
+  const picker = (
+    key: keyof GalleryFilterValues,
+    label: string,
+    icon: typeof Boxes,
+    choices: GalleryFilterOption[],
+    searchable = false,
+  ) => (
+    <GalleryFilterPicker
+      label={label}
+      withinPortal={withinPortal}
+      icon={icon}
+      options={choices}
+      value={value[key]}
+      onChange={(next) => onChange({ ...value, [key]: next })}
+      searchable={searchable}
+    />
+  );
+  const active = starred || hasGalleryFilters(value);
   return (
     <>
-      <Tooltip label="Only Starred">
-        <ActionIcon
-          aria-label="Starred"
-          aria-pressed={starred}
-          variant={starred ? "light" : "subtle"}
-          color={starred ? undefined : "gray"}
-          size={36}
-          onClick={() => onStarredChange(!starred)}
-        >
-          <Star size={19} fill={starred ? "currentColor" : "none"} />
-        </ActionIcon>
-      </Tooltip>
-      <GalleryFilterPicker
-        label="Models"
-        withinPortal={withinPortal}
-        icon={Boxes}
-        options={options("model")}
-        value={value.model}
-        onChange={(model) => onChange({ ...value, model })}
-        searchable
-      />
-      <GalleryFilterPicker
-        label="LoRAs"
-        withinPortal={withinPortal}
-        icon={Layers}
-        options={options("lora")}
-        value={value.lora}
-        onChange={(lora) => onChange({ ...value, lora })}
-        searchable
-      />
-      <GalleryFilterPicker
-        label="Size"
-        withinPortal={withinPortal}
-        icon={Ruler}
-        options={facets.data?.sizes || []}
-        value={value.size}
-        onChange={(size) => onChange({ ...value, size })}
-      />
-      <GalleryFilterPicker
-        label="Aspect Ratio"
-        withinPortal={withinPortal}
-        icon={Ratio}
-        options={facets.data?.aspects || []}
-        value={value.aspect}
-        onChange={(aspect) => onChange({ ...value, aspect })}
-      />
-      {(starred || hasGalleryFilters(value)) && (
-        <Tooltip label="Clear Filters">
-          <ActionIcon
-            aria-label="Clear Filters"
-            variant="subtle"
-            color="gray"
-            size={36}
-            ml="auto"
-            onClick={() => {
-              onStarredChange(false);
-              onChange(emptyGalleryFilters);
-            }}
+      <Scroller
+        className={classes.facets}
+        edgeGradientColor="var(--mantine-color-body)"
+        controlSize={28}
+      >
+        <Group gap={6} wrap="nowrap" py={4}>
+          {facets.error && (
+            <Tooltip label={facets.error.message}>
+              <Button
+                color="red"
+                variant="light"
+                size="compact-md"
+                radius="xl"
+                leftSection={<RotateCw size={15} />}
+                loading={facets.isFetching}
+                onClick={() => void facets.refetch()}
+              >
+                Couldn’t Load Filters
+              </Button>
+            </Tooltip>
+          )}
+          <Button
+            aria-label="Starred"
+            aria-pressed={starred}
+            variant={starred ? "light" : "default"}
+            size="compact-md"
+            radius="xl"
+            leftSection={<Star size={15} fill={starred ? "currentColor" : "none"} />}
+            onClick={() => onStarredChange(!starred)}
           >
-            <X size={19} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-      {facets.error && (
-        <Alert w="100%" color="red" title="Couldn’t Load Gallery Filters">
-          {facets.error.message}
-          <Button variant="subtle" onClick={() => void facets.refetch()}>
-            Try Again
+            Starred
           </Button>
-        </Alert>
+          {picker("model", "Models", Boxes, options("model"), true)}
+          {picker("lora", "LoRAs", Layers, options("lora"), true)}
+          {picker("size", "Size", Ruler, facets.data?.sizes || [])}
+          {picker("aspect", "Aspect Ratio", Ratio, facets.data?.aspects || [])}
+          {picker("chat", "Chats", MessageCircle, facets.data?.chats || [], true)}
+        </Group>
+      </Scroller>
+      {active && (
+        <Button
+          aria-label="Clear Filters"
+          variant="subtle"
+          color="gray"
+          size="compact-md"
+          radius="xl"
+          leftSection={<X size={15} />}
+          className={classes.clear}
+          onClick={() => {
+            onStarredChange(false);
+            onChange(emptyGalleryFilters);
+          }}
+        >
+          Clear
+        </Button>
       )}
     </>
   );
