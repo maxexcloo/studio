@@ -1,4 +1,12 @@
-import { lazy, Suspense, type ReactNode, type Ref } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { ActionIcon, Group, Stack, Tooltip } from "@mantine/core";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
 
@@ -11,9 +19,8 @@ export type OrderedItemsProps<T> = {
   kind: "references" | "loras";
 };
 
-const SortableOrderedItems = lazy(() => import("./SortableOrderedItems")) as <T>(
-  props: OrderedItemsProps<T>,
-) => ReactNode;
+const loadSortable = () => import("./SortableOrderedItems");
+const SortableOrderedItems = lazy(loadSortable) as <T>(props: OrderedItemsProps<T>) => ReactNode;
 
 export function OrderedItemRow({
   elementRef,
@@ -36,6 +43,23 @@ export function OrderedItemRow({
   move: (from: number, to: number) => void;
   children: ReactNode;
 }) {
+  const earlier = useRef<HTMLButtonElement>(null);
+  const later = useRef<HTMLButtonElement>(null);
+  const moved = useRef<"earlier" | "later">(undefined);
+  // Keyboard moves keep focus on the moved item, switching buttons at either end.
+  useLayoutEffect(() => {
+    if (!moved.current) return;
+    const target =
+      moved.current === "earlier"
+        ? index === 0
+          ? later
+          : earlier
+        : index === count - 1
+          ? earlier
+          : later;
+    target.current?.focus();
+    moved.current = undefined;
+  }, [index, count]);
   return (
     <Group
       ref={elementRef}
@@ -60,20 +84,28 @@ export function OrderedItemRow({
             </ActionIcon>
           </Tooltip>
           <ActionIcon
+            ref={earlier}
             aria-label={`Move ${label} Earlier`}
             variant="subtle"
             color="gray"
             disabled={index === 0}
-            onClick={() => move(index, index - 1)}
+            onClick={() => {
+              moved.current = "earlier";
+              move(index, index - 1);
+            }}
           >
             <ArrowUp size={14} />
           </ActionIcon>
           <ActionIcon
+            ref={later}
             aria-label={`Move ${label} Later`}
             variant="subtle"
             color="gray"
             disabled={index === count - 1}
-            onClick={() => move(index, index + 1)}
+            onClick={() => {
+              moved.current = "later";
+              move(index, index + 1);
+            }}
           >
             <ArrowDown size={14} />
           </ActionIcon>
@@ -86,6 +118,8 @@ export function OrderedItemRow({
 
 function PlainOrderedItems<T>(props: OrderedItemsProps<T>) {
   const { items, identity, label, onChange, children, kind } = props;
+  // Loads ordering ahead of a second item, so the list isn't replaced (and focus lost) when it arrives.
+  useEffect(() => void loadSortable(), []);
   return (
     <Stack gap="xs" role="list">
       {items.map((item, index) =>
