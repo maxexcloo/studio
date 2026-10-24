@@ -37,6 +37,7 @@ version opens with a `> ` summary line.
 - Let MCP Generate and Reuse wait inline only when Studio's generation-timing estimate says the set finishes within the 30-second wait; otherwise they return links at once with the expected wait (`eta_seconds`), one per set for several models. Without a named model, Generate lets the prompt writer pick the ready profile that suits the request and names the choice and its reason in one line. Results queued together come back as one contact-sheet image linking to All Results instead of one preview each.
 - Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
 - Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it. Civitai image imports get the same nearest installed stand-ins as dropped images, with Use Prompt and Use Settings.
+- Export profiles, guides and catalogues in the ai repository's flat layout (`profiles/`, `prompting.json` and the other files at the root, `EXPORT.json` format 2), the layout the seed already reads; older nested exports still seed.
 
 ### Removed
 
