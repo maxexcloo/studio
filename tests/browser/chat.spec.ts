@@ -148,7 +148,10 @@ test("Chats can be renamed and deleted with an opt-in results checklist", async 
   await title.press("Enter");
   await expect(list.getByRole("link", { name: /Watercolour Birds/ })).toBeVisible();
   expect(state.sessions[0]).toMatchObject({ title: "Watercolour Birds", titleSource: "user" });
-  if (isMobile) await page.keyboard.press("Escape");
+  if (isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+  }
   await expect(page.getByRole("heading", { name: "Watercolour Birds", exact: true })).toBeVisible();
 
   // A chat with work in progress refuses deletion and says why.

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import {
   Badge,
   Button,
@@ -97,7 +97,14 @@ function ResultTile({
       hold={hold}
       caption="none"
       className={single ? classes.single : undefined}
-      style={{ aspectRatio: `${width} / ${height}`, "--ratio": width / height } as CSSProperties}
+      style={
+        {
+          aspectRatio: `${width} / ${height}`,
+          "--ratio": width / height,
+          // A failed or cancelled run without results stays a compact notice.
+          ...(["error", "canceled"].includes(item.status) && { "--chat-media-height": "12rem" }),
+        } as CSSProperties
+      }
       onOpen={() => item.status === "done" && open(item)}
       onMenu={() => setMenu(true)}
       actions={
@@ -164,6 +171,7 @@ export function SessionIteration({
   parentIndex: number;
 }) {
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
   const { profiles } = useGenerationActions();
   const tiles = iterationTiles(job);
   const hold = useHoldToSelect(tiles, undefined);
@@ -206,7 +214,12 @@ export function SessionIteration({
             sessionId={job.sessionId}
             title={`Edit Iteration ${number}`}
             request={`Edit iteration ${number}`}
-            onClose={() => setEditing(false)}
+            onClose={(submitted) => {
+              setEditing(false);
+              // Closing returns focus to Edit; a submission follows the new iteration instead.
+              if (!submitted)
+                requestAnimationFrame(() => editButton.current?.focus({ preventScroll: true }));
+            }}
           />
         ) : (
           <>
@@ -243,6 +256,7 @@ export function SessionIteration({
               </Group>
               {job.operation !== "upscale" && (
                 <Button
+                  ref={editButton}
                   variant="subtle"
                   color="gray"
                   size="compact-md"
