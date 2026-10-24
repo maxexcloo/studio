@@ -235,18 +235,12 @@ export function usePromptAssistant({
       });
       return;
     }
-    const triggers = (suggestion.triggers || []).filter((trigger) => {
-      const escaped = trigger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return trigger.trim() && !new RegExp(`(?:^|\\W)${escaped}(?:$|\\W)`, "i").test(input.prompt);
-    });
+    // Studio adds enabled LoRAs' trigger words when it runs the prompt.
     applyChange("LoRA applied", {
       loras: [
         ...input.loras,
         { name: suggestion.name, strength: suggestion.strength, enabled: true },
       ],
-      ...(triggers.length
-        ? { prompt: [input.prompt.trim(), ...triggers].filter(Boolean).join(", ") }
-        : {}),
     });
   }
   if (!info?.available || !profile || !info.presets.length)
