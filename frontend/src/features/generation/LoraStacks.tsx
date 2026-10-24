@@ -13,7 +13,7 @@ import {
 } from "@mantine/core";
 import { Trash2 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import type { GenerationInput } from "../../types";
 type Loras = GenerationInput["loras"];
@@ -22,9 +22,15 @@ interface SavedStack {
   name: string;
   loras: Loras;
 }
-interface Library {
+export interface LoraLibrary {
   snapshots: Record<string, SavedStack[]>;
+  favorites?: string[];
 }
+/** The account's saved stacks and favourite LoRAs. */
+export const loraLibraryQuery = queryOptions({
+  queryKey: ["lora-library"],
+  queryFn: () => api<{ found: boolean; library: LoraLibrary }>("/api/loras/library"),
+});
 type Operation =
   | { op: "stack.add"; key: string; stack: SavedStack }
   | { op: "stack.update"; key: string; id: string; loras: Loras }
@@ -45,11 +51,7 @@ export function LoraStacks({
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState("");
   const cache = useQueryClient();
-  const library = useQuery({
-    queryKey: ["lora-library"],
-    queryFn: () => api<{ found: boolean; library: Library }>("/api/loras/library"),
-    enabled: opened === "stacks",
-  });
+  const library = useQuery(loraLibraryQuery);
   const familyKey = `family:${family || "other"}`;
   const keys = [...new Set([familyKey, profileId].filter(Boolean))];
   const records = keys.flatMap((key) =>
@@ -63,9 +65,9 @@ export function LoraStacks({
   const change = useMutation({
     meta: { inlineError: true },
     mutationFn: ({ ops }: { ops: Operation[]; deleted?: typeof current }) =>
-      post<{ library: Library }>("/api/loras/library/ops", { ops }),
+      post<{ library: LoraLibrary }>("/api/loras/library/ops", { ops }),
     onSuccess: ({ library }, request) => {
-      cache.setQueryData(["lora-library"], { found: true, library });
+      cache.setQueryData(loraLibraryQuery.queryKey, { found: true, library });
       if (request.deleted) {
         const { key, stack } = request.deleted;
         setSelected(null);
@@ -127,7 +129,11 @@ export function LoraStacks({
   return (
     <Accordion value={opened} onChange={setOpened} transitionDuration={0}>
       <Accordion.Item value="stacks">
-        <Accordion.Control>Saved LoRA Stacks</Accordion.Control>
+        <Accordion.Control>
+          <Text size="sm" fw={500}>
+            Saved LoRA Stacks
+          </Text>
+        </Accordion.Control>
         <Accordion.Panel>
           <Stack gap="sm">
             <Select

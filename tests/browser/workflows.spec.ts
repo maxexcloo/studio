@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   closeReferences,
+  closeLoras,
   create,
   fixtures,
   image,
@@ -293,10 +294,8 @@ test("Library shows import grades and reuses compatible inspiration settings", a
   );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
-  await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
-  await page.getByRole("combobox", { name: "LoRAs", exact: true }).press("Escape");
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await closeLoras(page);
   const close = page.getByRole("button", { name: "Close Generation Controls", exact: true });
   if (await close.isVisible()) await close.click();
   else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
@@ -478,18 +477,21 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await page.getByRole("combobox", { name: "LoRA Type", exact: true }).click();
-  await page.getByRole("option", { name: "Style", exact: true }).click();
-  await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
-  await page.getByRole("option", { name: "Soft Style", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Soft Style", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await page
+    .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
+    .getByText("Style", { exact: true })
+    .click();
+  await expect(page.getByRole("button", { name: "Detail Slider", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Soft Style Strength", exact: true }),
+  ).toBeVisible();
+  await closeLoras(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: "Other Quality", exact: true }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "LoRA Type", exact: true })).toHaveValue("");
-  await page.getByRole("combobox", { name: "LoRAs", exact: true }).click();
-  await page.getByRole("option", { name: "Other Detail", exact: true }).click();
+  await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+  await page.getByRole("button", { name: "Other Detail", exact: true }).click();
   await expect(
     page.getByRole("switch", { name: "Enable Other Detail", exact: true }),
   ).toBeChecked();
@@ -881,14 +883,16 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An ordered adapter study");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  const picker = page.getByRole("combobox", { name: "LoRAs", exact: true });
-  await picker.click();
-  await page.getByRole("option", { name: "Detail Slider", exact: true }).click();
-  await page.getByRole("option", { name: "Soft Style", exact: true }).click();
-  await picker.press("Escape");
+  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await page.getByRole("button", { name: "Soft Style", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Drag Soft Style", exact: true })).toBeEnabled();
   const earlier = page.getByRole("button", { name: "Move Soft Style Earlier", exact: true });
   await earlier.focus();
   await earlier.press("Enter");
+  // Focus stays on the moved LoRA, on the move that is still possible.
+  await expect(
+    page.getByRole("button", { name: "Move Soft Style Later", exact: true }),
+  ).toBeFocused();
   if (!testInfo.project.use.isMobile) {
     const drag = page.getByRole("button", { name: "Drag Detail Slider", exact: true });
     await drag.focus();
@@ -896,7 +900,7 @@ test("LoRA stack ordering is preserved in submitted inputs", async ({ page }, te
     await drag.press("ArrowUp");
     await drag.press("Space");
   }
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await closeLoras(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras.map((lora: { name: string }) => lora.name)).toEqual(
@@ -1082,7 +1086,7 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
   await enabled.check();
-  await page.getByRole("button", { name: "Use LoRAs", exact: true }).click();
+  await closeLoras(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "owned-asset", slot: "image" }]);

@@ -59,7 +59,7 @@ export async function fixtures(page: Page) {
   const loraLibrary = {
     strengths: {},
     snapshots: {} as Record<string, any[]>,
-    favorites: [],
+    favorites: [] as string[],
     recents: [],
   };
   const loraOperations: any[] = [];
@@ -282,12 +282,27 @@ export async function fixtures(page: Page) {
               (stack) => stack.id !== operation.id,
             );
             break;
+          case "favorite":
+            loraLibrary.favorites = operation.on
+              ? [...new Set([...loraLibrary.favorites, operation.name])]
+              : loraLibrary.favorites.filter((name) => name !== operation.name);
+            break;
           default:
             throw new Error(`Unsupported fixture LoRA operation: ${operation.op}`);
         }
       }
       return respond({ ok: true, library: loraLibrary });
     }
+    if (path === "/api/loras/previews")
+      return respond({
+        previews: Object.fromEntries(
+          gallery
+            .flatMap((item) =>
+              (item.settings?.loras || []).map((lora: any) => [lora.name, item.thumbnailUrl]),
+            )
+            .reverse(),
+        ),
+      });
     if (path === "/api/loras/info")
       return respond({
         loras: {
@@ -661,4 +676,12 @@ export async function closeReferences(page: Page) {
       .getByRole("radio", { checked: true })
       .press("Escape");
   await expect(references).toBeHidden();
+}
+
+/** Closes the LoRA picker: Use LoRAs on phones, Escape in the desktop popover. */
+export async function closeLoras(page: Page) {
+  const use = page.getByRole("button", { name: "Use LoRAs", exact: true });
+  if (await use.isVisible()) await use.click();
+  else await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeHidden();
 }
