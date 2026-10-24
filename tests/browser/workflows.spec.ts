@@ -965,7 +965,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("2 Selected");
+  await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(page.getByRole("link", { name: "Download Selected", exact: true })).toHaveAttribute(
     "href",
     /ids=selection-0%2Cselection-1/,

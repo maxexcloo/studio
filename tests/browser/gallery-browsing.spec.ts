@@ -38,16 +38,17 @@ test("Gallery continues near the bottom and retains loaded results when the next
   ).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => failed).toBe(true);
+  const retry = page.getByRole("button", { name: "Try Again", exact: true });
+  await expect(retry).toBeVisible({ timeout: 20000 });
   await expect(
-    page.getByText("More results could not be loaded. Try again.", { exact: true }),
-  ).toBeVisible({ timeout: 20000 });
-  await expect(page.locator(".studio-media-tile").first()).toBeVisible();
+    page.getByRole("button", { name: /^Open image: Browse Result/ }).first(),
+  ).toBeVisible();
   recovered = true;
-  await page.getByRole("button", { name: "Load More", exact: true }).click();
+  await retry.click();
   await expect(
     page.getByRole("button", { name: "Open image: Browse Result 60", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Load More", exact: true })).toBeHidden();
+  await expect(retry).toBeHidden();
 });
 
 test("Closing a navigated viewer reveals and focuses its current virtualised gallery tile", async ({
@@ -244,9 +245,10 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await expect(
       page.getByRole("checkbox", { name: "Select Failed third", exact: true }),
     ).toBeChecked();
+    // The accepted retry's new tiles replace its failed ones.
     await expect(
       page.getByRole("checkbox", { name: "Select Failed first", exact: true }),
-    ).not.toBeChecked();
+    ).toHaveCount(0);
     failSecond = false;
     await retry.click();
     await expect(selection.getByRole("status")).toHaveText("1 Selected");
@@ -257,4 +259,156 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   } finally {
     release();
   }
+});
+
+test("Runs fan a stacked run out in place, link its Chat and filter by it", async ({ page }) => {
+  const state = await fixtures(page);
+  state.sessions.push({ id: "chat-a", title: "Bird Chat", inputs: {}, createdAt: stamp });
+  state.gallery.push(
+    ...results(3).map((item, index) => ({
+      ...item,
+      id: `run-${index}`,
+      jobId: "run-job",
+      sessionId: "chat-a",
+      prompt: `Bird study ${index}`,
+    })),
+    ...results(1),
+  );
+  await page.goto("/images");
+  await page.getByText("Runs", { exact: true }).click();
+  const stack = page.getByRole("button", { name: "Run: Bird study 0, 3 Images", exact: true });
+  await stack.click();
+  await expect(stack).toHaveAttribute("aria-expanded", "true");
+  const run = page.getByRole("region", { name: "Run: Bird study 0", exact: true });
+  await expect(run.getByRole("button", { name: /^Open image: Bird study/ })).toHaveCount(3);
+  await expect(run.getByRole("link", { name: "Bird Chat", exact: true })).toHaveAttribute(
+    "href",
+    "/chat/chat-a",
+  );
+  await run.getByRole("button", { name: "Open image: Bird study 2", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await run.getByRole("button", { name: "Close Run", exact: true }).click();
+  await expect(run).toBeHidden();
+  await expect(stack).toHaveAttribute("aria-expanded", "false");
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Filter By Chats", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Bird Chat", exact: true }).check();
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
+    .toEqual(["chat-a"]);
+});
+
+test("Running tiles show progress with Cancel and Try Again replaces a failed tile", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const job = (id: string, status: string, extra = {}) => ({
+    id,
+    sessionId: "chat-a",
+    status,
+    operation: "image",
+    input: { kind: "image", prompt: id },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+    ...extra,
+  });
+  state.jobs.push(
+    job("live-job", "running", { progress: { value: 5, max: 10, phase: "Sampling" } }),
+    job("failed-job", "failed", { reason: "The worker ran out of memory." }),
+  );
+  state.gallery.push(
+    { ...results(1)[0], id: "live", jobId: "live-job", prompt: "Live study", status: "pending" },
+    {
+      ...results(1)[0],
+      id: "failed",
+      jobId: "failed-job",
+      prompt: "Failed study",
+      status: "error",
+    },
+  );
+  await page.route("**/api/queue/failed-job/retry", async (route) => {
+    const retried = job("retried-job", "queued");
+    state.jobs.push(retried);
+    state.gallery.unshift({
+      ...results(1)[0],
+      id: "retried",
+      jobId: "retried-job",
+      prompt: "Failed study",
+      status: "pending",
+    });
+    await route.fulfill({ json: { job: retried } });
+  });
+  await page.goto("/images");
+  await expect(page.getByText("Sampling · 50%", { exact: true })).toBeVisible();
+  await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel Live study", exact: true }).click();
+  await expect.poll(() => state.jobs[0].status).toBe("cancelled");
+  await page.getByRole("button", { name: "Try Again: Failed study", exact: true }).click();
+  await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
+  await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
+  expect(state.gallery.map((item) => item.id)).not.toContain("failed");
+});
+
+test("Selection extends with Shift, picks in-progress or failed work and acts from keys and menus", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    Boolean(testInfo.project.use.isMobile),
+    "Shift, Delete and context keys need a keyboard",
+  );
+  const state = await fixtures(page);
+  state.jobs.push({
+    id: "live-job",
+    sessionId: "chat-a",
+    status: "running",
+    operation: "image",
+    input: { kind: "image", prompt: "Live" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  state.gallery.push(
+    { ...results(1)[0], id: "live", jobId: "live-job", prompt: "Live study", status: "pending" },
+    { ...results(1)[0], id: "failed", prompt: "Failed study", status: "error", url: "" },
+    ...results(4),
+  );
+  await page.goto("/images");
+  const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
+  await first.focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(page.getByRole("menuitem", { name: "Recreate", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
+  await page.getByRole("button", { name: "Select image: Browse Result 0", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Select image: Browse Result 2", exact: true })
+    .click({ modifiers: ["Shift"] });
+  await expect(status).toHaveText("3 Selected");
+  await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
+  await expect(status).toHaveText("1 Selected");
+  await page.getByRole("button", { name: "Stop Selected", exact: true }).click();
+  await expect.poll(() => state.jobs[0].status).toBe("cancelled");
+  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
+  await expect(status).toHaveText("1 Selected");
+  await page
+    .getByRole("button", { name: "Select image: Browse Result 3", exact: true })
+    .click({ button: "right" });
+  await expect(status).toHaveText("2 Selected");
+  await expect(page.getByRole("menuitem", { name: "Delete Selected", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Delete");
+  const confirm = page.getByRole("dialog", { name: "Delete Selected Items", exact: true });
+  await expect(confirm).toContainText("Delete 2 items");
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect
+    .poll(() => state.gallery.map((item) => item.id))
+    .toEqual(["live", "browse-0", "browse-1", "browse-2"]);
 });

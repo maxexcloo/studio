@@ -93,7 +93,7 @@ export function MediaJobStatus({ item }: { item: MediaItem }) {
         <Group justify="center">
           <QueueJobAction job={job} />
           <Button component={Link} to={`/chat/${job.sessionId}`} variant="subtle" size="compact-sm">
-            Open Session
+            Open Chat
           </Button>
         </Group>
       )}

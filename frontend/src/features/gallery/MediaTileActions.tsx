@@ -6,6 +6,7 @@ import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaActionItems, type PrimaryAction } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
+import { mediaTitle } from "./mediaLabels";
 import { UpscaleDialog } from "./UpscaleControls";
 import classes from "./MediaTileActions.module.css";
 
@@ -29,7 +30,7 @@ export function MediaTileActions({
   const [upscaling, setUpscaling] = useState(false);
   const favorite = useMediaFavorite(item);
   const transfer = useMediaTransfer(item, opened);
-  const name = item.prompt || item.filename || "Result";
+  const name = mediaTitle(item);
   return (
     <>
       <Group
@@ -41,29 +42,27 @@ export function MediaTileActions({
         role="group"
         aria-label={`Actions for ${name}`}
       >
-        <Tooltip label={item.favorite ? "Unstar" : "Star"}>
-          <ActionIcon
-            className={`${classes.control} ${classes.favorite}`}
-            data-starred={item.favorite || undefined}
-            aria-label={`${item.favorite ? "Unstar" : "Star"} ${name}`}
-            aria-pressed={Boolean(item.favorite)}
-            variant="default"
-            size="lg"
-            radius="xl"
-            loading={favorite.isPending}
-            onClick={() => favorite.mutate()}
-          >
-            <Star size={16} fill={item.favorite ? "currentColor" : "none"} />
-          </ActionIcon>
-        </Tooltip>
+        {item.status === "done" && (
+          <Tooltip label={item.favorite ? "Unstar" : "Star"}>
+            <ActionIcon
+              className={`${classes.control} ${classes.favorite}`}
+              data-starred={item.favorite || undefined}
+              aria-label={`${item.favorite ? "Unstar" : "Star"} ${name}`}
+              aria-pressed={Boolean(item.favorite)}
+              variant="default"
+              loading={favorite.isPending}
+              onClick={() => favorite.mutate()}
+            >
+              <Star size={16} fill={item.favorite ? "currentColor" : "none"} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={210}>
           <Menu.Target>
             <ActionIcon
               className={classes.control}
               aria-label={`More Actions for ${name}`}
               variant="default"
-              size="lg"
-              radius="xl"
             >
               <Ellipsis size={18} />
             </ActionIcon>
