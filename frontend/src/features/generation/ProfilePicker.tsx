@@ -52,11 +52,18 @@ export function ProfilePicker({
             <Text size="sm" fw={checked ? 600 : undefined} truncate>
               {option.label}
             </Text>
-            {status && status.label !== "Ready" && (
-              <Badge size="xs" variant="light" color={status.color}>
-                {status.label}
-              </Badge>
-            )}
+            <Group gap={4} wrap="nowrap">
+              {profile?.aiDrafted && (
+                <Badge size="xs" variant="light" color="orange">
+                  AI-Drafted
+                </Badge>
+              )}
+              {status && status.label !== "Ready" && (
+                <Badge size="xs" variant="light" color={status.color}>
+                  {status.label}
+                </Badge>
+              )}
+            </Group>
           </Group>
         );
       }}
