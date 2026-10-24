@@ -168,7 +168,7 @@ export function registerRewriteRoutes(
       (typeof parentJobId !== "string" ||
         !store.jobs(owner(req), req.params.id).some((job) => job.id === parentJobId))
     )
-      return res.status(400).json({ error: "Parent generation must belong to this session." });
+      return res.status(400).json({ error: "Parent generation must belong to this chat." });
     let job;
     const checked = await validate?.(input, req.studioAccount);
     if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);

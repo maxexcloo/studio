@@ -281,8 +281,7 @@ export class ChatService {
     if (input.modelId !== undefined && (typeof input.modelId !== "string" || !input.modelId))
       throw failure("Choose a text model approved for this account.", 400);
     const key = `${ownerId}:${sessionId}`;
-    if (this.active.has(key))
-      throw failure("This session already has a text response in progress.", 409);
+    if (this.active.has(key)) throw failure("This chat already has a reply in progress.", 409);
     this.active.add(key);
     let assistant: ReturnType<ChatStore["add"]> | undefined;
     try {

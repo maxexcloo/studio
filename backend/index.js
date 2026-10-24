@@ -2670,9 +2670,9 @@ const sessionChat = new ChatService({
             .jobs(ownerId, sessionId)
             .filter((job) => job.status === "completed" && job.outputs.length)
             .at(-1);
-      if (parentJobId && !parent) throw new Error("Parent generation must belong to this session.");
+      if (parentJobId && !parent) throw new Error("Parent generation must belong to this chat.");
       if (parent && parent.sessionId !== sessionId)
-        throw new Error("Parent generation must belong to this session.");
+        throw new Error("Parent generation must belong to this chat.");
       parentJobId = parent?.id;
       const references = Array.isArray(input.referenceAssets) ? input.referenceAssets : [];
       const inheritedPrimary = parent?.input.referenceAssets?.[0]?.assetId;

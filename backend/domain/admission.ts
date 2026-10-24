@@ -44,7 +44,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
       scope?.parentJobId &&
       options.store.job(ownerId, scope.parentJobId)?.sessionId !== scope.sessionId
     )
-      return { status: 400, payload: { error: "Parent generation must belong to this session." } };
+      return { status: 400, payload: { error: "Parent generation must belong to this chat." } };
     const clientId = String(input.clientJobId || "").replace(/[^\w-]/g, "");
     let release: (() => void) | undefined;
     if (clientId) {
