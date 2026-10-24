@@ -17,7 +17,7 @@ const OptionsTarget = forwardRef<HTMLButtonElement, { onStyle: () => void }>(fun
   return (
     <Menu opened={opened} onChange={setOpened} position="bottom-end" shadow="md">
       <Menu.Target>
-        <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray" size={36}>
+        <ActionIcon ref={ref} aria-label="More Options" variant="subtle" color="gray">
           <MoreHorizontal size={20} />
         </ActionIcon>
       </Menu.Target>

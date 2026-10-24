@@ -17,15 +17,6 @@ select {
 .studio-content {
   min-width: 0;
 }
-.studio-logo {
-  letter-spacing: -0.055em;
-}
-.studio-mode-tabs {
-  border: 1px solid var(--mantine-color-default-border);
-  padding: 0.25rem;
-  border-radius: var(--mantine-radius-xl);
-  background: var(--mantine-color-default);
-}
 .studio-gallery-page {
   padding-bottom: 7rem;
   min-height: calc(100dvh - var(--app-shell-header-height) - 2 * var(--app-shell-padding, 20px));
@@ -266,19 +257,9 @@ select {
   position: relative;
   opacity: 0.6;
 }
-@media (min-width: 48em) {
-  .studio-mode-tabs {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
 @media (max-width: 48em) {
   :root {
     --studio-composer-gap: 0.5rem;
-  }
-  .studio-home-link {
-    display: none;
   }
   .studio-composer-dock .mantine-Button-root {
     min-height: 44px;

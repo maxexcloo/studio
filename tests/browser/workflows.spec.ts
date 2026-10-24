@@ -844,10 +844,10 @@ test("Gallery search preserves the query and status panel cancels only active wo
     "aria-pressed",
     "true",
   );
-  if (await page.getByRole("button", { name: "Open Status", exact: true }).isVisible())
-    await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  else await page.getByRole("button", { name: "Open Queue", exact: true }).click();
-  const queue = page.getByRole("dialog", { name: /^(Status|Queue)$/ });
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Generating");
+  await status.click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
   await expect(queue.getByText("queued-job", { exact: true })).toBeVisible();
   await queue.getByRole("button", { name: "Cancel All", exact: true }).click();
@@ -1102,9 +1102,7 @@ test("Generation size presets and custom dimensions preserve profile constraints
   expect(state.jobs[0].input.height).toBe(1024);
 });
 
-test("Retry pending state is shared while unrelated jobs remain cancellable", async ({
-  page,
-}, testInfo) => {
+test("Retry pending state is shared while unrelated jobs remain cancellable", async ({ page }) => {
   const state = await fixtures(page);
   const input = {
     ...profiles[0].defaults,
@@ -1151,20 +1149,17 @@ test("Retry pending state is shared while unrelated jobs remain cancellable", as
     await retry.click();
     await expect.poll(() => calls).toBe(1);
     await expect(retry).toBeDisabled();
-    if (!testInfo.project.use.isMobile) {
-      await page.getByRole("button", { name: "Open Queue", exact: true }).click();
-      const queue = page.getByRole("dialog", { name: "Queue", exact: true });
-      await expect(queue.getByRole("button", { name: "Retry", exact: true })).toBeDisabled();
-      await expect(queue.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
-      await queue.getByRole("button", { name: "Cancel", exact: true }).click();
-    } else {
-      await page
-        .getByRole("article", { name: "Iteration 2", exact: true })
-        .getByRole("button", { name: "Cancel", exact: true })
-        .click();
-    }
+    // Gallery modes own the queue slideout; the pending retry stays shared across surfaces.
+    await page.getByRole("link", { name: "Images", exact: true }).first().click();
+    await page.getByRole("button", { name: "Open Status", exact: true }).click();
+    const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+    await expect(queue.getByRole("button", { name: "Retry", exact: true })).toBeDisabled();
+    await queue.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect.poll(() => state.jobs[1].status).toBe("cancelled");
     expect(calls).toBe(1);
+    await page.keyboard.press("Escape");
+    await expect(queue).toBeHidden();
+    await page.goBack();
     release();
     await expect(retry).toBeEnabled();
   } finally {
@@ -1222,27 +1217,28 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
   }
 });
 
-test("Desktop status inspects endpoint health without changing the queue", async ({
+test("Status summarises service health and opens Workers over the current page", async ({
   page,
-}, testInfo) => {
-  test.skip(Boolean(testInfo.project.use.isMobile), "Desktop runtime interaction");
+}) => {
   await fixtures(page);
-  await page.goto("/images");
-  const status = page.getByRole("button", { name: "Runtime Status", exact: true });
-  await expect(status).toHaveAttribute("aria-description", "unknown");
+  await page.goto("/chat");
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
   await status.click();
-  const panel = page.getByRole("dialog", { name: "Runtime Status", exact: true });
-  await expect(panel.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
-    "Image Worker",
-  );
-  await panel.getByRole("combobox", { name: "Images Endpoint", exact: true }).click();
-  await page.getByRole("option", { name: "Image Worker", exact: true }).click();
-  await expect(panel).toBeVisible();
-  await expect(panel.getByText("Fixture GPU", { exact: false })).toBeVisible();
+  const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+  await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
+  await drawer.getByRole("link", { name: "Workers", exact: true }).click();
+  await expect(drawer).toBeHidden();
+  const settings = page.getByRole("dialog", { name: /^Settings/ });
+  const images = settings.getByRole("combobox", { name: "Images Endpoint", exact: true });
+  await expect(images).toHaveValue("Image Worker");
+  await images.click();
+  await page.getByRole("option", { name: /Image Worker/ }).click();
+  await expect(settings.getByText("Fixture GPU", { exact: false })).toBeVisible();
+  await expect(settings.getByText("Automatic Control Off", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  await status.click();
-  await expect(panel.getByText("Automatic Control Off", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
 });
 
 test("Owned uploaded references can be reused without another upload", async ({ page }) => {
