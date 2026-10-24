@@ -114,7 +114,6 @@ export async function mediaDraft(
         prompt: item.prompt || "",
         negative: item.negative || "",
         ...(item.width ? { width: item.width, height: item.height || item.width } : {}),
-        ...(operation === "image" && legacyId ? { startImageId: legacyId } : {}),
         referenceAssets: operation === "image" ? restored : [],
         referenceDetails: preparedReferences,
       },

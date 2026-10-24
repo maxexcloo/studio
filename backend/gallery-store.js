@@ -27,6 +27,7 @@ import {
 } from "./gallery-order.js";
 import { currentDataDir } from "./data-dir.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
+import { hasReferenceImage } from "./workflow-modes.js";
 
 export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
@@ -1265,7 +1266,7 @@ export function generationSettings(body) {
   if (loras.length) settings.loras = loras;
   if (body.kind === "image") {
     settings.count = Number(body.count || 1);
-    if ((body.startImage || body.startImageId) && !providerModel.endsWith(".rad"))
+    if (hasReferenceImage(body) && !providerModel.endsWith(".rad"))
       settings.denoise = Number(body.denoise || 0);
     // Where the painted part sat in the reference; the mask itself is never kept.
     if (body.inpaint?.box) {
