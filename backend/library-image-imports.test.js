@@ -42,7 +42,7 @@ const dreamshaper8 = {
   ],
 };
 
-function harness(t, { vision = true, resolveCivitai = null } = {}) {
+function harness(t, { vision = true, resolveCivitai = null, preset = null } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-image-imports-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const store = createImportStore({ dataDir: dir, log: quiet });
@@ -101,9 +101,10 @@ function harness(t, { vision = true, resolveCivitai = null } = {}) {
       throw new Error("unused");
     },
     importImage: async () => {
-      throw new Error("unused");
+      if (!preset) throw new Error("unused");
+      return structuredClone(preset);
     },
-    resolvePreset: async () => null,
+    resolvePreset: async () => (preset ? structuredClone(preset) : null),
     inspect: async (want) => {
       const folders = ["checkpoints", "diffusion_models"].includes(want.folder)
         ? ["checkpoints", "diffusion_models"]
@@ -261,6 +262,60 @@ test("a substitute lowers the grade to Close; Use Exact File appears once the ex
   assert.ok(
     exact.grade.reasons.includes("No profile runs the base model"),
     "the exact model has no profile yet",
+  );
+});
+
+test("a Civitai image link gets the same stand-ins, and the exact file replaces it once installed", async (t) => {
+  const preset = {
+    id: "civitai-42",
+    name: "Misty Fox",
+    sourceUrl: "https://civitai.com/images/42",
+    baseModel: "SD 1.5",
+    prompt: "a watercolour fox",
+    negative: "blurry",
+    settings: { seed: 7, sampler: "euler", steps: 20, cfg: 6, width: 512, height: 768 },
+    warnings: [],
+    resources: [
+      {
+        name: "DreamShaper",
+        file: "dreamshaper_8.safetensors",
+        folder: "checkpoints",
+        sha256: full("0123456789"),
+        status: "missing",
+        supported: true,
+      },
+      {
+        name: "Watercolour Style",
+        file: "watercolour-v2.safetensors",
+        folder: "loras",
+        status: "installed",
+        localName: "watercolour-v2.safetensors",
+        weight: 0.8,
+      },
+    ],
+  };
+  const h = harness(t, { preset });
+  const record = await h.engine.create("https://civitai.com/images/42");
+  const [checkpoint, watercolour] = record.resources;
+  assert.deepEqual(
+    [checkpoint.status, checkpoint.substitute.file, checkpoint.profileId],
+    ["substitute", "dreamshaper_9.safetensors", "sd15-dreamshaper"],
+  );
+  assert.deepEqual([watercolour.status, watercolour.strength], ["installed", 0.8]);
+  assert.equal(record.grade.value, "close");
+  assert.ok(record.grade.reasons.includes("DreamShaper uses a substitute: Version 9 instead of 8"));
+  assert.equal(record.state, "ready", "a stand-in counts as there");
+  assert.equal(record.preset.prompt, "a watercolour fox", "Use Prompt and Use Settings apply it");
+
+  preset.resources[0] = {
+    ...preset.resources[0],
+    status: "installed",
+    localName: "dreamshaper_8.safetensors",
+  };
+  const exact = await h.engine.open(record.id);
+  assert.deepEqual(
+    [exact.resources[0].status, exact.resources[0].substitute],
+    ["installed", undefined],
   );
 });
 

@@ -36,7 +36,7 @@ version opens with a `> ` summary line.
 - Slim the MCP tools for small-context chats: shorter instructions and descriptions that point iteration to Reuse; schema limits that match the 1–10 per call; Models shows a 500-character guide gist (whole guide with `full_guide`) and at most 30 LoRAs; replies carry text only, without repeated structured records or guides. Review sends one 512px preview, with a comparison side by side, and a short record. Generate runs `prompts` when `request` comes too, dedupes identical calls for two minutes and never upscales unless asked.
 - Let MCP Generate and Reuse wait inline only when Studio's generation-timing estimate says the set finishes within the 30-second wait; otherwise they return links at once with the expected wait (`eta_seconds`), one per set for several models. Without a named model, Generate lets the prompt writer pick the ready profile that suits the request and names the choice and its reason in one line. Results queued together come back as one contact-sheet image linking to All Results instead of one preview each.
 - Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
-- Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it.
+- Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it. Civitai image imports get the same nearest installed stand-ins as dropped images, with Use Prompt and Use Settings.
 
 ## [0.48.2] - 2026-10-23
 

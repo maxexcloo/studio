@@ -488,12 +488,14 @@ export function registerLibraryRoutes(
         entries: catalogue().entries({ throttleMs: 5000 }),
         json,
       }),
-    substituteFor: async (resource) => {
+    substituteFor: async (resource, record) => {
       const files = Object.entries(await installedNow().catch(() => ({}))).flatMap(
         ([folder, names]) => (names || []).map((file) => ({ folder, file })),
       );
       const list = (await profilesNow().catch(() => [])).filter((item) => item.kind !== "video");
-      const [family] = familiesOf(resource.baseModel || resource.want.file || resource.name || "");
+      const [family] = familiesOf(
+        resource.baseModel || record?.baseModel || resource.want.file || resource.name || "",
+      );
       return findSubstitute(
         {
           file: resource.want.file,

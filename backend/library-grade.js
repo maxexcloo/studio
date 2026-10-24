@@ -132,8 +132,8 @@ export function presetGrade(preset = {}, { cfgUsed = true } = {}) {
     unverified: resource.unverified,
     nameOnly: resource.nameOnly,
     status:
-      resource.status === "installed"
-        ? "installed"
+      resource.status === "installed" || resource.status === "substitute"
+        ? resource.status
         : resource.status === "conflict"
           ? "conflict"
           : resource.unavailable
@@ -142,11 +142,14 @@ export function presetGrade(preset = {}, { cfgUsed = true } = {}) {
               ? "unsupported"
               : "missing",
     ...(resource.unavailable ? { unavailable: resource.unavailable } : {}),
+    ...(resource.substitute ? { substitute: resource.substitute } : {}),
   }));
   const checkpoints = (preset.resources || []).filter((resource) =>
     modelFolders.has(resource.folder),
   );
-  const installed = checkpoints.find((resource) => resource.status === "installed");
+  const installed = checkpoints.find((resource) =>
+    ["installed", "substitute"].includes(resource.status),
+  );
   const approximate = warnings
     .filter((warning) => /needs a manual choice|default will be used/i.test(warning))
     .map((warning) => warning.replace(/\.$/, ""));
@@ -166,7 +169,7 @@ export function presetGrade(preset = {}, { cfgUsed = true } = {}) {
     baseModel: {
       required: checkpoints.length > 0,
       installed: Boolean(installed),
-      profile: Boolean(installed?.profileId),
+      profile: Boolean(installed?.substitute?.profileId || installed?.profileId),
     },
   });
 }
