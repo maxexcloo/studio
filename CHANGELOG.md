@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-10-24
+
 > Profiles can carry their own Radiance LoRAs
 
 ### Changed
@@ -1861,7 +1863,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.50.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.51.0...HEAD
+[0.51.0]: https://github.com/maxexcloo/studio/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/maxexcloo/studio/compare/v0.49.0...v0.50.0
 [0.49.0]: https://github.com/maxexcloo/studio/compare/v0.48.2...v0.49.0
 [0.48.2]: https://github.com/maxexcloo/studio/compare/v0.48.1...v0.48.2
