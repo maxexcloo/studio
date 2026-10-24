@@ -33,15 +33,20 @@ primary component reference and verify APIs against the installed version.
 ## Theme & Layout
 
 - `frontend/src/theme.ts` owns the MantineHub Shadcn-inspired theme, shared radii,
-  spacing, motion and workspace width. Follow the system colour scheme by
+  spacing, motion and workspace width. It is one self-contained module, shaped to
+  become a shared package for other apps: tokens and component defaults only, no
+  app-specific CSS. Translucent blurred ("glass") surfaces apply throughout
+  (header, sidebars, cards, overlays, viewer chrome, composer) through theme
+  defaults, with readable contrast over media. Follow the system colour scheme by
   default. The header Theme popover owns persisted Animations, Background, Colour,
   Colour Scheme, Corners and Layout controls in that order; Settings does not duplicate appearance controls.
 - Use Mantine spacing, typography, colours and breakpoints, including custom
   media CSS. Give Paper padding and borders explicitly where needed; do not
   apply global Paper defaults that leak into dialogs and navigation.
-- Primary modes are Chat, Images and Videos in that order; Images is the
-  landing page at `/images`; videos use `/video` and conversation uses
-  `/chat` and `/chat/:id`. `/` redirects to Images. Phone tabs use MessageCircle, Image and Video icons with
+- Primary modes are Chat, Images, Videos and Dream in that order; Images is the
+  landing page at `/images`; videos use `/video`, conversation uses
+  `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
+  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image and Video icons with
   accessible names and tooltips. The left status action opens sessions in Chat
   and active work in gallery modes. Its slideout keeps the compact service
   summary at the bottom and contextual content above it. The icon reflects the
@@ -64,7 +69,10 @@ primary component reference and verify APIs against the installed version.
   Keep the same bounded dimensions and title typography across both workspaces,
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
   Section Select in the phone modal header. Mount sections on first visit and
-  keep visited forms mounted to preserve edits. Use Mantine Table for dense records; preview cards are for
+  keep visited forms mounted to preserve edits. Navigation items carry an icon;
+  each section shows its heading and one-line description, segmented views,
+  an expanding search and filters in one popover above compact rows with status
+  badges and row menus. Use Mantine Table for dense records; preview cards are for
   visual content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
@@ -80,8 +88,10 @@ primary component reference and verify APIs against the installed version.
 ## Generation & Conversation
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
-  generation-input action and icon-only Generate. Expanded controls show the
-  labelled Generate action. Clicking inside expands; clicking outside collapses.
+  generation-input action and icon-only Generate. Expanded controls are one prompt
+  box with a history action inside it and a row of compact chips: Profile, Aspect,
+  Count, References, LoRAs, Presets and an Expert settings popover, then
+  Image/Video and Generate. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer upward with a short
   transition and the standard accessible close action.
@@ -96,6 +106,11 @@ primary component reference and verify APIs against the installed version.
 - Render assistant Markdown semantically with the shared safe renderer, using
   Mantine typography. Defer parsing streamed changes and keep scroll anchored
   only while the user remains at the bottom.
+- Generation cards are compact: prompt, setting chips, results grid and the
+  shared actions. Edit expands the shared editor inline; submitting an edited card
+  appends a new iteration at the bottom. Chats can be renamed and deleted; new
+  chats get a short LLM title. Deleting a chat offers an unticked per-result
+  checklist of media to delete as well.
 - Chat retains streamed text, generation snapshots and results chronologically.
   Assistant text appears above each input card and results below it. Discussion
   stays text-only; explicit media requests use selected settings without model
@@ -119,9 +134,9 @@ primary component reference and verify APIs against the installed version.
   never filenames; submission and Chat use owned asset IDs. Phones show the shared filtered gallery
   inside generation controls, desktop uses an anchored popover.
 - Profile and size controls share the gallery/card implementation. The prompt
-  comes first; `GenerationInputControls` owns the wrapping
-  Profile, Size and Reference rail in both gallery and timeline editors. Controls
-  share the standard input height; phones give Profile its own row. The footer
+  comes first; `GenerationInputControls` owns the wrapping chip rail in both
+  gallery and timeline editors. Phones keep the full-height editor, giving the
+  prompt generous, easy-to-edit space above the chips. The footer
   places the Image/Video toggle left and Clear/Generate right. Size uses
   a vertical list of profile-provided aspect presets with their resolution,
   alongside constrained custom dimensions. Selected
@@ -131,6 +146,19 @@ primary component reference and verify APIs against the installed version.
   keys, order, strengths and disabled entries; legacy profile groups remain explicit.
   Trigger words use copy controls and source links use the published catalogue URL.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
+
+## Dream & Taste
+
+- Dream is a full-screen card deck of background results. Swipe left discards,
+  right keeps, up keeps and queues variations; Star and Animate are buttons.
+  Dream results stay in their own pool until kept; discards are retained and
+  can be shown with a filter.
+- Dream generates images, videos and (with the NSFW grant) spicy content only
+  while no other work is queued, yields to user and text work, and stops at its
+  unseen buffer or daily cap.
+- An editable, LLM-maintained taste profile learns from swipes, stars,
+  iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,
+  viewer next-step suggestions and Chat.
 
 ## Data & Feedback
 
@@ -162,6 +190,17 @@ primary component reference and verify APIs against the installed version.
 
 ## Media, Motion & Accessibility
 
+- The viewer is the iteration hub. Under the image, a prompt bar prefilled from
+  the item generates variations (the composer Count) into a strip; choosing one
+  makes it current. Always-visible actions: Star, Download (Share on phones),
+  Upscale, Animate with an LLM prompt menu (Cinematic Camera, Living Photo,
+  Action, Spicy for NSFW-granted accounts, Custom Instruction), Regenerate (new
+  seed, with Exact Repeat in its menu) and Copy Prompt/Settings. The desktop details sidebar is open by
+  default and its toggle is remembered. Phones show the image full-bleed with
+  an icon row and prompt bar; swipe left/right navigates, down closes and up
+  reveals details and further options.
+- Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
+  card that fans out in place; its images open the viewer hub.
 - Viewers always fill the viewport independently of workspace width. Transparent
   stage/content reveal the blurred gallery behind. Empty-stage clicks close;
   media, native video controls and details/actions remain interactive. Keep
@@ -169,7 +208,7 @@ primary component reference and verify APIs against the installed version.
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Viewer actions share one bottom area with consistent 36px controls; secondary
+- Viewer actions share one icon row with consistent controls; secondary
   actions use More Viewer Actions and display/sharing switches use Viewer Options.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
