@@ -18,7 +18,7 @@ one of those in place of a local build where you deploy.
 ## Build and start
 
 With compose, from the project directory. Put ComfyUI's output folder in a
-`.env` file next to `docker-compose.yml` once (compose reads it for every
+`.env` file next to `docker-compose.yaml` once (compose reads it for every
 command, so `logs`, `restart` and `down` work too):
 
 ```bash

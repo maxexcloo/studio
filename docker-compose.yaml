@@ -41,7 +41,7 @@ services:
       - studio-data:/data
       # ComfyUI's output folder on the machine it runs on. Compose stops with a
       # clear message rather than start without it (see the header above).
-      - "${COMFY_OUTPUT_HOST:?put COMFY_OUTPUT_HOST=/path/to/ComfyUI/output in a .env file next to docker-compose.yml}:/comfy-output"
+      - "${COMFY_OUTPUT_HOST:?put COMFY_OUTPUT_HOST=/path/to/ComfyUI/output in a .env file next to docker-compose.yaml}:/comfy-output"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
