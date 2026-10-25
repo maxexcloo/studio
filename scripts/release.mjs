@@ -11,7 +11,7 @@
 // summary line. Then it bumps package.json and the lockfile, dates the
 // changelog section, commits "Release vX.Y.Z" and makes an annotated tag with
 // the notes. It runs no test suites: pushing the tag runs
-// .github/workflows/release.yml, which runs the full checks before it publishes
+// .github/workflows/release.yaml, which runs the full checks before it publishes
 // the container image and the GitHub release.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
