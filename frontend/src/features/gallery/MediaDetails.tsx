@@ -1,6 +1,8 @@
-import { Badge, Group, Image, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Group, Image, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import { Copy } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
+import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { referenceLabel } from "../generation/references";
@@ -190,7 +192,22 @@ export function MediaDetails({ item }: { item: MediaItem }) {
   return (
     <Stack gap="lg" fz="sm">
       <Stack gap={6}>
-        <Title order={6}>Prompt</Title>
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Title order={6}>Prompt</Title>
+          {item.prompt && (
+            <Tooltip label="Copy Prompt">
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label="Copy Prompt"
+                onClick={() => void copyText(item.prompt || "", "Prompt")}
+              >
+                <Copy size={14} />
+              </ActionIcon>
+            </Tooltip>
+          )}
+        </Group>
         <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
           {item.prompt || "No prompt recorded."}
         </Text>
