@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type {
   ServiceEndpoint,
   ServiceKind,
@@ -13,13 +11,6 @@ interface Worker {
   name: string;
   url: string;
   capabilities: string[];
-}
-interface Workload {
-  kind: ServiceKind;
-  label?: string;
-  placements?: string[];
-  service?: { url?: string; display_label?: string };
-  studio?: { url: string; apiKeyEnv?: string };
 }
 type Environment = Record<string, string | undefined>;
 type Probe = Pick<
@@ -68,11 +59,8 @@ export function createServicesObserver({
   cacheMs = 5000,
 }: Options) {
   const cache = new Map<string, { until: number; result: Promise<Probe> }>();
-  function workloads(): Record<string, Workload> {
-    if (!environment.STUDIO_CONFIG_DIR) return {};
-    const file = join(environment.STUDIO_CONFIG_DIR, "workloads.json");
-    return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
-  }
+  const managed = controller?.workloads ?? [];
+  const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
   function probe(endpoint: string, kind: ServiceKind, apiKeyEnv?: string): Promise<Probe> {
     for (const [key, entry] of cache) if (entry.until <= now()) cache.delete(key);
     const key = `${kind}:${endpoint}:${apiKeyEnv || ""}`;
@@ -158,42 +146,31 @@ export function createServicesObserver({
     administrator?: boolean;
     waitingWorkers?: string[];
   }): Promise<ServicesStatus> => {
-    let records: Record<string, Workload> = {};
-    let configurationError = false;
-    try {
-      records = workloads();
-    } catch {
-      configurationError = true;
-    }
     const services: ServicesStatus["services"] = {};
     await Promise.all(
       allowed.map(async (kind) => {
-        const configured = Object.entries(records).filter(([, record]) => record.kind === kind);
+        // Text endpoints are the managed text deployments; media endpoints are the workers, matched to theirs by URL.
         const targets =
           kind === "text"
-            ? configured.map(([id, record]) => ({
-                id,
-                label: record.service?.display_label || record.label || id,
-                url: record.studio?.url || record.service?.url || "",
-                workloadId: id,
-                placements: record.placements,
-                apiKeyEnv: record.studio?.apiKeyEnv,
-              }))
+            ? managed
+                .filter((workload) => workload.kind === "text")
+                .map((workload) => ({
+                  id: workload.id,
+                  label: workload.label,
+                  url: workload.url,
+                  workloadId: workload.id,
+                  apiKeyEnv: workload.apiKeyEnv,
+                }))
             : workers()
                 .filter((worker) => worker.capabilities.includes(kind))
                 .map((worker) => {
-                  const match = configured.find(
-                    ([, record]) =>
-                      (record.studio?.url || record.service?.url || "").replace(/\/+$/, "") ===
-                      worker.url.replace(/\/+$/, ""),
-                  );
+                  const match = managed.find((workload) => sameUrl(workload.url, worker.url));
                   return {
                     id: worker.id,
                     label: worker.name,
                     url: worker.url,
-                    workloadId: match?.[0],
-                    placements: match?.[1].placements,
-                    apiKeyEnv: match?.[1].studio?.apiKeyEnv,
+                    workloadId: match?.id,
+                    apiKeyEnv: match?.apiKeyEnv,
                   };
                 });
         const endpoints = await Promise.all(
@@ -224,7 +201,11 @@ export function createServicesObserver({
               observed.state = "waiting";
               observed.reason = "Your accepted work is waiting for this worker to become ready.";
             }
-            return { ...target, ...observed, ...(administrator && endpoint ? { endpoint } : {}) };
+            return {
+              ...target,
+              ...observed,
+              ...(administrator && endpoint ? { endpoint } : {}),
+            };
           }),
         );
         const bound = endpoints.filter((endpoint) => endpoint.checkedAt);
@@ -239,9 +220,7 @@ export function createServicesObserver({
           state,
           endpoints,
           reason: !endpoints.length
-            ? configurationError
-              ? "Mounted workload definitions could not be read."
-              : `No direct ${kind} runtime endpoint is configured.`
+            ? `No direct ${kind} runtime endpoint is configured.`
             : state === "healthy"
               ? "A direct runtime is healthy."
               : state === "waiting"
@@ -258,10 +237,10 @@ export function createServicesObserver({
         configured: Boolean(controller),
         automaticLifecycle: controller?.automaticLifecycle === true,
         reason: !controller
-          ? "Studio runtime control is not configured. Existing AI Control retains ownership; active workload and GPU placement are not observed."
+          ? "Studio runtime control is not configured; GPU workloads are neither observed nor switched."
           : controller.automaticLifecycle
-            ? "Studio automatic lifecycle control is enabled."
-            : "Studio automatic lifecycle control is disabled; existing runtime ownership is unchanged.",
+            ? "Studio starts and stops GPU workloads as queued work needs them."
+            : "Studio switches GPU workloads only when an administrator applies a placement.",
       },
     };
   };
