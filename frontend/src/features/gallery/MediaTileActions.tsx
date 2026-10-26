@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
-import { Ellipsis, Star } from "lucide-react";
+import { Download, Ellipsis, Star } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { MediaActionItems, type PrimaryAction } from "./MediaActions";
@@ -10,7 +10,7 @@ import { mediaTitle } from "./mediaLabels";
 import { UpscaleDialog } from "./UpscaleControls";
 import classes from "./MediaTileActions.module.css";
 
-/** Star and More over a gallery tile or Chat result; the More menu doubles as its context menu. */
+/** Star, Download and More over a gallery tile or Chat result; the More menu doubles as its context menu. */
 export function MediaTileActions({
   item,
   opened,
@@ -57,10 +57,23 @@ export function MediaTileActions({
             </ActionIcon>
           </Tooltip>
         )}
+        {item.status === "done" && item.url && (
+          <Tooltip label="Download">
+            <ActionIcon
+              component="a"
+              {...transfer.download}
+              className={`${classes.control} ${classes.download}`}
+              aria-label={`Download ${name}`}
+              variant="default"
+            >
+              <Download size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={210}>
           <Menu.Target>
             <ActionIcon
-              className={classes.control}
+              className={`${classes.control} ${classes.more}`}
               aria-label={`More Actions for ${name}`}
               variant="default"
             >
