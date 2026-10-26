@@ -58,8 +58,12 @@
   opacity: 1;
 }
 
+/* The title lines up with the conversation and composer below it. */
 .heading {
   flex-shrink: 0;
+  width: 100%;
+  max-width: var(--studio-composer-width);
+  margin-inline: auto;
 }
 
 @media (hover: none) {
