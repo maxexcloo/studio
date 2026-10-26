@@ -436,7 +436,7 @@ function findGalleryItemForAccount(id, account) {
   );
 }
 
-async function publicGalleryBuffer(item) {
+export async function publicGalleryBuffer(item) {
   const imported = importedImageFile(item);
   if (imported && fs.existsSync(imported))
     return { buffer: fs.readFileSync(imported), mime: "image/png", name: item.outputName };

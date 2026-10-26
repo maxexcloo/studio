@@ -25,6 +25,7 @@ import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
+import { createCaptioner } from "./domain/captions.ts";
 import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
@@ -128,6 +129,7 @@ import { startServers } from "./listen.js";
 import { httpsPort, startupTls, tlsHostNames } from "./tls.js";
 import { legacyEnvInUse, removeLocalEnvValue } from "./env.js";
 import { sharedRequests } from "./shared-requests.js";
+import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
 import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from "./env-names.js";
 import { retireFeatureSwitches } from "./feature-options.js";
@@ -136,6 +138,7 @@ import { lorasEnabled, presetsEnabled } from "./features.js";
 import {
   catalogueFlags,
   describeFlag,
+  flagEnabled,
   isCatalogueFlag,
   saveDeploymentSetting,
   settingSource,
@@ -147,6 +150,7 @@ import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
   flushGalleryStrict,
+  galleryKey,
   flushPendingGallery,
   replaceGalleryJob,
   makePendingItems,
@@ -214,6 +218,7 @@ import {
 } from "./lora-stacks.js";
 import {
   bytesForReferenceAccount,
+  publicGalleryBuffer,
   referenceAssetFromGallery,
   referenceAssetForAccount,
   referenceExistsForAccount,
@@ -1945,6 +1950,7 @@ const taste = createTaste({
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   dream.admitted(job);
+  captioner.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
   starred: (req, items, favorite) =>
@@ -2584,6 +2590,18 @@ registerCompareRoutes(app, {
   title: chatTitle,
 });
 registerTasteRoutes(app, { taste });
+/** Whether text work (Chat replies, admitted local text) is running now; Dream and captions wait for it. */
+const textBusy = () =>
+  Boolean(
+    runtime?.controller
+      .status()
+      .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0) ||
+    rewriteStore.db
+      .prepare(
+        "SELECT 1 FROM studio_chat_messages WHERE json_extract(record, '$.status') = 'streaming' LIMIT 1",
+      )
+      .get(),
+  );
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
 // It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
 const dream = createDream({
@@ -2624,17 +2642,7 @@ const dream = createDream({
       media: services[kind]?.state !== "offline",
     };
   },
-  textBusy: () =>
-    Boolean(
-      runtime?.controller
-        .status()
-        .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0) ||
-      rewriteStore.db
-        .prepare(
-          "SELECT 1 FROM studio_chat_messages WHERE json_extract(record, '$.status') = 'streaming' LIMIT 1",
-        )
-        .get(),
-    ),
+  textBusy,
   writer: assistantEngine,
   guide: assistantGuide,
   gallery: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
@@ -2645,6 +2653,38 @@ const dream = createDream({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerDreamRoutes(app, { dream });
+// Gallery captions (domain/captions.ts) let search match what an image shows. Like Chat, accounts
+// without the prompt assistant never send their images to the text model.
+const captioner = createCaptioner({
+  enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
+  writer: assistantEngine,
+  // Dream's idle rule (domain/dream.ts), with Dream's own jobs counting as work: no live job, no text work.
+  idle: () =>
+    !textBusy() &&
+    !rewriteStore.db
+      .prepare(
+        "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
+      )
+      .get(),
+  allowed: (ownerId) => {
+    if (!multiUserEnabled) return true;
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
+  },
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  image: async (item) => {
+    const sharp = await loadSharp();
+    if (!sharp) return null;
+    const data = await sharp((await publicGalleryBuffer(item)).buffer)
+      .rotate()
+      .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    return { mime: "image/jpeg", data: data.toString("base64") };
+  },
+  save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
+});
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
@@ -2876,6 +2916,7 @@ async function mcpGenerationRequest(method, route, input, owner) {
 }
 generationQueue.start();
 dream.start();
+captioner.start();
 
 /**
  * Upscaling runs on a worker with Upscale (workers.js): the routes below run
