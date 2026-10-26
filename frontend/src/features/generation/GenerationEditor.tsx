@@ -162,10 +162,15 @@ export function GenerationEditor({
     onChange,
   });
   const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen);
+  const placedCaret = useRef(false);
   useLayoutEffect(() => {
-    if (!focusPrompt || inlineOpen) return;
-    prompt.current?.focus({ preventScroll: true });
-    prompt.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    const element = prompt.current;
+    if (!focusPrompt || inlineOpen || !element) return;
+    element.focus({ preventScroll: true });
+    element.scrollIntoView({ block: "nearest", behavior: "instant" });
+    // Typing begun in the collapsed prompt carries on at the end.
+    if (!placedCaret.current) element.setSelectionRange(element.value.length, element.value.length);
+    placedCaret.current = true;
   }, [focusPrompt, inlineOpen, models.isPending]);
   if (models.isPending) return <LoadingState label="Loading Profiles" />;
   const details = referenceDetails(references, input, profile);

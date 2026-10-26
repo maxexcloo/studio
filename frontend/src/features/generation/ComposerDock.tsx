@@ -30,6 +30,10 @@ const composerLayers =
 export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const [opened, { open, close }] = useDisclosure(!chat && params.get("compose") === "1");
+  // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
+  // keystrokes typed meanwhile land in the shared draft.
+  const [expanded, setExpanded] = useState(opened);
+  const [compactFocused, setCompactFocused] = useState(false);
   const phone = usePhone();
   const motionDuration = useMotionDuration();
   const dock = useRef<HTMLDivElement>(null);
@@ -97,6 +101,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
     close();
+    setExpanded(false);
     if (params.has("compose")) {
       const next = new URLSearchParams(params);
       next.delete("compose");
@@ -138,7 +143,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         className={classes.dock}
         data-composer-dock
         data-chat={chat ? true : undefined}
-        hidden={!chat && phone && opened}
+        hidden={!chat && phone && opened && expanded}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
         onDragOver={dragReferences}
@@ -192,15 +197,17 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           marginBottom: chat ? keyboardInset : undefined,
         }}
       >
-        {(chat || !opened) && (
+        {(chat || !opened || !expanded) && (
           <Paper
             withBorder
             p={8}
             radius="xl"
             shadow="xl"
             className={classes.surface}
-            hidden={!chat && opened}
-            inert={!chat && opened}
+            // While handing over, it leaves the accessibility tree once focus has moved on.
+            aria-hidden={(!chat && opened && !compactFocused) || undefined}
+            onFocus={() => setCompactFocused(true)}
+            onBlur={() => setCompactFocused(false)}
             onClick={(event) => {
               if (
                 chat ||
@@ -219,6 +226,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             mounted={opened}
             transition="slide-up"
             duration={motionDuration}
+            onEntered={() => setExpanded(true)}
             onExited={focusCompact}
           >
             {(styles) => (
@@ -237,7 +245,10 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
                   aria-hidden={!opened}
                   inert={!opened}
                 >
-                  <GenerationForm onSubmitted={collapse} />
+                  <GenerationForm
+                    onSubmitted={collapse}
+                    focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
+                  />
                 </div>
               </Paper>
             )}
@@ -266,6 +277,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           transitionProps={{ duration: motionDuration }}
           size="100%"
           returnFocus={false}
+          onEnterTransitionEnd={() => setExpanded(true)}
           onExitTransitionEnd={focusCompact}
         >
           {/* Without a prompt focus intent, initial focus lands here rather than on Close. */}
@@ -275,6 +287,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               fill
               onSubmitted={collapse}
               autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}
+              focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
             />
           </div>
         </Drawer>
