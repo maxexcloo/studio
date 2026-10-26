@@ -198,3 +198,95 @@ test("Status summarises service health and opens Workers over the current page",
   await expect(page).toHaveURL(/\/chat$/);
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
 });
+
+test("Workers switch GPU workloads only through a reviewed preview", async ({ page }) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  await page.route("**/api/services/status", (route) =>
+    route.fulfill({
+      json: {
+        services: {},
+        runtime: {
+          configured: true,
+          automaticLifecycle: false,
+          reason: "Studio switches GPU workloads only when an administrator applies a placement.",
+        },
+      },
+    }),
+  );
+  const workload = (id: string, label: string, phase: string, gpus = 1) => ({
+    id,
+    label,
+    kind: id === "text" ? "text" : id.startsWith("video") ? "video" : "image",
+    pool: "gpu",
+    gpus,
+    phase,
+    replicas: phase === "running" ? 1 : 0,
+    ready: phase === "running" ? 1 : 0,
+    acceptedOperations: 0,
+  });
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({
+      json: {
+        automaticLifecycle: false,
+        pools: [{ id: "gpu", capacity: 2, used: 2 }],
+        history: [
+          {
+            id: "earlier",
+            type: "restart",
+            status: "completed",
+            requestedBy: "control-mcp",
+            startedAt: stamp,
+            finishedAt: stamp,
+            before: ["text"],
+            after: ["text"],
+            target: ["text", "image"],
+            stop: ["text"],
+            start: ["text"],
+            progress: "Done.",
+            steps: [],
+          },
+        ],
+        workloads: [
+          workload("image", "Image", "running"),
+          workload("text", "Text", "running"),
+          workload("video", "Video", "stopped"),
+        ],
+      },
+    }),
+  );
+  const previews: unknown[] = [];
+  const applied: unknown[] = [];
+  await page.route("**/api/runtime/preview", (route) => {
+    previews.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        target: ["text", "video"],
+        stop: ["image"],
+        start: ["video"],
+        keep: ["text"],
+        signature: "fixture",
+      },
+    });
+  });
+  await page.route("**/api/runtime/apply", (route) => {
+    applied.push(route.request().postDataJSON());
+    return route.fulfill({ status: 202, json: { id: "next", status: "running" } });
+  });
+  await page.goto("/settings");
+  await section(page, "Settings", "Workers");
+  const table = page.getByRole("table", { name: "GPU Workloads", exact: true });
+  await expect(table.getByRole("checkbox", { name: "Run Image", exact: true })).toBeChecked();
+  await expect(page.getByRole("table", { name: "Runtime Changes" })).toContainText("Restart Text");
+  await table.getByRole("checkbox", { name: "Run Image", exact: true }).click();
+  await table.getByRole("checkbox", { name: "Run Video", exact: true }).click();
+  await page.getByRole("button", { name: "Preview Changes", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Apply GPU Placement" });
+  await expect(dialog).toContainText("Stop: Image");
+  await expect(dialog).toContainText("Start: Video");
+  expect(applied).toEqual([]);
+  await dialog.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(previews).toEqual([{ workloads: ["text", "video"] }]);
+  expect(applied).toEqual([{ workloads: ["text", "video"], signature: "fixture" }]);
+});

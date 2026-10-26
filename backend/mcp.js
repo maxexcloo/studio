@@ -43,7 +43,6 @@ import {
   withinFamily,
 } from "./mcp-tiers.js";
 import { createPromptWriter } from "./prompt-writer.js";
-import { createControlClient } from "./ai-control.js";
 import { gatewaySettings } from "./assistant.js";
 import { mayUseFeature } from "./account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
@@ -88,7 +87,7 @@ const mediaInstructions = (writing) =>
       : ", as one clear prompt that keeps their subjects and scene"
   }. Use prompts only for prompts the user gave; count is images per prompt. Make one Generate call per set, one after another; for several models at once pass profile_ids, or each_profile with tier ("each turbo model"). To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "landscape" or "16:9" is aspect; "2K" is size; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
-  "GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.";
+  "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
   "This chat account isn’t linked to a Studio account yet. Ask an administrator to link it in Settings › Users.";
 const anonymousMessage = "The gateway must forward its user identity.";
@@ -164,12 +163,6 @@ export function adminScope({ account, gateway = false, gatewayAdminTools = () =>
   if (account?.role !== "administrator" || account.authenticated === false) return false;
   return gateway ? gatewayAdminTools() === true : true;
 }
-const allocation = z
-  .array(
-    z.object({ profile: z.string().min(1), devices: z.array(z.string().min(1)).min(1) }).strict(),
-  )
-  .max(32);
-
 /** Optional authenticated MCP on the studio's existing HTTP(S) server. */
 export function registerMcpRoutes(
   app,
@@ -177,6 +170,8 @@ export function registerMcpRoutes(
     dataDir,
     baseUrl,
     environment = process.env,
+    // Studio's RuntimeController (runtime/controller.ts), which the control key's tools drive.
+    runtime,
     imageWaitSeconds = generateWaitSeconds,
     etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
@@ -191,22 +186,17 @@ export function registerMcpRoutes(
     domainRequest,
     gatewayAdminTools = () => false,
     claimHandover = () => false,
-    // The owner's taste profile summary, or "", as context for the auto model pick.
+    // The owner's taste profile summary, or "", as context for the auto model pick and prompt writing.
     taste = () => "",
   } = {},
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
   if (!mediaKey && !controlKey && !accountMode) return null;
-  if (
-    controlKey &&
-    (!environment.CONTROL_URL ||
-      !environment.CONTROL_API_KEY ||
-      equal(controlKey, mediaKey) ||
-      equal(controlKey, environment.CONTROL_API_KEY) ||
-      equal(mediaKey, environment.CONTROL_API_KEY))
-  )
-    throw new Error("AI Control requires separate MCP/media/upstream credentials and CONTROL_URL.");
+  if (controlKey && (!runtime || equal(controlKey, mediaKey)))
+    throw new Error(
+      "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_WORKLOADS) and a key separate from STUDIO_MCP_API_KEY.",
+    );
   const publicUrl =
     environment.MCP_PUBLIC_URL?.replace(/\/+$/, "") ||
     (typeof baseUrl === "function" ? baseUrl() : baseUrl);
@@ -691,6 +681,7 @@ export function registerMcpRoutes(
         references,
         role,
         suggest,
+        taste: taste(owner),
         fallback,
         signal,
       });
@@ -1469,81 +1460,87 @@ export function registerMcpRoutes(
         },
       );
     } else {
-      const ask = createControlClient(environment, fetchImpl);
-      const control = async (method, route, body) => {
-        try {
-          return await ask(method, route, body);
-        } catch {
-          throw new Error(
-            "AI Control is unavailable or refused the request. Refresh its status and preview before retrying.",
-          );
-        }
-      };
-      const request = async (method, route, body) => mcpJson(await control(method, route, body));
-      /** A preset board: image with text, image with video, or video on both GPUs. Text keeps the running single-GPU model unless one is named. */
-      const modeAllocation = async (mode, textProfile) => {
-        if (mode === "image_video")
-          return [
-            { profile: "comfyui-image", devices: ["0"] },
-            { profile: "comfyui-video", devices: ["1"] },
-          ];
-        if (mode === "video") return [{ profile: "comfyui-video", devices: ["0", "1"] }];
-        const [status, catalogue] = await Promise.all([
-          control("GET", "status"),
-          control("GET", "catalogue"),
-        ]);
-        const workloads = catalogue?.rules?.workloads || {};
-        const fits = Object.keys(workloads).filter(
-          (id) => workloads[id].kind === "text" && workloads[id].placements?.includes("0"),
-        );
-        const running = status?.runtimes?.text?.running ? status.runtimes.text.profile : "";
-        const text = textProfile || (fits.includes(running) ? running : "");
+      const workloadList = z.array(z.string().min(1)).max(32);
+      /** A preset placement; workloads in other GPU pools keep running as they are. */
+      const modePlacement = async (mode, textProfile) => {
+        const configured = runtime.workloads;
+        const pick = (kind, gpus) => {
+          const found = configured.find((item) => item.kind === kind && item.gpus === gpus);
+          if (!found) throw new Error(`No ${gpus}-GPU ${kind} workload is configured.`);
+          return found;
+        };
+        const status = await runtime.observe();
+        const running = (item) => ["running", "starting"].includes(item.phase);
+        const anchor = mode === "video" ? pick("video", 2) : pick("image", 1);
+        const elsewhere = status.workloads
+          .filter((item) => item.pool !== anchor.pool && running(item))
+          .map((item) => item.id);
+        if (mode === "video") return [anchor.id, ...elsewhere];
+        if (mode === "image_video") return [anchor.id, pick("video", 1).id, ...elsewhere];
+        const fits = configured
+          .filter((item) => item.kind === "text" && item.gpus === 1 && item.pool === anchor.pool)
+          .map((item) => item.id);
+        const current = status.workloads.find(
+          (item) => fits.includes(item.id) && running(item),
+        )?.id;
+        const text = textProfile || current || "";
         if (!fits.includes(text))
           throw new Error(`Name text_profile, a text model that fits one GPU: ${fits.join(", ")}.`);
-        return [
-          { profile: text, devices: ["0"] },
-          { profile: "comfyui-image", devices: ["1"] },
-        ];
+        return [text, anchor.id, ...elsewhere];
       };
       tool(
         server,
         "GPUStatus",
         "GPU Status",
-        "Read GPU allocation and runtime health.",
+        "Read each GPU workload's state, the GPUs in use and the current or last runtime change.",
         {},
-        () => request("GET", "status"),
+        async () => mcpJson(await runtime.observe()),
         { readOnlyHint: true },
       );
       tool(
         server,
         "Workloads",
         "List Workloads",
-        "List workloads and placement rules for an explicitly requested allocation.",
+        "List the GPU workloads Studio can run, with their kind, GPU pool and GPU count.",
         {},
-        () => request("GET", "catalogue"),
+        () =>
+          mcpJson({
+            pools: runtime.pools,
+            workloads: runtime.workloads.map(({ id, label, kind, pool, gpus }) => ({
+              id,
+              label,
+              kind,
+              pool,
+              gpus,
+            })),
+          }),
         { readOnlyHint: true },
       );
       tool(
         server,
         "Preview",
-        "Preview Allocation",
-        "Preview a COMPLETE GPU board without applying it; omitted workloads stop and an empty board stops all. Present the changes for approval; discard to cancel.",
-        { allocation },
-        (args) => request("POST", "board/plan", args),
+        "Preview Placement",
+        "Preview a COMPLETE placement without applying it: the listed workload ids run and every other stops; an empty list stops all. Present the changes for approval; discard to cancel.",
+        { workloads: workloadList },
+        async ({ workloads }) => mcpJson(await runtime.preview(workloads)),
         { readOnlyHint: true },
       );
       tool(
         server,
         "Apply",
-        "Apply Allocation",
-        "Apply an explicitly requested allocation only after its Preview was presented and approved, with its exact signature. Active jobs may stop; never use it for media generation.",
-        { allocation, signature: z.string().min(1), confirmed: z.boolean().default(false) },
-        ({ allocation, signature, confirmed }) => {
+        "Apply Placement",
+        "Apply an explicitly requested placement only after its Preview was presented and approved, with its exact signature. Studio waits for accepted work on stopping workloads, then switches; poll Operation. Never use it for media generation.",
+        {
+          workloads: workloadList,
+          signature: z.string().min(1),
+          confirmed: z.boolean().default(false),
+        },
+        async ({ workloads, signature, confirmed }) => {
           if (!confirmed)
             throw new Error(
-              "Present the preview and obtain approval before applying this allocation.",
+              "Present the preview and obtain approval before applying this placement.",
             );
-          return request("POST", "board", { allocation, replace: true, signature });
+          return mcpJson(await runtime.apply(workloads, signature, "control-mcp"));
         },
         { destructiveHint: true },
       );
@@ -1551,45 +1548,31 @@ export function registerMcpRoutes(
         server,
         "Mode",
         "Preview GPU Mode",
-        "Preview a preset board only when the user asks for it: image_text (text on GPU 0, image on GPU 1), image_video (image on GPU 0, video on GPU 1) or video (video on both GPUs). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then Apply the returned allocation and signature.",
+        "Preview a preset placement only when the user asks for it: image_text (a one-GPU text model and image), image_video (image and one-GPU video) or video (two-GPU video). image_text keeps the running text model when it fits one GPU; otherwise pass text_profile. Present the changes for approval, then Apply the returned workloads and signature.",
         {
           mode: z.enum(["image_text", "image_video", "video"]),
           text_profile: z.string().min(1).optional(),
         },
-        async ({ mode, text_profile }) => {
-          const board = await modeAllocation(mode, text_profile);
-          return mcpJson({
-            allocation: board,
-            ...(await control("POST", "board/plan", { allocation: board })),
-          });
-        },
+        async ({ mode, text_profile }) =>
+          mcpJson(await runtime.preview(await modePlacement(mode, text_profile))),
         { readOnlyHint: true },
       );
       tool(
         server,
         "Restart",
         "Restart Workload",
-        "Restart a running workload in place, only when the user asks: the same model, profile and GPUs. Its active jobs stop. runtime is a runtime name from GPUStatus, such as text, image or comfyui-video. Never starts a stopped workload or changes allocation.",
-        { runtime: z.string().min(1) },
-        async ({ runtime }) => {
-          const current = (await control("GET", "status"))?.runtimes?.[runtime];
-          if (!current?.running)
-            throw new Error(`${runtime} is not running; only a running workload can be restarted.`);
-          return request("POST", "restart", {
-            runtime,
-            profile: current.profile,
-            devices: current.devices,
-          });
-        },
+        "Restart a running workload in place, only when the user asks: Studio waits for its accepted work, scales it to 0 and back to 1. workload is an id from GPUStatus. Never starts a stopped workload or changes the placement.",
+        { workload: z.string().min(1) },
+        async ({ workload }) => mcpJson(await runtime.restart(workload, "control-mcp")),
         { destructiveHint: true },
       );
       tool(
         server,
         "Operation",
         "Check Operation",
-        "Read the job returned by Apply, without waiting.",
+        "Read the runtime change returned by Apply or Restart, without waiting.",
         { job_id: z.string().regex(/^[a-zA-Z0-9]{1,64}$/) },
-        ({ job_id }) => request("GET", `jobs/${job_id}`),
+        ({ job_id }) => mcpJson(runtime.operation(job_id)),
         { readOnlyHint: true },
       );
     }
