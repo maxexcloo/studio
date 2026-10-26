@@ -1,7 +1,8 @@
 import { Badge, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
-import { RuntimePanel } from "../runtime/RuntimePanel";
+import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
+import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { TasteProfile } from "../taste/TasteProfile";
 import { AboutStudio } from "./AboutStudio";
@@ -13,10 +14,13 @@ import { ProfileDefinitions } from "./ProfileDefinitions";
 import { useSettingsNavigation } from "./SettingsNavigation";
 import { StudioPreferences } from "./StudioPreferences";
 
-const servicesKey = ["services-status"];
+const workerQueries = [servicesStatusQuery.queryKey, runtimeStatusQuery.queryKey];
 function WorkerSettings() {
   const client = useQueryClient();
-  const refreshing = useIsFetching({ queryKey: servicesKey }) > 0;
+  const refreshing =
+    useIsFetching({
+      predicate: (query) => workerQueries.some((key) => key[0] === query.queryKey[0]),
+    }) > 0;
   return (
     <Stack gap="md">
       <Group justify="flex-end">
@@ -26,7 +30,9 @@ function WorkerSettings() {
             size="compact-sm"
             leftSection={<RefreshCw size={16} />}
             loading={refreshing}
-            onClick={() => void client.refetchQueries({ queryKey: servicesKey })}
+            onClick={() =>
+              workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
+            }
           >
             Refresh
           </Button>
