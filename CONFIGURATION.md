@@ -180,6 +180,8 @@ Configure these in the deployment. The retained administrator integration APIs l
 
 The **Prompt Assistant** group feature (an access profile on the server) gates every assistant route. It is on for the built-in groups and for groups stored before it existed; turn it off per group in **Settings › Groups**. Spicy also needs **NSFW Models**. LoRA suggestions need **LoRAs**, and drafting guides and profiles is for administrators. Replies are never logged; logs carry only the operation, profile, timing and a short failure reason. Each call times out (30 s, 90 s for a streamed rewrite) and falls back: a rewrite returns the original prompt, a negative the guide's default, LoRA suggestions the word-matched candidates.
 
+Each account's **Taste Profile** (Settings › Account; `GET`, `PUT` and `DELETE /api/taste`, `POST /api/taste/refresh`) is a short summary the assistant model keeps from the account's stars, compare votes and iterations, with their prompts, profiles and LoRAs. It is stored in `studio.sqlite` as the `taste:<account id>` document. After every eight new signals Studio rewrites it in the background, at most every ten minutes and never while the text runtime is offline; an edited summary is kept and revised, not replaced. Accounts without **Prompt Assistant** can edit their summary, but nothing is sent to the text model. MCP's automatic model pick reads the summary as context.
+
 `mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway, using the variables above, and scores them; `--record` writes the live replies back for review. CI only scores the recorded replies.
 
 ## Profiles, Guides & Catalogue
