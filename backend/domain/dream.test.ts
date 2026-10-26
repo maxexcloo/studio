@@ -13,6 +13,7 @@ import {
   registerDreamRoutes,
   type DreamAccess,
   type DreamItem,
+  type DreamLoraLibrary,
   type DreamProfile,
   retainedDiscards,
 } from "./dream.ts";
@@ -22,7 +23,14 @@ import { queuePriority, RewriteStore } from "./store.ts";
 import { createTaste } from "./taste.ts";
 
 const profiles: DreamProfile[] = [
-  { id: "flux", kind: "image", label: "FLUX", defaults: { width: 1024, height: 1024 } },
+  {
+    id: "flux",
+    kind: "image",
+    label: "FLUX",
+    workflow: "family:flux",
+    defaults: { width: 1024, height: 1024 },
+    options: { loras: ["fox.safetensors", "film.safetensors", "ink.safetensors"] },
+  },
   { id: "qwen", kind: "image", label: "Qwen" },
   { id: "wan", kind: "video", label: "Wan", mediaInputs: [{ id: "start", required: true }] },
 ];
@@ -60,6 +68,7 @@ function fixture(t: TestContext) {
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
     removed: [] as string[],
+    loras: {} as Record<string, DreamLoraLibrary>,
   };
   let dream: ReturnType<typeof createDream>;
   const admission = createGenerationAdmission({
@@ -100,6 +109,7 @@ function fixture(t: TestContext) {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
     },
+    loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
     remove: (ownerId, itemIds) => {
       state.removed.push(...itemIds);
       state.items = state.items.filter(
@@ -353,12 +363,8 @@ test("Dream skips accounts without the prompt assistant and offline services, lo
   assert.equal(dream.status("alice").status, "paused");
 });
 
-test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
-  const { dream, store, state, taste, dreamOnce } = fixture(t);
-  await dream.save("alice", { enabled: true });
-  const job = (await dreamOnce())!;
-  await dreamOnce();
-  await dreamOnce();
+/** Serves the Dream routes; `request` answers as the user named in its last argument. */
+async function serve(t: TestContext, dream: ReturnType<typeof createDream>) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -372,7 +378,7 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
     server.closeAllConnections();
     server.close();
   });
-  const request = async (route: string, body?: unknown, method = "POST", user = "alice") => {
+  return async (route: string, body?: unknown, method = "POST", user = "alice") => {
     const response = await fetch(
       `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/dream${route}`,
       {
@@ -383,6 +389,15 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
     );
     return { status: response.status, body: await response.json() };
   };
+}
+
+test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
+  const { dream, store, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  await dreamOnce();
+  await dreamOnce();
+  const request = await serve(t, dream);
   const shown = (await request("")).body;
   assert.equal(shown.settings.enabled, true);
   assert.deepEqual(shown.today, { images: 3, videos: 0 });
@@ -461,4 +476,78 @@ test("Dream keeps only the newest discards", (t) => {
   assert.deepEqual(state.removed, ["old-0"]);
   assert.equal(dream.discarded("alice").length, retainedDiscards);
   assert.equal(dream.discarded("alice")[0].id, "fresh");
+});
+
+test("Calibration offers older gallery images, unjudged first, and only teaches the taste profile", async (t) => {
+  const { dream, state, taste } = fixture(t);
+  const old = new Date(state.clock - 2 * 86_400_000).toISOString();
+  const image = (id: string, extra: Partial<DreamItem> = {}): DreamItem => ({
+    id,
+    jobId: `job-${id}`,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    prompt: `prompt ${id}`,
+    createdAt: old,
+    settings: { profileId: "flux" },
+    ...extra,
+  });
+  state.items.push(
+    image("a"),
+    image("b"),
+    image("c"),
+    image("new", { createdAt: new Date(state.clock).toISOString() }),
+    image("clip", { type: "video" }),
+    image("unseen", { dream: { prompt: "p", why: "", at: old, state: "unseen" } }),
+    image("bobs", { ownerId: "bob" }),
+  );
+  const request = await serve(t, dream);
+  const offered = async () =>
+    (await request("/calibration?limit=10")).body.items.map((item: DreamItem) => item.id).sort();
+  assert.deepEqual(await offered(), ["a", "b", "c"]);
+
+  assert.equal((await request("/calibration", { liked: ["a", "b"] })).status, 400);
+  assert.equal((await request("/calibration", {})).status, 400);
+  assert.equal((await request("/calibration", { liked: ["a"], passed: ["a"] })).status, 400);
+  assert.equal((await request("/calibration", { liked: ["bobs"] })).status, 404);
+  assert.equal((await request("/calibration", { liked: ["new"] })).status, 404);
+  assert.equal((await request("/calibration", { liked: ["a"], passed: ["b"] })).status, 200);
+  assert.equal((await request("/calibration", { passed: ["c"] })).status, 200);
+  assert.deepEqual(
+    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId, signal.prompt]),
+    [
+      ["calibrate-pass", "job-c", "prompt c"],
+      ["calibrate-pass", "job-b", "prompt b"],
+      ["calibrate-like", "job-a", "prompt a"],
+    ],
+  );
+  // Judged images come after unjudged ones; nothing in the gallery changed.
+  state.items.push(image("d"));
+  assert.equal((await request("/calibration?limit=1")).body.items[0].id, "d");
+  assert.deepEqual(
+    state.items.filter((item) => item.ownerId === "alice").map((item) => item.dream?.state),
+    [undefined, undefined, undefined, undefined, undefined, "unseen", undefined],
+  );
+});
+
+test("Dream loads up to two of the account's starred LoRAs the profile can use", async (t) => {
+  const { dream, state, store, dreamOnce } = fixture(t);
+  state.loras.alice = {
+    favorites: ["other-family.safetensors", "fox.safetensors", "film.safetensors"],
+    strengths: { "family:flux": { "fox.safetensors": 0.6 } },
+  };
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  const loras = store.job("alice", job.id)!.input.loras as { name: string; strength: number }[];
+  assert.deepEqual(loras.map((lora) => [lora.name, lora.strength]).sort(), [
+    ["film.safetensors", 1],
+    ["fox.safetensors", 0.6],
+  ]);
+  state.loras.alice.favorites.push("ink.safetensors");
+  assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 2);
+  assert.match(state.calls.at(-1)!.user, /starred LoRAs: /);
+  // Without LoRA access nothing is added.
+  state.loras = {};
+  const next = (await dreamOnce())!;
+  assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
 });
