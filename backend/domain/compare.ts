@@ -57,8 +57,8 @@ export function registerCompareRoutes(
     /** The caller's visible gallery, or `null` when the account may not use the gallery. */
     gallery(req: Request): GalleryItem[] | null;
     pendingItems(id: string, input: GenerationInput): QueueMedia[];
-    /** Hears the winning job of a vote, for the taste profile; must not throw. */
-    voted?(ownerId: string, jobId: string): void;
+    /** Hears the winning job of a vote and the other finished variants, for the taste profile; must not throw. */
+    voted?(ownerId: string, jobId: string, others: string[]): void;
     /** Titles the chat a compare run starts; must not reject. */
     title?(account: GenerationAccount | undefined, sessionId: string, prompt: string): unknown;
   },
@@ -263,7 +263,14 @@ export function registerCompareRoutes(
     record.vote = vote;
     record.votedAt = new Date().toISOString();
     options.write(records);
-    if (vote) options.voted?.(record.ownerId, vote);
+    if (vote)
+      options.voted?.(
+        record.ownerId,
+        vote,
+        record.jobIds.filter(
+          (jobId) => jobId !== vote && variantItem(record.ownerId, items, jobId)?.status === "done",
+        ),
+      );
     return res.json(show(record, items));
   });
 }

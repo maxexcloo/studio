@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Alert, Button, Group, NavLink, Stack, Title } from "@mantine/core";
+import { Alert, Button, Group, NavLink, Stack, Title, type ButtonProps } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Link, useMatch } from "react-router";
@@ -56,26 +56,33 @@ function ChatRow({
   );
 }
 
+/** New Chat: an empty draft on `/chat`, ready for the first message. */
+export function NewChatButton({ onClick, ...props }: ButtonProps & { onClick?: () => void }) {
+  const { setDraft } = useGenerationActions();
+  return (
+    <Button
+      component={Link}
+      to="/chat"
+      variant="default"
+      leftSection={<Plus size={16} />}
+      {...props}
+      onClick={() => {
+        setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
+        onClick?.();
+      }}
+    >
+      New Chat
+    </Button>
+  );
+}
+
 /** New Chat and the account's Chats, in the desktop sidebar and the phone status Drawer. */
 export function SessionList({ close = () => {} }: { close?: () => void }) {
-  const id = useMatch("/chat/:id")?.params.id,
-    { setDraft } = useGenerationActions();
+  const id = useMatch("/chat/:id")?.params.id;
   const sessions = useQuery(sessionsQuery);
   return (
     <Stack gap={4} flex={1} mih={0}>
-      <Button
-        component={Link}
-        to="/chat"
-        variant="default"
-        leftSection={<Plus size={16} />}
-        mb="sm"
-        onClick={() => {
-          setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
-          close();
-        }}
-      >
-        New Chat
-      </Button>
+      <NewChatButton mb="sm" onClick={close} />
       {sessions.error ? (
         <Alert color="red">{sessions.error.message}</Alert>
       ) : sessions.data?.sessions.length === 0 ? (
