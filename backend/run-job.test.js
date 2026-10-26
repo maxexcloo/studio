@@ -10,9 +10,11 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 // relies on polling alone), history reports the images, and the gallery
 // placeholder becomes the finished item.
 const fake = await startFakeComfy();
-process.env.COMFY_URL = fake.url;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
+]);
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
-process.env.COMFY_OUTPUT_DIR = "";
+process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery-store.js");
 test.after(() => fake.close());

@@ -8,8 +8,13 @@ const child = fork("backend/index.js", [], {
   // An unreachable backend and a fresh env file keep the suite independent of local ComfyUI and secrets.
   env: {
     ...process.env,
-    COMFY_URL: "http://127.0.0.1:1",
-    COMFY_VIDEO_URL: "",
+    STUDIO_WORKERS: JSON.stringify([
+      {
+        id: "primary",
+        url: "http://127.0.0.1:1",
+        capabilities: ["image", "video", "upscale", "models"],
+      },
+    ]),
     STUDIO_DATA_DIR: data,
     STUDIO_DEMO: "1",
     STUDIO_ENV_FILE: path.join(data, ".env"),

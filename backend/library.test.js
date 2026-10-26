@@ -9,7 +9,7 @@ import sharp from "sharp";
 const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-")));
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
 const earlier = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-earlier-")));
-process.env.COMFY_OUTPUT_DIR = outputDir;
+process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = dataDir;
 fs.writeFileSync(
   path.join(dataDir, "library-folders.json"),

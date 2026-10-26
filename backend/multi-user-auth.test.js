@@ -7,7 +7,13 @@ import test from "node:test";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-multi-user-auth-"));
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MULTI_USER = "1";
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 const { registerMultiUserAuthRoutes, accountForRequest } = await import("./multi-user-auth.js");
 
 const routes = {};

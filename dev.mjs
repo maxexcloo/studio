@@ -14,7 +14,6 @@ const environment = {
   HOST: "127.0.0.1",
   PORT: process.env.STUDIO_DEV_API_PORT || "18787",
   STUDIO_DEV_API_PORT: process.env.STUDIO_DEV_API_PORT || "18787",
-  STUDIO_COMFY_SEARCH: "0",
   STUDIO_DATA_DIR: dataDir,
   STUDIO_ENV_FILE: path.join(dataDir, ".env"),
   STUDIO_MEDIA_DIR: path.join(dataDir, "media"),

@@ -46,7 +46,7 @@ test("without workloads there is no runtime; malformed configuration fails with 
       loadRuntime(
         environment(
           { text: { ...image, kind: "text", url: "http://bifrost:8080" } },
-          { BIFROST_URL: "http://bifrost:8080" },
+          { STUDIO_BIFROST_URL: "http://bifrost:8080" },
         ),
       ),
     /must point directly to its worker, not Bifrost/,

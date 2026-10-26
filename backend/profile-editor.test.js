@@ -6,7 +6,13 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-editor-"));
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 const editor = await import("./profile-editor.js");
 const { userWorkflowsDir } = await import("./custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
