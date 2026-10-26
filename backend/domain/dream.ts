@@ -52,6 +52,13 @@ export interface DreamProfile {
   defaults?: GenerationInput;
   capabilities?: { startImage?: boolean };
   mediaInputs?: { id: string; required?: boolean }[];
+  /** The LoRA files this profile can load. */
+  options?: { loras?: string[] };
+}
+/** The account's LoRA library: starred LoRA names and saved strengths per workflow. */
+export interface DreamLoraLibrary {
+  favorites: string[];
+  strengths: Record<string, Record<string, number>>;
 }
 /** What an account may do, or null once it is gone; `account` is undefined in single-user mode. */
 export interface DreamAccess {
@@ -80,6 +87,8 @@ interface DreamRecord {
   session?: string;
   /** The latest Dream prompts, newest first, so new ones don't repeat them. */
   recent: string[];
+  /** Gallery images judged in calibration, newest first, so unjudged ones come first. */
+  judged?: string[];
 }
 type Kind = "image" | "video";
 interface Request {
@@ -115,7 +124,12 @@ const tickMs = 45_000;
 const starredDays = 30;
 /** Dream deletes discards beyond the newest this many, so hidden results don't pile up. */
 export const retainedDiscards = 500;
+/** Calibration shows gallery images at least this old, so it doesn't repeat what was just made. */
+const calibrationAgeMs = 86_400_000;
+const judgedLimit = 2000;
 const maxPrompt = 4000;
+/** Dream adds at most this many of the account's starred LoRAs to a result. */
+const dreamLoras = 2;
 const spicyTheme =
   "Spicy: sensual, explicit content where it suits the scene, with frank, specific wording about bodies. Every person is an adult.";
 
@@ -160,6 +174,8 @@ export function createDream(options: {
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
+  /** The account's LoRA library, or null where it may not use LoRAs. */
+  loraLibrary(ownerId: string): DreamLoraLibrary | null;
   /** Deletes the owner's gallery records and their files. */
   remove(ownerId: string, itemIds: string[]): void;
   /** A gallery image as a reference asset for a video, or a throw when it can't be one. */
@@ -289,11 +305,27 @@ export function createDream(options: {
     return choices.length ? choices[random(choices.length)] : undefined;
   }
 
+  /** Up to two of the account's starred LoRAs the profile can load, at their saved strength. */
+  function starredLoras(ownerId: string, profile: DreamProfile) {
+    const library = options.loraLibrary(ownerId);
+    const available = new Set(profile.options?.loras || []);
+    const names = shuffled((library?.favorites || []).filter((name) => available.has(name)));
+    return names.slice(0, dreamLoras).map((name) => ({
+      name,
+      strength: library!.strengths[profile.workflow || ""]?.[name] ?? 1,
+      enabled: true,
+    }));
+  }
   async function writePrompt(
     ownerId: string,
     writer: DreamWriter,
     profile: DreamProfile,
-    { recent, spicy, source }: { recent: string[]; spicy: boolean; source?: DreamItem },
+    {
+      recent,
+      spicy,
+      source,
+      loras,
+    }: { recent: string[]; spicy: boolean; source?: DreamItem; loras: string[] },
   ) {
     const media = kindOf(profile);
     const starred = options
@@ -331,6 +363,7 @@ export function createDream(options: {
               "Recent Dream prompts:",
               ...(recent.length ? recent.map((prompt) => `- ${prompt}`) : ["(none yet)"]),
               ...(source ? [`The first frame was made from: ${clean(source.prompt, 1000)}`] : []),
+              ...(loras.length ? [`It loads their starred LoRAs: ${loras.join(", ")}`] : []),
             ].join("\n"),
           },
         ],
@@ -408,10 +441,12 @@ export function createDream(options: {
         }
       }
       const spicy = record.settings.spicy && access.nsfw && Boolean(writer.settings().spicyModel);
+      const loras = starredLoras(ownerId, profile);
       const written = await writePrompt(ownerId, writer, profile, {
         recent: record.recent,
         spicy,
         source: reference ? source : undefined,
+        loras: loras.map((lora) => lora.name),
       });
       if (!written)
         return { status: "waiting", reason: "The text model’s idea was unusable. Trying again." };
@@ -428,7 +463,7 @@ export function createDream(options: {
         ...(profile.workflow ? { workflow: profile.workflow } : {}),
         count: 1,
         prompt: written.prompt,
-        loras: [],
+        loras,
         allowFallback: false,
         referenceAssets: reference
           ? [
@@ -523,6 +558,26 @@ export function createDream(options: {
     pool(ownerId, "discarded").sort((a, b) =>
       String(b.dream?.decidedAt || "").localeCompare(String(a.dream?.decidedAt || "")),
     );
+  /** The owner's finished gallery images that are old enough to calibrate with. */
+  const calibrationPool = (ownerId: string) => {
+    const before = now() - calibrationAgeMs;
+    return options
+      .visible(options.gallery(ownerId))
+      .filter(
+        (item) =>
+          item.type === "image" &&
+          item.status === "done" &&
+          Date.parse(item.createdAt || "") <= before,
+      );
+  };
+  function shuffled<T>(items: T[]) {
+    const list = [...items];
+    for (let index = list.length - 1; index > 0; index--) {
+      const other = random(index + 1);
+      [list[index], list[other]] = [list[other], list[index]];
+    }
+    return list;
+  }
   function decide(ownerId: string, itemId: string, state: "kept" | "discarded") {
     const item = find(ownerId, itemId);
     if (item.status !== "done") throw failure("That Dream result is not finished yet.", 409);
@@ -593,6 +648,38 @@ export function createDream(options: {
       }
       if (timer) void tick().catch(() => undefined);
       return record.settings;
+    },
+    /** Random older gallery images to judge without the GPU, those not judged yet first. */
+    calibration(ownerId: string, limit: number) {
+      const judged = new Set(read(ownerId).judged);
+      const pool = calibrationPool(ownerId);
+      return [
+        ...shuffled(pool.filter((item) => !judged.has(String(item.id)))),
+        ...shuffled(pool.filter((item) => judged.has(String(item.id)))),
+      ].slice(0, limit);
+    },
+    /**
+     * Teaches the taste profile which older images the person likes or passes over (a this-or-that
+     * pair is one of each). The gallery itself stays as it was.
+     */
+    calibrate(ownerId: string, { liked, passed }: { liked: string[]; passed: string[] }) {
+      const pool = new Map(calibrationPool(ownerId).map((item) => [String(item.id), item]));
+      const signal = (kind: "calibrate-like" | "calibrate-pass") => (id: string) => {
+        const item = pool.get(id);
+        if (!item) throw failure("That gallery image is unavailable.", 404);
+        return tasteSignal(kind, item.jobId, { ...item.settings, prompt: item.prompt });
+      };
+      options.taste.record(ownerId, [
+        ...liked.map(signal("calibrate-like")),
+        ...passed.map(signal("calibrate-pass")),
+      ]);
+      const ids = [...liked, ...passed];
+      const record = read(ownerId);
+      record.judged = [...ids, ...(record.judged || []).filter((id) => !ids.includes(id))].slice(
+        0,
+        judgedLimit,
+      );
+      write(ownerId, record);
     },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),
@@ -677,6 +764,38 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
         .json({ ok: false, error: "Spicy needs NSFW Models for this account." });
     await dream.save(owner(req), patch);
     return res.json(show(owner(req)));
+  });
+  app.get("/api/dream/calibration", (req, res) => {
+    if (!allowed(req, res)) return;
+    const limit = Math.max(
+      1,
+      Math.min(24, Number.parseInt(String(req.query?.limit || "12"), 10) || 12),
+    );
+    return res.json({ items: dream.calibration(owner(req), limit) });
+  });
+  app.post("/api/dream/calibration", (req, res) => {
+    if (!allowed(req, res)) return;
+    const { liked = [], passed = [] } = req.body || {};
+    const ids = [liked, passed].flat();
+    if (
+      !Array.isArray(liked) ||
+      !Array.isArray(passed) ||
+      liked.length > 1 ||
+      !ids.length ||
+      ids.length > 2 ||
+      ids.some((id) => typeof id !== "string") ||
+      new Set(ids).size < ids.length
+    )
+      return res.status(400).json({
+        ok: false,
+        error: "Like or pass one image, or like one of a pair and pass the other.",
+      });
+    try {
+      dream.calibrate(owner(req), { liked, passed });
+      return res.json({ ok: true });
+    } catch (error) {
+      return refuse(res, error);
+    }
   });
   app.get("/api/dream/discarded", (req, res) => {
     if (!allowed(req, res)) return;

@@ -77,6 +77,46 @@ test("Dream explains itself while off and saves its settings on the deck", async
   expect(dream.settings.paused).toBe(true);
 });
 
+test("Animate keeps a Dream image and stages it in the Videos composer", async ({ page }) => {
+  const state = await fixtures(page);
+  const dream = await serveDream(page, { unseen: [dreamItem("fox")] });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(page).toHaveURL(/\/video/);
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Dream prompt fox",
+  );
+  expect(verdicts(dream)).toEqual(["POST /api/dream/fox/keep"]);
+  expect(state.referenceRequests).toEqual([{ galleryItemId: "fox" }]);
+});
+
+test("Calibration judges gallery images, singly and as a pair, even while Dream is off", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const gallery = ["g1", "g2", "g3", "g4"].map((id) => ({
+    ...dreamItem(id),
+    dream: undefined,
+  }));
+  const dream = await serveDream(page, { enabled: false, calibration: gallery });
+  await page.goto("/dream");
+  await page.getByRole("button", { name: "Tune Your Taste", exact: true }).click();
+  const card = page.getByRole("group", { name: "Current Gallery Image", exact: true });
+  await expect(card).toContainText("From Your Gallery");
+  await expect(page.getByRole("button", { name: "Animate", exact: true })).toBeDisabled();
+  await page.keyboard.press("ArrowRight");
+  await expect(card).toContainText("Dream prompt g2");
+  await page.getByRole("button", { name: "Pass", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Which Do You Prefer?" })).toBeVisible();
+  await page.getByRole("button", { name: "Prefer Second Image", exact: true }).click();
+  await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
+  expect(dream.requests.map((request) => request.body)).toEqual([
+    { liked: ["g1"] },
+    { passed: ["g2"] },
+    { liked: ["g4"], passed: ["g3"] },
+  ]);
+});
+
 test("Discarded Dream results stay listed and can be kept after all", async ({ page }) => {
   await fixtures(page);
   const dream = await serveDream(page, {
