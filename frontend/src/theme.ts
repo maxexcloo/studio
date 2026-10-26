@@ -53,6 +53,7 @@ const dropdown = {
 } as CSSProperties;
 // Translucent sticky headers would show scrolled content through the title.
 const overlayHeader = { background: "transparent" } satisfies CSSProperties;
+const overlayTitle = { fontWeight: 600 } satisfies CSSProperties;
 
 export function studioTheme({
   primaryColor,
@@ -170,7 +171,7 @@ export function studioTheme({
       Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
       Drawer: Drawer.extend({
         defaultProps: { overlayProps: { blur: 6, backgroundOpacity: 0.4 }, transitionProps },
-        styles: { header: overlayHeader },
+        styles: { header: overlayHeader, title: overlayTitle },
       }),
       Input: Input.extend({ defaultProps: { size: "md" } }),
       Menu: Menu.extend({ defaultProps: { transitionProps }, styles: { dropdown } }),
@@ -180,7 +181,7 @@ export function studioTheme({
           transitionProps: { transition: "fade", ...transitionProps },
           radius: "lg",
         },
-        styles: { header: overlayHeader },
+        styles: { header: overlayHeader, title: overlayTitle },
       }),
       NavLink: NavLink.extend({ styles: { root: { borderRadius: "var(--mantine-radius-md)" } } }),
       Notification: Notification.extend({ styles: { root: glass } }),
