@@ -51,9 +51,12 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/reference-assets(\/[^/]+(\/[a-z-]+)?)?$/],
   ["POST", /^\/api\/reference-assets\/(upload|from-gallery|[^/]+\/gallery)$/],
   ["DELETE", /^\/api\/reference-assets\/[^/]+$/],
-  // Comparisons, the taste profile and Dream read and write only the requester's own records.
+  // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/discarded)?)$/],
-  ["POST", /^\/api\/(comparisons(\/run)?|taste\/refresh|dream\/[^/]+\/(keep|discard|variations))$/],
+  [
+    "POST",
+    /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/[^/]+\/(keep|discard|variations))$/,
+  ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/taste$/],
   ["GET", /^\/api\/upscale\/status$/],
