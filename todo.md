@@ -88,7 +88,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Later (L)
 
-- [ ] L1 CivArchive (`https://civarchive.com/`) as a Library download and lookup source alongside Civitai and Hugging Face: search/resolve model and LoRA pages, catalogue metadata and downloads through the existing download queue. Check its terms and API before building.
+- [ ] L1 (deferred 26 Oct) CivArchive (`https://civarchive.com/`) as a Library download and lookup source alongside Civitai and Hugging Face: search/resolve model and LoRA pages, catalogue metadata and downloads through the existing download queue. Check its terms and API before building. Checked: no public API, terms or download hosting (it links to sources only), and `robots.txt` disallows `/api`; don't build against it without their permission. Ask CivArchive (Discord) for sanctioned API access first.
 
 ## Tests & Repository (T) — Small
 
