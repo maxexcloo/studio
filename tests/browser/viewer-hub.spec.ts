@@ -120,6 +120,27 @@ test("Animate themes write the motion prompt and queue a video from the image", 
   });
 });
 
+test("Copy Prompt beside the details heading copies in one click", async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as any).copiedPrompt = text;
+        },
+      },
+    });
+  });
+  const { viewer } = await seed(page);
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  }
+  await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).copiedPrompt)).toBe("An amber bird");
+});
+
 test("Desktop details stay where the viewer left them", async ({ page }, testInfo) => {
   test.skip(Boolean(testInfo.project.use.isMobile), "Phones show details in a sheet.");
   const { viewer } = await seed(page);
