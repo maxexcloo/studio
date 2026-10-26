@@ -45,6 +45,7 @@ export const catalogueFlags = [
     "STUDIO_GALLERY_CAPTIONS",
     "Gallery Captions",
     "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",
+    { defaultOn: false },
   ),
 ];
 
