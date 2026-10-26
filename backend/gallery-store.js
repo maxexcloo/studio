@@ -355,6 +355,7 @@ function gallerySearchText(item) {
       item.prompt,
       item.negative,
       item.caption?.text,
+      ...(Array.isArray(item.caption?.tags) ? item.caption.tags : []),
       item.model,
       settings.modelName,
       settings.profileId,
