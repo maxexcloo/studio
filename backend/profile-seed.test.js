@@ -120,10 +120,13 @@ test("without a seed directory nothing is copied; a missing one is a warning", (
   assert.match(warnings[0], /doesn’t exist/);
 });
 
-test("the guides’ seed is MCP_PROMPTING_PATH, else the seeded config/prompting.json", (t) => {
+test("the guides’ seed is STUDIO_MCP_PROMPTING_PATH, else the seeded config/prompting.json", (t) => {
   const dir = scratch(t);
   assert.equal(
-    guideSeedFile({ MCP_PROMPTING_PATH: "/x/prompting.json", STUDIO_SEED_DIR: "/seed" }, dir),
+    guideSeedFile(
+      { STUDIO_MCP_PROMPTING_PATH: "/x/prompting.json", STUDIO_SEED_DIR: "/seed" },
+      dir,
+    ),
     "/x/prompting.json",
   );
   assert.equal(

@@ -1,10 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { currentDataDir, projectRoot } from "./data-root.js";
-import { applyLegacyEnvNames } from "./env-names.js";
+import { currentDataDir, projectRoot, readEnvFile } from "./data-root.js";
 import { removeJsonFile, writeJsonFile } from "./json-store.js";
-import { readEnvFile } from "./env-names.js";
 
 /**
  * Why Studio stopped last time, so a studio that "just exited" has a reason
@@ -27,20 +25,11 @@ export const PORT_IN_USE_CODE = 78;
 
 /**
  * The data folder, as the server finds it (data-root.js). The launchers don't
- * load .env (the server does), so its values fill in what the shell left unset,
- * and an old HEISS_* name in the shell still beats the file, as in the server.
+ * load .env (the server does), so its values fill in what the shell left unset.
  */
 export function exitRecordDataDir(env = process.env, fileValues = null) {
   const shell = Object.fromEntries(Object.entries(env).filter(([, value]) => value));
-  applyLegacyEnvNames(shell);
-  let file = fileValues;
-  if (!file) {
-    try {
-      file = readEnvFile(projectRoot).values;
-    } catch {
-      file = {};
-    }
-  }
+  const file = fileValues || readEnvFile(path.join(projectRoot, ".env"));
   return currentDataDir({ ...file, ...shell });
 }
 const logDir = () => path.join(exitRecordDataDir(), "logs");

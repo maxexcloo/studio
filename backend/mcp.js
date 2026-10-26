@@ -198,7 +198,7 @@ export function registerMcpRoutes(
       "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_WORKLOADS) and a key separate from STUDIO_MCP_API_KEY.",
     );
   const publicUrl =
-    environment.MCP_PUBLIC_URL?.replace(/\/+$/, "") ||
+    environment.STUDIO_MCP_PUBLIC_URL?.replace(/\/+$/, "") ||
     (typeof baseUrl === "function" ? baseUrl() : baseUrl);
   const parsedPublic = new URL(publicUrl);
   if (
@@ -209,24 +209,24 @@ export function registerMcpRoutes(
     parsedPublic.hash
   )
     throw new Error(
-      "MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
+      "STUDIO_MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
     );
   const media =
     mediaKey || accountMode
       ? new McpMedia({
           dataDir,
           baseUrl,
-          publicUrl: environment.MCP_PUBLIC_URL
+          publicUrl: environment.STUDIO_MCP_PUBLIC_URL
             ? publicUrl
             : () => (typeof baseUrl === "function" ? baseUrl() : baseUrl),
-          signingKey: environment.MCP_SIGNING_KEY,
+          signingKey: environment.STUDIO_MCP_SIGNING_KEY,
           fetchImpl,
           resolveSignedResult,
           domainRequest,
         })
       : null;
-  // Studio's guide store (guides/prompting.json) first, the deployment's MCP_PROMPTING_PATH as seed, reloaded on change.
-  const prompting = livePrompting({ dataDir, seedFile: environment.MCP_PROMPTING_PATH });
+  // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
+  const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
   // Optional: with a writer, Studio writes each prompt from the request; a partial setting fails at start.
   const writer = createPromptWriter(environment, { fetchImpl });
   const instructions = mediaInstructions(Boolean(writer));

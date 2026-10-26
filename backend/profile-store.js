@@ -14,7 +14,7 @@ import { configurationFile } from "./config-directory.js";
  *
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
- * `<data>/history/guides/<packId>/<n>.json`. The deployment's MCP_PROMPTING_PATH is seed input
+ * `<data>/history/guides/<packId>/<n>.json`. The deployment's STUDIO_MCP_PROMPTING_PATH is seed input
  * only: it fills a new install and adds packs and bindings Studio doesn't have, and never
  * replaces one Studio holds. Studio is the only writer of live profiles and guides; the profiles
  * repository (`ai/profiles/`) is their seed and backup, fed by Settings › Profiles › Export.
@@ -352,13 +352,13 @@ function cleanPack(pack) {
 }
 
 /**
- * The guides' seed: STUDIO_CONFIG_DIR/prompting.json, then MCP_PROMPTING_PATH, else with STUDIO_SEED_DIR the data folder's
+ * The guides' seed: STUDIO_CONFIG_DIR/prompting.json, then STUDIO_MCP_PROMPTING_PATH, else with STUDIO_SEED_DIR the data folder's
  * `config/prompting.json` (which profile-seed.js fills from the seed on a new install).
  */
 export function guideSeedFile(environment = process.env, dataDir = currentDataDir()) {
   if (configurationFile("prompting.json", environment))
     return configurationFile("prompting.json", environment);
-  if (environment.MCP_PROMPTING_PATH) return environment.MCP_PROMPTING_PATH;
+  if (environment.STUDIO_MCP_PROMPTING_PATH) return environment.STUDIO_MCP_PROMPTING_PATH;
   return String(environment.STUDIO_SEED_DIR || "").trim()
     ? path.join(dataDir, "config", "prompting.json")
     : "";
