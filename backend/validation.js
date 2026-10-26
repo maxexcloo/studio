@@ -26,13 +26,30 @@ function snapNumber(value, fallback, range = {}) {
   const min = Number.isFinite(Number(range.min)) ? Number(range.min) : -Number.MAX_SAFE_INTEGER;
   const max = Number.isFinite(Number(range.max)) ? Number(range.max) : Number.MAX_SAFE_INTEGER;
   const base = clampNumber(value, fallback, min, max);
-  const offset = Number(range.offset || 0);
+  // Steps count from the minimum, as ComfyUI's own inputs do (H3: 124, 141, … 345).
+  const offset = Number(range.offset ?? (Number.isFinite(Number(range.min)) ? range.min : 0));
   const snapped = Math.round((base - offset) / step) * step + offset;
   return Math.max(min, Math.min(max, snapped));
 }
 
 function snapInteger(value, fallback, range = {}) {
   return Math.round(snapNumber(value, fallback, range));
+}
+
+/** Video frames the worker can't render are refused, never moved to the nearest length it can. */
+function videoFrames(value, range = {}) {
+  if (value === undefined || value === null || value === "")
+    return snapInteger(value, range.default, range);
+  const frames = Number(value);
+  const { min = 1, max = Number.MAX_SAFE_INTEGER, step = 1 } = range;
+  const offset = Number(range.offset ?? min);
+  if (!Number.isInteger(frames) || frames < min || frames > max || (frames - offset) % step)
+    throw new Error(
+      step > 1
+        ? `Frames must be from ${min} to ${max} in steps of ${step}.`
+        : `Frames must be from ${min} to ${max}.`,
+    );
+  return frames;
 }
 
 function ensureOption(info, node, key, value, label) {
@@ -238,7 +255,7 @@ function sanitizeFamilyBody(input, info, stats) {
               : 1,
         }
       : {}),
-    frames: kind === "video" ? snapInteger(input.frames, c.frames?.default, c.frames) : 0,
+    frames: kind === "video" ? videoFrames(input.frames, c.frames) : 0,
     fps: kind === "video" ? snapInteger(input.fps, c.fps?.default, c.fps) : 0,
     startImage: profile.capabilities.startImage ? String(input.startImage || "") : "",
     startImageId: profile.capabilities.startImage ? String(input.startImageId || "") : "",
@@ -407,7 +424,7 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
       ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration)
       : 0,
     resolution,
-    frames: snapInteger(input.frames, frameRange.default, frameRange),
+    frames: kind === "video" ? videoFrames(input.frames, frameRange) : 0,
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
     startImage: String(input.startImage || ""),
     startImageId: String(input.startImageId || ""),

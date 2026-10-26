@@ -398,10 +398,11 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
     if (Number(defaults.fps)) fpsRange.default = Number(defaults.fps);
     if (Number(defaults.duration)) durationRange.default = Number(defaults.duration);
     if (String(workflow.family || "").replaceAll("-", "_") === "minimax_h3") {
+      // H3 renders 124 to 362 frames on a 17n + 5 grid; a node that declares less (Radiance: 345) wins.
       Object.assign(frameRange, {
         default: Number(defaults.frames || 124),
-        min: 124,
-        max: 362,
+        min: Math.max(124, Number(frameRange.min) || 0),
+        max: Math.min(362, Number(frameRange.max) || 362),
         step: 17,
         offset: 5,
       });
