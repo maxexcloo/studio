@@ -11,8 +11,8 @@
   box-shadow: var(--mantine-shadow-xs);
 }
 
-.favorite {
-  margin-inline-end: auto;
+.more {
+  margin-inline-start: auto;
 }
 
 *:hover > .actions .control,
@@ -29,6 +29,7 @@
 }
 
 @media (max-width: 48em) {
+  .download,
   .favorite:not([data-starred]) {
     display: none;
   }
