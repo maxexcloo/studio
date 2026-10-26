@@ -8,13 +8,18 @@ import type {
   QueueJob,
   StudioSession,
 } from "../../shared/queue.ts";
+import type { DreamOrigin } from "./dream.ts";
 
-/** Queue tiers on one resource, lower first; Dream background work will add a tier below `mcp`. */
-export const queuePriority = { manual: 0, mcp: 1 } as const;
-/** Where a job was admitted from: its tier and, for an MCP call, the set it was enqueued with. */
+/** Queue tiers on one resource, lower first; Dream's background work runs below MCP. */
+export const queuePriority = { manual: 0, mcp: 1, dream: 2 } as const;
+/**
+ * Where a job was admitted from: its tier, for an MCP call the set it was enqueued with, and for a
+ * Dream job its prompt and note, which its gallery items carry until the person keeps them.
+ */
 export interface QueueOrigin {
   priority?: number;
   queueSet?: string;
+  dream?: DreamOrigin;
 }
 export type OwnedJob = QueueJob &
   QueueOrigin & { ownerId: string; resource: string; cancelRequested?: boolean };
@@ -52,9 +57,22 @@ export class RewriteStore {
       CREATE INDEX IF NOT EXISTS studio_chat_session ON studio_chat_messages(owner_id, session_id);`);
   }
 
-  createSession(ownerId: string, title = "New Chat", inputs: GenerationInput = {}): StudioSession {
+  /** A `hidden` session (Dream's own) holds jobs but is never listed as a Chat. */
+  createSession(
+    ownerId: string,
+    title = "New Chat",
+    inputs: GenerationInput = {},
+    hidden = false,
+  ): StudioSession {
     const stamp = now();
-    const session = { id: randomUUID(), title, inputs, createdAt: stamp, updatedAt: stamp };
+    const session: StudioSession = {
+      id: randomUUID(),
+      title,
+      inputs,
+      createdAt: stamp,
+      updatedAt: stamp,
+      ...(hidden ? { hidden: true as const } : {}),
+    };
     this.db
       .prepare("INSERT INTO studio_sessions VALUES (?, ?, ?, ?)")
       .run(session.id, ownerId, stamp, JSON.stringify(session));
@@ -65,7 +83,8 @@ export class RewriteStore {
     return this.db
       .prepare("SELECT record FROM studio_sessions WHERE owner_id = ? ORDER BY updated_at DESC")
       .all(ownerId)
-      .map((row) => JSON.parse(row.record as string));
+      .map((row) => JSON.parse(row.record as string) as StudioSession)
+      .filter((session) => !session.hidden);
   }
 
   session(ownerId: string, id: string): StudioSession | undefined {
@@ -158,9 +177,9 @@ export class RewriteStore {
     if (jobLimit !== undefined) {
       const row = this.db
         .prepare(
-          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled')",
+          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled') AND COALESCE(json_extract(record, '$.priority'), 0) <> ?",
         )
-        .get(ownerId)!;
+        .get(ownerId, queuePriority.dream)!;
       if (Number(row.count) >= jobLimit)
         throw Object.assign(new Error(`You can have up to ${jobLimit} outstanding jobs.`), {
           status: 429,
@@ -186,6 +205,7 @@ export class RewriteStore {
       operation,
       priority: origin.priority ?? queuePriority.manual,
       queueSet: origin.queueSet,
+      ...(origin.dream ? { dream: origin.dream } : {}),
       status: "queued",
       reason: "",
       input: { ...input, clientJobId: id },
@@ -322,6 +342,7 @@ export function publicJob({
   cancelRequested: _cancelRequested,
   priority: _priority,
   queueSet: _queueSet,
+  dream: _dream,
   ...job
 }: OwnedJob): QueueJob {
   return job;

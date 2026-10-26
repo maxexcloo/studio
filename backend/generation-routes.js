@@ -323,6 +323,9 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
     const chat = storedChatRecord(req.body?.chat);
     if (chat) body.chat = chat;
     else delete body.chat;
+    // A Dream job's results stay out of the gallery until kept (domain/dream.ts); only its queue record sets this.
+    if (req.studioDream) body.dream = { state: "unseen", ...req.studioDream };
+    else delete body.dream;
     // Smart upscale: the run's images upscale at this effort as part of the run itself (smartUpscalePrepare).
     const autoUpscale = req.body?.autoUpscale;
     // Only a worker with Upscale runs it as part of the run; elsewhere the run goes ahead at its own size.

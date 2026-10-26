@@ -613,6 +613,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
             ...(body.ownerId ? { ownerId: body.ownerId } : {}),
             ...(body.assistant ? { assistant: body.assistant } : {}),
             ...(body.chat ? { chat: body.chat } : {}),
+            ...(body.dream ? { dream: body.dream } : {}),
           },
         },
       }),

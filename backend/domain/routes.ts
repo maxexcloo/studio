@@ -4,7 +4,7 @@ import type {
   QueueCancelAllResponse,
 } from "../../shared/queue.ts";
 import { GenerationQueue, terminalStatuses } from "./queue.ts";
-import { publicJob, RewriteStore, type OwnedJob } from "./store.ts";
+import { publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 interface Request {
   studioAccount?: { userId: string; role?: string };
@@ -23,6 +23,9 @@ interface Router {
   delete(path: string, handler: Handler): unknown;
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
+/** The person's queue: Dream's background jobs stay out of it; Dream's own pause stops them. */
+const listed = (store: RewriteStore, ownerId: string) =>
+  store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream);
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -203,12 +206,12 @@ export function registerRewriteRoutes(
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
   });
-  app.get("/api/queue", (req, res) => res.json({ jobs: store.jobs(owner(req)).map(publicJob) }));
+  app.get("/api/queue", (req, res) => res.json({ jobs: listed(store, owner(req)).map(publicJob) }));
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
-    for (const job of store
-      .jobs(owner(req))
-      .filter((item) => ["queued", "waiting"].includes(item.status))) {
+    for (const job of listed(store, owner(req)).filter((item) =>
+      ["queued", "waiting"].includes(item.status),
+    )) {
       if ((await queue.cancel(owner(req), job.id))?.status === "cancelled") cancelled++;
     }
     return res.json({ cancelled });
@@ -216,8 +219,7 @@ export function registerRewriteRoutes(
   app.post("/api/queue/cancel-all", async (req, res) => {
     const ownerId = owner(req);
     const outcomes = await Promise.all(
-      store
-        .jobs(ownerId)
+      listed(store, ownerId)
         .filter((job) => !terminalStatuses.has(job.status))
         .map(async (initial) => {
           let error: string | undefined;

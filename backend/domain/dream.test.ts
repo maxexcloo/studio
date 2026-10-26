@@ -1,0 +1,431 @@
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import fs from "node:fs";
+import type { AddressInfo } from "node:net";
+import os from "node:os";
+import path from "node:path";
+import test, { type TestContext } from "node:test";
+import express from "express";
+import { closeRuntimeDatabase } from "../persistence/runtime.ts";
+import { createGenerationAdmission } from "./admission.ts";
+import {
+  createDream,
+  registerDreamRoutes,
+  type DreamAccess,
+  type DreamItem,
+  type DreamProfile,
+} from "./dream.ts";
+import type { GenerationQueue } from "./queue.ts";
+import { registerRewriteRoutes } from "./routes.ts";
+import { queuePriority, RewriteStore } from "./store.ts";
+import { createTaste } from "./taste.ts";
+
+const profiles: DreamProfile[] = [
+  { id: "flux", kind: "image", label: "FLUX", defaults: { width: 1024, height: 1024 } },
+  { id: "qwen", kind: "image", label: "Qwen" },
+  { id: "wan", kind: "video", label: "Wan", mediaInputs: [{ id: "start", required: true }] },
+];
+const everything: DreamAccess = {
+  gallery: true,
+  image: true,
+  video: true,
+  assistant: true,
+  nsfw: false,
+};
+
+/** Dream with fakes for every service; nothing generates and nothing starts on its own. */
+function fixture(t: TestContext) {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-"));
+  const store = new RewriteStore(":memory:");
+  t.after(() => {
+    store.close();
+    closeRuntimeDatabase(dataDir);
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
+  const taste = createTaste({ dataDir, writer: () => null });
+  const state = {
+    clock: Date.now(),
+    items: [] as DreamItem[],
+    access: Object.fromEntries(
+      ["alice", "bob"].map((userId) => [
+        userId,
+        { ...everything, account: { userId, role: "user" } },
+      ]),
+    ) as Record<string, DreamAccess>,
+    online: { text: true, image: true, video: true },
+    textBusy: false,
+    spicyModel: "",
+    prompts: 0,
+    calls: [] as { model: string; system: string; user: string }[],
+    logs: [] as string[],
+  };
+  let dream: ReturnType<typeof createDream>;
+  const admission = createGenerationAdmission({
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    validate: async () => ({ status: 200, payload: { ok: true } }),
+    resourceFor: async (input) => `worker:${input.kind === "video" ? "video" : "image"}`,
+    pendingItems: (id, input) => [
+      { id: `${id}-0`, jobId: id, status: "pending", prompt: input.prompt },
+    ],
+    revision: () => 0,
+    jobLimit: 10,
+    admitted: (job) => dream.admitted(job),
+  });
+  dream = createDream({
+    dataDir,
+    store,
+    taste,
+    owners: () => ["alice", "bob"],
+    access: (ownerId) => state.access[ownerId] ?? null,
+    catalogue: async () => ({ profiles, defaults: { imageModel: "flux", videoModel: "wan" } }),
+    online: async (kind) => ({ text: state.online.text, media: state.online[kind] }),
+    textBusy: () => state.textBusy,
+    writer: {
+      settings: () => ({ model: "writer", spicyModel: state.spicyModel }),
+      chat: async ({ model, messages }) => {
+        state.calls.push({ model, system: messages[0].content, user: messages[1].content });
+        state.prompts++;
+        return {
+          text: JSON.stringify({ prompt: `dream ${state.prompts}`, why: "You star foxes." }),
+        };
+      },
+    },
+    guide: () => ({ summary: "natural language" }),
+    gallery: (ownerId) => state.items.filter((item) => item.ownerId === ownerId),
+    visible: (items) => items.filter((item) => !item.dream || item.dream.state === "kept"),
+    mark: (ownerId, itemId, mark) => {
+      const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
+      item.dream = mark;
+    },
+    reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
+    // Like the generation route: a Dream job's pending tile carries its mark from the queue record.
+    admit: async (input, account, scope, origin) => {
+      const result = await admission(input, account, scope, origin);
+      const job = store.job(account?.userId || "", String(result.payload.jobId))!;
+      state.items.unshift({
+        id: `${job.id}-0`,
+        jobId: job.id,
+        ownerId: job.ownerId,
+        type: input.kind === "video" ? "video" : "image",
+        status: "pending",
+        prompt: String(input.prompt),
+        createdAt: new Date(state.clock).toISOString(),
+        settings: { profileId: input.profileId },
+        ...(job.dream ? { dream: { state: "unseen" as const, ...job.dream } } : {}),
+      });
+      return result;
+    },
+    cancel: async (ownerId, jobId) =>
+      store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
+    now: () => state.clock,
+    random: () => 0,
+    log: { info: (message) => state.logs.push(message) },
+  });
+  /** Finishes a job and its tile, as saving its outputs would. */
+  const finish = (ownerId: string, jobId: string) => {
+    store.save({ ...store.job(ownerId, jobId)!, status: "completed" });
+    for (const item of state.items) if (item.jobId === jobId) item.status = "done";
+  };
+  const dreamJobs = (ownerId?: string) =>
+    store.jobs(ownerId).filter((job) => job.priority === queuePriority.dream);
+  const live = (ownerId?: string) =>
+    dreamJobs(ownerId).filter((job) => !["completed", "failed", "cancelled"].includes(job.status));
+  /** One tick, then the Dream job it queued finished. */
+  const dreamOnce = async (ownerId = "alice") => {
+    await dream.tick();
+    const [job] = live(ownerId);
+    if (job) finish(ownerId, job.id);
+    return job;
+  };
+  return { dream, store, state, admission, taste, finish, dreamJobs, live, dreamOnce, dataDir };
+}
+
+test("Dream is off until turned on, queues one hidden job only while Studio is idle and yields at once", async (t) => {
+  const { dream, store, state, admission, dreamJobs, live } = fixture(t);
+  assert.deepEqual(dream.read("alice").settings, {
+    enabled: false,
+    paused: false,
+    buffer: 12,
+    dailyImages: 40,
+    dailyVideos: 4,
+    videos: false,
+    spicy: false,
+  });
+  await dream.tick();
+  assert.equal(dreamJobs().length, 0);
+  assert.equal(dream.status("alice").status, "off");
+  assert.equal(dream.started, false);
+
+  await dream.save("alice", { enabled: true });
+  // Someone's own work (or MCP's) is queued: Dream waits.
+  const session = store.createSession("bob");
+  const user = store.enqueue("bob", session.id, { prompt: "mine" }, "image");
+  await dream.tick();
+  assert.equal(dreamJobs().length, 0);
+  store.save({ ...user, status: "completed" });
+  const mcp = store.enqueue(
+    "bob",
+    session.id,
+    { prompt: "chat" },
+    "image",
+    undefined,
+    "worker:image",
+    undefined,
+    undefined,
+    { priority: queuePriority.mcp },
+  );
+  await dream.tick();
+  assert.equal(dreamJobs().length, 0);
+  store.save({ ...mcp, status: "completed" });
+  // Text work holds it back too.
+  state.textBusy = true;
+  await dream.tick();
+  assert.equal(dreamJobs().length, 0);
+  state.textBusy = false;
+
+  await dream.tick();
+  const [job] = dreamJobs("alice");
+  assert.equal(job.priority, queuePriority.dream);
+  assert.equal(job.input.kind, "image");
+  assert.equal(job.input.profileId, "flux");
+  assert.equal(job.input.prompt, "dream 1");
+  assert.equal(job.input.allowFallback, false);
+  assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {
+    prompt: "dream 1",
+    why: "You star foxes.",
+  });
+  // Its session is Dream's own and never listed as a Chat.
+  assert.equal(store.session("alice", job.sessionId)?.hidden, true);
+  assert.equal(store.sessions("alice").length, 0);
+  assert.equal(dream.status("alice").status, "generating");
+  // One Dream job at a time across Studio.
+  await dream.tick();
+  assert.equal(live().length, 1);
+
+  // A person's request cancels the waiting Dream job before the queue can start it.
+  const mine = await admission({ prompt: "now" }, { userId: "bob", role: "user" });
+  assert.equal(mine.status, 200);
+  assert.equal(store.job("alice", job.id)?.status, "cancelled");
+  // Cancelled Dream work doesn't count towards the day.
+  assert.deepEqual(dream.today("alice"), { images: 0, videos: 0 });
+  // A started Dream job is never pre-empted.
+  store.save({ ...store.job("bob", String(mine.payload.jobId))!, status: "completed" });
+  await dream.tick();
+  const [next] = live("alice");
+  store.save({ ...next, status: "running" });
+  await admission({ prompt: "later" }, { userId: "bob", role: "user" });
+  assert.equal(store.job("alice", next.id)?.status, "running");
+  // The person's queue never lists Dream jobs, and they don't count towards the job limit.
+  const app = express();
+  app.use((req, _res, nextHandler) => {
+    Object.assign(req, { studioAccount: { userId: "alice", role: "user" } });
+    nextHandler();
+  });
+  registerRewriteRoutes(app as never, {
+    store,
+    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  assert.deepEqual((await (await fetch(`${base}/api/queue`)).json()).jobs, []);
+  assert.deepEqual((await (await fetch(`${base}/api/sessions`)).json()).sessions, []);
+  for (let index = 0; index < 10; index++)
+    assert.equal(
+      (await admission({ prompt: `p${index}` }, { userId: "alice", role: "user" })).status,
+      200,
+    );
+});
+
+test("Dream stops at the unseen buffer and today's cap per kind, and animates kept or starred images", async (t) => {
+  const { dream, state, dreamOnce, live } = fixture(t);
+  await dream.save("alice", { enabled: true, buffer: 2, dailyImages: 3 });
+  assert.ok(await dreamOnce());
+  assert.ok(await dreamOnce());
+  assert.equal(await dreamOnce(), undefined);
+  assert.deepEqual(dream.status("alice"), {
+    status: "waiting",
+    reason: "Dream waits until you have looked at what it made.",
+  });
+  const [first, second] = dream.unseen("alice");
+  assert.deepEqual([first.prompt, second.prompt], ["dream 1", "dream 2"]);
+  // The writer saw the recent Dream prompts so it can avoid them.
+  assert.match(state.calls[1].user, /- dream 1/);
+  dream.discard("alice", String(first.id));
+  assert.ok(await dreamOnce());
+  dream.keep("alice", String(second.id));
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal(dream.status("alice").status, "capped");
+  assert.deepEqual(dream.today("alice"), { images: 3, videos: 0 });
+  // A new day starts a new share.
+  state.clock += 86_400_000;
+  assert.equal(dream.status("alice").status, "waiting");
+
+  // Videos animate a kept or starred image with the default video profile.
+  await dream.save("alice", { buffer: 10, dailyImages: 0, videos: true, dailyVideos: 1 });
+  const video = await dreamOnce();
+  assert.equal(video?.input.kind, "video");
+  assert.equal(video?.input.profileId, "wan");
+  assert.deepEqual(video?.input.referenceAssets, [
+    { assetId: `asset-${second.id}`, source: "gallery", slot: "start" },
+  ]);
+  assert.match(state.calls.at(-1)!.user, /first frame was made from: dream 2/);
+  assert.equal(await dreamOnce(), undefined);
+  assert.equal(dream.status("alice").status, "capped");
+  assert.equal(live().length, 0);
+});
+
+test("Dream picks the most-starred ready profile and keeps Spicy to NSFW-granted accounts with a Spicy model", async (t) => {
+  const { dream, state, dreamOnce } = fixture(t);
+  const starred = (id: string, profileId: string, days = 1) =>
+    state.items.push({
+      id,
+      ownerId: "alice",
+      type: "image",
+      status: "done",
+      favorite: true,
+      prompt: `starred ${id}`,
+      createdAt: new Date(state.clock - days * 86_400_000).toISOString(),
+      settings: { profileId },
+    });
+  starred("a", "qwen");
+  starred("b", "qwen");
+  starred("c", "flux");
+  starred("d", "flux", 40);
+  starred("e", "flux", 40);
+  await dream.save("alice", { enabled: true, spicy: true });
+  const job = await dreamOnce();
+  assert.equal(job?.input.profileId, "qwen");
+  assert.match(state.calls[0].user, /- starred a/);
+  // No NSFW grant: Spicy never applies, whatever the setting says.
+  assert.equal(state.calls[0].model, "writer");
+  assert.match(state.calls[0].system, /safe for work/);
+  state.access.alice.nsfw = true;
+  await dreamOnce();
+  // A grant without a Spicy model still writes safe prompts.
+  assert.equal(state.calls[1].model, "writer");
+  state.spicyModel = "uncensored";
+  const spicy = await dreamOnce();
+  assert.equal(state.calls[2].model, "uncensored");
+  assert.match(state.calls[2].system, /Spicy/);
+  assert.equal(spicy?.dream?.spicy, true);
+});
+
+test("Dream skips accounts without the prompt assistant and offline services, logging each reason once", async (t) => {
+  const { dream, state, dreamJobs, store } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  state.access.alice.assistant = false;
+  await dream.tick();
+  await dream.tick();
+  assert.equal(dreamJobs().length, 0);
+  assert.deepEqual(dream.status("alice"), {
+    status: "unavailable",
+    reason: "The prompt assistant is off for this account.",
+  });
+  assert.equal(state.logs.length, 1);
+  state.access.alice.assistant = true;
+  state.online.text = false;
+  await dream.tick();
+  assert.equal(dream.status("alice").reason, "The text model is offline.");
+  state.online.text = true;
+  state.online.image = false;
+  await dream.tick();
+  assert.equal(dream.status("alice").reason, "The image worker is offline.");
+  assert.equal(state.logs.length, 3);
+  assert.equal(state.calls.length, 0);
+  assert.equal(dreamJobs().length, 0);
+  // Pausing stops a waiting Dream job.
+  state.online.image = true;
+  await dream.tick();
+  assert.equal(dreamJobs("alice")[0].status, "queued");
+  await dream.save("alice", { paused: true });
+  assert.equal(dreamJobs("alice")[0].status, "cancelled");
+  assert.equal(dream.status("alice").status, "paused");
+});
+
+test("Dream routes are owner-scoped: keep, discard and variations move results and teach the taste profile", async (t) => {
+  const { dream, store, state, taste, dreamOnce } = fixture(t);
+  await dream.save("alice", { enabled: true });
+  const job = (await dreamOnce())!;
+  await dreamOnce();
+  await dreamOnce();
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: String(req.headers["x-user"]), role: "user" } });
+    next();
+  });
+  registerDreamRoutes(app as never, { dream });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  const request = async (route: string, body?: unknown, method = "POST", user = "alice") => {
+    const response = await fetch(
+      `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/dream${route}`,
+      {
+        method: body === undefined ? "GET" : method,
+        headers: { "content-type": "application/json", "x-user": user },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      },
+    );
+    return { status: response.status, body: await response.json() };
+  };
+  const shown = (await request("")).body;
+  assert.equal(shown.settings.enabled, true);
+  assert.deepEqual(shown.today, { images: 3, videos: 0 });
+  assert.deepEqual(
+    shown.unseen.map((item: DreamItem) => item.prompt),
+    ["dream 1", "dream 2", "dream 3"],
+  );
+  assert.equal(shown.spicyAvailable, false);
+  assert.equal((await request("", undefined, "GET", "bob")).body.unseen.length, 0);
+  const [one, two, three] = shown.unseen.map((item: DreamItem) =>
+    encodeURIComponent(String(item.id)),
+  );
+
+  assert.equal((await request("/settings", { buffer: 0 }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { videos: "yes" }, "PUT")).status, 400);
+  assert.equal((await request("/settings", { spicy: true }, "PUT")).status, 403);
+  const saved = await request("/settings", { paused: true, dailyVideos: 2 }, "PUT");
+  assert.equal(saved.body.settings.paused, true);
+  assert.equal(saved.body.settings.dailyVideos, 2);
+  assert.equal(saved.body.status, "paused");
+
+  // Another account can't judge Alice's results.
+  assert.equal((await request(`/${one}/keep`, {}, "POST", "bob")).status, 404);
+  const kept = await request(`/${one}/keep`, {});
+  assert.equal(kept.body.item.dream.state, "kept");
+  assert.equal((await request(`/${one}/discard`, {})).status, 409);
+  assert.equal((await request(`/${two}/discard`, {})).body.item.dream.state, "discarded");
+  assert.deepEqual(
+    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId]),
+    [
+      ["discard", state.items.find((item) => item.prompt === "dream 2")?.jobId],
+      ["keep", job.id],
+    ],
+  );
+  const discarded = await request("/discarded?limit=1");
+  assert.equal(discarded.body.items[0].prompt, "dream 2");
+  assert.equal(discarded.body.nextCursor, "");
+
+  // Variations keep the result and queue the person's own job with new seeds.
+  assert.equal((await request(`/${three}/variations`, { count: 9 })).status, 400);
+  const varied = await request(`/${three}/variations`, { count: 3 });
+  assert.equal(varied.status, 202);
+  assert.equal(varied.body.item.dream.state, "kept");
+  const variation = store.job("alice", varied.body.jobId)!;
+  assert.equal(variation.priority, queuePriority.manual);
+  assert.equal(variation.dream, undefined);
+  assert.equal(variation.input.count, 3);
+  assert.equal(variation.input.prompt, "dream 3");
+  assert.equal(store.session("alice", variation.sessionId)?.hidden, undefined);
+  assert.equal((await request("")).body.unseen.length, 0);
+  // Without gallery access Dream is closed.
+  state.access.alice.gallery = false;
+  assert.equal((await request("")).status, 403);
+});
