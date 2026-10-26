@@ -56,7 +56,6 @@ version opens with a `> ` summary line.
 - Remove every old setting and request name; Studio reads only Studio names ([Renamed Settings](CONFIGURATION.md#renamed-settings)). The `HEISS_*` aliases are gone (use each `STUDIO_*` name), as are the `X-HEISS` request header (send `X-Studio`) and the start-up notice about old names.
 - Rename the unprefixed Studio settings with no aliases: `MCP_SIGNING_KEY` → `STUDIO_MCP_SIGNING_KEY`, `MCP_PUBLIC_URL` → `STUDIO_MCP_PUBLIC_URL`, `MCP_PROMPTING_PATH` → `STUDIO_MCP_PROMPTING_PATH`, `COMFY_OUTPUT_DIR` → `STUDIO_COMFY_OUTPUT_DIR`, `COMFY_INPUT_DIR` → `STUDIO_COMFY_INPUT_DIR`, `BIFROST_URL` → `STUDIO_BIFROST_URL` and `CIVITAI_DNS_SERVERS` → `STUDIO_CIVITAI_DNS_SERVERS`. `HF_TOKEN` and `CIVITAI_API_TOKEN` keep their standard names.
 - Workers come only from `STUDIO_WORKERS` and Studio's own `workers.json`: `COMFY_URL` and `COMFY_VIDEO_URL`, the `.env` seed and its default local address, `STUDIO_DEFAULT_COMFY_URL` and finding ComfyUI by itself (`STUDIO_COMFY_SEARCH`) are gone. A fresh install has no workers until one is configured.
-- Remove the next-free-port fallback: Studio listens on `PORT` or stops with the reason.
 
 ### Fixed
 
