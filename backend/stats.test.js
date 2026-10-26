@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { galleryStats } from "./stats.js";
+import { galleryStats, profileStats } from "./stats.js";
 
 const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).toISOString();
 const done = (createdAt, extra = {}) => ({
@@ -62,4 +62,35 @@ test("reports the most used workflow and busiest day", () => {
   assert.equal(stats.topWorkflow, "a");
   assert.equal(stats.topWorkflowCount, 2);
   assert.equal(stats.busiestCount, 2);
+});
+
+test("profile stats count the last 30 days and flag a profile failing most of its recent runs", () => {
+  const now = Date.parse("2026-10-26T12:00:00Z");
+  const run = (profileId, status, daysAgo, extra = {}) => ({
+    status,
+    createdAt: new Date(now - daysAgo * 86_400_000).toISOString(),
+    settings: { profileId },
+    ...extra,
+  });
+  const stats = profileStats(
+    [
+      run("steady", "done", 1, { favorite: true, timing: { runMs: 9000 } }),
+      run("steady", "done", 2, { timing: { runMs: 11000 } }),
+      run("steady", "failed", 3),
+      run("steady", "cancelled", 1),
+      run("steady", "done", 40),
+      ...Array.from({ length: 5 }, (_, index) => run("broken", index ? "failed" : "done", index)),
+    ],
+    now,
+  );
+  assert.deepEqual(stats.steady, {
+    runs: 3,
+    failed: 1,
+    starred: 1,
+    lastAt: new Date(now - 86_400_000).toISOString(),
+    medianRunMs: 11000,
+    failing: false,
+  });
+  assert.equal(stats.broken.failing, true);
+  assert.equal(stats.broken.failed, 4);
 });

@@ -82,7 +82,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 - [ ] I1 Semantic search: background captions from the text model (idle-only) so gallery search matches what an image shows, not only its prompt.
 - [ ] I2 Prompt templates from starred results, with slots (subject, setting, style), usable from the composer chips and Chat.
-- [ ] I3 Model stats per profile: timing, failure and star rates, shown in Library and used to pick defaults and flag broken models.
+- [ ] I3 Model stats per profile: timing, failure and star rates, shown in Library and used to pick defaults and flag broken models. Done: `profileStats` (`backend/stats.js`, `/api/stats/profiles`) and a Last 30 Days column with a Failing badge in Settings › Profiles, where profiles are listed. Remaining: Failing in the composer's profile picker and the MCP pick skipping failing profiles (after D4 merges).
 - [ ] I4 Optional auto finishing on Star: queue upscale/face detail in idle GPU time.
 - [x] I5 Installable phone app: PWA manifest, icons and share target so images shared to Studio become references. Done: manifest share target posts to `/share`, which saves the reference (session-bound, cross-site refused) and opens the composer with it; 512px and maskable icons. iOS Safari has no share target; check on a real Android phone.
 
