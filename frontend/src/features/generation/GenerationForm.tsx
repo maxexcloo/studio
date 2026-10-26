@@ -27,7 +27,7 @@ export function GenerationForm({
   focusPrompt?: boolean;
   fill?: boolean;
 }) {
-  const { draft, setDraft, input, update, profile, selectProfile } = useGeneration();
+  const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -84,7 +84,8 @@ export function GenerationForm({
         }}
       >
         <Group wrap="nowrap" gap="xs">
-          {supportsReferences && <ReferencePicker compact />}
+          {/* Shown while profiles load so the prompt doesn't jump when they arrive. */}
+          {(models.isPending || supportsReferences) && <ReferencePicker compact />}
           <Textarea
             data-composer-prompt
             aria-label="Prompt"
