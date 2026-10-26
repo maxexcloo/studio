@@ -159,6 +159,7 @@ export class McpMedia {
     this.resolveSignedResult = resolveSignedResult;
     this.domainRequest = domainRequest;
     this.credentials = new Map();
+    this.stopping = new AbortController();
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
     this.file = path.join(dataDir, "mcp-ownership.json");
@@ -882,10 +883,22 @@ export class McpMedia {
         );
         if (cloud.refused) job = { ...job, error: cloudQuotaMessage, cloudQuota: true };
       }
-      if (terminal.has(job.status) || Date.now() >= deadline) return job;
+      if (terminal.has(job.status) || Date.now() >= deadline || this.stopping.signal.aborted)
+        return job;
       // A client Stop or disconnect ends only this wait; the generation itself keeps running.
-      await pause(Math.min(interval, deadline - Date.now()), signal);
+      // Shutting down ends it too, with the job as last read: the server no longer takes the next read.
+      await pause(
+        Math.min(interval, deadline - Date.now()),
+        signal ? AbortSignal.any([signal, this.stopping.signal]) : this.stopping.signal,
+      ).catch((error) => {
+        if (signal?.aborted || !this.stopping.signal.aborted) throw error;
+      });
+      if (this.stopping.signal.aborted) return job;
     }
+  }
+  /** Ends every inline wait now (shutdown), so each call replies with its result links. */
+  endWaits() {
+    this.stopping.abort();
   }
   /** Result links are sealed (AES-256-GCM), so a shared link reveals no account or job ID. */
   sealingKey() {
