@@ -98,5 +98,45 @@ test("custom H3 duration selections reach their mapped graph input with the fixe
         "optional references follow node types rather than fixed IDs",
       );
     }
+    // Lengths the worker can't render are refused, never moved to the nearest one it can.
+    for (const frames of [100, 125, 379])
+      assert.throws(
+        () =>
+          sanitizeGenerateBody(
+            {
+              kind: "video",
+              workflow: profile.workflow,
+              model: profile.model,
+              prompt: "waves",
+              frames,
+            },
+            info,
+          ),
+        /^Error: Frames must be from 124 to 362 in steps of 17\.$/,
+      );
   }
+});
+
+test("a node that declares fewer H3 frames than the model can render sets the limit", () => {
+  saveCustomWorkflow({
+    heissUi: {
+      id: "radiance-h3",
+      kind: "video",
+      family: "minimax-h3",
+      defaults: { fps: 24 },
+      controls: { prompt: { node: "1", input: "prompt" }, frames: { node: "1", input: "frames" } },
+    },
+    1: { class_type: "RadianceVideoGenerate", inputs: { prompt: "waves", frames: 192 } },
+    2: { class_type: "SaveVideo", inputs: { video: ["1", 0], filename_prefix: "test" } },
+  });
+  const radiance = {
+    ...info,
+    RadianceVideoGenerate: node({
+      prompt: ["STRING"],
+      frames: ["INT", { default: 192, min: 124, max: 345, step: 17 }],
+    }),
+  };
+  const profile = inferModels(radiance).profiles.find((item) => item.id === "custom:radiance-h3");
+  assert.equal(profile.constraints.frames.max, 345);
+  assert.equal(profile.constraints.frames.min, 124);
 });
