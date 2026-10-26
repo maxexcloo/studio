@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeLoras, create, fixtures, withExpertSettings } from "./fixtures";
+import { closeLoras, create, fixtures, stamp, withExpertSettings } from "./fixtures";
 async function assist(page: Page, action: string) {
   await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
   await page.getByRole("menuitem", { name: action, exact: true }).click();
@@ -187,4 +187,68 @@ test("Loading a new preset dismisses earlier draft Undo and keeps the preset inp
     negative: "preset negative",
     seed: "54",
   });
+});
+
+test("Prompt assistance finishes before a generation is submitted", async ({ page }) => {
+  const state = await fixtures(page);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("bird");
+  await page.getByRole("button", { name: "Prompt Assistance", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Improve Prompt", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A cinematic amber bird",
+  );
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Control+Enter");
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.prompt).toBe("A cinematic amber bird");
+});
+
+test("Prompt history reuses positive and negative prompts independently and persists pinning", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const histories = {
+    positive: [{ text: "Earlier landscape", at: stamp, uses: 2, pinned: false }],
+    negative: [{ text: "Earlier exclusions", at: stamp, uses: 1, pinned: false }],
+  };
+  await page.route("**/api/prompts**", (route) => {
+    const request = route.request(),
+      url = new URL(request.url());
+    const body = request.method() === "POST" ? request.postDataJSON() : {};
+    const kind = (body.kind ||
+      url.searchParams.get("kind") ||
+      "positive") as keyof typeof histories;
+    if (url.pathname.endsWith("/pin")) {
+      const entry = histories[kind].find((entry) => entry.text === body.text);
+      if (entry) entry.pinned = body.pinned;
+    }
+    if (url.pathname.endsWith("/forget"))
+      histories[kind] = histories[kind].filter((entry) => entry.text !== body.text);
+    return route.fulfill({ json: { prompts: histories[kind], enabled: true } });
+  });
+  await create(page);
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
+  await withExpertSettings(page, () => negative.fill("Keep these exclusions"));
+  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
+  const historySearch = panel.getByRole("textbox", { name: "Search Prompt History", exact: true });
+  await historySearch.fill("landscape");
+  await historySearch.press("ArrowDown");
+  await historySearch.press("Enter");
+  await expect(prompt).toHaveValue("Earlier landscape");
+  await withExpertSettings(page, async () => {
+    await expect(negative).toHaveValue("Keep these exclusions");
+    await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
+    panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
+    await panel
+      .getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true })
+      .click();
+    // Picking a negative prompt keeps the Expert settings open around it.
+    await expect(negative).toHaveValue("Earlier exclusions");
+  });
+  await expect(prompt).toHaveValue("Earlier landscape");
+  expect(histories.positive[0].pinned).toBe(true);
 });

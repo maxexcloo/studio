@@ -425,3 +425,162 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .poll(() => state.gallery.map((item) => item.id))
     .toEqual(["live", "browse-0", "browse-1", "browse-2"]);
 });
+
+test("Offline views report the API error and support retry", async ({ page }) => {
+  await fixtures(page);
+  let fails = true;
+  await page.route("**/api/gallery?**", (route) =>
+    fails
+      ? route.fulfill({ status: 503, json: { error: "The gallery is temporarily unavailable" } })
+      : route.fulfill({ json: { items: [], hasMore: false } }),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("alert")).toContainText("The gallery is temporarily unavailable");
+  fails = false;
+  await page.getByRole("button", { name: "Try Again" }).click();
+  await expect(page.getByText("No Images", { exact: true })).toBeVisible();
+});
+
+test("Gallery search preserves the query and status panel cancels only active work", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  for (const [id, status] of [
+    ["waiting-job", "waiting"],
+    ["queued-job", "queued"],
+    ["finished-job", "completed"],
+  ])
+    state.jobs.push({
+      id,
+      jobId: id,
+      sessionId: "s",
+      operation: "image",
+      status,
+      input: { prompt: id },
+      items: [],
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
+  const search = page.getByRole("textbox", { name: "Search Gallery", exact: true });
+  await expect(search).toBeFocused();
+  await search.fill("birds");
+  await search.press("Escape");
+  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
+  await expect(search).toHaveValue("birds");
+  await search.press("Escape");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Starred", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Generating");
+  await status.click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
+  await expect(queue.getByText("queued-job", { exact: true })).toBeVisible();
+  await queue.getByRole("button", { name: "Cancel All", exact: true }).click();
+  await expect
+    .poll(() => state.jobs.map((job) => job.status))
+    .toEqual(["cancelled", "cancelled", "completed"]);
+  await expect(queue.getByText("Empty Queue", { exact: true })).toBeVisible();
+});
+
+test("Gallery selection stars, downloads and deletes only selected finished records", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...["First Study", "Second Study", "Pending Study"].map((prompt, index) => ({
+      id: `selection-${index}`,
+      jobId: `selection-job-${index}`,
+      type: "image",
+      status: index === 2 ? "running" : "done",
+      url: image,
+      thumbnailUrl: image,
+      prompt,
+      width: 1024,
+      height: 1024,
+      settings: { profileId: "image:test" },
+    })),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("3 Selected");
+  await expect(page.getByRole("link", { name: "Download Selected", exact: true })).toHaveAttribute(
+    "href",
+    /ids=selection-0%2Cselection-1/,
+  );
+  await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+  await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
+  await page.getByRole("button", { name: "Delete Selected", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Selected Items", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect.poll(() => state.gallery.map((item) => item.id)).toEqual(["selection-2"]);
+  await page.getByRole("button", { name: "Done Selecting", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+});
+
+test("Gallery facets submit repeated models together with LoRA, size and aspect filters", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search Gallery", exact: true }).fill("bird");
+  await page.getByRole("textbox", { name: "Search Gallery", exact: true }).press("Escape");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Filter By Models", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Studio Image", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Motion Quality", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Filter By LoRAs", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Detail Slider", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Filter By Size", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Up to 1K", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Filter By Aspect Ratio", exact: true }).click();
+  await page.getByRole("checkbox", { name: "1:1", exact: true }).check();
+  await page.keyboard.press("Escape");
+  await expect
+    .poll(() => {
+      const query = new URLSearchParams(state.galleryRequests.at(-1));
+      return {
+        model: query.getAll("model"),
+        lora: query.getAll("lora"),
+        size: query.getAll("size"),
+        aspect: query.getAll("aspect"),
+        q: query.get("q"),
+      };
+    })
+    .toEqual({
+      model: ["image.safetensors", "video.safetensors"],
+      lora: ["detail.safetensors"],
+      size: ["up-to-1k"],
+      aspect: ["1:1"],
+      q: "bird",
+    });
+  await page.getByRole("button", { name: "Clear Filters", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Clear Filters", exact: true })).toBeHidden();
+  // The cleared search is served fresh from cache or requested again, never with the old facets.
+  await expect
+    .poll(() =>
+      state.galleryRequests.some((search) => {
+        const query = new URLSearchParams(search);
+        return query.get("q") === "bird" && !query.has("model") && !query.has("lora");
+      }),
+    )
+    .toBe(true);
+  await page.getByRole("button", { name: "Close Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
+    "bird",
+  );
+});

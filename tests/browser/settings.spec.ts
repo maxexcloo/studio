@@ -1,15 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, section, stamp } from "./fixtures";
+import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
 }) => {
   await fixtures(page);
-  await page.route("**/api/accounts/status", (route) =>
-    route.fulfill({
-      json: { mode: "multi-user", signedIn: true, account: { id: "admin", role: "administrator" } },
-    }),
-  );
+  await signIn(page, { id: "admin", role: "administrator" });
   let cleared = 0,
     statusReads = 0;
   await page.route("**/api/gallery/errors/clear", (route) => {
@@ -78,4 +74,79 @@ test("Tile Captions in Settings › Studio pin phone tile captions", async ({ pa
   await page.getByRole("switch", { name: "Tile Captions", exact: true }).check({ force: true });
   await page.getByRole("button", { name: "Close Settings", exact: true }).click();
   await expect(caption).toBeVisible();
+});
+
+test("Header appearance preferences persist across reloads", async ({ page }) => {
+  await fixtures(page);
+  await page.goto("/");
+  await openTheme(page);
+  const popup = await page.locator('.mantine-Popover-dropdown[role="dialog"]').boundingBox();
+  expect(popup!.y).toBeGreaterThanOrEqual(68);
+  await page.getByRole("button", { name: "Use Blue Colour", exact: true }).click();
+  await page.getByRole("button", { name: "Use Warm Background", exact: true }).click();
+  await page.getByText("Fast", { exact: true }).click();
+  await page.getByText("Round", { exact: true }).click();
+  await page.getByText("Dark", { exact: true }).click();
+  await page.getByText("Fixed Width", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.reload();
+  await openTheme(page);
+  await expect(page.getByRole("button", { name: "Use Blue Colour", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(
+    page.getByRole("button", { name: "Use Warm Background", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("radio", { name: "Fast", exact: true })).toBeChecked();
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+    .toBe("rgb(23, 19, 15)");
+  await expect(page.getByRole("radio", { name: "Round", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Dark", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Fixed Width", exact: true })).toBeChecked();
+});
+
+test("Administrator accounts retain worker visibility and attribution", async ({ page }) => {
+  await fixtures(page);
+  await signIn(page, { id: "account-a", role: "administrator" });
+  await page.goto("/settings");
+  await expect(
+    page.getByRole("region", { name: "Your Account" }).getByText("Administrator", { exact: true }),
+  ).toBeVisible();
+  await section(page, "Settings", "Workers");
+  await expect(page.getByRole("heading", { name: "Workers", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
+    "Image Worker",
+  );
+  await section(page, "Settings", "About");
+  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Licence", exact: true })).toHaveAttribute(
+    "href",
+    /\/LICENSE$/,
+  );
+});
+
+test("Status summarises service health and opens Workers over the current page", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/chat");
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
+  await status.click();
+  const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+  await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
+  await drawer.getByRole("link", { name: "Workers", exact: true }).click();
+  await expect(drawer).toBeHidden();
+  const settings = page.getByRole("dialog", { name: /^Settings/ });
+  const images = settings.getByRole("combobox", { name: "Images Endpoint", exact: true });
+  await expect(images).toHaveValue("Image Worker");
+  await images.click();
+  await page.getByRole("option", { name: /Image Worker/ }).click();
+  await expect(settings.getByText("Fixture GPU", { exact: false })).toBeVisible();
+  await expect(settings.getByText("Automatic Control Off", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
 });

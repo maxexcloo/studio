@@ -1,5 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeReferences, create, fixtures, image, profiles, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  stamp,
+} from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 async function setup(page: Page) {
@@ -12,9 +20,7 @@ async function setup(page: Page) {
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   for (const prompt of ["Alpha", "Beta"])
     state.gallery.push({
       id: prompt.toLowerCase(),
@@ -122,4 +128,140 @@ test("Escape closes only the innermost reference layer; phones confirm at the sa
   await expect(
     page.getByRole("region", { name: "Generation Controls", exact: true }),
   ).toBeVisible();
+});
+
+test("The compact composer expands on interaction and keeps picked or dragged references", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  state.gallery.push(
+    ...["Picked Study", "Dragged Study"].map((prompt, index) => ({
+      id: `reference-${index}`,
+      jobId: `source-${index}`,
+      type: "image",
+      status: "done",
+      url: image,
+      thumbnailUrl: image,
+      width: 1024,
+      height: 1024,
+      prompt,
+      settings: { profileId: "image:test" },
+    })),
+  );
+  await page.goto("/");
+  await page
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("Preserve the working direction");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Picked Study", exact: true }).click();
+  await closeReferences(page);
+  await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Preserve the working direction",
+  );
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  expect(state.referenceRequests[0].galleryItemId).toBe("reference-0");
+  if (testInfo.project.use.isMobile) await page.keyboard.press("Escape");
+  else await page.getByRole("link", { name: "Images", exact: true }).first().click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+  if (!testInfo.project.use.isMobile) {
+    const transfer = await page.evaluateHandle(() => new DataTransfer());
+    await page
+      .getByRole("button", { name: "Open image: Dragged Study", exact: true })
+      .dispatchEvent("dragstart", { dataTransfer: transfer });
+    await page
+      .locator("[data-composer-dock]")
+      .dispatchEvent("dragover", { dataTransfer: transfer });
+    await page.locator("[data-composer-dock]").dispatchEvent("drop", { dataTransfer: transfer });
+    await expect.poll(() => state.referenceRequests.length).toBe(2);
+    expect(state.referenceRequests[1].galleryItemId).toBe("reference-1");
+  }
+});
+
+test("Reference slots preserve optional End-only inputs and reuse one asset in two roles", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const profile = {
+    ...profiles[0],
+    id: "image:slots",
+    mediaInputs: [
+      { id: "start", label: "Start", required: false, max: 1 },
+      { id: "end", label: "End", required: false, max: 1 },
+    ],
+  };
+  await serveProfiles(page, [profile]);
+  state.gallery.push({
+    id: "slot-source",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Slot Source",
+    width: 1024,
+    height: 1024,
+  });
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("End-only study");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByRole("button", { name: "Slot 2 · End", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
+  await closeReferences(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([
+    { assetId: "asset-slot-source", slot: "end" },
+  ]);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  // A tap fills the next empty slot.
+  await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
+  await closeReferences(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input.referenceAssets).toEqual([
+    { assetId: "asset-slot-source", slot: "start" },
+    { assetId: "asset-slot-source", slot: "end" },
+  ]);
+});
+
+test("Owned uploaded references can be reused without another upload", async ({ page }) => {
+  const state = await fixtures(page);
+  const requests: string[] = [];
+  await page.route("**/api/reference-assets?*", (route) => {
+    requests.push(route.request().url());
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            id: "past-upload",
+            name: "Past Upload",
+            source: "upload",
+            type: "image",
+            url: image,
+            thumbnailUrl: image,
+            width: 1024,
+            height: 1024,
+          },
+        ],
+        hasMore: false,
+        nextCursor: "",
+      },
+    });
+  });
+  await create(page);
+  await page
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("Reuse an earlier photograph");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByText("Uploads", { exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  await closeReferences(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "past-upload", slot: "image" }]);
+  expect(state.referenceRequests).toHaveLength(0);
+  expect(new URL(requests[0]).searchParams.get("source")).toBe("upload");
 });

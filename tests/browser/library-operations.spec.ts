@@ -1,5 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { chooseView, fixtures, openNav, profiles, section } from "./fixtures";
+import {
+  chooseView,
+  closeLoras,
+  create,
+  fixtures,
+  openNav,
+  profiles,
+  section,
+  serveProfiles,
+  signIn,
+} from "./fixtures";
 
 test("Model downloads cancel only the chosen file and explicitly resume or retry", async ({
   page,
@@ -318,17 +328,8 @@ for (const ordinary of [true, false])
       : "Administrators retain model management when deployment imports are disabled",
     async ({ page }) => {
       await fixtures(page);
-      if (ordinary)
-        await page.route("**/api/accounts/status", (route) =>
-          route.fulfill({
-            json: { mode: "multi-user", signedIn: true, account: { id: "member", role: "user" } },
-          }),
-        );
-      await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-        route.fulfill({
-          json: { profiles, features: { library: true, presets: !ordinary ? false : true } },
-        }),
-      );
+      if (ordinary) await signIn(page, { id: "member", role: "user" });
+      await serveProfiles(page, profiles, { library: true, presets: !ordinary ? false : true });
       let unavailableReads = 0;
       for (const pattern of ["**/api/library/imports**", "**/api/presets**"])
         await page.route(pattern, (route) => {
@@ -417,4 +418,60 @@ test("Catalogue views, search and filters narrow the list and reset without losi
   await chooseView(page, "Models", "Available");
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Later Model");
+});
+
+test("Library shows import grades and reuses compatible inspiration settings", async ({ page }) => {
+  const state = await fixtures(page);
+  await page.route("**/api/presets", (route) =>
+    route.fulfill({
+      json: {
+        presets: [
+          {
+            id: "plain",
+            name: "Amber Study",
+            prompt: "Amber bird study",
+            negative: "blur",
+            settings: { steps: 24 },
+            resources: [{ profileId: "image:test" }],
+          },
+          {
+            id: "missing",
+            name: "Missing Style Study",
+            prompt: "A missing style study",
+            negative: "",
+            settings: { model: "foreign-model" },
+            resources: [{ folder: "loras", status: "missing", weight: 0.8 }],
+          },
+        ],
+      },
+    }),
+  );
+  await create(page);
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
+  await closeLoras(page);
+  const close = page.getByRole("button", { name: "Close Generation Controls", exact: true });
+  if (await close.isVisible()) await close.click();
+  else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
+  await openNav(page, "Library");
+  await expect(page.getByText("Watercolour Inspiration", { exact: true })).toBeVisible();
+  await expect(page.getByText("Watercolour LoRA is missing", { exact: true })).toBeVisible();
+  await section(page, "Library", "Inspiration");
+  const missing = page
+    .locator(".mantine-Card-root")
+    .filter({ has: page.getByText("Missing Style Study", { exact: true }) });
+  await expect(missing.getByRole("button", { name: "Use Settings", exact: true })).toBeDisabled();
+  await expect(missing.getByRole("button", { name: "Use Prompt", exact: true })).toBeEnabled();
+  await page
+    .locator(".mantine-Card-root")
+    .filter({ has: page.getByText("Amber Study", { exact: true }) })
+    .getByRole("button", { name: "Use Settings", exact: true })
+    .click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Amber bird study",
+  );
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.profileId).toBe("image:test");
+  expect(state.jobs[0].input.loras).toEqual([]);
 });

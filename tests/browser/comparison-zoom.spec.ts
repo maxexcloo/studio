@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, stamp, viewerAction } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 const png = (width: number, height: number) =>
   sharp({ create: { width, height, channels: 3, background: "#46a3ff" } })
@@ -122,4 +122,33 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
   await page.mouse.click(blank.x, blank.y);
   await expect(dialog).toBeHidden();
   await expect(opener).toBeFocused();
+});
+
+test("Upscale comparison uses one bounded slider and preserves the original result", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "original",
+    jobId: "job-original",
+    url: image,
+    thumbnailUrl: image,
+    type: "image",
+    status: "done",
+    prompt: "Comparison Study",
+    width: 1024,
+    height: 1024,
+    settings: { profileId: "image:test" },
+    upscale: { url: image, status: "done" },
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open image: Comparison Study", exact: true }).click();
+  await viewerAction(page, "Compare");
+  const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
+  await expect(slider).toBeVisible();
+  await slider.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuenow", "51");
+  await expect(page.getByRole("img", { name: "Original Result", exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Upscaled Result", exact: true })).toBeVisible();
 });

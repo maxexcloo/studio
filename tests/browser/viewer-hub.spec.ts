@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, stamp, viewerAction } from "./fixtures";
+import { closeLoras, fixtures, image, stamp, viewerAction } from "./fixtures";
 
 async function seed(page: Page) {
   const state = await fixtures(page);
@@ -158,4 +158,214 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
   await expect(sheet).toBeHidden();
   await swipe(120);
   await expect(viewer).toBeHidden();
+});
+
+test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  // Native sharing would replace the row's Download on WebKit phones.
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: undefined }),
+  );
+  state.gallery.push({
+    id: "viewer",
+    jobId: "job-viewer",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Viewer Study",
+    width: 1024,
+    height: 1024,
+    settings: { profileId: "image:test" },
+  });
+  state.gallery.push({
+    ...state.gallery[0],
+    id: "viewer-next",
+    jobId: "job-viewer-next",
+    prompt: "Next Viewer Study",
+  });
+  await page.goto("/images");
+  const firstTile = page.getByRole("button", { name: "Open image: Viewer Study", exact: true });
+  await firstTile.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(
+    page.getByRole("button", { name: "Open image: Next Viewer Study", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowLeft");
+  await expect(firstTile).toBeFocused();
+  await firstTile.click();
+  const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox(),
+    viewport = page.viewportSize()!;
+  expect(bounds?.width).toBe(viewport.width);
+  expect(bounds?.height).toBe(viewport.height);
+  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  await expect(download).toHaveAttribute("href", image);
+  await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
+  await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
+  if (testInfo.project.use.browserName !== "webkit") {
+    const picture = await dialog
+      .getByRole("img", { name: "Viewer Study", exact: true })
+      .boundingBox();
+    const touch = await page.context().newCDPSession(page);
+    const y = picture!.y + picture!.height / 2;
+    const start = picture!.x + picture!.width * 0.8;
+    const end = picture!.x + picture!.width * 0.2;
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: start, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: end, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+    await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
+    await page.keyboard.press("ArrowLeft");
+    await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
+  }
+  const zoom = dialog.locator("[data-zoom-mode]");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeGreaterThan(0);
+  const fitScale = Number(await zoom.getAttribute("data-zoom-scale"));
+  await page.keyboard.press("Equal");
+  await expect
+    .poll(async () => Number(await zoom.getAttribute("data-zoom-scale")))
+    .toBeGreaterThan(fitScale);
+  await page.keyboard.press("Digit0");
+  await expect(zoom).toHaveAttribute("data-zoom-mode", "Fit");
+  await dialog.getByRole("img", { name: "Viewer Study", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Zoom: Fill", exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Zoom: Fill", exact: true }).click();
+  await expect(
+    dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Zoom: Actual Size", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Zoom: Fit", exact: true })).toBeVisible();
+  // Desktop details are open beside the image; phones open them as a sheet.
+  if (testInfo.project.use.isMobile) {
+    await dialog.getByRole("button", { name: "Generation Details", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "Viewer Study", exact: true });
+    await expect(sheet.getByText("Prompt", { exact: true })).toBeVisible();
+    await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
+    await expect(sheet).toBeHidden();
+  } else await expect(dialog.getByText("Prompt", { exact: true })).toBeVisible();
+  await expect
+    .poll(async () => {
+      const picture = await dialog
+        .getByRole("img", { name: "Viewer Study", exact: true })
+        .boundingBox();
+      const viewport = await zoom.boundingBox();
+      return picture && viewport
+        ? picture.width <= viewport.width + 1 && picture.height <= viewport.height + 1
+        : false;
+    })
+    .toBe(true);
+  await dialog.click({ position: { x: 2, y: 2 } });
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Open image: Viewer Study", exact: true }),
+  ).toBeFocused();
+});
+
+test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile settings", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "legacy-item",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Legacy study",
+    width: 1024,
+    height: 1024,
+    settings: {
+      profileId: "image:test",
+      model: "image.safetensors",
+      referenceAssets: [{ assetId: "owned-asset", slot: "image" }],
+      referenceRole: "reference",
+      loras: [{ name: "detail.safetensors", enabled: false, strength: 0.8 }],
+    },
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
+  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();
+  const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
+  await expect(enabled).not.toBeChecked();
+  await enabled.check();
+  await closeLoras(page);
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "owned-asset", slot: "image" }]);
+  expect(state.jobs[0].input.referenceRole).toBe("reference");
+  expect(state.jobs[0].input.loras[0]).toEqual({
+    name: "detail.safetensors",
+    enabled: true,
+    strength: 0.8,
+  });
+});
+
+test("Viewer deletion retains failed media and waits for confirmed removal", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "delete-study",
+    type: "image",
+    status: "done",
+    url: image,
+    thumbnailUrl: image,
+    prompt: "Delete Study",
+    width: 1024,
+    height: 1024,
+  });
+  let attempts = 0;
+  let release!: () => void;
+  const removed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/gallery/delete-study", async (route) => {
+    if (++attempts === 1)
+      return route.fulfill({ status: 503, json: { error: "Storage is temporarily unavailable." } });
+    await removed;
+    return route.fallback();
+  });
+  try {
+    await page.goto("/images");
+    await page.getByRole("button", { name: "Open image: Delete Study", exact: true }).click();
+    const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+    await viewerAction(page, "Delete");
+    const confirmation = page.getByRole("dialog", { name: "Delete Item", exact: true });
+    await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(
+      confirmation.getByText("1 item could not be deleted. You can try again."),
+    ).toBeVisible();
+    await expect(viewer).toBeVisible();
+    expect(state.gallery).toHaveLength(1);
+    await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(confirmation.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    await expect(confirmation).toBeVisible();
+    await expect(viewer).toBeVisible();
+    release();
+    await expect(viewer).toBeHidden();
+    await expect(confirmation).toBeHidden();
+    await expect(page.getByText("No Images", { exact: true })).toBeVisible();
+    expect(state.gallery).toHaveLength(0);
+  } finally {
+    release();
+  }
 });

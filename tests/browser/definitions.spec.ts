@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { editDefinition, fixtures, openNav, profiles, section } from "./fixtures";
+import {
+  editDefinition,
+  fixtures,
+  openNav,
+  profiles,
+  section,
+  serveProfiles,
+  signIn,
+} from "./fixtures";
 
 test("Profile edits preserve workflow metadata and retain unsaved text after a conflict", async ({
   page,
@@ -178,15 +186,7 @@ test("Model classification saves and reads back while definition administration 
     modelType: "",
   };
   const writes: unknown[] = [];
-  await page.route("**/api/accounts/status", (route) =>
-    route.fulfill({
-      json: {
-        mode: "multi-user",
-        signedIn: true,
-        account: { id: "account-a", role: administrator ? "administrator" : "user" },
-      },
-    }),
-  );
+  await signIn(page, { id: "account-a", role: administrator ? "administrator" : "user" });
   await page.route("**/api/library/items", (route) =>
     administrator
       ? route.fulfill({ json: { items: [item] } })
@@ -220,9 +220,7 @@ test("Model classification saves and reads back while definition administration 
     "Original",
   );
   administrator = false;
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles, features: { library: false, presets: false } } }),
-  );
+  await serveProfiles(page, profiles, { library: false, presets: false });
   await page.goto("/library");
   await expect(page).toHaveURL(/\/images$/);
   const options = page.getByRole("button", { name: "More Options", exact: true });

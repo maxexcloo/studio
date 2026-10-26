@@ -1,17 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, section, stamp } from "./fixtures";
+import { fixtures, section, signIn, stamp } from "./fixtures";
 
 async function accountFixture(page: Page) {
   const state = await fixtures(page);
-  await page.route("**/api/accounts/status", (route) =>
-    route.fulfill({
-      json: {
-        mode: "multi-user",
-        signedIn: true,
-        account: { id: "admin", role: "administrator" },
-      },
-    }),
-  );
+  await signIn(page, { id: "admin", role: "administrator" });
   return state;
 }
 
@@ -162,4 +154,99 @@ test("Personal MCP credentials can be issued, rotated and revoked without retain
   await expect(page.getByRole("button", { name: "Rotate Token", exact: true })).toBeEnabled();
   await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveCount(0);
   expect({ issued, revoked }).toEqual({ issued: 3, revoked: 1 });
+});
+
+test("Sign-in gate keeps account data behind authentication", async ({ page }) => {
+  await fixtures(page);
+  await page.route("**/api/accounts/status", (route) =>
+    route.fulfill({ json: { mode: "multi-user", signedIn: false, oidc: { label: "Pocket ID" } } }),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign In With Pocket ID" })).toHaveAttribute(
+    "href",
+    "/api/accounts/oidc/start",
+  );
+  await expect(page.getByRole("link", { name: "Images", exact: true })).toHaveCount(0);
+});
+
+test("Administrators save and verify per-user cloud and NSFW access through assigned groups", async ({
+  page,
+}) => {
+  const state = await accountFixture(page);
+  await page.goto("/settings");
+  await section(page, "Settings", "Groups");
+  await page.getByRole("button", { name: "New Group", exact: true }).click();
+  await page.getByRole("textbox", { name: "Group Name", exact: true }).fill("Member Cloud");
+  await page.getByRole("textbox", { name: "Group ID", exact: true }).fill("member-cloud");
+  await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
+  await page.getByRole("checkbox", { name: "NSFW Models", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Image Generation", exact: true }).check();
+  await page.getByRole("button", { name: "Save Access Group", exact: true }).click();
+  await expect
+    .poll(
+      () =>
+        state.administration.accessProfiles.find((group) => group.id === "member-cloud")?.features
+          .cloudModels,
+    )
+    .toBe(true);
+  await section(page, "Settings", "Users");
+  const member = page.getByRole("row", { name: "Account Member", exact: true });
+  await member.getByRole("combobox", { name: "Access Group for Member", exact: true }).click();
+  await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
+  await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
+  await expect(member.getByText("NSFW Models On", { exact: true })).toBeVisible();
+  await member.getByRole("button", { name: "Actions for Member", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Disable Account", exact: true }).click();
+  await expect(member.getByText("Disabled", { exact: true })).toBeVisible();
+  expect(state.administration.accounts.find((account) => account.id === "member")?.disabled).toBe(
+    true,
+  );
+});
+
+test("Users update their own display name and retain password-protected email controls", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "user" });
+  await page.goto("/settings");
+  const own = page.getByRole("region", { name: "Your Account", exact: true });
+  await own.getByRole("textbox", { name: "Display Name", exact: true }).fill("Studio Maker");
+  await own.getByRole("button", { name: "Save Display Name", exact: true }).click();
+  await expect.poll(() => state.ownAccount.displayName).toBe("Studio Maker");
+  await expect(own.getByRole("textbox", { name: "Display Name", exact: true })).toHaveValue(
+    "Studio Maker",
+  );
+  await own.getByRole("button", { name: "Email & Password", exact: true }).click();
+  await expect(own.getByRole("textbox", { name: "Email", exact: true })).toHaveValue(
+    "admin@example.test",
+  );
+  await expect(own.getByRole("textbox", { name: "Current Password", exact: true })).toBeVisible();
+  await expect(
+    own.getByRole("button", { name: "Save Email & Password", exact: true }),
+  ).toBeDisabled();
+});
+
+test("Account menu opens the account workspace and reflects the saved name", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  await signIn(page, { id: "admin", role: "user" });
+  await page.goto("/");
+  async function account() {
+    if (testInfo.project.use.isMobile)
+      await page.getByRole("button", { name: "More Options", exact: true }).click();
+    else await page.getByRole("button", { name: "Your Account", exact: true }).click();
+  }
+  await account();
+  await expect(page.getByText("Administrator", { exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Account", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings#account$/);
+  await page.getByRole("textbox", { name: "Display Name", exact: true }).fill("Studio Artist");
+  await page.getByRole("button", { name: "Save Display Name", exact: true }).click();
+  await expect.poll(() => state.ownAccount.displayName).toBe("Studio Artist");
+  await page.getByRole("button", { name: "Close Settings", exact: true }).click();
+  await account();
+  await expect(page.getByText("Studio Artist", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
 });
