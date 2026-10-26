@@ -612,6 +612,18 @@ export async function fixtures(page: Page) {
           },
         ],
       });
+    if (path === "/api/gallery/captions")
+      return respond({
+        state: "finished",
+        active: false,
+        reason: "",
+        done: 0,
+        failed: 0,
+        remaining: 0,
+        total: 0,
+        perMinute: 0,
+        etaSeconds: null,
+      });
     if (path === "/api/workers")
       return respond({
         workers: [{ id: "gpu", label: "Media Worker", capabilities: ["image", "video"] }],

@@ -78,7 +78,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Intelligence & Finishing (I) — Medium, after D1
 
-- [x] I1 Semantic search: background captions from the text model (idle-only) so gallery search matches what an image shows, not only its prompt. Done (`backend/domain/captions.ts`): idle-only, one at a time, ≤1 per 10 s and 500 a day, vision models only, Prompt Assistant accounts only; search matches prompt or caption. Gallery Captions is off by default (Settings › Models).
+- [x] I1 Semantic search: background captions from the text model (idle-only) so gallery search matches what an image shows, not only its prompt. Done (`backend/domain/captions.ts`): idle-only, one at a time, ≤1 per 10 s and 500 a day, vision models only, Prompt Assistant accounts only; search matches prompt or caption. Gallery Captions is on by default (Settings › Models); 27 Oct: search-oriented captions with tags, shown in Details, and an admin Caption Gallery pass in Settings › Maintenance.
 - [ ] I2 Prompt templates from starred results, with slots (subject, setting, style), usable from the composer chips and Chat.
 - [ ] I3 Model stats per profile: timing, failure and star rates, shown in Library and used to pick defaults and flag broken models. Done: `profileStats` (`backend/stats.js`, `/api/stats/profiles`) and a Last 30 Days column with a Failing badge in Settings › Profiles, where profiles are listed. Remaining: Failing in the composer's profile picker and the MCP pick skipping failing profiles (after D4 merges).
 - [ ] I4 Optional auto finishing on Star: queue upscale/face detail in idle GPU time.
@@ -117,8 +117,6 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 - Dream: prompts use no LoRAs yet. Default: add the account's starred LoRAs with D3/D4.
 - Dream: does starring an unseen Dream item keep it? Default: yes, in D3.
 - Dream: a Dream job waiting on a worker that went offline blocks further Dream work until other work arrives or the account pauses. Default: accept for now.
-- Gallery Captions: on by default once a vision model is configured? Default: off until you turn it on in Settings › Models (it would otherwise start captioning the dev and live galleries straight away).
-- Captions: show the caption in viewer details as a dimmed line? Default: yes, in the next viewer pass.
 - Phone viewer action buttons went from 42px to 40px so the split Regenerate fits a 375px phone. Default: keep 40px.
 - Duplicate profile pairs now show an id suffix ("· comfyui" / "· fp8"); most look like legacy duplicates with the same settings. Default: keep the suffix until you prune runtime definitions.
 - Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
@@ -131,6 +129,8 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 
 1. Bento host (homelab, outside Studio): a USB4 port's power-management loop (`pci_bus 0000:13` behind ASM4242 12:00.0) is still repeating and hung the whole host for 2.3 h on 23 Oct, with an iGPU SDMA timeout. Fix it by disabling runtime PM for that port (or `pcie_port_pm=off`, or removing the device) plus `amdgpu.runpm=0` for the iGPU, and arm a runtime hardware watchdog (`RuntimeWatchdogSec`) so a hang self-recovers in minutes? Recommended: yes, as a reviewed homelab change.
 2. GPU experiments and image redeploys on bento (24 Oct 02:18 and 05:16) stopped image work for 59 and 8 minutes outside AI Control. Route them through AI Control and pull images before stopping containers? Recommended: yes.
+
+Settled 27 Oct: Gallery Captions are on by default; captions describe visible facts (people, clothing and nudity, setting, style, legible text) with 8–15 search tags and a format version that a Caption Gallery pass (Settings › Maintenance, flat out while idle, two at a time, persisted) redoes; Details shows the caption as a dimmed line with tag badges.
 
 Settled 26 Oct: main's MCP cloud video fallback is the opt-in Video Cloud Fallback switch (off by default); held composer video still drains without cloud fallback.
 

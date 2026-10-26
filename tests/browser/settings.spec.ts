@@ -51,6 +51,54 @@ test("Settings follow the settled section order and run maintenance and worker r
   await expect.poll(() => statusReads).toBeGreaterThan(before);
 });
 
+test("Caption Gallery in Settings › Maintenance starts a pass, shows its progress and stops", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const idle = {
+    state: "ready",
+    active: false,
+    reason: "",
+    done: 0,
+    failed: 0,
+    remaining: 7000,
+    total: 7000,
+    perMinute: 0,
+    etaSeconds: null,
+  };
+  const running = {
+    ...idle,
+    state: "running",
+    active: true,
+    done: 120,
+    remaining: 6880,
+    perMinute: 30,
+    etaSeconds: 13_760,
+  };
+  let status: Record<string, unknown> = idle;
+  const actions: string[] = [];
+  await page.route("**/api/gallery/captions**", (route) => {
+    const action = new URL(route.request().url()).pathname.split("/").pop();
+    if (action === "start") status = running;
+    if (action === "stop") status = { ...running, state: "stopped", active: false, perMinute: 0 };
+    if (action !== "captions") actions.push(action!);
+    return route.fulfill({ json: status });
+  });
+  await page.goto("/settings#maintenance");
+  const row = page.getByRole("region", { name: "Clean Up", exact: true });
+  await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
+  await row.getByRole("button", { name: "Start", exact: true }).click();
+  await expect(
+    row.getByText("Running · 120 of 7,000 · 30 a minute · about 3 h 49 min left", { exact: true }),
+  ).toBeVisible();
+  await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
+  await row.getByRole("button", { name: "Stop", exact: true }).click();
+  await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Start", exact: true })).toBeEnabled();
+  expect(actions).toEqual(["start", "stop"]);
+});
+
 test("Tile Captions in Settings › Studio pin phone tile captions", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.use.isMobile, "Desktop shows captions on hover.");
   const state = await fixtures(page);
