@@ -20,13 +20,14 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
 import { createSuggestions, registerSuggestionRoutes } from "./domain/suggestions.ts";
-import { createTaste, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
+import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
-import { createCaptioner } from "./domain/captions.ts";
+import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
@@ -1952,16 +1953,23 @@ const jobAdmitted = (job) => {
   captioner.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
-  starred: (req, items, favorite) =>
+  starred: (req, items, favorite) => {
+    const ownerId = ownerIdForRequest(req);
+    if (favorite)
+      dream.starred(
+        ownerId,
+        items.map((item) => item.id),
+      );
     taste.record(
-      ownerIdForRequest(req),
+      ownerId,
       items.map((item) =>
         tasteSignal(favorite ? "star" : "unstar", item.jobId, {
           ...item.settings,
           prompt: item.prompt,
         }),
       ),
-    ),
+    );
+  },
 });
 
 app.get("/api/prompts", (req, res) => {
@@ -2577,13 +2585,15 @@ registerCompareRoutes(app, {
       ? recordsForRequest(filterVisibleGallery(gallery), req)
       : null,
   pendingItems: makePendingItems,
-  voted: (ownerId, jobId) => {
-    const job = rewriteStore.job(ownerId, jobId);
-    const item = gallery.find(
-      (entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId,
-    );
+  voted: (ownerId, jobId, others) => {
+    const values = (id) => {
+      const item = gallery.find((entry) => entry.jobId === id && (entry.ownerId || "") === ownerId);
+      return rewriteStore.job(ownerId, id)?.input || { ...item?.settings, prompt: item?.prompt };
+    };
+    const winner = { jobId, values: values(jobId) };
     taste.record(ownerId, [
-      tasteSignal("compare", jobId, job?.input || { ...item?.settings, prompt: item?.prompt }),
+      tasteSignal("compare", jobId, winner.values),
+      ...others.map((id) => preferenceSignal(winner, { jobId: id, values: values(id) })),
     ]);
   },
   title: chatTitle,
@@ -2659,7 +2669,6 @@ const dream = createDream({
   gallery: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
   visible: filterVisibleGallery,
   mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
-  remove: deleteOwnedGalleryItems,
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
@@ -2696,7 +2705,17 @@ const captioner = createCaptioner({
     return { mime: "image/jpeg", data: data.toString("base64") };
   },
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
+  load: () => {
+    try {
+      return readRuntimeDocument(dataDir, "captions");
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }
+  },
+  persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
+registerCaptionRoutes(app, { captioner, requireAdmin });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);

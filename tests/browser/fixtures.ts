@@ -611,6 +611,18 @@ export async function fixtures(page: Page) {
           },
         ],
       });
+    if (path === "/api/gallery/captions")
+      return respond({
+        state: "finished",
+        active: false,
+        reason: "",
+        done: 0,
+        failed: 0,
+        remaining: 0,
+        total: 0,
+        perMinute: 0,
+        etaSeconds: null,
+      });
     if (path === "/api/workers")
       return respond({
         workers: [{ id: "gpu", label: "Media Worker", capabilities: ["image", "video"] }],
@@ -850,6 +862,13 @@ export async function serveDream(
       status: verdict === "variations" ? 202 : 200,
       json: verdict === "variations" ? { item, jobId: "job-variations" } : { item },
     });
+  });
+  // As the backend: starring an unseen result keeps it.
+  await page.route(/\/api\/gallery\/favorite$/, (route) => {
+    const body = route.request().postDataJSON();
+    state.requests.push({ method: "POST", path: "/api/gallery/favorite", body });
+    if (body.favorite) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
+    return route.fulfill({ json: { ok: true, items: [] } });
   });
   return state;
 }
