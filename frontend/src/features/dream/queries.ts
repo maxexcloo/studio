@@ -49,5 +49,17 @@ export const discardedQuery = infiniteQueryOptions({
   initialPageParam: "",
   getNextPageParam: (page) => page.nextCursor || undefined,
 });
+/**
+ * Older gallery images to calibrate the taste profile with, unjudged first. Each round is a new
+ * random draw, kept apart from `["dream"]` so judging a card never reshuffles the deck.
+ */
+export const calibrationQuery = (round: number) =>
+  queryOptions({
+    queryKey: ["dream-calibration", round],
+    queryFn: () => api<{ items: MediaItem[] }>("/api/dream/calibration?limit=12"),
+    staleTime: Infinity,
+    // A later visit draws afresh rather than replaying images already judged.
+    gcTime: 0,
+  });
 export const dreamItemPath = (item: { id: string }, action: string) =>
   `/api/dream/${encodeURIComponent(item.id)}/${action}`;

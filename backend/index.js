@@ -2707,6 +2707,11 @@ const dream = createDream({
     gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
   mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
+  loraLibrary: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return null;
+    return loadLoraLibrary(ownerId);
+  },
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),

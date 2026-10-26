@@ -24,6 +24,7 @@ export function SwipeCard({
   fly,
   onSwipe,
   label,
+  hints = { keep: "Keep", discard: "Discard" },
 }: {
   children: ReactNode;
   /** 0 for the top card, 1 for the one waiting beneath it. */
@@ -32,6 +33,8 @@ export function SwipeCard({
   fly?: RefObject<Fly | null>;
   onSwipe?: (direction: Direction) => void;
   label: string;
+  /** The words that show while dragging right and left. */
+  hints?: { keep: string; discard: string };
 }) {
   const card = useRef<HTMLDivElement>(null);
   const duration = useMotionDuration();
@@ -171,10 +174,10 @@ export function SwipeCard({
       {!depth && (
         <>
           <span className={classes.hint} data-hint="keep" aria-hidden>
-            Keep
+            {hints.keep}
           </span>
           <span className={classes.hint} data-hint="discard" aria-hidden>
-            Discard
+            {hints.discard}
           </span>
           {up && (
             <span className={classes.hint} data-hint="up" aria-hidden>
