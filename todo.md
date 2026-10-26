@@ -2,9 +2,7 @@
 
 ## Goal
 
-Current focus (26 Oct): the rewrite feels finished and calm — on desktop and phone every main flow (compose → result → viewer → iterate/animate → Chat → Library/Settings) has no unexpected layout shift, takes no more clicks than legacy for the same task and stays tidy and aligned; then M7, T1 and D1–D5.
-
-Bring `rewrite/mantine` beyond legacy Studio: a clean, Grok Imagine-like media workflow (viewer iteration hub, chip composer, Runs, compact Chat, Dream with a learned taste profile), a lean MCP, and one tidy, pattern-led codebase that stays maintainable. Done means every workstream below is checked off or explicitly deferred, `mise run check` and full browser acceptance pass on a fresh build, the preview is running and PR #61 is ready for review. Never merge or deploy; the user reviews first.
+Replace production with the rewrite as soon as it is safe (decided 27 Oct): PR #61 is merged into `main`; release 1.0.0 and upgrade the live Studio in place, with the worker image switch in the same window. Polish continues afterwards. Done means production runs 1.0.0 on migrated data with accounts, OIDC, result links and media verified, the workers run the Studio worker image, and the rollback to 0.51.0 is rehearsed and documented.
 
 ## Working Rules
 
@@ -140,24 +138,37 @@ Settled 24 Oct (later): no generation toasts; AI Control folds into Studio; no R
 
 Settled 24 Oct: viewer hub, chip composer, Grid | Runs, compact Chat cards, Chat noun and LLM titles, unticked delete checklist, legacy-style Library/Settings, glass everywhere via one extractable theme, phone full-height editor, Dream as a fourth mode with idle-only capped generation and an LLM taste profile. Not wanted: gateway-based text readiness, centring the thread on the composer, LoRA recents, Megapixels and per-run Smart Upscale. Also settled: 2K/4K returns; LoRA favourites and strength slider; LoRA and reference pickers redesigned (R8, R9); compare runs feed the taste profile (R10); read-only LibreChat trace review is approved; kubelab drops the duplicate Studio prompt prefix, lowers reasoning effort and uses the model's maximum context window once M2/M3 land; `private/todo.md` is mined into this backlog and then deleted.
 
-## Required Before Cutover
+## Cutover to 1.0.0 (in place)
+
+Decided 27 Oct: in-place upgrade (no staging), version 1.0.0, app and workers switched together. AI Control is already retired and the GPU workloads run as Kubernetes deployments (`comfyui`, `comfyui-video`, `text-*`), switched by scaling replicas. Studio's deployment lives in kubelab (`apps/base/studio`, single replica, Recreate, pinned to `0.51.0`); its data is about 8.3 GB (8.2 GB media, about 25 MB metadata) on kimbap's `truenas-nvme/studio` dataset.
+
+Prep (now, off-LAN):
+
+- [ ] `main` green (Studio and Worker workflows) after the merge.
+- [ ] Cutover script (`mise run` task or documented commands) for the window: scale Studio to 0, ZFS snapshot plus a copy of `/data`, `migrate-runtime` dry run then apply in a one-off pod on the 1.0.0 image, then upgrade.
+- [ ] kubelab PR (draft, not merged): Studio image `1.0.0`; worker deployments on `ghcr.io/maxexcloo/studio-worker` with the env, mounts and args the rewrite's worker expects; remove settings the rewrite no longer reads.
+- [ ] Check every kubelab Studio setting against `CONFIGURATION.md` (renamed and removed settings, `COMFY_URL`/`COMFY_VIDEO_URL` seeding, `STUDIO_MODEL_STORAGE=worker`, OIDC, Bifrost writer).
+- [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions (after migration, in Studio) and ai's seeds.
+
+On the LAN (with Max):
+
+- [ ] Copy production data (read-only) and rehearse the migration on the copy: mappings, conflicts, media bytes, result links and account ownership.
+      Earlier: A stable read-only capture of 135 live metadata files passed local dry run, SQLite apply, repeated-apply protection and byte-exact restoration: 2 accounts, 7,082 gallery records, 19 deletion markers, zero conflicts or unmatched gallery owners. All three account folders were retained. The rewrite reads all 36 profiles, their version history, 10 guide packs and 140 catalogue entries without changing their definitions. Legacy and rewrite readers also agree on 1,176 stored result links, 1,568 job owners and 1,094 result numbers, including audience restrictions and legacy sealed tokens. Retain deployment-owned `STUDIO_MODEL_MANIFEST_PREFIX` when moving the catalogue. Media bytes, HTTP result-link delivery and authenticated account behaviour still need verification.
+- [ ] Tag `v1.0.0` from `main` (publishes the image and release notes from `CHANGELOG.md`).
+- [ ] Window: snapshot, migrate, merge the kubelab PR, verify accounts/OIDC, isolation, NSFW and cloud grants, old result links, a real Image → Refine → Animate, references, LoRAs, upscale, Library imports and MCP from LibreChat.
+- [ ] Rollback rehearsed: scale to 0, restore the snapshot, pin `0.51.0` (and the old worker image).
+
+Carried over (verify live after cutover):
 
 - [ ] Exercise real Image → Refine → Animate, references, masks, upscale/comparison, video extension, LoRAs, model/preset reuse, downloads and Library imports/grading against intended workers.
-      Live image generation and reference-based Fibo refinement are verified with saved results. Cloud is offline and the user has asked to omit live cloud checks for now. GPU video is offline. Browser fixtures cover the complete session workflow on desktop, phone Chromium and phone WebKit.
 - [ ] Verify administrator/user isolation, Cloud Models and NSFW grants with real accounts, including OIDC and old result links.
-- [ ] Rehearse migration and restoration on a protected copy of actual runtime state; report mappings/conflicts and verify media/result links and account ownership.
-      A stable read-only capture of 135 live metadata files passed local dry run, SQLite apply, repeated-apply protection and byte-exact restoration: 2 accounts, 7,082 gallery records, 19 deletion markers, zero conflicts or unmatched gallery owners. All three account folders were retained. The rewrite reads all 36 profiles, their version history, 10 guide packs and 140 catalogue entries without changing their definitions. Legacy and rewrite readers also agree on 1,176 stored result links, 1,568 job owners and 1,094 result numbers, including audience restrictions and legacy sealed tokens. Retain deployment-owned `STUDIO_MODEL_MANIFEST_PREFIX` when moving the catalogue. Media bytes, HTTP result-link delivery and authenticated account behaviour still need verification.
 - [ ] Verify the app and worker images, GPU lease exclusion, offline/startup failures, cancellation/retry, restart recovery and safe saved-output workload switching.
       Both images build locally; the AMD64 app passes read-only runtime, SQLite and Sharp smoke checks. The AMD64 worker, including non-blocking provider discovery, passes 84 packaged CPU lease/loader/bridge fixtures. GPU inference and runtime switching remain unverified.
-- [ ] After publishing the verified worker image, update ai's workload image references and retire the old worker recipe from images together. Existing image consumers and the images checkout remain unchanged during this review.
-- [ ] Confirm AI Control relinquishes runtime ownership and every managed local text caller uses Studio admission before enabling automatic control.
 - [ ] Verify stream draining and independent GPU/cloud work with real services. Live authenticated Bifrost ai/text discussion completed in 9.081 seconds with 1556 characters and no media jobs. Managed Radiance stream draining still needs live verification; LiteLLM → Bifrost migration is separate.
 - [ ] Verify video limits come from the worker (frame maximum, frame grid, area limit) and out-of-range requests are rejected, not silently adjusted. Done in code: H3 frame limits intersect the node's declared range (Radiance 124–345, native 124–362) and Studio refuses off-grid or out-of-range frames instead of snapping them (`backend/validation.js` `videoFrames`). Still to verify against the live worker; area and size limits still snap.
 - [ ] Held video work while the worker is off stays owner-scoped, counts against limits and drains in order without cloud fallback.
-- [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions and ai's seeds.
 - [ ] Honest worker health (done in the rewrite: status probes read a timeout as busy for the 60 s grace; outage logs skip busy timeouts, count a silent worker from its first unanswered check and record the error code, e.g. `ECONNREFUSED`): deliberately stopped workers show as Parked, not down — needs Studio to own runtime stops (A1).
 - [ ] Graceful shutdown: a rollout must finish or cleanly refuse in-flight MCP/API requests before the pod stops (a 0.51.0 rollout dropped in-flight Generate calls with EOF and connection refused, and the model retried them). Rewrite, locally: SIGTERM lets an in-flight request finish (200), refuses new connections and exits 0; MCP inline waits end at once and reply with their links. Still to verify on a real rollout (single replica, Recreate).
-- [ ] Review the large rewrite before merge; keep production single-replica with Recreate. Publish and deploy only through the verified image pipeline.
 
 ## Deferred Decisions & Work
 

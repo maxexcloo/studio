@@ -2259,6 +2259,8 @@ test("the Result wait ends promptly when the client cancels or disconnects, with
   const f = await fixture(t);
   const lookups = () => f.requests.filter((request) => request.path.startsWith("/jobs/")).length;
   const settled = async () => {
+    // The cancellation reaches the server as its own request; let it land before measuring.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const before = lookups();
     await new Promise((resolve) => setTimeout(resolve, 4500));
     return lookups() - before;
