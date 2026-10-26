@@ -1,15 +1,7 @@
+import type { NextStep, Suggestions } from "../../shared/suggestions.ts";
 import type { Taste, TasteWriter } from "./taste.ts";
 
 export type SuggestionSurface = "composer" | "viewer" | "chat";
-/** A viewer next step: a short label, the change in words and the item's prompt with it applied. */
-export interface NextStep {
-  label: string;
-  request: string;
-  prompt: string;
-}
-export type Suggestions =
-  | { suggestions: string[] | NextStep[]; reason?: undefined }
-  | { suggestions: []; reason: string };
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
 export interface SuggestionItem {
   type?: string;

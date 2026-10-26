@@ -1,7 +1,9 @@
 import { ActionIcon, Alert, Group, Select, Stack, Text, Textarea, Tooltip } from "@mantine/core";
 import { ArrowUp, Square } from "lucide-react";
 import { ComposerDock } from "../generation/ComposerDock";
+import { usePromptIdeas } from "../generation/PromptIdeas";
 import { ReferencePicker } from "../generation/ReferencePicker";
+import { usePhone } from "../../ui/usePhone";
 import { useChat } from "./ChatProvider";
 import { useIsMutating } from "@tanstack/react-query";
 import classes from "./ChatComposer.module.css";
@@ -11,8 +13,17 @@ function ChatComposer() {
   const unavailable =
     uploadingReferences || status.isPending || status.isError || status.data?.available === false;
   const models = status.data?.models || [];
+  const phone = usePhone();
+  const ideas = usePromptIdeas({
+    kind: "image",
+    empty: !text.trim(),
+    onPick: setText,
+    className: classes.ideas,
+    stacked: phone,
+  });
   return (
     <form
+      className={classes.form}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
@@ -20,24 +31,26 @@ function ChatComposer() {
     >
       <Group wrap="nowrap" gap={4} align="center">
         <ReferencePicker compact />
-        <Textarea
-          aria-label="Message"
-          placeholder="Message Studio…"
-          variant="unstyled"
-          autosize
-          minRows={1}
-          maxRows={5}
-          className={classes.writing}
-          style={{ flex: 1, minWidth: 0 }}
-          value={text}
-          onChange={(event) => setText(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              if (!sendingSession && !unavailable) void send();
-            }
-          }}
-        />
+        <div className={classes.message} {...ideas.focusProps}>
+          <Textarea
+            aria-label="Message"
+            placeholder="Message Studio…"
+            variant="unstyled"
+            autosize
+            minRows={1}
+            maxRows={5}
+            className={classes.writing}
+            value={text}
+            onChange={(event) => setText(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                if (!sendingSession && !unavailable) void send();
+              }
+            }}
+          />
+          {ideas.ideas}
+        </div>
         <Select
           aria-label="Chat Model"
           placeholder="Model"

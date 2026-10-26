@@ -334,6 +334,11 @@ export async function fixtures(page: Page) {
         defaultPreset: "improve",
         presets: [{ id: "improve", label: "Improve" }],
       });
+    if (path === "/api/suggestions")
+      return respond({
+        suggestions: [],
+        reason: "Star a few results so Studio learns your taste.",
+      });
     if (path === "/api/assistant/rewrite")
       return respond({ prompt: "A cinematic amber bird", source: "model" });
     if (path === "/api/services/status")
