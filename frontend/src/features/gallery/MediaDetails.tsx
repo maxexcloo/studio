@@ -224,6 +224,20 @@ export function MediaDetails({ item }: { item: MediaItem }) {
             Negative: {item.negative}
           </Text>
         )}
+        {item.caption?.text && (
+          <Text size="sm" c="dimmed">
+            Caption: {item.caption.text}
+          </Text>
+        )}
+        {!!item.caption?.tags?.length && (
+          <Group gap={4} aria-label="Caption Tags">
+            {item.caption.tags.map((tag) => (
+              <Badge key={tag} variant="default" radius="sm" size="sm" tt="none" fw={400}>
+                {tag}
+              </Badge>
+            ))}
+          </Group>
+        )}
       </Stack>
       {(details.profile || !!details.loras.length) && (
         <Stack gap={6}>
