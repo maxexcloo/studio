@@ -2,18 +2,35 @@ import { Alert, Button, Group, Stack, Text, TextInput } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
-import type { GenerationInput } from "../../types";
-import { initialInput, useGeneration } from "./GenerationProvider";
+import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { generationInput } from "./payload";
-interface Preset {
+export interface Preset {
   id: string;
   title: string;
   input: GenerationInput;
 }
-/** Saved composer presets: loading one replaces the draft, then `onLoad` runs. */
-export function PresetEditor({ onLoad }: { onLoad: () => void }) {
-  const { draft, input, profile, setDraft } = useGeneration(),
-    client = useQueryClient();
+/** The preset an editor last loaded or saved, and the name being typed. */
+export interface PresetSelection {
+  presetId?: string;
+  presetTitle?: string;
+}
+/** Saved presets for any generation editor: `onLoad` replaces that editor's draft. */
+export function PresetEditor({
+  input,
+  references,
+  profile,
+  selection: draft,
+  onSelectionChange,
+  onLoad,
+}: {
+  input: GenerationInput;
+  references: ReferenceAsset[];
+  profile?: Profile;
+  selection: PresetSelection;
+  onSelectionChange: (selection: PresetSelection) => void;
+  onLoad: (preset: Preset) => void;
+}) {
+  const client = useQueryClient();
   const presets = useQuery({
     queryKey: ["user-presets"],
     queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
@@ -27,12 +44,12 @@ export function PresetEditor({ onLoad }: { onLoad: () => void }) {
           method: existing ? "PATCH" : "POST",
           body: JSON.stringify({
             title: draft.presetTitle,
-            input: generationInput(input, profile, draft.references),
+            input: generationInput(input, profile, references),
           }),
         },
       ),
     onSuccess: ({ preset }) => {
-      setDraft((value) => ({ ...value, presetId: preset.id, presetTitle: preset.title }));
+      onSelectionChange({ presetId: preset.id, presetTitle: preset.title });
       void client.invalidateQueries({ queryKey: ["user-presets"] });
       notifications.show({ message: "Preset saved" });
     },
@@ -40,8 +57,7 @@ export function PresetEditor({ onLoad }: { onLoad: () => void }) {
   const remove = useMutation({
     mutationFn: (id: string) => api(`/api/user-presets/${id}`, { method: "DELETE" }),
     onSuccess: (_, id) => {
-      if (id === draft.presetId)
-        setDraft((value) => ({ ...value, presetId: undefined, presetTitle: "" }));
+      if (id === draft.presetId) onSelectionChange({ presetId: undefined, presetTitle: "" });
       void client.invalidateQueries({ queryKey: ["user-presets"] });
     },
   });
@@ -55,21 +71,7 @@ export function PresetEditor({ onLoad }: { onLoad: () => void }) {
         <Group key={preset.id} justify="space-between">
           <Button
             variant={preset.id === draft.presetId ? "light" : "subtle"}
-            onClick={() => {
-              setDraft((value) => ({
-                ...value,
-                presetId: preset.id,
-                presetTitle: preset.title,
-                sessionId: "",
-                parentJobId: undefined,
-                operation: preset.input.kind === "video" ? "animate" : "image",
-                input: { ...initialInput, ...preset.input },
-                references: Array.isArray(preset.input.referenceDetails)
-                  ? preset.input.referenceDetails
-                  : [],
-              }));
-              onLoad();
-            }}
+            onClick={() => onLoad(preset)}
           >
             {preset.title}
           </Button>
@@ -103,8 +105,7 @@ export function PresetEditor({ onLoad }: { onLoad: () => void }) {
           savePreset(Boolean(draft.presetId));
         }}
         onChange={(event) => {
-          const presetTitle = event.currentTarget.value;
-          setDraft((value) => ({ ...value, presetTitle }));
+          onSelectionChange({ ...draft, presetTitle: event.currentTarget.value });
         }}
       />
       {save.error && <Alert color="red">{save.error.message}</Alert>}

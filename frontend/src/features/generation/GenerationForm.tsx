@@ -162,7 +162,30 @@ export function GenerationForm({
         draft.presetId,
         draft.operation,
       ])}
-      presets={(close) => <PresetEditor onLoad={close} />}
+      presets={(close) => (
+        <PresetEditor
+          input={input}
+          references={draft.references}
+          profile={profile}
+          selection={draft}
+          onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
+          onLoad={(preset) => {
+            setDraft((value) => ({
+              ...value,
+              presetId: preset.id,
+              presetTitle: preset.title,
+              sessionId: "",
+              parentJobId: undefined,
+              operation: preset.input.kind === "video" ? "animate" : "image",
+              input: { ...initialInput, ...preset.input },
+              references: Array.isArray(preset.input.referenceDetails)
+                ? preset.input.referenceDetails
+                : [],
+            }));
+            close();
+          }}
+        />
+      )}
       onCompare={() =>
         compare.open({
           input,
