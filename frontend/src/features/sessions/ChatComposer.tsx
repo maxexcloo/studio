@@ -17,7 +17,8 @@ function ChatComposer() {
   const ideas = usePromptIdeas({
     kind: "image",
     empty: !text.trim(),
-    onPick: setText,
+    // An idea is an image to make, so Chat asks for it rather than discussing it.
+    onPick: (idea) => setText(`Create an image: ${idea}`),
     className: classes.ideas,
     stacked: phone,
   });
