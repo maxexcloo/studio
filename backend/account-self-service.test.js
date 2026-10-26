@@ -97,7 +97,7 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   assert.equal("password" in me.body.account, false);
   assert.equal(ordinaryRouteAllowed("GET", "/api/accounts/me"), true);
   assert.equal(ordinaryRouteAllowed("PATCH", "/api/accounts/me"), true);
-  // Compare Variants and the taste profile are owner-scoped, so ordinary accounts use them too.
+  // Compare Variants, the taste profile and Dream are owner-scoped, so ordinary accounts use them too.
   for (const [method, route] of [
     ["POST", "/api/comparisons/run"],
     ["GET", "/api/comparisons/abc-123"],
@@ -106,8 +106,15 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
     ["PUT", "/api/taste"],
     ["POST", "/api/taste/refresh"],
     ["DELETE", "/api/taste"],
+    ["GET", "/api/dream"],
+    ["GET", "/api/dream/discarded"],
+    ["PUT", "/api/dream/settings"],
+    ["POST", "/api/dream/%2Fcomfy%2Fview%3Ffilename%3Da.png/keep"],
+    ["POST", "/api/dream/item-1/discard"],
+    ["POST", "/api/dream/item-1/variations"],
   ])
     assert.equal(ordinaryRouteAllowed(method, route), true, `${method} ${route}`);
+  assert.equal(ordinaryRouteAllowed("POST", "/api/dream/item-1/delete"), false);
   const anonymous = await call(routes["GET /api/accounts/me"], local());
   assert.equal(anonymous.statusCode, 401);
 });
