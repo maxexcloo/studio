@@ -184,7 +184,7 @@ export function MediaActionItems({
         disabled={action.isPending}
         onClick={() => action.mutate("image")}
       >
-        Recreate
+        Recreate in Composer
       </Menu.Item>
       {ready && item.type === "image" && (
         <Menu.Item
