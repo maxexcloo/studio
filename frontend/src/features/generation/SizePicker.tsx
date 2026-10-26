@@ -74,17 +74,22 @@ export function SizePicker({
       current;
     apply(drawnAt(shape, next, max));
   }
+  // A custom size of a preset's shape still reads as that aspect; the exact size is in the title.
+  const shaped = presets.find((preset) => preset.w * current.h === preset.h * current.w);
   const label = framed
     ? `Reference · ${aspect}`
     : active
       ? `${active.label}${tier === "standard" ? "" : ` · ${tierLabels[tier]}`}`
-      : `${input.width} × ${input.height}`;
+      : shaped
+        ? shaped.label
+        : `${input.width} × ${input.height}`;
   return (
     <Popover position="top-start" width={300} trapFocus>
       <Popover.Target>
         <Button
           {...chipProps}
           aria-label="Aspect"
+          title={framed ? undefined : `${input.width} × ${input.height}`}
           leftSection={<RectangleHorizontal size={16} />}
           rightSection={<ChevronDown size={14} />}
         >
