@@ -234,7 +234,13 @@ export function GallerySelectionBar({
   return (
     <>
       <Group gap={4} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
-        <Text size="sm" fw={500} role="status" mr={4} style={{ whiteSpace: "nowrap" }}>
+        <Text
+          size="sm"
+          fw={500}
+          role="status"
+          mr={4}
+          style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+        >
           {selected.length} Selected
         </Text>
         {quick.map(
@@ -294,7 +300,8 @@ export function GallerySelectionBar({
         transitionProps={{ transition: "slide-up" }}
       >
         <Stack gap={4} w="100%">
-          <Group justify="center" gap={phone ? 0 : "xs"} wrap="nowrap">
+          {/* 40px keeps the desktop bar the height of the composer it replaces. */}
+          <Group justify="center" gap={phone ? 0 : "xs"} wrap="nowrap" mih={phone ? undefined : 40}>
             {actions.map((action) => {
               const props = {
                 "aria-label": action.label,
