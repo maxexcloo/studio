@@ -25,6 +25,7 @@
 }
 
 .layout {
+  --studio-viewer-aside-width: clamp(300px, 26vw, 380px);
   display: flex;
   flex: 1;
   min-width: 0;
@@ -171,9 +172,27 @@
   min-width: 22px;
 }
 
+.asideTrack {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition:
+    width var(--studio-motion-duration) ease,
+    visibility 0s var(--studio-motion-duration);
+}
+
+.asideTrack[data-open] {
+  width: var(--studio-viewer-aside-width);
+  visibility: visible;
+  transition: width var(--studio-motion-duration) ease;
+}
+
 .aside {
   flex-shrink: 0;
-  width: clamp(300px, 26vw, 380px);
+  width: var(--studio-viewer-aside-width);
   height: 100%;
   border-left: 1px solid var(--studio-glass-border);
   background: var(--studio-glass-chrome);
