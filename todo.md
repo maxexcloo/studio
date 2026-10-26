@@ -73,7 +73,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 ## Dream & Taste (D) — Large, after R
 
 - [x] D1 Taste profile: LLM-maintained, editable summary from swipes, stars, iterations, prompts and LoRAs; stored per account. Done: `backend/domain/taste.ts` keeps signals (star, unstar, compare winner, any job with a parent) per account in SQLite and rewrites the summary after 8 new signals (at most every 10 minutes, text offline skips); Settings › Account edits, refreshes and clears it; the MCP model pick reads it. Swipes join with D3.
-- [ ] D2 Dream scheduler: idle-only, yields to user and text work, unseen buffer and daily cap; images, videos and NSFW-granted spicy content; separate pool until kept.
+- [x] D2 Dream scheduler: idle-only, yields to user and text work, unseen buffer and daily cap; images, videos and NSFW-granted spicy content; separate pool until kept. Done (`backend/domain/dream.ts`): off by default per account; one Dream job at a time, only with an empty queue and no text work, lowest priority, cancelled when other work is admitted; buffer 12, 40 images and 4 videos a day; taste-written prompts; items stay out of every gallery listing and MCP until kept; keep/discard feed the taste profile; `/api/dream` routes for D3. Not run against a live worker.
 - [ ] D3 `/dream` deck: swipe left discard, right keep, up keep + variations; Star and Animate buttons; pause and settings; discards retained and filterable.
 - [ ] D4 Suggestions: composer prompt ideas, viewer next-step chips and Chat context from the taste profile.
 - [ ] D5 Taste calibration from existing media: Dream mixes in random older gallery items (single cards and occasional this-or-that pairs) to learn preferences without using the GPU; choices feed the taste profile, change nothing in the gallery except an optional Star, and favour items not yet judged.
@@ -114,6 +114,11 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 - Phone Chat with no Chat selected gives no cue that the list lives behind the status action. Default: the empty state says where the Chats are and offers New Chat.
 - The Chat model select reads "Text" with a wide gap. Default: show the actual text model label from chat status.
 - Library Imports and Inspiration are hidden in dev because `features.presets` is off. Default: leave the flag; dev data only.
+- Dream: should Cancel All / Cancel Pending also stop Dream? Default: no; Pause does.
+- Dream: discarded and failed Dream items count towards the gallery limit while hidden. Default: keep the newest 500 discards once D3 lands.
+- Dream: prompts use no LoRAs yet. Default: add the account's starred LoRAs with D3/D4.
+- Dream: does starring an unseen Dream item keep it? Default: yes, in D3.
+- Dream: a Dream job waiting on a worker that went offline blocks further Dream work until other work arrives or the account pauses. Default: accept for now.
 - Phone viewer action buttons went from 42px to 40px so the split Regenerate fits a 375px phone. Default: keep 40px.
 - Duplicate profile pairs now show an id suffix ("· comfyui" / "· fp8"); most look like legacy duplicates with the same settings. Default: keep the suffix until you prune runtime definitions.
 - Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
