@@ -26,7 +26,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-KJNodes",
-    "revision": "f4bae1f9960e5d643573a2ecf7abd56453a21821",
+    "revision": "37ca7aff7ed14dde6ba3c0b25713e21c18b28dcb",
     "url": "https://github.com/kijai/ComfyUI-KJNodes.git"
   },
   {
