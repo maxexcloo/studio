@@ -19,6 +19,7 @@ version opens with a `> ` summary line.
 - Taste Profile (Settings › Account): an editable per-account summary the assistant model keeps from stars, compare votes and iterations with their prompts and LoRAs; MCP's automatic model pick takes it into account.
 - Dream (backend, off by default per account): while Studio is idle, it makes images and optionally videos from the taste profile into a separate pool, within an unseen buffer and daily caps, and yields to anyone's work; keeping a result moves it into the gallery.
 - Gallery Captions (Settings › Models, `STUDIO_GALLERY_CAPTIONS`, off by default): while Studio is idle, a vision assistant model describes finished images so gallery search also finds what they show.
+- Suggestions from the taste profile: an empty, focused composer or Chat message offers three prompt ideas, the viewer offers next-step chips (such as Warmer Light or Closer Crop) that stage a rewritten prompt in its prompt bar, and Chat's assistant receives the taste summary as context.
 - Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
 - Settings › Profiles shows each profile's last 30 days (runs, failures, stars, typical time) and marks one Failing when most of its recent runs failed.
 - Installed on a phone, Studio appears in the share sheet (Android): a shared image opens the composer with it as a reference. The app gains 512px and maskable icons.

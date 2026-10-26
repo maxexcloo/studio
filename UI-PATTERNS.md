@@ -165,6 +165,10 @@ primary component reference and verify APIs against the installed version.
 - An editable, LLM-maintained taste profile learns from swipes, stars,
   iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,
   viewer next-step suggestions and Chat.
+- Suggestions never move the layout or act on their own: prompt ideas float
+  over an empty, focused prompt and fill it; viewer next steps hold their row
+  while loading and stage a prompt that Enter or Generate runs. With none to
+  offer, nothing shows.
 
 ## Data & Feedback
 

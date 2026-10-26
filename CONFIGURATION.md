@@ -186,6 +186,8 @@ Each account's **Taste Profile** (Settings › Account; `GET`, `PUT` and `DELETE
 
 **Gallery Captions** (**Settings › Models**, `STUDIO_GALLERY_CAPTIONS=1`, off by default) let gallery search match what an image shows as well as its prompt. While Studio is idle, by the same rule as Dream (Dream's own jobs count as work here), the assistant model describes one finished image at a time, newest first, from a copy of at most 512 px: at most one every 10 seconds and 500 a day. It yields as soon as other work arrives and tries that image again later. The caption (up to 300 characters, with the model and time) is stored on the gallery record as `caption`. Captions need a model that reads images (`supports_vision`); with a text-only model they are skipped and the log says so once. Accounts without **Prompt Assistant** are never captioned, and there is no cloud fallback.
 
+**Suggestions** (`POST /api/suggestions` with `surface` `composer`, `viewer` or `chat`) ask the assistant model for three prompt ideas from the taste profile and liked prompts, three or four next steps for a finished image from its prompt and settings, or a paragraph of taste context. Answers are cached per account and input for ten minutes. Accounts without **Prompt Assistant**, or while the text runtime is offline, get an empty list with the reason; there is no fallback text and no cloud model. Chat's assistant also receives the account's taste summary as context.
+
 `mise run eval:assistant` replays the recorded cases in `backend/fixtures/assistant-evals/` against the live gateway, using the variables above, and scores them; `--record` writes the live replies back for review. CI only scores the recorded replies.
 
 ## Profiles, Guides & Catalogue
