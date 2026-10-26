@@ -3,21 +3,48 @@ import { once } from "node:events";
 import http from "node:http";
 import test from "node:test";
 import express from "express";
-import { RuntimeController } from "./controller.ts";
-import { createTextAdmissionRouter } from "./routes.ts";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { RuntimeController, type Workload } from "./controller.ts";
+import { KubernetesEngine } from "./kubernetes.ts";
+import { createRuntimeRouter, createTextAdmissionRouter } from "./routes.ts";
+
+/** One GPU, shared by every workload given; `running` start with a ready pod. */
+function runtime(
+  workloads: Pick<Workload, "id" | "kind" | "url">[],
+  running: string[],
+  automaticLifecycle = false,
+) {
+  const kube = fakeKubernetes(
+    workloads.map(({ id }) => ({
+      namespace: "gpu",
+      name: id,
+      replicas: running.includes(id) ? 1 : 0,
+    })),
+  );
+  const controller = new RuntimeController({
+    engine: new KubernetesEngine(kube.request),
+    workloads: workloads.map((item) => ({
+      ...item,
+      label: item.id,
+      namespace: "gpu",
+      deployment: item.id,
+      pool: "gpu",
+      gpus: 1,
+    })),
+    pools: { gpu: 1 },
+    automaticLifecycle,
+    sleep: async () => {
+      kube.tick();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    },
+  });
+  return { kube, controller };
+}
 
 test("Bifrost-compatible streaming request calls direct Radiance and holds admission until output drains", async (context) => {
-  const controller = new RuntimeController(
-    { running: async () => true, start: async () => {}, stop: async () => {} },
-    [
-      {
-        id: "text",
-        container: "radiance",
-        devices: ["0"],
-        kind: "text",
-        url: "http://radiance.internal:8000",
-      },
-    ],
+  const { controller } = runtime(
+    [{ id: "text", kind: "text", url: "http://radiance.internal:8000" }],
+    ["text"],
   );
   let releaseStream: (() => void) | undefined;
   const source = new ReadableStream({
@@ -101,36 +128,12 @@ test("caller disconnect drains the real Radiance response and blocks conflicting
     upstream.close();
   });
   const address = upstream.address() as { port: number };
-  const running = new Set(["radiance"]);
-  const lifecycle: string[] = [];
-  const controller = new RuntimeController(
-    {
-      running: async (container) => running.has(container),
-      start: async (container) => {
-        lifecycle.push(`start:${container}`);
-        running.add(container);
-      },
-      stop: async (container) => {
-        lifecycle.push(`stop:${container}`);
-        running.delete(container);
-      },
-    },
+  const { kube, controller } = runtime(
     [
-      {
-        id: "text",
-        container: "radiance",
-        devices: ["0"],
-        kind: "text",
-        url: `http://127.0.0.1:${address.port}`,
-      },
-      {
-        id: "media",
-        container: "comfy",
-        devices: ["0"],
-        kind: "media",
-        url: "http://comfy.invalid",
-      },
+      { id: "text", kind: "text", url: `http://127.0.0.1:${address.port}` },
+      { id: "media", kind: "image", url: "http://comfy.invalid" },
     ],
+    ["text"],
     true,
   );
   let markReleased!: () => void;
@@ -176,12 +179,69 @@ test("caller disconnect drains the real Radiance response and blocks conflicting
   await disconnected;
   assert.equal(upstreamClosed, false, "closing the caller must not cancel Radiance's response");
   assert.equal(controller.status()[0].acceptedOperations, 1);
-  await assert.rejects(controller.acquire("media"), /Waiting for accepted work/);
-  assert.deepEqual(lifecycle, []);
+  // Media needs the GPU: the switch begins but waits for the open text stream.
+  await assert.rejects(controller.acquire("media"), /Waiting for media to start/);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.match(
+    (await controller.observe()).operation!.progress,
+    /Waiting for 1 accepted operation on text/,
+  );
+  assert.deepEqual(kube.log, []);
   finishUpstream();
   await released;
   assert.equal(controller.status()[0].acceptedOperations, 0);
-  const media = await controller.acquire("media");
-  assert.deepEqual(lifecycle, ["stop:radiance", "start:comfy"]);
-  media.release();
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale gpu/text 0", "gone gpu/text", "scale gpu/media 1"]);
+  (await controller.acquire("media")).release();
+});
+
+test("administrator runtime routes preview, apply and report operations, with plain refusals", async (context) => {
+  const { kube, controller } = runtime(
+    [
+      { id: "text", kind: "text", url: "http://text.invalid" },
+      { id: "media", kind: "image", url: "http://media.invalid" },
+    ],
+    ["text"],
+  );
+  const app = express();
+  app.use(express.json());
+  app.use(createRuntimeRouter(controller, () => "account:admin"));
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  context.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const send = async (path: string, body?: unknown) => {
+    const response = await fetch(base + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "Content-Type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  const status = await send("/");
+  assert.deepEqual(
+    status.body.workloads.map((item: { id: string; phase: string }) => [item.id, item.phase]),
+    [
+      ["text", "running"],
+      ["media", "stopped"],
+    ],
+  );
+  assert.deepEqual(await send("/preview", { workloads: "media" }), {
+    status: 400,
+    body: { error: "workloads must list workload ids." },
+  });
+  assert.equal((await send("/preview", { workloads: ["text", "media"] })).status, 400);
+  const preview = await send("/preview", { workloads: ["media"] });
+  assert.deepEqual(preview.body.stop, ["text"]);
+  assert.equal((await send("/apply", { workloads: ["media"], signature: "stale" })).status, 409);
+  const applied = await send("/apply", { workloads: ["media"], signature: preview.body.signature });
+  assert.equal(applied.status, 202);
+  assert.equal(applied.body.requestedBy, "account:admin");
+  await controller.settled;
+  assert.equal((await send(`/operations/${applied.body.id}`)).body.status, "completed");
+  assert.deepEqual(kube.log, ["scale gpu/text 0", "gone gpu/text", "scale gpu/media 1"]);
+  assert.deepEqual(await send("/restart", { workload: "text" }), {
+    status: 409,
+    body: { error: "text is not running; only a running workload can be restarted." },
+  });
 });
