@@ -263,7 +263,7 @@ async function fixture(
     MCP_PUBLIC_URL: "https://studio.example.test",
     ...extra,
   };
-  await registerMcpRoutes(app, {
+  const mcp = await registerMcpRoutes(app, {
     baseUrl: () => base,
     dataDir,
     environment,
@@ -330,6 +330,7 @@ async function fixture(
     app,
     assets,
     base,
+    mcp,
     controlRequests,
     writerRequests,
     dataDir,
@@ -1057,6 +1058,17 @@ test("Status and Result wait 20 seconds at most, so a chat never blocks on a bac
   );
   assert.equal(data(await call(client, "Result", { job_id: id, wait_seconds: 5 })).status, "done");
   assert.equal(data(await call(client, "Status", { job_id: id, wait_seconds: 20 })).status, "done");
+});
+
+test("shutting down ends inline waits, so the call replies with its links instead of being cut off", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  const started = performance.now();
+  setTimeout(() => f.mcp.endWaits(), 300);
+  const status = await call(client, "Status", { job_id: id, wait_seconds: 20 });
+  assert.equal(data(status).status, "running");
+  assert.ok(performance.now() - started < 3000, "the wait ended with the shutdown");
 });
 
 test("Generate returns immediately with one saved-size image and passes explicit controls without polling", async (t) => {

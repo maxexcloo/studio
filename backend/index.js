@@ -399,7 +399,7 @@ for (const [name, migrate] of [
 }
 // Chat handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
 const chatHandovers = createHandoverStore({ dataDir });
-registerMcpRoutes(app, {
+const mcp = registerMcpRoutes(app, {
   dataDir,
   gatewayAdminTools,
   claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
@@ -3795,6 +3795,8 @@ const serverStartup = startServers(app, {
 });
 
 drainServer = async () => {
+  // MCP calls waiting inline for images reply with their links instead of outliving the grace.
+  mcp?.endWaits();
   const listening = await serverStartup;
   const closed = Promise.all(
     (listening?.servers || []).map(

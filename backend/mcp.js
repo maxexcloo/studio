@@ -195,7 +195,7 @@ export function registerMcpRoutes(
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
-  if (!mediaKey && !controlKey && !accountMode) return false;
+  if (!mediaKey && !controlKey && !accountMode) return null;
   if (
     controlKey &&
     (!environment.CONTROL_URL ||
@@ -1738,5 +1738,5 @@ export function registerMcpRoutes(
         res.status(404).json({ error: "The result link is invalid, unavailable or expired." });
       }
     });
-  return true;
+  return { endWaits: () => media.endWaits() };
 }
