@@ -92,7 +92,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Tests & Repository (T) — Small
 
-- [ ] T1 Split `tests/browser/workflows.spec.ts` into its topic specs, keeping only cross-feature journeys; share route mocks through `fixtures.ts`.
+- [x] T1 Split `tests/browser/workflows.spec.ts` into its topic specs, keeping only cross-feature journeys; share route mocks through `fixtures.ts`. Done: 30 tests moved into 11 topic specs, 3 journeys stay; `serveProfiles` and `signIn` replace 21 inline mocks; touched specs 239 passed, 0 failed across desktop, phone and WebKit.
 - [x] T2 Add a Mise task for browser tests and use it in README; remove `dev:lan`; align `package.json` ranges; delete empty scaffold directories.
 - [x] T3 Deduplicate README/CONTRIBUTING development steps and TROUBLESHOOTING/DOCKER rollback text.
 - [x] T4 Stop writing `startImageId` in new drafts once `referenceAssets` covers every reader; keep reading it for old records.
@@ -133,7 +133,7 @@ Settled 24 Oct: viewer hub, chip composer, Grid | Runs, compact Chat cards, Chat
 - [ ] Held video work while the worker is off stays owner-scoped, counts against limits and drains in order without cloud fallback.
 - [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions and ai's seeds.
 - [ ] Honest worker health (done in the rewrite: status probes read a timeout as busy for the 60 s grace; outage logs skip busy timeouts, count a silent worker from its first unanswered check and record the error code, e.g. `ECONNREFUSED`): deliberately stopped workers show as Parked, not down — needs Studio to own runtime stops (A1).
-- [ ] Graceful shutdown: a rollout must finish or cleanly refuse in-flight MCP/API requests before the pod stops (a 0.51.0 rollout dropped in-flight Generate calls with EOF and connection refused, and the model retried them).
+- [ ] Graceful shutdown: a rollout must finish or cleanly refuse in-flight MCP/API requests before the pod stops (a 0.51.0 rollout dropped in-flight Generate calls with EOF and connection refused, and the model retried them). Rewrite, locally: SIGTERM lets an in-flight request finish (200), refuses new connections and exits 0; MCP inline waits end at once and reply with their links. Still to verify on a real rollout (single replica, Recreate).
 - [ ] Review the large rewrite before merge; keep production single-replica with Recreate. Publish and deploy only through the verified image pipeline.
 
 ## Deferred Decisions & Work
