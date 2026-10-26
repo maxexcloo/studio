@@ -132,12 +132,23 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       try { own = new URL(origin).origin === parsedPublic.origin || new URL(origin).host.toLowerCase() === req.headers.host?.toLowerCase(); } catch { /* Invalid origins are rejected. */ }
       if (!own) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
     }
-    const token = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ''))?.[1];
+    // A bearer header carries the credential; a client that sends no headers (a Grok connector takes only a
+    // URL) puts its token in the path instead. Only a personal account token is accepted there: the shared
+    // gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
+    const bearer = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ''))?.[1];
+    const fromUrl = bearer ? '' : String(req.params.token || '');
+    const token = bearer || fromUrl;
     const user = String(req.headers['x-ai-user-id'] || '');
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user)) return res.status(400).json({ error: 'Invalid forwarded user identity.' });
     let account = null;
     let scope = '';
-    if (!accountMode) scope = equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
+    if (fromUrl) {
+      account = authenticateAccountToken(token);
+      if (account) {
+        scope = 'media';
+        media.credentials.set(account.userId, { Authorization: `Bearer ${token}` });
+      }
+    } else if (!accountMode) scope = equal(token, mediaKey) ? 'media' : equal(token, controlKey) ? 'control' : '';
     else if (equal(token, controlKey)) scope = 'control';
     else if (equal(token, mediaKey)) {
       // Gateway trust: the shared key vouches for the gateway; only a link (an administrator's, or by matching email) maps its user to an account.
@@ -510,7 +521,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     }
     return server;
   };
-  app.post('/mcp', guard, express.json({ limit: '30mb' }), async (req, res) => {
+  const handle = async (req, res) => {
     for (const message of [req.body].flat()) if (message?.method === 'notifications/cancelled' && message.params?.requestId !== undefined) {
       inflight.get(inflightKey(req.mcpActor, message.params.requestId))?.abort();
     }
@@ -523,8 +534,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     } catch {
       if (!res.headersSent) res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'MCP could not complete this request.' }, id: req.body?.id ?? null });
     }
-  });
-  app.all('/mcp', guard, (_req, res) => res.status(405).set('Allow', 'POST').json({ error: 'Use Streamable HTTP POST for MCP.' }));
+  };
+  // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
+  for (const route of ['/mcp', '/mcp/:token']) {
+    app.post(route, guard, express.json({ limit: '30mb' }), handle);
+    app.all(route, guard, (_req, res) => res.status(405).set('Allow', 'POST').json({ error: 'Use Streamable HTTP POST for MCP.' }));
+  }
   // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, 'exports') : '';
   function signExport(name, now = Date.now()) {
