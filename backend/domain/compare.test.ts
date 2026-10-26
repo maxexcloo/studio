@@ -38,6 +38,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     revision: () => 0,
     jobLimit: 10,
   });
+  const votes: string[][] = [];
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -57,6 +58,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
+    voted: (ownerId, jobId) => votes.push([ownerId, jobId]),
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -140,6 +142,8 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.equal(voted.body.vote, winner.jobId);
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
+  // The winner is a taste signal; a refused vote is not.
+  assert.deepEqual(votes, [["alice", winner.jobId]]);
 
   // Existing jobs, such as an MCP fan-out run, form a set; foreign jobs are refused.
   const created = await request("", {
