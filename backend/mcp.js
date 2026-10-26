@@ -275,27 +275,39 @@ export function registerMcpRoutes(
       return res.status(403).json({ error: "Unrecognised MCP host." });
     const origin = req.headers.origin;
     if (origin !== undefined) {
-      let own = false;
+      let own;
       try {
         own =
           new URL(origin).origin === parsedPublic.origin ||
           new URL(origin).host.toLowerCase() === req.headers.host?.toLowerCase();
       } catch {
-        /* Invalid origins are rejected. */
-      }
-      if (!own)
         return res.status(403).json({ error: "Cross-origin MCP requests are not permitted." });
+      }
+      // A browser-based MCP client (a Grok connector validates its URL from the page) runs cross-origin. MCP
+      // takes no ambient credentials — every call carries its bearer token — so a hostile page gains nothing it
+      // could not do from its own server; the host check above still stops DNS rebinding.
+      if (!own)
+        res.set({
+          "Access-Control-Allow-Origin": origin,
+          "Access-Control-Expose-Headers": "mcp-session-id",
+          Vary: "Origin",
+        });
     }
-    const token = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ""))?.[1];
+    // A bearer header carries the credential; a client that sends no headers (a Grok connector takes only a
+    // URL) puts its token in the path instead. Only a personal account token is accepted there: the shared
+    // gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
+    const bearer = /^Bearer ([^\s]+)$/i.exec(String(req.headers.authorization || ""))?.[1];
+    const fromUrl = bearer ? "" : String(req.params.token || "");
+    const token = bearer || fromUrl;
     const user = String(req.headers["x-ai-user-id"] || "");
     if (user.length > 256 || /[\x00-\x1f\x7f]/.test(user))
       return res.status(400).json({ error: "Invalid forwarded user identity." });
     let account = null;
     let scope = "";
-    if (!accountMode)
+    if (!fromUrl && !accountMode)
       scope = equal(token, mediaKey) ? "media" : equal(token, controlKey) ? "control" : "";
-    else if (equal(token, controlKey)) scope = "control";
-    else if (equal(token, mediaKey)) {
+    else if (!fromUrl && equal(token, controlKey)) scope = "control";
+    else if (!fromUrl && equal(token, mediaKey)) {
       // Gateway trust: the shared key vouches for the gateway; only a link (an administrator's, or by matching email) maps its user to an account.
       // The gateway's own health checks and handshakes name no user: they connect and list, and every call is refused.
       const email = String(req.headers["x-ai-user-email"] || "");
@@ -1263,7 +1275,7 @@ export function registerMcpRoutes(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: request changes it in words, prompt replaces its prompt, tier or profile_id picks another model, preserve_seed keeps its seed. mode animate makes an image a video (tier picks the model). mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: request changes it in words, prompt replaces its prompt, preserve_seed keeps its seed. mode animate makes an image a video. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
         {
           ...output,
           job_id: z
@@ -1319,20 +1331,30 @@ export function registerMcpRoutes(
           if (mode === "animate" && own === "video")
             throw new Error("This result is already a video; call Reuse with mode again instead.");
           const kind = mode === "animate" ? "video" : own;
-          if (kind !== own && profile_id)
-            throw new Error("Pass tier, not profile_id, to choose the video model when animating.");
           if (preserve_seed && (kind !== own || wanted || profile_id))
             throw new Error(
               "preserve_seed is for a same-model revision, not animation or a model/tier change. Call Reuse again without preserve_seed.",
             );
           let plan;
-          const cloud = asksForCloud(request);
+          // Animating may name the video model ("grok imagine") in profile_id; naming a cloud profile asks for the cloud.
+          const named =
+            kind !== own && profile_id
+              ? namedInTier(await media.profiles("video", owner), profile_id, wanted)
+              : null;
+          const cloud =
+            asksForCloud(request) ||
+            asksForCloud(prompt) ||
+            Boolean(named && isCloudProfile(named.profile));
           if (kind !== own)
-            plan = await media.animate(owner, id, output_index, item, {
-              tier: wanted,
-              count,
-              cloud,
-            });
+            plan = {
+              ...(await media.animate(owner, id, output_index, item, {
+                tier: wanted,
+                count,
+                cloud,
+                profile: named?.profile,
+              })),
+              tierNote: named?.note || "",
+            };
           else if (wanted || profile_id) {
             const references = (item.settings?.referenceAssets || []).filter(
               (asset) => asset?.assetId,
@@ -1536,7 +1558,7 @@ export function registerMcpRoutes(
     }
     return server;
   };
-  app.post("/mcp", guard, express.json({ limit: "30mb" }), async (req, res) => {
+  const handle = async (req, res) => {
     for (const message of [req.body].flat())
       if (
         message?.method === "notifications/cancelled" &&
@@ -1564,10 +1586,40 @@ export function registerMcpRoutes(
           id: req.body?.id ?? null,
         });
     }
-  });
-  app.all("/mcp", guard, (_req, res) =>
-    res.status(405).set("Allow", "POST").json({ error: "Use Streamable HTTP POST for MCP." }),
-  );
+  };
+  // A browser-based MCP client must preflight before it may send its JSON; that needs no credential.
+  const preflight = (req, res) =>
+    res
+      .set({
+        "Access-Control-Allow-Headers":
+          "accept, authorization, content-type, mcp-protocol-version, mcp-session-id",
+        "Access-Control-Allow-Methods": "DELETE, GET, OPTIONS, POST",
+        "Access-Control-Allow-Origin": req.headers.origin || "*",
+        "Access-Control-Expose-Headers": "mcp-session-id",
+        "Access-Control-Max-Age": "600",
+        "Cache-Control": "private, no-store",
+        Vary: "Origin",
+      })
+      .status(204)
+      .end();
+  // A client probing for OAuth (the MCP auth spec's discovery) gets a plain miss, never the app page.
+  for (const route of [
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/oauth-protected-resource",
+  ])
+    app.all(route, (_req, res) =>
+      res
+        .status(404)
+        .json({ error: "Studio MCP takes a bearer credential; there is no OAuth here." }),
+    );
+  // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
+  for (const route of ["/mcp", "/mcp/:token"]) {
+    app.options(route, preflight);
+    app.post(route, guard, express.json({ limit: "30mb" }), handle);
+    app.all(route, guard, (_req, res) =>
+      res.status(405).set("Allow", "POST").json({ error: "Use Streamable HTTP POST for MCP." }),
+    );
+  }
   // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, "exports") : "";
   function signExport(name, now = Date.now()) {
