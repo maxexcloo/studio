@@ -91,6 +91,23 @@ class Reservations(unittest.TestCase):
     def wait_ready(self, child):
         self.wait_marker(self.ready[child], child)
 
+    def test_without_a_lease_folder_the_runtime_starts_directly(self):
+        # Kubernetes: no host lease folder and no device selection, the GPU claim is exclusive.
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in ("AI_GPU_DEVICES", "HIP_VISIBLE_DEVICES")
+        }
+        env["AI_GPU_LEASE_DIR"] = str(Path(self.directory.name) / "absent")
+        result = subprocess.run(
+            ["/bin/sh", str(SCRIPT), "/bin/sh", "-c", "exit 7"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT,
+        )
+        self.assertEqual(result.returncode, 7, result.stderr)
+
     def test_disjoint_singles_and_dual_refusal(self):
         self.wait_ready(self.start("0"))
         self.assertEqual(self.start("0,1").wait(timeout=TIMEOUT), 75)

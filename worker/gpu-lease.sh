@@ -1,6 +1,13 @@
 #!/bin/sh
 # Keep the lease through model caches and graceful shutdown, not just generation.
 set -u
+lease_dir=${AI_GPU_LEASE_DIR:-/run/ai-gpu}
+# Without the host's lease folder (Kubernetes, where a GPU claim already makes the device
+# exclusive), there is nothing to coordinate: run the worker as it is.
+if [ ! -d "$lease_dir" ]; then
+    [ "$#" -gt 0 ] || { echo "A runtime command is required." >&2; exit 64; }
+    exec "$@"
+fi
 devices=${AI_GPU_DEVICES:-${HIP_VISIBLE_DEVICES:-}}
 case "$devices" in
     0|1|0,1) ;;
@@ -14,7 +21,6 @@ if [ "$#" -eq 0 ]; then
     echo "A runtime command is required." >&2
     exit 64
 fi
-lease_dir=${AI_GPU_LEASE_DIR:-/run/ai-gpu}
 acquire() {
     flock -n -x "$1"
 }
