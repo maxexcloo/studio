@@ -158,6 +158,12 @@
   padding-block: 0;
 }
 
+/* Regenerate's menu half stays narrow so the split control reads as one action. */
+.splitMenu {
+  width: 22px;
+  min-width: 22px;
+}
+
 .aside {
   flex-shrink: 0;
   width: clamp(300px, 26vw, 380px);

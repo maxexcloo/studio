@@ -65,23 +65,27 @@ test("The viewer prompt bar queues variations into a strip and choosing one make
   ).toBeVisible();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 
-  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2]).toMatchObject({ parentJobId: state.jobs[1].id, input: { count: 1 } });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
 });
 
-test("Recreate and New Seed draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
+test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
   const { state, viewer } = await seed(page);
+  // One click regenerates with a new seed; the menu holds New Seed and Exact Repeat.
   await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "New Seed", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
-  expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
+  expect(state.jobs[2].input).toMatchObject({ seed: "", steps: 28 });
+  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(4);
+  expect(state.jobs[3].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Recreate in Composer");
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
