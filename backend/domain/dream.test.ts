@@ -430,6 +430,33 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
+test("starring an unseen, finished Dream result keeps it", (t) => {
+  const { dream, state, taste } = fixture(t);
+  const mark = { prompt: "p", why: "", at: new Date(state.clock).toISOString() };
+  for (const [id, status] of [
+    ["done", "done"],
+    ["pending", "pending"],
+  ])
+    state.items.push({
+      id,
+      jobId: `job-${id}`,
+      ownerId: "alice",
+      type: "image",
+      status,
+      dream: { ...mark, state: "unseen" },
+    });
+  dream.starred("alice", ["done", "pending"]);
+  dream.starred("bob", ["done"]);
+  assert.deepEqual(
+    state.items.map((item) => item.dream?.state),
+    ["kept", "unseen"],
+  );
+  assert.deepEqual(
+    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId]),
+    [["keep", "job-done"]],
+  );
+});
+
 test("Dream keeps every discard, most recently discarded first", (t) => {
   const { dream, state } = fixture(t);
   const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString();

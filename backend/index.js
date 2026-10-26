@@ -1953,16 +1953,23 @@ const jobAdmitted = (job) => {
   captioner.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
-  starred: (req, items, favorite) =>
+  starred: (req, items, favorite) => {
+    const ownerId = ownerIdForRequest(req);
+    if (favorite)
+      dream.starred(
+        ownerId,
+        items.map((item) => item.id),
+      );
     taste.record(
-      ownerIdForRequest(req),
+      ownerId,
       items.map((item) =>
         tasteSignal(favorite ? "star" : "unstar", item.jobId, {
           ...item.settings,
           prompt: item.prompt,
         }),
       ),
-    ),
+    );
+  },
 });
 
 app.get("/api/prompts", (req, res) => {

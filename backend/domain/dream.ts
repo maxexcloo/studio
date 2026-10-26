@@ -584,6 +584,13 @@ export function createDream(options: {
     },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),
+    /** Starring an unseen, finished result, wherever it happens, keeps it. */
+    starred(ownerId: string, itemIds: string[]) {
+      const ids = new Set(itemIds);
+      for (const item of options.gallery(ownerId))
+        if (ids.has(String(item.id)) && item.dream?.state === "unseen" && item.status === "done")
+          decide(ownerId, String(item.id), "kept");
+    },
     /** Keeps an image and queues `count` new seeds of it as the person's own job. */
     async variations(
       ownerId: string,
