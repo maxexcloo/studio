@@ -15,7 +15,7 @@
 ## Delivery
 
 - The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
-- Studio builds the app image and the `studio-worker` GPU runtime image; deployment and model configuration remain in `ai`. Automatic lifecycle control stays disabled until AI Control relinquishes ownership and managed local text uses Studio admission.
+- Studio builds the app image and the `studio-worker` GPU runtime image. The deployment lives in kubelab (`apps/base/studio`); GPU workloads are Kubernetes deployments switched by scaling replicas, and ai supplies seed definitions. AI Control is retired; Studio's automatic lifecycle control stays disabled until it can drive those deployments.
 - A `v*` tag publishes the verified image under its version tags and a GitHub release with notes from `CHANGELOG.md`.
 - Single-user mode keeps working for local development.
 
