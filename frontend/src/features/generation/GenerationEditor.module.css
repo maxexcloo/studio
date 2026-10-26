@@ -24,6 +24,17 @@
   line-height: 1.55;
 }
 
+/* Prompt ideas float over the empty prompt's lower lines, clear of its history and assistant actions. */
+.promptArea {
+  position: relative;
+}
+
+.promptIdeas {
+  left: 0;
+  right: 44px;
+  bottom: 4px;
+}
+
 .footer {
   flex-shrink: 0;
 }
@@ -38,6 +49,7 @@
   overflow: visible;
 }
 
+.editor[data-fill] .promptArea,
 .editor[data-fill] .prompt,
 .editor[data-fill] .promptWrapper {
   flex: 1;
