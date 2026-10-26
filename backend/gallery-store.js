@@ -808,6 +808,11 @@ let writing = null;
 // Which save is newest, so a slow background write never replaces a newer one.
 let writeSequence = 0;
 let committedSequence = 0;
+// Counts changes, so a strict flush waits for its own changes rather than for
+// the gallery to go quiet: changes made while a save is under way are not failures.
+let changeCount = 0;
+let savedChangeCount = 0;
+let saveFailure = null;
 
 function persistableGallery() {
   const items = [];
@@ -819,6 +824,7 @@ function persistableGallery() {
 }
 
 export function saveGallery() {
+  changeCount += 1;
   dirty = true;
   if (saveTimer || writing) return;
   saveTimer = setTimeout(() => {
@@ -840,6 +846,7 @@ export async function flushGallery() {
   if (!dirty) return undefined;
   dirty = false;
   const sequence = (writeSequence += 1);
+  const changes = changeCount;
   writing = (
     usesRuntimeDatabase(dataDir)
       ? Promise.resolve().then(() => {
@@ -852,10 +859,14 @@ export async function flushGallery() {
   )
     .then((replaced) => {
       if (replaced) committedSequence = sequence;
+      // Not replaced means a newer save, holding these changes too, already landed.
+      savedChangeCount = Math.max(savedChangeCount, changes);
+      saveFailure = null;
     })
     .catch((error) => {
       // Try again shortly; the old file (and its backup) are still whole.
       dirty = true;
+      saveFailure = error;
       console.warn(`[Studio] Could not save the gallery: ${error.message}`);
     })
     .finally(() => {
@@ -875,8 +886,15 @@ export async function flushGallery() {
 
 /** A workload may release its lease only when all gallery changes are durable. */
 export async function flushGalleryStrict() {
-  await flushGallery();
-  if (dirty) throw new Error("The gallery could not be saved. Outputs remain reserved.");
+  const changes = changeCount;
+  while (savedChangeCount < changes) {
+    await flushGallery();
+    if (savedChangeCount < changes && saveFailure)
+      throw new Error(
+        `The gallery could not be saved (${saveFailure.message}). Outputs remain reserved.`,
+        { cause: saveFailure },
+      );
+  }
 }
 
 function persistHiddenMarkers(value) {
@@ -890,11 +908,20 @@ function writeGalleryNow() {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  dirty = false;
   const sequence = (writeSequence += 1);
-  if (usesRuntimeDatabase(dataDir)) writeRuntimeDocument(dataDir, "gallery", persistableGallery());
-  else writeJsonFile(galleryPath, persistableGallery(), { compact: true });
+  const changes = changeCount;
+  try {
+    if (usesRuntimeDatabase(dataDir))
+      writeRuntimeDocument(dataDir, "gallery", persistableGallery());
+    else writeJsonFile(galleryPath, persistableGallery(), { compact: true });
+  } catch (error) {
+    saveFailure = error;
+    throw error;
+  }
+  dirty = false;
   committedSequence = sequence;
+  savedChangeCount = changes;
+  saveFailure = null;
 }
 
 export function flushPendingGallery() {
