@@ -20,7 +20,7 @@ export function legacyRecoverySwitchGuard({
 }) {
   const unresolved = new Set(ids);
   return async (workload: Workload) => {
-    if (workload.kind !== "media" || !unresolved.size) return;
+    if (workload.kind === "text" || !unresolved.size) return;
     await recover();
     const relevant = [...unresolved].filter((id) => {
       const state = inspect(id);

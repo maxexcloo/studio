@@ -15,8 +15,6 @@ export interface ServiceEndpoint {
   memoryFree?: number;
   /** Catalogue identity; does not establish which model is currently loaded. */
   workloadId?: string;
-  /** Supported choices from ai, not observed GPU placement. */
-  placements?: string[];
   /** Only present when the direct health response identifies its loaded model. */
   loadedModel?: string;
 }
