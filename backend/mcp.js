@@ -494,8 +494,36 @@ export function registerMcpRoutes(
         },
       };
     };
+    /**
+     * 2–4 single-image sets become one labelled side-by-side page (/compare/:id), or "" when the run doesn't fit
+     * one (videos, several images per model, a refused set) or the comparison can't be saved.
+     */
+    const comparisonOf = async (sets) => {
+      const jobs = sets.map(({ queued }) => queued.jobs || []);
+      if (
+        sets.length < 2 ||
+        sets.length > 4 ||
+        sets.some(({ profile, queued }) => profile.kind === "video" || queued.error) ||
+        jobs.some((list) => list.length !== 1)
+      )
+        return "";
+      try {
+        const { id = "" } = await media.request(
+          "POST",
+          "/api/comparisons",
+          {
+            jobIds: jobs.map(([job]) => job.job_id),
+            labels: sets.map(({ profile }) => (profile.label || profile.id).slice(0, 80)),
+          },
+          owner,
+        );
+        return id && `${publicUrl}/compare/${id}`;
+      } catch {
+        return "";
+      }
+    };
     /** Several models' sets as one reply: a line of result links per model with its expected wait, without waiting for any. */
-    const respondSets = async (sets, note = "", signal) => {
+    const respondSets = async (sets, note = "", signal, compare = "") => {
       const link = ({ ref, link: url }) => `[${ref[0].toUpperCase()}${ref.slice(1)}](${url})`;
       const now = Date.now();
       const left = (
@@ -515,11 +543,12 @@ export function registerMcpRoutes(
         content: [
           {
             type: "text",
-            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. Never poll or resubmit. To change or animate one later, call Reuse with its ref (such as "${first}") and the change as request.\n\n${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. Never poll or resubmit. To change or animate one later, call Reuse with its ref (such as "${first}") and the change as request.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
           },
         ],
         structuredContent: {
           status: "queued",
+          ...(compare ? { compare } : {}),
           sets: sets.map(({ profile, queued }, index) => ({
             profile: { id: profile.id, label: profile.label || profile.id },
             ...(left[index] ? { eta_seconds: Math.round(left[index] / 1000) } : {}),
@@ -1097,15 +1126,20 @@ export function registerMcpRoutes(
             : "";
         if (several) {
           // One set per model, queued in order so each model loads once; links come back at once.
+          // Every set shares one seed, so image N of each model is a like-for-like comparison.
+          const seed = args.seed ?? crypto.randomInt(2 ** 31);
           const sets = [];
           for (const item of plans)
             sets.push({
               profile: item.profile,
               note: item.note,
-              queued: (await submit(item.profile, item.plan, recordOf(item), { guide: false }))
-                .queued,
+              queued: (
+                await submit(item.profile, { ...item.plan, seed }, recordOf(item), {
+                  guide: false,
+                })
+              ).queued,
             });
-          return respondSets(sets, contextNote, signal);
+          return respondSets(sets, contextNote, signal, await comparisonOf(sets));
         }
         const [{ profile, note: tierNote, plan, source }] = plans;
         // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.

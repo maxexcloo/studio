@@ -157,6 +157,9 @@ async function fixture(
     });
     res.json({ jobId: id, status: "queued" });
   });
+  app.post("/api/comparisons", (req, res) =>
+    res.status(201).json({ id: `fixture-comparison-${req.body.jobIds.join("-")}` }),
+  );
   // Studio's estimate for a set: jobEtaMs per run once given, like a model with trusted timings.
   app.get("/api/estimate", (req, res) =>
     res.json({ ok: true, ...(jobEtaMs ? { ms: jobEtaMs * Number(req.query.runs) } : {}) }),
@@ -5140,8 +5143,15 @@ test("one Generate call fans out over several models, each written with its own 
   );
   assert.match(
     texts(reply),
-    /^Queued 2 sets, one per model\.[^\n]+\n\nFixture Image: \[Result 1\]\([^)]+\)\nOther Image: \[Result 2\]\([^)]+\)\n\[All Results\]/,
+    /^Queued 2 sets, one per model\.[^\n]+\n\n\[Compare Side by Side\]\([^)]+\/compare\/fixture-comparison-[^)]+\)\nFixture Image: \[Result 1\]\([^)]+\)\nOther Image: \[Result 2\]\([^)]+\)\n\[All Results\]/,
   );
+  // One shared seed, and one labelled comparison of the two jobs.
+  assert.equal(new Set(f.submitted.map((body) => String(body.seed))).size, 1);
+  assert.deepEqual(f.requests.find((request) => request.path === "/comparisons")?.body.labels, [
+    "Fixture Image",
+    "Other Image",
+  ]);
+  assert.match(data(reply).compare, /\/compare\/fixture-comparison-/);
   assert.doesNotMatch(texts(reply), /Lead with the light|Tags, comma/);
   // LoRAs belong to one model.
   const loras = await call(client, "Generate", {

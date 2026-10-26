@@ -19,6 +19,7 @@ version opens with a `> ` summary line.
 - Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
 - Video Cloud Fallback (Settings › Models, `STUDIO_VIDEO_CLOUD_FALLBACK`, off by default): while the local video worker is off, MCP video runs on a granted cloud profile and the reply says so, instead of being refused.
 - Accept a personal MCP token in the path (`/mcp/<token>`) for clients that can send no headers, such as a Grok custom connector; the shared gateway and control keys stay header-only. MCP answers CORS preflights and cross-origin calls, and OAuth discovery gets a plain 404.
+- A multi-model MCP run of 2–4 single images shares one seed and replies with one Compare Side by Side link to `/compare/:id`, above the per-model result links.
 - Let one MCP Generate call cover several models (`profile_ids`, or `each_profile` with a tier), each with a prompt written from its own guide and its own set, replying at once with a line of links per model. `preview` returns the written prompts and concept suggestions without queuing, and the same call without it queues exactly those prompts; `apply_guide` rewrites supplied prompts for the model's guide.
 
 ### Changed
