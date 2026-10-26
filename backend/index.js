@@ -408,8 +408,11 @@ for (const [name, migrate] of [
 }
 // Chat handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
 const chatHandovers = createHandoverStore({ dataDir });
+// GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
+const runtime = loadRuntime(process.env, { dataDir });
 const mcp = registerMcpRoutes(app, {
   dataDir,
+  runtime: runtime?.controller,
   gatewayAdminTools,
   claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
@@ -428,7 +431,6 @@ const mcp = registerMcpRoutes(app, {
   },
 });
 app.use(express.json({ limit: "25mb" }));
-const runtime = loadRuntime();
 const cloudProvider = configuredCliProxy();
 const directCloud =
   cloudProvider &&
@@ -629,9 +631,14 @@ function requireSignedIn(req, res, next) {
 }
 
 app.use(requireSignedIn);
-registerRuntimeStatus(app, runtime, (req, res, next) => {
-  if (requireAdmin(req, res)) next();
-});
+registerRuntimeStatus(
+  app,
+  runtime,
+  (req, res, next) => {
+    if (requireAdmin(req, res)) next();
+  },
+  (req) => (req.studioAccount?.userId ? `account:${req.studioAccount.userId}` : "local"),
+);
 const observeServices = createServicesObserver({
   workers: listWorkers,
   controller: runtime?.controller,
@@ -1322,18 +1329,12 @@ async function mediaModels(force = false) {
   if (!answered.length && workers.length)
     models.reason =
       "Configured workers are offline. Selected jobs wait until their worker is available.";
-  models.workers = workers.map((worker) => {
-    const workload = runtime?.controller.workloads.find(
-      (item) => item.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""),
-    );
-    return {
-      id: worker.id,
-      name: worker.name,
-      capabilities: worker.capabilities,
-      available: answered.some((entry) => entry.worker.id === worker.id),
-      ...(workload ? { gpuDevices: workload.devices } : {}),
-    };
-  });
+  models.workers = workers.map((worker) => ({
+    id: worker.id,
+    name: worker.name,
+    capabilities: worker.capabilities,
+    available: answered.some((entry) => entry.worker.id === worker.id),
+  }));
   return { primary, models };
 }
 
@@ -2276,17 +2277,18 @@ async function queueResourceFor(input) {
       : worker?.id || defaultWorkerId() || "";
   return `${profile && isCloudProfile(profile) ? "cloud" : "worker"}:${backend}`;
 }
-function managedWorkload(job) {
-  if (job.resource.startsWith("provider:cliproxyapi")) return;
+/** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
+function managedWorkloads(job) {
+  if (job.resource.startsWith("provider:cliproxyapi")) return [];
   const worker = workerById(job.backend);
-  return (
-    worker &&
-    runtime?.controller.workloads.find(
+  if (!worker || !runtime) return [];
+  return runtime.controller.workloads
+    .filter(
       (workload) =>
-        workload.kind === "media" &&
+        workload.kind !== "text" &&
         workload.url.replace(/\/$/, "") === worker.url.replace(/\/$/, ""),
     )
-  );
+    .map((workload) => workload.id);
 }
 async function permitQueueFallback(job) {
   if (job.input.allowFallback !== true) return false;
@@ -2369,10 +2371,10 @@ const queueAdapter = createLegacyQueueAdapter({
         return "Moving to another worker with explicit fallback permission.";
       return "Waiting for the selected worker to be configured.";
     }
-    const workload = managedWorkload(job);
+    const workloads = managedWorkloads(job);
     try {
-      if (workload && !mediaLeases.has(job.id))
-        mediaLeases.set(job.id, await runtime.controller.acquire(workload.id));
+      if (workloads.length && !mediaLeases.has(job.id))
+        mediaLeases.set(job.id, await runtime.controller.acquire(workloads));
       await withComfyBackend(job.backend, () => loadComfyContext());
     } catch (error) {
       mediaLeases.get(job.id)?.release();
@@ -2397,8 +2399,8 @@ for (const job of rewriteStore
       !["completed", "failed", "cancelled"].includes(item.status) &&
       (["starting", "running", "saving"].includes(item.status) || item.providerJobId),
   )) {
-  const workload = managedWorkload(job);
-  if (workload) mediaLeases.set(job.id, runtime.controller.retain(workload.id));
+  const workloads = managedWorkloads(job);
+  if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
 }
 if (runtime) {
   const queuedIds = new Set(rewriteStore.jobs().map((job) => job.id));
