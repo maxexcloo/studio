@@ -87,6 +87,8 @@ function describe(error) {
     return {
       name: error.name,
       message: error.message,
+      // ECONNREFUSED (nothing listening) versus ETIMEDOUT/EHOSTUNREACH (the host is gone).
+      ...(error.code || error.cause?.code ? { code: error.code || error.cause.code } : {}),
       stack: String(error.stack || "")
         .split("\n")
         .slice(0, 12)
@@ -157,11 +159,14 @@ export function installCrashLog({ heartbeatMs = 60_000, stallMs = 750 } = {}) {
 
 let comfyDown = false;
 let comfyDownSince = 0;
-/** Called whenever a request to ComfyUI succeeds or fails: only changes are written. */
-export function noteComfyState(reachable, error) {
+/**
+ * Called whenever a request to ComfyUI succeeds or fails: only changes are written. `since` is when it
+ * really stopped answering (a silent ComfyUI counts from its first unanswered check, not the grace's end).
+ */
+export function noteComfyState(reachable, error, since = Date.now()) {
   if (!reachable && !comfyDown) {
     comfyDown = true;
-    comfyDownSince = Date.now();
+    comfyDownSince = since;
     write("warn", "ComfyUI stopped answering", { ...describe(error), ...readings() });
   } else if (reachable && comfyDown) {
     comfyDown = false;

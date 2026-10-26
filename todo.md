@@ -132,7 +132,7 @@ Settled 24 Oct: viewer hub, chip composer, Grid | Runs, compact Chat cards, Chat
 - [ ] Verify video limits come from the worker (frame maximum, frame grid, area limit) and out-of-range requests are rejected, not silently adjusted.
 - [ ] Held video work while the worker is off stays owner-scoped, counts against limits and drains in order without cloud fallback.
 - [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions and ai's seeds.
-- [ ] Honest worker health: the multi-worker status probe treats a timeout as busy, not down (1.5 s is shorter than model loads), and allows the single-worker 8 s; outage logging measures real downtime rather than first-failure-to-next-success; logs say refused vs unreachable (`error.cause.code`); deliberately stopped workers show as Parked, not down.
+- [ ] Honest worker health (done in the rewrite: status probes read a timeout as busy for the 60 s grace; outage logs skip busy timeouts, count a silent worker from its first unanswered check and record the error code, e.g. `ECONNREFUSED`): deliberately stopped workers show as Parked, not down — needs Studio to own runtime stops (A1).
 - [ ] Graceful shutdown: a rollout must finish or cleanly refuse in-flight MCP/API requests before the pod stops (a 0.51.0 rollout dropped in-flight Generate calls with EOF and connection refused, and the model retried them).
 - [ ] Review the large rewrite before merge; keep production single-replica with Recreate. Publish and deploy only through the verified image pipeline.
 
