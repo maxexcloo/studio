@@ -1,4 +1,5 @@
 import type { MediaItem, Profile } from "../../types";
+import { isProfile } from "../generation/payload";
 
 /** A short title from the prompt's first clause, for captions and accessible names. */
 export function mediaTitle(item: Pick<MediaItem, "prompt">) {
@@ -27,7 +28,7 @@ export function mediaDetail(item: MediaItem, profiles: Profile[]) {
             : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" },
         )
       : "";
-  const profile = profiles.find((entry) => entry.id === settings.profileId);
+  const profile = profiles.find((entry) => isProfile(entry, settings.profileId));
   const name = String(settings.profileName || profile?.displayName || profile?.label || "");
   const seconds =
     Number(settings.duration) || Number(settings.frames) / Number(settings.fps) || undefined;

@@ -1,5 +1,6 @@
 // Numbers for the About page and per-profile health. Computed from the gallery record only:
 // nothing is tracked beyond what Studio already keeps about its own outputs.
+import { canonicalProfileId } from "./profile-store.js";
 
 const dayKey = (value) => {
   const date = new Date(value);
@@ -27,7 +28,7 @@ export function galleryStats(items = [], now = new Date()) {
     const key = dayKey(item.createdAt);
     if (key) days.set(key, (days.get(key) || 0) + 1);
     if (item.createdAt && (!first || item.createdAt < first)) first = item.createdAt;
-    const workflow = item.settings?.profileId || item.model || "";
+    const workflow = canonicalProfileId(item.settings?.profileId || item.model || "");
     if (workflow) workflows.set(workflow, (workflows.get(workflow) || 0) + 1);
   }
 
@@ -86,7 +87,7 @@ const dayMs = 86_400_000;
 export function profileStats(items = [], now = Date.now()) {
   const stats = new Map();
   for (const item of items) {
-    const profile = item?.settings?.profileId;
+    const profile = canonicalProfileId(item?.settings?.profileId);
     const at = Date.parse(item?.createdAt || "");
     if (!profile || item.library || !(now - at < 30 * dayMs)) continue;
     if (item.status !== "done" && item.status !== "failed") continue;

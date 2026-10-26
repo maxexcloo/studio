@@ -22,6 +22,7 @@ import {
 } from "./account-ownership.js";
 import { mayUseFeature } from "./account-policy.js";
 import { galleryAspects, gallerySizeBands, otherAspect } from "./gallery-filters.js";
+import { canonicalProfileId } from "./profile-store.js";
 
 function requireGalleryAccess(req, res) {
   if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;
@@ -102,7 +103,9 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
         (a, b) => a.localeCompare(b),
       );
     res.json({
-      models: unique(items.flatMap((item) => [item.model, item.settings?.modelName])),
+      models: unique(
+        items.flatMap((item) => [canonicalProfileId(item.model), item.settings?.modelName]),
+      ),
       loras: unique(
         items.flatMap((item) =>
           (Array.isArray(item.settings?.loras) ? item.settings.loras : []).map(

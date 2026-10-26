@@ -120,7 +120,9 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 - Gallery Captions: on by default once a vision model is configured? Default: off until you turn it on in Settings › Models (it would otherwise start captioning the dev and live galleries straight away).
 - Captions: show the caption in viewer details as a dimmed line? Default: yes, in the next viewer pass.
 - Phone viewer action buttons went from 42px to 40px so the split Regenerate fits a 375px phone. Default: keep 40px.
-- Duplicate profile pairs now show an id suffix ("· comfyui" / "· fp8"); most look like legacy duplicates with the same settings. Default: keep the suffix until you prune runtime definitions.
+- Merge Duplicate Profiles (Settings › Profiles) merges same-named profiles with identical definitions into the `<kind>-…-<backend>` id and aliases the old one; on a copy of the dev data it merges 15 pairs and lists Krea 2 Turbo · Radiance (the rebalance graph differs). Run it on the live data after the cutover? Default: yes, preview then apply in the window's verification step.
+- 15 more dev pairs run identical definitions but their names differ, mostly by "· 1 Reference" (`image-krea2-turbo-comfyui`/`-int8-convrot`, FinePorn, Kroma, Kromafine, Z-Image, Qwen-Image 2.1 Turbo, Fibo 2.0, Grok Image). Offer them as an opt-in second list that keeps the newer id and its name? Default: yes, in a follow-up.
+- One profile with a selectable Radiance or ComfyUI backend: the dev pairs differ in steps, references and modes (H3 Radiance is text-only at 50 steps, ComfyUI is first-frame/reference at 20), so it needs a `backends` block, backend-aware routing, readiness and records rather than a merge. Default: build it after 1.0.0 from the proposal in the profile-aliases PR.
 - Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
 - Taste profile: a bulk star of up to 500 items adds a signal each and can push out older history. Default: cap each bulk call at 20 signals.
 - Taste profile: does Exact Repeat count as an iteration? Default: yes, repeating a result signals interest.

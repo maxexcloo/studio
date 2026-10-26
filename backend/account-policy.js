@@ -13,6 +13,7 @@
  * `allModels` grants every local profile, including ones added later.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
+import { canonicalProfileId } from "./profile-store.js";
 
 export { isCloudProfile };
 
@@ -122,7 +123,14 @@ export function effectiveAccountAccess(account, profiles, availableProfiles = nu
   const profile = profiles?.[account.accessProfileId];
   if (!profile) return { authenticated: false, reason: "profile-unassigned" };
   const safe = normaliseAccessProfile(
-    { ...profile, id: account.accessProfileId },
+    {
+      ...profile,
+      id: account.accessProfileId,
+      // A grant of a merged profile grants the profile it became (profile-merge.js).
+      ...(Array.isArray(profile.generationProfiles)
+        ? { generationProfiles: profile.generationProfiles.map(canonicalProfileId) }
+        : {}),
+    },
     availableProfiles,
   );
   return {
