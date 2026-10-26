@@ -8,8 +8,14 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-trash-"));
 const outputDir = path.join(temporary, "ComfyUI", "output");
 fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
-process.env.COMFY_OUTPUT_DIR = outputDir;
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 
 const trash = await import("./gallery-trash.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
