@@ -20,6 +20,9 @@ import { usePhone } from "./ui/usePhone";
 const ComparePage = lazy(() =>
   import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
 );
+const DreamPage = lazy(() =>
+  import("./features/dream/DreamPage").then((module) => ({ default: module.DreamPage })),
+);
 const ChatPage = lazy(() =>
   import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
 );
@@ -78,6 +81,14 @@ function Workspace() {
                     element={
                       <Suspense fallback={<LoadingState fill label="Loading Comparison" />}>
                         <ComparePage />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/dream"
+                    element={
+                      <Suspense fallback={<LoadingState fill label="Loading Dream" />}>
+                        <DreamPage />
                       </Suspense>
                     }
                   />

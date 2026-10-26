@@ -1,5 +1,5 @@
 import { ActionIcon, Box, Button, Group, Tooltip } from "@mantine/core";
-import { Image, Library, MessageCircle, Settings, Video } from "lucide-react";
+import { Image, Library, MessageCircle, Settings, Sparkles, Video } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
 import { StudioLogo } from "../../ui/StudioLogo";
@@ -14,6 +14,7 @@ const modes = [
   { to: "/chat", label: "Chat", icon: MessageCircle },
   { to: "/images", label: "Images", icon: Image },
   { to: "/video", label: "Videos", icon: Video },
+  { to: "/dream", label: "Dream", icon: Sparkles },
 ];
 const navigation = [
   { to: "/library", label: "Library", icon: Library },
