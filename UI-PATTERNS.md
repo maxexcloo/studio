@@ -46,7 +46,7 @@ primary component reference and verify APIs against the installed version.
 - Primary modes are Chat, Images, Videos and Dream in that order; Images is the
   landing page at `/images`; videos use `/video`, conversation uses
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
-  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image and Video icons with
+  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image, Video and Sparkles icons with
   accessible names and tooltips. On every breakpoint one status action sits
   left of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
