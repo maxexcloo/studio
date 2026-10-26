@@ -64,6 +64,8 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
+  // A multi-model run's side-by-side page, of the account's own image jobs.
+  ["POST", /^\/api\/comparisons$/],
   // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
   ["GET", /^\/api\/reference-assets\/[^/]+\/media$/],
   ["GET", /^\/comfy\/view$/],

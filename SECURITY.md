@@ -4,13 +4,13 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 
 ## Who may do what
 
-| Who                                      | Can use the studio                                         | Can look after the studio* | Can manage accounts and groups                        |
-| ---------------------------------------- | ---------------------------------------------------------- | -------------------------- | ----------------------------------------------------- |
-| An administrator account                 | Yes                                                        | Yes                        | Yes                                                   |
-| An ordinary account                      | What its group allows, on its own outputs                  | No                         | No (only its own name, email, password and MCP token) |
-| A personal MCP token                     | Generate, read its own jobs and results, upload references | No                         | No                                                    |
-| No account, or a waiting or disabled one | No                                                         | No                         | No                                                    |
-| Another website open in your browser     | No                                                         | No                         | No                                                    |
+| Who                                      | Can use the studio                                                                 | Can look after the studio* | Can manage accounts and groups                        |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------- |
+| An administrator account                 | Yes                                                                                | Yes                        | Yes                                                   |
+| An ordinary account                      | What its group allows, on its own outputs                                          | No                         | No (only its own name, email, password and MCP token) |
+| A personal MCP token                     | Generate, read its own jobs and results, upload references, compare its own images | No                         | No                                                    |
+| No account, or a waiting or disabled one | No                                                                                 | No                         | No                                                    |
+| Another website open in your browser     | No                                                                                 | No                         | No                                                    |
 
 \* Models, downloads and node packs, workers and ComfyUI's address and restarts, the output folder, workflow files, presets, logs and raw ComfyUI access.
 
