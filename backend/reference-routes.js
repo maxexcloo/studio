@@ -1,5 +1,7 @@
 import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature } from "./account-policy.js";
+import { clientOf } from "./access.js";
+import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
   deleteUploadedReference,
   listReferenceAssets,
@@ -64,6 +66,32 @@ export function registerReferenceRoutes(app) {
       res.status(201).json({ ok: true, asset });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  // The installed app's share target (manifest.webmanifest): an image shared to Studio becomes a
+  // reference and opens the composer with it. Another site's form post carries no session, and in
+  // single-user mode the browser's own Sec-Fetch-Site marks it, so neither can add one.
+  app.post("/share", async (req, res) => {
+    const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
+    const account = multiUserEnabled ? accountForRequest(req) : null;
+    const allowed =
+      site !== "cross-site" &&
+      site !== "same-site" &&
+      (multiUserEnabled
+        ? account &&
+          (mayUseFeature(account, "imageReferences") || mayUseFeature(account, "videoReferences"))
+        : clientOf(req).thisComputer);
+    if (!allowed) return res.redirect(303, "/images");
+    req.studioAccount = account;
+    try {
+      const asset = await saveUploadedReference(
+        await readMultipartImage(req),
+        ownerIdForRequest(req),
+      );
+      res.redirect(303, `/images?compose=1&shared=${encodeURIComponent(asset.id)}`);
+    } catch {
+      res.redirect(303, "/images?compose=1");
     }
   });
 

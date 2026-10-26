@@ -265,3 +265,12 @@ test("Owned uploaded references can be reused without another upload", async ({ 
   expect(state.referenceRequests).toHaveLength(0);
   expect(new URL(requests[0]).searchParams.get("source")).toBe("upload");
 });
+
+test("An image shared to the installed app opens the composer with it as a reference", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/images?compose=1&shared=shared-asset");
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true }).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/images\?compose=1$/);
+});
