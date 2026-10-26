@@ -13,6 +13,9 @@ version opens with a `> ` summary line.
 
 > Animating images with Grok, and one ask is one call
 
+### Added
+- **MCP without headers:** `/mcp/<token>` is a complete MCP URL for a client that can send no headers, such as a Grok custom connector, carrying the account's personal MCP token in the path. Only a personal account token works there; the shared gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
+
 ### Fixed
 - **Cloud image animation:** `Reuse` with `kind: video` takes `profile_id`, so a chat can animate a finished image on the video model the user names ("animate these with grok imagine"). A profile without an image input is refused with what to pass instead.
 - **An unfinished result says so:** Reuse on a result that is still rendering says it is still running and to share its link, instead of "Choose an available output from this completed job.", which read like a finished job and drew repeated retries.
