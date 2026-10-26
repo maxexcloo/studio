@@ -16,6 +16,25 @@ function profileReadiness(profile: Profile, workers: Models["workers"]) {
     : { label: "Offline", color: "red" };
 }
 
+const profileName = (profile: Profile) => profile.displayName || profile.label;
+
+/** A shared name gains the part of the profile ID that differs, such as "· fp8" or "· comfyui". */
+function profileLabel(profile: Profile, profiles: Profile[]) {
+  const name = profileName(profile);
+  const twins = profiles.filter((other) => profileName(other) === name);
+  if (twins.length < 2) return name;
+  const words = (other: Profile) => other.id.replace(/^custom:/, "").split("-");
+  const own = words(profile);
+  const others = twins.map(words);
+  const shared = (at: (parts: string[]) => string | undefined) =>
+    others.every((parts) => at(parts) === at(own));
+  let start = 0;
+  while (start < own.length - 1 && shared((parts) => parts[start])) start++;
+  let end = own.length;
+  while (end - 1 > start && shared((parts) => parts.at(end - own.length - 1))) end--;
+  return `${name} · ${own.slice(start, end).join("-")}`;
+}
+
 export function ProfilePicker({
   value,
   onChange,
@@ -25,6 +44,7 @@ export function ProfilePicker({
   const workers = context.models.data?.workers;
   const available = context.profiles.filter((profile) => profile.kind === input.kind);
   const selected = available.find((profile) => profile.id === input.profileId);
+  const selectedLabel = selected && profileLabel(selected, available);
   const families = [
     ...new Set(available.map((profile) => modelFamilyLabel(profile.family, profile.familyName))),
   ].sort((a, b) => a.localeCompare(b));
@@ -36,12 +56,16 @@ export function ProfilePicker({
       withCheckIcon={false}
       maxDropdownHeight={320}
       nothingFoundMessage="No Matching Profiles"
-      comboboxProps={{ width: 320, position: "top-start", withinPortal: true }}
+      comboboxProps={{
+        width: "min(440px, 100vw - 32px)",
+        position: "top-start",
+        withinPortal: true,
+      }}
       data={families.map((family) => ({
         group: family,
         items: available
           .filter((profile) => modelFamilyLabel(profile.family, profile.familyName) === family)
-          .map((profile) => ({ value: profile.id, label: profile.displayName || profile.label })),
+          .map((profile) => ({ value: profile.id, label: profileLabel(profile, available) })),
       }))}
       value={selected?.id ?? null}
       renderOption={({ option, checked }) => {
@@ -49,10 +73,10 @@ export function ProfilePicker({
         const status = profile && profileReadiness(profile, workers);
         return (
           <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
-            <Text size="sm" fw={checked ? 600 : undefined} truncate>
+            <Text size="sm" fw={checked ? 600 : undefined} lineClamp={2} title={option.label}>
               {option.label}
             </Text>
-            <Group gap={4} wrap="nowrap">
+            <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
               {profile?.aiDrafted && (
                 <Badge size="xs" variant="light" color="orange">
                   AI-Drafted
@@ -91,11 +115,11 @@ export function ProfilePicker({
             )
           }
           rightSection={<ChevronDown size={14} />}
-          title={readiness ? readiness.label : undefined}
+          title={
+            selectedLabel && (readiness ? `${selectedLabel} · ${readiness.label}` : selectedLabel)
+          }
         >
-          <span className={classes.label}>
-            {selected ? selected.displayName || selected.label : "Choose a Profile"}
-          </span>
+          <span className={classes.label}>{selectedLabel || "Choose a Profile"}</span>
         </Button>
       </ComboboxPopover.Target>
     </ComboboxPopover>
