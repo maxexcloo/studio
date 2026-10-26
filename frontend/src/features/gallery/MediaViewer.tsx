@@ -178,6 +178,20 @@ export function MediaViewer({
         removeScrollProps={{ allowPinchZoom: true }}
         fullScreen
         classNames={{ content: classes.content, body: classes.body, header: classes.header }}
+        onKeyDownCapture={(event) => {
+          // A hovered control's open tooltip would otherwise take the first Escape for itself.
+          const target = event.target as Element;
+          if (
+            event.key === "Escape" &&
+            !event.nativeEvent.isComposing &&
+            !deleting &&
+            event.currentTarget.contains(target) &&
+            !target.closest("input,textarea,select,[aria-haspopup]")
+          ) {
+            event.preventDefault();
+            close();
+          }
+        }}
         onKeyDown={(event) => {
           // Portalled layers (menus, popovers, the details sheet) bubble here through React.
           if (
