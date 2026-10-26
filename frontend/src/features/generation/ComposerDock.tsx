@@ -35,6 +35,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
   const [compactFocused, setCompactFocused] = useState(false);
+  // Exactly one prompt is exposed: the compact bar until the panel has slid in or taken focus.
+  const handingOver = !chat && opened && !expanded && compactFocused;
   const phone = usePhone();
   const motionDuration = useMotionDuration();
   const dock = useRef<HTMLDivElement>(null);
@@ -255,7 +257,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
                   id={controlsId}
                   role="region"
                   aria-label="Generation Controls"
-                  aria-hidden={!opened}
+                  aria-hidden={handingOver || !opened || undefined}
                   inert={!opened}
                 >
                   <GenerationForm
@@ -295,7 +297,11 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         >
           {/* Without a prompt focus intent, initial focus lands here rather than on Close. */}
           {focusIntent.current !== "[data-expanded-prompt]" && <FocusTrap.InitialFocus />}
-          <div className={classes.panel} aria-hidden={!opened} inert={!opened}>
+          <div
+            className={classes.panel}
+            aria-hidden={handingOver || !opened || undefined}
+            inert={!opened}
+          >
             <GenerationForm
               fill
               onSubmitted={collapse}
