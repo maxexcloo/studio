@@ -68,6 +68,8 @@ interface Router {
 
 export const maxSummary = 1000;
 const maxSignals = 200;
+/** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
+const maxPerCall = 20;
 const maxPrompt = 300;
 const rewriteAfter = 8;
 const rewriteGapMs = 10 * 60_000;
@@ -240,8 +242,9 @@ export function createTaste({
     refresh,
     /** Whether the text model may write this account's profile. */
     writable: (ownerId: string) => Boolean(writer(ownerId)),
-    /** Adds signals newest first; a failure is logged, never passed to the request that caused it. */
-    record(ownerId: string, signals: Omit<TasteSignal, "at">[]) {
+    /** Adds one action's signals newest first; a failure is logged, never passed to the request that caused it. */
+    record(ownerId: string, all: Omit<TasteSignal, "at">[]) {
+      const signals = all.slice(0, maxPerCall);
       if (!signals.length) return;
       try {
         const record = read(ownerId);
