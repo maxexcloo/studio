@@ -62,6 +62,13 @@
   overflow: hidden;
 }
 
+/* Desktop media keeps an even margin above and below instead of meeting the top edge. */
+@media (min-width: 48em) {
+  .stage {
+    padding-block: var(--mantine-spacing-md);
+  }
+}
+
 .video {
   display: block;
   max-width: 100%;
