@@ -10,6 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import type { QueueJob } from "../../shared/queue.ts";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
 test(
@@ -110,34 +111,17 @@ test(
     const other = await startFakeComfy({ objectInfo: info });
     chosen.setDown(true);
     other.setDown(true);
-    let allowStart = false,
-      running = false,
-      starts = 0;
-    const engine = createServer((request, response) => {
-      response.setHeader("content-type", "application/json");
-      if (request.url === "/containers/chosen-container/json")
-        return response.end(JSON.stringify({ State: { Running: running } }));
-      if (request.url === "/containers/chosen-container/start") {
-        if (!allowStart) return response.writeHead(503).end("{}");
-        starts++;
-        running = true;
-        chosen.setDown(false);
-        return response.writeHead(204).end();
-      }
-      response.writeHead(404).end("{}");
+    // The chosen worker's deployment is stopped, and its pod cannot get a GPU until allowed.
+    const kube = fakeKubernetes([{ namespace: "comfyui", name: "chosen" }], {
+      tickOnRead: true,
+      onChange: (_name, ready) => chosen.setDown(!ready),
     });
+    const deployment = kube.deployments.get("comfyui/chosen")!;
+    deployment.unschedulable = "0/1 nodes are available: 1 cannot allocate all claims.";
+    const starts = () => kube.log.filter((entry) => entry === "scale comfyui/chosen 1").length;
+    const engine = createServer(kube.handle);
     engine.listen(0, "127.0.0.1");
     await once(engine, "listening");
-    writeFileSync(
-      path.join(config, "workloads.json"),
-      JSON.stringify({
-        chosen: {
-          kind: "image",
-          placements: ["0"],
-          studio: { container: "chosen-container", placement: "0", url: chosen.url },
-        },
-      }),
-    );
     let child: ChildProcess | undefined,
       base = "",
       cookie = "";
@@ -162,9 +146,19 @@ test(
           COMFY_OUTPUT_DIR: "",
           COMFY_INPUT_DIR: "",
           STUDIO_RUNTIME_AUTOMATIC: "1",
-          STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED: "1",
           STUDIO_TEXT_ADMISSION_ACKNOWLEDGED: "1",
-          STUDIO_DOCKER_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
+          STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
+          STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
+          STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
+            chosen: {
+              kind: "image",
+              namespace: "comfyui",
+              deployment: "chosen",
+              pool: "gpu",
+              gpus: 1,
+              url: chosen.url,
+            },
+          }),
           STUDIO_WORKERS: JSON.stringify([
             { id: "chosen", name: "Chosen Worker", url: chosen.url, capabilities: ["image"] },
             { id: "other", name: "Other Worker", url: other.url, capabilities: ["image"] },
@@ -317,12 +311,16 @@ test(
       await stop();
       other.setDown(false);
       await start();
-      const restored = await waitFor(accepted.jobId, (job) => job.status === "waiting");
+      const restored = await waitFor(
+        accepted.jobId,
+        (job) => job.status === "waiting" && /Waiting for a GPU/.test(job.reason || ""),
+      );
       assert.equal(restored.backend, "chosen");
+      assert.match(restored.reason, /^Waiting for chosen to start\. Waiting for a GPU: 0\/1 nodes/);
       assert.deepEqual(restored.input.referenceAssets, references);
       assert.equal(chosen.prompts.length + other.prompts.length, 0);
       const nextPrompt = chosen.nextPrompt();
-      allowStart = true;
+      delete deployment.unschedulable;
       const submitted = await nextPrompt;
       assert.equal(submitted.client_id, accepted.jobId);
       assert.equal(chosen.uploads.length, 10);
@@ -333,7 +331,7 @@ test(
         );
       const acknowledged = await waitFor(accepted.jobId, (job) => Boolean(job.providerJobId));
       assert.equal(acknowledged.backend, "chosen");
-      assert.equal(starts, 1);
+      assert.equal(starts(), 1);
       assert.equal(other.prompts.length, 0);
       chosen.finish(submitted.id, {
         outputs: { 8: { images: [{ filename: "own.png", type: "output", subfolder: "" }] } },
@@ -347,7 +345,8 @@ test(
       await stop();
       chosen.setDown(true);
       other.setDown(true);
-      running = false;
+      deployment.replicas = 0;
+      deployment.pods = [];
       writeFileSync(
         path.join(dataDir, "per-model-workflows.json"),
         JSON.stringify([{ id: profile.id, model: profile.model, name: "Stale Runtime Title" }]),

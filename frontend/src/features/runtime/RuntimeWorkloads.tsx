@@ -1,0 +1,292 @@
+import {
+  ActionIcon,
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Loader,
+  Menu,
+  Stack,
+  Table,
+  Text,
+  VisuallyHidden,
+} from "@mantine/core";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ellipsis } from "lucide-react";
+import { useState } from "react";
+import type {
+  RuntimeOperation,
+  RuntimePreview,
+  RuntimeStatus,
+  WorkloadPhase,
+} from "../../../../shared/runtime";
+import { api, post } from "../../api";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { LoadingState } from "../../ui/LoadingState";
+import { SectionHeading } from "../../ui/SectionHeading";
+
+export const runtimeStatusQuery = queryOptions({
+  queryKey: ["runtime-status"],
+  queryFn: () => api<RuntimeStatus>("/api/runtime"),
+  // Follow a running change closely; otherwise refresh with the service status.
+  refetchInterval: (query) => (query.state.data?.operation ? 2000 : 15000),
+});
+const phaseColour = (phase: WorkloadPhase) =>
+  ({ running: "green", starting: "yellow", stopping: "yellow", stopped: "gray", unknown: "red" })[
+    phase
+  ];
+const phaseLabel = (phase: WorkloadPhase) =>
+  ({
+    running: "Running",
+    starting: "Starting",
+    stopping: "Stopping",
+    stopped: "Stopped",
+    unknown: "Unknown",
+  })[phase];
+const operationColour = (status: RuntimeOperation["status"]) =>
+  ({ running: "blue", completed: "green", failed: "red", interrupted: "yellow" })[status];
+const operationLabel = (status: RuntimeOperation["status"]) =>
+  ({ running: "Running", completed: "Completed", failed: "Failed", interrupted: "Interrupted" })[
+    status
+  ];
+const holding = (phase: WorkloadPhase) => phase === "running" || phase === "starting";
+const sameSet = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+/** Settings › Workers: which GPU deployments run, a previewed switch, restarts and the change history. */
+export function RuntimeWorkloads() {
+  const client = useQueryClient();
+  const status = useQuery(runtimeStatusQuery);
+  const [selection, setSelection] = useState<string[] | null>(null);
+  const [preview, setPreview] = useState<RuntimePreview | null>(null);
+  const [restarting, setRestarting] = useState<string | null>(null);
+  const refresh = () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey });
+  const previewing = useMutation({
+    mutationFn: (workloads: string[]) =>
+      post<RuntimePreview>("/api/runtime/preview", { workloads }),
+    onSuccess: setPreview,
+  });
+  const applying = useMutation({
+    mutationFn: (plan: RuntimePreview) =>
+      post<RuntimeOperation>("/api/runtime/apply", {
+        workloads: plan.target,
+        signature: plan.signature,
+      }),
+    meta: { inlineError: true },
+    onSuccess: () => {
+      setPreview(null);
+      setSelection(null);
+      void refresh();
+    },
+  });
+  const restart = useMutation({
+    mutationFn: (workload: string) => post<RuntimeOperation>("/api/runtime/restart", { workload }),
+    meta: { inlineError: true },
+    onSuccess: () => {
+      setRestarting(null);
+      void refresh();
+    },
+  });
+  if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
+  if (status.error) return <Alert color="red">{status.error.message}</Alert>;
+  const { workloads, pools, operation, history, desired } = status.data;
+  const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
+  const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
+  const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
+  const chosen = selection ?? running;
+  const drifted = Boolean(desired && !operation && !sameSet(desired, running));
+  return (
+    <Stack gap="md" component="section" aria-label="GPU Workloads">
+      <Group justify="space-between" gap="xs">
+        <SectionHeading>GPU Workloads</SectionHeading>
+        <Text size="xs" c="dimmed">
+          {pools.map((pool) => `${pool.id}: ${pool.used} of ${pool.capacity} GPUs`).join(" · ")}
+        </Text>
+      </Group>
+      {operation && (
+        <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
+          {operation.progress}
+        </Alert>
+      )}
+      {drifted && (
+        <Alert color="yellow" title="Placement Changed Outside Studio">
+          <Stack gap="xs" align="flex-start">
+            <Text size="sm">
+              Studio last applied {names(desired!)}; something else (such as a Flux upgrade) has
+              changed what runs.
+            </Text>
+            <Button size="compact-sm" variant="default" onClick={() => setSelection(desired!)}>
+              Select Last Placement
+            </Button>
+          </Stack>
+        </Alert>
+      )}
+      <Table aria-label="GPU Workloads" verticalSpacing="xs" highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th w={44}>Run</Table.Th>
+            <Table.Th>Workload</Table.Th>
+            <Table.Th visibleFrom="sm">GPUs</Table.Th>
+            <Table.Th>State</Table.Th>
+            <Table.Th w={44}>
+              <VisuallyHidden>Actions</VisuallyHidden>
+            </Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {workloads.map((item) => (
+            <Table.Tr key={item.id}>
+              <Table.Td>
+                <Checkbox
+                  aria-label={`Run ${item.label}`}
+                  checked={chosen.includes(item.id)}
+                  disabled={Boolean(operation)}
+                  onChange={(event) =>
+                    setSelection(
+                      event.currentTarget.checked
+                        ? [...chosen, item.id]
+                        : chosen.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+              </Table.Td>
+              <Table.Td>
+                <Text size="sm" fw={500}>
+                  {item.label}
+                </Text>
+                <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                  {item.reason ||
+                    (item.acceptedOperations
+                      ? `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`
+                      : item.id)}
+                </Text>
+              </Table.Td>
+              <Table.Td visibleFrom="sm">
+                <Text size="sm">
+                  {item.gpus} · {item.pool}
+                </Text>
+              </Table.Td>
+              <Table.Td>
+                <Badge variant="light" color={phaseColour(item.phase)}>
+                  {phaseLabel(item.phase)}
+                </Badge>
+              </Table.Td>
+              <Table.Td>
+                <Menu position="bottom-end">
+                  <Menu.Target>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      aria-label={`Actions for ${item.label}`}
+                    >
+                      <Ellipsis size={18} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item
+                      disabled={Boolean(operation) || item.phase !== "running"}
+                      onClick={() => setRestarting(item.id)}
+                    >
+                      Restart
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+      <Group justify="flex-end" gap="xs">
+        <Button
+          variant="default"
+          disabled={!selection || sameSet(chosen, running)}
+          onClick={() => setSelection(null)}
+        >
+          Reset
+        </Button>
+        <Button
+          disabled={Boolean(operation) || sameSet(chosen, running)}
+          loading={previewing.isPending}
+          onClick={() => previewing.mutate(chosen)}
+        >
+          Preview Changes
+        </Button>
+      </Group>
+      <ConfirmDialog
+        opened={Boolean(preview)}
+        title="Apply GPU Placement"
+        action="Apply"
+        pending={applying.isPending}
+        error={applying.error?.message}
+        onConfirm={() => applying.mutate(preview!)}
+        onClose={() => {
+          setPreview(null);
+          applying.reset();
+        }}
+      >
+        {preview && (
+          <Stack gap={4}>
+            <Text size="sm">Stop: {names(preview.stop)}</Text>
+            <Text size="sm">Start: {names(preview.start)}</Text>
+            <Text size="sm">Keep: {names(preview.keep)}</Text>
+            <Text size="xs" c="dimmed">
+              Studio waits for accepted work on stopping workloads to finish and save, then stops
+              them before it starts the others.
+            </Text>
+          </Stack>
+        )}
+      </ConfirmDialog>
+      <ConfirmDialog
+        opened={Boolean(restarting)}
+        title={`Restart ${restarting ? label(restarting) : ""}`}
+        action="Restart"
+        pending={restart.isPending}
+        error={restart.error?.message}
+        onConfirm={() => restart.mutate(restarting!)}
+        onClose={() => {
+          setRestarting(null);
+          restart.reset();
+        }}
+      >
+        Studio waits for its accepted work to finish, stops it and starts it again with the same
+        model and GPUs.
+      </ConfirmDialog>
+      {!!history.length && (
+        <Table aria-label="Runtime Changes" verticalSpacing="xs">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Change</Table.Th>
+              <Table.Th visibleFrom="sm">Started</Table.Th>
+              <Table.Th>Status</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {history.map((entry) => (
+              <Table.Tr key={entry.id}>
+                <Table.Td>
+                  <Text size="sm">
+                    {entry.type === "restart"
+                      ? `Restart ${names(entry.start)}`
+                      : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`}
+                  </Text>
+                  <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                    {entry.error || entry.progress} · {entry.requestedBy}
+                  </Text>
+                </Table.Td>
+                <Table.Td visibleFrom="sm">
+                  <Text size="xs">{new Date(entry.startedAt).toLocaleString()}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Badge variant="light" color={operationColour(entry.status)}>
+                    {operationLabel(entry.status)}
+                  </Badge>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      )}
+    </Stack>
+  );
+}

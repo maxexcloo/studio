@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { RuntimeController, type Workload } from "./controller.ts";
 import { createServicesObserver } from "./services.ts";
 import { fork } from "node:child_process";
 import { once } from "node:events";
@@ -11,30 +12,39 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import type { ServicesStatus } from "../../shared/services.ts";
 
-test("service health observes direct runtimes, shares a bounded cache and scopes waiting and addresses to the caller", async (context) => {
-  const directory = mkdtempSync(join(tmpdir(), "studio-health-"));
-  context.after(() => rmSync(directory, { recursive: true, force: true }));
-  writeFileSync(
-    join(directory, "workloads.json"),
-    JSON.stringify({
-      image: { kind: "image", placements: ["0", "1"], service: { url: "http://image.invalid" } },
-      text: {
-        kind: "text",
-        placements: ["0,1"],
-        service: { url: "http://text.invalid", display_label: "Direct Text" },
+test("service health observes direct runtimes, shares a bounded cache and scopes waiting and addresses to the caller", async () => {
+  const workload = (id: string, kind: Workload["kind"], url: string, label = id): Workload => ({
+    id,
+    label,
+    kind,
+    namespace: "gpu",
+    deployment: id,
+    pool: "gpu",
+    gpus: 1,
+    url,
+  });
+  const controller = new RuntimeController({
+    engine: {
+      state: async () => {
+        throw new Error("Service health never reads or scales deployments");
       },
-      unbound: { kind: "text", label: "Unbound Text", placements: ["0"] },
-      gateway: { kind: "text", service: { url: "http://gateway.invalid" } },
-    }),
-  );
+      scale: async () => {
+        throw new Error("Service health never reads or scales deployments");
+      },
+    },
+    workloads: [
+      workload("image", "image", "http://image.invalid"),
+      workload("text", "text", "http://text.invalid", "Direct Text"),
+      workload("gateway", "text", "http://gateway.invalid"),
+    ],
+    pools: { gpu: 2 },
+  });
   let time = 0;
   let textOffline = false;
   const calls: string[] = [];
   const observe = createServicesObserver({
-    environment: {
-      STUDIO_CONFIG_DIR: directory,
-      STUDIO_CHAT_GATEWAY_URL: "http://gateway.invalid",
-    },
+    controller,
+    environment: { STUDIO_CHAT_GATEWAY_URL: "http://gateway.invalid" },
     workers: () => [
       {
         id: "image-worker",
@@ -75,18 +85,18 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   assert.equal(admin.services.text?.state, "healthy");
   assert.equal(admin.services.image?.endpoints[0].device, "Fixture GPU");
   assert.equal(admin.services.image?.endpoints[0].memoryFree, 40);
-  assert.deepEqual(admin.services.image?.endpoints[0].placements, ["0", "1"]);
+  assert.equal(admin.services.image?.endpoints[0].workloadId, "image");
   assert.equal(
-    admin.services.text?.endpoints.find((endpoint) => endpoint.id === "unbound")?.state,
-    "unknown",
+    admin.services.text?.endpoints.find((endpoint) => endpoint.id === "text")?.label,
+    "Direct Text",
   );
   assert.equal(
     admin.services.text?.endpoints.find((endpoint) => endpoint.id === "gateway")?.state,
     "unknown",
   );
-  assert.equal(admin.runtime.configured, false);
+  assert.equal(admin.runtime.configured, true);
   assert.equal(admin.runtime.automaticLifecycle, false);
-  assert.match(admin.runtime.reason, /not observed/);
+  assert.match(admin.runtime.reason, /only when an administrator applies a placement/);
   assert.doesNotMatch(JSON.stringify(admin), /never-return|foreign-job|private details/);
   assert.equal(
     calls.some((url) => /gateway|models|containers/.test(url)),
@@ -109,7 +119,7 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   assert.equal(
     stopped.services.text?.state,
     "offline",
-    "unbound catalogue choices do not conceal an observed offline text runtime",
+    "an endpoint without a direct health check does not conceal an observed offline text runtime",
   );
   assert.equal(calls.length, 4);
 });
@@ -153,10 +163,6 @@ test(
     worker.listen(0, "127.0.0.1");
     await once(worker, "listening");
     const workerUrl = `http://127.0.0.1:${(worker.address() as AddressInfo).port}`;
-    writeFileSync(
-      join(directory, "workloads.json"),
-      JSON.stringify({ text: { kind: "text", placements: ["0"], service: { url: workerUrl } } }),
-    );
     const server = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
       env: {
         PATH: process.env.PATH,
@@ -165,6 +171,19 @@ test(
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: join(directory, "data"),
         STUDIO_CONFIG_DIR: directory,
+        STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
+        // Health observation never calls the API, so it needs no fake.
+        STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",
+        STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
+          text: {
+            kind: "text",
+            namespace: "text",
+            deployment: "text",
+            pool: "gpu",
+            gpus: 1,
+            url: workerUrl,
+          },
+        }),
         STUDIO_WORKERS: "[]",
         STUDIO_DEMO: "1",
         STUDIO_MULTI_USER: "1",
@@ -217,7 +236,7 @@ test(
       "demo placeholders are not evidence of worker health",
     );
     assert.equal(admin.services.text?.endpoints[0].endpoint, `${workerUrl}/health`);
-    assert.equal(admin.runtime.configured, false);
+    assert.equal(admin.runtime.configured, true);
     const profile = async (promptAssistant: boolean) => {
       cookie = administratorCookie;
       await api("/api/accounts/profiles", "POST", {
