@@ -374,7 +374,8 @@ export async function fixtures(page: Page) {
         runtime: {
           configured: false,
           automaticLifecycle: false,
-          reason: "Workload control remains with AI Control until cutover.",
+          reason:
+            "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },
       });
     if (path === "/api/queue") return respond({ jobs });

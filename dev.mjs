@@ -27,25 +27,6 @@ if (values.demo) environment.STUDIO_DEMO = "1";
 const siblingConfig = path.resolve(root, "../ai");
 if (!environment.STUDIO_CONFIG_DIR && fs.existsSync(path.join(siblingConfig, "profiles")))
   environment.STUDIO_CONFIG_DIR = siblingConfig;
-if (!environment.STUDIO_WORKERS && !environment.COMFY_URL && environment.STUDIO_CONFIG_DIR) {
-  const workloadsFile = path.join(environment.STUDIO_CONFIG_DIR, "workloads.json");
-  if (fs.existsSync(workloadsFile)) {
-    const workloads = JSON.parse(fs.readFileSync(workloadsFile, "utf8"));
-    const workers = Object.entries(workloads).flatMap(([id, workload]) =>
-      ["image", "video"].includes(workload.kind) && workload.service?.url
-        ? [
-            {
-              id,
-              name: workload.label,
-              url: workload.service.url,
-              capabilities: workload.kind === "image" ? ["image", "models", "upscale"] : ["video"],
-            },
-          ]
-        : [],
-    );
-    if (workers.length) environment.STUDIO_WORKERS = JSON.stringify(workers);
-  }
-}
 const migration = migrateRuntime(dataDir, { apply: true });
 if (migration.conflicts.length) throw new Error(migration.conflicts.join("\n"));
 

@@ -55,7 +55,7 @@ model downloads, plus video when there is no video worker) and
 `COMFY_URL` in `.env`, or the default local address, only seeds Studio's own
 list until it is first saved.
 
-**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly. Worker capability checks apply before submission. Automatic GPU lifecycle control remains disabled unless the separate ownership and traffic acknowledgements are configured.
+**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
 ## Cloud Models
 
@@ -129,7 +129,7 @@ MCP clients connect in one of three ways in multi-user mode:
 
 - **Personal token:** a client sends the account's own token as `Authorization: Bearer <token>` to `/mcp`. A client that can send no headers, such as a Grok custom connector, uses `/mcp/<token>` as its complete URL. Only a personal token works in the path; the shared gateway and control keys are header-only. URLs can reach proxy logs and browser history, so mint a token for that one client and revoke it if it leaks. Studio has no OAuth (discovery gets a plain 404), and the MCP endpoints answer a browser's CORS preflight so a connector can validate its URL from a page.
 - **Trusted gateway:** a chat gateway such as LiteLLM sends the shared `STUDIO_MCP_API_KEY` together with its own user ID in `x-ai-user-id`. Studio acts for that user only once the ID is linked to an account. When the gateway also forwards the user's email in `x-ai-user-email` and it matches an enabled, approved account's username (ignoring case), Studio links the ID to that account on its first request, recorded like an administrator's link; an unknown email creates an account only when a default access group is configured, subject to the new-account approval policy. Otherwise an administrator links the ID under **Settings › Users › Chat Gateway**, where unlinked IDs are listed; **Dismiss** removes one from the list until the gateway sends it again. Unlinked IDs still see the tools, but every call only returns a message asking for the link, so the chat explains the problem instead of reporting no tools. Unlinking an ID whose email matches an enabled account lets it link again on its next request; disable the account to stop it.
-- **AI Control:** `CONTROL_MCP_API_KEY` keeps its control tools and reaches no galleries or accounts. They need `CONTROL_URL` and `CONTROL_API_KEY`; these retained external-service tools are separate from Studio’s integrated runtime controls in **Settings › Workers**.
+- **GPU control:** `CONTROL_MCP_API_KEY` (header-only, distinct from `STUDIO_MCP_API_KEY`) gets only the GPU tools (GPUStatus, Workloads, Preview, Apply, Mode, Restart, Operation) and reaches no galleries or accounts. They drive Studio's own [runtime control](#queue-sessions--runtime-control), so the key needs `STUDIO_KUBERNETES_WORKLOADS`.
 
 MCP's own requests to the studio use a per-process internal credential. It is accepted only from this computer and only for MCP's routes.
 
@@ -194,14 +194,13 @@ Each account's **Taste Profile** (Settings › Account; `GET`, `PUT` and `DELETE
 
 Studio owns editable live definitions in its data directory: profiles in `workflows/`, prompting guides in `guides/`, and catalogue changes in `library/`. Administrators edit and approve these in Library; user presets remain account-owned runtime data. Existing identifiers and the `studio`/`heissUi` mapping format are preserved.
 
-`STUDIO_CONFIG_DIR` is a read-only ai mount for workload metadata and initial seed definitions. Its seed layout is:
+`STUDIO_CONFIG_DIR` is a read-only ai mount for initial seed definitions. Its seed layout is:
 
 ```text
 profiles/*.json
 lora-catalogue.json
 models.json
 prompting.json
-workloads.json
 ```
 
 `STUDIO_SEED_DIR` can explicitly select a seed/export directory. Startup fills only missing files and definitions, preserving existing runtime edits and deleted-profile history. It never writes back to ai or synchronises over live definitions. Export through the retained administrator API to update the ai backup after review.
@@ -235,7 +234,22 @@ Development uses `data/development` with SQLite migration applied only to that i
 
 Work waits for the selected worker by default. Independent resources can run concurrently. A worker's admission remains held until results are safely saved; text admission remains held until its response stream drains. Runtime status is administrator-only.
 
-The `studio` mapping in each `ai/workloads.json` entry names an existing container, one fixed GPU placement and a direct worker URL. Configure the forwarded Docker Engine and text-admission credentials only on the server; see [worker operations](worker/README.md) for their single configuration reference. Automatic control is disabled by default and requires explicit ownership and traffic acknowledgements before enabling it.
+Studio switches the GPU workloads itself: each is a Kubernetes deployment it scales between 0 and 1 replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool and `STUDIO_KUBERNETES_WORKLOADS` the deployments, keyed by a stable workload id:
+
+```bash
+STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
+STUDIO_KUBERNETES_WORKLOADS='{
+  "comfyui": {"kind": "image", "label": "Image", "namespace": "comfyui", "deployment": "comfyui", "pool": "gpu", "gpus": 1, "url": "http://comfyui.comfyui.svc.cluster.local:8188"},
+  "comfyui-video-tp2": {"kind": "video", "label": "Video · 2 GPUs", "namespace": "comfyui-video", "deployment": "comfyui-video-tp2", "pool": "gpu", "gpus": 2, "url": "http://comfyui-video.comfyui-video.svc.cluster.local:8188"},
+  "text-qwen-mxfp4": {"kind": "text", "label": "Qwen MXFP4", "namespace": "text", "deployment": "text-qwen-mxfp4", "pool": "gpu", "gpus": 1, "url": "http://qwen-mxfp4.text.svc.cluster.local:8000", "apiKeyEnv": "STUDIO_TEXT_KEY"}
+}'
+```
+
+`kind` is `image`, `video` or `text`; `url` is the workload's direct address (media workloads match their worker by it, and several deployments may share one); text workloads name the variable holding their Radiance key in `apiKeyEnv`. A malformed value stops Studio at start with the reason. Studio uses its pod's service account, which needs a role in each workload namespace to read deployments and pods and to update `deployments/scale`; `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+
+**Settings › Workers** shows each workload's state, GPU use and why a pod is not ready (such as a GPU claim that cannot be allocated). An administrator ticks the workloads that should run and reviews a preview before applying it; every workload left out stops. Restart scales a running workload to 0 and back. One change runs at a time: Studio stops accepting new work on the workloads that leave, waits for their accepted work to finish and save, scales them to 0, waits for their pods to go (their GPU claims are released only then), then starts the others and waits for them to be ready. Each change is recorded with its requester, timestamps, steps and the placement before and after, and the history survives restarts; a change cut short by a restart is marked interrupted. A deployment stopped outside Studio, such as by a Flux upgrade that resets replicas, shows as changed outside Studio.
+
+Automatic control (`STUDIO_RUNTIME_AUTOMATIC=1`, off by default) also requires `STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1`. With it, queued work for a stopped workload starts it, stopping the idle holders of its GPUs first, and waits with "Waiting for <workload> to start"; Studio also restores its last applied placement after an outside stop. Without it, such work waits with the reason that the worker is offline. Text admission credentials stay on the server; see [worker operations](worker/README.md).
 
 Bifrost remains a separate text gateway. It calls `/api/local-text/v1/chat/completions` for managed local text; that endpoint calls Radiance directly. Live Bifrost verification and the separate LiteLLM migration remain pending. Existing assistant gateway settings continue to work during that migration.
 

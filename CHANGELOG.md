@@ -34,7 +34,8 @@ version opens with a `> ` summary line.
 - Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
 - Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal. Preserve declared reference slots through admission, recovery and worker graph bindings.
 - Keep live profiles, guides and catalogue definitions editable in Studio, with administrator approval and version conflicts. The ai mount supplies missing-definition seeds and backups. Existing workflow connections can be edited with node and input selectors alongside Advanced JSON.
-- Build a separate shared media/text worker image with GPU leases, Docker admission and authenticated local text streaming. Automatic lifecycle control remains disabled until ownership and traffic cutover are verified.
+- Build a separate shared media/text worker image with GPU leases and authenticated local text streaming.
+- Studio switches the GPU workloads itself, replacing AI Control: it scales the Kubernetes deployments in `STUDIO_KUBERNETES_WORKLOADS` with its service account. Settings › Workers shows their state and GPU use, applies a reviewed placement and restarts a workload, and records every change with its requester and the placement before and after across restarts. A switch waits for accepted work to finish and save and for the old pods to release their GPUs before starting the new ones. The control MCP tools (`CONTROL_MCP_API_KEY`) keep their names and drive the same controller; Preview and Apply take a list of workload ids and Restart a workload id. Automatic lifecycle control stays off by default.
 - Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
 - Put enabled LoRAs' trigger words at the start of the prompt, in stack order and once each, on every generation path (gallery, Chat and MCP), instead of at the end unless a LoRA's note asked otherwise. Each stacked LoRA keeps a `triggers` switch (on unless set to `false`) in saved stacks and runs, and the gallery records the prompt that ran.
 - Queue MCP (external chat) generations after manual Studio requests waiting for the same worker or provider, first-in first-out within each, without splitting an MCP set once it has started. The order is stored with each job and survives restarts.
@@ -48,6 +49,7 @@ version opens with a `> ` summary line.
 
 ### Removed
 
+- Remove the Docker Engine runtime and its settings (`STUDIO_DOCKER_URL`, `STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED`, the `workloads.json` `studio` mapping) and the AI Control client (`CONTROL_URL`, `CONTROL_API_KEY`).
 - Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
 
 ### Fixed
