@@ -78,7 +78,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Intelligence & Finishing (I) — Medium, after D1
 
-- [x] I1 Semantic search: background captions from the text model (idle-only) so gallery search matches what an image shows, not only its prompt. Done (`backend/domain/captions.ts`): idle-only, one at a time, ≤1 per 10 s and 500 a day, vision models only, Prompt Assistant accounts only; search matches prompt or caption. Gallery Captions is off by default (Settings › Models).
+- [x] I1 Semantic search: background captions from the text model (idle-only) so gallery search matches what an image shows, not only its prompt. Done (`backend/domain/captions.ts`): idle-only, one at a time, ≤1 per 10 s and 500 a day, vision models only, Prompt Assistant accounts only; search matches prompt or caption. Gallery Captions is on by default (Settings › Models); 27 Oct: search-oriented captions with tags, shown in Details, and an admin Caption Gallery pass in Settings › Maintenance.
 - [ ] I2 Prompt templates from starred results, with slots (subject, setting, style), usable from the composer chips and Chat.
 - [ ] I3 Model stats per profile: timing, failure and star rates, shown in Library and used to pick defaults and flag broken models. Done: `profileStats` (`backend/stats.js`, `/api/stats/profiles`) and a Last 30 Days column with a Failing badge in Settings › Profiles, where profiles are listed. Remaining: Failing in the composer's profile picker and the MCP pick skipping failing profiles (after D4 merges).
 - [ ] I4 Optional auto finishing on Star: queue upscale/face detail in idle GPU time.
@@ -108,7 +108,13 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 1. Bento host (homelab, outside Studio): a USB4 port's power-management loop (`pci_bus 0000:13` behind ASM4242 12:00.0) hung the host for 2.3 h on 23 Oct, with an iGPU SDMA timeout. Disable runtime PM for that port (or `pcie_port_pm=off`), set `amdgpu.runpm=0` and arm `RuntimeWatchdogSec` so a hang self-recovers? Recommended: yes, as a reviewed homelab change.
 
+2. Dream: a Dream job waiting on a worker that went offline blocks further Dream work until other work arrives or the account pauses. Default: accept for now.
+3. Suggestions: `surface: "chat"` returns an LLM-condensed taste paragraph, but Chat reads the summary directly (already a short paragraph, no extra call per reply), so nothing consumes it yet. Default: keep it for D3/Dream copy; drop it if still unused at review.
+4. Suggestions: viewer next steps use the normal text model, so a Spicy image's steps may come back empty. Default: accept; use the Spicy model for items made with a Spicy prompt later.
+
 Settled 27 Oct: in-place cutover to 1.0.0 with app and workers together; AI Control is retired and Studio scales the GPU deployments itself at 1.0. The 16 duplicate profile pairs (identical weights, old and new ids) are merged into the new ids with the old ids kept as aliases; Radiance and ComfyUI variants of one model become one profile with a configurable backend. Gallery Captions are on by default, with a Caption Gallery action in Settings › Maintenance that runs flat out until done or stopped, then idle-only; captions cover visible content, people (appearance, outfits), style and look, legible text and short search tags. Dream: Star keeps the card; Cancel All leaves Dream alone (Pause stops it); discards are all kept; starred LoRAs join Dream with D5. Taste: a compare winner records "preferred over" each other variant (relative, not a dislike); bulk stars add at most 20 signals; Exact Repeat counts; the taste profile steers MCP prompt writing as well as the model pick. UI: 40px phone viewer buttons; caption in viewer details; the phone Chat empty state points to the Chats and offers New Chat; the Chat model select shows the real model name; a Chat prompt idea fills "Create an image: …".
+
+Settled 27 Oct: Gallery Captions are on by default; captions describe visible facts (people, clothing and nudity, setting, style, legible text) with 8–15 search tags and a format version that a Caption Gallery pass (Settings › Maintenance, flat out while idle, two at a time, persisted) redoes; Details shows the caption as a dimmed line with tag badges.
 
 Settled 26 Oct: main's MCP cloud video fallback is the opt-in Video Cloud Fallback switch (off by default); held composer video still drains without cloud fallback.
 
