@@ -19,6 +19,7 @@ version opens with a `> ` summary line.
 - Taste Profile (Settings › Account): an editable per-account summary the assistant model keeps from stars, compare votes and iterations with their prompts and LoRAs; MCP's automatic model pick takes it into account.
 - Dream (backend, off by default per account): while Studio is idle, it makes images and optionally videos from the taste profile into a separate pool, within an unseen buffer and daily caps, and yields to anyone's work; keeping a result moves it into the gallery.
 - Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
+- Settings › Profiles shows each profile's last 30 days (runs, failures, stars, typical time) and marks one Failing when most of its recent runs failed.
 - Installed on a phone, Studio appears in the share sheet (Android): a shared image opens the composer with it as a reference. The app gains 512px and maskable icons.
 - Video Cloud Fallback (Settings › Models, `STUDIO_VIDEO_CLOUD_FALLBACK`, off by default): while the local video worker is off, MCP video runs on a granted cloud profile and the reply says so, instead of being refused.
 - Accept a personal MCP token in the path (`/mcp/<token>`) for clients that can send no headers, such as a Grok custom connector; the shared gateway and control keys stay header-only. MCP answers CORS preflights and cross-origin calls, and OAuth discovery gets a plain 404.

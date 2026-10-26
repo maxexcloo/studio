@@ -191,7 +191,7 @@ import {
   saveImportedWorkflow,
   userWorkflowsDir,
 } from "./custom-workflows.js";
-import { galleryStats } from "./stats.js";
+import { galleryStats, profileStats } from "./stats.js";
 import { describeHardware } from "./hardware.js";
 import { familySetupPlan, guidedSetups } from "./family-setup.js";
 import { setDismissed } from "./dismissals.js";
@@ -767,6 +767,12 @@ app.get("/api/stats", (req, res) => {
     sinceRelease: null,
     stats: galleryStats(recordsForRequest(gallery, req)),
   });
+});
+
+// Settings › Profiles: each profile's runs, failures, stars and speed across every account.
+app.get("/api/stats/profiles", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.json({ ok: true, profiles: profileStats(filterVisibleGallery(gallery)) });
 });
 
 // What ComfyUI runs on (GPU, memory and the budget fit hints use). See backend/hardware.js.
