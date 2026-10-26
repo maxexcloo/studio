@@ -11,6 +11,16 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Animating images with Grok, and one ask is one call
+
+### Fixed
+- **Cloud image animation:** `Reuse` with `kind: video` takes `profile_id`, so a chat can animate a finished image on the video model the user names ("animate these with grok imagine"). A profile without an image input is refused with what to pass instead.
+- **An unfinished result says so:** Reuse on a result that is still rendering says it is still running and to share its link, instead of "Choose an available output from this completed job.", which read like a finished job and drew repeated retries.
+- **One ask is one call:** the Generate description and the server instructions say several images of one ask are `count`, or several `prompts`, in one call — never repeated calls.
+
+### Changed
+- **Video falls back to the cloud while the video worker is off:** with no local video worker available, video runs on a granted cloud (Grok) profile and the reply says it went to the cloud, instead of being refused; an account with no cloud profile still gets "Local video is unavailable right now". A `profile_id`, or a request or prompt naming Grok or the cloud, runs there as before.
+
 ## [0.51.0] - 2026-10-24
 
 > Profiles can carry their own Radiance LoRAs
