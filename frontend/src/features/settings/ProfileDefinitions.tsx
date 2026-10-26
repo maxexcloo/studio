@@ -35,6 +35,45 @@ interface DefinitionRow {
 const nouns = { profile: "Profile", guide: "Guide" } as const;
 
 /** Settings › Profiles: generation profiles and prompting guides, each with saved versions. */
+interface ProfileStats {
+  runs: number;
+  failed: number;
+  starred: number;
+  medianRunMs?: number;
+  failing: boolean;
+}
+const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
+
+/** Runs, failures, stars and typical time; Failing when most recent runs failed. */
+function ProfileUse({ stats }: { stats?: ProfileStats }) {
+  if (!stats)
+    return (
+      <Text size="xs" c="dimmed">
+        No Runs
+      </Text>
+    );
+  const done = stats.runs - stats.failed;
+  return (
+    <Group gap="xs" wrap="nowrap">
+      {stats.failing && (
+        <Badge color="red" variant="light" size="sm">
+          Failing
+        </Badge>
+      )}
+      <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
+        {[
+          `${stats.runs} ${stats.runs === 1 ? "Run" : "Runs"}`,
+          stats.failed && `${percent(stats.failed, stats.runs)} Failed`,
+          done > 0 && `${percent(stats.starred, done)} Starred`,
+          stats.medianRunMs && `${Math.round(stats.medianRunMs / 1000)} s`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </Text>
+    </Group>
+  );
+}
+
 export function ProfileDefinitions() {
   const [kind, setKind] = useState<DefinitionKind>("profile");
   const [query, setQuery] = useState("");
@@ -49,6 +88,11 @@ export function ProfileDefinitions() {
         `/api/profiles/${kind === "profile" ? "editable" : "guides"}`,
       ),
   });
+  const stats = useQuery({
+    queryKey: ["profile-stats"],
+    queryFn: () => api<{ profiles: Record<string, ProfileStats> }>("/api/stats/profiles"),
+    enabled: kind === "profile",
+  }).data?.profiles;
   const records = list.data?.profiles || list.data?.packs || [];
   const idOf = (entry: DefinitionRow) => entry.id || entry.packId!;
   const families = [
@@ -202,6 +246,7 @@ export function ProfileDefinitions() {
               <Table.Th>Name</Table.Th>
               <Table.Th visibleFrom="sm">Family</Table.Th>
               <Table.Th>Version</Table.Th>
+              {kind === "profile" && <Table.Th visibleFrom="md">Last 30 Days</Table.Th>}
               <Table.Th w={44}>
                 <VisuallyHidden>Actions</VisuallyHidden>
               </Table.Th>
@@ -234,6 +279,12 @@ export function ProfileDefinitions() {
                       )}
                     </Group>
                   </Table.Td>
+                  {kind === "profile" && (
+                    <Table.Td visibleFrom="md">
+                      {/* Runs record the runtime id, `custom:` plus the definition's id. */}
+                      <ProfileUse stats={stats?.[`custom:${id}`] || stats?.[id]} />
+                    </Table.Td>
+                  )}
                   <Table.Td>
                     <Menu position="bottom-end">
                       <Menu.Target>

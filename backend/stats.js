@@ -1,5 +1,5 @@
-// Numbers for the About page. Computed from the gallery record only: nothing is
-// tracked beyond what Studio already keeps about its own outputs.
+// Numbers for the About page and per-profile health. Computed from the gallery record only:
+// nothing is tracked beyond what Studio already keeps about its own outputs.
 
 const dayKey = (value) => {
   const date = new Date(value);
@@ -74,4 +74,56 @@ export function galleryStats(items = [], now = new Date()) {
     topWorkflow,
     topWorkflowCount,
   };
+}
+
+const dayMs = 86_400_000;
+
+/**
+ * Each profile's last 30 days: finished and failed runs (cancelled ones say nothing about the model),
+ * how many finished ones were starred, the median run time, and `failing` when at least half of five
+ * or more runs in the last week failed.
+ */
+export function profileStats(items = [], now = Date.now()) {
+  const stats = new Map();
+  for (const item of items) {
+    const profile = item?.settings?.profileId;
+    const at = Date.parse(item?.createdAt || "");
+    if (!profile || item.library || !(now - at < 30 * dayMs)) continue;
+    if (item.status !== "done" && item.status !== "failed") continue;
+    const entry = stats.get(profile) || {
+      runs: 0,
+      failed: 0,
+      starred: 0,
+      times: [],
+      week: 0,
+      weekFailed: 0,
+      lastAt: "",
+    };
+    entry.runs += 1;
+    if (item.status === "failed") entry.failed += 1;
+    else {
+      if (item.favorite) entry.starred += 1;
+      const ms = Number(item.timing?.runMs);
+      if (ms > 0) entry.times.push(ms);
+    }
+    if (now - at < 7 * dayMs) {
+      entry.week += 1;
+      if (item.status === "failed") entry.weekFailed += 1;
+    }
+    if (item.createdAt > entry.lastAt) entry.lastAt = item.createdAt;
+    stats.set(profile, entry);
+  }
+  return Object.fromEntries(
+    [...stats].map(([profile, { times, week, weekFailed, ...entry }]) => {
+      const sorted = times.sort((a, b) => a - b);
+      return [
+        profile,
+        {
+          ...entry,
+          ...(sorted.length ? { medianRunMs: sorted[Math.floor(sorted.length / 2)] } : {}),
+          failing: week >= 5 && weekFailed / week >= 0.5,
+        },
+      ];
+    }),
+  );
 }
