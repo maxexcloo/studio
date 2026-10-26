@@ -123,8 +123,9 @@ function useJudge(onFailed: (card: DeckCard) => void) {
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
       }
+      // Starring an unseen result keeps it (backend/domain/dream.ts).
+      if (verdict === "star") return star(item);
       await post(dreamItemPath(item, "keep"));
-      if (verdict === "star") await star(item);
       if (verdict === "animate") {
         // As the viewer's Animate in Composer, staged in the Videos composer for review.
         const { draft } = await mediaDraft(item, "animate", profiles, client);

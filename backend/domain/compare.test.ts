@@ -58,7 +58,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
     pendingItems: (id, input) => [
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
-    voted: (ownerId, jobId) => votes.push([ownerId, jobId]),
+    voted: (ownerId, jobId, others) => votes.push([ownerId, jobId, ...others]),
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -125,7 +125,7 @@ test("compare runs queue one seeded set, read back per owner and record the star
   assert.equal((await request(`/${run.body.id}`, undefined, "GET", "bob")).status, 404);
 
   // Only a finished variant can win; the choice is stored for the taste profile.
-  const [winner] = run.body.variants;
+  const [winner, other] = run.body.variants;
   assert.equal((await request(`/${run.body.id}/vote`, { jobId: winner.jobId }, "PUT")).status, 400);
   gallery = [
     ...gallery,
@@ -137,13 +137,14 @@ test("compare runs queue one seeded set, read back per owner and record the star
       status: "done",
       prompt: "a fox",
     },
+    { id: "o-0", jobId: other.jobId, ownerId: "alice", type: "image", status: "done" },
   ];
   const voted = await request(`/${run.body.id}/vote`, { jobId: winner.jobId }, "PUT");
   assert.equal(voted.body.vote, winner.jobId);
   assert.equal(records[0].vote, winner.jobId);
   assert.ok(records[0].votedAt);
-  // The winner is a taste signal; a refused vote is not.
-  assert.deepEqual(votes, [["alice", winner.jobId]]);
+  // The winner is a taste signal, preferred over each other finished variant; a refused vote is not.
+  assert.deepEqual(votes, [["alice", winner.jobId, other.jobId]]);
 
   // Existing jobs, such as an MCP fan-out run, form a set; foreign jobs are refused.
   const created = await request("", {

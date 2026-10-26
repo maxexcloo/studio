@@ -15,7 +15,6 @@ import {
   type DreamItem,
   type DreamLoraLibrary,
   type DreamProfile,
-  retainedDiscards,
 } from "./dream.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
@@ -67,7 +66,6 @@ function fixture(t: TestContext) {
     prompts: 0,
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
-    removed: [] as string[],
     loras: {} as Record<string, DreamLoraLibrary>,
   };
   let dream: ReturnType<typeof createDream>;
@@ -110,12 +108,6 @@ function fixture(t: TestContext) {
       item.dream = mark;
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
-    remove: (ownerId, itemIds) => {
-      state.removed.push(...itemIds);
-      state.items = state.items.filter(
-        (item) => item.ownerId !== ownerId || !itemIds.includes(String(item.id)),
-      );
-    },
     reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
     // Like the generation route: a Dream job's pending tile carries its mark from the queue record.
     admit: async (input, account, scope, origin) => {
@@ -242,7 +234,11 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   });
   registerRewriteRoutes(app as never, {
     store,
-    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    queue: {
+      tick: async () => undefined,
+      cancel: async (ownerId: string, jobId: string) =>
+        store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
+    } as unknown as GenerationQueue,
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -255,6 +251,16 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
       (await admission({ prompt: `p${index}` }, { userId: "alice", role: "user" })).status,
       200,
     );
+  // Cancel Pending and Cancel All act on the person's own work and leave Dream alone.
+  for (const route of ["cancel-pending", "cancel-all"])
+    assert.equal((await fetch(`${base}/api/queue/${route}`, { method: "POST" })).status, 200);
+  assert.equal(store.job("alice", next.id)?.status, "running");
+  assert.ok(
+    store
+      .jobs("alice")
+      .filter((job) => job.priority !== queuePriority.dream)
+      .every((job) => job.status === "cancelled"),
+  );
 });
 
 test("Dream stops at the unseen buffer and today's cap per kind, and animates kept or starred images", async (t) => {
@@ -453,10 +459,37 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
-test("Dream keeps only the newest discards", (t) => {
+test("starring an unseen, finished Dream result keeps it", (t) => {
+  const { dream, state, taste } = fixture(t);
+  const mark = { prompt: "p", why: "", at: new Date(state.clock).toISOString() };
+  for (const [id, status] of [
+    ["done", "done"],
+    ["pending", "pending"],
+  ])
+    state.items.push({
+      id,
+      jobId: `job-${id}`,
+      ownerId: "alice",
+      type: "image",
+      status,
+      dream: { ...mark, state: "unseen" },
+    });
+  dream.starred("alice", ["done", "pending"]);
+  dream.starred("bob", ["done"]);
+  assert.deepEqual(
+    state.items.map((item) => item.dream?.state),
+    ["kept", "unseen"],
+  );
+  assert.deepEqual(
+    taste.read("alice").signals.map((signal) => [signal.kind, signal.jobId]),
+    [["keep", "job-done"]],
+  );
+});
+
+test("Dream keeps every discard, most recently discarded first", (t) => {
   const { dream, state } = fixture(t);
   const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString();
-  for (let index = 0; index < retainedDiscards; index++)
+  for (let index = 0; index < 600; index++)
     state.items.push({
       id: `old-${index}`,
       ownerId: "alice",
@@ -473,8 +506,7 @@ test("Dream keeps only the newest discards", (t) => {
     dream: { prompt: "p", why: "", at: at(0), state: "unseen" },
   });
   dream.discard("alice", "fresh");
-  assert.deepEqual(state.removed, ["old-0"]);
-  assert.equal(dream.discarded("alice").length, retainedDiscards);
+  assert.equal(dream.discarded("alice").length, 601);
   assert.equal(dream.discarded("alice")[0].id, "fresh");
 });
 
