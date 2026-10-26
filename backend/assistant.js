@@ -29,7 +29,10 @@ export const assistantSpicyModelKey = "STUDIO_ASSISTANT_SPICY_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
-const captionCharacters = 300;
+const captionCharacters = 600;
+const captionTags = 15;
+// Gallery captions are for search: what is visible, in the words people search with.
+const captionInstructions = `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under ${captionCharacters} characters", "tags": ["8 to ${captionTags} short lowercase search tags"]}`;
 const maxCandidates = 20;
 const maxExamples = 6;
 const visionTtlMs = 10 * 60_000;
@@ -907,27 +910,37 @@ export function createAssistant(
   }
 
   /**
-   * A short plain description of what an image shows, for gallery search (domain/captions.ts).
-   * The caller checks the model reads images; the reply is cut to `captionCharacters`.
+   * A factual description of what an image shows and short search tags, for gallery search
+   * (domain/captions.ts). The caller checks the model reads images. A reply that isn't the asked-for
+   * JSON is kept as plain text without tags; the text is cut to `captionCharacters`.
    */
   async function caption({ image, signal } = {}) {
     const model = settings().model;
     const reply = await chat({
       model,
       messages: [
-        {
-          role: "system",
-          content: `Say what the attached image shows in one or two plain sentences: subjects, setting, style and colours. No preamble, under ${captionCharacters} characters.`,
-        },
-        { role: "user", content: userContent("Describe this image.", [image], true) },
+        { role: "system", content: captionInstructions },
+        { role: "user", content: userContent("Caption this image.", [image], true) },
       ],
       temperature: 0.2,
-      maxTokens: 160,
+      maxTokens: 500,
       signal,
     });
-    const text = one(reply.text, captionCharacters);
+    const parsed = replyJson(reply.text);
+    const text = one(
+      typeof parsed?.text === "string" ? parsed.text : reply.text,
+      captionCharacters,
+    );
     if (!text) throw new AssistantError("unusable reply");
-    return { text, model };
+    const tags = [
+      ...new Set(
+        (Array.isArray(parsed?.tags) ? parsed.tags : [])
+          .filter((tag) => typeof tag === "string")
+          .map((tag) => one(tag.toLowerCase(), 40))
+          .filter(Boolean),
+      ),
+    ].slice(0, captionTags);
+    return { text, tags, model };
   }
 
   /**
