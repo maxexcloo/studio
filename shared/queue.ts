@@ -16,6 +16,8 @@ export interface StudioSession {
   title: string;
   /** Set once the title is generated or the user renames the chat; unset while it is New Chat. */
   titleSource?: "generated" | "user";
+  /** Dream's own session: it holds Dream jobs and is never listed as a Chat. */
+  hidden?: true;
   inputs: GenerationInput;
   createdAt: string;
   updatedAt: string;
