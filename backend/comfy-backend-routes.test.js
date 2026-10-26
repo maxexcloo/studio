@@ -17,15 +17,6 @@ const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 imageInfo.UNETLoader.input.required.unet_name[0] = ["kroma-v0.3.1-turbo-opd-W8A8.safetensors"];
 imageInfo.LoraLoader.input.required.lora_name[0] = ["private-lora.safetensors"];
-imageInfo.GrokMedia = {
-  input: {
-    required: {
-      prompt: ["STRING"],
-      width: ["INT", { default: 1024, min: 256, max: 2048, step: 8 }],
-      height: ["INT", { default: 1024, min: 256, max: 2048, step: 8 }],
-    },
-  },
-};
 const videoInfo = structuredClone(source);
 videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = [];
 videoInfo.UNETLoader.input.required.unet_name[0] = [
@@ -44,27 +35,10 @@ fs.writeFileSync(
   path.join(dataDir, "lora-catalogue.json"),
   JSON.stringify({ "private-lora.safetensors": { triggers: ["privfx"] } }),
 );
-fs.writeFileSync(
-  path.join(dataDir, "workflows/grok-video.json"),
-  JSON.stringify({
-    heissUi: {
-      id: "grok-video",
-      kind: "video",
-      family: "grok",
-      controls: { prompt: { node: "1", input: "prompt" } },
-    },
-    1: { class_type: "GrokMedia", inputs: { prompt: "" } },
-  }),
-);
 let server;
 let base;
 
-async function start(
-  useVideo = true,
-  enableGrok = true,
-  restrictModels = false,
-  runtimeDir = dataDir,
-) {
+async function start(useVideo = true, restrictModels = false, runtimeDir = dataDir) {
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
     env: {
@@ -73,7 +47,6 @@ async function start(
       HOST: "127.0.0.1",
       COMFY_URL: primary.url,
       COMFY_VIDEO_URL: useVideo ? video.url : "",
-      STUDIO_ENABLE_GROK: enableGrok ? "1" : "0",
       STUDIO_ENABLE_KROMA: restrictModels ? "0" : "1",
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
@@ -151,7 +124,7 @@ test("health keeps the studio connected while either configured backend is avail
   }
 });
 
-test("the catalogue reports whether the local video worker answered, keeping Grok while it is off", async () => {
+test("the catalogue reports whether the local video worker answered", async () => {
   try {
     let models = (await api("/api/models")).body;
     assert.deepEqual(models.backends.video, { configured: true, available: true });
@@ -161,7 +134,6 @@ test("the catalogue reports whether the local video worker answered, keeping Gro
     const offline = models.profiles.find((profile) => profile.family === "minimax_h3");
     assert.equal(offline.availability, "offline");
     assert.equal(offline.ready, undefined);
-    assert.ok(models.profiles.some((profile) => profile.id === "custom:grok-video"));
   } finally {
     video.setDown(false);
     await api("/api/comfy/status");
@@ -282,14 +254,12 @@ test(
 );
 
 test(
-  "HTTP catalogue and generate select the video node schema, keep Grok primary and cancel only target",
+  "HTTP catalogue and generate select the video node schema and cancel only target",
   { timeout: 10000 },
   async () => {
     const models = (await api("/api/models")).body;
     const h3 = models.profiles.find((profile) => profile.family === "minimax_h3");
-    const grok = models.profiles.find((profile) => profile.id === "custom:grok-video");
     assert.ok(h3?.ready, JSON.stringify(h3));
-    assert.ok(grok);
     const videoQueued = video.nextPrompt();
     const accepted = await api("/api/generate", generation(h3));
     assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
@@ -298,16 +268,6 @@ test(
     assert.ok(
       Object.values(h3Prompt.prompt).some((node) => node.class_type === "MiniMaxH3ImageToVideo"),
     );
-    const grokQueued = primary.nextPrompt();
-    const grokAccepted = await api("/api/generate", {
-      ...generation(grok),
-      comfyBackend: "video",
-      COMFY_VIDEO_URL: video.url,
-      family: "minimax_h3",
-    });
-    assert.equal(grokAccepted.status, 200, JSON.stringify(grokAccepted.body));
-    const grokPrompt = await grokQueued;
-    assert.equal(grokPrompt.client_id, grokAccepted.body.jobId);
     const status = (await api("/api/comfy/status")).body;
     assert.doesNotMatch(JSON.stringify(status), /red ceramic teapot/);
     const before = primary.requests.length;
@@ -317,8 +277,6 @@ test(
       false,
     );
     assert.ok(video.requests.some((entry) => entry.pathname === "/interrupt"));
-    await api(`/api/jobs/${grokAccepted.body.jobId}/cancel`, {});
-    primary.drop(grokPrompt.id);
     video.drop(h3Prompt.id);
   },
 );
@@ -391,11 +349,11 @@ test(
       profiles.some((profile) => profile.family === "minimax_h3"),
       false,
     );
-    const grok = profiles.find((profile) => profile.id === "custom:grok-video");
+    const image = profiles.find((profile) => profile.kind === "image" && profile.ready);
     const secondaryCount = video.prompts.length;
     const queued = primary.nextPrompt();
     const accepted = await api("/api/generate", {
-      ...generation(grok),
+      ...generation(image),
       comfyBackend: "video",
       COMFY_VIDEO_URL: video.url,
     });
@@ -408,34 +366,17 @@ test(
 );
 
 test(
-  "SFW instances hide restricted models and LoRAs and reject saved Grok requests on either backend configuration",
+  "SFW instances hide restricted models and LoRAs on either backend configuration",
   { timeout: 10000 },
   async () => {
-    const grok = (await api("/api/models")).body.profiles.find(
-      (profile) => profile.id === "custom:grok-video",
-    );
-    assert.ok(grok);
     const before = (await api("/api/models")).body;
     assert.ok(before.modelFiles.some((file) => file.name.startsWith("kroma-")));
     assert.ok(before.loras.includes("private-lora.safetensors"));
-    fs.writeFileSync(
-      path.join(dataDir, "workflows/renamed-provider.json"),
-      JSON.stringify({
-        heissUi: { id: "renamed-provider", family: "custom" },
-        1: { class_type: "GrokMedia", inputs: { prompt: "" } },
-      }),
-    );
     try {
       for (const useVideo of [true, false]) {
         await stop();
-        await start(useVideo, false, true);
+        await start(useVideo, true);
         const models = (await api("/api/models")).body;
-        assert.equal(
-          models.profiles.some(
-            (profile) => profile.family === "grok" || profile.id === "custom:renamed-provider",
-          ),
-          false,
-        );
         assert.equal(
           models.profiles.some((profile) => profile.model.startsWith("kroma-")),
           false,
@@ -449,21 +390,11 @@ test(
         assert.deepEqual((await api("/api/loras/info")).body.loras, {});
         assert.equal((await api("/api/loras/library")).body.found, false);
         assert.deepEqual((await api("/api/loras/saved-profile")).body.loras, []);
-        assert.doesNotMatch(
-          JSON.stringify((await api("/api/workflows")).body.workflows),
-          /custom:grok-video|custom:renamed-provider/,
-        );
-        const count = primary.prompts.length;
-        const response = await api("/api/generate", generation(grok));
-        assert.equal(response.status, 400);
-        assert.equal(primary.prompts.length, count);
       }
     } finally {
-      fs.rmSync(path.join(dataDir, "workflows/renamed-provider.json"));
       await stop();
       await start();
     }
-    assert.ok((await api("/api/models")).body.profiles.some((profile) => profile.id === grok.id));
   },
 );
 
@@ -589,7 +520,7 @@ test(
     video.url = `http://127.0.0.1:${proxy.address().port}`;
     let jobId;
     try {
-      await start(true, false, false, isolatedData);
+      await start(true, false, isolatedData);
       const original = (await api("/api/models")).body;
       const h3 = original.profiles.find((item) => item.family === "minimax_h3");
       assert.ok(h3);

@@ -21,11 +21,21 @@ interface ProviderVideo {
 }
 
 const prefixes = { image: "grok-imagine-image", video: "grok-imagine-video" };
+// The aspect ratios the provider's video models accept.
+const videoAspects = ["1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3"];
 function gcd(a: number, b: number): number {
   return b ? gcd(b, a % b) : a;
 }
+/** The accepted video aspect ratio closest to a width and height, such as a first frame's. */
+export function videoAspect(width: number, height: number): string {
+  const distance = (aspect: string) => {
+    const [w, h] = aspect.split(":").map(Number);
+    return Math.abs(Math.log(width / height) - Math.log(w / h));
+  };
+  return videoAspects.reduce((best, aspect) => (distance(aspect) < distance(best) ? aspect : best));
+}
 
-/** Mirrors the existing CLIProxyAPI node's documented wire contracts, without ComfyUI. */
+/** CLIProxyAPI's Grok image and video wire contracts. */
 export class CliProxyMedia {
   private base: string;
   private key: string;
@@ -135,13 +145,12 @@ export class CliProxyMedia {
   }
 
   async video(input: CloudRequest, signal: AbortSignal): Promise<string> {
-    const divisor = gcd(input.width, input.height);
     const result = await this.call<{ request_id?: string }>(
       "/v1/videos/generations",
       {
         model: input.model,
         prompt: input.prompt,
-        aspect_ratio: `${input.width / divisor}:${input.height / divisor}`,
+        aspect_ratio: videoAspect(input.width, input.height),
         duration: input.duration,
         ...(input.resolution ? { resolution: input.resolution } : {}),
         ...(input.reference
@@ -183,10 +192,7 @@ export class CliProxyMedia {
 }
 
 export function configuredCliProxy(environment = process.env): CliProxyMedia | undefined {
-  const base = environment.STUDIO_CLIPROXYAPI_URL || environment.CLIPROXYAPI_URL;
+  const base = environment.STUDIO_CLIPROXYAPI_URL;
   if (!base) return;
-  return new CliProxyMedia(
-    base,
-    environment.STUDIO_CLIPROXYAPI_KEY || environment.CLIPROXYAPI_KEY || "",
-  );
+  return new CliProxyMedia(base, environment.STUDIO_CLIPROXYAPI_KEY || "");
 }
