@@ -136,7 +136,9 @@ export function studioTheme({
     other: { background, motionDuration, transparency },
     components: {
       ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
-      // One size for header and toolbar icons; the radius follows the Corners setting.
+      // One size for header and toolbar icons; the radius follows the Corners setting. Default
+      // icons take the glass fill without a backdrop blur of their own: tiles and the viewer show
+      // dozens at once, and each blur layer stalls rendering on slow phones.
       ActionIcon: ActionIcon.extend({
         defaultProps: { size: 36, radius: "xl" },
         vars: (_theme, props) => ({
@@ -146,15 +148,6 @@ export function studioTheme({
                   "--ai-bg": "var(--studio-glass-raised)",
                   "--ai-hover": "var(--studio-glass-raised-hover)",
                   "--ai-bd": "1px solid var(--studio-glass-border)",
-                }
-              : {},
-        }),
-        styles: (_theme, props) => ({
-          root:
-            props.variant === "default"
-              ? {
-                  backdropFilter: "var(--studio-glass-filter)",
-                  WebkitBackdropFilter: "var(--studio-glass-filter)",
                 }
               : {},
         }),
