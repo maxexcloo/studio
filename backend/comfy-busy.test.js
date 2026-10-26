@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { comfyBusyGraceMs, isComfyTimeout, noteComfyReachable, noteComfySilent } from "./comfy.js";
+import {
+  comfyBusyGraceMs,
+  isComfyTimeout,
+  noteComfyFetchError,
+  noteComfyReachable,
+  noteComfySilent,
+} from "./comfy.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 
 /** What a status check to `url` throws, cut short after `ms` the way the status route does it. */
@@ -93,4 +99,29 @@ test("one backend answering does not reset another backend's busy grace", async 
     assert.equal(noteComfySilent(at + 1000, at + comfyBusyGraceMs).busy, false);
     noteComfyReachable();
   });
+});
+
+test("outage logs skip busy timeouts, say refused or unreachable and count from the first silence", (t) => {
+  const lines = [];
+  t.mock.method(console, "error", (line) => lines.push(String(line)));
+  noteComfyReachable();
+  lines.length = 0;
+  // A timed-out check is a busy ComfyUI, not an outage.
+  noteComfyFetchError(Object.assign(new Error("timed out"), { name: "TimeoutError" }));
+  assert.deepEqual(lines, []);
+  // A refusal is one, and the log says which kind.
+  const refused = new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+  noteComfyFetchError(refused);
+  assert.match(lines.join("\n"), /ComfyUI stopped answering .*"code":"ECONNREFUSED"/);
+  noteComfyReachable();
+  assert.match(lines.at(-1), /ComfyUI answering again/);
+  // Silence past the grace is an outage that began at the first unanswered check.
+  const start = Date.now() - comfyBusyGraceMs - 30_000;
+  noteComfySilent(start, start + 1000);
+  lines.length = 0;
+  noteComfySilent(Date.now() - 1000, Date.now());
+  assert.match(lines.join("\n"), /ComfyUI stopped answering/);
+  noteComfyReachable();
+  const downFor = Number(/"downForS":(\d+)/.exec(lines.at(-1))?.[1]);
+  assert.ok(downFor >= comfyBusyGraceMs / 1000 + 29, `down for ${downFor} s`);
 });

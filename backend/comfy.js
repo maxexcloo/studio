@@ -241,13 +241,24 @@ export function noteComfySilent(sentAt, now = Date.now()) {
   const first = !comfySilentSince.has(backend);
   if (first) comfySilentSince.set(backend, sentAt);
   const silentForMs = now - comfySilentSince.get(backend);
-  return { busy: silentForMs < comfyBusyGraceMs, first, silentForMs };
+  const busy = silentForMs < comfyBusyGraceMs;
+  // Silent past the grace: it has stopped, since its first unanswered check.
+  if (!busy && isDefaultBackend())
+    noteComfyState(
+      false,
+      "No answer to checks within the busy grace",
+      comfySilentSince.get(backend),
+    );
+  return { busy, first, silentForMs };
 }
-/** Call with what a fetch to ComfyUI threw; a canceled request says nothing about ComfyUI. */
+/**
+ * Call with what a fetch to ComfyUI threw. A canceled request says nothing about ComfyUI, and a timed-out
+ * one reads as busy (noteComfySilent decides when silence becomes an outage).
+ */
 export function noteComfyFetchError(error) {
   if (error?.name === "AbortError") return;
   comfyUnreachableUntil = Date.now() + 5000;
-  noteComfyState(false, error);
+  if (!isComfyTimeout(error)) noteComfyState(false, error);
 }
 
 /**
