@@ -15,6 +15,7 @@ version opens with a `> ` summary line.
 
 ### Added
 - **MCP without headers:** `/mcp/<token>` is a complete MCP URL for a client that can send no headers, such as a Grok custom connector, carrying the account's personal MCP token in the path. Only a personal account token works there; the shared gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
+- **Connector-friendly MCP:** the MCP endpoints answer a browser's CORS preflight and cross-origin calls, since every call carries its own bearer credential and no cookies — a connector can validate its URL from a page. OAuth discovery (`/.well-known/oauth-*`) gets a plain miss instead of the app page.
 
 ### Fixed
 - **Cloud image animation:** `Reuse` with `kind: video` takes `profile_id`, so a chat can animate a finished image on the video model the user names ("animate these with grok imagine"). A profile without an image input is refused with what to pass instead.

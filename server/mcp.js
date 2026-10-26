@@ -129,8 +129,13 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
     const origin = req.headers.origin;
     if (origin !== undefined) {
       let own = false;
-      try { own = new URL(origin).origin === parsedPublic.origin || new URL(origin).host.toLowerCase() === req.headers.host?.toLowerCase(); } catch { /* Invalid origins are rejected. */ }
-      if (!own) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
+      let wellFormed = true;
+      try { own = new URL(origin).origin === parsedPublic.origin || new URL(origin).host.toLowerCase() === req.headers.host?.toLowerCase(); } catch { wellFormed = false; }
+      if (!wellFormed) return res.status(403).json({ error: 'Cross-origin MCP requests are not permitted.' });
+      // A browser-based MCP client (a Grok connector validates its URL from the page) runs cross-origin. MCP
+      // takes no ambient credentials — every call carries its bearer token — so a hostile page gains nothing it
+      // could not do from its own server; the host check above still stops DNS rebinding.
+      if (!own) res.set({ 'Access-Control-Allow-Origin': origin, 'Vary': 'Origin', 'Access-Control-Expose-Headers': 'mcp-session-id' });
     }
     // A bearer header carries the credential; a client that sends no headers (a Grok connector takes only a
     // URL) puts its token in the path instead. Only a personal account token is accepted there: the shared
@@ -535,8 +540,23 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
       if (!res.headersSent) res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'MCP could not complete this request.' }, id: req.body?.id ?? null });
     }
   };
+  // A browser-based MCP client must preflight before it may send its JSON; that needs no credential.
+  const preflight = (req, res) => res.set({
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'POST, GET, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type, accept, authorization, mcp-protocol-version, mcp-session-id',
+    'Access-Control-Expose-Headers': 'mcp-session-id',
+    'Access-Control-Max-Age': '600',
+    'Cache-Control': 'private, no-store'
+  }).status(204).end();
+  // A client probing for OAuth (the MCP auth spec's discovery) gets a plain miss, never the app page.
+  for (const route of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-authorization-server']) {
+    app.all(route, (_req, res) => res.status(404).json({ error: 'Studio MCP takes a bearer credential; there is no OAuth here.' }));
+  }
   // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
   for (const route of ['/mcp', '/mcp/:token']) {
+    app.options(route, preflight);
     app.post(route, guard, express.json({ limit: '30mb' }), handle);
     app.all(route, guard, (_req, res) => res.status(405).set('Allow', 'POST').json({ error: 'Use Streamable HTTP POST for MCP.' }));
   }
