@@ -18,6 +18,7 @@ import {
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
+import { createDream, registerDreamRoutes } from "./domain/dream.ts";
 import { createTaste, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
@@ -299,6 +300,7 @@ import {
   accountAccessForId,
   gatewayAccountAccess,
   gatewayAdminTools,
+  listAccounts,
   migrateCloudModelAccess,
   migrateFeatureOptionAccess,
   noteGatewayIdentity,
@@ -1933,8 +1935,10 @@ const taste = createTaste({
   online: async () =>
     (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline",
 });
-const tasteAdmitted = (job) => {
+// Every admitted job teaches the taste profile (iterations) and makes waiting Dream work step aside.
+const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+  dream.admitted(job);
 };
 registerGalleryHistoryRoutes(app, {
   starred: (req, items, favorite) =>
@@ -2531,7 +2535,7 @@ registerRewriteRoutes(app, {
   jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
   title: chatTitle,
-  admitted: tasteAdmitted,
+  admitted: jobAdmitted,
 });
 const admitGeneration = createGenerationAdmission({
   store: rewriteStore,
@@ -2541,7 +2545,7 @@ const admitGeneration = createGenerationAdmission({
   revision: galleryRevisionValue,
   jobLimit: accountJobLimit,
   validate: validateGenerationInput,
-  admitted: tasteAdmitted,
+  admitted: jobAdmitted,
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {
@@ -2574,6 +2578,67 @@ registerCompareRoutes(app, {
   title: chatTitle,
 });
 registerTasteRoutes(app, { taste });
+// Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
+// It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
+const dream = createDream({
+  dataDir,
+  store: rewriteStore,
+  taste,
+  owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
+  access: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (ownerId && !account?.authenticated) return null;
+    const may = (feature) => !account || mayUseFeature(account, feature);
+    return {
+      account,
+      gallery: may("gallery"),
+      image: may("imageGeneration"),
+      video: may("videoGeneration"),
+      assistant: may("promptAssistant"),
+      nsfw: may("nsfwModels"),
+    };
+  },
+  catalogue: async (_ownerId, account) => {
+    const models = modelsForAccount((await mediaModels(false)).models, { studioAccount: account });
+    return {
+      profiles: (models.profiles || []).filter(
+        (profile) =>
+          profile.ready !== false &&
+          profile.availability !== "offline" &&
+          !isCloudProfile(profile) &&
+          !directCloud?.isProfile({ profileId: profile.id }),
+      ),
+      defaults: models.defaults,
+    };
+  },
+  online: async (kind) => {
+    const { services } = await observeServices({ allowed: ["text", kind] });
+    return {
+      text: services.text?.state !== "offline",
+      media: services[kind]?.state !== "offline",
+    };
+  },
+  textBusy: () =>
+    Boolean(
+      runtime?.controller
+        .status()
+        .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0) ||
+      rewriteStore.db
+        .prepare(
+          "SELECT 1 FROM studio_chat_messages WHERE json_extract(record, '$.status') = 'streaming' LIMIT 1",
+        )
+        .get(),
+    ),
+  writer: assistantEngine,
+  guide: assistantGuide,
+  gallery: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
+  visible: filterVisibleGallery,
+  mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
+  reference: (account, itemId) => referenceAssetForAccount(account, itemId),
+  admit: admitGeneration,
+  cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
+});
+registerDreamRoutes(app, { dream });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
@@ -2804,6 +2869,7 @@ async function mcpGenerationRequest(method, route, input, owner) {
   return admitGeneration(body, account, undefined, { priority: queuePriority.mcp, queueSet });
 }
 generationQueue.start();
+dream.start();
 
 /**
  * Upscaling runs on a worker with Upscale (workers.js): the routes below run
