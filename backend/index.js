@@ -20,7 +20,7 @@ import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
 import { createSuggestions, registerSuggestionRoutes } from "./domain/suggestions.ts";
-import { createTaste, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
+import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
@@ -2585,13 +2585,15 @@ registerCompareRoutes(app, {
       ? recordsForRequest(filterVisibleGallery(gallery), req)
       : null,
   pendingItems: makePendingItems,
-  voted: (ownerId, jobId) => {
-    const job = rewriteStore.job(ownerId, jobId);
-    const item = gallery.find(
-      (entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId,
-    );
+  voted: (ownerId, jobId, others) => {
+    const values = (id) => {
+      const item = gallery.find((entry) => entry.jobId === id && (entry.ownerId || "") === ownerId);
+      return rewriteStore.job(ownerId, id)?.input || { ...item?.settings, prompt: item?.prompt };
+    };
+    const winner = { jobId, values: values(jobId) };
     taste.record(ownerId, [
-      tasteSignal("compare", jobId, job?.input || { ...item?.settings, prompt: item?.prompt }),
+      tasteSignal("compare", jobId, winner.values),
+      ...others.map((id) => preferenceSignal(winner, { jobId: id, values: values(id) })),
     ]);
   },
   title: chatTitle,
