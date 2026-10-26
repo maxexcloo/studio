@@ -108,6 +108,13 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Questions for Max
 
+UX audit 26 Oct (defaults apply until you say otherwise):
+
+- Duplicate profile labels: 17 pairs in the picker read the same (e.g. two "FLUX.2 [klein] 9B Base · ComfyUI · Quality · 50 Steps · 3 References" for `…-comfyui` and `…-fp8`; H3 and Grok video pairs). Stale definitions to delete in runtime data, or both wanted? Default: keep both and add a short disambiguator (such as the precision) when labels collide.
+- Phone Chat with no Chat selected gives no cue that the list lives behind the status action. Default: the empty state says where the Chats are and offers New Chat.
+- The Chat model select reads "Text" with a wide gap. Default: show the actual text model label from chat status.
+- Library Imports and Inspiration are hidden in dev because `features.presets` is off. Default: leave the flag; dev data only.
+
 1. Bento host (homelab, outside Studio): a USB4 port's power-management loop (`pci_bus 0000:13` behind ASM4242 12:00.0) is still repeating and hung the whole host for 2.3 h on 23 Oct, with an iGPU SDMA timeout. Fix it by disabling runtime PM for that port (or `pcie_port_pm=off`, or removing the device) plus `amdgpu.runpm=0` for the iGPU, and arm a runtime hardware watchdog (`RuntimeWatchdogSec`) so a hang self-recovers in minutes? Recommended: yes, as a reviewed homelab change.
 2. GPU experiments and image redeploys on bento (24 Oct 02:18 and 05:16) stopped image work for 59 and 8 minutes outside AI Control. Route them through AI Control and pull images before stopping containers? Recommended: yes.
 
@@ -129,7 +136,7 @@ Settled 24 Oct: viewer hub, chip composer, Grid | Runs, compact Chat cards, Chat
 - [ ] After publishing the verified worker image, update ai's workload image references and retire the old worker recipe from images together. Existing image consumers and the images checkout remain unchanged during this review.
 - [ ] Confirm AI Control relinquishes runtime ownership and every managed local text caller uses Studio admission before enabling automatic control.
 - [ ] Verify stream draining and independent GPU/cloud work with real services. Live authenticated Bifrost ai/text discussion completed in 9.081 seconds with 1556 characters and no media jobs. Managed Radiance stream draining still needs live verification; LiteLLM → Bifrost migration is separate.
-- [ ] Verify video limits come from the worker (frame maximum, frame grid, area limit) and out-of-range requests are rejected, not silently adjusted.
+- [ ] Verify video limits come from the worker (frame maximum, frame grid, area limit) and out-of-range requests are rejected, not silently adjusted. Found 26 Oct: the Radiance worker rejects out-of-range frames, area and grid (`worker/comfyui/radiance/video.py`), but Studio snaps frames into the profile's range (`backend/validation.js` `snapInteger`) and the limits are duplicated in ai's profile constraints instead of read from the node's `INPUT_TYPES`.
 - [ ] Held video work while the worker is off stays owner-scoped, counts against limits and drains in order without cloud fallback.
 - [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions and ai's seeds.
 - [ ] Honest worker health (done in the rewrite: status probes read a timeout as busy for the 60 s grace; outage logs skip busy timeouts, count a silent worker from its first unanswered check and record the error code, e.g. `ECONNREFUSED`): deliberately stopped workers show as Parked, not down — needs Studio to own runtime stops (A1).
