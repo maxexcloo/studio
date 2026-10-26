@@ -52,9 +52,12 @@ jobs:
           path: dist
           retention-days: 1
 
+  # Pull requests run Check only; the browser suite and image build run on main and tags, where
+  # they gate publishing.
   browser:
     name: Browser
     needs: check
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.check.outputs.browser-image }}
@@ -87,6 +90,7 @@ jobs:
   image:
     name: Image
     needs: [browser, check]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
