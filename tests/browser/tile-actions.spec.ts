@@ -110,7 +110,10 @@ for (const operation of ["Refine", "Animate"] as const) {
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
-    await page.locator("[data-composer-prompt]").click();
+    // An Animate draft opens the Videos composer, a Refine draft stays in Images.
+    await expect(page).toHaveURL(operation === "Animate" ? /\/video\?compose=1/ : /\/images/);
+    // Videos opens with its composer expanded; Images keeps the compact bar until it is clicked.
+    if (operation === "Refine") await page.locator("[data-composer-prompt]").click();
     await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "A copper bird",
     );
