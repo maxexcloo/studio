@@ -4,6 +4,7 @@ import { Copy } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { referenceLabel } from "../generation/references";
 import { mediaSource } from "./mediaSource";
@@ -60,7 +61,7 @@ function generationDetails(
     entries
       .filter(([, value]) => value !== "" && value !== undefined && value !== null && value !== 0)
       .map(([label, value]) => [label, String(value)]);
-  const recorded = profiles.find((profile) => profile.id === settings.profileId);
+  const recorded = profiles.find((profile) => isProfile(profile, settings.profileId));
   const references = Array.isArray(settings.referenceDetails)
     ? (settings.referenceDetails as ReferenceAsset[])
     : [];
@@ -196,7 +197,7 @@ export function MediaDetails({ item }: { item: MediaItem }) {
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
   const { profiles } = useGenerationActions();
-  const profile = profiles.find((candidate) => candidate.id === item.settings?.profileId);
+  const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
       <Stack gap={6}>

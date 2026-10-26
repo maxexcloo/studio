@@ -8,6 +8,7 @@ import { root } from "./comfy.js";
 import { workflowIds } from "./workflow-registry.js";
 import { writeJsonFile } from "./json-store.js";
 import { builtInProfilesEnabled, grokEnabled, modelFamilyEnabled } from "./features.js";
+import { canonicalProfileId } from "./profile-store.js";
 
 const bundledWorkflowsDir = path.join(root, "backend", "workflows");
 export const userWorkflowsDir = path.join(dataDir, "workflows");
@@ -457,7 +458,8 @@ export function loadCustomWorkflows() {
   });
 }
 
-export function getCustomWorkflow(profileId) {
+export function getCustomWorkflow(requested) {
+  const profileId = canonicalProfileId(requested);
   return (
     loadCustomWorkflows().find(
       (workflow) =>
