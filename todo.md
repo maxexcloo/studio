@@ -145,9 +145,10 @@ Decided 27 Oct: in-place upgrade (no staging), version 1.0.0, app and workers sw
 Prep (now, off-LAN):
 
 - [ ] `main` green (Studio and Worker workflows) after the merge.
-- [ ] Cutover script (`mise run` task or documented commands) for the window: scale Studio to 0, ZFS snapshot plus a copy of `/data`, `migrate-runtime` dry run then apply in a one-off pod on the 1.0.0 image, then upgrade.
+- [x] Cutover runbook for the window (below): suspend Flux, scale to 0, ZFS snapshot, `migrate-runtime` dry run then apply in a one-off pod on the 1.0.0 image, upgrade, verify, rollback.
 - [ ] kubelab PR (draft, not merged): Studio image `1.0.0`; worker deployments on `ghcr.io/maxexcloo/studio-worker` with the env, mounts and args the rewrite's worker expects; remove settings the rewrite no longer reads.
-- [ ] Check every kubelab Studio setting against `CONFIGURATION.md` (renamed and removed settings, `COMFY_URL`/`COMFY_VIDEO_URL` seeding, `STUDIO_MODEL_STORAGE=worker`, OIDC, Bifrost writer).
+- [x] Check every kubelab Studio setting against `CONFIGURATION.md`. Done 27 Oct: every Studio setting and secret name in kubelab is read by the rewrite; the data volume is owned by uid 1000, as the new image runs. `STUDIO_SETUP_TOKEN` is still set although accounts exist; remove it in the window.
+- [ ] The worker image ran a Docker-era GPU lease that refuses to start without a device selection (PR #75 lets it run under a Kubernetes GPU claim) and pinned Radiance 1.10 while production runs 1.11 (Renovate PR #73 brings 1.12.0). Both auto-merge on green CI; then pin the worker's `sha-…` tag in kubelab.
 - [ ] Mark `image-kroma-turbo-w8a8-*` and `h3-singularity-*` profiles NSFW in Studio's runtime definitions (after migration, in Studio) and ai's seeds.
 
 On the LAN (with Max):
@@ -157,6 +158,15 @@ On the LAN (with Max):
 - [ ] Tag `v1.0.0` from `main` (publishes the image and release notes from `CHANGELOG.md`).
 - [ ] Window: snapshot, migrate, merge the kubelab PR, verify accounts/OIDC, isolation, NSFW and cloud grants, old result links, a real Image → Refine → Animate, references, LoRAs, upscale, Library imports and MCP from LibreChat.
 - [ ] Rollback rehearsed: scale to 0, restore the snapshot, pin `0.51.0` (and the old worker image).
+
+Runbook (window; Studio's HelmRelease is `application` in namespace `studio`, data PVC `data`, uid 1000):
+
+1. `flux -n studio suspend helmrelease application`, then `kubectl -n studio scale deploy/studio --replicas=0` (Flux would otherwise scale it back).
+2. On kimbap: `zfs snapshot truenas-nvme/studio@pre-1.0.0` (rollback point; about 8.3 GB referenced).
+3. Migration dry run on the 1.0.0 image in a one-off pod on the same PVC: `kubectl -n studio run studio-migrate --rm -i --restart=Never --image=ghcr.io/maxexcloo/studio:1.0.0 --overrides='{"spec":{"securityContext":{"runAsUser":1000,"runAsGroup":1000,"fsGroup":1000},"volumes":[{"name":"data","persistentVolumeClaim":{"claimName":"data"}}],"containers":[{"name":"studio-migrate","image":"ghcr.io/maxexcloo/studio:1.0.0","command":["node","backend/commands/migrate-runtime.mjs","--data-dir","/data"],"volumeMounts":[{"name":"data","mountPath":"/data"}]}]}}'`; review mappings and conflicts, then repeat with `"--apply"` added.
+4. Merge the kubelab PR (Studio `1.0.0`, workers on `studio-worker`), `flux -n studio resume helmrelease application`, reconcile, then `kubectl -n comfyui scale deploy/comfyui --replicas=1` (GPU releases start at 0 after an upgrade).
+5. Verify (list above), and check `/api/ready`, the logs and one real image.
+6. Rollback: suspend, scale to 0, `zfs rollback truenas-nvme/studio@pre-1.0.0`, revert the kubelab PR (Studio `0.51.0`, workers `comfyui-radiance`), resume.
 
 Carried over (verify live after cutover):
 
