@@ -18,11 +18,13 @@ export function GenerationForm({
   onSubmitted,
   compact = false,
   autoFocusPrompt = false,
+  focusPrompt = false,
   fill = false,
 }: {
   onSubmitted?: () => void;
   compact?: boolean;
   autoFocusPrompt?: boolean;
+  focusPrompt?: boolean;
   fill?: boolean;
 }) {
   const { draft, setDraft, input, update, profile, selectProfile } = useGeneration();
@@ -168,6 +170,7 @@ export function GenerationForm({
         })
       }
       autoFocusPrompt={autoFocusPrompt}
+      focusPrompt={focusPrompt}
       fill={fill}
     />
   );

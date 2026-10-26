@@ -645,6 +645,16 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   );
 });
 
+test("Typing straight after clicking the collapsed prompt keeps every keystroke", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.goto("/");
+  await page.locator("[data-composer-prompt]").click();
+  await page.keyboard.type("abc", { delay: 0 });
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("abc");
+});
+
 test("Generation size presets and custom dimensions preserve profile constraints", async ({
   page,
 }) => {
