@@ -4,10 +4,13 @@ import { Center, Stack, Text, Title } from "@mantine/core";
 export function EmptyState({
   children,
   title,
+  action,
   fill = false,
 }: {
   children?: ReactNode;
   title?: string;
+  /** A button beneath the copy, such as New Chat. */
+  action?: ReactNode;
   fill?: boolean;
 }) {
   return (
@@ -19,6 +22,7 @@ export function EmptyState({
           </Title>
         )}
         {children && <Text size="sm">{children}</Text>}
+        {action}
       </Stack>
     </Center>
   );

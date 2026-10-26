@@ -122,8 +122,6 @@ const switches = ["enabled", "paused", "videos", "spicy"] as const;
 const recentPrompts = 20;
 const tickMs = 45_000;
 const starredDays = 30;
-/** Dream deletes discards beyond the newest this many, so hidden results don't pile up. */
-export const retainedDiscards = 500;
 /** Calibration shows gallery images at least this old, so it doesn't repeat what was just made. */
 const calibrationAgeMs = 86_400_000;
 const judgedLimit = 2000;
@@ -176,8 +174,6 @@ export function createDream(options: {
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
-  /** Deletes the owner's gallery records and their files. */
-  remove(ownerId: string, itemIds: string[]): void;
   /** A gallery image as a reference asset for a video, or a throw when it can't be one. */
   reference(
     account: GenerationAccount | undefined,
@@ -586,14 +582,6 @@ export function createDream(options: {
       throw failure("That result is in the gallery now; delete it there instead.", 409);
     const dream: DreamMark = { ...item.dream!, state, decidedAt: stamp() };
     options.mark(ownerId, itemId, dream);
-    if (state === "discarded") {
-      const old = discarded(ownerId).slice(retainedDiscards);
-      if (old.length)
-        options.remove(
-          ownerId,
-          old.map((entry) => String(entry.id)),
-        );
-    }
     options.taste.record(ownerId, [
       tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, {
         ...item.settings,
@@ -683,6 +671,13 @@ export function createDream(options: {
     },
     keep: (ownerId: string, itemId: string) => decide(ownerId, itemId, "kept"),
     discard: (ownerId: string, itemId: string) => decide(ownerId, itemId, "discarded"),
+    /** Starring an unseen, finished result, wherever it happens, keeps it. */
+    starred(ownerId: string, itemIds: string[]) {
+      const ids = new Set(itemIds);
+      for (const item of options.gallery(ownerId))
+        if (ids.has(String(item.id)) && item.dream?.state === "unseen" && item.status === "done")
+          decide(ownerId, String(item.id), "kept");
+    },
     /** Keeps an image and queues `count` new seeds of it as the person's own job. */
     async variations(
       ownerId: string,
