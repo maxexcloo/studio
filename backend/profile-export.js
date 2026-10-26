@@ -5,6 +5,7 @@
  * it. Studio never writes Git itself.
  *
  *   profiles/<id>.json    every profile file Studio holds, exactly as on disk
+ *   profile-aliases.json  merged profile ids and the profile each became, when there are any
  *   prompting.json        the guide store without its `meta`
  *   lora-catalogue.json   the LoRA catalogue by file name (seed and admin files plus Studio's edits)
  *   catalogue.json        editable metadata for every model file, keyed by folder/file
@@ -84,6 +85,9 @@ export function buildExport({
       hash,
     });
   }
+  const aliases = profiles.aliases();
+  if (Object.keys(aliases).length)
+    files.push({ name: "profile-aliases.json", body: json(sorted(aliases)), date: now });
   const store = guides.read();
   if (store) {
     const { meta = {}, ...config } = store;

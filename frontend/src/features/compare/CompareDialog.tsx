@@ -24,7 +24,7 @@ import { usePhone } from "../../ui/usePhone";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { inputForProfile, useGenerationActions } from "../generation/GenerationProvider";
 import { blockedProps } from "../generation/GenerationEditor";
-import { controlRange, generationInput, stepsRange } from "../generation/payload";
+import { controlRange, generationInput, isProfile, stepsRange } from "../generation/payload";
 import { ProfilePicker } from "../generation/ProfilePicker";
 import { queueQuery } from "../generation/Queue";
 import type { Comparison } from "./queries";
@@ -76,7 +76,7 @@ function nextVariant(
     };
   if (dimension === "settings") {
     // More steps first; once the profile's maximum is reached, more guidance.
-    const profile = profiles.find((profile) => profile.id === last.profileId);
+    const profile = profiles.find((profile) => isProfile(profile, last.profileId));
     const steps = stepsRange(profile);
     const most = Math.max(...variants.map((input) => input.steps));
     if (steps && most < (steps.max ?? 200))
@@ -101,7 +101,7 @@ function variantLabel(
   profiles: Profile[],
 ) {
   if (dimension === "profile") {
-    const profile = profiles.find((profile) => profile.id === input.profileId);
+    const profile = profiles.find((profile) => isProfile(profile, input.profileId));
     return (profile?.displayName || profile?.label || `Variant ${letter(index)}`).slice(0, 80);
   }
   if (dimension === "settings") return `${input.steps} Steps · Guidance ${input.cfg}`;
@@ -201,7 +201,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   const phone = usePhone();
   const navigate = useNavigate();
   const client = useQueryClient();
-  const profile = profiles.find((profile) => profile.id === base.input.profileId);
+  const profile = profiles.find((profile) => isProfile(profile, base.input.profileId));
   const available = dimensions.filter(
     (option) =>
       (option.value !== "loras" || (profile?.capabilities.lora && base.input.loras.length)) &&
@@ -238,7 +238,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
           label: labels[index],
           input: generationInput(
             { ...input, seed: base.input.seed, count: 1 },
-            profiles.find((profile) => profile.id === input.profileId),
+            profiles.find((profile) => isProfile(profile, input.profileId)),
             base.references,
           ),
         })),
@@ -322,7 +322,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
                   <VariantFields
                     input={input}
                     dimension={dimension}
-                    profile={profiles.find((profile) => profile.id === input.profileId)}
+                    profile={profiles.find((profile) => isProfile(profile, input.profileId))}
                     onChange={(next) => change(index, next)}
                   />
                 </Stack>

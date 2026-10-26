@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import { Anchor, Badge, Button, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { Pencil, Play } from "lucide-react";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
+import { isProfile } from "../generation/payload";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaTileActions } from "../gallery/MediaTileActions";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
@@ -188,7 +189,7 @@ export function SessionIteration({
   const hold = useHoldToSelect(tiles, undefined);
   const input = job.input;
   const profile = profiles.find(
-    (candidate) => candidate.id === input.profileId && candidate.kind === input.kind,
+    (candidate) => isProfile(candidate, input.profileId) && candidate.kind === input.kind,
   );
   const references = Array.isArray(input.referenceDetails)
     ? (input.referenceDetails as ReferenceAsset[])

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Card, Group, Image, Stack, Text } from "@mantine/core";
 import { useNavigate } from "react-router";
 import type { GenerationInput, Profile } from "../../types";
+import { isProfile } from "../generation/payload";
 import { initialInput, inputForProfile, useGeneration } from "../generation/GenerationProvider";
 import { ProfilePicker } from "../generation/ProfilePicker";
 
@@ -132,7 +133,7 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
   const exact = profiles.find(
     (profile) =>
       profile.kind === kind &&
-      (profile.id === preset.settings.profileId ||
+      (isProfile(profile, preset.settings.profileId) ||
         preset.resources?.some((resource) => resource.profileId === profile.id) ||
         (profile.model === preset.settings.model &&
           (!preset.settings.workflow || profile.workflow === preset.settings.workflow))),

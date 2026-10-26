@@ -21,6 +21,8 @@ export interface Profile {
   nsfw?: boolean;
   /** Drafted by the assistant and not yet approved; only administrators see it. */
   aiDrafted?: boolean;
+  /** Merged profile ids that now resolve to this one; older records may still name them. */
+  aliases?: string[];
   defaults: Record<string, string | number>;
   capabilities: Record<string, boolean>;
   mediaInputs?: {

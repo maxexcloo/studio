@@ -200,11 +200,14 @@ Studio owns editable live definitions in its data directory: profiles in `workfl
 profiles/*.json
 lora-catalogue.json
 models.json
+profile-aliases.json
 prompting.json
 workloads.json
 ```
 
 `STUDIO_SEED_DIR` can explicitly select a seed/export directory. Startup fills only missing files and definitions, preserving existing runtime edits and deleted-profile history. It never writes back to ai or synchronises over live definitions. Export through the retained administrator API to update the ai backup after review.
+
+Settings › Profiles › Merge Duplicate Profiles is an explicit administrator action, never run at startup. It previews profiles with the same name and kind whose graph (node titles aside), profile block (apart from id, name and description), guide binding, negatives and AI-Drafted state are identical, keeps the id that follows `<kind>-…-<backend>` and lists same-named profiles that differ or have no single id to keep. Applying copies the removed files and the previous aliases and workflow preferences to `backups/profile-merges/<time>/`, records each removed id in `workflows/.studio-aliases.json` and removes its file; its version history stays. Records that name an old id (gallery items, presets, jobs, Chats, MCP calls, access grants, taste signals) are left as they are and resolve to the kept profile. Exports carry the aliases as `profile-aliases.json`, and seeding adds aliases the data folder lacks before profiles, so a merged id is never seeded back.
 
 ## SQLite Migration & Rollback
 

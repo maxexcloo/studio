@@ -68,7 +68,13 @@ import {
   registerAssistantRoutes,
 } from "./assistant-routes.js";
 import { registerAnimatePromptRoute } from "./prompt-animate.js";
-import { guideStore, livePrompting, profileStore } from "./profile-store.js";
+import {
+  canonicalProfileId,
+  guideStore,
+  livePrompting,
+  profileStore,
+  withCanonicalProfile,
+} from "./profile-store.js";
 
 import { requireAdmin, requireLocal } from "./route-access.js";
 import express from "express";
@@ -1376,6 +1382,20 @@ function modelsForAccount(models, req) {
   };
 }
 
+/** Each profile lists the merged ids that now resolve to it, so the browser can match records that name them. */
+function withProfileAliases(models) {
+  const aliases = {};
+  for (const id of Object.keys(profileStore().aliases()))
+    (aliases[canonicalProfileId(`custom:${id}`)] ||= []).push(`custom:${id}`);
+  if (!Object.keys(aliases).length || !models?.profiles) return models;
+  return {
+    ...models,
+    profiles: models.profiles.map((profile) =>
+      aliases[profile.id] ? { ...profile, aliases: aliases[profile.id] } : profile,
+    ),
+  };
+}
+
 /** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
 function withLibrary(models, req) {
   if (!models?.features) return models;
@@ -1406,9 +1426,9 @@ app.get("/api/models", async (req, res) => {
       } catch {
         /* Tried again on the next load. */
       }
-    res.json(withLibrary(modelsForAccount(models, req), req));
+    res.json(withProfileAliases(withLibrary(modelsForAccount(models, req), req)));
   } catch {
-    res.json(withLibrary(modelsForAccount(unavailableModels(), req), req));
+    res.json(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)));
   }
 });
 
@@ -1779,9 +1799,8 @@ const assistantEngine = registerAssistantRoutes(app, {
   // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
   starred: async (req, profile) => {
     const families = new Map((await assistantProfiles(req)).map((item) => [item.id, item.family]));
-    const same = (item) =>
-      item.settings?.profileId === profile.id ||
-      (profile.family && families.get(item.settings?.profileId) === profile.family);
+    const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
+      id === profile.id || (profile.family && families.get(id) === profile.family);
     const items = gallery
       .filter(
         (item) =>
@@ -1944,7 +1963,18 @@ const tasteWriter = (ownerId) => {
 };
 const textOnline = async () =>
   (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline";
-const taste = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
+const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
+// Signals name a merged profile by the id it goes by now (profile-merge.js).
+const taste = {
+  ...tasteStore,
+  record: (ownerId, signals) =>
+    tasteStore.record(
+      ownerId,
+      signals.map((signal) =>
+        signal.profileId ? { ...signal, profileId: canonicalProfileId(signal.profileId) } : signal,
+      ),
+    ),
+};
 // Every admitted job teaches the taste profile (iterations) and makes waiting Dream work step aside.
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
@@ -2265,7 +2295,7 @@ async function queueResourceFor(input) {
   const models = await mediaModels(false)
     .then((result) => result.models)
     .catch(() => (demoMode ? mockModelResult() : { profiles: [] }));
-  const profile = models.profiles?.find((item) => item.id === input.profileId);
+  const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input.profileId));
   const worker = routeJob(
     profile ? capabilityForProfile(profile) : input.kind === "video" ? "video" : "image",
     { profileId: input.profileId },
@@ -2293,7 +2323,9 @@ async function permitQueueFallback(job) {
   const models = await mediaModels(false)
     .then((result) => result.models)
     .catch(() => null);
-  const profile = models?.profiles.find((item) => item.id === job.input.profileId);
+  const profile = models?.profiles.find(
+    (item) => item.id === canonicalProfileId(job.input.profileId),
+  );
   const backend = profile?.workerIds?.find((id) => id !== job.backend);
   if (!backend) return false;
   const latest = rewriteStore.job(job.ownerId, job.id);
@@ -2519,6 +2551,9 @@ const generationQueue = new GenerationQueue(
   ),
 );
 async function validateGenerationInput(input, account) {
+  // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
+  for (const key of ["profileId", "model", "workflow"])
+    if (typeof input[key] === "string") input[key] = canonicalProfileId(input[key]);
   if (directCloud?.isProfile(input)) {
     try {
       await directCloud.resolve({ ownerId: account?.userId || "", input });
@@ -2656,7 +2691,8 @@ const dream = createDream({
   textBusy,
   writer: assistantEngine,
   guide: assistantGuide,
-  gallery: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
+  gallery: (ownerId) =>
+    gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
   mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
   remove: deleteOwnedGalleryItems,
@@ -2709,7 +2745,7 @@ async function selectedChatMediaProfile(input, operation) {
       if (demoMode) return mockModelResult();
       throw error;
     });
-  const profile = models.profiles?.find((item) => item.id === input?.profileId);
+  const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input?.profileId));
   const reject = (message) => {
     throw Object.assign(new Error(message), { status: 400 });
   };

@@ -9,7 +9,7 @@ import {
 } from "../generation/GenerationProvider";
 import { GenerationEditor } from "../generation/GenerationEditor";
 import { PresetEditor, type PresetSelection } from "../generation/PresetEditor";
-import { generationInput, referencePatch } from "../generation/payload";
+import { generationInput, isProfile, referencePatch } from "../generation/payload";
 import type { ChatDraft } from "../../../../shared/chat";
 import { useChatController } from "./ChatProvider";
 import classes from "./SessionsPage.module.css";
@@ -44,7 +44,7 @@ export function GenerationCard({
     initialValues: { ...initialInput, ...draft.input } as GenerationInput,
   });
   const profile = profiles.find(
-    (profile) => profile.id === form.values.profileId && profile.kind === form.values.kind,
+    (profile) => isProfile(profile, form.values.profileId) && profile.kind === form.values.kind,
   );
   const references = Array.isArray(form.values.referenceDetails)
     ? (form.values.referenceDetails as ReferenceAsset[])
