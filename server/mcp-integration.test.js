@@ -304,9 +304,9 @@ test('media and administrator credentials discover only their own friendly tools
   assert.deepEqual((await admin.listTools()).tools.map(tool => tool.name).sort(), ['Apply', 'GPUStatus', 'Mode', 'Operation', 'Preview', 'Restart', 'Workloads']);
   // Each scope gets only its own rules: media sessions carry no GPU guidance and control sessions no media workflow.
   // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
-  assert.match(media.getInstructions(), /^Studio makes images and videos\. For each one the user asks for, follow their instructions: call Generate/);
+  assert.match(media.getInstructions(), /^Studio makes images and videos\. For what the user asks for, follow their instructions: one ask is one Generate call/);
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
-  assert.match(media.getInstructions(), /call Generate once with request \(the user's words, with anything they refer back to\), kind and tier/);
+  assert.match(media.getInstructions(), /one ask is one Generate call with request \(the user's words, with anything they refer back to\), kind and tier/);
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(media.getInstructions(), /share the result links and end the turn\. Call Result only when the user asks/);
   assert.match(tools.find(tool => tool.name === 'Result').description, /only when the user asks/);
@@ -1531,18 +1531,18 @@ const videoCatalogue = (local = true) => [
   cloudVideo('cloud-video-fast', 'Cloud Video · Fast · Cloud')
 ];
 
-test('video never goes to the cloud by itself while the local video worker is off', async t => {
+test('while the local video worker is off, video falls back to a granted cloud profile and says so', async t => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   const client = await f.client();
-  // No automatic fallback: the reply says local video is unavailable and that Grok can be asked for.
+  // The worker is offline: a granted cloud (Grok) profile runs the video instead of a refusal, and the reply says why.
   for (const args of [{ kind: 'video', prompts: ['A wave'], count: 1 }, { kind: 'video', tier: 'fast', prompts: ['A wave'] }, { kind: 'video', request: 'A cloud over the sea' }]) {
-    const refused = await call(client, 'Generate', args);
-    assert.equal(refused.isError, true);
-    assert.match(texts(refused), /^Local video is unavailable right now: the video worker is offline\. Tell the user; they can ask for Grok/);
+    const fallback = await call(client, 'Generate', args);
+    assert.match(texts(fallback), /local video worker is offline, so this went to the cloud/i);
+    assert.equal(data(fallback).profile.remote, true);
   }
-  assert.equal(f.submitted.length, 0);
-  // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video-fast', 'cloud-video-fast', 'cloud-video-fast']);
+  // With no cloud profile granted, there is nothing to fall back to and the refusal doesn't name Grok; Models lists no cloud section.
   await f.profiles(videoCatalogue(false).filter(profile => !/^cloud/.test(profile.id)), { defaults: { image: imageProfile.id }, videoAvailable: false });
   const none = await call(client, 'Generate', { kind: 'video', prompts: ['A wave'], count: 1 });
   assert.equal(texts(none), 'Local video is unavailable right now: the video worker is offline. Tell the user to try again later.');
@@ -1559,25 +1559,32 @@ test('video never goes to the cloud by itself while the local video worker is of
   // An explicit local profile stays explicit: it is not ready, so it fails clearly.
   await f.profiles(videoCatalogue(false).concat({ ...structuredClone(localFirstFrame), ready: false }));
   await failure(client, 'Generate', { profile_id: 'fl-fast', prompts: ['A wave'] });
-  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video', 'cloud-video-fast', 'cloud-video']);
+  assert.deepEqual(f.submitted.map(body => body.profileId), ['cloud-video-fast', 'cloud-video-fast', 'cloud-video-fast', 'cloud-video', 'cloud-video-fast', 'cloud-video']);
 });
 
-test('Reuse animates on the cloud only when asked while the local video worker is off', async t => {
+test('Reuse animates on the cloud while the local video worker is off, named or not', async t => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), { defaults: { image: imageProfile.id, video: 'cloud-video' }, videoAvailable: false });
   const client = await f.client();
   data(await call(client, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  // Still rendering: the chat is told the result is not finished, never "choose an output" from a completed job.
+  const pending = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
+  assert.equal(pending.isError, true);
+  assert.match(texts(pending), /^This result is still /);
+  assert.equal(f.submitted.length, 1);
   finish(f);
-  const refused = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
-  assert.equal(refused.isError, true);
-  assert.match(texts(refused), /^Local video is unavailable right now/);
-  const animation = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', request: 'animate it with Grok' });
+  // With the worker offline the animation goes to the cloud without anyone asking, and the reply says so.
+  const animation = await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', prompt: 'The heron takes flight' });
+  assert.match(texts(animation), /local video worker is offline, so this went to the cloud/i);
   // Without a tier, the fastest cloud profile that takes the image.
   assert.deepEqual(data(animation).profile, { id: 'cloud-video-fast', label: 'Cloud Video · Fast · Cloud', tier: 'fast', remote: true });
   const body = f.submitted.at(-1);
   assert.equal(body.profileId, 'cloud-video-fast');
   assert.equal(body.referenceAssets.length, 1);
   assert.ok(f.assets.has(body.referenceAssets[0].assetId), 'the image was uploaded as the starting frame');
+  // A named profile picks the video model outright, as the chat does when the user says "with grok imagine".
+  assert.equal(data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', profile_id: 'cloud-video', prompt: 'The heron takes flight' })).profile.id, 'cloud-video');
+  assert.equal(f.submitted.at(-1).profileId, 'cloud-video');
   assert.equal(data(await call(client, 'Reuse', { job_id: 'result 1', kind: 'video', tier: 'standard', request: 'on Grok' })).profile.id, 'cloud-video');
 });
 
@@ -1598,9 +1605,11 @@ test('video stays local while the worker is up, and a plain request never reache
   const turbo = data(await call(full, 'Generate', { kind: 'video', tier: 'turbo', prompts: ['A wave'], count: 1 })).profile;
   assert.equal(turbo.tier, 'fast');
   assert.equal(turbo.remote, undefined, 'an up worker never falls back');
-  data(await call(full, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 }));
+  const heron = jobId(data(await call(full, 'Generate', { kind: 'image', prompts: ['A heron'], count: 1 })));
   finish(f);
   assert.equal(data(await call(full, 'Reuse', { job_id: 'result 3', kind: 'video' })).profile.id, 'fl-fast');
+  // A named video profile that takes no starting image cannot animate, and says so.
+  await failure(full, 'Reuse', { job_id: heron, kind: 'video', profile_id: 'fixture-video' });
   await f.profiles(videoCatalogue(false), { videoAvailable: false });
   const restricted = await f.client('', Object.keys(tokens)[0]);
   const refused = await call(restricted, 'Generate', { kind: 'video', prompts: ['A wave'] });
@@ -1699,8 +1708,8 @@ test('one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(texts(excess), 'count is images per prompt, so 2 prompts × count 6 would queue 12 jobs; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.');
   const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
-  assert.match(generate.description, /For several different images \("six photos" is count 6; if unsure, separate images\), use one call with count \(1–10\) or prompts; don't make repeated calls\. When the user names a model or family \(MOSS, FLUX\.3, Krea, Qwen, Boogu\), pass it in profile_id; plain names are fine\. .*prompts \(one per different image\)/);
-  assert.equal(generate.inputSchema.properties.count.description, '1–10 per prompt; default 1.');
+  assert.match(generate.description, /One ask is one call: "six photos" is count 6; different scenes are one call with several prompts\. Never repeated calls\. When the user names a model or family \(MOSS, FLUX\.3, Krea, Qwen, Boogu\), pass it in profile_id; plain names are fine\. .*prompts \(one per different image\)/);
+  assert.equal(generate.inputSchema.properties.count.description, 'Per prompt; one ask for several images is count N on one call. 1–10, default 1.');
   assert.equal(generate.inputSchema.properties.prompts.description, '1–10.');
   assert.equal(f.submitted.length, 4);
 });
@@ -1905,7 +1914,7 @@ test('six individual photos are one Generate call: six jobs, each with its own w
   await f.profiles(guidedCatalogue());
   const client = await f.client();
   const generate = (await client.listTools()).tools.find(tool => tool.name === 'Generate');
-  assert.match(generate.description, /use one call with count \(1–10, a distinct prompt each\) or prompts; don't make repeated calls\./);
+  assert.match(generate.description, /"six photos" is count 6 \(a distinct prompt each\); different scenes are one call with several prompts\./);
   const result = data(await call(client, 'Generate', { kind: 'image', request: 'six individual photos of a plush, unique colours', count: 6 }));
   assert.equal(result.jobs.length, 6);
   assert.equal(f.writerRequests.length, 1, 'one writer call for all six');
