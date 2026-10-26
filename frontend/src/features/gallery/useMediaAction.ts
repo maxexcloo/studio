@@ -134,8 +134,14 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
       if (location.pathname.startsWith("/chat")) setStaged(draft);
       else setDraft(draft);
       prepared?.();
-      if (!["/images", "/video"].includes(location.pathname))
-        navigate(draft.sessionId ? `/chat/${draft.sessionId}` : "/images?compose=1");
+      // The gallery composer opens on the page for the draft's kind (an Animate draft lands in
+      // Videos); elsewhere a Chat result returns to its Chat.
+      const page = draft.input.kind === "video" ? "/video" : "/images";
+      const gallery = ["/images", "/video"].includes(location.pathname);
+      if (gallery || !draft.sessionId) {
+        if (location.pathname !== page) navigate(`${page}?compose=1`);
+      } else if (location.pathname !== `/chat/${draft.sessionId}`)
+        navigate(`/chat/${draft.sessionId}`);
       requestAnimationFrame(() =>
         document
           .querySelector<HTMLTextAreaElement>("[data-composer-prompt]")
