@@ -84,7 +84,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 - [ ] I2 Prompt templates from starred results, with slots (subject, setting, style), usable from the composer chips and Chat.
 - [ ] I3 Model stats per profile: timing, failure and star rates, shown in Library and used to pick defaults and flag broken models.
 - [ ] I4 Optional auto finishing on Star: queue upscale/face detail in idle GPU time.
-- [ ] I5 Installable phone app: PWA manifest, icons and share target so images shared to Studio become references.
+- [x] I5 Installable phone app: PWA manifest, icons and share target so images shared to Studio become references. Done: manifest share target posts to `/share`, which saves the reference (session-bound, cross-site refused) and opens the composer with it; 512px and maskable icons. iOS Safari has no share target; check on a real Android phone.
 
 ## Later (L)
 
