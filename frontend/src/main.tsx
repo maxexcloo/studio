@@ -24,14 +24,21 @@ const client = new QueryClient({
   }),
   defaultOptions: { queries: { staleTime: 10_000, retry: 1, refetchOnWindowFocus: true } },
 });
-createRoot(document.getElementById("root")!).render(
-  <AppearanceProvider>
-    <QueryClientProvider client={client}>
-      {/* Stream updates must not keep declarative route changes in a pending transition. */}
-      <BrowserRouter useTransitions={false}>
-        <App />
-      </BrowserRouter>
-      <Notifications position="top-right" />
-    </QueryClientProvider>
-  </AppearanceProvider>,
+// The first frame waits briefly for Geist, so text doesn't reflow when the fallback font swaps out.
+const fontReady = Promise.race([
+  document.fonts.load('1em "Geist Variable"'),
+  new Promise((resolve) => setTimeout(resolve, 500)),
+]).catch(() => {});
+void fontReady.then(() =>
+  createRoot(document.getElementById("root")!).render(
+    <AppearanceProvider>
+      <QueryClientProvider client={client}>
+        {/* Stream updates must not keep declarative route changes in a pending transition. */}
+        <BrowserRouter useTransitions={false}>
+          <App />
+        </BrowserRouter>
+        <Notifications position="top-right" />
+      </QueryClientProvider>
+    </AppearanceProvider>,
+  ),
 );
