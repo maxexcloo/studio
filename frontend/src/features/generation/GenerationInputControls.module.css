@@ -18,9 +18,10 @@
   padding-inline: 0;
 }
 
+/* Sized so Profile shares its row on phones and the desktop rail fits one row. */
 .label {
   display: block;
-  max-width: 14rem;
+  max-width: 11rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -45,7 +46,7 @@
   }
 
   .label {
-    max-width: 10rem;
+    max-width: 8rem;
   }
 }
 
