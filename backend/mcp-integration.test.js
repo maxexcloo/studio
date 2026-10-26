@@ -13,9 +13,46 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./mcp-media.js";
 import { adminToolNames } from "./mcp-admin.js";
+import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
+import { RuntimeController } from "./runtime/controller.ts";
+import { KubernetesEngine } from "./runtime/kubernetes.ts";
 
 const mediaKey = "fixture-media-credential";
 const controlKey = "fixture-control-credential";
+/** Studio's runtime over a fake cluster: two GPUs; `running` start with a ready pod. */
+function fixtureRuntime(running = ["comfyui-image", "radiance-mxfp4"]) {
+  const catalogue = [
+    ["comfyui-image", "image", 1],
+    ["comfyui-video", "video", 1],
+    ["comfyui-video-tp2", "video", 2],
+    ["radiance-mxfp4", "text", 1],
+    ["radiance-flashnext", "text", 2],
+    ["gemma-31b", "text", 1],
+  ];
+  const kube = fakeKubernetes(
+    catalogue.map(([id]) => ({
+      namespace: "gpu",
+      name: id,
+      replicas: running.includes(id) ? 1 : 0,
+    })),
+  );
+  const runtime = new RuntimeController({
+    engine: new KubernetesEngine(kube.request),
+    workloads: catalogue.map(([id, kind, gpus]) => ({
+      id,
+      label: id,
+      kind,
+      namespace: "gpu",
+      deployment: id,
+      pool: "gpu",
+      gpus,
+      url: `http://${id}.invalid`,
+    })),
+    pools: { gpu: 2 },
+    sleep: async () => kube.tick(),
+  });
+  return { kube, runtime };
+}
 const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#537c90" } })
   .png()
   .toBuffer();
@@ -92,12 +129,7 @@ async function fixture(
     resolveSignedResult,
     gatewayAdminTools,
     claimHandover,
-    controlReply = () => ({
-      runtimes: {},
-      signature: "fixture-preview",
-      id: "fixture-operation",
-      state: "running",
-    }),
+    control = fixtureRuntime(),
     writerReply,
     taste,
   } = {},
@@ -106,7 +138,6 @@ async function fixture(
   const app = express();
   app.use(express.json({ limit: "30mb" }));
   const requests = [];
-  const controlRequests = [];
   const writerRequests = [];
   const jobs = new Map();
   const assets = new Map();
@@ -268,6 +299,7 @@ async function fixture(
     baseUrl: () => base,
     dataDir,
     environment,
+    runtime: control.runtime,
     accountMode,
     authenticateAccountToken,
     // Most tests check the queued response; inline waits have their own tests.
@@ -286,16 +318,6 @@ async function fixture(
         const body = JSON.parse(init.body);
         writerRequests.push({ url: String(url), authorization: init.headers.Authorization, body });
         return writerReply(body, writerRequests.length);
-      }
-      if (String(url).startsWith("http://fixture-control.invalid")) {
-        controlRequests.push({
-          url: String(url),
-          method: init?.method || "GET",
-          body: init?.body ? JSON.parse(init.body) : undefined,
-        });
-        return Response.json(
-          controlReply(new URL(url).pathname, init?.body ? JSON.parse(init.body) : undefined),
-        );
       }
       const response = await fetch(url, init);
       if (dropAck && new URL(url).pathname === "/api/generate") {
@@ -333,7 +355,8 @@ async function fixture(
     assets,
     base,
     mcp,
-    controlRequests,
+    kube: control.kube,
+    runtime: control.runtime,
     writerRequests,
     dataDir,
     downloads,
@@ -704,11 +727,7 @@ function localLink(f, publicLink) {
   return f.base + url.pathname;
 }
 
-const adminEnvironment = {
-  CONTROL_API_KEY: "fixture-private-control",
-  CONTROL_MCP_API_KEY: controlKey,
-  CONTROL_URL: "http://fixture-control.invalid",
-};
+const adminEnvironment = { CONTROL_MCP_API_KEY: controlKey };
 
 test("tool lists, schemas and instructions are identical for every caller and call, so prompt prefixes cache", async (t) => {
   const f = await fixture(t);
@@ -843,91 +862,65 @@ test("media and administrator credentials discover only their own friendly tools
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
   assert.equal(f.submitted.length, 0);
-  await call(admin, "GPUStatus");
-  assert.equal(f.controlRequests.length, 1);
-  await failure(admin, "Apply", { allocation: [], signature: "fixture-preview" });
-  assert.equal(f.controlRequests.length, 1);
-  await call(admin, "Apply", { allocation: [], signature: "fixture-preview", confirmed: true });
-  assert.deepEqual(f.controlRequests.at(-1).body, {
-    allocation: [],
-    replace: true,
-    signature: "fixture-preview",
-  });
+  const status = data(await call(admin, "GPUStatus"));
+  assert.deepEqual(status.pools, [{ id: "gpu", capacity: 2, used: 2 }]);
+  const { signature } = data(await call(admin, "Preview", { workloads: [] }));
+  await failure(admin, "Apply", { workloads: [], signature });
+  assert.deepEqual(f.kube.log, []);
+  const operation = data(await call(admin, "Apply", { workloads: [], signature, confirmed: true }));
+  assert.equal(operation.requestedBy, "control-mcp");
+  await f.runtime.settled;
+  assert.equal(data(await call(admin, "Operation", { job_id: operation.id })).status, "completed");
+  assert.deepEqual(
+    f.kube.log.filter((entry) => entry.startsWith("scale")),
+    ["scale gpu/comfyui-image 0", "scale gpu/radiance-mxfp4 0"],
+  );
 });
 
-test("control Mode previews preset boards and Restart restarts only a running workload as it is", async (t) => {
-  const runtimes = {
-    text: { running: true, profile: "radiance-mxfp4", devices: ["1"], health: "healthy" },
-    image: { running: false, profile: "", devices: [], health: "stopped" },
-  };
-  const catalogue = {
-    rules: {
-      workloads: {
-        "comfyui-image": { kind: "image", placements: ["0", "1"] },
-        "radiance-mxfp4": { kind: "text", placements: ["0", "1"] },
-        "radiance-flashnext": { kind: "text", placements: ["0,1"] },
-        "gemma-31b": { kind: "text", placements: ["0", "1", "0,1"] },
-      },
-    },
-  };
-  const f = await fixture(t, {
-    environment: adminEnvironment,
-    controlReply: (route, body) =>
-      route === "/api/status"
-        ? { runtimes }
-        : route === "/api/catalogue"
-          ? catalogue
-          : route === "/api/board/plan"
-            ? { signature: `plan:${JSON.stringify(body.allocation)}`, stop: [], start: [] }
-            : { id: "fixture-operation", state: "running" },
-  });
+test("control Mode previews preset placements and Restart restarts only a running workload as it is", async (t) => {
+  const control = fixtureRuntime(["radiance-mxfp4"]);
+  const f = await fixture(t, { environment: adminEnvironment, control });
   const admin = await f.client("administrator", controlKey);
   const tools = (await admin.listTools()).tools;
   assert.equal(tools.find((tool) => tool.name === "Restart").annotations.destructiveHint, true);
   assert.equal(tools.find((tool) => tool.name === "Mode").annotations.readOnlyHint, true);
-  const board = async (args) => data(await call(admin, "Mode", args));
+  const mode = async (args) => data(await call(admin, "Mode", args));
   // Modes only preview; applying stays a separate, approved Apply.
-  assert.deepEqual((await board({ mode: "image_video" })).allocation, [
-    { profile: "comfyui-image", devices: ["0"] },
-    { profile: "comfyui-video", devices: ["1"] },
+  assert.deepEqual((await mode({ mode: "image_video" })).target, [
+    "comfyui-image",
+    "comfyui-video",
   ]);
-  assert.deepEqual((await board({ mode: "video" })).allocation, [
-    { profile: "comfyui-video", devices: ["0", "1"] },
-  ]);
-  const imageText = await board({ mode: "image_text" });
+  const video = await mode({ mode: "video" });
+  assert.deepEqual(video.target, ["comfyui-video-tp2"]);
+  assert.deepEqual(video.stop, ["radiance-mxfp4"]);
   assert.deepEqual(
-    imageText.allocation,
-    [
-      { profile: "radiance-mxfp4", devices: ["0"] },
-      { profile: "comfyui-image", devices: ["1"] },
-    ],
+    (await mode({ mode: "image_text" })).target,
+    ["radiance-mxfp4", "comfyui-image"],
     "keeps the running text model",
   );
-  assert.equal(imageText.signature, `plan:${JSON.stringify(imageText.allocation)}`);
-  assert.deepEqual((await board({ mode: "image_text", text_profile: "gemma-31b" })).allocation[0], {
-    profile: "gemma-31b",
-    devices: ["0"],
-  });
-  runtimes.text.profile = "radiance-flashnext";
+  assert.deepEqual((await mode({ mode: "image_text", text_profile: "gemma-31b" })).target, [
+    "gemma-31b",
+    "comfyui-image",
+  ]);
+  const flashnext = control.kube.deployments.get("gpu/radiance-flashnext");
+  const mxfp4 = control.kube.deployments.get("gpu/radiance-mxfp4");
+  [flashnext.replicas, mxfp4.replicas, mxfp4.pods] = [1, 0, []];
+  control.kube.tick();
   const ambiguous = await call(admin, "Mode", { mode: "image_text" });
   assert.equal(ambiguous.isError, true);
   assert.match(ambiguous.content[0].text, /Name text_profile.*radiance-mxfp4, gemma-31b/);
-  assert.equal(
-    f.controlRequests.some((request) =>
-      ["/api/board", "/api/restart"].includes(new URL(request.url).pathname),
-    ),
-    false,
-  );
-  await call(admin, "Restart", { runtime: "text" });
-  assert.deepEqual(f.controlRequests.at(-1).body, {
-    runtime: "text",
-    profile: "radiance-flashnext",
-    devices: ["1"],
-  });
-  const stopped = await call(admin, "Restart", { runtime: "image" });
+  assert.deepEqual(control.kube.log, []);
+  const restart = data(await call(admin, "Restart", { workload: "radiance-flashnext" }));
+  assert.equal(restart.type, "restart");
+  await control.runtime.settled;
+  assert.deepEqual(control.kube.log, [
+    "scale gpu/radiance-flashnext 0",
+    "gone gpu/radiance-flashnext",
+    "scale gpu/radiance-flashnext 1",
+  ]);
+  const stopped = await call(admin, "Restart", { workload: "comfyui-image" });
   assert.equal(stopped.isError, true);
-  assert.match(stopped.content[0].text, /image is not running/);
-  assert.equal(new URL(f.controlRequests.at(-1).url).pathname, "/api/status");
+  assert.match(stopped.content[0].text, /comfyui-image is not running/);
 });
 
 test("Models uses only this studio, filters readiness and kind, and returns detailed capabilities on request", async (t) => {

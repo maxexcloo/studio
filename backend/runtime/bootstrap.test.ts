@@ -1,88 +1,96 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import { loadRuntime } from "./bootstrap.ts";
 
-function configuration(context: { after(fn: () => void): void }, overrides = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "studio-runtime-"));
-  context.after(() => rmSync(directory, { recursive: true, force: true }));
-  writeFileSync(
-    join(directory, "workloads.json"),
-    JSON.stringify({
-      image: {
-        kind: "image",
-        placements: ["0"],
-        studio: { container: "image-worker", placement: "0", url: "http://image:8188" },
-        ...overrides,
-      },
-    }),
-  );
-  return { STUDIO_CONFIG_DIR: directory, STUDIO_DOCKER_URL: "http://engine:2375" };
-}
-
-test("mounted runtime configuration preserves ids and observes by default", async (context) => {
-  const environment = configuration(context);
-  const calls: string[] = [];
-  const runtime = loadRuntime(environment, (async (url) => {
-    calls.push(String(url));
-    return new Response(
-      JSON.stringify(
-        String(url).includes("/containers/") ? { State: { Running: true } } : { devices: [] },
-      ),
-    );
-  }) as typeof fetch)!;
-  assert.equal(runtime.controller.automaticLifecycle, false);
-  (await runtime.controller.acquire("image")).release();
-  assert.deepEqual(calls, [
-    "http://engine:2375/containers/image-worker/json",
-    "http://image:8188/system_stats",
-  ]);
+const image = {
+  kind: "image",
+  namespace: "comfyui",
+  deployment: "comfyui",
+  pool: "gpu",
+  gpus: 1,
+  url: "http://comfyui.comfyui.svc:8188",
+};
+const environment = (workloads: Record<string, unknown> = { image }, extra = {}) => ({
+  STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 2 }),
+  STUDIO_KUBERNETES_WORKLOADS: JSON.stringify(workloads),
+  STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",
+  ...extra,
 });
 
-test("lifecycle control requires both ownership and traffic acknowledgements", (context) => {
-  const environment = { ...configuration(context), STUDIO_RUNTIME_AUTOMATIC: "1" };
-  assert.throws(() => loadRuntime(environment), /STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED/);
-  assert.equal(
-    loadRuntime({
-      ...environment,
-      STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED: "1",
-      STUDIO_TEXT_ADMISSION_ACKNOWLEDGED: "1",
-    })!.controller.automaticLifecycle,
-    true,
-  );
-});
-
-test("container Running alone does not admit work when worker health fails", async (context) => {
-  const runtime = loadRuntime(configuration(context), (async (url) =>
-    String(url).includes("/containers/")
-      ? new Response(JSON.stringify({ State: { Running: true } }))
-      : new Response("starting", { status: 503 })) as typeof fetch)!;
-  await assert.rejects(runtime.controller.acquire("image"), /not responding/);
-  assert.equal(runtime.controller.status()[0].acceptedOperations, 0);
-});
-
-test("health connection timeout leaves work waiting without accepting it", async (context) => {
-  const runtime = loadRuntime(configuration(context), (async (url, options) => {
-    if (String(url).includes("/containers/"))
-      return new Response(JSON.stringify({ State: { Running: true } }));
-    assert.ok(options?.signal);
-    throw new DOMException("Timed out", "TimeoutError");
-  }) as typeof fetch)!;
-  await assert.rejects(runtime.controller.acquire("image"), /not responding/);
-});
-
-test("configured gateway origin cannot be used as a direct worker", (context) => {
+test("without workloads there is no runtime; malformed configuration fails with the setting's name", () => {
+  assert.equal(loadRuntime({}), undefined);
   assert.throws(
-    () => loadRuntime({ ...configuration(context), BIFROST_URL: "http://image:8188/gateway" }),
-    /directly/,
+    () => loadRuntime({ STUDIO_KUBERNETES_WORKLOADS: "{}" }),
+    /STUDIO_KUBERNETES_GPUS is required/,
+  );
+  assert.throws(
+    () => loadRuntime({ ...environment(), STUDIO_KUBERNETES_WORKLOADS: "{" }),
+    /STUDIO_KUBERNETES_WORKLOADS is not valid JSON/,
+  );
+  for (const [change, message] of [
+    [{ kind: "audio" }, /image needs a kind of image, video or text/],
+    [{ deployment: "" }, /image needs deployment/],
+    [{ pool: "gaming" }, /image names pool gaming, which has no GPUs/],
+    [{ gpus: 3 }, /image needs gpus between 1 and the gpu pool's 2/],
+    [{ url: "http://user:secret@comfyui:8188" }, /image needs a direct worker URL/],
+    [{ apiKeyEnv: "STUDIO_FIXTURE_MISSING_KEY" }, /STUDIO_FIXTURE_MISSING_KEY is required/],
+  ] as const)
+    assert.throws(() => loadRuntime(environment({ image: { ...image, ...change } })), message);
+  assert.throws(
+    () =>
+      loadRuntime(
+        environment(
+          { text: { ...image, kind: "text", url: "http://bifrost:8080" } },
+          { BIFROST_URL: "http://bifrost:8080" },
+        ),
+      ),
+    /must point directly to its worker, not Bifrost/,
   );
 });
 
-test("unsupported fixed placement fails before contacting Docker", (context) => {
-  const environment = configuration(context, {
-    studio: { container: "image", placement: "1", url: "http://image:8188" },
+test("in-cluster access needs the mounted service account", () => {
+  const { STUDIO_KUBERNETES_URL: _url, ...inCluster } = environment();
+  assert.throws(
+    () => loadRuntime({ ...inCluster, KUBERNETES_SERVICE_HOST: "10.0.0.1" }),
+    /needs Studio's in-cluster service account token \(automountServiceAccountToken\) or STUDIO_KUBERNETES_URL/,
+  );
+});
+
+test("automatic control is off by default and needs the text admission acknowledgement", () => {
+  assert.equal(loadRuntime(environment())!.controller.automaticLifecycle, false);
+  assert.throws(
+    () => loadRuntime(environment(undefined, { STUDIO_RUNTIME_AUTOMATIC: "1" })),
+    /STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1/,
+  );
+});
+
+test("runtime changes are recorded in the data folder and outlive the process", async (context) => {
+  const dataDir = mkdtempSync(join(tmpdir(), "studio-runtime-history-"));
+  context.after(() => {
+    closeRuntimeDatabase(dataDir);
+    rmSync(dataDir, { recursive: true, force: true });
   });
-  assert.throws(() => loadRuntime(environment), /unsupported/);
+  const kube = fakeKubernetes([{ namespace: "comfyui", name: "comfyui", replicas: 1 }], {
+    tickOnRead: true,
+  });
+  const first = loadRuntime(environment(), { dataDir, request: kube.request })!.controller;
+  const operation = await first.restart("image", "account:admin");
+  await first.settled;
+  const later = loadRuntime(environment(), { dataDir, request: kube.request })!.controller;
+  const recorded = later.operation(operation.id);
+  assert.equal(recorded.status, "completed");
+  assert.equal(recorded.requestedBy, "account:admin");
+  assert.deepEqual(recorded.before, ["image"]);
+  assert.deepEqual(recorded.after, ["image"]);
+  assert.ok(recorded.steps.length >= 2);
+  assert.deepEqual(kube.log, [
+    "scale comfyui/comfyui 0",
+    "gone comfyui/comfyui",
+    "scale comfyui/comfyui 1",
+  ]);
 });
