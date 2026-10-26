@@ -35,6 +35,8 @@ const time = (value?: string) => {
 };
 
 type Row = [label: string, value: string];
+// Holds the Size row's place while the size loads, so the table does not grow afterwards.
+const pendingValue = "…";
 interface Details {
   profile: string;
   loras: { name: string; strength: string }[];
@@ -51,7 +53,7 @@ function generationDetails(
     profiles,
     loraTitle,
     size = 0,
-  }: { profiles: Profile[]; loraTitle: (file: string) => string; size?: number },
+  }: { profiles: Profile[]; loraTitle: (file: string) => string; size?: number | null },
 ): Details {
   const settings = item.settings || {};
   const rows = (entries: [string, unknown][]): Row[] =>
@@ -93,7 +95,7 @@ function generationDetails(
       ["Frames", video ? settings.frames : ""],
       ["FPS", video ? settings.fps : ""],
       ["File", item.outputName || item.filename],
-      ["Size", bytes(size)],
+      ["Size", size === null ? pendingValue : bytes(size)],
       ["Time", time(item.createdAt)],
     ]),
     timing: rows([
@@ -107,7 +109,7 @@ function generationDetails(
   };
 }
 
-function useGenerationDetails(item: MediaItem, size?: number) {
+function useGenerationDetails(item: MediaItem, size?: number | null) {
   const { profiles } = useGenerationActions();
   const info = useQuery(loraInfoQuery);
   return generationDetails(item, {
@@ -153,7 +155,7 @@ function useMediaSize(url: string) {
       if (/^(data|blob):/i.test(url)) return (await response.blob()).size;
       return response.status === 200 ? Number(response.headers.get("content-length")) || 0 : 0;
     },
-  }).data;
+  });
 }
 
 function Section({ title, rows }: { title: string; rows: Row[] }) {
@@ -174,7 +176,12 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
               <Table.Th w={96} bg="transparent" fw={400} c="dimmed">
                 {label}
               </Table.Th>
-              <Table.Td style={{ overflowWrap: "anywhere" }}>{value}</Table.Td>
+              <Table.Td
+                c={value === pendingValue ? "dimmed" : undefined}
+                style={{ overflowWrap: "anywhere" }}
+              >
+                {value}
+              </Table.Td>
             </Table.Tr>
           ))}
         </Table.Tbody>
@@ -185,8 +192,9 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 
 /** Details › Prompt, Model, References, Settings, Output and Timing for one result. */
 export function MediaDetails({ item }: { item: MediaItem }) {
-  const size = useMediaSize(item.status === "done" ? mediaSource(item).url : "");
-  const details = useGenerationDetails(item, size);
+  const url = item.status === "done" ? mediaSource(item).url : "";
+  const size = useMediaSize(url);
+  const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
   const { profiles } = useGenerationActions();
   const profile = profiles.find((candidate) => candidate.id === item.settings?.profileId);
   return (
