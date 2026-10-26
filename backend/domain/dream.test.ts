@@ -224,7 +224,11 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   });
   registerRewriteRoutes(app as never, {
     store,
-    queue: { tick: async () => undefined } as unknown as GenerationQueue,
+    queue: {
+      tick: async () => undefined,
+      cancel: async (ownerId: string, jobId: string) =>
+        store.save({ ...store.job(ownerId, jobId)!, status: "cancelled" }),
+    } as unknown as GenerationQueue,
   });
   const server = app.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -237,6 +241,16 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
       (await admission({ prompt: `p${index}` }, { userId: "alice", role: "user" })).status,
       200,
     );
+  // Cancel Pending and Cancel All act on the person's own work and leave Dream alone.
+  for (const route of ["cancel-pending", "cancel-all"])
+    assert.equal((await fetch(`${base}/api/queue/${route}`, { method: "POST" })).status, 200);
+  assert.equal(store.job("alice", next.id)?.status, "running");
+  assert.ok(
+    store
+      .jobs("alice")
+      .filter((job) => job.priority !== queuePriority.dream)
+      .every((job) => job.status === "cancelled"),
+  );
 });
 
 test("Dream stops at the unseen buffer and today's cap per kind, and animates kept or starred images", async (t) => {
