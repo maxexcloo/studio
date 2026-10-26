@@ -470,6 +470,16 @@ test("describe reads an image with a vision model, writes from a hint without on
   );
 });
 
+test("caption sends the image and returns one short line", async () => {
+  const seen = fakeGateway(() => json(`  A red barn\nat noon. ${"x".repeat(400)}`));
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const reply = await engine.caption({ image: { mime: "image/jpeg", data: "AAAA" } });
+  assert.equal(reply.model, "ai/text-quick");
+  assert.equal(reply.text.length, 300);
+  assert.match(reply.text, /^A red barn at noon\. x/);
+  assert.equal(seen.calls[0].body.messages[1].content[1].type, "image_url");
+});
+
 test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown NSFW", async () => {
   assert.equal(validDraftGuide({ rules: ["x"] }), null);
   assert.deepEqual(

@@ -342,7 +342,7 @@ function pageStart(entry, cursor) {
 
 const searchTexts = new WeakMap();
 
-/** What a gallery search looks through: the prompts, the model and LoRAs, and the file's name. */
+/** What a gallery search looks through: the prompts, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
 function gallerySearchText(item) {
   if (!item || typeof item !== "object") return "";
   let text = searchTexts.get(item);
@@ -354,6 +354,7 @@ function gallerySearchText(item) {
     text = [
       item.prompt,
       item.negative,
+      item.caption?.text,
       item.model,
       settings.modelName,
       settings.profileId,

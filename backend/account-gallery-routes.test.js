@@ -310,3 +310,27 @@ test("gallery items carry their Chat, which filters pages and lists as a facet",
     jobChats.clear();
   }
 });
+
+test("search matches an image's caption as well as its prompt, within the account's own records", () => {
+  const caption = (text) => ({ text, model: "vision-model", at: "2026-10-26T09:00:00.000Z" });
+  galleryStore.setGallery([
+    { ...item("account-a", "job-fox"), caption: caption("A red fox in deep snow at dusk.") },
+    { ...item("account-a", "job-plain"), prompt: "red fox portrait" },
+    { ...item("account-b", "job-other"), caption: caption("A red fox in the snow.") },
+  ]);
+  const ids = (q) =>
+    call(routes["/api/gallery"], {
+      studioAccount: {
+        userId: "account-a",
+        role: "user",
+        authenticated: true,
+        features: { gallery: true },
+      },
+      query: { q },
+    })
+      .items.map((record) => record.jobId)
+      .sort();
+  assert.deepEqual(ids("Fox SNOW"), ["job-fox"]);
+  assert.deepEqual(ids("red fox"), ["job-fox", "job-plain"]);
+  assert.deepEqual(ids("dusk private"), ["job-fox"], "words may come from caption and prompt");
+});

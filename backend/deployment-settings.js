@@ -41,6 +41,11 @@ export const catalogueFlags = [
     "While the local video worker is off, MCP video runs on a granted cloud profile instead of being refused.",
     { defaultOn: false },
   ),
+  flag(
+    "STUDIO_GALLERY_CAPTIONS",
+    "Gallery Captions",
+    "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",
+  ),
 ];
 
 const flagOn = (item) =>

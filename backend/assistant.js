@@ -29,6 +29,7 @@ export const assistantSpicyModelKey = "STUDIO_ASSISTANT_SPICY_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
+const captionCharacters = 300;
 const maxCandidates = 20;
 const maxExamples = 6;
 const visionTtlMs = 10 * 60_000;
@@ -906,6 +907,30 @@ export function createAssistant(
   }
 
   /**
+   * A short plain description of what an image shows, for gallery search (domain/captions.ts).
+   * The caller checks the model reads images; the reply is cut to `captionCharacters`.
+   */
+  async function caption({ image, signal } = {}) {
+    const model = settings().model;
+    const reply = await chat({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: `Say what the attached image shows in one or two plain sentences: subjects, setting, style and colours. No preamble, under ${captionCharacters} characters.`,
+        },
+        { role: "user", content: userContent("Describe this image.", [image], true) },
+      ],
+      temperature: 0.2,
+      maxTokens: 160,
+      signal,
+    });
+    const text = one(reply.text, captionCharacters);
+    if (!text) throw new AssistantError("unusable reply");
+    return { text, model };
+  }
+
+  /**
    * A drafted prompting guide in the prompting.json pack schema, from a source page's text and the
    * nearest existing pack. Throws when the reply isn't a usable pack; callers mark it AI-drafted.
    */
@@ -1012,6 +1037,7 @@ export function createAssistant(
     negative,
     matchLoras,
     describe,
+    caption,
     draftGuide,
     draftProfile,
   };
