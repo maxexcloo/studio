@@ -154,7 +154,7 @@ primary component reference and verify APIs against the installed version.
 
 - Dream is a full-screen card deck of background results. Swipe left discards,
   right keeps, up keeps and queues variations; Star and Animate are buttons.
-  Dream results stay in their own pool until kept; discards are retained and
+  Dream results stay in their own pool until kept; every discard is kept and
   can be shown with a filter.
 - Dream generates images, videos and (with the NSFW grant) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
