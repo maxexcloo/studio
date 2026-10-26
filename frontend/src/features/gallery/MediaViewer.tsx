@@ -361,6 +361,7 @@ export function MediaViewer({
             </div>
             <MediaViewerDock
               item={displayed}
+              neighbour={canNavigate ? viewable[(currentIndex + 1) % viewable.length] : undefined}
               family={family}
               choose={(next) => {
                 setCompare(false);
