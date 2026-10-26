@@ -63,6 +63,7 @@ function Limit({
       value={draft}
       min={min}
       max={max}
+      size="sm"
       allowDecimal={false}
       clampBehavior="strict"
       disabled={disabled}
@@ -161,7 +162,8 @@ export function DreamSettingsButton({ dream }: { dream: Dream }) {
           opened={opened}
           onClose={() => setOpened(false)}
           position="bottom"
-          size="auto"
+          radius="lg"
+          styles={{ content: { height: "auto", maxHeight: "90dvh" } }}
           title="Dream Settings"
           closeButtonProps={{ "aria-label": "Close Dream Settings" }}
         >
