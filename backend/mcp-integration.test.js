@@ -2943,6 +2943,8 @@ test("the Generate wait ends promptly when the client cancels, without cancellin
   await new Promise((resolve) => once(() => lookups() >= 1, resolve));
   controller.abort();
   await assert.rejects(waiting);
+  // The cancellation reaches the server as its own request; let it land before measuring.
+  await new Promise((resolve) => setTimeout(resolve, 500));
   const before = lookups();
   await new Promise((resolve) => setTimeout(resolve, 4500));
   assert.equal(lookups() - before, 0, "a cancelled wait stops polling");
