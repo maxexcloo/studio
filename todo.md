@@ -114,6 +114,8 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 - Phone Chat with no Chat selected gives no cue that the list lives behind the status action. Default: the empty state says where the Chats are and offers New Chat.
 - The Chat model select reads "Text" with a wide gap. Default: show the actual text model label from chat status.
 - Library Imports and Inspiration are hidden in dev because `features.presets` is off. Default: leave the flag; dev data only.
+- Phone viewer action buttons went from 42px to 40px so the split Regenerate fits a 375px phone. Default: keep 40px.
+- Duplicate profile pairs now show an id suffix ("· comfyui" / "· fp8"); most look like legacy duplicates with the same settings. Default: keep the suffix until you prune runtime definitions.
 - Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
 - Taste profile: a bulk star of up to 500 items adds a signal each and can push out older history. Default: cap each bulk call at 20 signals.
 - Taste profile: does Exact Repeat count as an iteration? Default: yes, repeating a result signals interest.
