@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { closeReferences, create, fixtures, image, openNav, profiles, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  openNav,
+  profiles,
+  serveProfiles,
+  stamp,
+} from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 test("Multiple owned references preserve order, role identity and capacity through generation and Chat", async ({
@@ -13,9 +22,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   for (const id of ["first", "second", "third"])
     state.gallery.push({
       id,
@@ -116,9 +123,7 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   state.gallery.push({
     id: "kept",
     jobId: "kept-job",

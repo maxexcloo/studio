@@ -1,6 +1,14 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { closeReferences, create, fixtures, image, profiles, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  stamp,
+} from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
 const workflow = JSON.parse(
@@ -27,9 +35,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
       { id: "end", label: "End", role: "end" },
     ],
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile] } }),
-  );
+  await serveProfiles(page, [profile]);
   state.gallery.push({
     id: "shared",
     jobId: "saved",

@@ -8,6 +8,7 @@ import {
   profiles,
   stamp,
   withExpertSettings,
+  serveProfiles,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
@@ -38,9 +39,7 @@ test("Changing the second encoder and weight type preserves the first encoder in
     },
     options: { ...profiles[0].options, weightDtypes: ["default", "fp8_e4m3fn"] },
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An encoder comparison");
   await withExpertSettings(page, async () => {
@@ -73,9 +72,7 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     capabilities: { ...profiles[0].capabilities, inpaint: false },
     defaults: { ...profiles[0].defaults, referenceRole: "edit" },
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   state.gallery.push({
     id: "portrait",
     jobId: "old-portrait",
@@ -159,9 +156,7 @@ test("A saved End-only preset restores its explicit slot without creating a Star
       { id: "end", role: "end", label: "End", required: false },
     ],
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles: [profile], features: { library: true, presets: true } } }),
-  );
+  await serveProfiles(page, [profile], { library: true, presets: true });
   state.gallery.push({
     id: "ending",
     jobId: "ending-source",
@@ -492,11 +487,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
     capabilities: { ...profiles[1].capabilities, duration: true },
     constraints: { duration: { min: 1, max: 10, step: 1 } },
   };
-  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({
-      json: { profiles: [still, motion], features: { library: true, presets: true } },
-    }),
-  );
+  await serveProfiles(page, [still, motion], { library: true, presets: true });
   state.gallery.push({
     id: "source",
     jobId: "source-job",
@@ -562,4 +553,164 @@ test("The chip composer offers supported sizes and settings, follows the output 
     ).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Frames", exact: true })).toHaveCount(0);
   });
+});
+
+test("References, masking, expert controls and runtime presets remain editable", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
+  const upload = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose References", exact: true }).click();
+  await page.getByText("Uploads", { exact: true }).click();
+  await page.getByRole("button", { name: "Upload Reference", exact: true }).click();
+  await (
+    await upload
+  ).setFiles({ name: "reference.png", mimeType: "image/png", buffer: Buffer.from("fixture") });
+  await closeReferences(page);
+  await expect(page.getByRole("region", { name: "References", exact: true })).toBeHidden();
+  await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Paint Mask", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Paint the Area to Refine" })).toBeVisible();
+  await page.locator("canvas").click({ position: { x: 40, y: 40 } });
+  await page.getByRole("button", { name: "Use Mask", exact: true }).click();
+  await page.getByRole("button", { name: "Edit Mask", exact: true }).click();
+  const canvas = page.locator("canvas");
+  const painted = () =>
+    canvas.evaluate((canvas: HTMLCanvasElement) => {
+      const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let total = 0;
+      for (let index = 3; index < pixels.length; index += 4) if (pixels[index]) total++;
+      return total;
+    });
+  await expect.poll(painted).toBeGreaterThan(0);
+  const beforeErase = await painted();
+  await page.getByText("Erase", { exact: true }).click();
+  await canvas.click({ position: { x: 40, y: 40 } });
+  await expect.poll(painted).toBeLessThan(beforeErase);
+  const erased = await painted();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(painted).toBe(beforeErase);
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect.poll(painted).toBe(erased);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Use Mask", exact: true }).click();
+
+  await withExpertSettings(page, async () => {
+    await page.getByRole("textbox", { name: "Seed", exact: true }).fill("42");
+    await page.getByRole("checkbox", { name: "Allow Fallback to Another Worker" }).check();
+  });
+  await page.getByRole("button", { name: "Presets", exact: true }).click();
+  await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Bird Study");
+  await page.getByRole("button", { name: "Save Preset", exact: true }).click();
+  await expect.poll(() => state.presets.length).toBe(1);
+  expect(state.presets[0].input.seed).toBe("42");
+  expect(state.presets[0].input.inpaint.mask).toMatch(/^data:image\/png/);
+  expect(state.presets[0].input.inpaint.feather).toBe(0.4);
+  expect(state.presets[0].input.allowFallback).toBe(true);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An updated amber bird");
+  await page.getByRole("textbox", { name: "Preset Name", exact: true }).fill("Updated Bird Study");
+  await page.getByRole("button", { name: "Update Preset", exact: true }).click();
+  await expect.poll(() => state.presets[0].title).toBe("Updated Bird Study");
+  expect(state.presets[0].input.prompt).toBe("An updated amber bird");
+  expect(state.presets).toHaveLength(1);
+});
+
+test("Generation controls preserve the draft and return keyboard focus with reduced motion", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Keep this direction");
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(prompt).toHaveValue("Keep this direction");
+  await prompt.fill("Keep this direction, in soft daylight");
+  await prompt.press("Escape");
+  if (testInfo.project.use.isMobile)
+    await expect(
+      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
+    ).toBeHidden();
+  const controls = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(controls).toBeFocused();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Keep this direction, in soft daylight",
+  );
+  await controls.press("Enter");
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Keep this direction, in soft daylight",
+  );
+});
+
+test("Generation size presets and custom dimensions preserve profile constraints", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const profile = {
+    ...profiles[0],
+    aspectPresets: [
+      { label: "Square", w: 1024, h: 1024 },
+      { label: "Landscape", w: 1536, h: 1024 },
+    ],
+    constraints: {
+      width: { min: 512, max: 2048, step: 64 },
+      height: { min: 512, max: 2048, step: 64 },
+    },
+  };
+  await serveProfiles(page, [profile]);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
+  await page.getByRole("button", { name: "Aspect", exact: true }).click();
+  await page.getByRole("button", { name: "Landscape 1536 × 1024", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1536");
+  await page.getByRole("textbox", { name: "Width", exact: true }).fill("1600");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.width).toBe(1600);
+  expect(state.jobs[0].input.height).toBe(1024);
+});
+
+test("Images and Videos retain independent prompts and expert settings", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await create(page);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Image draft");
+  const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
+  const seed = page.getByRole("textbox", { name: "Seed", exact: true });
+  await withExpertSettings(page, async () => {
+    await negative.fill("Image exclusions");
+    await seed.fill("777");
+  });
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
+    ).toBeHidden();
+  }
+  await page.getByRole("link", { name: "Videos", exact: true }).first().click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Video draft");
+  await page.getByRole("link", { name: "Images", exact: true }).first().click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Image draft",
+  );
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await withExpertSettings(page, async () => {
+    await expect(negative).toHaveValue("Image exclusions");
+    await expect(seed).toHaveValue("777");
+  });
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
+    ).toBeHidden();
+  }
+  await page.getByRole("link", { name: "Videos", exact: true }).first().click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "Video draft",
+  );
 });
