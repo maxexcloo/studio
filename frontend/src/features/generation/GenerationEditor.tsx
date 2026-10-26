@@ -22,6 +22,7 @@ import { chipProps } from "./chip";
 import { LoraPicker, useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails } from "./payload";
 import { usePromptAssistant } from "./PromptAssistant";
+import { usePromptIdeas } from "./PromptIdeas";
 import { PromptHistory } from "./PromptHistory";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
@@ -114,6 +115,7 @@ export function GenerationEditor({
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
+  ideas: offerIdeas = false,
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -138,6 +140,8 @@ export function GenerationEditor({
   focusPrompt?: boolean;
   /** Fills a phone Drawer that owns scrolling, keeping the actions at its safe bottom. */
   fill?: boolean;
+  /** Offers taste-led prompt ideas while the prompt is empty and focused. */
+  ideas?: boolean;
 }) {
   const { models, profiles } = useGeneration();
   const [maskOpen, setMaskOpen] = useState(false);
@@ -160,6 +164,13 @@ export function GenerationEditor({
     profile,
     references,
     onChange,
+  });
+  const ideas = usePromptIdeas({
+    kind: input.kind,
+    empty: !input.prompt.trim(),
+    onPick: (prompt) => onChange({ prompt }),
+    className: classes.promptIdeas,
+    stacked: fill,
   });
   const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen);
   const placedCaret = useRef(false);
@@ -248,42 +259,45 @@ export function GenerationEditor({
             </Alert>
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
-          <Textarea
-            ref={prompt}
-            data-expanded-prompt
-            classNames={{
-              root: classes.prompt,
-              wrapper: classes.promptWrapper,
-              input: classes.promptInput,
-            }}
-            variant="unstyled"
-            aria-label="Prompt"
-            data-autofocus={autoFocusPrompt || undefined}
-            placeholder={
-              input.kind === "image"
-                ? "Describe the image you want to create…"
-                : "Describe the motion and camera…"
-            }
-            // The phone editor gives the prompt all the room above the chips.
-            autosize={!fill}
-            minRows={3}
-            maxRows={10}
-            rightSection={
-              <Stack gap={4}>
-                <PromptHistory
-                  kind="positive"
-                  value={input.prompt}
-                  onPick={(prompt) => onChange({ prompt })}
-                />
-                {assistant.action}
-              </Stack>
-            }
-            rightSectionWidth={40}
-            rightSectionPointerEvents="all"
-            rightSectionProps={{ style: { alignItems: "flex-start" } }}
-            value={input.prompt}
-            onChange={(event) => onChange({ prompt: event.currentTarget.value })}
-          />
+          <div className={classes.promptArea} {...(offerIdeas ? ideas.focusProps : {})}>
+            <Textarea
+              ref={prompt}
+              data-expanded-prompt
+              classNames={{
+                root: classes.prompt,
+                wrapper: classes.promptWrapper,
+                input: classes.promptInput,
+              }}
+              variant="unstyled"
+              aria-label="Prompt"
+              data-autofocus={autoFocusPrompt || undefined}
+              placeholder={
+                input.kind === "image"
+                  ? "Describe the image you want to create…"
+                  : "Describe the motion and camera…"
+              }
+              // The phone editor gives the prompt all the room above the chips.
+              autosize={!fill}
+              minRows={3}
+              maxRows={10}
+              rightSection={
+                <Stack gap={4}>
+                  <PromptHistory
+                    kind="positive"
+                    value={input.prompt}
+                    onPick={(prompt) => onChange({ prompt })}
+                  />
+                  {assistant.action}
+                </Stack>
+              }
+              rightSectionWidth={40}
+              rightSectionPointerEvents="all"
+              rightSectionProps={{ style: { alignItems: "flex-start" } }}
+              value={input.prompt}
+              onChange={(event) => onChange({ prompt: event.currentTarget.value })}
+            />
+            {offerIdeas && ideas.ideas}
+          </div>
           {assistant.suggestions}
           <GenerationInputControls
             loraPicker={loraPicker}

@@ -196,6 +196,7 @@ export function GenerationForm({
       autoFocusPrompt={autoFocusPrompt}
       focusPrompt={focusPrompt}
       fill={fill}
+      ideas
     />
   );
 }
