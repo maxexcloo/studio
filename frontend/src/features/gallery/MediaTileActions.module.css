@@ -1,0 +1,36 @@
+.actions {
+  position: absolute;
+  inset: var(--mantine-spacing-xs) var(--mantine-spacing-xs) auto;
+  pointer-events: none;
+}
+
+.control {
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity var(--studio-motion-duration) ease;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.more {
+  margin-inline-start: auto;
+}
+
+*:hover > .actions .control,
+*:focus-within > .actions .control,
+.actions[data-opened] .control,
+.control[data-starred] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .control {
+    opacity: 0.85;
+  }
+}
+
+@media (max-width: 48em) {
+  .download,
+  .favorite:not([data-starred]) {
+    display: none;
+  }
+}

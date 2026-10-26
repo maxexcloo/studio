@@ -15,6 +15,5 @@ release/
 .env
 .env.*
 !.env.example
-docs/screenshots/size-picker*
 # PP Neue Bit is a commercial font; the app doesn't use it, keep any local copy out of the repo.
-/public/fonts/PPNeueBit*
+/frontend/public/fonts/PPNeueBit*

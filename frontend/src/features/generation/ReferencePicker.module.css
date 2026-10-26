@@ -1,0 +1,116 @@
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cell,
+.tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-default);
+  transition:
+    border-color var(--studio-motion-duration) ease,
+    box-shadow var(--studio-motion-duration) ease,
+    opacity var(--studio-motion-duration) ease;
+}
+
+.cell {
+  width: 64px;
+  height: 64px;
+  color: var(--mantine-color-dimmed);
+}
+
+.cell[data-empty] {
+  border-style: dashed;
+  background: transparent;
+}
+
+.cell[data-required] {
+  border-color: var(--mantine-color-yellow-filled);
+}
+
+.cell[data-target],
+.cell[data-over],
+.tile[data-over] {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: 0 0 0 1px var(--mantine-primary-color-filled);
+}
+
+.cell:focus-visible,
+.tile:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  pointer-events: none;
+}
+
+.caption {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile {
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.tile:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.tile[data-upload] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--mantine-color-dimmed);
+}
+
+.tileAction {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+@media (hover: hover) {
+  .tileWrap .tileAction {
+    opacity: 0;
+    transition: opacity var(--studio-motion-duration) ease;
+  }
+
+  .tileWrap:hover .tileAction,
+  .tileWrap:focus-within .tileAction {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 48em) {
+  .cell {
+    width: 72px;
+    height: 72px;
+  }
+}

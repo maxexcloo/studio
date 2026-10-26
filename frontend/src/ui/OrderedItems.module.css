@@ -1,0 +1,5 @@
+/* Disabled ordering controls stay transparent like their enabled subtle state. */
+.control:disabled,
+.control[data-disabled] {
+  background: transparent;
+}

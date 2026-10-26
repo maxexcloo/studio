@@ -1,0 +1,51 @@
+.page {
+  padding-bottom: var(--mantine-spacing-xl);
+}
+
+.tile {
+  transition: box-shadow var(--studio-motion-duration) ease;
+}
+
+.variant[data-winner] .tile {
+  box-shadow: 0 0 0 2px var(--mantine-primary-color-filled);
+}
+
+.star {
+  position: absolute;
+  top: var(--mantine-spacing-xs);
+  right: var(--mantine-spacing-xs);
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.missing {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-default);
+}
+
+.applied {
+  animation: arrive var(--studio-motion-duration) ease-out both;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.grid {
+  width: 100%;
+  margin-inline: auto;
+}
+
+@media (min-width: 48em) {
+  .grid {
+    max-width: calc(
+      (100dvh - 15rem) * var(--compare-aspect) * var(--compare-columns) +
+        (var(--compare-columns) - 1) * var(--mantine-spacing-sm)
+    );
+  }
+}

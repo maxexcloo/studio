@@ -1,0 +1,33 @@
+:root {
+  --studio-composer-gap: 1rem;
+}
+a {
+  color: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  touch-action: manipulation;
+}
+.studio-page {
+  margin-inline: auto;
+}
+.studio-content {
+  min-width: 0;
+}
+@media (max-width: 48em) {
+  :root {
+    --studio-composer-gap: 0.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

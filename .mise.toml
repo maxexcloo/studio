@@ -6,11 +6,16 @@ _.path = ["node_modules/.bin"]
 run = "npm run build"
 
 [tasks.check]
+depends = ["check:app", "check:python", "test:python"]
+
+[tasks."check:app"]
 depends = [
   "check:actions",
   "check:mise",
+  "check:oxfmt",
   "check:typescript",
   "check:updates",
+  "check:whitespace",
   "test",
 ]
 
@@ -20,22 +25,34 @@ run = "npm run dev"
 [tasks.test]
 run = "npm test"
 
+[tasks."test:browser"]
+run = "playwright test"
+
 # Setup
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"
 
 # Native MCP
 [tasks."test:mcp"]
-run = "node --test server/mcp*.test.js"
+run = "node --test backend/mcp*.test.js"
 
 # Prompt Assistant Evals (live LiteLLM replay on demand, never in CI; --record refreshes the fixtures)
 [tasks."eval:assistant"]
-run = "node scripts/assistant-eval.mjs"
+run = "node backend/commands/assistant-eval.mjs"
 
-# Studio Import (a dry run unless --apply; see docs/guides/CONFIGURATION.md)
+# Studio Import (a dry run unless --apply; see CONFIGURATION.md)
 [tasks."import:studio"]
-run = "node scripts/import-studio.mjs"
+run = "node backend/commands/import-studio.mjs"
 
-# Release Preparation
-[tasks."release:prepare"]
-run = "npm run release -- minor --dry-run"
+# Native bridge checks live with each custom node, outside tests/.
+[tasks."test:python"]
+run = """
+PYTHONPATH=worker/comfyui uv run --no-project --with pillow python -B -m unittest discover -s worker/comfyui/cliproxy -p 'test_*.py'
+PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
+PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
+python -B -m unittest discover -s worker -p 'test_*.py'
+"""
+
+# Offline runtime migration is a dry run unless --apply is supplied.
+[tasks."migrate:runtime"]
+run = "node backend/commands/migrate-runtime.mjs"

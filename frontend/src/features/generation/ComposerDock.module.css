@@ -1,0 +1,65 @@
+.dock {
+  position: fixed;
+  z-index: 90;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--studio-composer-width), calc(100% - 2 * var(--studio-composer-gap)));
+}
+
+/* Chat keeps its composer in the conversation column instead of floating it. */
+.dock[data-chat] {
+  position: static;
+  transform: none;
+  width: 100%;
+  max-width: var(--studio-composer-width);
+  margin-inline: auto;
+  flex-shrink: 0;
+}
+
+.dock textarea {
+  font-size: 1rem;
+}
+
+.surface {
+  transition: border-color var(--studio-motion-duration) ease;
+}
+
+.surface:focus-within {
+  border-color: var(--mantine-color-dimmed);
+}
+
+.dock[data-chat] .surface {
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+.dock[data-reference-drop] > .surface {
+  border-color: var(--mantine-primary-color-filled);
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 3px;
+}
+
+.compactPrompt {
+  flex: 1;
+  min-width: 0;
+}
+
+.compactPrompt textarea {
+  min-height: 1.8rem;
+  line-height: 1.8rem;
+  padding-block: 0;
+}
+
+.panel {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 48em) {
+  .dock :global(.mantine-Button-root) {
+    min-height: 44px;
+  }
+}

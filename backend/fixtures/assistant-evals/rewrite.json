@@ -1,0 +1,446 @@
+{
+  "about": "Rewrite cases: subjects and quoted text kept, no setting words, the preset's tone. 'recorded' is a model reply replayed in CI; mise run eval:assistant replays live (--record refreshes it).",
+  "cases": [
+    {
+      "id": "enhance-cabin",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a cosy cabin in snow at night",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["cabin", "snow"]
+      },
+      "recorded": "A cosy wooden cabin half-buried in fresh snow at night, warm amber light spilling from its small square windows, smoke curling from the stone chimney, snow-laden pines around it under a clear starry sky."
+    },
+    {
+      "id": "enhance-sign-quote",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a bakery storefront with a sign reading \"Fresh Bread Daily\"",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["bakery"]
+      },
+      "recorded": "<think>Keep the sign text.</think>A narrow corner bakery storefront in the morning, a hand-painted wooden sign above the door reading \"Fresh Bread Daily\", loaves and pastries stacked in the window, a chalk menu board by the entrance and soft early light on the brick facade."
+    },
+    {
+      "id": "enhance-setting-words",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "turbo 16:9 a red fox in a meadow, 2K",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["red fox", "meadow"]
+      },
+      "recorded": "A red fox standing alert in a wildflower meadow at golden hour, its thick russet coat lit from behind, tall grasses and yellow buttercups around it, soft hills fading into haze in the distance."
+    },
+    {
+      "id": "photographic-portrait",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "portrait of an old fisherman",
+      "preset": "photographic",
+      "expect": {
+        "keep": ["fisherman"]
+      },
+      "recorded": "Close-up photograph of an old fisherman on a harbour wall, deep weathered lines across his face, grey stubble and a navy wool cap, shot on an 85mm lens at f/2 with overcast daylight from the left, the boats behind him softly out of focus."
+    },
+    {
+      "id": "photographic-street",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a rainy street in Tokyo at night",
+      "preset": "photographic",
+      "expect": {
+        "keep": ["Tokyo", "night"]
+      },
+      "recorded": "Street photograph of a narrow rainy lane in Tokyo at night, wet asphalt reflecting red and white lanterns, a commuter with a clear umbrella mid-stride, shot handheld on a 35mm lens with a slow shutter catching the drizzle."
+    },
+    {
+      "id": "cinematic-desert",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a lone rider crossing the desert",
+      "preset": "cinematic",
+      "expect": {
+        "keep": ["rider", "desert"]
+      },
+      "recorded": "A wide cinematic film still of a lone rider crossing an endless desert at dusk, the horse kicking up fine dust, long shadows raking across the dunes, low camera angle, warm orange grade with teal shadows and heat haze on the horizon."
+    },
+    {
+      "id": "cinematic-quote",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a neon sign that says \"OPEN 24 HOURS\" over a diner",
+      "preset": "cinematic",
+      "expect": {
+        "keep": ["diner"]
+      },
+      "recorded": "A moody film still of a roadside diner at 3 a.m., a buzzing red neon sign that says \"OPEN 24 HOURS\" above the door, rain on the windows, a single waitress visible inside, shot from across the empty street with a cool, desaturated grade."
+    },
+    {
+      "id": "concise-long",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a tall old lighthouse standing on a rocky cliff above a stormy sea with huge waves crashing against the rocks, dark clouds, seagulls flying around, dramatic lighting, very detailed, intricate, beautiful",
+      "preset": "concise",
+      "expect": {
+        "keep": ["lighthouse"]
+      },
+      "recorded": "An old lighthouse on a rocky cliff above a stormy sea, waves crashing below under dark clouds, gulls circling in dramatic light."
+    },
+    {
+      "id": "concise-quote",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a vintage poster with the title \"Summer Jazz\" and a saxophone player",
+      "preset": "concise",
+      "expect": {
+        "keep": ["poster", "saxophone"]
+      },
+      "recorded": "A vintage poster titled \"Summer Jazz\" showing a saxophone player in warm sunset colours."
+    },
+    {
+      "id": "candid-family",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a family having breakfast",
+      "preset": "candid",
+      "expect": {
+        "keep": ["breakfast"]
+      },
+      "recorded": "A candid phone snapshot of a family having breakfast in a small kitchen, a child mid-laugh with milk on his lip, a parent pouring coffee, cereal boxes and a cluttered counter, soft natural light from the window."
+    },
+    {
+      "id": "candid-dog",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a dog on a sofa",
+      "preset": "candid",
+      "expect": {
+        "keep": ["dog", "sofa"]
+      },
+      "recorded": "An unposed everyday snapshot of a scruffy terrier dog dozing on a worn grey sofa, one ear flopped over, a crumpled blanket and a phone charger cable beside it, afternoon light through half-closed blinds."
+    },
+    {
+      "id": "spicy-couple",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a couple on a beach at sunset",
+      "preset": "spicy",
+      "expect": {
+        "keep": ["couple", "beach"],
+        "avoid": ["teen", "young girl"]
+      },
+      "recorded": "A sensual scene of an adult couple on a deserted beach at sunset, her sheer wrap slipping from bare shoulders as he pulls her close, warm skin glowing in the low golden light, waves foaming around their ankles."
+    },
+    {
+      "id": "enhance-two-subjects",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a cat and an owl sitting on a bookshelf",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["cat", "owl", "bookshelf"]
+      },
+      "recorded": "A ginger tabby cat and a small barn owl sitting side by side on the top shelf of a crowded wooden bookshelf, the cat curled with its tail hanging down, the owl upright and watchful, dusty leather-bound books and warm lamplight around them."
+    },
+    {
+      "id": "enhance-video",
+      "profile": {
+        "id": "custom:h3-fixture",
+        "label": "MiniMax H3",
+        "kind": "video",
+        "family": "minimax-h3"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a wave crashing on rocks",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["wave", "rocks"]
+      },
+      "recorded": "A large green wave rolls in and crashes against dark volcanic rocks, white spray bursting upward and drifting in the wind, foam draining back between the stones as the next swell builds, the camera holding steady at shoreline height."
+    },
+    {
+      "id": "enhance-flux3-upsampler",
+      "profile": {
+        "id": "custom:flux3-fixture",
+        "label": "FLUX.3 Klein",
+        "kind": "image",
+        "family": "flux3"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a robot reading a newspaper in a park",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["robot", "newspaper", "park"]
+      },
+      "recorded": "Full-color outdoor photograph, a city park on an overcast afternoon. In the foreground, a silver humanoid robot with scuffed joints sits on a green wooden bench, holding an open newspaper in both hands, its round camera eyes angled down at the page. Behind it, a gravel path curves past plane trees and a rubbish bin."
+    },
+    {
+      "id": "photographic-food",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a bowl of ramen",
+      "preset": "photographic",
+      "expect": {
+        "keep": ["ramen"]
+      },
+      "recorded": "Overhead food photograph of a steaming bowl of tonkotsu ramen on a dark wooden counter, a halved soft egg, chashu slices and spring onions on top, chopsticks resting on the rim, shot on a 50mm lens under a single warm pendant light."
+    },
+    {
+      "id": "cinematic-space",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "an astronaut alone on Mars",
+      "preset": "cinematic",
+      "expect": {
+        "keep": ["astronaut", "Mars"]
+      },
+      "recorded": "A lone astronaut standing on a rust-red ridge on Mars, a cinematic wide shot with the tiny figure against vast dunes and a pale butterscotch sky, low sun casting a long shadow, anamorphic framing with a muted orange grade."
+    },
+    {
+      "id": "enhance-accented-quote",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a café chalkboard reading \"Café du Jour\"",
+      "preset": "enhance",
+      "expect": {
+        "keep": ["chalkboard"]
+      },
+      "recorded": "A black chalkboard propped outside a small Parisian café, hand-lettered in white chalk reading \"Café du Jour\", with a doodled coffee cup beneath, wicker chairs and a striped awning behind it in soft morning light."
+    },
+    {
+      "id": "concise-tag-pile",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a red apple on a white table, studio lighting, high detail, sharp focus, beautiful composition, masterpiece",
+      "preset": "concise",
+      "expect": {
+        "keep": ["apple", "table"]
+      },
+      "recorded": "A red apple on a white table under soft studio light."
+    },
+    {
+      "id": "candid-musician",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "Write clear natural-language prose: subject first, then setting, light and style.",
+        "rules": [
+          "Keep every requested subject and quoted text exactly.",
+          "Describe what should be present."
+        ]
+      },
+      "prompt": "a street musician playing violin",
+      "preset": "candid",
+      "expect": {
+        "keep": ["violin"]
+      },
+      "recorded": "A candid snapshot of a street musician playing violin on a busy pavement, caught mid-bow with eyes closed, an open case with a few coins at his feet, passers-by blurred as they walk past in flat overcast light."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+.modes {
+  border: 1px solid var(--mantine-color-default-border);
+  padding: 0.25rem;
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-color-default);
+}
+@media (min-width: 48em) {
+  .modes {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+.home {
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}

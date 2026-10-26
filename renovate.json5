@@ -1,4 +1,45 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>maxexcloo/dotfiles//renovate/default.json5"],
+  customManagers: [
+    {
+      customType: "regex",
+      datasourceTemplate: "git-refs",
+      description: "Worker extensions follow their configured upstream branch",
+      managerFilePatterns: ["/^worker/sources\\.json$/"],
+      matchStrings: [
+        '"branch":\\s*"(?<currentValue>[^"]+)",\\s*"path":\\s*"[^"]+",\\s*"revision":\\s*"(?<currentDigest>[a-f0-9]{40})",\\s*"url":\\s*"(?<depName>[^"]+)"',
+      ],
+    },
+    {
+      customType: "regex",
+      datasourceTemplate: "github-releases",
+      description: "Worker ComfyUI source release and its immutable revision",
+      managerFilePatterns: ["/^worker/source\\.json$/"],
+      matchStrings: [
+        '"reference":\\s*"(?<currentValue>v?\\d+(?:\\.\\d+)+[^"]*)",\\s*"repository":\\s*"(?<depName>[^"]+)",\\s*"revision":\\s*"(?<currentDigest>[a-f0-9]{40})"',
+      ],
+    },
+    {
+      customType: "regex",
+      datasourceTemplate: "pypi",
+      description: "Python packages pinned in worker image commands",
+      managerFilePatterns: ["/^worker/Dockerfile$/"],
+      matchStrings: ["\\b(?<depName>[\\w.-]+)==(?<currentValue>\\d[\\w.+!-]*)"],
+    },
+  ],
+  packageRules: [
+    {
+      description: "Hold ComfyUI release updates until a stable release includes the pinned Fibo 2 implementation",
+      enabled: false,
+      matchDatasources: ["github-releases"],
+      matchPackageNames: ["Comfy-Org/ComfyUI"],
+    },
+    {
+      description: "Keep dated ROCm builds on the existing channel",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["/(^|/)yanwk/comfyui-boot$/"],
+      versioning: "regex:^rocm-(?<major>\\d{4})(?<minor>\\d{2})(?<patch>\\d{2})$",
+    },
+  ],
 }
