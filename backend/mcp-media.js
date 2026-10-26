@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
+import { flagEnabled } from "./deployment-settings.js";
 import { referenceImageSize } from "./generation-defaults.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import {
@@ -352,23 +353,31 @@ export class McpMedia {
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
    * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
-   * unavailable, video is refused with what to tell the user, never sent to the cloud by itself.
+   * unavailable, video is refused with what to tell the user, or with Video Cloud Fallback on goes to a granted
+   * cloud profile with a `note` to pass on.
    */
   async choose(owner, options = {}) {
-    return (await this.choices(owner, options)).profile;
+    const { profile, note } = await this.choices(owner, options);
+    return { profile, note };
   }
-  /** The profiles choose() picks from (`pool`) and its usual pick (`profile`), so Generate can pick by the request. */
+  /** The profiles choose() picks from (`pool`), its usual pick (`profile`) and any `note`, so Generate can pick by the request. */
   async choices(
     owner,
     { kind = "image", tier, references = 0, firstFrame = false, loras = [], cloud = false } = {},
   ) {
     const models = await this.catalogue(owner);
-    let profiles = await this.profiles(kind, owner);
+    const ready = await this.profiles(kind, owner);
+    let profiles = ready;
+    let note = "";
     if (!cloud) {
-      const cloudOffered = profiles.some(isCloudProfile);
-      profiles = profiles.filter((profile) => !isCloudProfile(profile));
-      if (kind === "video" && models.backends?.video?.available === false)
-        throw new Error(localVideoUnavailable(cloudOffered));
+      const cloudOffered = ready.some(isCloudProfile);
+      profiles = ready.filter((profile) => !isCloudProfile(profile));
+      if (kind === "video" && models.backends?.video?.available === false) {
+        if (!cloudOffered || !flagEnabled("STUDIO_VIDEO_CLOUD_FALLBACK"))
+          throw new Error(localVideoUnavailable(cloudOffered));
+        profiles = ready.filter(isCloudProfile);
+        note = "The local video worker is offline, so this went to the cloud. Tell the user. ";
+      }
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
@@ -394,6 +403,7 @@ export class McpMedia {
     return {
       pool: choicePool(profiles, options),
       profile: chooseProfile(profiles, { ...options, defaultId }),
+      note,
     };
   }
   async catalogue(owner = "") {
@@ -1170,15 +1180,15 @@ export class McpMedia {
     jobId,
     index,
     item,
-    { tier, prompt, count = 1, cloud = false, profile: named = null } = {},
+    { tier, prompt, count = 1, cloud = false, profile: named = null, note: namedNote = "" } = {},
   ) {
     const output = await this.download(owner, jobId, index);
     if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
       throw new Error("Only image results can be animated.");
     // A named profile (the chat asking for Grok by name) picks the video model outright; otherwise the tier does.
-    const base =
-      named ||
-      (await this.choose(owner, { kind: "video", tier, references: 1, firstFrame: true, cloud }));
+    const { profile: base, note } = named
+      ? { profile: named, note: namedNote }
+      : await this.choose(owner, { kind: "video", tier, references: 1, firstFrame: true, cloud });
     if (!(base.mediaInputs || []).some((slot) => slot.kind === "image"))
       throw new Error(
         `${base.label || base.id} takes no starting image, so it cannot animate this result. Pass tier instead, or a profile_id that takes one.`,
@@ -1212,7 +1222,7 @@ export class McpMedia {
       (size.width !== profile.defaults?.width || size.height !== profile.defaults?.height)
     )
       Object.assign(args, size);
-    return { profile: base, args };
+    return { profile: base, args, tierNote: note };
   }
   async signedResult(owner, jobId, index) {
     if (!this.resolveSignedResult) throw new Error("The signed result is unavailable.");
