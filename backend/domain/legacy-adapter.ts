@@ -81,6 +81,8 @@ export function createLegacyQueueAdapter(options: LegacyAdapterOptions): QueueAd
           body: { ...job.input, clientJobId: job.id },
           studioAccount: account || undefined,
           studioQueueBackend: job.backend,
+          // Only the queue record marks Dream work; a request body cannot.
+          studioDream: job.dream,
           headers: {},
         },
         res,

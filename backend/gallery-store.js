@@ -255,9 +255,12 @@ export function isGalleryHidden(item) {
   return true;
 }
 
+/** A Dream result the person has not kept: it lives in Dream's own pool (domain/dream.ts), not the gallery. */
+export const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept");
+
 export function filterVisibleGallery(items) {
   return items.filter((item) => {
-    if (isGalleryHidden(item)) return false;
+    if (isGalleryHidden(item) || inDreamPool(item)) return false;
     if (isComfyOutputItem(item)) return hasExistingOutputFile(item);
     if (item.library) return libraryFileCheck ? libraryFileCheck(item) : true;
     return !isGalleryHidden(item);
@@ -507,7 +510,7 @@ export function galleryDelta({
     .filter((item) => {
       if (type && item.type !== type) return false;
       if (!includeFailed && item.status === "error") return false;
-      if (item.status === "canceled" || isGalleryHidden(item)) return false;
+      if (item.status === "canceled" || isGalleryHidden(item) || inDreamPool(item)) return false;
       // With a search on, what no longer matches (unstarred, or a run that
       // finished with another prompt) leaves the results instead of going stale.
       if (filter && !filter(item)) {
@@ -1106,6 +1109,17 @@ export function recordsFromComfyHistory(history) {
           ? { assistant: storedAssistantRecord(saved.assistant) }
           : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
+        // A rebuilt Dream result goes back to Dream's pool rather than into the gallery.
+        ...(saved.dream && typeof saved.dream === "object"
+          ? {
+              dream: {
+                state: "unseen",
+                prompt: String(saved.dream.prompt || ""),
+                why: String(saved.dream.why || ""),
+                at: String(saved.dream.at || ""),
+              },
+            }
+          : {}),
         ...(typeof saved.ownerId === "string" && saved.ownerId ? { ownerId: saved.ownerId } : {}),
       };
       if (hasExistingOutputFile(record)) records.push(record);
@@ -1145,6 +1159,7 @@ export function makePendingItems(id, body) {
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
     ...(body.chat ? { chat: body.chat } : {}),
+    ...(body.dream ? { dream: body.dream } : {}),
     ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
   }));
 }
@@ -1350,6 +1365,7 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         settings: generationSettings(body),
         ...(body.assistant ? { assistant: body.assistant } : {}),
         ...(body.chat ? { chat: body.chat } : {}),
+        ...(body.dream ? { dream: body.dream } : {}),
         outputName: item.filename,
         promptId: job.promptId || "",
         index,
