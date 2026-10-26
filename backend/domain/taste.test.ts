@@ -37,6 +37,12 @@ test("signals keep their prompt, profile and enabled LoRAs, newest first, capped
   for (let index = 0; index < 205; index++)
     taste.record("alice", [tasteSignal("star", `job-${index}`)]);
   taste.record("bob", [tasteSignal("unstar", "theirs")]);
+  // A bulk star adds at most 20 signals.
+  taste.record(
+    "carol",
+    Array.from({ length: 30 }, (_, index) => tasteSignal("star", `bulk-${index}`)),
+  );
+  assert.equal(taste.read("carol").signals.length, 20);
   const alice = taste.read("alice");
   assert.equal(alice.signals.length, 200);
   assert.equal(alice.signals[0].jobId, "job-204");
