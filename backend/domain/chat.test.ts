@@ -516,3 +516,22 @@ test("the system context carries the owner's taste summary as data, and nothing 
   assert.doesNotMatch(system(fixture.requests[1]), /taste profile/);
   fixture.db.close();
 });
+
+test("a model without a name of its own is labelled with the model that last answered for it", async () => {
+  const fixture = setup([
+    frame({ model: "qwen3.6-27b", choices: [{ delta: { content: "Hi" } }] }),
+    "data: [DONE]\n\n",
+  ]);
+  assert.equal((await fixture.service.status("alice")).models[0].label, "selected-text");
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    { content: "Hello" },
+    new AbortController().signal,
+    () => {},
+  );
+  assert.deepEqual((await fixture.service.status("alice")).models, [
+    { id: "selected-text", label: "qwen3.6-27b" },
+  ]);
+  fixture.db.close();
+});

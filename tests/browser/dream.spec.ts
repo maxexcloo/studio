@@ -47,8 +47,9 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     "POST /api/dream/two/discard",
     "POST /api/dream/three/variations",
     "POST /api/dream/four/discard",
-    "POST /api/dream/five/keep",
+    "POST /api/gallery/favorite",
   ]);
+  expect(dream.requests.at(-1)?.body).toEqual({ ids: ["five"], favorite: true });
 });
 
 test("Dream explains itself while off and saves its settings on the deck", async ({ page }) => {

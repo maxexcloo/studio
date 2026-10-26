@@ -18,43 +18,28 @@ through its isolated loader. Supply model paths, listening address, port and
 credentials in deployment configuration. The lease wrapper reserves the placement
 before either mode starts and holds it until graceful shutdown finishes.
 
-Studio controls only configured existing Docker containers through the forwarded
-Engine API. Automatic lifecycle control starts disabled. Enable it only after
-AI Control relinquishes ownership and all managed local text traffic reaches
-Studio's authenticated admission endpoint. Bifrost must call
-`/api/local-text/v1/chat/completions`; Studio's target is the direct Radiance
-worker, with its own server-side key. Pointing that target at Bifrost would create
-a routing loop. Active streams and media output saving retain admission until
-finished. Idle containers stay warm.
+Studio starts and stops workers by scaling their Kubernetes deployments between 0
+and 1 replicas; see
+[runtime control](../CONFIGURATION.md#queue-sessions--runtime-control) for
+`STUDIO_KUBERNETES_WORKLOADS` and the service account role it needs. Workers that
+are not listed stay unmanaged. Active streams and media output saving retain
+admission until finished, so a switch waits for them. Idle workers stay warm.
 
-Set `STUDIO_CONFIG_DIR` to the read-only `ai` mount and `STUDIO_DOCKER_URL` to
-the forwarded Docker Engine HTTP endpoint. Workloads without `studio` metadata
-remain unmanaged. Each managed `workloads.json` record adds a `studio` object:
-
-```json
-{
-  "container": "configured-container-name",
-  "placement": "0",
-  "url": "http://direct-worker:8188"
-}
-```
-
-The placement must be one of that record's existing `placements`. Text workers
-also set `apiKeyEnv` to the name of the environment variable holding their
-Radiance credential. Studio checks HTTP readiness before admission. A failed
-or starting worker leaves jobs waiting and does not stop independent workloads.
-
-Set `STUDIO_TEXT_WORKLOAD` to the text workload identifier and
+Managed local text reaches Studio's authenticated admission endpoint: Bifrost
+calls `/api/local-text/v1/chat/completions`, and Studio's target is the direct
+Radiance worker with its own server-side key (the workload's `apiKeyEnv`).
+Pointing that target at Bifrost would create a routing loop. Set
+`STUDIO_TEXT_WORKLOAD` to the text workload identifier and
 `STUDIO_TEXT_ADMISSION_TOKEN` to the separate bearer credential used by Bifrost.
 The browser never receives either credential. Configure `BIFROST_URL` when used;
 Studio refuses to target that gateway origin as a worker.
 
-After the ownership and routing transition is verified, lifecycle switching
-requires all three explicit values: `STUDIO_RUNTIME_AUTOMATIC=1`,
-`STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED=1` and
-`STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1`. These are deployment acknowledgements,
-not settings exposed to app users. Runtime status is administrator-only at
-`/api/runtime`; text admission uses its own bearer authentication.
+Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) also needs
+`STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1`, confirming that all managed local text
+traffic reaches that endpoint before Studio stops text workers on its own. These
+are deployment acknowledgements, not settings exposed to app users. Runtime
+status and control are administrator-only at `/api/runtime`; text admission uses
+its own bearer authentication.
 
 CPU checks: `node --test backend/runtime/*.test.ts` and
 `python3 -m unittest discover -s worker -p 'test_*.py'`. Lease tests require Linux

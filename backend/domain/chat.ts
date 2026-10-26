@@ -175,7 +175,14 @@ export class ChatService {
   async status(ownerId = ""): Promise<ChatStatus> {
     try {
       const settings = this.options.settings();
-      const models = settings ? await this.models(ownerId, settings) : [];
+      const models = (settings ? await this.models(ownerId, settings) : []).map((model) => {
+        // A routing alias (such as ai/text) has no name of its own: show the model that answered.
+        const bare =
+          model.label === model.id ||
+          model.id.toLowerCase().endsWith(`/${model.label.toLowerCase()}`);
+        const actual = bare && this.options.store.actualModel(model.id);
+        return actual && actual !== model.id ? { ...model, label: actual } : model;
+      });
       return settings
         ? {
             available: models.length > 0,
