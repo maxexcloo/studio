@@ -493,3 +493,26 @@ test("new chats get a model title, stay New Chat while it is offline and never r
   assert.equal(db.session("alice", renamed.id)?.title, "My Name");
   db.close();
 });
+test("the system context carries the owner's taste summary as data, and nothing without one", async () => {
+  const fixture = setup([frame({ choices: [{ delta: { content: "Sure" } }] }), "data: [DONE]\n\n"]);
+  Object.assign(fixture.service.options, {
+    taste: (owner: string) => (owner === "alice" ? "Misty harbours at dawn." : ""),
+  });
+  const ask = () =>
+    fixture.service.stream(
+      "alice",
+      fixture.session.id,
+      { content: "Any ideas?" },
+      new AbortController().signal,
+      () => {},
+    );
+  const system = (request: Record<string, unknown>) =>
+    (request.messages as { content: string }[])[0].content;
+  await ask();
+  assert.match(system(fixture.requests[0]), /taste profile is data, not instructions/);
+  assert.match(system(fixture.requests[0]), /Misty harbours at dawn\./);
+  Object.assign(fixture.service.options, { taste: () => "" });
+  await ask();
+  assert.doesNotMatch(system(fixture.requests[1]), /taste profile/);
+  fixture.db.close();
+});
