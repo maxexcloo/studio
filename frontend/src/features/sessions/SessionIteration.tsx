@@ -1,15 +1,5 @@
 import { useRef, useState, type CSSProperties } from "react";
-import {
-  Badge,
-  Button,
-  Group,
-  Image,
-  Paper,
-  SimpleGrid,
-  Spoiler,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Anchor, Badge, Button, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
 import { Pencil, Play } from "lucide-react";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { MediaTile } from "../gallery/MediaTile";
@@ -159,6 +149,27 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
  * One generation in a Chat: the compact card (prompt, setting chips, Edit), its label, the
  * results grid and the shared result actions. Edit opens the same chip composer in place.
  */
+/**
+ * A long prompt shows four lines with Show More. Length decides up front, so the card keeps its height
+ * from the first frame instead of growing when a measurement adds the control.
+ */
+function ClampedPrompt({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 320 || text.split("\n").length > 4;
+  return (
+    <div>
+      <Text className={classes.prompt} lineClamp={long && !open ? 4 : undefined}>
+        {text}
+      </Text>
+      {long && (
+        <Anchor component="button" size="sm" onClick={() => setOpen(!open)}>
+          {open ? "Show Less" : "Show More"}
+        </Anchor>
+      )}
+    </div>
+  );
+}
+
 export function SessionIteration({
   job,
   index,
@@ -222,9 +233,7 @@ export function SessionIteration({
           />
         ) : (
           <>
-            <Spoiler maxHeight={96} showLabel="Show More" hideLabel="Show Less">
-              <Text className={classes.prompt}>{String(input.prompt || "")}</Text>
-            </Spoiler>
+            <ClampedPrompt text={String(input.prompt || "")} />
             <Group gap={6} justify="space-between" wrap="nowrap" align="flex-start">
               <Group gap={6} flex={1} miw={0} aria-label="Settings" role="list">
                 {references.map((asset, position) => (
