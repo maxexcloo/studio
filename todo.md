@@ -109,30 +109,21 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 UX audit 26 Oct (defaults apply until you say otherwise):
 
 - Duplicate profile labels: 17 pairs in the picker read the same (e.g. two "FLUX.2 [klein] 9B Base · ComfyUI · Quality · 50 Steps · 3 References" for `…-comfyui` and `…-fp8`; H3 and Grok video pairs). Stale definitions to delete in runtime data, or both wanted? Default: keep both and add a short disambiguator (such as the precision) when labels collide.
-- Phone Chat with no Chat selected gives no cue that the list lives behind the status action. Default: the empty state says where the Chats are and offers New Chat.
-- The Chat model select reads "Text" with a wide gap. Default: show the actual text model label from chat status.
 - Library Imports and Inspiration are hidden in dev because `features.presets` is off. Default: leave the flag; dev data only.
-- Dream: should Cancel All / Cancel Pending also stop Dream? Default: no; Pause does.
-- Dream: discarded and failed Dream items count towards the gallery limit while hidden. Default: keep the newest 500 discards once D3 lands.
 - Dream: prompts use no LoRAs yet. Default: add the account's starred LoRAs with D3/D4.
-- Dream: does starring an unseen Dream item keep it? Default: yes, in D3.
 - Dream: a Dream job waiting on a worker that went offline blocks further Dream work until other work arrives or the account pauses. Default: accept for now.
 - Phone viewer action buttons went from 42px to 40px so the split Regenerate fits a 375px phone. Default: keep 40px.
-- Merge Duplicate Profiles (Settings › Profiles) merges same-named profiles with identical definitions into the `<kind>-…-<backend>` id and aliases the old one; on a copy of the dev data it merges 15 pairs and lists Krea 2 Turbo · Radiance (the rebalance graph differs). Run it on the live data after the cutover? Default: yes, preview then apply in the window's verification step.
-- 15 more dev pairs run identical definitions but their names differ, mostly by "· 1 Reference" (`image-krea2-turbo-comfyui`/`-int8-convrot`, FinePorn, Kroma, Kromafine, Z-Image, Qwen-Image 2.1 Turbo, Fibo 2.0, Grok Image). Offer them as an opt-in second list that keeps the newer id and its name? Default: yes, in a follow-up.
-- One profile with a selectable Radiance or ComfyUI backend: the dev pairs differ in steps, references and modes (H3 Radiance is text-only at 50 steps, ComfyUI is first-frame/reference at 20), so it needs a `backends` block, backend-aware routing, readiness and records rather than a merge. Default: build it after 1.0.0 from the proposal in the profile-aliases PR.
-- Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
-- Taste profile: a bulk star of up to 500 items adds a signal each and can push out older history. Default: cap each bulk call at 20 signals.
+- Duplicate profile pairs now show an id suffix ("· comfyui" / "· fp8"); most look like legacy duplicates with the same settings. Default: keep the suffix until you prune runtime definitions.
 - Taste profile: does Exact Repeat count as an iteration? Default: yes, repeating a result signals interest.
-- Taste profile: also give the summary to the MCP prompt writer, or only the model pick? Default: only the pick; D4 keeps suggestions in the UI and Chat.
 - Suggestions: `surface: "chat"` returns an LLM-condensed taste paragraph, but Chat reads the summary directly (already a short paragraph, no extra call per reply), so nothing consumes it yet. Default: keep it for D3/Dream copy; drop it if still unused at review.
-- Suggestions: Chat message ideas fill the message with a bare prompt, which the assistant may discuss rather than generate. Default: keep as is; prefix "Create an image: " only if testing shows it discusses.
 - Suggestions: viewer next steps use the normal text model, so a Spicy image's steps may come back empty. Default: accept; use the Spicy model for items made with a Spicy prompt later.
 
 1. Bento host (homelab, outside Studio): a USB4 port's power-management loop (`pci_bus 0000:13` behind ASM4242 12:00.0) is still repeating and hung the whole host for 2.3 h on 23 Oct, with an iGPU SDMA timeout. Fix it by disabling runtime PM for that port (or `pcie_port_pm=off`, or removing the device) plus `amdgpu.runpm=0` for the iGPU, and arm a runtime hardware watchdog (`RuntimeWatchdogSec`) so a hang self-recovers in minutes? Recommended: yes, as a reviewed homelab change.
 2. GPU experiments and image redeploys on bento (24 Oct 02:18 and 05:16) stopped image work for 59 and 8 minutes outside AI Control. Route them through AI Control and pull images before stopping containers? Recommended: yes.
 
 Settled 27 Oct: Gallery Captions are on by default; captions describe visible facts (people, clothing and nudity, setting, style, legible text) with 8–15 search tags and a format version that a Caption Gallery pass (Settings › Maintenance, flat out while idle, two at a time, persisted) redoes; Details shows the caption as a dimmed line with tag badges.
+
+Settled 27 Oct (Dream, Taste & Chat): starring an unseen Dream result keeps it; Cancel All and Cancel Pending leave Dream alone (Pause stops it); every Dream discard is kept; a compare winner is recorded as preferred over each other finished variant (relative, not a dislike); one action adds at most 20 taste signals; the taste profile steers MCP prompt writing as well as the model pick; the phone Chat empty state points to the Chats and offers New Chat; the Chat model select names the model that last answered for an unnamed alias such as `ai/text`; a Chat prompt idea fills "Create an image: …".
 
 Settled 26 Oct: main's MCP cloud video fallback is the opt-in Video Cloud Fallback switch (off by default); held composer video still drains without cloud fallback.
 

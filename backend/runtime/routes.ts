@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { finished } from "node:stream/promises";
-import { Router } from "express";
-import type { RuntimeController } from "./controller.ts";
+import { Router, type Request, type Response } from "express";
+import { RuntimeRequestError, type RuntimeController } from "./controller.ts";
 
 interface AdmissionOptions {
   controller: RuntimeController;
@@ -31,7 +31,10 @@ export function createTextAdmissionRouter({
         `${lease.workload.url.replace(/\/$/, "")}/v1/chat/completions`,
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify(request.body),
           redirect: "error",
         },
@@ -69,14 +72,61 @@ export function createTextAdmissionRouter({
   return router;
 }
 
-/** Mount behind the existing administrator middleware. */
-export function createRuntimeRouter(controller: RuntimeController) {
+const workloadIds = (value: unknown) => {
+  if (!Array.isArray(value) || value.some((id) => typeof id !== "string"))
+    throw new RuntimeRequestError("workloads must list workload ids.");
+  return value as string[];
+};
+
+/** Mount behind the existing administrator middleware. Apply and restart answer at once; poll the operation. */
+export function createRuntimeRouter(
+  controller: RuntimeController,
+  requestedBy: (request: Request) => string,
+) {
   const router = Router();
-  router.get("/", (_request, response) =>
-    response.json({
-      automaticLifecycle: controller.automaticLifecycle,
-      workloads: controller.status(),
-    }),
+  const handle =
+    (action: (request: Request) => Promise<unknown> | unknown, status = 200) =>
+    async (request: Request, response: Response) => {
+      response.setHeader("Cache-Control", "no-store");
+      try {
+        response.status(status).json(await action(request));
+      } catch (error) {
+        const known = error as Error & { status?: number };
+        response.status(known.status ?? 500).json({
+          error: known.status ? known.message : "Studio couldn’t complete the runtime request.",
+        });
+      }
+    };
+  router.get(
+    "/",
+    handle(() => controller.observe()),
+  );
+  router.post(
+    "/preview",
+    handle((request) => controller.preview(workloadIds(request.body?.workloads))),
+  );
+  router.post(
+    "/apply",
+    handle(
+      (request) =>
+        controller.apply(
+          workloadIds(request.body?.workloads),
+          String(request.body?.signature ?? ""),
+          requestedBy(request),
+        ),
+      202,
+    ),
+  );
+  router.post(
+    "/restart",
+    handle(
+      (request) => controller.restart(String(request.body?.workload ?? ""), requestedBy(request)),
+      202,
+    ),
+  );
+  router.get(
+    "/operations/:id",
+    handle((request) => controller.operation(String(request.params.id))),
   );
   return router;
 }
