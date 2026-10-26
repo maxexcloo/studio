@@ -14,7 +14,6 @@ import {
   type DreamAccess,
   type DreamItem,
   type DreamProfile,
-  retainedDiscards,
 } from "./dream.ts";
 import type { GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
@@ -59,7 +58,6 @@ function fixture(t: TestContext) {
     prompts: 0,
     calls: [] as { model: string; system: string; user: string }[],
     logs: [] as string[],
-    removed: [] as string[],
   };
   let dream: ReturnType<typeof createDream>;
   const admission = createGenerationAdmission({
@@ -99,12 +97,6 @@ function fixture(t: TestContext) {
     mark: (ownerId, itemId, mark) => {
       const item = state.items.find((entry) => entry.ownerId === ownerId && entry.id === itemId)!;
       item.dream = mark;
-    },
-    remove: (ownerId, itemIds) => {
-      state.removed.push(...itemIds);
-      state.items = state.items.filter(
-        (item) => item.ownerId !== ownerId || !itemIds.includes(String(item.id)),
-      );
     },
     reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
     // Like the generation route: a Dream job's pending tile carries its mark from the queue record.
@@ -438,10 +430,10 @@ test("Dream routes are owner-scoped: keep, discard and variations move results a
   assert.equal((await request("")).status, 403);
 });
 
-test("Dream keeps only the newest discards", (t) => {
+test("Dream keeps every discard, most recently discarded first", (t) => {
   const { dream, state } = fixture(t);
   const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString();
-  for (let index = 0; index < retainedDiscards; index++)
+  for (let index = 0; index < 600; index++)
     state.items.push({
       id: `old-${index}`,
       ownerId: "alice",
@@ -458,7 +450,6 @@ test("Dream keeps only the newest discards", (t) => {
     dream: { prompt: "p", why: "", at: at(0), state: "unseen" },
   });
   dream.discard("alice", "fresh");
-  assert.deepEqual(state.removed, ["old-0"]);
-  assert.equal(dream.discarded("alice").length, retainedDiscards);
+  assert.equal(dream.discarded("alice").length, 601);
   assert.equal(dream.discarded("alice")[0].id, "fresh");
 });

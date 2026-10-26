@@ -113,8 +113,6 @@ const switches = ["enabled", "paused", "videos", "spicy"] as const;
 const recentPrompts = 20;
 const tickMs = 45_000;
 const starredDays = 30;
-/** Dream deletes discards beyond the newest this many, so hidden results don't pile up. */
-export const retainedDiscards = 500;
 const maxPrompt = 4000;
 const spicyTheme =
   "Spicy: sensual, explicit content where it suits the scene, with frank, specific wording about bodies. Every person is an adult.";
@@ -160,8 +158,6 @@ export function createDream(options: {
   /** The records the normal gallery shows. */
   visible(items: DreamItem[]): DreamItem[];
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
-  /** Deletes the owner's gallery records and their files. */
-  remove(ownerId: string, itemIds: string[]): void;
   /** A gallery image as a reference asset for a video, or a throw when it can't be one. */
   reference(
     account: GenerationAccount | undefined,
@@ -531,14 +527,6 @@ export function createDream(options: {
       throw failure("That result is in the gallery now; delete it there instead.", 409);
     const dream: DreamMark = { ...item.dream!, state, decidedAt: stamp() };
     options.mark(ownerId, itemId, dream);
-    if (state === "discarded") {
-      const old = discarded(ownerId).slice(retainedDiscards);
-      if (old.length)
-        options.remove(
-          ownerId,
-          old.map((entry) => String(entry.id)),
-        );
-    }
     options.taste.record(ownerId, [
       tasteSignal(state === "kept" ? "keep" : "discard", item.jobId, {
         ...item.settings,
