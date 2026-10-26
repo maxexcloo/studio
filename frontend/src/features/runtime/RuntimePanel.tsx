@@ -26,15 +26,15 @@ export const servicesStatusQuery = queryOptions({
   queryFn: () => api<ServicesStatus>("/api/services/status"),
   refetchInterval: 15000,
 });
-/** Header summary: partial readiness is yellow and nothing is green until it is observed. */
+/** Header summary: partial readiness is yellow, nothing usable is red and nothing is green until it is observed. */
 export function serviceSummary({ data, error }: UseQueryResult<ServicesStatus>) {
   const states = Object.values(data?.services || {}).map((service) => service.state);
   if (error) return { colour: "yellow", label: "Service Status Unavailable" };
   if (!states.length) return { colour: "gray", label: "Checking Services" };
   if (states.every((state) => state === "healthy"))
     return { colour: "green", label: "Services Healthy" };
-  if (states.every((state) => state === "offline"))
-    return { colour: "red", label: "Services Offline" };
+  if (states.every((state) => state === "offline" || state === "unknown"))
+    return { colour: "red", label: "Services Unavailable" };
   return { colour: "yellow", label: "Services Partly Available" };
 }
 export function ServiceHealthSummary() {
