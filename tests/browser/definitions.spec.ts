@@ -232,3 +232,38 @@ test("Model classification saves and reads back while definition administration 
   ).toHaveCount(0);
   expect(writes).toHaveLength(1);
 });
+
+test("Merge Duplicate Profiles previews the merge and applies exactly that preview", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let merged = false;
+  const posted: unknown[] = [];
+  const merge = { from: "h3-fl-pdd8", to: "video-h3-fast-comfyui", name: "H3 Fast" };
+  await page.route("**/api/profiles/duplicates**", async (route) => {
+    if (route.request().method() === "POST") {
+      posted.push(route.request().postDataJSON());
+      merged = true;
+      return route.fulfill({ json: { merged: [merge], backup: "backups/profile-merges/now" } });
+    }
+    return route.fulfill({
+      json: {
+        hash: "plan-1",
+        merges: merged ? [] : [merge],
+        differing: [{ name: "Krea 2 Turbo", ids: ["a", "b"], differences: ["graph"] }],
+        unresolved: [],
+      },
+    });
+  });
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  await page.getByRole("button", { name: "Merge Duplicate Profiles", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Merge Duplicate Profiles", exact: true });
+  await expect(dialog).toContainText("Keeps video-h3-fast-comfyui, removes h3-fl-pdd8");
+  await expect(dialog).toContainText("a, b differ in graph");
+  await dialog.getByRole("button", { name: "Merge 1 Profile", exact: true }).click();
+  await expect(dialog).toContainText("backups/profile-merges/now");
+  await expect(dialog.getByRole("button", { name: "Merge Profiles", exact: true })).toBeDisabled();
+  expect(posted).toEqual([{ hash: "plan-1" }]);
+});

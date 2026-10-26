@@ -18,6 +18,7 @@ import {
 import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
 import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
+import { canonicalProfileId } from "./profile-store.js";
 import { isLocalVideoProfile } from "./comfy-backends.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
@@ -770,7 +771,7 @@ export class McpMedia {
       ) {
         outputs.set(item.index, { url: item.url });
         kind = item.type;
-        profileId ||= item.settings?.profileId;
+        profileId ||= canonicalProfileId(item.settings?.profileId);
       }
     return outputs.size
       ? {
@@ -1107,7 +1108,7 @@ export class McpMedia {
   async rerun(owner, item, { prompt, count = 1 } = {}) {
     const settings = item.settings;
     const base = (await this.profiles(item.type === "video" ? "video" : "image", owner)).find(
-      (profile) => profile.id === settings.profileId,
+      (profile) => profile.id === canonicalProfileId(settings.profileId),
     );
     if (!base)
       throw new Error(
@@ -1472,7 +1473,7 @@ export class McpMedia {
     const [{ job }] = entries;
     const profile = job.profileId
       ? (await this.profiles("all", owner).catch(() => [])).find(
-          (item) => item.id === job.profileId,
+          (item) => item.id === canonicalProfileId(job.profileId),
         )
       : undefined;
     // The profile's short name, as its label reads before the first ' · '.

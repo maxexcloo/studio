@@ -2,6 +2,7 @@ import { Badge, Button, ColorSwatch, ComboboxPopover, Group, Text } from "@manti
 import { ChevronDown } from "lucide-react";
 import { inputForProfile, useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Models, Profile } from "../../types";
+import { isProfile } from "./payload";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { chipProps } from "./chip";
 import classes from "./GenerationInputControls.module.css";
@@ -43,7 +44,7 @@ export function ProfilePicker({
   const input = value || context.input;
   const workers = context.models.data?.workers;
   const available = context.profiles.filter((profile) => profile.kind === input.kind);
-  const selected = available.find((profile) => profile.id === input.profileId);
+  const selected = available.find((profile) => isProfile(profile, input.profileId));
   const selectedLabel = selected && profileLabel(selected, available);
   const families = [
     ...new Set(available.map((profile) => modelFamilyLabel(profile.family, profile.familyName))),

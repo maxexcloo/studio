@@ -7,7 +7,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
-import { generationInput } from "../generation/payload";
+import { generationInput, isProfile } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -31,7 +31,7 @@ export async function mediaDraft(
         profile.capabilities.img2img),
   );
   const original = compatible.find((profile) =>
-    priorId ? profile.id === priorId : profile.model === item.model,
+    priorId ? isProfile(profile, priorId) : profile.model === item.model,
   );
   const profile =
     original ||

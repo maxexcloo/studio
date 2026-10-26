@@ -14,7 +14,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Ellipsis, FileDown, Plus, Upload } from "lucide-react";
+import { Ellipsis, FileDown, Merge, Plus, Upload } from "lucide-react";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
@@ -22,6 +22,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
+import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 
 interface DefinitionRow {
   id?: string;
@@ -80,6 +81,7 @@ export function ProfileDefinitions() {
   const [family, setFamily] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState<LoadedDefinition | null>(null);
+  const [merging, setMerging] = useState(false);
   const noun = nouns[kind];
   const list = useQuery({
     queryKey: ["definition-list", kind],
@@ -211,6 +213,18 @@ export function ProfileDefinitions() {
                 </ActionIcon>
               </Tooltip>
             )}
+            {kind === "profile" && (
+              <Tooltip label="Merge Duplicate Profiles">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Merge Duplicate Profiles"
+                  onClick={() => setMerging(true)}
+                >
+                  <Merge size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <Tooltip label="Export Definitions">
               <ActionIcon
                 component="a"
@@ -310,6 +324,7 @@ export function ProfileDefinitions() {
           </Table.Tbody>
         </Table>
       )}
+      <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       {selected !== null && (
         <DefinitionEditor
           kind={kind}
