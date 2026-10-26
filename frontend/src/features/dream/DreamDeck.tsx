@@ -74,9 +74,10 @@ function useVerdict(onFailed: (item: DreamItem) => void) {
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
       }
-      await post(dreamItemPath(item, "keep"));
+      // Starring an unseen result keeps it (backend/domain/dream.ts).
       if (verdict === "star")
-        await post("/api/gallery/favorite", { ids: [item.id], favorite: true });
+        return post("/api/gallery/favorite", { ids: [item.id], favorite: true });
+      await post(dreamItemPath(item, "keep"));
       if (verdict === "animate") {
         // As the viewer's Animate in Composer, staged in the Videos composer for review.
         const { draft } = await mediaDraft(item, "animate", profiles, client);
