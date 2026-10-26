@@ -396,7 +396,9 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
   await first.focus();
   await page.keyboard.press("Shift+F10");
-  await expect(page.getByRole("menuitem", { name: "Recreate", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");

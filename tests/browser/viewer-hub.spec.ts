@@ -82,7 +82,7 @@ test("Recreate and New Seed draw a new seed; only Exact Repeat keeps it", async 
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
-  await viewerAction(page, "Recreate");
+  await viewerAction(page, "Recreate in Composer");
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -300,7 +300,7 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await viewerAction(page, "Recreate");
+  await viewerAction(page, "Recreate in Composer");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
