@@ -83,7 +83,7 @@ test("An idea chip fills the empty, focused composer prompt", async ({ page }) =
   expect(asked).toHaveLength(1);
 });
 
-test("An idea chip fills the empty Chat message", async ({ page }) => {
+test("An idea chip fills the empty Chat message with a request to create it", async ({ page }) => {
   const state = await fixtures(page);
   state.sessions.push({
     id: "chat-a",
@@ -98,7 +98,7 @@ test("An idea chip fills the empty Chat message", async ({ page }) => {
   await message.click();
   const group = page.getByRole("group", { name: "Prompt Ideas" });
   await group.getByRole("button", { name: ideas[0] }).click();
-  await expect(message).toHaveValue(ideas[0]);
+  await expect(message).toHaveValue(`Create an image: ${ideas[0]}`);
   await expect(group).toHaveCount(0);
   expect(state.chatRequests).toHaveLength(0);
 });
