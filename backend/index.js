@@ -19,6 +19,7 @@ import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
+import { createSuggestions, registerSuggestionRoutes } from "./domain/suggestions.ts";
 import { createTaste, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
@@ -1935,17 +1936,15 @@ app.put("/api/loras/:workflowId", (req, res) => {
 
 // Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
 // Like Chat, accounts without the prompt assistant never send their prompts to the text model.
-const taste = createTaste({
-  dataDir,
-  writer: (ownerId) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    return ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant"))
-      ? null
-      : assistantEngine;
-  },
-  online: async () =>
-    (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline",
-});
+const tasteWriter = (ownerId) => {
+  const account = ownerId ? accountAccessForId(ownerId) : undefined;
+  return ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant"))
+    ? null
+    : assistantEngine;
+};
+const textOnline = async () =>
+  (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline";
+const taste = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
 // Every admitted job teaches the taste profile (iterations) and makes waiting Dream work step aside.
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
@@ -2602,6 +2601,18 @@ const textBusy = () =>
       )
       .get(),
   );
+// Suggestions (domain/suggestions.ts): composer ideas, viewer next steps and Chat context from taste.
+registerSuggestionRoutes(app, {
+  suggestions: createSuggestions({
+    taste,
+    writer: tasteWriter,
+    online: textOnline,
+    item: (ownerId, jobId) =>
+      filterVisibleGallery(
+        gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
+      )[0],
+  }),
+});
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
 // It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
 const dream = createDream({
@@ -2722,6 +2733,8 @@ let chatGateway;
 const sessionChat = new ChatService({
   store: new ChatStore(rewriteStore.db),
   settings: chatSettings,
+  // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
+  taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
   session: (ownerId, id) => rewriteStore.session(ownerId, id),
   models: async (ownerId) => {
     const settings = chatSettings();
