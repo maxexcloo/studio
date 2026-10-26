@@ -130,8 +130,11 @@
   outline: 1px solid var(--studio-glass-border);
   outline-offset: -1px;
   opacity: 0.7;
-  animation: arrive var(--studio-motion-duration) ease-out;
   transition: opacity var(--studio-motion-duration) ease;
+}
+
+.variation[data-entering] {
+  animation: arrive var(--studio-motion-duration) ease-out;
 }
 
 .variation:hover,
@@ -208,7 +211,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .variation {
+  .variation[data-entering] {
     animation: none;
   }
 }

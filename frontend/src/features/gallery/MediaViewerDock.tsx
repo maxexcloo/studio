@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ActionIcon,
   Group,
@@ -81,6 +82,10 @@ export function MediaViewerDock({
   const { input } = useGeneration();
   const ready = item.status === "done" && Boolean(item.url);
   const label = `Generate ${input.count} Variation${input.count === 1 ? "" : "s"}`;
+  // Only variations that arrive while this family is shown animate in, not those present on open.
+  const root = family[0]?.key;
+  const [shown, setShown] = useState(() => ({ root, keys: new Set(family.map(({ key }) => key)) }));
+  if (shown.root !== root) setShown({ root, keys: new Set(family.map(({ key }) => key)) });
   return (
     <div className={classes.dock}>
       {family.length > 1 && (
@@ -108,6 +113,7 @@ export function MediaViewerDock({
                   role="listitem"
                   className={classes.variation}
                   data-current={current || undefined}
+                  data-entering={(shown.root === root && !shown.keys.has(key)) || undefined}
                   aria-current={current || undefined}
                   aria-label={
                     result
