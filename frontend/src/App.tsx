@@ -53,7 +53,12 @@ function Workspace() {
     <GenerationProvider workspace={chatRoute ? "chat" : "gallery"}>
       <ChatProvider>
         <CompareProvider>
-          <AppShell header={{ height: 68 }} padding={{ base: "sm", md: "lg" }}>
+          <AppShell
+            header={{ height: 68 }}
+            padding={{ base: "sm", md: "lg" }}
+            // Chat's own padding switches with the mode; animating it slides the whole page.
+            transitionDuration={0}
+          >
             <AppShell.Header>
               <AppHeader chat={chatRoute} mode={mode} />
             </AppShell.Header>
