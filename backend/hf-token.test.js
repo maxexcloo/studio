@@ -8,7 +8,7 @@ import test from "node:test";
 const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
 const envFile = path.join(folder, ".env");
 const fromFile = `hf_${"f".repeat(20)}1234`;
-fs.writeFileSync(envFile, `COMFY_URL=http://127.0.0.1:8188\nHF_TOKEN=${fromFile}\n`);
+fs.writeFileSync(envFile, `HF_TOKEN=${fromFile}\n`);
 process.env.STUDIO_ENV_FILE = envFile;
 delete process.env.HF_TOKEN;
 delete process.env.HUGGING_FACE_HUB_TOKEN;

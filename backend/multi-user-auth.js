@@ -433,7 +433,8 @@ export function registerMultiUserAuthRoutes(
       return res.status(401).json({ ok: false, error: "Sign in to manage your MCP token." });
     res.setHeader("Cache-Control", "no-store");
     const endpointBase =
-      process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+      process.env.STUDIO_MCP_PUBLIC_URL?.replace(/\/+$/, "") ||
+      `${req.protocol}://${req.get("host")}`;
     res.json({
       ok: true,
       endpoint: `${endpointBase}/mcp`,
@@ -472,7 +473,8 @@ export function registerMultiUserAuthRoutes(
     if (!account) return res.status(401).json({ ok: false, error: "Sign in to see your account." });
     res.setHeader("Cache-Control", "no-store");
     const endpointBase =
-      process.env.MCP_PUBLIC_URL?.replace(/\/+$/, "") || `${req.protocol}://${req.get("host")}`;
+      process.env.STUDIO_MCP_PUBLIC_URL?.replace(/\/+$/, "") ||
+      `${req.protocol}://${req.get("host")}`;
     res.json({
       ok: true,
       account,

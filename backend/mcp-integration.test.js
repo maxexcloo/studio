@@ -292,7 +292,7 @@ async function fixture(
   });
   const environment = {
     ...(enabled ? { STUDIO_MCP_API_KEY: mediaKey } : {}),
-    MCP_PUBLIC_URL: "https://studio.example.test",
+    STUDIO_MCP_PUBLIC_URL: "https://studio.example.test",
     ...extra,
   };
   const mcp = await registerMcpRoutes(app, {
@@ -1558,7 +1558,7 @@ test("deployment prompting packs retain compact discovery, profile modes and rev
       variants: { quick: { rules: ["Keep the request concise"] } },
     }),
   );
-  const f = await fixture(t, { dataDir: dir, environment: { MCP_PROMPTING_PATH: file } });
+  const f = await fixture(t, { dataDir: dir, environment: { STUDIO_MCP_PROMPTING_PATH: file } });
   const client = await f.client();
   // Guides stay in the detail; the compact list carries only each profile's id and label.
   assert.deepEqual(data(await call(client, "Models", { kind: "image" })), {
@@ -1688,7 +1688,7 @@ test("signed links do not expire, preserve the configured public path and cannot
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const f = await fixture(t, {
     dataDir: dir,
-    environment: { MCP_PUBLIC_URL: "https://studio.example.test/nested/studio" },
+    environment: { STUDIO_MCP_PUBLIC_URL: "https://studio.example.test/nested/studio" },
   });
   const client = await f.client();
   const id = jobId(await generate(client));
@@ -1702,7 +1702,7 @@ test("signed links do not expire, preserve the configured public path and cannot
   assert.equal((await fetch(local)).status, 200);
   const second = await fixture(t, {
     dataDir: dir,
-    environment: { MCP_PUBLIC_URL: "https://another-studio.example.test" },
+    environment: { STUDIO_MCP_PUBLIC_URL: "https://another-studio.example.test" },
   });
   second.jobs.set(id, f.jobs.get(id));
   assert.equal((await fetch(second.base + new URL(local).pathname)).status, 404);
@@ -1877,7 +1877,13 @@ test(
         STUDIO_DEMO: "1",
         STUDIO_LAN: "0",
         STUDIO_MCP_API_KEY: mediaKey,
-        COMFY_URL: "http://127.0.0.1:1",
+        STUDIO_WORKERS: JSON.stringify([
+          {
+            id: "primary",
+            url: "http://127.0.0.1:1",
+            capabilities: ["image", "video", "upscale", "models"],
+          },
+        ]),
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
@@ -1981,7 +1987,7 @@ test("profile-owned prompting overrides a stale compatibility inventory", async 
       packs: { "stale-pack": { summary: "Stale fallback guidance", rules: ["Old guidance"] } },
     }),
   );
-  const f = await fixture(t, { dataDir: dir, environment: { MCP_PROMPTING_PATH: file } });
+  const f = await fixture(t, { dataDir: dir, environment: { STUDIO_MCP_PROMPTING_PATH: file } });
   const owned = {
     id: "profile-guide",
     summary: "Reviewed profile guidance",
@@ -2065,7 +2071,13 @@ test(
         STUDIO_ENABLE_BUILTIN_PROFILES: "0",
         STUDIO_LAN: "0",
         STUDIO_MCP_API_KEY: mediaKey,
-        COMFY_URL: `http://127.0.0.1:${backend.address().port}`,
+        STUDIO_WORKERS: JSON.stringify([
+          {
+            id: "primary",
+            url: `http://127.0.0.1:${backend.address().port}`,
+            capabilities: ["image", "video", "upscale", "models"],
+          },
+        ]),
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
@@ -4333,7 +4345,7 @@ test("partial prompt writer settings fail at start by name", () => {
           baseUrl: "http://127.0.0.1:1",
           environment: {
             STUDIO_MCP_API_KEY: mediaKey,
-            MCP_PUBLIC_URL: "https://studio.example.test",
+            STUDIO_MCP_PUBLIC_URL: "https://studio.example.test",
             STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid",
           },
         }),
