@@ -3237,7 +3237,26 @@ const videoCatalogue = (local = true) => [
   cloudVideo("cloud-video-fast", "Cloud Video · Fast · Cloud"),
 ];
 
-test("video never goes to the cloud by itself while the local video worker is off", async (t) => {
+test("with Video Cloud Fallback on, video runs on a granted cloud profile while the worker is off and says so", async (t) => {
+  process.env.STUDIO_VIDEO_CLOUD_FALLBACK = "1";
+  t.after(() => delete process.env.STUDIO_VIDEO_CLOUD_FALLBACK);
+  const f = await fixture(t);
+  await f.profiles(videoCatalogue(false), {
+    defaults: { image: imageProfile.id, video: "cloud-video" },
+    videoAvailable: false,
+  });
+  const client = await f.client();
+  const fallback = await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 });
+  assert.match(texts(fallback), /local video worker is offline, so this went to the cloud/i);
+  assert.equal(data(fallback).profile.remote, true);
+  data(await call(client, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
+  finish(f);
+  const animation = await call(client, "Reuse", { job_id: "result 2", mode: "animate" });
+  assert.match(texts(animation), /went to the cloud/);
+  assert.equal(f.submitted.at(-1).profileId, "cloud-video-fast");
+});
+
+test("by default, video never goes to the cloud by itself while the local video worker is off", async (t) => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), {
     defaults: { image: imageProfile.id, video: "cloud-video" },

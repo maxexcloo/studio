@@ -537,8 +537,8 @@ export function registerMcpRoutes(
      * Without a named model, the writer picks from Studio's choices by the request; otherwise the usual
      * pick stands. With several to choose from, the note says which and why, in one line.
      */
-    const picked = async ({ pool, profile }, request, signal) => {
-      if (pool.length < 2) return { profile, note: "" };
+    const picked = async ({ pool, profile, note: fallback }, request, signal) => {
+      if (pool.length < 2) return { profile, note: fallback };
       const choice =
         writer && request
           ? await writer.pick({ request, profiles: pool, preferred: profile, signal })
@@ -546,7 +546,7 @@ export function registerMcpRoutes(
       const chosen = choice?.profile || profile;
       return {
         profile: chosen,
-        note: `Chose ${chosen.label || chosen.id}${choice ? `: ${choice.reason}` : ", the default"}. `,
+        note: `${fallback}Chose ${chosen.label || chosen.id}${choice ? `: ${choice.reason}` : ", the default"}. `,
       };
     };
     /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
@@ -1346,25 +1346,20 @@ export function registerMcpRoutes(
             asksForCloud(prompt) ||
             Boolean(named && isCloudProfile(named.profile));
           if (kind !== own)
-            plan = {
-              ...(await media.animate(owner, id, output_index, item, {
-                tier: wanted,
-                count,
-                cloud,
-                profile: named?.profile,
-              })),
-              tierNote: named?.note || "",
-            };
+            plan = await media.animate(owner, id, output_index, item, {
+              tier: wanted,
+              count,
+              cloud,
+              profile: named?.profile,
+              note: named?.note,
+            });
           else if (wanted || profile_id) {
             const references = (item.settings?.referenceAssets || []).filter(
               (asset) => asset?.assetId,
             ).length;
             const target = profile_id
               ? namedInTier(await media.profiles(kind, owner), profile_id, wanted)
-              : {
-                  profile: await media.choose(owner, { kind, tier: wanted, references, cloud }),
-                  note: "",
-                };
+              : await media.choose(owner, { kind, tier: wanted, references, cloud });
             plan = { ...media.retarget(item, target.profile, { count }), tierNote: target.note };
           } else plan = await media.rerun(owner, item, { count });
           // Changes re-expand the original request for the target profile, so no prompt or guide piles up in the chat.

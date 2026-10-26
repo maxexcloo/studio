@@ -35,10 +35,21 @@ export const catalogueFlags = [
   flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", {
     applies: "restart",
   }),
+  flag(
+    "STUDIO_VIDEO_CLOUD_FALLBACK",
+    "Video Cloud Fallback",
+    "While the local video worker is off, MCP video runs on a granted cloud profile instead of being refused.",
+    { defaultOn: false },
+  ),
 ];
 
 const flagOn = (item) =>
   item.defaultOn ? process.env[item.key] !== "0" : process.env[item.key] === "1";
+
+/** Whether a catalogue switch is on now (Settings saves apply at once). */
+export function flagEnabled(key) {
+  return flagOn(catalogueFlags.find((item) => item.key === key));
+}
 
 export function describeFlag(item) {
   return { ...item, value: flagOn(item), ...settingSource(item.key) };
