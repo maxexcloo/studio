@@ -5,13 +5,14 @@ import { Navigate, useParams } from "react-router";
 import type { ChatMessage } from "../../../../shared/chat";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
+import { usePhone } from "../../ui/usePhone";
 import type { MediaItem, QueueJob } from "../../types";
 import { useGeneration, initialInput } from "../generation/GenerationProvider";
 import { MediaViewer } from "../gallery/MediaViewer";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatWorkspace } from "./ChatWorkspace";
+import { ChatWorkspace, NewChatButton } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { jobResults, sessionQuery } from "./queries";
 import { SessionIteration } from "./SessionIteration";
@@ -23,10 +24,28 @@ export function ChatPage() {
 }
 export function SessionsPage() {
   const { draft } = useGeneration();
+  const phone = usePhone();
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <ChatWorkspace>
-      <EmptyState fill>No Chat Selected</EmptyState>
+      {phone ? (
+        // Phones have no Chats sidebar, so the empty state says where the list is.
+        <EmptyState
+          fill
+          title="No Chat Selected"
+          action={
+            <NewChatButton
+              onClick={() =>
+                document.querySelector<HTMLElement>('textarea[aria-label="Message"]')?.focus()
+              }
+            />
+          }
+        >
+          Your Chats are behind the status button at the top left.
+        </EmptyState>
+      ) : (
+        <EmptyState fill>No Chat Selected</EmptyState>
+      )}
       <ChatDock />
     </ChatWorkspace>
   );
