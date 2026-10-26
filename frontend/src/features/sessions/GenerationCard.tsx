@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { CloseButton, Group, Text } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import type { GenerationInput, ReferenceAsset } from "../../types";
@@ -8,6 +8,7 @@ import {
   useGenerationActions,
 } from "../generation/GenerationProvider";
 import { GenerationEditor } from "../generation/GenerationEditor";
+import { PresetEditor, type PresetSelection } from "../generation/PresetEditor";
 import { generationInput, referencePatch } from "../generation/payload";
 import type { ChatDraft } from "../../../../shared/chat";
 import { useChatController } from "./ChatProvider";
@@ -36,6 +37,7 @@ export function GenerationCard({
   onClose?: (submitted?: boolean) => void;
 }) {
   const submitting = useRef(false);
+  const [preset, setPreset] = useState<PresetSelection>({});
   const { profiles } = useGenerationActions();
   const { send, sendingSession, status } = useChatController();
   const form = useForm<GenerationInput>({
@@ -104,6 +106,25 @@ export function GenerationCard({
         }
         onClear={() => form.reset()}
         onSubmit={() => void submit()}
+        presets={(close) => (
+          <PresetEditor
+            input={form.values}
+            references={references}
+            profile={profile}
+            selection={preset}
+            onSelectionChange={setPreset}
+            onLoad={(loaded) => {
+              setPreset({ presetId: loaded.id, presetTitle: loaded.title });
+              form.setValues({
+                ...initialInput,
+                referenceDetails: [],
+                inpaint: null,
+                ...loaded.input,
+              });
+              close();
+            }}
+          />
+        )}
         operation={draft.operation}
         pending={!!sendingSession}
         blockedReason={chatUnavailable}

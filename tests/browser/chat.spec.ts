@@ -213,6 +213,17 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   expect(state.chatRequests[1].generation.input.profileId).toBe("image:test");
   expect(state.chatRequests[1].generation.input.backendId).toBe("worker-a");
   await first.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
+  // The card shares the gallery's chip rail: a preset loads into this card only.
+  state.presets.push({
+    id: "dusk",
+    title: "Dusk",
+    input: { kind: "image", profileId: "image:test", prompt: "A blue bird at dusk" },
+  });
+  await first.getByRole("button", { name: "Presets", exact: true }).click();
+  await page.getByRole("button", { name: "Dusk", exact: true }).click();
+  await expect(first.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A blue bird at dusk",
+  );
   // The card's output switch picks a profile like the gallery and explains why Generate waits.
   const output = first.getByRole("radiogroup", { name: "Generation Output", exact: true });
   await output.locator("label").filter({ hasText: "Video" }).click();
