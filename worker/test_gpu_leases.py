@@ -101,6 +101,7 @@ class Reservations(unittest.TestCase):
         env["AI_GPU_LEASE_DIR"] = str(Path(self.directory.name) / "absent")
         result = subprocess.run(
             ["/bin/sh", str(SCRIPT), "/bin/sh", "-c", "exit 7"],
+            check=False,
             env=env,
             capture_output=True,
             text=True,
