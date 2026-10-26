@@ -215,7 +215,8 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
   });
 }
 
-export function registerGalleryHistoryRoutes(app) {
+/** `starred` hears which of the caller's items changed, for the taste profile. */
+export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
   app.get("/api/gallery/export", (req, res) => {
     if (!requireGalleryAccess(req, res))
       return res
@@ -249,6 +250,7 @@ export function registerGalleryHistoryRoutes(app) {
       )
       .flatMap((item) => [item.id, item.url, galleryKey(item)]);
     const changed = setGalleryFavorites(ids, Boolean(req.body?.favorite));
+    starred(req, changed, Boolean(req.body?.favorite));
     res.json({ ok: true, items: changed, revision: galleryRevisionValue() });
   });
 }

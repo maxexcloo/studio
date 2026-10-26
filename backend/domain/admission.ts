@@ -1,6 +1,6 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { GenerationQueue } from "./queue.ts";
-import { RewriteStore, type QueueOrigin } from "./store.ts";
+import { RewriteStore, type OwnedJob, type QueueOrigin } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;
@@ -24,6 +24,8 @@ interface AdmissionOptions {
   pendingItems(id: string, input: GenerationInput): QueueMedia[];
   revision(): number;
   jobLimit: number;
+  /** Hears each newly queued job, for the taste profile; must not throw. */
+  admitted?(job: OwnedJob): void;
 }
 
 /** HTTP and MCP share durable admission, identity, validation and idempotency. */
@@ -96,6 +98,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             };
           throw error;
         }
+        options.admitted?.(job);
       }
       void options.queue.tick().catch(() => undefined);
       const items = job.items.length

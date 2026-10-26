@@ -18,6 +18,7 @@ import {
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
+import { createTaste, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
@@ -448,6 +449,11 @@ app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 // Each worker's latest ComfyUI answer (node list and stats), by worker id.
 const emptyContext = { info: null, stats: null, fetchedAt: 0 };
 const rewriteStore = new RewriteStore(path.join(dataDir, "studio.sqlite"));
+// Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
+const taste = createTaste({ dataDir });
+const tasteAdmitted = (job) => {
+  if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+};
 const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
@@ -1915,7 +1921,18 @@ app.put("/api/loras/:workflowId", (req, res) => {
   }
 });
 
-registerGalleryHistoryRoutes(app);
+registerGalleryHistoryRoutes(app, {
+  starred: (req, items, favorite) =>
+    taste.record(
+      ownerIdForRequest(req),
+      items.map((item) =>
+        tasteSignal(favorite ? "star" : "unstar", item.jobId, {
+          ...item.settings,
+          prompt: item.prompt,
+        }),
+      ),
+    ),
+});
 
 app.get("/api/prompts", (req, res) => {
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
@@ -2499,6 +2516,7 @@ registerRewriteRoutes(app, {
   jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
   title: chatTitle,
+  admitted: tasteAdmitted,
 });
 const admitGeneration = createGenerationAdmission({
   store: rewriteStore,
@@ -2508,6 +2526,7 @@ const admitGeneration = createGenerationAdmission({
   revision: galleryRevisionValue,
   jobLimit: accountJobLimit,
   validate: validateGenerationInput,
+  admitted: tasteAdmitted,
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {
@@ -2528,8 +2547,18 @@ registerCompareRoutes(app, {
       ? recordsForRequest(filterVisibleGallery(gallery), req)
       : null,
   pendingItems: makePendingItems,
+  voted: (ownerId, jobId) => {
+    const job = rewriteStore.job(ownerId, jobId);
+    const item = gallery.find(
+      (entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId,
+    );
+    taste.record(ownerId, [
+      tasteSignal("compare", jobId, job?.input || { ...item?.settings, prompt: item?.prompt }),
+    ]);
+  },
   title: chatTitle,
 });
+registerTasteRoutes(app, { taste });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);

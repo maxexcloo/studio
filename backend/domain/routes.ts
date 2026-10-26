@@ -4,7 +4,7 @@ import type {
   QueueCancelAllResponse,
 } from "../../shared/queue.ts";
 import { GenerationQueue, terminalStatuses } from "./queue.ts";
-import { publicJob, RewriteStore } from "./store.ts";
+import { publicJob, RewriteStore, type OwnedJob } from "./store.ts";
 
 interface Request {
   studioAccount?: { userId: string; role?: string };
@@ -42,6 +42,7 @@ export function registerRewriteRoutes(
     jobLimit,
     deleteMedia,
     title,
+    admitted,
   }: {
     store: RewriteStore;
     queue: GenerationQueue;
@@ -58,6 +59,8 @@ export function registerRewriteRoutes(
     ) => { removed: string[]; files: { deleted: number; skipped: number } };
     /** Titles a chat started by its first generation; must not reject. */
     title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
+    /** Hears each newly queued job, for the taste profile; must not throw. */
+    admitted?: (job: OwnedJob) => void;
   },
 ) {
   app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
@@ -186,6 +189,7 @@ export function registerRewriteRoutes(
     } catch (error) {
       return admissionError(res, error);
     }
+    admitted?.(job);
     // The scheduler is also driven by its timer; responses acknowledge durable acceptance.
     void queue.tick().catch(() => undefined);
     if (
