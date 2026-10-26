@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { migrateRuntime } from "../persistence/migration.ts";
 import {
   closeRuntimeDatabase,
@@ -11,28 +12,44 @@ import {
 } from "../persistence/runtime.ts";
 import { RewriteStore } from "../domain/store.ts";
 import { RuntimeController, type Workload } from "./controller.ts";
+import { KubernetesEngine } from "./kubernetes.ts";
 import { legacyRecoverySwitchGuard } from "./legacy-recovery.ts";
 
 const workloads: Workload[] = [
-  { id: "image", container: "image", devices: ["0"], kind: "media", url: "http://image:8188" },
-  { id: "text", container: "text", devices: ["0"], kind: "text", url: "http://text:8000" },
-  {
-    id: "independent",
-    container: "independent",
-    devices: ["1"],
-    kind: "media",
-    url: "http://video:8188",
-  },
-  {
-    id: "other-media",
-    container: "other-media",
-    devices: ["0"],
-    kind: "media",
-    url: "http://other:8188",
-  },
-];
+  ["image", "image", "http://image:8188"],
+  ["independent", "video", "http://video:8188"],
+  ["text", "text", "http://text:8000"],
+].map(([id, kind, url]) => ({
+  id,
+  label: id,
+  kind: kind as Workload["kind"],
+  namespace: "gpu",
+  deployment: id,
+  pool: "gpu",
+  gpus: 1,
+  url,
+}));
+function controller(running: string[]) {
+  const kube = fakeKubernetes(
+    workloads.map((item) => ({
+      namespace: "gpu",
+      name: item.id,
+      replicas: running.includes(item.id) ? 1 : 0,
+    })),
+  );
+  return {
+    kube,
+    controller: new RuntimeController({
+      engine: new KubernetesEngine(kube.request),
+      workloads,
+      pools: { gpu: 2 },
+      automaticLifecycle: true,
+      sleep: async () => kube.tick(),
+    }),
+  };
+}
 
-test("migrated accepted legacy generation holds text and media switches until its own outputs are saved", async () => {
+test("migrated accepted legacy generation holds a switch until its own outputs are saved", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-legacy-admission-"));
   let store: RewriteStore | undefined;
   try {
@@ -48,24 +65,9 @@ test("migrated accepted legacy generation holds text and media switches until it
       .filter((id) => !store!.jobs().some((job) => job.id === id));
     let phase: "offline" | "running" | "done" = "offline",
       saveFails = true;
-    const operations: string[] = [];
-    const running = new Set(["image", "independent"]);
-    const controller = new RuntimeController(
-      {
-        running: async (id) => running.has(id),
-        stop: async (id) => {
-          operations.push(`stop:${id}`);
-          running.delete(id);
-        },
-        start: async (id) => {
-          operations.push(`start:${id}`);
-          running.add(id);
-        },
-      },
-      workloads,
-      true,
-    );
-    controller.beforeStop = legacyRecoverySwitchGuard({
+    const saved: string[] = [];
+    const { kube, controller: runtime } = controller(["image", "independent"]);
+    runtime.beforeStop = legacyRecoverySwitchGuard({
       ids,
       recover: async () => {},
       inspect: () => ({
@@ -83,22 +85,24 @@ test("migrated accepted legacy generation holds text and media switches until it
             url: "/comfy/view?filename=result.png&type=media",
           },
         ]);
-        operations.push("saved");
+        saved.push("saved");
       },
     });
-    await assert.rejects(controller.acquire("text"), /legacy generations/);
-    assert.deepEqual(operations, []);
+    // Text needs a GPU, so the idle image worker would stop; its unsaved legacy job holds it.
+    await assert.rejects(runtime.acquire("text"), /legacy generations/);
     phase = "running";
-    (await controller.acquire("image")).release();
-    (await controller.acquire("independent")).release();
-    await assert.rejects(controller.acquire("other-media"), /legacy generations/);
-    assert.deepEqual(operations, []);
+    (await runtime.acquire("image")).release();
+    (await runtime.acquire("independent")).release();
+    await assert.rejects(runtime.acquire("text"), /legacy generations/);
     phase = "done";
-    await assert.rejects(controller.acquire("text"), /storage is full/);
-    assert.deepEqual(operations, []);
+    await assert.rejects(runtime.acquire("text"), /storage is full/);
+    assert.deepEqual(kube.log, []);
     saveFails = false;
-    (await controller.acquire("text")).release();
-    assert.deepEqual(operations, ["saved", "stop:image", "start:text"]);
+    await assert.rejects(runtime.acquire("text"), /Waiting for text to start/);
+    await runtime.settled;
+    assert.deepEqual(saved, ["saved"]);
+    assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/text 1"]);
+    (await runtime.acquire("text")).release();
     assert.match(
       (readRuntimeDocument(directory, "gallery") as { url: string }[])[0].url,
       /type=media/,
@@ -111,28 +115,17 @@ test("migrated accepted legacy generation holds text and media switches until it
   }
 });
 
-test("a known legacy operation on an independent placement does not block a switch", async () => {
-  const stopped: string[] = [];
-  // A started worker is confirmed by Engine inspection on the second call.
-  let textStarted = false;
-  const engine = {
-    running: async (id: string) => id === "image" || (id === "text" && textStarted),
-    stop: async (id: string) => {
-      stopped.push(id);
-    },
-    start: async () => {
-      textStarted = true;
-    },
-  };
-  const independent = new RuntimeController(engine, workloads, true);
-  independent.beforeStop = legacyRecoverySwitchGuard({
+test("a known legacy operation on another worker does not block a switch", async () => {
+  const { kube, controller: runtime } = controller(["image", "independent"]);
+  runtime.beforeStop = legacyRecoverySwitchGuard({
     ids: ["video-job"],
     recover: async () => {},
-    inspect: () => ({ backendUrl: workloads[2].url, settled: false }),
+    inspect: () => ({ backendUrl: workloads[1].url, settled: false }),
     save: async () => {
       throw new Error("Independent output must not be saved by this switch");
     },
   });
-  (await independent.acquire("text")).release();
-  assert.deepEqual(stopped, ["image"]);
+  await assert.rejects(runtime.acquire("text"), /Waiting for text to start/);
+  await runtime.settled;
+  assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/text 1"]);
 });

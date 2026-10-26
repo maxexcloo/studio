@@ -10,6 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
@@ -43,19 +44,16 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
       : {}),
     outputFiles: new Map([["own.png", png]]),
   });
-  const running = new Set(["media"]);
-  const operations = [];
-  const engine = http.createServer((request, response) => {
-    const match = /^\/containers\/(media|text)\/(json|start|stop)/.exec(request.url);
-    if (!match) return response.writeHead(404).end();
-    const [, id, action] = match;
-    if (action === "json")
-      return response.end(JSON.stringify({ State: { Running: running.has(id) } }));
-    operations.push(`${action}:${id}`);
-    if (action === "start") running.add(id);
-    else running.delete(id);
-    response.writeHead(204).end();
-  });
+  // Media and text share the one GPU; media starts running.
+  const kube = fakeKubernetes(
+    [
+      { namespace: "gpu", name: "media", replicas: 1 },
+      { namespace: "gpu", name: "text" },
+    ],
+    { tickOnRead: true },
+  );
+  const operations = kube.log;
+  const engine = http.createServer(kube.handle);
   engine.listen(0, "127.0.0.1");
   await once(engine, "listening");
   const text = http.createServer((request, response) => {
@@ -65,26 +63,17 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   });
   text.listen(0, "127.0.0.1");
   await once(text, "listening");
-  fs.writeFileSync(
-    path.join(config, "workloads.json"),
-    JSON.stringify({
-      media: {
-        kind: "image",
-        placements: ["0"],
-        studio: { container: "media", placement: "0", url: worker.url },
-      },
-      text: {
-        kind: "text",
-        placements: ["0"],
-        studio: {
-          container: "text",
-          placement: "0",
-          url: `http://127.0.0.1:${text.address().port}`,
-          apiKeyEnv: "STUDIO_FIXTURE_TEXT_KEY",
-        },
-      },
-    }),
-  );
+  const gpu = { namespace: "gpu", pool: "gpu", gpus: 1 };
+  const workloads = JSON.stringify({
+    media: { ...gpu, kind: "image", deployment: "media", url: worker.url },
+    text: {
+      ...gpu,
+      kind: "text",
+      deployment: "text",
+      url: `http://127.0.0.1:${text.address().port}`,
+      apiKeyEnv: "STUDIO_FIXTURE_TEXT_KEY",
+    },
+  });
   const launch = () =>
     fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
       env: {
@@ -98,9 +87,10 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_WORKERS: JSON.stringify([
           { id: "chosen", name: "Chosen", url: worker.url, capabilities: ["image"] },
         ]),
-        STUDIO_DOCKER_URL: `http://127.0.0.1:${engine.address().port}`,
+        STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
+        STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
+        STUDIO_KUBERNETES_WORKLOADS: workloads,
         STUDIO_RUNTIME_AUTOMATIC: "1",
-        STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED: "1",
         STUDIO_TEXT_ADMISSION_ACKNOWLEDGED: "1",
         STUDIO_TEXT_WORKLOAD: "text",
         STUDIO_TEXT_ADMISSION_TOKEN: "fixture-admission",
@@ -229,8 +219,9 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   const saved = await fetch(new URL(completed.outputs[0].url, base));
   assert.equal(saved.status, 200);
   assert.ok((await saved.arrayBuffer()).byteLength > 0);
-  assert.equal((await textRequest()).status, 200);
-  assert.deepEqual(operations, ["stop:media", "start:text"]);
+  // Text waited for the saved output; now the switch stops media, waits for its pod and starts text.
+  await waitFor(textRequest, (response) => response.status === 200);
+  assert.deepEqual(operations, ["scale gpu/media 0", "gone gpu/media", "scale gpu/text 1"]);
   assert.equal(worker.prompts.length, 1);
 }
 

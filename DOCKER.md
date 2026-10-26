@@ -4,7 +4,7 @@ Studio publishes two images: `ghcr.io/maxexcloo/studio` for the application and 
 
 ## Application
 
-Mount persistent data at `/data` and the `ai` configuration checkout at `/config:ro`. Set `STUDIO_CONFIG_DIR=/config` and configure workers, authentication and provider credentials using [Configuration](CONFIGURATION.md). Generated media and editable profiles, guides and catalogue data remain in the Studio data mount. The ai mount supplies workload metadata and fills only missing seed definitions; worker model files belong on worker mounts.
+Mount persistent data at `/data` and the `ai` configuration checkout at `/config:ro`. Set `STUDIO_CONFIG_DIR=/config` and configure workers, authentication and provider credentials using [Configuration](CONFIGURATION.md). Generated media and editable profiles, guides and catalogue data remain in the Studio data mount. The ai mount fills only missing seed definitions; worker model files belong on worker mounts.
 
 ```sh
 docker build -t studio:development .

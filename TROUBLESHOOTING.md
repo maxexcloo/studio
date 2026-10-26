@@ -16,7 +16,7 @@ Read the startup error for the missing setting, occupied port or invalid mounted
 
 ### Profiles or Models Are Missing
 
-Check the live profile and catalogue definitions in Library, and confirm that `STUDIO_CONFIG_DIR` mounts the intended ai seed and workload configuration. Existing runtime edits take precedence over seeds. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
+Check the live profile and catalogue definitions in Library, and confirm that `STUDIO_CONFIG_DIR` mounts the intended ai seed. Existing runtime edits take precedence over seeds. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
 
 ### Chat Is Unavailable
 

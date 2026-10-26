@@ -1,36 +1,52 @@
 import { timingSafeEqual } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Express, RequestHandler } from "express";
-import { DockerEngine, RuntimeController, type Workload } from "./controller.ts";
+import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
+import { RuntimeController, type RuntimeRecord, type Workload } from "./controller.ts";
+import {
+  inClusterRequest,
+  KubernetesEngine,
+  urlRequest,
+  type KubernetesRequest,
+} from "./kubernetes.ts";
 import { createRuntimeRouter, createTextAdmissionRouter } from "./routes.ts";
 
 type Environment = Record<string, string | undefined>;
-interface ConfiguredWorkload {
-  kind: "image" | "video" | "text";
-  placements: string[];
-  studio?: { container: string; placement: string; url: string; apiKeyEnv?: string };
-}
+const kinds = ["image", "video", "text"];
 
 function required(environment: Environment, name: string) {
   const value = environment[name];
   if (!value) throw new Error(`${name} is required.`);
   return value;
 }
+function json(environment: Environment, name: string) {
+  try {
+    return JSON.parse(required(environment, name));
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new Error(`${name} is not valid JSON.`);
+    throw error;
+  }
+}
 
-/** The ai-owned workload records retain identifiers; studio selects one fixed placement. */
-export function loadRuntime(environment: Environment = process.env, fetchImpl = fetch) {
-  if (!environment.STUDIO_CONFIG_DIR) return undefined;
-  const path = join(environment.STUDIO_CONFIG_DIR, "workloads.json");
-  if (!existsSync(path)) return undefined;
-  const records = JSON.parse(readFileSync(path, "utf8")) as Record<string, ConfiguredWorkload>;
+/** Parse STUDIO_KUBERNETES_GPUS and STUDIO_KUBERNETES_WORKLOADS; anything malformed stops Studio with its name. */
+export function kubernetesWorkloads(environment: Environment) {
+  const pools = json(environment, "STUDIO_KUBERNETES_GPUS") as Record<string, number>;
+  for (const [pool, count] of Object.entries(pools))
+    if (!Number.isInteger(count) || count < 1)
+      throw new Error(`STUDIO_KUBERNETES_GPUS: ${pool} needs a whole number of GPUs.`);
+  const records = json(environment, "STUDIO_KUBERNETES_WORKLOADS") as Record<
+    string,
+    Partial<Workload>
+  >;
   const keys = new Map<string, string>();
-  const workloads = Object.entries(records).flatMap(([id, record]): Workload[] => {
-    if (!record.studio) return [];
-    const config = record.studio;
-    if (!record.placements.includes(config.placement))
-      throw new Error(`Workload ${id} has an unsupported Studio placement.`);
-    const target = new URL(config.url);
+  const workloads = Object.entries(records).map(([id, record]): Workload => {
+    const problem = (detail: string) => new Error(`STUDIO_KUBERNETES_WORKLOADS: ${id} ${detail}.`);
+    if (!kinds.includes(record.kind!)) throw problem("needs a kind of image, video or text");
+    for (const field of ["namespace", "deployment", "pool", "url"] as const)
+      if (typeof record[field] !== "string" || !record[field]) throw problem(`needs ${field}`);
+    if (!(record.pool! in pools)) throw problem(`names pool ${record.pool}, which has no GPUs`);
+    if (!Number.isInteger(record.gpus) || record.gpus! < 1 || record.gpus! > pools[record.pool!])
+      throw problem(`needs gpus between 1 and the ${record.pool} pool's ${pools[record.pool!]}`);
+    const target = new URL(record.url!);
     if (
       !["http:", "https:"].includes(target.protocol) ||
       target.username ||
@@ -38,59 +54,75 @@ export function loadRuntime(environment: Environment = process.env, fetchImpl = 
       target.search ||
       target.hash
     )
-      throw new Error(`Workload ${id} needs a direct worker URL.`);
+      throw problem("needs a direct worker URL");
     if (environment.BIFROST_URL && target.origin === new URL(environment.BIFROST_URL).origin)
-      throw new Error(`Workload ${id} must point directly to its worker, not Bifrost.`);
-    if (config.apiKeyEnv) keys.set(id, required(environment, config.apiKeyEnv));
-    return [
-      {
-        id,
-        container: config.container,
-        devices: config.placement.split(","),
-        kind: record.kind === "text" ? "text" : "media",
-        url: config.url.replace(/\/$/, ""),
-      },
-    ];
+      throw problem("must point directly to its worker, not Bifrost");
+    if (record.apiKeyEnv) keys.set(id, required(environment, record.apiKeyEnv));
+    return {
+      id,
+      label: record.label || id,
+      kind: record.kind!,
+      namespace: record.namespace!,
+      deployment: record.deployment!,
+      pool: record.pool!,
+      gpus: record.gpus!,
+      url: record.url!.replace(/\/$/, ""),
+      ...(record.apiKeyEnv ? { apiKeyEnv: record.apiKeyEnv } : {}),
+    };
   });
+  return { pools, workloads, keys };
+}
+
+/** Studio scales the configured GPU deployments on the cluster it runs in. */
+export function loadRuntime(
+  environment: Environment = process.env,
+  {
+    dataDir,
+    fetchImpl = fetch,
+    request,
+  }: {
+    dataDir?: string;
+    fetchImpl?: typeof fetch;
+    request?: KubernetesRequest;
+  } = {},
+) {
+  if (!environment.STUDIO_KUBERNETES_WORKLOADS) return undefined;
+  const { pools, workloads, keys } = kubernetesWorkloads(environment);
   if (!workloads.length) return undefined;
   const automatic = environment.STUDIO_RUNTIME_AUTOMATIC === "1";
-  if (
-    automatic &&
-    (environment.STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED !== "1" ||
-      environment.STUDIO_TEXT_ADMISSION_ACKNOWLEDGED !== "1")
-  ) {
+  if (automatic && environment.STUDIO_TEXT_ADMISSION_ACKNOWLEDGED !== "1")
     throw new Error(
-      "Automatic runtime control requires STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED=1 and STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1.",
+      "Automatic runtime control requires STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1: managed local text must reach Studio's admission before Studio stops text workloads on its own.",
     );
-  }
-  const engine = new DockerEngine(required(environment, "STUDIO_DOCKER_URL"), fetchImpl);
-  const readiness = async (workload: Workload) => {
-    try {
-      const key = keys.get(workload.id);
-      const response = await fetchImpl(
-        `${workload.url}/${workload.kind === "text" ? "health" : "system_stats"}`,
-        {
-          headers: key ? { Authorization: `Bearer ${key}` } : {},
-          redirect: "error",
-          signal: AbortSignal.timeout(5_000),
-        },
-      );
-      await response.body?.cancel();
-      return response.ok;
-    } catch {
-      return false;
-    }
-  };
-  const controller = new RuntimeController(
-    {
-      running: (id) => engine.running(id),
-      start: (id) => engine.start(id),
-      stop: (id) => engine.stop(id),
-      ready: readiness,
-    },
-    workloads,
-    automatic,
+  const engine = new KubernetesEngine(
+    request ??
+      (environment.STUDIO_KUBERNETES_URL
+        ? urlRequest(environment.STUDIO_KUBERNETES_URL, fetchImpl)
+        : inClusterRequest(environment)),
   );
+  const name = "runtime-operations";
+  const controller = new RuntimeController({
+    engine,
+    workloads,
+    pools,
+    automaticLifecycle: automatic,
+    ...(dataDir
+      ? {
+          store: {
+            read: () => {
+              try {
+                return readRuntimeDocument(dataDir, name) as RuntimeRecord;
+              } catch (error) {
+                if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+                throw error;
+              }
+            },
+            write: (record) => writeRuntimeDocument(dataDir, name, record),
+          },
+        }
+      : {}),
+  });
+  if (automatic) setInterval(() => void controller.reconcile().catch(() => {}), 30_000).unref();
   return { controller, keys };
 }
 
@@ -119,11 +151,15 @@ export function registerTextAdmission(
   )
     throw new Error("STUDIO_TEXT_WORKLOAD must select a configured text workload.");
   const apiKey = runtime.keys.get(workloadId);
-  if (!apiKey) throw new Error("Text admission requires the workload studio.apiKeyEnv credential.");
+  if (!apiKey) throw new Error("Text admission requires the workload's apiKeyEnv credential.");
   app.use(
     "/api/local-text",
     authenticate,
-    createTextAdmissionRouter({ controller: runtime.controller, workloadId, apiKey }),
+    createTextAdmissionRouter({
+      controller: runtime.controller,
+      workloadId,
+      apiKey,
+    }),
   );
 }
 
@@ -132,6 +168,8 @@ export function registerRuntimeStatus(
   app: Express,
   runtime: ReturnType<typeof loadRuntime>,
   requireAdmin: RequestHandler,
+  requestedBy: (request: Parameters<RequestHandler>[0]) => string,
 ) {
-  if (runtime) app.use("/api/runtime", requireAdmin, createRuntimeRouter(runtime.controller));
+  if (runtime)
+    app.use("/api/runtime", requireAdmin, createRuntimeRouter(runtime.controller, requestedBy));
 }

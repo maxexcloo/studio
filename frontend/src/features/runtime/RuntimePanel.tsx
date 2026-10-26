@@ -11,6 +11,7 @@ import type {
 import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { RuntimeWorkloads } from "./RuntimeWorkloads";
 
 const services = [
   { kind: "text", label: "Text" },
@@ -121,11 +122,6 @@ function EndpointDetails({ endpoint }: { endpoint: ServiceEndpoint }) {
           Configured Workload: {endpoint.workloadId}
         </Text>
       )}
-      {!!endpoint.placements?.length && (
-        <Text size="xs" c="dimmed">
-          Supported Placements: {endpoint.placements.join(", ")}
-        </Text>
-      )}
       {endpoint.checkedAt && (
         <Text size="xs" c="dimmed">
           Checked: {new Date(endpoint.checkedAt).toLocaleString()}
@@ -210,6 +206,7 @@ export function RuntimePanel() {
       <Text size="sm" c="dimmed">
         {status.data.runtime.reason}
       </Text>
+      {status.data.runtime.configured && <RuntimeWorkloads />}
       {available.map(({ kind, label }) => (
         <ServiceEndpointRow key={kind} label={label} service={status.data.services[kind]!} />
       ))}
