@@ -83,6 +83,8 @@ export interface MediaItem {
   status: string;
   prompt?: string;
   negative?: string;
+  /** What the image shows, from Gallery Captions; older captions have no tags. */
+  caption?: { text: string; tags?: string[]; model?: string; at?: string };
   createdAt?: string;
   favorite?: boolean;
   settings?: Record<string, unknown>;
