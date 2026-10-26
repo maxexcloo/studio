@@ -62,7 +62,14 @@ function ChatComposer() {
           variant="unstyled"
           size="xs"
           searchable={models.length > 8}
-          w={{ base: 80, sm: 160 }}
+          // Sizes the field to the chosen model's name where `field-sizing` is unsupported.
+          style={{
+            "--model-chars": Math.max(
+              5,
+              models.find((model) => model.id === modelId)?.label.length || 0,
+            ),
+          }}
+          maw={{ base: 112, sm: 220 }}
           miw={0}
           className={classes.model}
           comboboxProps={{ withinPortal: true, width: 280, position: "top-end" }}
