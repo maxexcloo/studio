@@ -26,7 +26,8 @@ import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
-import { createCaptioner } from "./domain/captions.ts";
+import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
+import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
@@ -2701,7 +2702,17 @@ const captioner = createCaptioner({
     return { mime: "image/jpeg", data: data.toString("base64") };
   },
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
+  load: () => {
+    try {
+      return readRuntimeDocument(dataDir, "captions");
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }
+  },
+  persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
+registerCaptionRoutes(app, { captioner, requireAdmin });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);

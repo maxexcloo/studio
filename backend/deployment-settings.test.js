@@ -33,6 +33,8 @@ test("values report their source and only deployment values are locked", () => {
     ["STUDIO_ENABLE_INPAINT", "STUDIO_VIDEO_CLOUD_FALLBACK", "STUDIO_GALLERY_CAPTIONS"],
   );
   assert.equal(settings.isCatalogueFlag("STUDIO_ENABLE_LORAS"), false);
+  delete process.env.STUDIO_GALLERY_CAPTIONS;
+  assert.equal(settings.flagEnabled("STUDIO_GALLERY_CAPTIONS"), true, "Gallery Captions start on");
   assert.equal(settings.describeFlag(settings.catalogueFlags[0]).applies, "restart");
 });
 
