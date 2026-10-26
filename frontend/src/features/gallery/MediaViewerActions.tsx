@@ -89,6 +89,12 @@ export function MediaViewerActions({
   const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
   const [instructing, setInstructing] = useState(false);
   const [instruction, setInstruction] = useState("");
+  // A tooltip must not linger behind the menu or popover its control opened.
+  const [layer, setLayer] = useState<string | null>(null);
+  const layerEvents = (name: string) => ({
+    onOpen: () => setLayer(name),
+    onClose: () => setLayer((current) => (current === name ? null : current)),
+  });
   const cache = useQueryClient();
   const version = useMutation({
     mutationFn: (body: { galleryItemId: string; active: boolean }) =>
@@ -100,7 +106,7 @@ export function MediaViewerActions({
     },
   });
   const tip = (label: string, control: React.ReactElement) => (
-    <Tooltip label={label} disabled={phone}>
+    <Tooltip label={label} disabled={phone || Boolean(layer)}>
       {control}
     </Tooltip>
   );
@@ -159,7 +165,7 @@ export function MediaViewerActions({
               )}
           <UpscaleControls key={item.id} item={item} size={size} />
           {item.type === "image" && (
-            <Menu position="top" width={240}>
+            <Menu position="top" width={240} {...layerEvents("animate")}>
               {tip(
                 "Animate",
                 <Menu.Target>
@@ -221,7 +227,7 @@ export function MediaViewerActions({
                 <RefreshCw size={18} />
               </ActionIcon>,
             )}
-            <Menu position="top" width={220}>
+            <Menu position="top" width={220} {...layerEvents("regenerate")}>
               {tip(
                 "Regenerate Options",
                 <Menu.Target>
@@ -254,7 +260,7 @@ export function MediaViewerActions({
               </Menu.Dropdown>
             </Menu>
           </ActionIcon.Group>
-          <Menu position="top" width={220}>
+          <Menu position="top" width={220} {...layerEvents("copy")}>
             {tip(
               "Copy",
               <Menu.Target>
@@ -292,7 +298,7 @@ export function MediaViewerActions({
           </Menu>
         </>
       )}
-      <Menu position="top-end" width={220}>
+      <Menu position="top-end" width={220} {...layerEvents("more")}>
         {tip(
           "More",
           <Menu.Target>
@@ -324,7 +330,7 @@ export function MediaViewerActions({
         </Menu.Dropdown>
       </Menu>
       {ready && (
-        <Popover position="top-end" width={280} trapFocus>
+        <Popover position="top-end" width={280} trapFocus {...layerEvents("options")}>
           {tip(
             "Viewer Options",
             <Popover.Target>
