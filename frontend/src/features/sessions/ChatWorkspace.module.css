@@ -1,0 +1,88 @@
+/* Chat fills the viewport below the header; its panes own their scrolling. */
+.shell {
+  padding-top: var(--app-shell-header-height);
+  padding-inline: 0;
+  padding-bottom: 0;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: clamp(240px, 20vw, 300px) minmax(0, 1fr);
+  height: calc(100dvh - var(--app-shell-header-height));
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-md);
+  background: var(--mantine-color-default-hover);
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--mantine-spacing-lg);
+}
+
+.row {
+  position: relative;
+}
+
+/* Room for the options button over the link's trailing edge. */
+.link {
+  padding-inline-end: 2.75rem;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu {
+  position: absolute;
+  inset-inline-end: 0.25rem;
+  top: 50%;
+  translate: 0 -50%;
+  opacity: 0;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+.row:hover .menu,
+.row:focus-within .menu,
+.menu[aria-expanded="true"] {
+  opacity: 1;
+}
+
+/* The title lines up with the conversation and composer below it. */
+.heading {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: var(--studio-composer-width);
+  margin-inline: auto;
+}
+
+@media (hover: none) {
+  .menu {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 48em) {
+  .workspace {
+    display: flex;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main {
+    flex: 1;
+    padding: var(--studio-composer-gap);
+  }
+}

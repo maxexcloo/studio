@@ -1,0 +1,249 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* The header only names the dialog; the viewer draws its own close action. */
+.header {
+  position: absolute;
+  width: 0;
+  height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+}
+
+.layout {
+  --studio-viewer-aside-width: clamp(300px, 26vw, 380px);
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.topBar {
+  position: absolute;
+  top: calc(var(--mantine-spacing-sm) + env(safe-area-inset-top));
+  inset-inline: var(--mantine-spacing-sm);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Desktop media keeps an even margin above and below instead of meeting the top edge. */
+@media (min-width: 48em) {
+  .stage {
+    padding-block: var(--mantine-spacing-md);
+  }
+}
+
+.video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.navigation {
+  position: absolute;
+  inset-inline: var(--mantine-spacing-sm);
+  top: 50%;
+  z-index: 2;
+  translate: 0 -50%;
+  pointer-events: none;
+}
+
+.navigation button {
+  pointer-events: auto;
+}
+
+.comparison {
+  width: 100%;
+  height: 100%;
+  padding: var(--mantine-spacing-xl);
+}
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  flex-shrink: 0;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md)
+    calc(var(--mantine-spacing-md) + env(safe-area-inset-bottom));
+}
+
+.dock > * {
+  width: min(100%, var(--studio-composer-width));
+}
+
+.strip {
+  width: auto;
+  max-width: min(100%, var(--studio-composer-width));
+}
+
+.variation {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-md);
+  background: var(--studio-glass-raised);
+  outline: 1px solid var(--studio-glass-border);
+  outline-offset: -1px;
+  opacity: 0.7;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+.variation[data-entering] {
+  animation: arrive var(--studio-motion-duration) ease-out;
+}
+
+.variation:hover,
+.variation[data-current] {
+  opacity: 1;
+}
+
+.variation[data-current] {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: -2px;
+}
+
+.variationBadge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  color: white;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
+}
+
+.prompt {
+  width: 100%;
+}
+
+/* Next steps hold their row's height while they load, so the prompt bar never moves. */
+.steps {
+  width: auto;
+  max-width: min(100%, var(--studio-composer-width));
+}
+
+/* Centred while the steps fit; a phone scrolls an overflowing row from its first step. */
+.stepRow {
+  justify-content: safe center;
+  min-height: 26px;
+  padding-inline: 2px;
+  opacity: 0;
+  transition-property: opacity;
+  transition-timing-function: ease;
+}
+
+.stepRow[data-shown] {
+  opacity: 1;
+}
+
+.step {
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+/* Padding sits outside the scrolling textarea, so a capped prompt never shows a cut-off line. */
+.promptWrapper {
+  padding-block: 8px;
+}
+
+.promptInput {
+  min-height: 0;
+  padding-block: 0;
+}
+
+/* Regenerate's menu half stays narrow so the split control reads as one action. */
+.splitMenu {
+  width: 22px;
+  min-width: 22px;
+}
+
+.asideTrack {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition:
+    width var(--studio-motion-duration) ease,
+    visibility 0s var(--studio-motion-duration);
+}
+
+.asideTrack[data-open] {
+  width: var(--studio-viewer-aside-width);
+  visibility: visible;
+  transition: width var(--studio-motion-duration) ease;
+}
+
+.aside {
+  flex-shrink: 0;
+  width: var(--studio-viewer-aside-width);
+  height: 100%;
+  border-left: 1px solid var(--studio-glass-border);
+  background: var(--studio-glass-chrome);
+  backdrop-filter: var(--studio-glass-filter);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .variation[data-entering] {
+    animation: none;
+  }
+}
+
+/* Phones show the media edge to edge, filling the space above the strip and controls. */
+@media (max-width: 48em) {
+  .dock {
+    padding-inline: var(--mantine-spacing-sm);
+  }
+}

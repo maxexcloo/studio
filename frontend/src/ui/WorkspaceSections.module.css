@@ -1,0 +1,13 @@
+.nav {
+  position: sticky;
+  top: 0;
+}
+/* A newly chosen section fades in where the last one was, so switching never jumps. */
+.section:not([hidden]) {
+  animation: enter var(--studio-motion-duration) ease-out;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+  }
+}

@@ -11,15 +11,19 @@
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true
   },
-  "include": ["src"],
-  "references": []
+  "include": [
+    "backend/domain",
+    "backend/persistence",
+    "backend/providers",
+    "backend/runtime",
+    "frontend/src",
+    "shared",
+    "tests/browser"
+  ]
 }

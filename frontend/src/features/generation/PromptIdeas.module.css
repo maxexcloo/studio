@@ -1,0 +1,46 @@
+.ideas {
+  position: absolute;
+  z-index: 1;
+  flex-wrap: nowrap;
+  pointer-events: none;
+}
+
+.idea {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  pointer-events: auto;
+  color: var(--mantine-color-dimmed);
+  font-weight: 400;
+}
+
+.inner,
+.label {
+  min-width: 0;
+}
+
+.text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tall prompts (the phone editor) stack the ideas and let each wrap to two lines. */
+.ideas[data-stacked] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ideas[data-stacked] .idea {
+  height: auto;
+  min-height: 2.25rem;
+  padding-block: 4px;
+}
+
+.ideas[data-stacked] .text {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-align: start;
+  line-height: 1.35;
+}
