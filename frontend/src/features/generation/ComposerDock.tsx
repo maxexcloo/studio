@@ -12,7 +12,8 @@ import { useClickOutside, useDisclosure, useMergedRef } from "@mantine/hooks";
 import { useSearchParams } from "react-router";
 import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
-import { failure } from "../../api";
+import { api, failure } from "../../api";
+import type { ReferenceAsset } from "../../types";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 function GenerationScrollArea(props: ScrollAreaProps) {
@@ -42,7 +43,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const focusIntent = useRef("[data-profile-picker]");
   const [dragging, setDragging] = useState(false);
   const reference = useGalleryReference();
-  const { uploadFiles } = useReferenceFiles();
+  const placement = useReferenceFiles();
+  const { uploadFiles } = placement;
   function pasteReferences(event: React.ClipboardEvent<HTMLElement>) {
     if (
       event.defaultPrevented ||
@@ -98,6 +100,17 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   useEffect(() => {
     if (!chat && params.get("compose") === "1") open();
   }, [params, open, chat]);
+  // An image shared to the installed app (POST /share) arrives as a reference to place.
+  const shared = chat ? "" : params.get("shared") || "";
+  useEffect(() => {
+    if (!shared) return;
+    void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
+      .then(({ asset }) => placement.place(asset))
+      .catch(() => {});
+    const next = new URLSearchParams(params);
+    next.delete("shared");
+    setParams(next, { replace: true });
+  }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
     close();

@@ -105,6 +105,24 @@ test(
     const upload = (await uploaded.json()).asset;
     const metadata = (id) => api(`/api/reference-assets/${encodeURIComponent(id)}`);
     assert.deepEqual((await metadata(upload.id)).asset, upload);
+    // The installed app's share target saves the image and opens the composer with it.
+    const share = (headers) => {
+      const shared = new FormData();
+      shared.append("image", new Blob([bytes], { type: "image/png" }), "shared.png");
+      return fetch(base + "/share", { method: "POST", headers, body: shared, redirect: "manual" });
+    };
+    const sharedReply = await share({ cookie });
+    assert.equal(sharedReply.status, 303);
+    const sharedId = new URL(sharedReply.headers.get("location"), base).searchParams.get("shared");
+    assert.ok(sharedId, sharedReply.headers.get("location"));
+    assert.equal(
+      (await metadata(sharedId)).asset.id,
+      upload.id,
+      "the same bytes reuse the reference",
+    );
+    // Without a session, or from another site, nothing is saved.
+    for (const headers of [{}, { cookie, "sec-fetch-site": "cross-site" }])
+      assert.equal((await share(headers)).headers.get("location"), "/images");
     const saveRoute = `/api/reference-assets/${encodeURIComponent(upload.id)}/gallery`;
     const saved = (await api(saveRoute, "POST")).item;
     assert.equal((await api(saveRoute, "POST")).item.id, saved.id);
