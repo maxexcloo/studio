@@ -1,0 +1,32 @@
+/* Prompt ideas float above the composer while the message is empty, so the thread never moves. */
+.form {
+  position: relative;
+}
+
+.ideas {
+  left: 0;
+  right: 0;
+  bottom: calc(100% + var(--mantine-spacing-md));
+  justify-content: center;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+}
+
+.writing textarea {
+  padding: 10px 0;
+  min-height: 44px;
+  line-height: 1.5;
+}
+
+.model input {
+  padding-inline: 0;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.model input:disabled {
+  background: transparent;
+}

@@ -1,0 +1,133 @@
+import { Alert, Button, Group, Stack, Text, TextInput } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../api";
+import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { generationInput } from "./payload";
+export interface Preset {
+  id: string;
+  title: string;
+  input: GenerationInput;
+}
+/** The preset an editor last loaded or saved, and the name being typed. */
+export interface PresetSelection {
+  presetId?: string;
+  presetTitle?: string;
+}
+/** Saved presets for any generation editor: `onLoad` replaces that editor's draft. */
+export function PresetEditor({
+  input,
+  references,
+  profile,
+  selection: draft,
+  onSelectionChange,
+  onLoad,
+}: {
+  input: GenerationInput;
+  references: ReferenceAsset[];
+  profile?: Profile;
+  selection: PresetSelection;
+  onSelectionChange: (selection: PresetSelection) => void;
+  onLoad: (preset: Preset) => void;
+}) {
+  const client = useQueryClient();
+  const presets = useQuery({
+    queryKey: ["user-presets"],
+    queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
+  });
+  const save = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (existing: boolean) =>
+      api<{ preset: Preset }>(
+        existing ? `/api/user-presets/${draft.presetId}` : "/api/user-presets",
+        {
+          method: existing ? "PATCH" : "POST",
+          body: JSON.stringify({
+            title: draft.presetTitle,
+            input: generationInput(input, profile, references),
+          }),
+        },
+      ),
+    onSuccess: ({ preset }) => {
+      onSelectionChange({ presetId: preset.id, presetTitle: preset.title });
+      void client.invalidateQueries({ queryKey: ["user-presets"] });
+      notifications.show({ message: "Preset saved" });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/api/user-presets/${id}`, { method: "DELETE" }),
+    onSuccess: (_, id) => {
+      if (id === draft.presetId) onSelectionChange({ presetId: undefined, presetTitle: "" });
+      void client.invalidateQueries({ queryKey: ["user-presets"] });
+    },
+  });
+  function savePreset(existing: boolean) {
+    if (save.isPending || !draft.presetTitle?.trim()) return;
+    save.mutate(existing);
+  }
+  return (
+    <Stack>
+      {presets.data?.presets.map((preset) => (
+        <Group key={preset.id} justify="space-between">
+          <Button
+            variant={preset.id === draft.presetId ? "light" : "subtle"}
+            onClick={() => onLoad(preset)}
+          >
+            {preset.title}
+          </Button>
+          <Button
+            color="red"
+            variant="subtle"
+            size="compact-xs"
+            onClick={() => remove.mutate(preset.id)}
+          >
+            Delete
+          </Button>
+        </Group>
+      ))}
+      {presets.error && (
+        <Text c="red" size="xs">
+          {presets.error.message}
+        </Text>
+      )}
+      <TextInput
+        label="Preset Name"
+        value={draft.presetTitle || ""}
+        onKeyDown={(event) => {
+          if (
+            event.key !== "Enter" ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.nativeEvent.isComposing
+          )
+            return;
+          event.preventDefault();
+          savePreset(Boolean(draft.presetId));
+        }}
+        onChange={(event) => {
+          onSelectionChange({ ...draft, presetTitle: event.currentTarget.value });
+        }}
+      />
+      {save.error && <Alert color="red">{save.error.message}</Alert>}
+      <Group>
+        {draft.presetId && (
+          <Button
+            disabled={!draft.presetTitle?.trim()}
+            loading={save.isPending}
+            onClick={() => savePreset(true)}
+          >
+            Update Preset
+          </Button>
+        )}
+        <Button
+          variant="default"
+          disabled={!draft.presetTitle?.trim()}
+          loading={save.isPending}
+          onClick={() => savePreset(false)}
+        >
+          {draft.presetId ? "Save as New Preset" : "Save Preset"}
+        </Button>
+      </Group>
+    </Stack>
+  );
+}

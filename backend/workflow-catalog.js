@@ -1,0 +1,346 @@
+import { profileBlock } from "./profile-block.js";
+import fs from "node:fs";
+import path from "node:path";
+import { dataDir } from "./gallery-store.js";
+import {
+  allCustomWorkflowRecords,
+  detectWorkflowFormat,
+  detectWorkflowMetadata,
+  graphFromJson,
+  validateGraph,
+  workflowMissingFiles,
+  workflowOptionIssues,
+} from "./custom-workflows.js";
+import { catalogDownloadsForFile } from "./family-profiles.js";
+import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { workflowRisks } from "./workflow-risk.js";
+
+const preferencesPath = path.join(dataDir, "workflow-preferences.json");
+let preferencesCache = null;
+let preferencesSaveTimer = null;
+
+export function loadWorkflowPreferences() {
+  if (preferencesCache) return preferencesCache;
+  try {
+    const raw = readJsonFile(preferencesPath);
+    preferencesCache = {
+      favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
+      lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
+      thumbnails: raw.thumbnails && typeof raw.thumbnails === "object" ? raw.thumbnails : {},
+    };
+    return preferencesCache;
+  } catch {
+    preferencesCache = { favorites: [], lastUsed: {}, thumbnails: {} };
+    return preferencesCache;
+  }
+}
+
+export function saveWorkflowPreferences(preferences, { immediate = false } = {}) {
+  preferencesCache = preferences;
+  if (!immediate) {
+    if (!preferencesSaveTimer) {
+      preferencesSaveTimer = setTimeout(() => {
+        preferencesSaveTimer = null;
+        saveWorkflowPreferences(preferencesCache, { immediate: true });
+      }, 300);
+    }
+    return;
+  }
+  if (preferencesSaveTimer) {
+    clearTimeout(preferencesSaveTimer);
+    preferencesSaveTimer = null;
+  }
+  fs.mkdirSync(dataDir, { recursive: true });
+  writeJsonFile(preferencesPath, preferences);
+}
+
+function updateWorkflowPreferencePatch(patch = {}) {
+  const current = loadWorkflowPreferences();
+  const next = {
+    favorites: Array.isArray(patch.favorites) ? patch.favorites : current.favorites,
+    lastUsed: { ...current.lastUsed, ...(patch.lastUsed || {}) },
+    thumbnails: { ...current.thumbnails, ...(patch.thumbnails || {}) },
+  };
+  saveWorkflowPreferences(next);
+  return next;
+}
+
+export function markWorkflowUsed(profileId, thumbnail = "") {
+  if (!profileId) return loadWorkflowPreferences();
+  const patch = { lastUsed: { [profileId]: new Date().toISOString() } };
+  return updateWorkflowPreferencePatch(patch);
+}
+
+function controlsList(controls = {}) {
+  return Object.keys(controls).filter((key) => controls[key]?.node && controls[key]?.input);
+}
+
+function validateWorkflow(workflow, info = {}, profile = null) {
+  // Without ComfyUI's node list we can't tell a missing node from an offline server,
+  // so node checks are skipped and the result is marked unverified instead.
+  const online = Object.keys(info || {}).length > 0;
+  const issues = [];
+  const warnings = [...(workflow.metadataWarnings || [])];
+  if (workflow.parseError) issues.push(workflow.parseError);
+  try {
+    validateGraph(workflow.graph);
+  } catch (error) {
+    issues.push(error.message);
+  }
+  if (workflow.loraStack) {
+    const node = workflow.graph?.[workflow.loraStack.node];
+    const expected =
+      { "rgthree-stack-v1": "Lora Loader Stack (rgthree)", "radiance-tags-v1": "" }[
+        workflow.loraStack.adapter
+      ] ?? "Power Lora Loader (rgthree)";
+    if (!node) issues.push(`Configured LoRA loader node is missing: ${workflow.loraStack.node}`);
+    else if (expected && node.class_type !== expected)
+      issues.push(`Configured LoRA node must be ${expected}: ${workflow.loraStack.node}`);
+  }
+  for (const mediaInput of workflow.mediaInputs || []) {
+    if (mediaInput.min > mediaInput.max)
+      issues.push(
+        `Reference input ${mediaInput.label || mediaInput.id} requires ${mediaInput.min} images but its mapping accepts one filename.`,
+      );
+    const mapping = mediaInput.control;
+    const node = mapping?.node ? workflow.graph?.[mapping.node] : null;
+    if (!mapping?.node || !mapping?.input)
+      issues.push(`Media input ${mediaInput.id} does not have a graph mapping.`);
+    else if (!node) issues.push(`Mapped media input node is missing: ${mapping.node}`);
+    else if (!(mapping.input in (node.inputs || {})))
+      issues.push(`Mapped media input is missing: ${mapping.node}.${mapping.input}`);
+  }
+  if (online) {
+    for (const classType of workflow.requiredNodes || []) {
+      if (classType && !info[classType]) issues.push(`Missing node class: ${classType}`);
+    }
+  }
+  issues.push(...workflowOptionIssues(workflow, info));
+  const graph = workflow.graph || {};
+  for (const [key, mapping] of Object.entries(workflow.controls || {})) {
+    if (!mapping?.node || !mapping?.input) continue;
+    const node = graph[mapping.node];
+    if (!node) {
+      issues.push(`Mapped ${key} node is missing: ${mapping.node}`);
+      continue;
+    }
+    if (!(mapping.input in (node.inputs || {})))
+      issues.push(`Mapped ${key} input is missing: ${mapping.node}.${mapping.input}`);
+  }
+  if (workflow.kind !== "image" && workflow.kind !== "video")
+    issues.push(`Unsupported workflow kind: ${workflow.kind}`);
+  if (
+    workflow.graph &&
+    Object.keys(workflow.graph).length &&
+    !Object.values(workflow.graph).some((node) =>
+      /Save|Preview|Video/i.test(node?.class_type || ""),
+    )
+  ) {
+    warnings.push("The workflow has no Save Image or other output node.");
+  }
+  return {
+    ok: issues.length === 0 && (profile ? true : !workflow.profileId || Boolean(profile)),
+    unverified: !online,
+    issues,
+    warnings,
+    missingNodes: issues
+      .filter((issue) => issue.startsWith("Missing node class:"))
+      .map((issue) => issue.replace("Missing node class:", "").trim()),
+    missingParts: missingFileParts(workflow, info),
+  };
+}
+
+const loaderParts = { CLIPLoader: "encoder", VAELoader: "vae" };
+
+/** The files an imported workflow lacks, shaped like a family's missing parts, with a download where Studio's catalog has that exact file. */
+function missingFileParts(workflow, info) {
+  return workflowMissingFiles(workflow, info).map(({ file, folder, classType }) => ({
+    part: loaderParts[classType] || "model",
+    label: file,
+    detail: `Put ${file} in ComfyUI’s models/${folder} folder.`,
+    downloads: catalogDownloadsForFile(file, folder),
+  }));
+}
+
+function latestThumbnailFor(profileId, workflowId, prefs) {
+  const icon = prefs.thumbnails?.[profileId];
+  return typeof icon === "string" && icon.startsWith("/workflow-icons/")
+    ? icon
+    : "/workflow-icons/workflow.svg";
+}
+
+function automaticTags(item, prefs) {
+  const tags = [];
+  if (prefs.favorites.includes(item.id)) tags.push("Favorite");
+  if (prefs.lastUsed[item.id]) tags.push("Recent");
+  tags.push(item.source === "builtin" ? "Built-in" : "Custom");
+  tags.push(item.kind === "video" ? "Video" : "Image");
+  if (item.capabilities?.imageToImage) tags.push("Image edit");
+  if (item.family) tags.push(item.family);
+  return [...new Set(tags)];
+}
+
+export function workflowSummaries({
+  info = {},
+  profiles = [],
+  preferences = loadWorkflowPreferences(),
+} = {}) {
+  const summaries = [];
+  const online = Object.keys(info || {}).length > 0;
+  const customRecords = allCustomWorkflowRecords();
+  const customByProfile = new Map(customRecords.map((workflow) => [workflow.profileId, workflow]));
+  for (const profile of profiles) {
+    const isCustom = profile.id.startsWith("custom:");
+    const custom = isCustom ? customByProfile.get(profile.id) : null;
+    const id = profile.id;
+    const summary = {
+      id,
+      profileId: profile.id,
+      workflow: profile.workflow,
+      name: profile.displayName || profile.label,
+      description: profile.description || "",
+      kind: profile.kind,
+      family: profile.family,
+      ...(profile.nsfw ? { nsfw: true } : {}),
+      ...(profile.aiDrafted || custom?.aiDrafted ? { aiDrafted: true } : {}),
+      familyName: profile.familyName || "",
+      // Every workflow-JSON profile is `custom:*`, bundled or not, so the id
+      // prefix cannot tell them apart - use the record's actual folder.
+      source: custom
+        ? custom.source === "bundled"
+          ? "builtin"
+          : "custom"
+        : isCustom
+          ? "custom"
+          : "builtin",
+      // Only workflows you imported can be deleted; bundled templates are part of the repo.
+      deleteId: custom
+        ? custom.source === "bundled"
+          ? ""
+          : custom.id
+        : isCustom
+          ? profile.id.replace(/^custom:/, "")
+          : "",
+      controls: [],
+      capabilities: profile.capabilities || {},
+      mediaInputs: profile.mediaInputs || custom?.mediaInputs || [],
+      aspectPolicy: profile.aspectPolicy || custom?.aspectPolicy || "manual",
+      defaults: profile.defaults || {},
+      path: custom?.path || "",
+      favorite: preferences.favorites.includes(id),
+      lastUsedAt: preferences.lastUsed[id] || "",
+      thumbnail: latestThumbnailFor(id, profile.workflow, preferences),
+      // Built-in families know exactly which files they still lack.
+      validation: {
+        ok: profile.ready !== false,
+        unverified: !online,
+        // A missing node pack gets its install steps from the setup panel, not as an issue line.
+        issues: (profile.missing || [])
+          .filter((item) => !item.nodePack)
+          .map((item) => item.detail || item.label),
+        warnings: [],
+        missingNodes: [],
+        missingPacks: (profile.missing || [])
+          .filter((item) => item.nodePack)
+          .map((item) => item.nodePack.name),
+        missingFiles: (profile.missing || [])
+          .filter((item) => item.part !== "comfy")
+          .map((item) => item.label),
+        // ComfyUI itself is too old for this family: no download fixes that.
+        outdatedComfy: (profile.missing || []).some(
+          (item) => item.part === "comfy" && !item.nodePack,
+        ),
+      },
+    };
+    summary.tags = automaticTags(summary, preferences);
+    summaries.push(summary);
+  }
+
+  const known = new Set(summaries.map((item) => item.profileId));
+  for (const workflow of customRecords) {
+    if (known.has(workflow.profileId)) continue;
+    const validation = validateWorkflow(workflow, info, null);
+    const summary = {
+      id: workflow.profileId,
+      profileId: workflow.profileId,
+      workflow: workflow.profileId,
+      name: workflow.name,
+      description: workflow.description || "",
+      kind: workflow.kind,
+      family: workflow.family,
+      source: workflow.source === "bundled" ? "builtin" : "custom",
+      deleteId: workflow.source === "bundled" ? "" : workflow.id,
+      controls: controlsList(workflow.controls),
+      capabilities: workflow.capabilities || {},
+      mediaInputs: workflow.mediaInputs || [],
+      aspectPolicy: workflow.aspectPolicy || "manual",
+      defaults: workflow.defaults || {},
+      path: workflow.path || "",
+      favorite: preferences.favorites.includes(workflow.profileId),
+      lastUsedAt: preferences.lastUsed[workflow.profileId] || "",
+      thumbnail: latestThumbnailFor(workflow.profileId, workflow.profileId, preferences),
+      validation,
+    };
+    summary.tags = automaticTags(summary, preferences);
+    summaries.push(summary);
+  }
+  return summaries
+    .filter((item) => item.source !== "builtin" || !online || item.validation.ok)
+    .sort((a, b) => {
+      const fav = Number(b.favorite) - Number(a.favorite);
+      if (fav) return fav;
+      const recent = Date.parse(b.lastUsedAt || "0") - Date.parse(a.lastUsedAt || "0");
+      if (recent) return recent;
+      return a.name.localeCompare(b.name);
+    });
+}
+
+export function previewWorkflowImport(raw, filename = "", info = {}) {
+  const format = detectWorkflowFormat(raw);
+  if (format === "unsupported")
+    throw new Error(
+      "This isn’t a ComfyUI workflow. Use one saved from ComfyUI, in the regular or API format.",
+    );
+  const source = format === "comfyui-api-wrapper" ? raw.prompt : raw;
+  const graph = graphFromJson(format === "comfyui-visual" ? { ...raw } : source, info);
+  // A wrapper ({ prompt: graph }) or a visual file can carry the heissUi block beside the graph.
+  const declared = profileBlock(raw);
+  const detected = detectWorkflowMetadata(
+    { ...(declared ? { heissUi: declared } : {}), ...source, graph },
+    path.basename(filename || "", path.extname(filename || "")),
+    info,
+  );
+  const validation = validateWorkflow(
+    {
+      id: detected.id,
+      profileId: `custom:${detected.id}`,
+      name: detected.name,
+      description: detected.description,
+      kind: detected.kind,
+      family: detected.family,
+      graph,
+      controls: detected.controls,
+      requiredNodes: [
+        ...new Set(
+          Object.values(graph || {})
+            .map((node) => node?.class_type)
+            .filter(Boolean),
+        ),
+      ],
+      capabilities: detected.capabilities,
+    },
+    info,
+    null,
+  );
+  return {
+    filename,
+    graph,
+    declared,
+    detected,
+    format,
+    hasStudioBlock: Boolean(profileBlock(raw)),
+    validation,
+    // Nodes that run code, touch files elsewhere or go online: the review says so before saving.
+    risks: workflowRisks(graph),
+  };
+}

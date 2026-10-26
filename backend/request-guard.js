@@ -1,0 +1,172 @@
+import { gatedPath } from "./gated-path.js";
+import os from "node:os";
+
+/**
+ * The first check on every /api and /comfy request, before anything else runs.
+ *
+ * Web pages the person visits share the browser with Studio, and a browser
+ * sends requests to localhost for any page that asks. Two checks keep other
+ * sites out:
+ *
+ * - The Host header must name this server: localhost, a loopback address, or
+ *   (listening beyond this computer) this machine's own network addresses and names, plus any
+ *   STUDIO_ALLOWED_HOSTS and the names on a configured HTTPS certificate. A
+ *   page that rebinds its own domain to 127.0.0.1 (DNS rebinding) still sends
+ *   its own name, so it gets nothing.
+ * - Anything that changes state (not GET, HEAD or OPTIONS) must come from the
+ *   studio's own page: the browser's Sec-Fetch-Site or Origin has to say same
+ *   origin, and the request must be JSON or carry the X-Studio header (or the older X-HEISS). Another
+ *   origin cannot send either without a CORS preflight, which this server
+ *   never grants. Cross-site reads and embeds of /api and /comfy are refused
+ *   too, so a page cannot show or probe what the studio holds.
+ *
+ * Non-browser clients (curl, scripts) send neither Origin nor Sec-Fetch-Site
+ * and are not a cross-site risk; they still need the header or JSON.
+ */
+
+const studioHeader = "x-studio";
+/** The header's name before Studio's hard fork, still accepted from pages and scripts made before it. */
+const legacyStudioHeader = "x-heiss";
+/** On a 401 that a sign-in would fix; the page then shows its sign-in. */
+export const signInHeader = "X-Studio-Sign-In";
+const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+const signOutPath = "/api/accounts/sign-out";
+
+/** "Localhost.:8787" -> "localhost", "[::1]:8787" -> "::1". "" when it cannot be read. */
+export function hostnameOf(hostHeader = "") {
+  const text = String(hostHeader || "")
+    .trim()
+    .toLowerCase();
+  if (!text) return "";
+  const bracketed = text.match(/^\[([0-9a-f:.]+)\](?::\d+)?$/);
+  if (bracketed) return bracketed[1];
+  const plain = text.match(/^([a-z0-9._-]+?)\.?(?::\d+)?$/);
+  return plain ? plain[1] : "";
+}
+
+/** This machine's own addresses and names. Rebuilt every few seconds: Wi-Fi changes. */
+let ownNames = { at: 0, names: new Set() };
+function machineNames() {
+  if (Date.now() - ownNames.at < 5000) return ownNames.names;
+  const names = new Set();
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || [])
+      names.add(
+        String(entry.address || "")
+          .toLowerCase()
+          .replace(/%.*$/, ""),
+      );
+  }
+  const host = String(os.hostname() || "")
+    .toLowerCase()
+    .replace(/\.$/, "");
+  if (host) {
+    names.add(host);
+    const short = host.replace(/\.local$/, "").split(".")[0];
+    names.add(short);
+    names.add(`${short}.local`);
+  }
+  names.delete("");
+  ownNames = { at: Date.now(), names };
+  return names;
+}
+
+/** STUDIO_ALLOWED_HOSTS: names a person put in front of the studio themselves (a home DNS name, a tailnet name). */
+function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
+  return String(value || "")
+    .split(/[\s,]+/)
+    .map((name) => hostnameOf(name.replace(/^https?:\/\//i, "").replace(/\/.*$/, "")))
+    .filter(Boolean);
+}
+
+/**
+ * Whether a Host header names this server. `network`: it listens beyond this computer, so its
+ * network addresses count. `extra`: more names (the HTTPS certificate's).
+ */
+export function hostAllowed(hostHeader, { network = false, extra = [] } = {}) {
+  const name = hostnameOf(hostHeader);
+  if (!name) return false;
+  if (name === "localhost" || name.endsWith(".localhost")) return true;
+  if (/^127\.\d+\.\d+\.\d+$/.test(name) || name === "::1") return true;
+  if (
+    extra.some(
+      (item) =>
+        item === name ||
+        (item.startsWith("*.") &&
+          name.endsWith(item.slice(1)) &&
+          name.split(".").length === item.split(".").length),
+    )
+  )
+    return true;
+  if (configuredHosts().includes(name)) return true;
+  return network && machineNames().has(name);
+}
+
+/** The browser says the request comes from the studio's own page (or from no page: typed, bookmarked). */
+function fromOwnPage(req) {
+  const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
+  if (site) return site === "same-origin" || site === "none";
+  const origin = req.headers.origin;
+  if (origin === undefined) return true; // Not a browser, or one too old to say; the header check below still applies.
+  try {
+    const url = new URL(String(origin));
+    return url.host.toLowerCase() === String(req.headers.host || "").toLowerCase();
+  } catch {
+    return false; // "null": a sandboxed frame, a file:// page.
+  }
+}
+
+function refuse(res, reason, error) {
+  res.status(403).json({ ok: false, reason, error });
+}
+
+/**
+ * The middleware. `network`: as for hostAllowed. `extraHosts()` returns the certificate's names,
+ * asked per request so they follow changes.
+ */
+export function requestGuard({ network = false, extraHosts = () => [] } = {}) {
+  return (req, res, next) => {
+    if (!gatedPath(req.path)) return next();
+    if (!hostAllowed(req.headers.host, { network, extra: extraHosts() })) {
+      refuse(
+        res,
+        "host",
+        `Studio doesn’t open at “${hostnameOf(req.headers.host) || "this address"}”. Open it at localhost, or from another device at this computer’s network address. Add other names to STUDIO_ALLOWED_HOSTS.`,
+      );
+      return;
+    }
+    const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
+    // The sign-in provider's redirect back is a top-level navigation from its own site.
+    // Its single-use state, bound to a cookie, is what proves it (multi-user-auth.js).
+    const signInReturn =
+      req.method === "GET" &&
+      req.path === "/api/accounts/oidc/callback" &&
+      String(req.headers["sec-fetch-mode"] || "navigate").toLowerCase() === "navigate";
+    if ((site === "cross-site" || site === "same-site") && !signInReturn) {
+      refuse(res, "origin", "Blocked a request from another website.");
+      return;
+    }
+    if (safeMethods.has(req.method)) return next();
+    if (!fromOwnPage(req)) {
+      refuse(res, "origin", "Blocked a request from another website.");
+      return;
+    }
+    // Signing out only ever ends the sender's own session, so a plain same-origin POST (a console
+    // fetch, a form) may do it; another site was already refused above.
+    const signOut = req.method === "POST" && req.path === signOutPath;
+    if (
+      !signOut &&
+      !req.headers[studioHeader] &&
+      !req.headers[legacyStudioHeader] &&
+      !req.is("application/json")
+    ) {
+      refuse(
+        res,
+        "header",
+        "This request didn’t come from the studio. Reload the page and try again.",
+      );
+      return;
+    }
+    next();
+  };
+}

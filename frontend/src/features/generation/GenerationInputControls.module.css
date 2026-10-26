@@ -1,0 +1,57 @@
+.rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
+}
+
+.chip {
+  max-width: 100%;
+  font-weight: 500;
+  transition:
+    background-color var(--studio-motion-duration) ease,
+    border-color var(--studio-motion-duration) ease;
+}
+
+.iconChip {
+  aspect-ratio: 1;
+  padding-inline: 0;
+}
+
+/* Sized so Profile shares its row on phones and the desktop rail fits one row. */
+.label {
+  display: block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Desktop chips stay compact so the rail fits one row where the composer width allows. */
+@media (min-width: 48em) {
+  .rail {
+    gap: 6px;
+  }
+
+  .rail .chip:not(.iconChip) {
+    padding-inline: var(--mantine-spacing-sm);
+  }
+
+  .chipSection[data-position="left"] {
+    margin-inline-end: 6px;
+  }
+
+  .chipSection[data-position="right"] {
+    margin-inline-start: 4px;
+  }
+
+  .label {
+    max-width: 8rem;
+  }
+}
+
+@media (max-width: 48em) {
+  .chip {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "about": "Negative cases: unused where the profile takes none, wanted terms in, the prompt's subjects out.",
+  "cases": [
+    {
+      "id": "guide-says-none",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "S",
+        "negative": {
+          "effect": "none"
+        }
+      },
+      "prompt": "a cabin",
+      "expect": {
+        "unused": true
+      },
+      "recorded": "blurry"
+    },
+    {
+      "id": "no-negative-input",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2",
+        "capabilities": {
+          "negativePrompt": false
+        }
+      },
+      "prompt": "a cabin",
+      "expect": {
+        "unused": true
+      },
+      "recorded": "blurry"
+    },
+    {
+      "id": "recommended",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "S",
+        "negative": {
+          "effect": "recommended",
+          "default": "lowres, blurry"
+        }
+      },
+      "prompt": "a portrait of a woman with red hair",
+      "cfg": 4,
+      "expect": {
+        "include": ["blurry"],
+        "avoid": ["red hair", "woman"]
+      },
+      "recorded": "lowres, blurry, extra fingers, deformed hands, watermark"
+    },
+    {
+      "id": "no-subjects",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "S",
+        "negative": {
+          "effect": "optional"
+        }
+      },
+      "prompt": "a dog in a park",
+      "expect": {
+        "include": ["watermark"],
+        "avoid": ["dog", "park"]
+      },
+      "recorded": "Negative prompt: blurry, jpeg artifacts, text, watermark"
+    },
+    {
+      "id": "fallback-to-guide",
+      "profile": {
+        "id": "custom:krea2-fixture",
+        "label": "Krea 2",
+        "kind": "image",
+        "family": "krea2"
+      },
+      "guide": {
+        "summary": "S",
+        "negative": {
+          "effect": "recommended",
+          "default": "lowres, worst quality"
+        }
+      },
+      "prompt": "a cabin",
+      "cfg": 4,
+      "expect": {
+        "include": ["lowres"]
+      },
+      "recorded": ""
+    }
+  ]
+}

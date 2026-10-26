@@ -3,7 +3,7 @@
 Every release of Studio, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow
 [Semantic Versioning](https://semver.org/) as described in
-[docs/guides/CONTRIBUTING.md](docs/guides/CONTRIBUTING.md#versions-and-releases).
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 Add notes under **Unreleased** as changes land; `npm run release` turns that
 section into the next version and uses it as the GitHub release notes. Each
@@ -11,25 +11,51 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Animating images with Grok, and one ask is one call
+> Media sessions, conversational iteration and durable jobs
 
 ### Added
-- **MCP without headers:** `/mcp/<token>` is a complete MCP URL for a client that can send no headers, such as a Grok custom connector, carrying the account's personal MCP token in the path. Only a personal account token works there; the shared gateway and control keys stay header-only, so a URL never vouches for a gateway or a GPU.
-- **Connector-friendly MCP:** the MCP endpoints answer a browser's CORS preflight and cross-origin calls, since every call carries its own bearer credential and no cookies — a connector can validate its URL from a page. OAuth discovery (`/.well-known/oauth-*`) gets a plain miss instead of the app page.
 
-### Fixed
-- **Cloud image animation:** `Reuse` with `kind: video` takes `profile_id`, so a chat can animate a finished image on the video model the user names ("animate these with grok imagine"). A profile without an image input is refused with what to pass instead.
-- **An unfinished result says so:** Reuse on a result that is still rendering says it is still running and to share its link, instead of "Choose an available output from this completed job.", which read like a finished job and drew repeated retries.
-- **One ask is one call:** the Generate description and the server instructions say several images of one ask are `count`, or several `prompts`, in one call — never repeated calls.
+- Compare Variants: from the composer or any image's actions, queue 2–4 variants that share the prompt and seed and change the profile, LoRA strengths, prompt or steps and guidance. They run as one queue set and open on a labelled side-by-side page at `/compare/:id`; starring the winner loads its settings into the composer and records the choice for the taste profile. `POST /api/comparisons` also groups existing image jobs, such as an MCP multi-model run.
+- Taste Profile (Settings › Account): an editable per-account summary the assistant model keeps from stars, compare votes and iterations with their prompts and LoRAs; MCP's automatic model pick takes it into account.
+- Dream (backend, off by default per account): while Studio is idle, it makes images and optionally videos from the taste profile into a separate pool, within an unseen buffer and daily caps, and yields to anyone's work; keeping a result moves it into the gallery.
+- Gallery Captions (Settings › Models, `STUDIO_GALLERY_CAPTIONS`, off by default): while Studio is idle, a vision assistant model describes finished images so gallery search also finds what they show.
+- Suggestions from the taste profile: an empty, focused composer or Chat message offers three prompt ideas, the viewer offers next-step chips (such as Warmer Light or Closer Crop) that stage a rewritten prompt in its prompt bar, and Chat's assistant receives the taste summary as context.
+- Settings › Profiles shows each profile's last 30 days (runs, failures, stars, typical time) and marks one Failing when most of its recent runs failed.
+- Installed on a phone, Studio appears in the share sheet (Android): a shared image opens the composer with it as a reference. The app gains 512px and maskable icons.
+- Video Cloud Fallback (Settings › Models, `STUDIO_VIDEO_CLOUD_FALLBACK`, off by default): while the local video worker is off, MCP video runs on a granted cloud profile and the reply says so, instead of being refused.
+- Accept a personal MCP token in the path (`/mcp/<token>`) for clients that can send no headers, such as a Grok custom connector; the shared gateway and control keys stay header-only. MCP answers CORS preflights and cross-origin calls, and OAuth discovery gets a plain 404.
+- A multi-model MCP run of 2–4 single images shares one seed and replies with one Compare Side by Side link to `/compare/:id`, above the per-model result links.
+- Let one MCP Generate call cover several models (`profile_ids`, or `each_profile` with a tier), each with a prompt written from its own guide and its own set, replying at once with a line of links per model. `preview` returns the written prompts and concept suggestions without queuing, and the same call without it queues exactly those prompts; `apply_guide` rewrites supplied prompts for the model's guide.
 
 ### Changed
-- **Video falls back to the cloud while the video worker is off:** with no local video worker available, video runs on a granted cloud (Grok) profile and the reply says it went to the cloud, instead of being refused; an account with no cloud profile still gets "Local video is unavailable right now". A `profile_id`, or a request or prompt naming Grok or the cloud, runs there as before.
+
+- MCP Reuse with `mode: animate` takes `profile_id`, so a chat can animate an image on the video model the user names; a profile without an image input is refused with what to pass instead. Reuse on a result that is still rendering says so instead of asking for an available output.
+- Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
+- Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
+- Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal. Preserve declared reference slots through admission, recovery and worker graph bindings.
+- Keep live profiles, guides and catalogue definitions editable in Studio, with administrator approval and version conflicts. The ai mount supplies missing-definition seeds and backups. Existing workflow connections can be edited with node and input selectors alongside Advanced JSON.
+- Build a separate shared media/text worker image with GPU leases, Docker admission and authenticated local text streaming. Automatic lifecycle control remains disabled until ownership and traffic cutover are verified.
+- Run cloud media directly through configured CLIProxyAPI providers, independent of GPU workers, retaining asynchronous provider job IDs and saved result links. MCP Generate calls enqueue whole same-profile/LoRA sets without interleaving, while prompt preparation and result waiting remain concurrent.
+- Put enabled LoRAs' trigger words at the start of the prompt, in stack order and once each, on every generation path (gallery, Chat and MCP), instead of at the end unless a LoRA's note asked otherwise. Each stacked LoRA keeps a `triggers` switch (on unless set to `false`) in saved stacks and runs, and the gallery records the prompt that ran.
+- Queue MCP (external chat) generations after manual Studio requests waiting for the same worker or provider, first-in first-out within each, without splitting an MCP set once it has started. The order is stored with each job and survives restarts.
+- Run queued work that reuses the worker's loaded model and LoRAs first within its tier, so fewer jobs pay for a model or LoRA switch. An older job is overtaken at most three times this way, a started MCP set still finishes first, and the bound survives restarts.
+- Consolidate application checks and image publication, reuse the frontend build, and remove superseded UI code, dependencies, assets and development/release setup.
+- Slim the MCP tools for small-context chats: shorter instructions and descriptions that point iteration to Reuse; schema limits that match the 1–10 per call; Models shows a 500-character guide gist (whole guide with `full_guide`) and at most 30 LoRAs; replies carry text only, without repeated structured records or guides. Review sends one 512px preview, with a comparison side by side, and a short record. Generate runs `prompts` when `request` comes too, dedupes identical calls for two minutes and never upscales unless asked.
+- Let MCP Generate and Reuse wait inline only when Studio's generation-timing estimate says the set finishes within the 30-second wait; otherwise they return links at once with the expected wait (`eta_seconds`), one per set for several models. Without a named model, Generate lets the prompt writer pick the ready profile that suits the request and names the choice and its reason in one line. Results queued together come back as one contact-sheet image linking to All Results instead of one preview each.
+- Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
+- Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it. Civitai image imports get the same nearest installed stand-ins as dropped images, with Use Prompt and Use Settings.
+- Export profiles, guides and catalogues in the ai repository's flat layout (`profiles/`, `prompting.json` and the other files at the root, `EXPORT.json` format 2), the layout the seed already reads; older nested exports still seed.
+
+### Removed
+
+- Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
 
 ## [0.51.0] - 2026-10-24
 
 > Profiles can carry their own Radiance LoRAs
 
 ### Changed
+
 - **Radiance LoRAs:** LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, stay in place and the request's LoRA stack is added after them, instead of replacing them.
 
 ## [0.50.0] - 2026-10-24
@@ -37,6 +63,7 @@ version opens with a `> ` summary line.
 > Up to four reference images for Radiance image profiles
 
 ### Changed
+
 - **Radiance node:** reference images arrive through four optional `images.image_1` to `images.image_4` inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
 
 ## [0.49.0] - 2026-10-24
@@ -44,6 +71,7 @@ version opens with a `> ` summary line.
 > Krea 2 rebalance for Radiance image generation
 
 ### Added
+
 - **Radiance node:** an optional `rebalance` input sends Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
 
 ## [0.48.2] - 2026-10-23
@@ -51,9 +79,11 @@ version opens with a `> ` summary line.
 > Saved results stay complete while worker cleanup finishes
 
 ### Fixed
+
 - **Generation status:** late worker progress, preview and cancellation messages can no longer change completed results back to Saving or an error while worker cleanup is still running.
 
 ### Changed
+
 - **Browser checks:** use the official Playwright image matching the installed test version, avoiding stalled system-package downloads before tests start.
 
 ## [0.48.1] - 2026-10-22
@@ -61,6 +91,7 @@ version opens with a `> ` summary line.
 > The CLIProxyAPI and Radiance ComfyUI nodes ship with Studio
 
 ### Changed
+
 - **ComfyUI nodes:** the CLIProxyAPI and Radiance worker nodes now live in `comfyui/` next to the Studio worker node, and the image ships all three at `/app/comfyui` for ComfyUI images to copy from the matching release. Their Python tests run with the Studio test suite.
 
 ## [0.48.0] - 2026-10-22
@@ -68,6 +99,7 @@ version opens with a `> ` summary line.
 > MCP sends one request per repeated Generate, always adds trigger words, refuses too many LoRAs, answers sooner, links Details to the chat, and rides out brief ComfyUI drops
 
 ### Changed
+
 - **Studio MCP, repeated requests:** the same Generate sent again from one conversation within a minute (a retry or a doubled tool call) returns the first call's jobs and reply instead of queuing the images twice.
 - **Studio MCP, trigger words:** every prompt carries each chosen LoRA's missing trigger words, including prompts the chat wrote itself or sent as exact; the chat is no longer asked to add them.
 - **Studio MCP, LoRA limit:** more LoRAs than the profile takes (8 at most) are refused with the limit, instead of the extras being dropped silently.
@@ -75,6 +107,7 @@ version opens with a `> ` summary line.
 - **Chat in Details:** an image or video a chat asked for records the conversation, and Details links back to it (with a chat address set, `STUDIO_CHAT_URL`).
 
 ### Fixed
+
 - **ComfyUI blips:** a read that loses its connection is tried once more before ComfyUI counts as gone, so a brief drop on the link to a remote worker no longer fails a run; recovery is logged as a warning with how long it was down.
 
 ## [0.47.0] - 2026-10-22
@@ -82,6 +115,7 @@ version opens with a `> ` summary line.
 > Phone model and LoRA pickers open on iOS again, swipe up for Details, loading and failed items open like finished ones, Try Again replaces, and a quicker reveal
 
 ### Changed
+
 - **Phone viewer:** a swipe up opens Details; a swipe down closes them (from the top of their scroll), and with them shut a swipe down closes the viewer as before.
 - **Loading, failed and stopped items:** a tap opens them in the viewer like finished ones, with their progress or failure report and Details; a run still generating no longer ignores the tap.
 - **Try Again:** replaces the failed item: once the new run is queued the failed one is removed, so the gallery keeps one tile per attempt.
@@ -92,6 +126,7 @@ version opens with a `> ` summary line.
 - **Phone compact prompt:** the Image/Video switcher is the Create sheet's, cell for cell.
 
 ### Fixed
+
 - **Phone pickers:** the model and LoRA pop-ups open at their row on iOS instead of failing to show.
 
 ## [0.46.0] - 2026-10-22
@@ -99,6 +134,7 @@ version opens with a `> ` summary line.
 > Picker search swaps in place, one chooser for image and video references, model views as one choice, steady Settings, LoRA and blur on first open, compact Generate as an icon, and Steps offered alike on both devices
 
 ### Changed
+
 - **Generate:** in the compact (collapsed) desktop composer Generate is its arrow alone, still named Generate; the word shows once the composer expands. Offline and restarting keep their words in the same slot in both sizes.
 - **Desktop gallery filters:** the filter row opens and folds as the search does, its width at the base motion while it fades, instead of appearing and vanishing at once; instant with reduced motion.
 - **Chooser search:** in the References, LoRAs and Models choosers on the desktop, the search field takes the place of every heading control but the views and Close: it opens where the search icon is (the icon, pressed, becomes its own) while Stacks and Clear fade out, and closing brings them back in place. The views and Close never move or flash. The Models chooser's field no longer drops down under its heading.
@@ -108,6 +144,7 @@ version opens with a `> ` summary line.
 - **Settings › About:** About sits at the foot of the section rail, apart from the other sections after a divider. On the phone it stays last in the row, after a divider.
 
 ### Fixed
+
 - **Reference chooser hover:** hovering a picture no longer flashes a white ring that fades out; the ring only changes colour, and only where a pointer hovers.
 - **References in video mode:** a video model's start image is chosen with exactly the image chooser: Selected 1/1, Clear, the tick and staying open after a pick. With its one slot full, tapping another picture swaps it in instead of greying out every other picture and asking to take one off.
 - **Settings, first open:** the first open of a session draws the final Settings sheet from its first frame, on the desktop and the phone, instead of an "Opening settings…" stand-in swapped for the real sheet, which then faded in again. Its code is fetched while the studio is idle and the open waits for it.
@@ -120,6 +157,7 @@ version opens with a `> ` summary line.
 > Menu search stays in place, gallery searches and filters swap without a reload, Upload leads Uploads, This Model shows the family's LoRAs, Advanced uses one dropdown, and Generate is labelled
 
 ### Changed
+
 - **Menu search:** in every dropdown and gallery filter menu, the search icon sits right after the menu's title and stays there, amber and pressed while the field is open; pressing it again clears and folds the search. The field drops down under the title and folds back up, and the menu keeps the full list's height while searching instead of shrinking to the matches.
 - **Desktop gallery:** the search field opens and folds smoothly. A search, a filter or Hide Failed & Queued keeps the list on screen until the new one arrives and swaps it in place, without the blank frame and fade of a fresh load; only the first load and Images | Videos fade in.
 - **Reference chooser:** Upload is the first tile of Uploads (with its progress while uploading), on the desktop and the phone, instead of a heading icon; the search icon sits right of the Library | Uploads | Selected views, and its field opens beside them rather than covering them.
@@ -129,6 +167,7 @@ version opens with a `> ` summary line.
 - **Generate:** the desktop composer's Generate shows its arrow and the word Generate, as on the phone; offline and restarting say so in the same slot.
 
 ### Removed
+
 - **Suggested LoRAs in the chooser:** the LoRA chooser no longer has a Suggested section or asks the prompt assistant when it opens; the assistant's suggestions stay as the chips under the prompt.
 
 ## [0.44.0] - 2026-10-21
@@ -136,6 +175,7 @@ version opens with a `> ` summary line.
 > Details read alike for images and videos and name the profile, Copy and Recreate close Details, desktop tiles star top left, typed view models with one access model, and orphan server routes removed
 
 ### Changed
+
 - **Prompt Assistant menus:** Enhance leads, the other presets read alphabetically, and Suggest LoRAs closes the menu, on the desktop caret and the phone list.
 - **Details › Output:** reads Dimensions (the picture's size), File, Size (the file's size on disk, once known) and Time (when it was made) in place of Size, File and Generated, for images and videos alike; a video shows exactly an image's groups and rows, adding only Duration, Frames and FPS, and Count and Reference no longer show on images only.
 - **Viewer title:** names the profile, as Details' Profile row does, instead of the model family, on the desktop and the phone.
@@ -150,10 +190,12 @@ version opens with a `> ` summary line.
 - **Account status:** the sign-in gate's `/api/accounts/status` answer is shared; Settings reuses it instead of asking on every open (again only once it is over a minute old), and a section that stops being offered gives way to Studio.
 
 ### Removed
+
 - **Refine in Chat:** Details' footer is Copy · Recreate. The chat handover routes (`/api/chat`, `/api/chat/handover`) and `STUDIO_CHAT_URL` stay for MCP, unused by the studio.
 - **Orphan server routes:** nothing in Studio, MCP or the docs called these since their Settings went: gallery bundles (`/api/gallery/bundles*`) and the server-side run grouping behind them (Auto-Grouping in the browser is unchanged), `/api/gallery/recover` (history is still recovered on start), `/api/gallery/clear` and the trash routes (`/api/gallery/trash*`; an existing trash still empties itself after `STUDIO_TRASH_DAYS`), the earlier-images folder routes (`/api/library/folders*`, `/api/library/output`; folders added before are still read), the model manifest routes (`/api/models/manifest*`), the Hugging Face and Civitai token routes (`/api/settings/hf-token`, `/api/settings/civitai-token`; tokens come from the environment) and `/api/shutdown` (containers stop Studio with a signal).
 
 ### Fixed
+
 - **Phone focused prompt:** a focused Prompt or Negative Prompt fills the field's full width; the space kept for the tools above the text no longer runs down its right side.
 - **Selection actions:** between 1051 and about 1082 px wide the gallery's selection actions no longer overflow their column by up to 16 px; above Tablet their column takes what it needs from the search side.
 - **One announcer:** generation progress speaks through the status announcer's polite region instead of a second live region of its own.
@@ -164,6 +206,7 @@ version opens with a `> ` summary line.
 > A steadier desktop gallery, one progress pattern, consolidated stylesheets with 44 px phone targets, recovered long video runs keeping their outputs, and Details naming the profile and LoRAs
 
 ### Changed
+
 - **Desktop gallery:** tiles appear in place on first load, Images/Videos, search and clearing a search instead of gliding in; returning to Images or Videos restores the scroll before the first paint; scrolled tiles keep their place when an activity pill or the filter row appears; tiles follow a resize at once while the column count holds.
 - **Selection actions fit narrow windows:** Auto-Grouping and Hide Failed step aside while selecting.
 - **One progress pattern:** imports, downloads, model, family, starter and upscale setup and the activity pills share one progress bar and words (Queued, Downloading 45%, Checking…, Paused, Done, Failed, Cancelled). A model download or upscale that fails out of sight reports in the status pill with Try Again, Show or Set Up.
@@ -177,6 +220,7 @@ version opens with a `> ` summary line.
 - **Gallery:** a desktop tile's hover caption names the profile, as Details does.
 
 ### Fixed
+
 - **Tooltips never take a click:** an open tooltip no longer blocks the control under it (the phone Model row after Escape).
 - **Gallery first load:** captions share one cached time formatter.
 - **Long video runs:** a worker too busy to answer in time (decoding and saving a long video) keeps its run waiting instead of being given up after a minute; only 20 minutes without any answer or progress ends it. A run given up on while still in ComfyUI's queue is followed again and delivered from its history as soon as it finishes, rather than five minutes later.
@@ -189,6 +233,7 @@ version opens with a `> ` summary line.
 > Studio gains the Library (Civitai, Hugging Face and image imports, graded with their missing files, substitutes, version offers and update checks), a prompt assistant in the composer, Refine in Chat, Studio-owned profiles and guides with versions and AI drafts, and MCP admin tools for the Library and profiles, plus a round of UI polish: Groups, pickers, selection and the phone shell
 
 ### Added
+
 - **Prompt assistant engine:** one LiteLLM engine on the prompt writer's gateway credentials rewrites prompts (streamed, with the Enhance, Spicy, Photographic, Cinematic, Concise and Candid presets), writes negatives, suggests LoRAs, describes images (vision, with a text fallback) and drafts guides and profiles. Each call has a timeout and a fallback, and reasoning is stripped. MCP Generate's prompt writer runs on it unchanged. The account-scoped `/api/assistant` routes serve the composer and MCP.
 - **Settings › Models › Integrations:** Assistant Model (by default the prompt writer's model) and Assistant Spicy Model rows list the gateway's models and say whether each reads reference images. Spicy stays off until a Spicy model is chosen.
 - **Prompt Assistant:** a new group feature in Settings › Groups, on for the built-in Administrator and User groups and for every existing group. Spicy also needs the account's NSFW Models access, whatever model is selected.
@@ -220,6 +265,7 @@ version opens with a `> ` summary line.
 - **`studio` profile block:** profile and workflow files may name their block `studio` as well as `heissUi`; Studio keeps writing `heissUi` until the seed migrates, and refuses a file with both.
 
 ### Changed
+
 - **How a prompt was written stays with its result:** the `assistant` record now rides in each ComfyUI run, so results rebuilt from ComfyUI's history keep it; Recreate and MCP Reuse carry it into a rerun of the same prompt; and what the chat's RewritePrompt and SuggestLoras did is kept on disk (`mcp-assistant.json`) instead of in memory, so it survives a restart.
 - **Studio owns live profiles and guides:** the profiles repository is now seed and backup, and `profiles:deploy` is retired. `STUDIO_SEED_DIR` (the seed's layout) fills only what a data folder is missing at start and never overwrites a profile or guide Studio holds; a profile removed in Studio stays removed. Guide seeds (`MCP_PROMPTING_PATH`) no longer replace unchanged packs either.
 - **Library:** the Image & Model Library is now the **Library**, for administrators (whether or not imports are on), from the desktop dock and the phone Menu. It has five pages: Import, Images, LoRAs, Models and Downloads. Import and Images follow `STUDIO_ENABLE_PRESETS`.
@@ -234,18 +280,20 @@ version opens with a `> ` summary line.
 - **Phone pop-ups:** a tap outside a pop-up, popover or dropdown (Size, Advanced, dropdown menus, the top bar's menu, gallery filters) only closes it; it no longer goes on to open the Create row, tile or filter under the finger.
 
 ### Removed
+
 - **Saved sizes:** Save Size, the saved rows with Rename and Remove, and the `/api/sizes` route are gone; the Size menu holds the model's presets and Custom on both devices. Sizes saved before stay in `saved-sizes.json` and browser storage, unread.
 
 ### Fixed
+
 - The desktop composer no longer stays pinned short (Generate cut off) after collapsing mid-animation, such as when opening the Library.
 - **Reset All Settings** asks again: its button in Settings › Maintenance did nothing because the action never reached Settings.
-
 
 ## [0.41.0] - 2026-10-21
 
 > Studio becomes a hard fork of HEISS UI: Studio names everywhere, with the old settings, headers, cookie and browser storage still read, and dead upstream code removed
 
 ### Changed
+
 - **Hard fork:** Studio no longer follows HEISS UI and owns all of its code. The HEISS UI and J-AI Studio credits and MIT notices stay in Settings › About, `LICENSE` and the README; the upstream-sync instructions and community links are gone.
 - **Settings:** every `HEISS_*` setting is now `STUDIO_*` (`STUDIO_DATA_DIR`, `STUDIO_ALLOWED_HOSTS` and the rest). The old names still work from the environment or Studio's settings file, read when the new name is unset, and the log names any still in use in one line. Saving a setting writes only the new name. See Configuration › Renamed Settings.
 - **Browser names:** pages send `X-Studio` and read `X-Studio-Sign-In`; the old `X-HEISS` header is still accepted. A device signed in with the old `heiss_device` cookie stays signed in and moves to `studio_device`. Preferences, drafts, LoRA favourites and other browser storage move from their `heiss-ui` names to Studio names on the first visit.
@@ -261,6 +309,7 @@ version opens with a `> ` summary line.
 > Publishes the 0.40.0 changes, whose release check timed out; see 0.40.0 below for what changed
 
 ### Fixed
+
 - The long administrator accounts browser test has room to finish on CI, so the 0.40 changes publish.
 
 ## [0.40.0] - 2026-10-21
@@ -268,6 +317,7 @@ version opens with a `> ` summary line.
 > Access profiles with a default and approval, any number of workers, and a calmer, consistent UI: one dropdown, amber selection, no press movement, anchored popovers and LoRA stacks
 
 ### Changed
+
 - **References:** a model that takes no reference shows no References control; Reference With is gone.
 - **Pickers:** References, LoRAs and Models share one heading row (the views, Stacks, Clear, search and Close); desktop search grows inside it and the hint text is gone. On the phone the views are a dropdown in the title ("LoRAs · This Model"), so the list starts higher.
 - **Picks:** every chooser marks a pick with the same amber tick as the model list; order numbers show only under Selected. LoRA source links are small "com" and "red" pills beside Star.
@@ -310,6 +360,7 @@ version opens with a `> ` summary line.
 > Compact pickers, clearer generation Details and a Custom size option
 
 ### Changed
+
 - **Generation Details:** clearer section headings and a Copy · Recreate footer. Copy preserves saved generation inputs and references while excluding output files, timestamps and timing. Edit and Copy Settings are removed.
 - **Image Text:** an optional concise summary appears only while Details is open.
 - **LoRAs:** enabled adapters show their filename and information automatically in a shared panel. Civitai sources have separate .com and .red icons beside the row; links are removed from the information panel.
@@ -326,12 +377,15 @@ version opens with a `> ` summary line.
 > Active worker model storage and clean container shutdown
 
 ### Added
+
 - **Worker model storage:** `STUDIO_MODEL_STORAGE=worker` lists and downloads models in the active ComfyUI library. Studio retains provider credentials and streams weights directly to authenticated worker endpoints, with source-bound resume, published checksum verification and no destination overwrites.
 
 ### Changed
+
 - Worker model storage respects ComfyUI folder aliases and extra roots. Saved-image checks use the active worker; manifest import, verification and restore are explicitly unavailable in this mode. Local model storage remains the default.
 
 ### Fixed
+
 - Containers stop promptly on termination after saving pending gallery changes, including when Node runs as PID 1.
 
 ## [0.37.0] - 2026-10-21
@@ -339,15 +393,18 @@ version opens with a `> ` summary line.
 > Controlled comparisons, clearer Details actions and steadier gallery layouts
 
 ### Added
+
 - **Compare Variants:** make 2–4 images with a shared seed, edit each prompt and settings, vote on finished results and return to account-owned comparison history.
 - **LoRA information in Details:** compatibility, suggested strengths, notes and triggers, with both civitai.com and civitai.red links for Civitai sources.
 - **MCP Handover:** copy a conversation summary with current result references when requested or when a chat host reports its context is nearly full. Studio never guesses the host's context usage.
 
 ### Changed
+
 - **Details copying:** Copy includes both prompts and all settings; Copy Settings includes only settings. Each prompt keeps its own Copy action.
 - **Phone selection:** Select is directly available at the top right; Menu moves beside the status light.
 
 ### Fixed
+
 - Resizing gallery columns no longer lets moving tiles pan the gallery and shift the desktop toolbar.
 - Ordinary visual-viewport scroll events no longer restore an old gallery scroll position; keyboard close still restores its resting position.
 - Deleting an image already removed elsewhere keeps it removed without a not-found error.
@@ -359,6 +416,7 @@ version opens with a `> ` summary line.
 > Visual image review on request through MCP and a generation timing breakdown
 
 ### Added
+
 - **Generation timing:** new runs save queue and active time plus estimated setup, sampling and finishing stages in Details and requested MCP reviews. Older results retain their recorded elapsed time.
 - **MCP Review:** a read-only tool supplies image pixels, the recorded prompt and generation settings for a chat model to assess when asked, with an optional second result for comparison. It preserves account ownership and hidden/deleted-result restrictions and never queues revisions.
 - **Controlled revisions:** Reuse accepts `preserve_seed` for same-profile follow-ups; ordinary reruns still use a new seed.
@@ -368,6 +426,7 @@ version opens with a `> ` summary line.
 > Batch 5: a reworked phone Create, inline confirmations in the status pill, Settings as flat lists, a manual AI Control switch, and MCP that owns its chat rules
 
 ### Added
+
 - **AI Control in Settings › Workers:** administrators choose what each GPU runs, with a preview of what stops, starts and keeps, a confirmation only when something stops, and progress in the status pill; a change to both GPUs runs as one job through AI Control's board routes. Everyone else reads the status. Manual only.
 - **Self-service account:** name, email and password in Settings › Account. Administrators edit model profiles as JSON (Settings › Users › Profiles), pick access profiles with multi-selects and Save & Discard.
 - **Gallery view controls on both devices:** Auto-Grouping, Grid Autoplay and Failed in the desktop toolbar and at the end of the phone's filter row. Stop All shows its count.
@@ -377,6 +436,7 @@ version opens with a `> ` summary line.
 - The LoRA picker notes a model's own limit (Radiance video: "Up to rank 64 in total").
 
 ### Changed
+
 - **Phone Create:** Model, References, LoRAs, Size and Advanced open as pop-up lists over Create; the prompt's actions sit at its right edge; a two-line footer holds Steps and the count, then Image/Video · Clear · Generate. The collapsed prompt bar is back at the bottom of the gallery.
 - **Phone top bar:** the status light and "Studio" on the left, Images and Videos as centred icons, Search, Filter and a menu (Select, Library, Settings, Account, Sign Out). Selecting swaps the bar's contents; its actions sit in a bottom bar.
 - **Phone viewer:** the desktop's title top left, Star · Info · Close top right, and a centred action bar. Phone tiles no longer show generation times.
@@ -388,6 +448,7 @@ version opens with a `> ` summary line.
 - Size always shows Width and Height; every composer control stays in the desktop bar; favourite workflows use the star.
 
 ### Removed
+
 - Zen mode and Follow the Latest Output, Simple Phone Studio, the desktop More Settings drawer, and the local-install Settings (model folders, Hugging Face token, Tessera, model types, manifest, rescan, other devices).
 
 ## [0.34.3] - 2026-10-20
@@ -395,6 +456,7 @@ version opens with a `> ` summary line.
 > Phone scrolling works again
 
 ### Fixed
+
 - **Phone scrolling:** the phone gallery scrolls again by touch, wheel and trackpad (also in a desktop browser's device mode). The narrow-screen `body { overflow: hidden }` passed to the page while the phone shell scrolls the document; the phone shell now keeps its body visible and locks the page only on `html` while a sheet or the viewer is open (`phone-touch-scroll.spec.ts`).
 
 ## [0.34.2] - 2026-10-20
@@ -402,6 +464,7 @@ version opens with a `> ` summary line.
 > LoRAs for Radiance workflows
 
 ### Added
+
 - **Radiance LoRAs:** a workflow's `loraStack` can use the `radiance-tags-v1` adapter (up to 4 LoRAs by default, at most 8). Studio sets the Radiance node's `loras` input to the enabled LoRAs as JSON (`[{"name","strength"}]`, in stack order) and leaves the prompt text alone; Radiance adds the tags itself.
 
 ## [0.34.1] - 2026-10-20
@@ -409,6 +472,7 @@ version opens with a `> ` summary line.
 > MCP face detail only beside a requested upscale, and exact prompts that refuse only clear instructions
 
 ### Changed
+
 - **MCP face detail:** Generate turns face detail on by itself for a full-body or wide-shot person only when the request already chooses `upscale_quality`; it no longer adds a fast upscale. Without an upscale nothing changes, and an explicit `face_detail: true` works as before.
 - **MCP exact prompts:** `exact_prompt` refuses only clear instructions ("variations", "of this scene", "generate 4 photos", "five variations"), so finished prompts such as "Create two cats on a sofa" run as written.
 
@@ -417,12 +481,14 @@ version opens with a `> ` summary line.
 > A flat phone Create sheet with a sticky Generate, one phone top bar with a floating Create, flat lists for every step and for Settings, one chooser for References, LoRAs and Models with drag to reorder, a Sign Out that works, and the gallery staying put when the viewer closes
 
 ### Added
+
 - **Sign Out in plain sight:** an Account menu in the desktop dock and an Account group at the top of the phone's More, each with Sign Out; it asks first only while something is generating.
 - **Drag to reorder:** picked references and LoRAs reorder by dragging their grip in the Selected tab, with a mouse, pen or finger, or with the arrow keys.
 - **Date headers as a setting:** Settings › Studio › Gallery › Date Headers, off by default.
 - **MCP:** Generate turns face detail on by itself when the prompt shows a person full-body or in a wide shot (an explicit `face_detail: false` wins) and says so in its reply; an `exact_prompt` request that holds generation instructions ("Generate five variations of this scene: …") is refused with a message to pass `count` and the plain prompt.
 
 ### Changed
+
 - **Phone Create sheet:** one flat column. The prompt fills the room that's left, with History and Clear in a small toolbar along its edge; Model, References, LoRAs, Size and Advanced are full-width rows; a sticky footer keeps the count, Reset and Generate in view. Image/Video sits beside Close. Nothing overflows at 320–430 px.
 - **Phone top bar:** the status light and Images | Videos are one element on the left; Search, Filter and More sit on the right; search and filters open under the bar. The bottom dock is gone and Create is a floating button, with a dot while a prompt waits.
 - **Flat lists:** Advanced Settings, Size, Model, More and Settings use one flat list of one-line rows with hairlines. Advanced Settings show steppers, friendly model-part names (the file name stays in the picker) and Seed as a field with a Random toggle, in two dense columns on the desktop. Size marks the shape in use with a check and makes Custom Size a normal row.
@@ -430,6 +496,7 @@ version opens with a `> ` summary line.
 - **Settings cleanup:** the Discord and feedback-board links, Report Bug buttons, About's stats and credits, and rows for a local install (output folders, finding ComfyUI on its own, the studio password for other devices, the second Restart) are gone or hidden in account mode. About shows the version, the repository and the changelog. Toggle labels are Title Case.
 
 ### Fixed
+
 - **Sign Out:** a plain same-origin POST to `/api/accounts/sign-out` (a console fetch, a form) is no longer refused for missing the studio header, and signing out also ends a leftover device session.
 - **Gallery jump after the viewer:** opening a tile that was partly under the top bar no longer scrolls the gallery behind the viewer, so closing it lands exactly where you were.
 - **Reference chooser on phones:** its tabs, Clear Selection, Upload and Close no longer run off the right edge.
@@ -439,6 +506,7 @@ version opens with a `> ` summary line.
 > Lighter icon-button hovers with tooltips that stay clear of the zoom, an outline Upscale arrow, plain centred empty states, picks that keep their place, and a steady CI
 
 ### Changed
+
 - **Icon-button states:** the viewer bar's and docks' hover and press fill is a 32 px circle inset evenly in the bar, with a keyboard ring that traces it; tile corner buttons share one hover, press and focus treatment; the phone viewer bar's press fill sits inside its cell.
 - **Viewer zoom in the corner:** the zoom pill sits at the bottom right, level with the action bar, so the bar's tooltips never cover it.
 - **Upscale arrow:** an outline like the other action icons.
@@ -446,6 +514,7 @@ version opens with a `> ` summary line.
 - **Picks keep their place:** in the References and LoRA choosers a picked item stays where it is and shows its number; the Selected tab lists picks in order. Clear All is now **Clear Selection**.
 
 ### Fixed
+
 - **CI:** the completion-notice test measures the island once its height settles instead of mid-animation.
 
 ## [0.33.0] - 2026-10-20
@@ -453,10 +522,12 @@ version opens with a `> ` summary line.
 > Messages move into the Studio pill, every reference stack gets one References button, Advanced Settings become a popover, Settings regroup, chat queues ten images per call, and motion and start-up get quicker
 
 ### Added
+
 - **Clear All in the pickers:** the reference chooser and the LoRA library show Clear All beside their tabs while something is picked; Undo comes back in the status pill.
 - **Cloud generations survive a restart:** a Grok job's ComfyUI prompt is kept in `cloud-jobs.json`, so after a Studio restart the tile keeps running and delivers instead of reading "Generation missing"; a lost or failed provider job fails the tile with a clear message.
 
 ### Changed
+
 - **Messages in the Studio pill:** toasts are gone. A message (with its Undo, View or Try Again) takes over the phone bar's Studio pill or sits in the desktop gallery's top bar; a sheet, dialog, picker sheet or the viewer that covers them shows it at its own top edge, never over controls.
 - **One References button for every reference stack:** a profile that lists its references as separate "Reference Image" slots (the synced FLUX.3 [klein] profiles' ten, Boogu Edit Turbo's and Qwen-Image 2.1's three) shows one References button and chooser; start and end frames stay separate.
 - **Advanced Settings in a popover:** above the composer like LoRAs and References, with the same glass, motion and dismissal; the phone keeps its sheet in the Create flow.
@@ -471,10 +542,12 @@ version opens with a `> ` summary line.
 - **Clearer MCP replies:** Generate's description asks for one call with `count` or `prompts` for several different images ("six photos" is count 6) instead of repeated calls, and for a named model in `profile_id`; finished replies say not to call Studio again for this request, and queued replies say to share links, not images.
 
 ### Fixed
+
 - **Phone Upscale label:** it lines up with the other viewer bar labels.
 - **LoRAs for another model are refused:** generation refuses an optional LoRA trained for another family (a Z-Image LoRA on Tesserafine), from the studio and from MCP, instead of applying it; Studio reads a worker LoRA's family before checking. MCP Reuse leaves such a LoRA out of a rerun and says so. `compatibleLoras` in `server/lora-policy.js` filters a reused stack and counts what it dropped.
 
 ### Removed
+
 - **Leftover Hidden styles and copy:** the vault's last CSS and text are gone; the device sign-in screen keeps its own styles.
 
 ## [0.32.0] - 2026-10-20
@@ -482,15 +555,18 @@ version opens with a `> ` summary line.
 > One References chooser for many-reference models, Hidden folded back into the gallery, multi-select gallery filters, Animate from the select bars and a tidier viewer, menu and phone sheets
 
 ### Added
+
 - **One References button:** a model that reads several references (FLUX.3 [klein] takes ten) shows a single References button with the picked thumbnails and n/max, instead of a control per slot. Its chooser picks several at once, numbers them in order and has a Selected n/max tab to review, reorder and remove them; the inpaint brush and Edit | Reference sit beside it.
 - **Selected n/max for LoRAs:** the LoRA library adds a Selected view beside This Model and All Models, and drops its row animations.
 - **Several values per gallery filter:** Models, LoRAs, Size and Aspect Ratio each take several values (any of them matches; every filter together), with a tick per value, a count on the trigger and its own Clear. The gallery API takes repeated `model`, `lora`, `size` and `aspect` parameters.
 - **Animate from the select bars:** selected photos animate from the desktop and phone select bars as well as the right-click menu.
 
 ### Removed
-- **Hidden:** the private vault, its password, passkeys, lock screen, settings, routes and Move to Hidden are gone. On the first start, Studio backs up its data to `backups/hidden-removal-<time>/` in the data folder, moves any vault there untouched (it needs the owner's old password to open), returns hidden-flagged records to their owner's gallery and clears the markers that kept them out of it. Nothing is deleted; see [Configuration](docs/guides/CONFIGURATION.md).
+
+- **Hidden:** the private vault, its password, passkeys, lock screen, settings, routes and Move to Hidden are gone. On the first start, Studio backs up its data to `backups/hidden-removal-<time>/` in the data folder, moves any vault there untouched (it needs the owner's old password to open), returns hidden-flagged records to their owner's gallery and clears the markers that kept them out of it. Nothing is deleted; see [Configuration](CONFIGURATION.md).
 
 ### Changed
+
 - **Desktop viewer:** Info sits alone in the top right and the open Details panel has its own Close; the bar reads Copy · Download | Animate · Recreate · Reference · Upscale | Star · Delete, then Close.
 - **Desktop gallery switch** reads Images | Videos in words.
 - **Right-click menu:** full-width rows with muted icons, hairlines between the intent groups, an "n Selected" heading for several items and an inset focus ring.
@@ -504,6 +580,7 @@ version opens with a `> ` summary line.
 > A thumb-first phone dock, one layer at a time, viewer actions by intent with Recreate and Reuse, Retry for failed items, and chat prompts written by Studio
 
 ### Added
+
 - **Retry failed items:** a failed image or video offers Retry on its tile, in the viewer and in the right-click menu, and Select Failed picks every failed item for one Retry or Delete. Each retry is a new job with the run's own model, prompts, settings and references.
 - **Selections download as one zip:** Download on several selected items fetches one archive of just those items (`/api/gallery/export?ids=`), instead of a burst of separate downloads.
 - **LoRA catalogue:** Studio also reads `lora-catalogue.json` from its data folder's `config/`, synced like `prompting.json`; that copy wins over one installed by hand. Entries take `triggers` and `guidance` (shown in a LoRA's info), Qwen-Image 2.1 LoRAs that read as Qwen-Image from their weights land on Qwen-Image 2.1 models, and a literal `[]` trigger is ignored.
@@ -512,6 +589,7 @@ version opens with a `> ` summary line.
 - **Reference With:** when the selected model takes no reference image, the composer shows Reference With in the Reference button's place. It lists the ready models of that kind that take one, grouped and labelled like the model picker; picking one switches to it and opens its reference picker. On the desktop and in the phone's Create sheet.
 
 ### Fixed
+
 - **Info closes Details on phones:** tapping Info while Details is open now closes it instead of reopening it.
 - **Videos stop when closed:** closing the video viewer or stepping away stops playback and releases the file, so no audio carries on in the background. On a phone, Details or a sheet over a playing video or the gallery pauses it; the viewer resumes when it's uncovered if it was playing.
 - **Cloud video quota:** when the cloud video provider refuses for authorisation or quota (such as CLIProxyAPI's HTTP 401), chat results and result pages say "Cloud video unavailable (quota)", and MCP queues no cloud video for 10 minutes instead of failing job after job.
@@ -524,6 +602,7 @@ version opens with a `> ` summary line.
 - **Viewer loading:** an image opens at its final size straight away, from the size its record gives, with its gallery thumbnail filling that rectangle until the sharp picture fades in over it. Nothing resizes as it loads, and reduced motion swaps without the fade.
 
 ### Changed
+
 - **Viewer actions by intent, one word each:** the desktop bar reads Copy · Download | Animate · Recreate · Reference · Upscale | Star · Delete | Info. A phone shows Copy · Share | Animate · Recreate · Reference · Upscale | Delete along the bottom, Star top left and Info top right; videos offer Extend instead of Animate. Zoom is a small `− 100% +` pill above the bar, faded until used; its percentage cycles Fit, 1:1 and Full Size. The right-click menu uses the same names and grouping.
 - **Recreate and Reuse:** Recreate (formerly Use Settings) is an exact rerun: model, prompts, size, LoRAs, references, settings and the same seed go into the prompt box. Reuse loads both prompts. In Details, each prompt has its own Copy and Use, Settings sit unboxed below, and the footer offers Reuse and Recreate; phones add Copy and Settings shortcuts at the top.
 - **Long press selects:** on a phone a long press on a tile starts selecting with it; the action sheet is gone. The select bar offers Select All, Select Failed, Share (Download where sharing isn't possible), Retry, Star and Delete; Animate and Move to Hidden left the select bars.
@@ -546,6 +625,7 @@ version opens with a `> ` summary line.
 > Result links work as references
 
 ### Fixed
+
 - **Result links as references:** Status, Result, Cancel and Reuse accept a result link or its short id from an earlier reply, for the same account; a chat model had passed the link id instead of "result 1".
 
 ## [0.30.1] - 2026-10-20
@@ -553,6 +633,7 @@ version opens with a `> ` summary line.
 > Chat asks for 2K only when the user does, and imported FLUX.3 workflows can draw it
 
 ### Fixed
+
 - **2K for imported workflows:** imported workflows take their model family's native 2K and 4K support, as they already took its size step, so `size: "2k"` works for the Bento FLUX.3 profiles.
 - **Size only on request:** MCP's instructions say to pass `size` only when the user asks for 2K or 4K; a chat model had added it to an ordinary request.
 
@@ -561,10 +642,12 @@ version opens with a `> ` summary line.
 > Fast profiles by default in chat, several images in one call, prompting guides once per conversation and Result links with an All Results page
 
 ### Added
+
 - **Aspect and size in chat:** Generate takes `aspect` (`landscape`, `portrait`, `square` or a ratio such as `16:9`) and `size` (`2k` or `4k`) and uses the profile's own native preset sizes instead of invented pixel sizes.
 - **All Results:** replies with several results, or any still running, add one All Results link to a page that lists every result of the conversation and fills in as they finish. Result with `job_id: "all"` answers "show them" with every recent finished result in one reply.
 
 ### Changed
+
 - **Result links:** chat replies label each link Result N instead of Watch result N.
 - **Fast by default in chat:** without a tier, Generate and Reuse animation pick the fastest tier available (Fast, then Super Fast, Standard and Quality). A `profile_id` such as "flux 3" or "FLUX.3" matches its family and picks that family's fastest profile, and near misses list the fastest first. An exact ID or an explicit tier still wins.
 - **Batches in one call:** Generate's description and errors say that N different images are N prompts in one call. `count` is variations per prompt, and a `count` equal to the number of prompts is read as one each. The call waits for all its jobs against one shared deadline, and a refusal such as the outstanding-job limit names its reason.
@@ -575,16 +658,19 @@ version opens with a `> ` summary line.
 > One image per chat request, AI Control restarts from chat, and a gallery that follows the viewer
 
 ### Added
+
 - **AI Control from chat:** the control tools add Restart, which restarts a running workload in place (same model, profile and GPUs) when the user asks, and Mode, which previews a preset board (image and text, image and video, or video on both GPUs) for an approved Apply. GPU changes still happen only on explicit request.
 - **The library follows the viewer:** stepping or swiping to another item in the viewer scrolls its tile (or the stack holding it) into view behind the viewer, on a computer and on a phone, so closing the viewer lands where you are. The gallery only moves when the item changes and its tile is out of sight.
 
 ### Changed
+
 - **One image per chat request:** Generate makes one image or video unless the user asks for more, and Models reports a `count` default of 1. The studio composer still defaults to two.
 - **Plain tool titles:** MCP tools carry short titles such as Generate, Find Models, Check Status and Preview Allocation for chat hosts that show them.
 - **Matching phone switches:** the phone's More sheet names its switches as Settings does (Smart upscale, Show failed items, Confirm before removing things) and uses the same switch control.
 - **Studio settings fail loudly:** a partial `STUDIO_OIDC_*` set, an invalid `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS` or `STUDIO_OUTPUT_STORAGE`, or a `STUDIO_SETUP_TOKEN` under 32 characters now stops Studio at startup with the setting's name instead of quietly falling back. The sign-in button reads Single Sign-On unless `STUDIO_OIDC_LABEL` names it.
 
 ### Fixed
+
 - **Reduced motion everywhere:** animated panels, sheets and the viewer follow the system's reduce-motion setting, as the CSS animations already did.
 - **Named sheets and number fields:** phone sheets take their name from their heading, including "Create in Hidden", and number fields are labelled; their buttons read "Images: 2" without a "click to edit" hint.
 - **Video wording:** deleting a video asks "Delete This Video?" and confirms "Video deleted", grouped deletes read "3 items deleted", the phone shows "Generating 1 video" for a video, and delete dialog titles use Title Case.
@@ -597,6 +683,7 @@ version opens with a `> ` summary line.
 > Chats hand back slow jobs at once
 
 ### Changed
+
 - **Slow jobs hand back at once:** when an image outlasts Generate's 60-second wait, or for any video, Generate and Reuse reply with the watch links and tell the chat to end its turn instead of waiting on a Result call. Result runs only when the user asks to see a result, such as "show result 3", with a short wait. Finished images still return inline.
 - **Lighter releases:** `npm run release` checks the tree, version, tags and changelog summary, then bumps, commits, tags and pushes without running the test suites locally. The Release workflow runs the full checks before it publishes.
 
@@ -605,14 +692,17 @@ version opens with a `> ` summary line.
 > Dismiss waiting chat users, and a faster studio while the video worker is off
 
 ### Added
+
 - **Dismiss waiting chat users:** each waiting ID under Settings › Accounts & MCP › Chat Gateway Users has Dismiss next to Link, which removes it from the list after a confirmation. An ID the gateway sends again returns to the list.
 
 ### Changed
+
 - **Leaner Studio chats:** Models lists profiles as short `id — label` lines and indexes every compatible LoRA in one line each, so a profile with 90 LoRAs fits in about 1,300 tokens instead of 6,500 and no LoRA is cut off. `lora_query` or the new `lora_names` returns full details for up to five LoRAs. Generate takes LoRA names alone, fills the recommended strength, and picks a profile that can use them; a guessed profile ID or label is matched, and a miss names the closest profiles.
 - **Short result links:** chat results use short links such as `/mcp/results/Ab3dE5fG7h` instead of 300-character sealed ones, and each image is a preview that opens the original, with no separate View Original link. Deleting or hiding the output still ends its links, and earlier links keep working.
 - **Images return inline more often:** Generate waits up to 60 seconds for images, enough for a cold model load, so the chat skips the Result call and its extra turn. A queued job is collected with one Result call that waits for it, without background polling. Generate sets `count` from the user's wording, so "a photo" makes one image. Generate, Reuse and Result replies carry only their instruction and markdown, and refused arguments come back as one line naming each field.
 
 ### Fixed
+
 - **Faster while the video worker is off:** when the video worker does not answer, Studio remembers that for 30 seconds instead of asking again on every model list and run, which took about 1.5 seconds each time a lookup or connection failed slowly. A connection check that reaches the worker, or a new video address, clears it at once. Model detection is also reused until ComfyUI is asked again.
 - **Faster gallery media:** Studio builds the thumbnails, video stills and grid previews of its stored media in the background after it starts and whenever the gallery changes, newest first and only while nothing else is being built, so a large imported gallery no longer waits on hundreds of first-view builds. A finished run's thumbnails are built as it is delivered. Browsers keep stored originals for good, and their thumbnails, stills and previews for a week before checking them again.
 - **Video thumbnails in small views:** a video's thumbnail address now gives its still, so the activity panel, the reference picker and the Animate review show a picture instead of a placeholder.
@@ -623,15 +713,18 @@ version opens with a `> ` summary line.
 > Email sign-in, Animate and Extend Video in the viewer, and a steadier phone prompt
 
 ### Added
+
 - **Animate from the image viewer:** a finished image has Animate in the viewer's dock on desktop and its action bar on a phone. It opens the same Animate review as a gallery selection, with that image as the first frame of a MiniMax H3 video.
 - **Extend Video:** a finished video has Extend Video in the viewer. Its last frame starts a new MiniMax H3 video with the video's prompt, which can be edited first. The frame is cut from the original when the run is staged and never stored, so only the owner's own videos can be extended and a Hidden video's extension stays in Hidden.
 
 ### Changed
+
 - **Clearer sign-in:** the account sign-in and first-administrator screens are a card like Studio's dialogs, with an Email field that phone keyboards no longer capitalise or autocorrect, inline errors and a separate Pocket ID button. Accounts are identified by email everywhere: new accounts and the first administrator need an email address, while existing non-email usernames keep working.
 - **Account actions on phones:** the phone studio's More sheet has an Account section with Accounts & MCP, Settings and Sign Out.
 - **Smaller MCP context:** the seven media tools' descriptions and parameter notes and the server instructions are cut to their essentials (about 2,900 to 1,650 estimated tokens per model step), since chat hosts resend them on every step. Media sessions no longer receive the GPU allocation rule, and AI Control sessions receive only it.
 
 ### Fixed
+
 - **Phone prompt with the keyboard up:** tapping the prompt in the phone's Create sheet no longer squeezes it to a sliver above the controls until the page is scrolled; the prompt keeps its height and the sheet scrolls instead.
 - **Phone viewer opens fitted:** on a phone, an image opens fitted to the screen instead of at 1:1, which showed a corner of it. A double tap zooms in from the fitted size and back; 1:1 and the zoom buttons stay available. Desktop still opens images at 1:1.
 
@@ -640,15 +733,18 @@ version opens with a `> ` summary line.
 > LibreChat users reach Studio without a manual link
 
 ### Added
+
 - **Chat gateway links by email:** a trusted gateway can forward the user's email in `x-ai-user-email` (in LibreChat, `{{LIBRECHAT_USER_EMAIL}}`, passed on by LiteLLM's `extra_headers`). An unlinked chat user whose email is an enabled, approved account's username, ignoring case, is linked to that account on its first request, recorded like an administrator's link. Unknown emails stay pending, disabled accounts are not linked and no accounts are created.
 
 ### Changed
+
 - **Unlinked chat users see a clear message:** instead of a refused connection, which LibreChat reports as no available MCP tools, an unlinked gateway user gets Studio's tools, and every call returns a short message asking an administrator to link it in Settings › Accounts & MCP. It still cannot generate or read anything.
 - **Local passwords have no minimum length:** any non-empty password is accepted when creating or resetting an account, and Settings no longer asks for 12 characters.
 
 ## [0.24.0] - 2026-10-19
 
 ### Added
+
 - **Cloud video while the local worker is off:** when the separate local video worker is unavailable, as in a text and image GPU mode, MCP Generate with `kind: video` and Reuse animation without a `profile_id` now use a ready provider-backed cloud video profile, such as Grok, instead of failing. The profile matching the requested tier wins, otherwise Standard; animation needs one that takes a starting image. The reply marks the profile `remote` and names it, so users know the video went to the cloud. `/api/models` reports the video worker's availability with the catalogue it already loads, so no request adds a check. Explicit profiles, accounts without cloud access and a running local worker behave as before.
 
 ## [0.23.1] - 2026-10-19
@@ -656,37 +752,45 @@ version opens with a `> ` summary line.
 > Named MCP results, with no gap above the image
 
 ### Fixed
+
 - **Named MCP results:** each finished result in Generate, Reuse and Result notification replies now opens with a visible header line naming its reference, model and View Original link, such as `**Result 3** · Krea 2 Turbo · [View Original](…)`, directly above its image with no gap in LibreChat. Users can see which result to refer to; videos get the same header with View Video.
 
 ## [0.23.0] - 2026-10-19
 
 ### Added
+
 - **MCP follow-ups:** Reuse with a result reference and `kind` handles "again", "more like that" and "animate it" without a Models call. The result's own kind runs it again with the same profile and settings and a new seed, optionally with a revised `prompt`. `kind: video` animates an image as the first frame of the account's default first-frame video profile (Fast unless a `tier` is given), sized to the image's proportions. Follow-ups reply and wait as Generate does; Reuse without `kind` still returns a reference asset.
 
 ### Fixed
+
 - **Phone search dismissal:** closing the phone search overlay with an outside tap, including opening Select from More, or Escape now also clears its query instead of leaving it applied. Its own header button still closes it and keeps the query.
 
 ## [0.22.0] - 2026-10-19
 
 ### Added
+
 - **MCP tiers:** Generate accepts `kind` and `tier` (`quality`, `standard`, `fast` or `turbo`) instead of a `profile_id` and picks the account's default ready profile for that tier, so ordinary chat requests need no Models call. Models filters by tier. Turbo means Super Fast; standard means Standard or untiered profiles, otherwise Quality.
 - **Inline MCP results:** Generate waits up to `wait_seconds` (30 seconds for images and none for videos by default, at most 60) and, when every job finishes in time, returns `status: done` with the signed image markdown and View Original link that a Result notification returns. Quick images then need no background Result and no extra agent turn; slower jobs return `status: queued` as before. A client Stop or disconnect ends the wait, never the generation.
 
 ### Changed
+
 - **Leaner MCP output:** the Models list returns only ID, label, kind, tier and a one-line summary (prompting guides stay in the profile detail), Generate returns the chosen profile and each job's ID, reference and watch link, and a background Result notification returns only its markdown unless `detail: true` is passed. For the Bento catalogue, a tier-filtered image list drops from 9.5 KB to 0.2 KB and a notification from 2.5 KB to 0.8 KB.
 
 ### Fixed
+
 - **Demo progress:** Demo Mode jobs report their steps in the studio's progress shape, so running tiles show "Step 1/4" instead of Queued.
 - **Running tile model label:** a running or queued tile names its profile as the model picker does, in a chip styled like Stop in the opposite corner, and it no longer shifts when the pointer is over the tile.
 
 ## [0.21.0] - 2026-10-19
 
 ### Removed
+
 - **Upstream links on About:** Settings › About no longer shows the feedback panel or links to upstream's feedback board, Discord and website. Source, licence, changelog and credits stay.
 
 ## [0.20.0] - 2026-10-19
 
 ### Changed
+
 - **Renamed to Studio:** this fork is now Studio, at `maxexcloo/studio` and `ghcr.io/maxexcloo/studio`. The app title, wordmark, MCP server and messages say Studio; HEISS UI stays credited as upstream. Upstream's `HEISS_*` settings keep their names. The fork's own settings move to `STUDIO_*`, with no fallback: `STUDIO_MULTI_USER`, `STUDIO_SETUP_TOKEN`, `STUDIO_OIDC_*`, `STUDIO_MCP_API_KEY`, `STUDIO_OUTPUT_STORAGE` (its `heiss` value is now `studio`), `STUDIO_MEDIA_DIR`, `STUDIO_WORKER_TOKEN`, `STUDIO_MODEL_MANIFEST`, `STUDIO_MODEL_MANIFEST_PREFIX`, `STUDIO_DEFAULT_IMAGE_PROFILE`, `STUDIO_DEFAULT_VIDEO_PROFILE`, `STUDIO_ENABLE_BUILTIN_PROFILES`, `STUDIO_ENABLE_GROK`, `STUDIO_ENABLE_TESSERA`, `STUDIO_ENABLE_LORAS`, `STUDIO_ENABLE_PRESETS` and `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS`.
 - **Worker node:** the ComfyUI node is now `comfyui/studio_worker`, answering on `/studio/worker` with the `X-Studio-Worker-Token` header. Update it together with Studio.
 - **Sessions and MCP:** accounts sign in again once (the cookie is now `studio_account`), and MCP clients send `x-studio-conversation-id` for per-conversation references.
@@ -696,6 +800,7 @@ version opens with a `> ` summary line.
 > Reliable selections and container-only releases
 
 ### Added
+
 - **Model manifest:** `HEISS_MODEL_MANIFEST` (or an imported copy) lists every model the deployment expects, with checksums. Settings shows what is verified, missing or wrong, verifies checksums in the background, restores missing Civitai and Hugging Face files through the checksum-verifying downloader, and exports the manifest.
 - **Gallery size & aspect filters:** filter Images, Videos and Hidden by long-edge size (Up to 1K, 1K–1.5K, 1.5K–2K, Over 2K) and common aspect ratios or Other. Pending jobs stay visible, and items without known dimensions only drop out while one of these filters is on.
 - **Optional multi-user mode (`HEISS_MULTI_USER=1`):** local accounts with a recovery administrator, access profiles that grant generation profiles and features, private per-account galleries, prompt history, LoRA stacks, references and jobs, personal MCP tokens, a per-account outstanding-job limit, Pocket ID/OpenID Connect sign-in with administrator approval, trusted chat-gateway user links, readiness probes and an **Accounts & MCP** settings section. Single-user mode is unchanged.
@@ -705,6 +810,7 @@ version opens with a `> ` summary line.
 - **MCP LoRA discovery:** Models details list a profile's compatible LoRAs with their descriptions, trigger words, recommended strength and source links, using the LoRA picker's metadata and the account's LoRA access.
 
 ### Changed
+
 - **Simpler configuration:** the trusted gateway forwards its user ID as `X-AI-User-Id` (was `X-Bento-User-Id`). `HEISS_DEVICE_COOKIE_NAME`, `HEISS_ACCOUNT_COOKIE_NAME`, `HEISS_ACCOUNT_COOKIE_SECURE`, `HEISS_MCP_FOREGROUND_WAIT_SECONDS` and the AI Control download route (`HEISS_MODEL_DOWNLOAD_URL`/`_TOKEN`) are gone: HEISS downloads into its model folders itself, and foreground MCP waits are capped at 20 seconds. Manifest paths are now relative to ComfyUI's model folder unless `HEISS_MODEL_MANIFEST_PREFIX` is set.
 - **Smoother LoRA and reference pickers:** a picked LoRA stays where it was clicked, with its strength brought into view. Rows are one line with Info beside the star, and the keyboard highlight is visible, with Home and End. Both pickers share one placement and a quicker motion (about 220 ms instead of 430 ms), stay on screen above long drafts, and the reference picker opens with its search focused and says when every slot is full. The composer's model menu stays within the composer, and the closed composer names the active LoRAs ("Film Grain +1") instead of only counting them.
 - **Deployment-aware Settings:** Connections show image and video backends in one layout with status, routing, address and source, and the video connection can now be set from Settings. Models adds default profiles and catalogue switches, and a new Integrations section gathers Civitai, Hugging Face, model downloads and output storage. Every value shows whether it comes from the deployment, this studio or the default; deployment values are locked, so saved changes no longer silently revert at restart.
@@ -722,10 +828,12 @@ version opens with a `> ` summary line.
 - **Larger reference libraries stay responsive:** only visible thumbnail rows are rendered, with arrow-key navigation preserved.
 
 ### Removed
+
 - **Container-only delivery:** this fork ships only the verified container image on GHCR. The desktop downloads and launchers, the in-app updater and its Settings › About controls and update pill, restarting HEISS UI from Settings, release signing and the legacy `JAI_*` environment variables are gone; set the `HEISS_*` names instead. A `v*` tag publishes the image under its version and a GitHub release with these notes and the image digest. LAN and HTTPS changes apply on the next start.
 - **Project website:** the upstream website and feedback board in `docs/` and its Pages workflow are not carried by this fork; the guides and screenshots stay.
 
 ### Fixed
+
 - **Mangled images from imported workflows:** an imported workflow now uses its model family's size step (for example 32 for Qwen Image 2.1) when its latent node allows a finer one. Off-step sizes such as 1536×2728 were silently cut by ComfyUI and could come out mangled.
 - **Container security updates:** Debian mirrors use verified HTTPS, and a package-index download failure now stops the build instead of silently leaving vulnerable packages installed.
 - **Video frame references:** deselecting a start frame preserves the end frame in its own slot, including when both use the same image.
@@ -747,6 +855,7 @@ version opens with a `> ` summary line.
 > Native 2K, a new size menu, FLUX.3 Klein and MOSS-Image
 
 ### Added
+
 - **2K.** Pick 2K in the size menu and the model draws your picture at full
   size in one go. The menu tells you if a model isn't made for it.
 - **A new size menu.** See the exact size before you make it, set your own
@@ -760,10 +869,11 @@ version opens with a `> ` summary line.
 - **Edit or Reference.** On Flux.2 and Qwen-Image 2.1, choose whether your
   first picture gets changed or only guides a new one.
 - **Docker.** Run HEISS with `docker compose up --build`
-  ([how](./docs/guides/DOCKER.md)).
+  ([how](DOCKER.md)).
 - **HEISS tells you why it stopped**, if it ever stops on its own.
 
 ### Changed
+
 - **Upscaling moved to the picture.** New pictures aren't upscaled
   automatically anymore. Use 2K, or the upscale arrow on any picture.
 - **Setup notices changes by itself.** Update ComfyUI or add nodes, and it
@@ -775,10 +885,12 @@ version opens with a `> ` summary line.
 - **Find ComfyUI on its own** can be turned off in Settings › Connection.
 
 ### Removed
+
 - Automatic upscaling of every new picture (see above).
 - The viewer's "Vary with a new seed" button.
 
 ### Fixed
+
 - A busy ComfyUI no longer shows as offline.
 - Translators and browser extensions no longer crash the studio.
 - Flux.2 Klein 9B picks a text encoder that works.
@@ -792,6 +904,7 @@ version opens with a `> ` summary line.
 > Inpainting, auto-grouping and smart upscale built in
 
 ### Added
+
 - **Inpainting.** Hover a reference image, hit the brush, paint over the part
   you want changed and say what it becomes. Only the painted part gets redrawn,
   the rest keeps its pixels. Works with the edit models (Flux.2, Klein,
@@ -820,6 +933,7 @@ version opens with a `> ` summary line.
   browser extensions or translators that might have gotten in the way.
 
 ### Changed
+
 - **The phone viewer zooms with your fingers now.** The pinch follows them and
   gives a little past its limits before springing back, and a swipe or flick
   slides in the next picture while its neighbours load ahead. Upscale shows its
@@ -842,6 +956,7 @@ version opens with a `> ` summary line.
   of a flickering checkerboard.
 
 ### Fixed
+
 - **Gallery export works at any size.** Past 4 GB or 65,535 files it writes a
   ZIP64 archive and reads each file once, so it no longer holds the whole
   export in memory.
@@ -865,6 +980,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Video in the gallery, and steadier thumbnails and references
 
 ### Added
+
 - **Videos play in the gallery.** Tiles show a still straight away and play a
   silent preview (720 px, up to 24 at once, 6 on a phone); the button by
   search pauses them. Opening a video plays it in a full player with seeking,
@@ -878,6 +994,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   works at before they're sent. The originals stay as they are.
 
 ### Changed
+
 - Download activity can take you back to the model or workflow that needs the
   file, and can be paused, resumed and canceled from its pill.
 - Reference images in the prompt bar are bigger, and their menu no longer
@@ -888,6 +1005,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   after a `git pull` the browser gets the new page, not the last build.
 
 ### Fixed
+
 - **References come off when you remove them.** With an edit model and more
   than one reference, taking the first one off left the next picture in both
   slots, and its × did nothing until you picked another model. The others now
@@ -912,6 +1030,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > A feedback board, right from the app
 
 ### Added
+
 - **A public feedback board** at [heiss-ui.vercel.app/board](https://heiss-ui.vercel.app/board/)
   for bugs, ideas and questions. Anyone can post, upvote and comment, no
   account needed, and each post shows whether it's open, planned, in progress
@@ -928,6 +1047,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Generated images in the feature mockups
 
 ### Changed
+
 - **The existing animated feature mockups now show real generated images** in
   their image areas, including the model thumbnail, render preview, phone
   gallery, search results, Hidden grid and upscale comparison.
@@ -943,6 +1063,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   workflows do. SANA 1.5 keeps 4.5.
 
 ### Fixed
+
 - **Wan video comes out clean on a Mac.** Wan 2.1 and Wan 2.2 5B start on the
   euler sampler there, since uni_pc corrupts video on Apple Silicon.
 - **A Mac gets files it can load.** Where a text encoder comes in full
@@ -973,11 +1094,13 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Model fixes, plainer wording and wide images
 
 ### Added
+
 - **Wide images take two columns** (Settings › General › Layout, off for
   now): landscape images span two gallery columns when there are three or
   more, so they show about as large as portraits.
 
 ### Changed
+
 - **Workflow import is no longer beta.**
 - **Recent prompts can be turned off** in Settings › Generation. Off, nothing
   new is kept and the recent ones are forgotten; starred prompts stay.
@@ -987,6 +1110,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   in the phone's Advanced settings, where they're easier to reach.
 
 ### Fixed
+
 - **Model settings work as they did before 0.12.0.** A renamed Krea 2,
   Z-Image or Klein fine-tune runs as Turbo or Distilled again unless its name
   says base or raw, stacking a speed LoRA no longer changes steps, CFG,
@@ -1003,14 +1127,16 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > An easy first run, prompt history, search and safer sharing
 
 ### What changes when you update
+
 - **Phones and other computers sign in once more.** Set a studio password in
   Settings › Connection; until you do, the Hidden password still works.
 - **Admin from other devices is off** until you turn on Trust other devices
   with admin at the computer running HEISS UI.
 - **HEISS UI keeps a copy of its data first**, in `data/.backups/`, so going
-  back to 0.11 works (see [the troubleshooting guide](docs/guides/TROUBLESHOOTING.md)).
+  back to 0.11 works (see [the troubleshooting guide](TROUBLESHOOTING.md)).
 
 ### Security
+
 - **Other websites can't drive HEISS UI any more.** Every request must name
   a known host, and anything that changes something must come from the
   studio's own page. Before, a page open in the same browser could clear the
@@ -1041,6 +1167,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   nodes that run code, touch files elsewhere or go online.
 
 ### Added
+
 - **Pick a first model.** An empty studio offers Krea 2, Flux.2 and SDXL, each
   in three versions, with the one that suits this computer marked. One tap
   gets the model, its text encoder and VAE, then selects it with a prompt
@@ -1071,6 +1198,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   diagnostics** in Settings › About.
 
 ### Changed
+
 - **The model picker is called Model**, with imported graphs under Your
   workflows. Desktop controls use the phone's plain labels, sampling moved to
   Advanced, and **Back to recommended** undoes changes.
@@ -1087,6 +1215,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   each family.
 
 ### Fixed
+
 - Nunchaku, NF4 and unrecognised checkpoints no longer look ready and then
   fail; unrecognised ones ask for their type instead of running as SDXL.
 - Error toasts stay until dismissed.
@@ -1098,6 +1227,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Notes as islands, a floating live run, gentler face detail
 
 ### Changed
+
 - **Toasts are islands now.** Notes float in under the download and update
   pills in the same frosted capsule, with a small cell glyph for each kind:
   done, heads-up, failed, removed and plain info. Hover fans the stack out and
@@ -1120,6 +1250,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   toasts that arrive after it.
 
 ### Added
+
 - **A generation you can't see floats at the top.** With the viewer on
   another image, zen on an older one, or the gallery scrolled away, the run
   shows as an island with its live preview, progress and time left; click it
@@ -1127,6 +1258,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   View.
 
 ### Fixed
+
 - **The face detail pass no longer ages faces.** It ran on the upscaled image,
   where the model redrew each face at several thousand pixels and baked in
   heavy freckles, pores and wrinkles. It now redraws small faces before the
@@ -1149,6 +1281,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Countdowns for runs and restarts, and Flux 2 edits
 
 ### Added
+
 - **Flux 2 (Klein 4B, Klein 9B and Dev) edits from reference images**, the
   way ComfyUI's own Flux 2 edit templates do; the first reference frames
   the result. The reference slots show once your ComfyUI has the nodes.
@@ -1172,6 +1305,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   model's usual, HEISS UI says once that ComfyUI may be short on video memory.
 
 ### Changed
+
 - **LoRAs stay when you switch workflows on the same model**, and a
   different model starts from its own last stack (or none) instead of
   carrying LoRAs that don't fit it.
@@ -1188,6 +1322,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Qwen-Image 2.1 edits from references, and restarts up front
 
 ### Added
+
 - **Qwen-Image 2.1 edits from reference images.** The composer offers its
   reference slots one after another as you fill them; the first reference
   frames the result.
@@ -1196,6 +1331,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   check when it's back.
 
 ### Fixed
+
 - **Qwen-Image 2.1 files are recognized** from their weights instead of
   showing as an unknown model. Any file whose weights match no known model
   now falls back to its name before being called unknown.
@@ -1204,6 +1340,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   button now says why instead of failing silently.
 
 ### Changed
+
 - **An upscaled image is used upscaled.** Using it as a reference or start
   image (from the viewer, the reference picker or a drop) now hands the
   workflow its upscaled pixels, scaled back to the original's size so a run
@@ -1221,6 +1358,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Finished images stay put, and the grid reads newest first
 
 ### Fixed
+
 - **Finished images no longer vanish.** Deleting your newest image while
   another was generating let ComfyUI give the new one the deleted file's
   name, and the new image disappeared the moment it finished. A new image
@@ -1239,6 +1377,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 > Updates show up right away, and Hidden keeps clear of tiles
 
 ### Fixed
+
 - **The update pill no longer waits for ComfyUI.** While ComfyUI wasn't
   answering (HEISS UI started first, or ComfyUI was restarting), a new
   version stayed unannounced until ComfyUI connected or Settings was opened.
@@ -1254,6 +1393,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.8.0] - 2026-09-27
 
 ### Added
+
 - **A model's setup ends with a ready moment.** Parts that land stay in the
   list, ticked "In place", and the last one turns the panel into "<model> is
   ready". A ComfyUI restart halfway through keeps your progress.
@@ -1265,6 +1405,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   machine.
 
 ### Changed
+
 - **Progress says what's happening.** Only sampler steps count as steps
   ("Step 1/2"); everything else is named: "Loading model", "Encoding image
   68%", "Upscaling". A tiled encode no longer shows as "Step 241/357".
@@ -1276,6 +1417,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   model's setup, and the model menu and phone list say what each one lacks.
 
 ### Fixed
+
 - **Downloads tell the truth.** A dropped connection retries by itself three
   times, then says so plainly. A gated file links to its Hugging Face page
   instead of offering a Retry that can't work. "Get all" adds up real sizes,
@@ -1292,6 +1434,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.5] - 2026-09-27
 
 ### Added
+
 - **A new version offers itself, once.** A small pill slides in at the top
   with what's new and an **Update** button. It downloads while you keep
   working, then **Restart** switches over in a few seconds; while something
@@ -1303,6 +1446,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.4] - 2026-09-27
 
 ### Fixed
+
 - **iPhone haptics now actually tick.** iOS 26.5 stopped web pages from
   ticking from script, so the tap itself now lands on a hidden system switch:
   Generate, All/None, Select several, Compare, Delete and picking images
@@ -1322,6 +1466,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.3] - 2026-09-25
 
 ### Added
+
 - **Haptics on iPhone too.** Safari on iOS 18 and later now gives a light
   tick on the same taps that vibrate on Android (one kind of tick only; iOS
   has no patterns for web pages).
@@ -1329,6 +1474,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.2] - 2026-09-24
 
 ### Fixed
+
 - **Images vanished after switching layout.** Going from the phone studio to
   the full studio (or back, or into Hidden) left the gallery drawing no tiles
   until something else redrew it, so fresh images looked missing. The gallery
@@ -1340,6 +1486,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.1] - 2026-09-24
 
 ### Added
+
 - **Select several on the phone.** Long press › "Select several", then tap
   more images and Save, Hide or Delete them together (one question, one
   Undo). All/None and Back work as expected.
@@ -1351,6 +1498,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   warning buzz on delete. (iPhones do not let web pages vibrate.)
 
 ### Changed
+
 - The phone's Advanced sheet is its own layout: Image/Video, sampler and
   scheduler as native pickers, prompt strength and denoise as sliders with
   plain-language ends, a numeric seed field, size and video sliders, model
@@ -1360,6 +1508,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   and shows upscale notices above its bar, and Info moved to the top corner.
 
 ### Fixed
+
 - **No way back to the phone studio.** After "Use the full studio" the only
   return was a Settings switch that showed only when the screen was narrow
   enough, so a phone held sideways (or a large one) had none. The full studio
@@ -1373,6 +1522,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.7.0] - 2026-09-24
 
 ### Added
+
 - **A phone studio.** On a phone, HEISS UI is now its own simplified app
   for making, browsing and sharing, laid out for your thumb: a slim top bar,
   the gallery edge to edge, and one "Describe…" pill that opens a full-height
@@ -1386,6 +1536,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   complete layout; `?phone=1` shows the phone studio on any screen.
 
 ### Changed
+
 - **Looking after the computer happens at the computer.** Model folders and
   downloads, node installs, ComfyUI's address and restarts, the output
   folder, updates, workflow import and delete, deleting every image, clearing
@@ -1393,6 +1544,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   on the network, and the app hides them there instead of offering them.
 
 ### Changed
+
 - **Restarting ComfyUI looks like restarting, not like a crash.** While a
   restart HEISS asked for is under way, the Generate button says
   "Restarting…", the status dot turns amber and pulses, the empty stage,
@@ -1404,6 +1556,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   saying so.
 
 ### Fixed
+
 - **GGUF models in `models/unet_gguf` kept being offered as "not read".**
   HEISS added that folder under ComfyUI-GGUF's `unet_gguf` name, which the
   pack replaces with the diffusion model folders when it loads, so ComfyUI
@@ -1415,6 +1568,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.6.0] - 2026-09-24
 
 ### Added
+
 - **Works on a phone.** The viewer closes with a corner button, a swipe down,
   a tap beside the picture or Back, and swipes sideways between images. The
   workflow menu, composer settings and tile actions all fit and stay on
@@ -1435,6 +1589,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   background, and a one-click install for the face detail pass's nodes.
 
 ### Changed
+
 - **Deleting says what it does.** Deletes and "Delete all finished images"
   (was "Clear gallery") state that files leave the disk; anything permanent
   asks even with confirmations off; Backspace no longer deletes.
@@ -1447,6 +1602,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   keys, and generation progress is announced.
 
 ### Fixed
+
 - Clicking just beside a tile's Delete button opened the viewer instead.
 - Tiles no longer reshuffle between columns when a new result lands.
 - One dropped request no longer marks every running generation as failed.
@@ -1458,6 +1614,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.5.3] - 2026-09-24
 
 ### Changed
+
 - **Downloads come with everything they need.** Each release has a zip per
   system (`-windows-x64`, `-macos-arm64`, `-linux-x64`) with its packages
   already inside, so the first start no longer runs an npm install; only
@@ -1475,6 +1632,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.5.2] - 2026-09-24
 
 ### Changed
+
 - **The model menu stays manageable with many models.** It scrolls inside a
   capped height with "Find more models" pinned below, gets a search field
   once there are more than eight models, and splits into Favorites (star any
@@ -1483,12 +1641,14 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   too.
 
 ### Fixed
+
 - Leaving Hidden no longer flashes the loading mosaic over the gallery; the
   gallery comes straight back and syncs behind it.
 
 ## [0.5.1] - 2026-09-24
 
 ### Added
+
 - Four more model families run out of the box, with the settings from
   Comfy-Org's own workflows: **Ideogram 4** (main and unconditional model
   paired automatically; its Turbo, Default and Quality schedules follow the
@@ -1499,6 +1659,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   downloaded from the setup panel.
 
 ### Fixed
+
 - Sana no longer shows up when you have no Sana weights: the "install a
   node pack" placeholder is gone, and ExtraModels presets only list once
   they are downloaded to `models/sana`. Sana runs through ExtraModels no
@@ -1518,6 +1679,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.5.0] - 2026-09-24
 
 ### Added
+
 - Hidden replaces Private Vault. It is a place, not a switch: open it from
   the lock in the dock, generate straight into it, or hide any finished
   image with the eye on its tile and bring it back the same way. Upscale,
@@ -1529,6 +1691,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   a full erase.
 
 ### Changed
+
 - The Hidden password no longer touches the normal gallery: prompts are
   stored as before, generating never waits for an unlock, and prompts sealed
   by the old scheme open back up on the first unlock. Existing Private Vault
@@ -1552,6 +1715,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   square while it runs, and the dock's Stop includes upscales.
 
 ### Fixed
+
 - Clearing the gallery while the vault was locked deleted the files and then
   failed without a word.
 - Finished private jobs handed out their per-file keys to any caller for
@@ -1573,6 +1737,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.4.1] - 2026-09-24
 
 ### Changed
+
 - **Shorter, plainer copy throughout the app.** Dropped reassurances nobody
   asked for, lines about the app doing things by itself, and explanations of
   how things work under the hood. Terms are now consistent: HEISS UI (not
@@ -1581,6 +1746,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   the current workflow import, smart upscale and the Settings layout.
 
 ### Fixed
+
 - **Windows: the first start of a download works.** It crashed while
   installing its packages (current Node refuses to run `npm.cmd` directly),
   and the launcher window closed before the error could be read. The `.bat`
@@ -1624,6 +1790,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.4.0] - 2026-09-24
 
 ### Added
+
 - **Models ComfyUI can't see are found and added in one step.** HEISS looks
   through shared folders, other ComfyUI installs, the ComfyUI Desktop app,
   Stability Matrix, A1111 and external drives for models in folders ComfyUI
@@ -1646,10 +1813,11 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   in and out. Models, workflows and smart upscale refresh by themselves.
 - A new empty state for a gallery with nothing in it yet: a blank pixel
   canvas where a picture keeps developing and fading.
-- [The model guide](docs/guides/MODELS.md) documents how a new model family, and the custom nodes, text
+- [The model guide](MODELS.md) documents how a new model family, and the custom nodes, text
   encoders or VAEs it needs, gets added.
 
 ### Fixed
+
 - With ComfyUI stopped or restarting, every image in the gallery broke,
   because images were only ever fetched through ComfyUI. They now open from
   the output folder, and thumbnails from HEISS's own cache.
@@ -1666,6 +1834,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.3.1] - 2026-09-24
 
 ### Added
+
 - One-click updates for downloaded releases. **Install update** in
   Settings › About downloads the new release, checks it against its
   published SHA-256 and swaps it in on **Restart now**, then reloads the page.
@@ -1677,6 +1846,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.3.0] - 2026-09-24
 
 ### Added
+
 - NVIDIA Sana runs built in. With the ComfyUI_ExtraModels custom nodes
   installed, SANA 1.5 (1.6B, 4.8B), SANA Sprint, the 2K/4K models and the
   multilingual model show up as ready models; ComfyUI fetches the weights,
@@ -1685,6 +1855,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   HEISS says which pack to install.
 
 ### Changed
+
 - The ComfyUI offline screen shows an animated pixel plug that keeps trying
   to reach its socket, in the same cell style as the wordmark. It pauses when
   hidden, holds still for reduced motion and falls back to the logo without
@@ -1694,6 +1865,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   terminal: Braille dots or half blocks, true colour, 256 colours or none.
 
 ### Fixed
+
 - With ComfyUI offline, HEISS pretended to work: it listed fake "(Demo)"
   models and "generated" placeholder images. It now shows ComfyUI as offline
   and refuses to generate. Demo mode is a developer opt-in
@@ -1709,6 +1881,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
 ## [0.2.1] - 2026-09-24
 
 ### Added
+
 - **Restart ComfyUI** from Settings, and wherever a setup step ends in a
   restart, when ComfyUI-Manager is installed. If the control is off, it says
   why (no Manager, or a HEISS server too old for it).
@@ -1716,6 +1889,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   hint, and the viewer shows the full error with a report you can copy.
 
 ### Changed
+
 - Model file setup lands files in the folders ComfyUI actually reads from,
   resumes a stopped download (even after a restart), shows progress in a pill
   at the top, and uses the same panel in the workflow gallery.
@@ -1724,6 +1898,7 @@ https://discord.gg/Hf7ysvDeGa, or from Settings and the website.
   reference, and a Change slider next to the image sets how much it may change.
 
 ### Fixed
+
 - Models, text encoders and VAEs in folders added through ComfyUI's
   `extra_model_paths.yaml` (a shared model drive, an A1111 install) were
   never read, so HEISS could not tell what they were. It now reads every
@@ -1767,6 +1942,7 @@ notes cover everything that changed since the fork.
 ### Added
 
 #### Models
+
 - 21 model families recognised from the weights: SD 1.5, SD 2.x, SDXL (Pony,
   Illustrious/NoobAI, v-pred, Lightning, DMD2, Hyper, Turbo), Pony V7, SD 3.5,
   Flux.1 (dev, schnell, de-distilled), Flux.2 Dev and Klein 4B/9B, Chroma,
@@ -1786,6 +1962,7 @@ notes cover everything that changed since the fork.
   variant.
 
 #### Smart upscale
+
 - SeedVR2 upscaling from any finished image at Fast, Balanced or High effort,
   with an optional face detail pass. The original is always kept.
 - A compare slider in the viewer: drag, double-click to centre, or use the arrow
@@ -1797,6 +1974,7 @@ notes cover everything that changed since the fork.
 - A popover that says why an image can't be upscaled.
 
 #### LoRAs
+
 - A LoRA library grouped by nested folders, with search, favorites, recents and
   suggestions for the current model family.
 - Stacks saved per model family, shown as chips; one click loads a stack.
@@ -1805,18 +1983,21 @@ notes cover everything that changed since the fork.
 - Warnings for LoRAs missing from ComfyUI or past a workflow's limit.
 
 #### Reference and start images
+
 - A reference library in the composer with an Uploads tab and pointer-aware
   drops; the chosen image survives a reload.
 - Workflows can let a reference image set the output size and aspect.
 - A bundled Flux 2 image-edit workflow.
 
 #### Workflows
+
 - A thumbnail workflow gallery with search, an image/video switch, favorites,
   filters and a detail panel listing missing nodes.
 - Two-step import that previews name, type, family, status and control mapping
   before saving. Drop JSON files anywhere on the gallery.
 
 #### Studio
+
 - Private Vault: password-protected, encrypted storage for chosen generations
   and their prompts and settings, with backup export.
 - An About page with version, update check, credits and local stats: outputs,

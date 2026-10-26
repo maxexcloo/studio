@@ -7,10 +7,8 @@
 .github
 .mise.toml
 artifacts
-comfyui/*/test_*.py
+worker/comfyui/*/test_*.py
 data
-dist
-docs
 node_modules
 outputs
 playwright-report
@@ -20,3 +18,4 @@ release
 renovate.json5
 test-results
 tests
+**/*.test.ts

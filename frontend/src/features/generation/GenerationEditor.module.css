@@ -1,0 +1,79 @@
+.editor {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  min-height: 0;
+  max-height: min(75dvh, 850px);
+}
+
+/* Desktop panels and cards bound their fields above the action row. */
+.fields {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+
+.promptInput {
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+/* Prompt ideas float over the empty prompt's lower lines, clear of its history and assistant actions. */
+.promptArea {
+  position: relative;
+}
+
+.promptIdeas {
+  left: 0;
+  right: 44px;
+  bottom: 4px;
+}
+
+.footer {
+  flex-shrink: 0;
+}
+
+/* The phone Drawer owns scrolling; its action row stays at the safe bottom. */
+.editor[data-fill] {
+  flex: 1;
+  max-height: none;
+}
+
+.editor[data-fill] .fields {
+  overflow: visible;
+}
+
+.editor[data-fill] .promptArea,
+.editor[data-fill] .prompt,
+.editor[data-fill] .promptWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor[data-fill] .promptInput {
+  flex: 1;
+  min-height: 10rem;
+  font-size: 1.0625rem;
+  resize: none;
+}
+
+.footer[data-sticky] {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  /* Span the Drawer body's padding so scrolled fields never show beside the actions. */
+  margin-inline: calc(-1 * var(--mantine-spacing-md));
+  padding-inline: var(--mantine-spacing-md);
+  padding-block: var(--mantine-spacing-sm)
+    max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
+  background: var(--studio-glass-raised);
+  backdrop-filter: var(--studio-glass-filter);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+}
