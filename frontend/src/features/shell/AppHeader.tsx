@@ -80,12 +80,16 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       <ModeSwitcher mode={mode} />
       <Group gap="xs" visibleFrom="sm">
         {navigation
-          .filter((item) => item.to !== "/library" || library.allowed)
+          .filter((item) => item.to !== "/library" || library.pending || library.allowed)
           .map((item) => {
             const active = location.pathname.startsWith(item.to);
+            // Library keeps its place while access loads, so the icons beside it don't move.
+            const holding = item.to === "/library" && library.pending;
             return (
-              <Tooltip key={item.to} label={item.label}>
+              <Tooltip key={item.to} label={item.label} disabled={holding}>
                 <ActionIcon
+                  style={holding ? { visibility: "hidden" } : undefined}
+                  tabIndex={holding ? -1 : undefined}
                   component={Link}
                   to={item.to}
                   state={{ backgroundLocation: location }}
