@@ -470,14 +470,40 @@ test("describe reads an image with a vision model, writes from a hint without on
   );
 });
 
-test("caption sends the image and returns one short line", async () => {
-  const seen = fakeGateway(() => json(`  A red barn\nat noon. ${"x".repeat(400)}`));
+test("caption sends the image and reads the description and tags, or plain text without them", async () => {
+  const tags = [
+    "Red Barn",
+    "noon",
+    "noon",
+    3,
+    " field ",
+    ...Array.from({ length: 20 }, (_, i) => `t${i}`),
+  ];
+  const seen = fakeGateway(() =>
+    json(
+      "```json\n" +
+        JSON.stringify({ text: `  A red barn\nat noon. ${"x".repeat(700)}`, tags }) +
+        "\n```",
+    ),
+  );
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   const reply = await engine.caption({ image: { mime: "image/jpeg", data: "AAAA" } });
   assert.equal(reply.model, "ai/text-quick");
-  assert.equal(reply.text.length, 300);
+  assert.equal(reply.text.length, 600);
   assert.match(reply.text, /^A red barn at noon\. x/);
-  assert.equal(seen.calls[0].body.messages[1].content[1].type, "image_url");
+  assert.equal(reply.tags.length, 15);
+  assert.deepEqual(reply.tags.slice(0, 4), ["red barn", "noon", "field", "t0"]);
+  const [system, user] = seen.calls[0].body.messages;
+  assert.match(system.content, /apparent age range.*legible text, quoted exactly.*"tags"/s);
+  assert.equal(user.content[1].type, "image_url");
+
+  const plain = fakeGateway(() => json("  A red barn\nat noon."));
+  const fallback = createAssistant(gateway(), { fetchImpl: plain.fetchImpl, log: quiet });
+  assert.deepEqual(await fallback.caption({ image: { mime: "image/jpeg", data: "AAAA" } }), {
+    text: "A red barn at noon.",
+    tags: [],
+    model: "ai/text-quick",
+  });
 });
 
 test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown NSFW", async () => {
