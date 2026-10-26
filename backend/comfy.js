@@ -4,7 +4,7 @@ import {
   isDefaultBackend,
   noteWorkerReachable,
 } from "./comfy-backends.js";
-import { defaultWorker, onWorkersChanged, saveDefaultWorkerUrl } from "./workers.js";
+import { defaultWorker, onWorkersChanged } from "./workers.js";
 import { writeLocalEnvValue } from "./env.js";
 import { listensBeyondThisComputer } from "./client-trust.js";
 import { noteComfyState } from "./crash-log.js";
@@ -18,36 +18,12 @@ import { mediaFile, mediaType } from "./media-paths.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(__dirname, "..");
 // A live binding: importers see the new address as soon as the workers change.
-// It is the default worker's (workers.js), or "" with no workers at all;
-// STUDIO_DEFAULT_COMFY_URL seeds a fresh install (the Docker image's host.docker.internal).
+// It is the default worker's (workers.js), or "" with no workers at all.
 export let comfyUrl = defaultWorker()?.url || "";
 onWorkersChanged(() => {
   comfyUrl = defaultWorker()?.url || "";
 });
 
-/** "localhost:8000", "http://pc.local:8188/" or a bare port all become a clean http(s) origin. */
-export function normalizeComfyUrl(value = "") {
-  let text = String(value || "").trim();
-  if (!text) return "";
-  if (/^\d{2,5}$/.test(text)) text = `127.0.0.1:${text}`;
-  if (!/^https?:\/\//i.test(text)) text = `http://${text}`;
-  try {
-    const url = new URL(text);
-    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, "")}`;
-  } catch {
-    return "";
-  }
-}
-
-export function setComfyUrl(value = "") {
-  const next = normalizeComfyUrl(value);
-  if (!next)
-    throw new Error("That doesn’t look like an address. Try something like 127.0.0.1:8188.");
-  // The default worker's address: Studio's saved workers, or the seed before they are saved.
-  saveDefaultWorkerUrl(next);
-  comfyUrl = defaultWorker()?.url || next;
-  return comfyUrl;
-}
 export const host = process.env.HOST || "127.0.0.1";
 /** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
 export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
@@ -56,7 +32,7 @@ export const networkListening = listensBeyondThisComputer(host) && !dockerHostOn
 
 /** The port asked for (PORT, else 8787). */
 const requestedPort = Number(process.env.PORT || 8787);
-// A live binding: the server may move to the next free port when this one is taken (see launch.js).
+// A live binding: PORT=0 (tests) listens on whichever port the system gives.
 export let port = requestedPort;
 export function setListeningPort(value) {
   port = Number(value) || requestedPort;
@@ -103,8 +79,8 @@ export function localOutputFile(filename, subfolder = "", type = "output") {
 }
 
 // Resolved, so a hand-written `D:/x` becomes `D:\x` on Windows (Explorer opens its default view otherwise).
-export let comfyOutputDir = process.env.COMFY_OUTPUT_DIR
-  ? path.resolve(process.env.COMFY_OUTPUT_DIR)
+export let comfyOutputDir = process.env.STUDIO_COMFY_OUTPUT_DIR
+  ? path.resolve(process.env.STUDIO_COMFY_OUTPUT_DIR)
   : "";
 
 /**
@@ -132,7 +108,7 @@ export function setComfyOutputDir(value = "") {
   if (!next) throw new Error("Choose an existing ComfyUI output folder.");
   if (!fs.existsSync(next) || !fs.statSync(next).isDirectory())
     throw new Error("That folder doesn’t exist on this computer.");
-  writeLocalEnvValue("COMFY_OUTPUT_DIR", next);
+  writeLocalEnvValue("STUDIO_COMFY_OUTPUT_DIR", next);
   comfyOutputDir = next;
   return comfyOutputDir;
 }
@@ -399,7 +375,7 @@ export function textRange(info, node, key) {
 
 /** ComfyUI's input folder on this machine, next to its output folder, or "" when unknown. */
 export function comfyInputDir() {
-  const explicit = String(process.env.COMFY_INPUT_DIR || "").trim();
+  const explicit = String(process.env.STUDIO_COMFY_INPUT_DIR || "").trim();
   if (explicit) return path.resolve(explicit);
   const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
   const candidates = [

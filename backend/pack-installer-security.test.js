@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 // A ComfyUI whose Manager 4 refuses installs on security grounds.
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 globalThis.fetch = async (url, options = {}) => {
   const { pathname } = new URL(url);
   if (pathname === "/v2/manager/version")

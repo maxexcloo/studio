@@ -10,7 +10,13 @@ const data = path.join(temporary, "runtime");
 process.env.STUDIO_CONFIG_DIR = config;
 process.env.STUDIO_DATA_DIR = data;
 process.env.STUDIO_ENABLE_BUILTIN_PROFILES = "0";
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 const write = (root, name, value) => {
   const file = path.join(root, name);
   fs.mkdirSync(path.dirname(file), { recursive: true });

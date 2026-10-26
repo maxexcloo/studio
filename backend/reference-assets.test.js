@@ -1,3 +1,4 @@
+import "./fixtures/local-worker.js";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -7,7 +8,7 @@ import sharp from "sharp";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-reference-assets-"));
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.COMFY_INPUT_DIR = temporary;
+process.env.STUDIO_COMFY_INPUT_DIR = temporary;
 const referenceAssets = await import(`./reference-assets.js?test=${Date.now()}`);
 
 test("uploaded references are validated, indexed, thumbnailed, and deletable", async () => {
@@ -179,7 +180,7 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
     "inpaint source and mask retain their coordinate system",
   );
   assert.equal(painted[1].temporary, true, "additional references still resize");
-  delete process.env.COMFY_INPUT_DIR;
+  delete process.env.STUDIO_COMFY_INPUT_DIR;
   const remote = await referenceAssets.stageReferenceAssets({}, refs, { generation });
   assert.equal(
     remote[0].comfyName,
@@ -187,7 +188,7 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
     "remote runs reuse content-named resized uploads",
   );
   assert.equal(remote[0].temporary, undefined);
-  process.env.COMFY_INPUT_DIR = temporary;
+  process.env.STUDIO_COMFY_INPUT_DIR = temporary;
   referenceAssets.deleteUploadedReference(asset.id);
 });
 

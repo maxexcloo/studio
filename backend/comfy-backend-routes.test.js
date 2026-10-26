@@ -71,13 +71,24 @@ async function start(
       ...process.env,
       PORT: "0",
       HOST: "127.0.0.1",
-      COMFY_URL: primary.url,
-      COMFY_VIDEO_URL: useVideo ? video.url : "",
+      STUDIO_WORKERS: JSON.stringify([
+        {
+          id: "primary",
+          name: "Image Worker",
+          url: primary.url,
+          capabilities: useVideo
+            ? ["image", "upscale", "models"]
+            : ["image", "video", "upscale", "models"],
+        },
+        ...(useVideo
+          ? [{ id: "video", name: "Video Worker", url: video.url, capabilities: ["video"] }]
+          : []),
+      ]),
       STUDIO_ENABLE_GROK: enableGrok ? "1" : "0",
       STUDIO_ENABLE_TESSERA: restrictModels ? "0" : "1",
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
-      COMFY_OUTPUT_DIR: "",
+      STUDIO_COMFY_OUTPUT_DIR: "",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -302,7 +313,6 @@ test(
     const grokAccepted = await api("/api/generate", {
       ...generation(grok),
       comfyBackend: "video",
-      COMFY_VIDEO_URL: video.url,
       family: "minimax_h3",
     });
     assert.equal(grokAccepted.status, 200, JSON.stringify(grokAccepted.body));
@@ -397,7 +407,6 @@ test(
     const accepted = await api("/api/generate", {
       ...generation(grok),
       comfyBackend: "video",
-      COMFY_VIDEO_URL: video.url,
     });
     assert.equal(accepted.status, 200);
     const prompt = await queued;

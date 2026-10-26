@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-// Settings first (.env and the old HEISS_* names), so STUDIO_DATA_DIR is read as configured.
+// Settings first (.env), so STUDIO_DATA_DIR is read as configured.
 import "./env.js";
 import { projectRoot } from "./data-root.js";
 

@@ -6,13 +6,10 @@ import test from "node:test";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-workers-"));
 process.env.STUDIO_DATA_DIR = dataDir;
-for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_DEFAULT_COMFY_URL"])
-  delete process.env[key];
+delete process.env.STUDIO_WORKERS;
 const workers = await import("./workers.js");
-const { envFileKeys } = await import("./env.js");
 const {
   deploymentWorkers,
-  seedWorkers,
   normalizeWorker,
   normalizeWorkerUrl,
   pickWorker,
@@ -28,8 +25,7 @@ const {
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 const reset = (environment = {}) => {
-  for (const key of ["STUDIO_WORKERS", "COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_DEFAULT_COMFY_URL"])
-    delete process.env[key];
+  delete process.env.STUDIO_WORKERS;
   Object.assign(process.env, environment);
   fs.rmSync(workers.workersFile(), { force: true });
   fs.rmSync(`${workers.workersFile()}.bak`, { force: true });
@@ -56,7 +52,6 @@ test("STUDIO_WORKERS defines any number of locked workers with their capabilitie
       { name: "Videos", url: "comfyui-video:8188", capabilities: "video" },
       { name: "Upscaler", url: "http://upscale:8188", capabilities: ["upscale"] },
     ]),
-    COMFY_URL: "http://ignored:8188",
   };
   const { variable, workers: list } = deploymentWorkers(environment);
   assert.equal(variable, "STUDIO_WORKERS");
@@ -68,8 +63,6 @@ test("STUDIO_WORKERS defines any number of locked workers with their capabilitie
       ["upscaler", "http://upscale:8188", ["upscale"]],
     ],
   );
-  // STUDIO_WORKERS owns the whole list: nothing is seeded beside it.
-  assert.deepEqual(seedWorkers(environment), []);
   assert.deepEqual(deploymentWorkers({ STUDIO_WORKERS: "[]" }).workers, []);
 });
 
@@ -93,29 +86,17 @@ test("STUDIO_WORKERS refuses what it can't use, plainly", () => {
     );
 });
 
-test("COMFY_URL and COMFY_VIDEO_URL seed the image and video workers with their old ids", () => {
-  const both = deploymentWorkers({
-    COMFY_URL: "http://image:8188",
-    COMFY_VIDEO_URL: "http://video:8188",
-  });
-  assert.deepEqual(
-    both.workers.map((worker) => [worker.id, worker.name, worker.capabilities]),
-    [
-      ["primary", "Image Worker", ["image", "upscale", "models"]],
-      ["video", "Video Worker", ["video"]],
-    ],
-  );
-  // Without a video address, local video runs on the image worker, as before.
-  assert.deepEqual(deploymentWorkers({ COMFY_URL: "http://image:8188" }).workers[0].capabilities, [
-    "image",
-    "video",
-    "upscale",
-    "models",
-  ]);
-});
-
 test("locked environment workers come first and can't be changed, removed or reused", () => {
-  reset({ COMFY_URL: "http://deployed-image:8188" });
+  reset({
+    STUDIO_WORKERS: JSON.stringify([
+      {
+        id: "primary",
+        name: "Image Worker",
+        url: "http://deployed-image:8188",
+        capabilities: ["image"],
+      },
+    ]),
+  });
   assert.deepEqual(
     listWorkers().map((worker) => [worker.id, worker.source, worker.locked]),
     [["primary", "deployment", true]],
@@ -153,13 +134,10 @@ test("locked environment workers come first and can't be changed, removed or reu
   );
 });
 
-test("a fresh install seeds the local address; the first save is kept as is, never overwritten by the seed", () => {
-  reset({ STUDIO_DEFAULT_COMFY_URL: "http://host.docker.internal:8188" });
-  assert.deepEqual(
-    listWorkers().map((worker) => [worker.id, worker.url, worker.source, worker.locked]),
-    [["primary", "http://host.docker.internal:8188", "default", false]],
-  );
-  assert.equal(fs.existsSync(workers.workersFile()), false, "seeding writes nothing");
+test("a fresh install has no workers until an administrator saves them to workers.json", () => {
+  reset();
+  assert.deepEqual(listWorkers(), []);
+  assert.equal(fs.existsSync(workers.workersFile()), false);
   saveWorkers([
     {
       id: "primary",
@@ -169,18 +147,13 @@ test("a fresh install seeds the local address; the first save is kept as is, nev
     },
     { name: "Video Box", url: "http://video-box:8188", capabilities: ["video", "models"] },
   ]);
-  process.env.COMFY_URL = "http://from-dotenv:8188";
-  // A later address in .env or the default no longer changes Studio's own list.
-  envFileOnly("COMFY_URL", () => {
-    const list = reloadWorkers();
-    assert.deepEqual(
-      list.map((worker) => [worker.id, worker.name, worker.url]),
-      [
-        ["primary", "Desk GPU", "http://127.0.0.1:8000"],
-        ["video-box", "Video Box", "http://video-box:8188"],
-      ],
-    );
-  });
+  assert.deepEqual(
+    reloadWorkers().map((worker) => [worker.id, worker.name, worker.url, worker.source]),
+    [
+      ["primary", "Desk GPU", "http://127.0.0.1:8000", "studio"],
+      ["video-box", "Video Box", "http://video-box:8188", "studio"],
+    ],
+  );
   assert.equal(modelLibraryWorker().id, "video-box");
   assert.equal(JSON.parse(fs.readFileSync(workers.workersFile(), "utf8")).workers.length, 2);
 });
@@ -190,7 +163,7 @@ test("zero workers is a valid setup with a plain message", () => {
   assert.deepEqual(listWorkers(), []);
   assert.equal(defaultWorkerId(), "");
   assert.match(noWorkerMessage("image"), /No workers are set up/);
-  reset({ STUDIO_DEFAULT_COMFY_URL: "http://x:1" });
+  reset();
   saveWorkers([]);
   assert.deepEqual(reloadWorkers(), []);
 });
@@ -249,13 +222,3 @@ test("names, ids and capabilities are tidied when saved", () => {
   assert.deepEqual(worker.capabilities, ["image", "video"]);
   assert.equal(normalizeWorker({ url: "x:1", capabilities: ["upscale"] }).name, "Upscale Worker");
 });
-
-/** Runs `check` as if `key` had come from Studio's .env (editable), not the deployment. */
-function envFileOnly(key, check) {
-  envFileKeys.add(key);
-  try {
-    check();
-  } finally {
-    envFileKeys.delete(key);
-  }
-}
