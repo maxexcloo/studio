@@ -31,9 +31,13 @@ import { useMediaFavorite } from "./useMediaFavorite";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
 );
-const ZoomImage = lazy(() =>
-  import("./ZoomImage").then((module) => ({ default: module.ZoomImage })),
-);
+// The image chunk loads once the page is idle; a viewer opened after that renders it directly
+// instead of flashing the Suspense fallback.
+let zoomImage: typeof import("./ZoomImage").ZoomImage | undefined;
+const loadZoomImage = () =>
+  import("./ZoomImage").then((module) => ({ default: (zoomImage = module.ZoomImage) }));
+const LazyZoomImage = lazy(loadZoomImage);
+(window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
 
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
@@ -97,6 +101,7 @@ export function MediaViewer({
     getInitialValueInEffect: false,
   });
   const [sheet, setSheet] = useState(false);
+  const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
