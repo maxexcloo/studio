@@ -72,7 +72,7 @@ The MCP tools use a lot of context and iterations often call tools wrongly. The 
 
 ## Dream & Taste (D) — Large, after R
 
-- [ ] D1 Taste profile: LLM-maintained, editable summary from swipes, stars, iterations, prompts and LoRAs; stored per account.
+- [x] D1 Taste profile: LLM-maintained, editable summary from swipes, stars, iterations, prompts and LoRAs; stored per account. Done: `backend/domain/taste.ts` keeps signals (star, unstar, compare winner, any job with a parent) per account in SQLite and rewrites the summary after 8 new signals (at most every 10 minutes, text offline skips); Settings › Account edits, refreshes and clears it; the MCP model pick reads it. Swipes join with D3.
 - [ ] D2 Dream scheduler: idle-only, yields to user and text work, unseen buffer and daily cap; images, videos and NSFW-granted spicy content; separate pool until kept.
 - [ ] D3 `/dream` deck: swipe left discard, right keep, up keep + variations; Star and Animate buttons; pause and settings; discards retained and filterable.
 - [ ] D4 Suggestions: composer prompt ideas, viewer next-step chips and Chat context from the taste profile.
@@ -114,6 +114,10 @@ UX audit 26 Oct (defaults apply until you say otherwise):
 - Phone Chat with no Chat selected gives no cue that the list lives behind the status action. Default: the empty state says where the Chats are and offers New Chat.
 - The Chat model select reads "Text" with a wide gap. Default: show the actual text model label from chat status.
 - Library Imports and Inspiration are hidden in dev because `features.presets` is off. Default: leave the flag; dev data only.
+- Taste profile: should compare votes also record the losing variants as "passed over"? Default: yes, an optional `passed` list when Dream extends the signal kinds.
+- Taste profile: a bulk star of up to 500 items adds a signal each and can push out older history. Default: cap each bulk call at 20 signals.
+- Taste profile: does Exact Repeat count as an iteration? Default: yes, repeating a result signals interest.
+- Taste profile: also give the summary to the MCP prompt writer, or only the model pick? Default: only the pick until D4 decides how suggestions use it.
 
 1. Bento host (homelab, outside Studio): a USB4 port's power-management loop (`pci_bus 0000:13` behind ASM4242 12:00.0) is still repeating and hung the whole host for 2.3 h on 23 Oct, with an iGPU SDMA timeout. Fix it by disabling runtime PM for that port (or `pcie_port_pm=off`, or removing the device) plus `amdgpu.runpm=0` for the iGPU, and arm a runtime hardware watchdog (`RuntimeWatchdogSec`) so a hang self-recovers in minutes? Recommended: yes, as a reviewed homelab change.
 2. GPU experiments and image redeploys on bento (24 Oct 02:18 and 05:16) stopped image work for 59 and 8 minutes outside AI Control. Route them through AI Control and pull images before stopping containers? Recommended: yes.
