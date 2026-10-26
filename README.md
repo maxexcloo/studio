@@ -29,7 +29,7 @@ mise run test:browser
 
 The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Deploy an exact verified version. The worker image has explicit `media` and `text` launch modes and preserves the existing shared GPU leases.
 
-Mount a writable Studio data directory for media and editable definitions, and a read-only `ai` configuration directory for workload metadata and missing-definition seeds. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [container operations](DOCKER.md), [worker operations](worker/README.md) and [models and workflows](MODELS.md).
+Mount a writable Studio data directory for media and editable definitions, and a read-only `ai` configuration directory for missing-definition seeds. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [container operations](DOCKER.md), [worker operations](worker/README.md) and [models and workflows](MODELS.md).
 
 Existing runtime state requires an offline [migration rehearsal and restore check](CONFIGURATION.md#sqlite-migration--rollback). Keep the current deployment until retained workflows and migration have been verified. Production remains single-replica with `Recreate` deployment behaviour.
 
