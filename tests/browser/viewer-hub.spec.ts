@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { closeLoras, fixtures, image, stamp, viewerAction } from "./fixtures";
 
-async function seed(page: Page) {
+async function seed(page: Page, extra: Record<string, unknown> = {}) {
   const state = await fixtures(page);
   const settings = { profileId: "image:test", seed: 1234567, steps: 28, count: 2 };
   const item = {
@@ -16,6 +16,7 @@ async function seed(page: Page) {
     height: 1024,
     createdAt: stamp,
     settings,
+    ...extra,
   };
   state.sessions.push({
     id: "session-hub",
@@ -139,6 +140,34 @@ test("Copy Prompt beside the details heading copies in one click", async ({ page
   }
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copiedPrompt)).toBe("An amber bird");
+});
+
+test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
+  const { viewer } = await seed(page, {
+    caption: {
+      text: "A small amber bird perched on a mossy branch, soft morning light.",
+      tags: ["bird", "branch"],
+      model: "vision-model",
+      at: stamp,
+      version: 2,
+    },
+  });
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  }
+  await expect(
+    details.getByText(
+      "Caption: A small amber bird perched on a mossy branch, soft morning light.",
+      {
+        exact: true,
+      },
+    ),
+  ).toBeVisible();
+  await expect(
+    details.getByLabel("Caption Tags", { exact: true }).getByText("branch"),
+  ).toBeVisible();
 });
 
 test("Desktop details stay where the viewer left them", async ({ page }, testInfo) => {
