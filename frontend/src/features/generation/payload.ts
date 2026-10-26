@@ -1,5 +1,9 @@
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 
+/** Whether `profile` is the one a recorded id names, including an id merged into it. */
+export const isProfile = (profile: Profile, id: unknown) =>
+  profile.id === id || (typeof id === "string" && Boolean(profile.aliases?.includes(id)));
+
 export function referenceDetails(
   references: ReferenceAsset[],
   input: GenerationInput,
