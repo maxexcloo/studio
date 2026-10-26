@@ -874,10 +874,10 @@ test('signed links do not expire, preserve the configured public path and cannot
   assert.equal((await fetch(legacy)).status, 200);
 });
 
-test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded identities', async t => {
+test('MCP serves browser-based clients and still rejects rebound hosts and oversized forwarded identities', async t => {
   const f = await fixture(t);
   const message = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-  for (const [headers, status] of [[{ Origin: 'https://hostile.example.test' }, 403], [{ Host: 'rebound.example.test' }, 403], [{ 'x-ai-user-id': 'x'.repeat(257) }, 400]]) {
+  for (const [headers, status] of [[{ Origin: 'https://hostile.example.test' }, 200], [{ Origin: 'null' }, 403], [{ Host: 'rebound.example.test' }, 403], [{ 'x-ai-user-id': 'x'.repeat(257) }, 400]]) {
     const requestHeaders = { authorization: `Bearer ${mediaKey}`, accept: 'application/json, text/event-stream', 'content-type': 'application/json', ...headers };
     // Fetch normalises Host, so use the native HTTP client for the rebinding case.
     const actual = headers.Host ? await new Promise((resolve, reject) => {
@@ -891,6 +891,16 @@ test('MCP rejects hostile browser origins, rebound hosts and oversized forwarded
     assert.equal(actual, status, JSON.stringify(headers));
   }
   assert.equal(f.requests.length, 0);
+  // A cross-origin call reads back: MCP takes no ambient credentials, so a browser client (a Grok connector)
+  // gets the CORS headers and the client's own token does the authorising.
+  const crossed = await fetch(f.base + '/mcp', { method: 'POST', headers: { authorization: `Bearer ${mediaKey}`, accept: 'application/json, text/event-stream', 'content-type': 'application/json', origin: 'https://grok.example.test' }, body: message });
+  assert.equal(crossed.headers.get('access-control-allow-origin'), 'https://grok.example.test');
+  // Its preflight gets the headers it needs, without a credential, and OAuth discovery misses cleanly.
+  const preflight = await fetch(f.base + '/mcp', { method: 'OPTIONS', headers: { origin: 'https://grok.example.test', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type' } });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://grok.example.test');
+  assert.match(preflight.headers.get('access-control-allow-headers'), /authorization/);
+  assert.equal((await fetch(f.base + '/.well-known/oauth-protected-resource')).status, 404);
 });
 
 
