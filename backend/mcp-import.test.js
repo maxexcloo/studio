@@ -10,7 +10,7 @@ import { McpMedia } from "./mcp-media.js";
 
 const environment = {
   STUDIO_MCP_API_KEY: "test-provider-key",
-  MCP_SIGNING_KEY: "test-signing-key",
+  STUDIO_MCP_SIGNING_KEY: "test-signing-key",
 };
 const options = { skip: !mcpImportSupported() };
 async function fixture(t, rows) {
@@ -43,7 +43,7 @@ const native = (f) =>
     dataDir: f.dataDir,
     baseUrl: "http://127.0.0.1:8787",
     publicUrl: "http://127.0.0.1:8787",
-    signingKey: environment.MCP_SIGNING_KEY,
+    signingKey: environment.STUDIO_MCP_SIGNING_KEY,
   });
 
 test(
@@ -77,7 +77,7 @@ test(
     };
     assert.equal((await importMcpOwnership({ ...x, studio: "secondary" })).imported, 2);
     const hash = crypto
-      .createHmac("sha256", environment.MCP_SIGNING_KEY)
+      .createHmac("sha256", environment.STUDIO_MCP_SIGNING_KEY)
       .update("provider:test-x-provider")
       .digest("hex");
     assert.equal(read(x).jobs["x-provider"], hash);
@@ -150,7 +150,7 @@ test(
     for (const config of [
       { ...f, studio: "both" },
       { ...f, studio: "primary", environment: {} },
-      { ...f, studio: "primary", environment: { MCP_SIGNING_KEY: "test" } },
+      { ...f, studio: "primary", environment: { STUDIO_MCP_SIGNING_KEY: "test" } },
     ])
       await assert.rejects(importMcpOwnership(config));
     assert.equal(fs.existsSync(f.dataDir), false);

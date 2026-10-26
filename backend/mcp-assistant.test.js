@@ -108,7 +108,7 @@ async function fixture(t, environment = gateway) {
   registerMcpRoutes(app, {
     baseUrl: () => base,
     dataDir,
-    environment: { MCP_PUBLIC_URL: "https://studio.example.test", ...environment },
+    environment: { STUDIO_MCP_PUBLIC_URL: "https://studio.example.test", ...environment },
     accountMode: true,
     imageWaitSeconds: 0,
     authenticateAccountToken: (token) => tokens[token] || null,

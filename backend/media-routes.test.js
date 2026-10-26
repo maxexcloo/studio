@@ -53,8 +53,13 @@ test.before(async () => {
       ...process.env,
       PORT: "0",
       HOST: "127.0.0.1",
-      COMFY_URL: "http://127.0.0.1:1",
-      COMFY_VIDEO_URL: "",
+      STUDIO_WORKERS: JSON.stringify([
+        {
+          id: "primary",
+          url: "http://127.0.0.1:1",
+          capabilities: ["image", "video", "upscale", "models"],
+        },
+      ]),
       STUDIO_DATA_DIR: dataDir,
       STUDIO_ENV_FILE: path.join(dataDir, ".env"),
       STUDIO_OUTPUT_STORAGE: "studio",

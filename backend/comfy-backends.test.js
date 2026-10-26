@@ -15,10 +15,15 @@ import { reloadWorkers } from "./workers.js";
 const primary = await startFakeComfy();
 const video = await startFakeComfy();
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backends-"));
-process.env.COMFY_URL = primary.url;
-process.env.COMFY_VIDEO_URL = video.url;
+const imageWorker = { id: "primary", capabilities: ["image", "upscale", "models"] };
+const videoWorker = { id: "video", capabilities: ["video"] };
+const bothWorkers = JSON.stringify([
+  { ...imageWorker, url: primary.url },
+  { ...videoWorker, url: video.url },
+]);
+process.env.STUDIO_WORKERS = bothWorkers;
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.COMFY_OUTPUT_DIR = "";
+process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("./gallery-store.js");
@@ -198,9 +203,6 @@ test("video failure stays a video failure and is never retried on primary", asyn
   assert.equal(primary.prompts.length, before);
 });
 
-// The legacy pair as workers: COMFY_URL runs images, COMFY_VIDEO_URL local video.
-const imageWorker = { id: "primary", capabilities: ["image", "upscale", "models"] };
-const videoWorker = { id: "video", capabilities: ["video"] };
 const mergeBackendModels = (primaryModels, videoModels) =>
   mergeWorkerModels([
     { worker: imageWorker, models: primaryModels },
@@ -242,11 +244,10 @@ test("catalogue selects local video models from secondary and keeps Grok on prim
 });
 
 test("lost secondary configuration never silently falls back to primary", () => {
-  const configured = process.env.COMFY_VIDEO_URL;
-  delete process.env.COMFY_VIDEO_URL;
+  process.env.STUDIO_WORKERS = JSON.stringify([{ ...imageWorker, url: primary.url }]);
   reloadWorkers();
   assert.throws(() => withComfyBackend("video", () => backendUrl()), /no longer configured/);
-  process.env.COMFY_VIDEO_URL = configured;
+  process.env.STUDIO_WORKERS = bothWorkers;
   reloadWorkers();
   assert.equal(currentComfyBackend(), "primary");
   assert.equal(

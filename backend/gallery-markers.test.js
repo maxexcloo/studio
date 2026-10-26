@@ -9,7 +9,13 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-markers-"));
 const dataDir = path.join(temporary, "data");
 fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
 process.env.STUDIO_DATA_DIR = dataDir;
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 
 const view = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`;

@@ -5,14 +5,13 @@ Copy `.env.example` to `.env` when you need different ports or paths.
 Set `STUDIO_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hides detected model profiles and bundled workflow templates from the generation catalogue; their definitions and model files remain intact. With a configuration mount, seeded and runtime profiles are used by default; standalone configuration keeps built-in profiles enabled. Set the switch explicitly to opt into detected model profiles.
 
 ```bash
-COMFY_URL=http://127.0.0.1:8188
 HOST=127.0.0.1
 PORT=8787
 STUDIO_DATA_DIR=./data
-COMFY_OUTPUT_DIR=
+STUDIO_COMFY_OUTPUT_DIR=
 ```
 
-`COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). The gallery's clear operation moves finished files to `.heiss-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
+`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). The gallery's clear operation moves finished files to `.heiss-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
 
 Single-user mode answers only the computer running Studio; other devices need [account mode](#multi-user-mode). `STUDIO_ALLOWED_HOSTS` lists extra names to answer to (comma-separated), and `STUDIO_TLS_CERT`, `STUDIO_TLS_KEY` and `STUDIO_HTTPS_PORT` give Studio its own HTTPS when it listens beyond this computer. See [Security](./SECURITY.md) and [Accounts & Devices](./TROUBLESHOOTING.md#accounts--devices).
 
@@ -48,12 +47,10 @@ worker by id. `STUDIO_WORKERS='[]'` runs Studio with no workers: it says so
 plainly and refuses generation. A malformed value stops Studio at start with
 the reason.
 
-Without `STUDIO_WORKERS`, the older variables still work. `COMFY_URL` from the
-deployment is the locked worker `primary` (Image Worker: image, upscale and
-model downloads, plus video when there is no video worker) and
-`COMFY_VIDEO_URL` the locked worker `video` (Video Worker: video). A
-`COMFY_URL` in `.env`, or the default local address, only seeds Studio's own
-list until it is first saved.
+Without `STUDIO_WORKERS`, Studio starts with no workers until an administrator
+adds them in **Settings › Workers**, which saves Studio's own list to
+`workers.json` in the data folder. Deployment workers come first and are never
+written there.
 
 **Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
@@ -153,7 +150,7 @@ MCP assistant records survive a restart and preserve who prepared each generatio
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
-`STUDIO_COMFY_SEARCH=0` keeps the legacy standalone worker-discovery path on its configured address. Development sets it to 0. Also, `STUDIO_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
+`STUDIO_THUMBNAIL_CACHE_MB` caps the gallery's thumbnail cache (2048 by default; the least recently shown go first).
 
 Model downloads follow the Hugging Face tools' own settings. `HF_TOKEN` opens gated repos and is only sent to huggingface.co, `HF_ENDPOINT` points downloads at a mirror, and `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` send them through a proxy. Existing administrator credential APIs remain available; the rewritten settings page does not expose provider credentials.
 
@@ -270,48 +267,14 @@ Studio no longer has Hidden. The first start of a version without it backs up an
 
 ## Renamed Settings
 
-Studio became a hard fork of HEISS UI and renamed its `HEISS_*` settings to `STUDIO_*`. The old names still work as deprecated aliases: Studio reads the new name first and falls back to the old one, and the log gets one line naming the old ones still in use. Saving a setting from Settings writes the new name to Studio's settings file and drops the old line. Compose also still reads `HEISS_DOCKER_COMFY_URL` when `STUDIO_DOCKER_COMFY_URL` is unset. Rename them in your deployment when convenient; a later release removes the aliases.
+Studio 1.0 reads only Studio names: every Studio setting starts with `STUDIO_`, and no old name is read as an alias. Third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`). Rename these before upgrading:
 
-| Old                             | New                              |
-| ------------------------------- | -------------------------------- |
-| `HEISS_ALLOWED_HOSTS`           | `STUDIO_ALLOWED_HOSTS`           |
-| `HEISS_COMFY_LOST_AFTER_MS`     | `STUDIO_COMFY_LOST_AFTER_MS`     |
-| `HEISS_COMFY_ROOT`              | `STUDIO_COMFY_ROOT`              |
-| `HEISS_COMFY_SEARCH`            | `STUDIO_COMFY_SEARCH`            |
-| `HEISS_DATA_DIR`                | `STUDIO_DATA_DIR`                |
-| `HEISS_DEFAULT_COMFY_URL`       | `STUDIO_DEFAULT_COMFY_URL`       |
-| `HEISS_DEMO`                    | `STUDIO_DEMO`                    |
-| `HEISS_DEV_PROXY_TOKEN`         | `STUDIO_DEV_PROXY_TOKEN`         |
-| `HEISS_DOCKER_HOST_ONLY`        | `STUDIO_DOCKER_HOST_ONLY`        |
-| `HEISS_ENABLE_INPAINT`          | `STUDIO_ENABLE_INPAINT`          |
-| `HEISS_ENV_FILE`                | `STUDIO_ENV_FILE`                |
-| `HEISS_FFMPEG_PATH`             | `STUDIO_FFMPEG_PATH`             |
-| `HEISS_GALLERY_CHANGELOG_LIMIT` | `STUDIO_GALLERY_CHANGELOG_LIMIT` |
-| `HEISS_GALLERY_LIMIT`           | `STUDIO_GALLERY_LIMIT`           |
-| `HEISS_GALLERY_SAVE_MS`         | `STUDIO_GALLERY_SAVE_MS`         |
-| `HEISS_HTTPS_PORT`              | `STUDIO_HTTPS_PORT`              |
-| `HEISS_PREVIEW_INTERVAL_MS`     | `STUDIO_PREVIEW_INTERVAL_MS`     |
-| `HEISS_REFERENCE_MAX_BYTES`     | `STUDIO_REFERENCE_MAX_BYTES`     |
-| `HEISS_REFERENCE_MAX_PIXELS`    | `STUDIO_REFERENCE_MAX_PIXELS`    |
-| `HEISS_SEEDVR2_HF_REPO`         | `STUDIO_SEEDVR2_HF_REPO`         |
-| `HEISS_SEEDVR2_MODEL_DIR`       | `STUDIO_SEEDVR2_MODEL_DIR`       |
-| `HEISS_TERMINAL_JOB_TTL_MS`     | `STUDIO_TERMINAL_JOB_TTL_MS`     |
-| `HEISS_THUMBNAIL_CACHE_MB`      | `STUDIO_THUMBNAIL_CACHE_MB`      |
-| `HEISS_TLS_CERT`                | `STUDIO_TLS_CERT`                |
-| `HEISS_TLS_KEY`                 | `STUDIO_TLS_KEY`                 |
-| `HEISS_TRASH_DAYS`              | `STUDIO_TRASH_DAYS`              |
-| `HEISS_VIDEO_PREVIEW_CACHE_MB`  | `STUDIO_VIDEO_PREVIEW_CACHE_MB`  |
+- Each `HEISS_*` setting is now `STUDIO_*` with the same suffix, such as `HEISS_DATA_DIR` → `STUDIO_DATA_DIR`.
+- `MCP_SIGNING_KEY`, `MCP_PUBLIC_URL`, `MCP_PROMPTING_PATH`, `COMFY_OUTPUT_DIR`, `COMFY_INPUT_DIR`, `BIFROST_URL` and `CIVITAI_DNS_SERVERS` gain the prefix: `STUDIO_MCP_SIGNING_KEY`, `STUDIO_MCP_PUBLIC_URL`, `STUDIO_MCP_PROMPTING_PATH`, `STUDIO_COMFY_OUTPUT_DIR`, `STUDIO_COMFY_INPUT_DIR`, `STUDIO_BIFROST_URL` and `STUDIO_CIVITAI_DNS_SERVERS`.
+- `COMFY_URL` and `COMFY_VIDEO_URL` are gone: list the workers in `STUDIO_WORKERS` (keep the ids `primary` and `video` so earlier jobs keep their worker) or add them in Settings › Workers. `STUDIO_DEFAULT_COMFY_URL` and `STUDIO_COMFY_SEARCH` are gone too; Studio no longer looks for ComfyUI by itself.
+- Scripts send the `X-Studio` header; `X-HEISS` is refused.
 
-The same goes for the names browsers and scripts see. Studio writes only the new ones and reads the old ones until a later release:
-
-| What                                    | Old               | New                | Compatibility       |
-| --------------------------------------- | ----------------- | ------------------ | ------------------- |
-| Request header for changes from scripts | `X-HEISS`         | `X-Studio`         | Both accepted       |
-| Sign-in needed (401 response)           | `X-HEISS-Sign-In` | `X-Studio-Sign-In` | The page reads both |
-
-The rewritten frontend uses Studio browser preferences. It does not import legacy browser drafts or LoRA favourites; saved gallery records and server-side sessions remain authoritative.
-
-Accounts already use `studio_account`, so account sessions are unaffected.
+Browser storage and the account cookie (`studio_account`) already used Studio names.
 
 ## On-Disk Names
 

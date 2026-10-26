@@ -2,8 +2,8 @@
 // (backend/contract.test.js), so every built-in graph is checked against what a
 // real ComfyUI version accepts.
 //
-//   node backend/commands/record-object-info.mjs                      # from COMFY_URL or 127.0.0.1:8188
-//   node backend/commands/record-object-info.mjs --from object_info.json
+//   node backend/commands/record-object-info.mjs [--url http://127.0.0.1:8188]
+//   node backend/commands/record-object-info.mjs --from object_info.json --version 0.41.0
 //
 // Writes backend/fixtures/object_info-comfyui-<version>.json. File lists
 // (models, LoRAs, input images) are emptied, so nothing from this computer
@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const dropKeys = new Set([
@@ -71,12 +72,18 @@ function sanitizeObjectInfo(info) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const fromIndex = process.argv.indexOf("--from");
-  const comfyUrl = (process.env.COMFY_URL || "http://127.0.0.1:8188").replace(/\/+$/, "");
+  const { values } = parseArgs({
+    options: {
+      from: { type: "string" },
+      url: { type: "string", default: "http://127.0.0.1:8188" },
+      version: { type: "string", default: "" },
+    },
+  });
+  const comfyUrl = values.url.replace(/\/+$/, "");
   let info;
-  let version = process.env.COMFYUI_VERSION || "";
-  if (fromIndex > 0) {
-    info = JSON.parse(fs.readFileSync(process.argv[fromIndex + 1], "utf8"));
+  let version = values.version;
+  if (values.from) {
+    info = JSON.parse(fs.readFileSync(values.from, "utf8"));
   } else {
     info = await fetch(`${comfyUrl}/object_info`).then((response) => response.json());
     const stats = await fetch(`${comfyUrl}/system_stats`)
@@ -84,8 +91,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       .catch(() => ({}));
     version ||= stats?.system?.comfyui_version || "";
   }
-  if (!version)
-    throw new Error("Set COMFYUI_VERSION to the ComfyUI version this snapshot is from.");
+  if (!version) throw new Error("Pass --version with the ComfyUI version this snapshot is from.");
   const file = path.join(root, "backend", "fixtures", `object_info-comfyui-${version}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(sanitizeObjectInfo(info))}\n`);

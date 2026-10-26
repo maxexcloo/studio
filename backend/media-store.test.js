@@ -40,9 +40,15 @@ await new Promise((resolve) => comfy.listen(0, "127.0.0.1", resolve));
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_OUTPUT_STORAGE = "studio";
-process.env.COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
+process.env.STUDIO_COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
 process.env.STUDIO_WORKER_TOKEN = "worker-secret";
-process.env.COMFY_URL = `http://127.0.0.1:${comfy.address().port}`;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: `http://127.0.0.1:${comfy.address().port}`,
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 const media = await import("./media-store.js");
 const paths = await import("./media-paths.js");
 const { localOutputFile } = await import("./comfy.js");
@@ -153,8 +159,11 @@ test("clearing a gallery that mixes Studio media and older ComfyUI outputs trash
     "",
   );
   const mediaItem = { ...results[0].output, id: results[0].output.url, status: "done" };
-  fs.mkdirSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui"), { recursive: true });
-  fs.writeFileSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png"), "old");
+  fs.mkdirSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui"), { recursive: true });
+  fs.writeFileSync(
+    path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png"),
+    "old",
+  );
   const oldItem = {
     ...comfyOutput("old_00001_.png"),
     id: comfyOutput("old_00001_.png").url,
@@ -165,13 +174,13 @@ test("clearing a gallery that mixes Studio media and older ComfyUI outputs trash
   assert.equal(result.batch.split(",").length, 2);
   assert.equal(trash.trashSummary().batches, 2);
   assert.equal(
-    fs.existsSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
+    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
     false,
   );
   const restored = trash.restoreTrash(result.batch);
   assert.equal(restored.restored.length, 2);
   assert.equal(
-    fs.existsSync(path.join(process.env.COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
+    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
     true,
   );
   assert.ok(localOutputFile(paths.mediaParams(mediaItem.url).filename, "heiss-ui", "media"));

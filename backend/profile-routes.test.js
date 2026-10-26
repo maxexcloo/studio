@@ -7,8 +7,14 @@ import express from "express";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-routes-"));
 process.env.STUDIO_DATA_DIR = dir;
-process.env.COMFY_URL = "http://127.0.0.1:9";
-delete process.env.MCP_PROMPTING_PATH;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
+delete process.env.STUDIO_MCP_PROMPTING_PATH;
 delete process.env.STUDIO_SEED_DIR;
 const { userWorkflowsDir } = await import("./custom-workflows.js");
 const { profileStore, guideStore, createProfileStore } = await import("./profile-store.js");

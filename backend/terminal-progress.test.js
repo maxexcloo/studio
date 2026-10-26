@@ -8,10 +8,12 @@ import { startFakeComfy } from "./fixtures/fake-comfy.js";
 
 const fake = await startFakeComfy();
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-terminal-progress-"));
-process.env.COMFY_URL = fake.url;
+process.env.STUDIO_WORKERS = JSON.stringify([
+  { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
+]);
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_OUTPUT_STORAGE = "studio";
-process.env.COMFY_OUTPUT_DIR = "";
+process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const nativeFetch = globalThis.fetch;
 const NativeWebSocket = globalThis.WebSocket;
 const sockets = new Map();

@@ -55,7 +55,10 @@ export function kubernetesWorkloads(environment: Environment) {
       target.hash
     )
       throw problem("needs a direct worker URL");
-    if (environment.BIFROST_URL && target.origin === new URL(environment.BIFROST_URL).origin)
+    if (
+      environment.STUDIO_BIFROST_URL &&
+      target.origin === new URL(environment.STUDIO_BIFROST_URL).origin
+    )
       throw problem("must point directly to its worker, not Bifrost");
     if (record.apiKeyEnv) keys.set(id, required(environment, record.apiKeyEnv));
     return {

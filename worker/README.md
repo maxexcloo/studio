@@ -31,7 +31,7 @@ Radiance worker with its own server-side key (the workload's `apiKeyEnv`).
 Pointing that target at Bifrost would create a routing loop. Set
 `STUDIO_TEXT_WORKLOAD` to the text workload identifier and
 `STUDIO_TEXT_ADMISSION_TOKEN` to the separate bearer credential used by Bifrost.
-The browser never receives either credential. Configure `BIFROST_URL` when used;
+The browser never receives either credential. Configure `STUDIO_BIFROST_URL` when used;
 Studio refuses to target that gateway origin as a worker.
 
 Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) also needs
