@@ -168,6 +168,29 @@ test('account MCP tokens map requests and jobs to the stable account identity', 
   assert.equal(rejected.status, 401);
 });
 
+test('a headerless client connects at /mcp/<token>, and a URL carries only a personal account token', async t => {
+  const token = 'account-mcp-token-that-is-long-enough-for-the-fixture';
+  const account = { userId: 'url-token-account', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
+  const f = await fixture(t, { enabled: false, accountMode: true, authenticateAccountToken: value => value === token ? account : null });
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  const post = (url, headers = {}) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers }, body });
+  // The token in the path is the whole credential, for a client (a Grok connector) that can send no headers.
+  assert.equal((await post(`${f.base}/mcp/${token}`)).status, 200);
+  // The shared gateway and control keys are header-only: in a URL they are just an unknown token.
+  assert.equal((await post(`${f.base}/mcp/${mediaKey}`)).status, 401);
+  assert.equal((await post(`${f.base}/mcp/${controlKey}`)).status, 401);
+  assert.equal((await post(`${f.base}/mcp/not-a-real-token`)).status, 401);
+  // A header still decides: a wrong one is refused even beside a valid path token.
+  assert.equal((await post(`${f.base}/mcp/${token}`, { authorization: 'Bearer not-a-real-token' })).status, 401);
+  // A path-token session acts as the account it names.
+  const client = new Client({ name: 'heiss-url-token-fixture', version: '1.0.0' }, { capabilities: {} });
+  t.after(() => client.close());
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${f.base}/mcp/${token}`), { requestInit: { headers: { accept: 'application/json, text/event-stream' } } }));
+  const result = await generate(client);
+  assert.equal(f.requests.find(request => request.path === '/generate')?.authorization, `Bearer ${token}`);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.dataDir, 'mcp-ownership.json'), 'utf8')).jobs[jobId(result)], 'url-token-account');
+});
+
 test('account mode trusts the gateway key only for linked forwarded users and keeps the control scope', async t => {
   const linked = { userId: 'stable-account-gateway', role: 'user', authenticated: true, generationProfiles: [imageProfile.id], features: {} };
   const noted = [];
