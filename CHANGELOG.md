@@ -20,7 +20,6 @@ version opens with a `> ` summary line.
 - Dream (backend, off by default per account): while Studio is idle, it makes images and optionally videos from the taste profile into a separate pool, within an unseen buffer and daily caps, and yields to anyone's work; keeping a result moves it into the gallery.
 - Gallery Captions (Settings › Models, `STUDIO_GALLERY_CAPTIONS`, off by default): while Studio is idle, a vision assistant model describes finished images so gallery search also finds what they show.
 - Suggestions from the taste profile: an empty, focused composer or Chat message offers three prompt ideas, the viewer offers next-step chips (such as Warmer Light or Closer Crop) that stage a rewritten prompt in its prompt bar, and Chat's assistant receives the taste summary as context.
-- Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
 - Settings › Profiles shows each profile's last 30 days (runs, failures, stars, typical time) and marks one Failing when most of its recent runs failed.
 - Installed on a phone, Studio appears in the share sheet (Android): a shared image opens the composer with it as a reference. The app gains 512px and maskable icons.
 - Video Cloud Fallback (Settings › Models, `STUDIO_VIDEO_CLOUD_FALLBACK`, off by default): while the local video worker is off, MCP video runs on a granted cloud profile and the reply says so, instead of being refused.
@@ -31,8 +30,6 @@ version opens with a `> ` summary line.
 ### Changed
 
 - MCP Reuse with `mode: animate` takes `profile_id`, so a chat can animate an image on the video model the user names; a profile without an image input is refused with what to pass instead. Reuse on a result that is still rendering says so instead of asking for an available output.
-- Keep LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, ahead of the request's LoRA stack instead of replacing them.
-- Take Radiance reference images through four optional `images.image_1` to `images.image_4` node inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
 - Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.
 - Group model choices by family, model or finetune and Fast/Quality preset; group LoRAs by family and type. Preserve selected worker and profile identifiers when continuing saved work.
 - Persist sessions, jobs and user presets in native SQLite, with an offline backed-up migration for account and gallery metadata and an explicit restoration rehearsal. Preserve declared reference slots through admission, recovery and worker graph bindings.
@@ -52,6 +49,30 @@ version opens with a `> ` summary line.
 ### Removed
 
 - Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
+
+## [0.51.0] - 2026-10-24
+
+> Profiles can carry their own Radiance LoRAs
+
+### Changed
+
+- **Radiance LoRAs:** LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, stay in place and the request's LoRA stack is added after them, instead of replacing them.
+
+## [0.50.0] - 2026-10-24
+
+> Up to four reference images for Radiance image profiles
+
+### Changed
+
+- **Radiance node:** reference images arrive through four optional `images.image_1` to `images.image_4` inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
+
+## [0.49.0] - 2026-10-24
+
+> Krea 2 rebalance for Radiance image generation
+
+### Added
+
+- **Radiance node:** an optional `rebalance` input sends Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
 
 ## [0.48.2] - 2026-10-23
 
@@ -2037,7 +2058,10 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.48.2...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.51.0...HEAD
+[0.51.0]: https://github.com/maxexcloo/studio/compare/v0.50.0...v0.51.0
+[0.50.0]: https://github.com/maxexcloo/studio/compare/v0.49.0...v0.50.0
+[0.49.0]: https://github.com/maxexcloo/studio/compare/v0.48.2...v0.49.0
 [0.48.2]: https://github.com/maxexcloo/studio/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/maxexcloo/studio/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/maxexcloo/studio/compare/v0.47.0...v0.48.0
