@@ -50,6 +50,10 @@ version opens with a `> ` summary line.
 
 - Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
 
+### Fixed
+
+- A finished run no longer fails with "The gallery could not be saved" when another gallery change lands while its outputs are being saved; a real save failure now names its cause.
+
 ## [0.51.0] - 2026-10-24
 
 > Profiles can carry their own Radiance LoRAs
