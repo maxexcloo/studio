@@ -153,9 +153,9 @@ primary component reference and verify APIs against the installed version.
 ## Dream & Taste
 
 - Dream is a full-screen card deck of background results. Swipe left discards,
-  right keeps, up keeps and queues variations; Star and Animate are buttons.
-  Dream results stay in their own pool until kept; discards are retained and
-  can be shown with a filter.
+  right keeps, up keeps and queues variations; Star and Animate are buttons
+  that keep the result too. Dream results stay in their own pool until kept;
+  every discard is kept and can be shown with a filter.
 - Dream generates images, videos and (with the NSFW grant) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.
@@ -166,9 +166,9 @@ primary component reference and verify APIs against the installed version.
   iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,
   viewer next-step suggestions and Chat.
 - Suggestions never move the layout or act on their own: prompt ideas float
-  over an empty, focused prompt and fill it; viewer next steps hold their row
-  while loading and stage a prompt that Enter or Generate runs. With none to
-  offer, nothing shows.
+  over an empty, focused prompt and fill it (in Chat as "Create an image: …");
+  viewer next steps hold their row while loading and stage a prompt that Enter
+  or Generate runs. With none to offer, nothing shows.
 
 ## Data & Feedback
 

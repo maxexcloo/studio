@@ -191,7 +191,7 @@ export function registerMcpRoutes(
     domainRequest,
     gatewayAdminTools = () => false,
     claimHandover = () => false,
-    // The owner's taste profile summary, or "", as context for the auto model pick.
+    // The owner's taste profile summary, or "", as context for the auto model pick and prompt writing.
     taste = () => "",
   } = {},
 ) {
@@ -691,6 +691,7 @@ export function registerMcpRoutes(
         references,
         role,
         suggest,
+        taste: taste(owner),
         fallback,
         signal,
       });

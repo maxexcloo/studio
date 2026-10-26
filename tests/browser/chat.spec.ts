@@ -295,6 +295,30 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   if (!testInfo.project.use.isMobile) await page.setViewportSize({ width: 1920, height: 1000 });
   await page.goto("/chat");
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
+  // The model select names the model and is only as wide as its name.
+  const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
+  await expect(model).toHaveValue("Studio Assistant");
+  if (!testInfo.project.use.isMobile) {
+    // The whole name shows, with no more than a little room to spare.
+    const { field, text } = await model.evaluate((input: HTMLInputElement) => {
+      const style = getComputedStyle(input);
+      const context = document.createElement("canvas").getContext("2d")!;
+      context.font = style.font;
+      return {
+        field: input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        text: context.measureText(input.value).width,
+      };
+    });
+    expect(field).toBeGreaterThan(text - 1);
+    expect(field - text).toBeLessThan(8);
+  }
+  // Without a sidebar, the phone's empty state says where the Chats are and offers New Chat.
+  const hint = page.getByText("Your Chats are behind the status button at the top left.");
+  if (testInfo.project.use.isMobile) {
+    await expect(hint).toBeVisible();
+    await page.getByRole("link", { name: "New Chat", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeFocused();
+  } else await expect(hint).toHaveCount(0);
   const nav = page.getByRole("navigation", { name: "Creative Modes" });
   expect(
     await nav

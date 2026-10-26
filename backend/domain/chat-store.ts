@@ -11,6 +11,15 @@ export class ChatStore {
       "UPDATE studio_chat_messages SET record = json_set(record, '$.status', 'failed') WHERE json_extract(record, '$.status') = 'streaming'",
     );
   }
+  /** The model that last answered for a model id, such as the local model behind a routing alias. */
+  actualModel(modelId: string): string | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT json_extract(record, '$.actualModelId') AS actual FROM studio_chat_messages WHERE json_extract(record, '$.modelId') = ? AND json_extract(record, '$.actualModelId') IS NOT NULL ORDER BY rowid DESC LIMIT 1",
+      )
+      .get(modelId);
+    return row ? String(row.actual) : undefined;
+  }
   messages(ownerId: string, sessionId: string): ChatMessage[] {
     return this.db
       .prepare(
