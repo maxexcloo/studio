@@ -10,8 +10,8 @@
   gap: 8px;
 }
 
-.run {
-  /* Room above the cover for the stacked layers behind it. */
+/* Room above the covers for stacked layers; rows of single runs line up with Grid. */
+.runs[data-stacked] .run {
   padding-top: 12px;
 }
 

@@ -194,6 +194,7 @@ export function RunsView({
             ) : (
               <div
                 className={classes.runs}
+                data-stacked={row.runs.some((run) => run.items.length > 1) || undefined}
                 style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
               >
                 {row.runs.map((run) => {
