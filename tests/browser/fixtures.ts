@@ -374,7 +374,8 @@ export async function fixtures(page: Page) {
         runtime: {
           configured: false,
           automaticLifecycle: false,
-          reason: "Workload control remains with AI Control until cutover.",
+          reason:
+            "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },
       });
     if (path === "/api/queue") return respond({ jobs });
@@ -862,6 +863,13 @@ export async function serveDream(
       status: verdict === "variations" ? 202 : 200,
       json: verdict === "variations" ? { item, jobId: "job-variations" } : { item },
     });
+  });
+  // As the backend: starring an unseen result keeps it.
+  await page.route(/\/api\/gallery\/favorite$/, (route) => {
+    const body = route.request().postDataJSON();
+    state.requests.push({ method: "POST", path: "/api/gallery/favorite", body });
+    if (body.favorite) state.unseen = state.unseen.filter((item) => !body.ids.includes(item.id));
+    return route.fulfill({ json: { ok: true, items: [] } });
   });
   return state;
 }
