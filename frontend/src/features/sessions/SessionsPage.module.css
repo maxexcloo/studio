@@ -15,10 +15,11 @@
   --chat-media-height: 420px;
 }
 
-/* Cards keep a readable measure in Full width; the thread itself spans the pane. */
-.card,
-.staged {
-  max-width: 52rem;
+/* The conversation shares the composer's centred measure; the thread itself scrolls the whole pane. */
+.feed {
+  width: 100%;
+  max-width: var(--studio-composer-width);
+  margin-inline: auto;
 }
 
 .grid {

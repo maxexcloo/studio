@@ -195,7 +195,7 @@ export function SessionPage() {
             atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 64;
           }}
         >
-          <Stack ref={feed} gap="xl">
+          <Stack ref={feed} gap="xl" className={classes.feed}>
             {timeline.map((entry) =>
               "message" in entry ? (
                 <Fragment key={entry.key}>

@@ -199,7 +199,6 @@ export function SessionIteration({
       withBorder
       radius="lg"
       p={{ base: "sm", sm: "md" }}
-      className={classes.card}
       aria-label={`Iteration ${number}`}
     >
       <Stack gap="sm">
