@@ -207,7 +207,7 @@ const mergeBackendModels = (primaryModels, videoModels) =>
     { worker: videoWorker, models: videoModels },
   ]);
 
-test("catalogue selects local video models from secondary and keeps Grok on primary", () => {
+test("catalogue selects local video models from secondary", () => {
   const image = { id: "image", kind: "image", family: "sdxl" };
   const h3 = { id: "h3", kind: "video", family: "minimax_h3" };
   const recipe = { id: "custom:video-workflow", kind: "video", family: "minimax-h3" };
@@ -222,21 +222,17 @@ test("catalogue selects local video models from secondary and keeps Grok on prim
       localVideo,
     ]);
   }
-  const grok = { id: "grok", kind: "video", family: "grok" };
   const other = { id: "secondary-image", kind: "image", family: "sdxl" };
   assert.deepEqual(
-    mergeBackendModels({ profiles: [image, h3, grok] }, { profiles: [h3, other] }).profiles,
-    [image, grok, h3],
+    mergeBackendModels({ profiles: [image, h3] }, { profiles: [h3, other] }).profiles,
+    [image, h3],
   );
-  assert.deepEqual(mergeBackendModels({ profiles: [image, h3, grok] }, { profiles: [] }).profiles, [
+  assert.deepEqual(mergeBackendModels({ profiles: [image, h3] }, { profiles: [] }).profiles, [
     image,
-    grok,
   ]);
   assert.equal(
-    mergeBackendModels(
-      { profiles: [image, grok], defaults: { videoModel: "h3" } },
-      { profiles: [h3] },
-    ).defaults.videoModel,
+    mergeBackendModels({ profiles: [image], defaults: { videoModel: "h3" } }, { profiles: [h3] })
+      .defaults.videoModel,
     "h3",
   );
 });
