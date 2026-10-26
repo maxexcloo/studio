@@ -97,6 +97,17 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   assert.equal("password" in me.body.account, false);
   assert.equal(ordinaryRouteAllowed("GET", "/api/accounts/me"), true);
   assert.equal(ordinaryRouteAllowed("PATCH", "/api/accounts/me"), true);
+  // Compare Variants and the taste profile are owner-scoped, so ordinary accounts use them too.
+  for (const [method, route] of [
+    ["POST", "/api/comparisons/run"],
+    ["GET", "/api/comparisons/abc-123"],
+    ["PUT", "/api/comparisons/abc-123/vote"],
+    ["GET", "/api/taste"],
+    ["PUT", "/api/taste"],
+    ["POST", "/api/taste/refresh"],
+    ["DELETE", "/api/taste"],
+  ])
+    assert.equal(ordinaryRouteAllowed(method, route), true, `${method} ${route}`);
   const anonymous = await call(routes["GET /api/accounts/me"], local());
   assert.equal(anonymous.statusCode, 401);
 });
