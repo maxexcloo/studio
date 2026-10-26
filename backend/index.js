@@ -2659,6 +2659,7 @@ const dream = createDream({
   gallery: (ownerId) => gallery.filter((item) => (item.ownerId || "") === ownerId),
   visible: filterVisibleGallery,
   mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
+  remove: deleteOwnedGalleryItems,
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),

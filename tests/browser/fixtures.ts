@@ -762,3 +762,94 @@ export async function closeLoras(page: Page) {
   else await page.keyboard.press("Escape");
   await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeHidden();
 }
+
+/** A finished, unseen Dream result. */
+export const dreamItem = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  jobId: `job-${id}`,
+  type: "image",
+  status: "done",
+  url: image,
+  thumbnailUrl: image,
+  width: 1024,
+  height: 1024,
+  prompt: `Dream prompt ${id}`,
+  createdAt: stamp,
+  settings: { profileId: "image:test" },
+  dream: {
+    prompt: `Dream prompt ${id}`,
+    why: `Because you star ${id}.`,
+    at: stamp,
+    state: "unseen",
+  },
+  ...extra,
+});
+/** Serves `/api/dream` from this state and records each verdict and settings change. */
+export async function serveDream(
+  page: Page,
+  options: { enabled?: boolean; unseen?: any[]; discarded?: any[]; spicyAvailable?: boolean } = {},
+) {
+  const state = {
+    settings: {
+      enabled: options.enabled ?? true,
+      paused: false,
+      buffer: 12,
+      dailyImages: 40,
+      dailyVideos: 4,
+      videos: false,
+      spicy: false,
+    },
+    unseen: options.unseen ?? [],
+    discarded: options.discarded ?? [],
+    spicyAvailable: options.spicyAvailable ?? false,
+    requests: [] as { method: string; path: string; body: any }[],
+  };
+  const show = () => ({
+    settings: state.settings,
+    unseen: state.unseen,
+    today: { images: 3, videos: 0 },
+    spicyAvailable: state.spicyAvailable,
+    status: !state.settings.enabled ? "off" : state.settings.paused ? "paused" : "waiting",
+  });
+  await page.route(/\/api\/dream(?:\/.*)?$/, (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const method = request.method();
+    let body: any = {};
+    try {
+      body = request.postDataJSON() || {};
+    } catch {}
+    if (method !== "GET") state.requests.push({ method, path, body });
+    if (path === "/api/dream") return route.fulfill({ json: show() });
+    if (path === "/api/dream/settings") {
+      Object.assign(state.settings, body);
+      return route.fulfill({ json: show() });
+    }
+    if (path === "/api/dream/discarded") {
+      const start = Number(url.searchParams.get("cursor") || 0);
+      const limit = Number(url.searchParams.get("limit") || 40);
+      return route.fulfill({
+        json: {
+          items: state.discarded.slice(start, start + limit),
+          nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
+        },
+      });
+    }
+    const [, , , rawId, verdict] = path.split("/");
+    const item = [...state.unseen, ...state.discarded].find(
+      (entry) => entry.id === decodeURIComponent(rawId),
+    );
+    if (!item)
+      return route.fulfill({ status: 404, json: { error: "That Dream result is unavailable." } });
+    state.unseen = state.unseen.filter((entry) => entry !== item);
+    state.discarded = state.discarded.filter((entry) => entry !== item);
+    item.dream = { ...item.dream, state: verdict === "discard" ? "discarded" : "kept" };
+    if (verdict === "discard") state.discarded.unshift(item);
+    return route.fulfill({
+      status: verdict === "variations" ? 202 : 200,
+      json: verdict === "variations" ? { item, jobId: "job-variations" } : { item },
+    });
+  });
+  return state;
+}
