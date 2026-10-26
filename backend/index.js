@@ -414,6 +414,10 @@ const mcp = registerMcpRoutes(app, {
   internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
   domainRequest: mcpGenerationRequest,
+  taste: (owner) => {
+    const ownerId = multiUserEnabled ? owner : "";
+    return taste.writable(ownerId) ? taste.read(ownerId).summary : "";
+  },
 });
 app.use(express.json({ limit: "25mb" }));
 const runtime = loadRuntime();
@@ -449,11 +453,6 @@ app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 // Each worker's latest ComfyUI answer (node list and stats), by worker id.
 const emptyContext = { info: null, stats: null, fetchedAt: 0 };
 const rewriteStore = new RewriteStore(path.join(dataDir, "studio.sqlite"));
-// Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
-const taste = createTaste({ dataDir });
-const tasteAdmitted = (job) => {
-  if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
-};
 const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
@@ -1921,6 +1920,22 @@ app.put("/api/loras/:workflowId", (req, res) => {
   }
 });
 
+// Taste profiles (domain/taste.ts) learn from stars, compare votes and iterations on a result.
+// Like Chat, accounts without the prompt assistant never send their prompts to the text model.
+const taste = createTaste({
+  dataDir,
+  writer: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    return ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant"))
+      ? null
+      : assistantEngine;
+  },
+  online: async () =>
+    (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline",
+});
+const tasteAdmitted = (job) => {
+  if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
+};
 registerGalleryHistoryRoutes(app, {
   starred: (req, items, favorite) =>
     taste.record(
