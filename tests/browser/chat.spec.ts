@@ -102,7 +102,10 @@ async function savedChat(page: Page) {
 async function chats(page: Page, isMobile: boolean) {
   if (!isMobile) return page.getByRole("complementary", { name: "Chats", exact: true });
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  return page.getByRole("dialog", { name: "Chats", exact: true });
+  const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+  // A press during the slide-in can release over another row, which focuses without clicking.
+  await expect(drawer).toBeInViewport({ ratio: 1 });
+  return drawer;
 }
 
 test("Chat cards show their request, settings and every output beneath the reply", async ({
