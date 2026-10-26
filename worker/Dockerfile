@@ -23,7 +23,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
     && zypper --non-interactive --no-refresh update --repo repo-oss --repo repo-update --no-recommends \
         libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
     && zypper clean --all \
-    && python3 -m pip install --no-cache-dir uv==0.13.4
+    && python3 -m pip install --no-cache-dir uv==0.13.5
 COPY LICENSE /opt/studio/LICENSE
 WORKDIR /root/ComfyUI
 EXPOSE 8000 8188
