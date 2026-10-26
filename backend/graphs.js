@@ -241,7 +241,6 @@ function applyRgthreeLoraStack(graph, body, config) {
 function applyRadianceLoraStack(graph, body, config) {
   const node = graph[config.node];
   if (!node) throw new Error("The configured Radiance node is missing from this workflow.");
-  // LoRAs the profile itself names (a speed LoRA such as Lightning) stay first; the request's stack follows.
   const fixed = JSON.parse(node.inputs?.loras || "[]");
   (node.inputs ||= {}).loras = JSON.stringify([
     ...fixed,

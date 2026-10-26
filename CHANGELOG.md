@@ -17,10 +17,12 @@ version opens with a `> ` summary line.
 
 - Compare Variants: from the composer or any image's actions, queue 2–4 variants that share the prompt and seed and change the profile, LoRA strengths, prompt or steps and guidance. They run as one queue set and open on a labelled side-by-side page at `/compare/:id`; starring the winner loads its settings into the composer and records the choice for the taste profile. `POST /api/comparisons` also groups existing image jobs, such as an MCP multi-model run.
 - Add an optional `rebalance` input to the Radiance node, sending Krea 2's ConditioningKrea2Rebalance to Radiance 1.11 or later.
+- Accept a personal MCP token in the path (`/mcp/<token>`) for clients that can send no headers, such as a Grok custom connector; the shared gateway and control keys stay header-only. MCP answers CORS preflights and cross-origin calls, and OAuth discovery gets a plain 404.
 - Let one MCP Generate call cover several models (`profile_ids`, or `each_profile` with a tier), each with a prompt written from its own guide and its own set, replying at once with a line of links per model. `preview` returns the written prompts and concept suggestions without queuing, and the same call without it queues exactly those prompts; `apply_guide` rewrites supplied prompts for the model's guide.
 
 ### Changed
 
+- MCP Reuse with `mode: animate` takes `profile_id`, so a chat can animate an image on the video model the user names; a profile without an image input is refused with what to pass instead. Reuse on a result that is still rendering says so instead of asking for an available output.
 - Keep LoRAs a profile names on its Radiance node, such as a Lightning speed LoRA, ahead of the request's LoRA stack instead of replacing them.
 - Take Radiance reference images through four optional `images.image_1` to `images.image_4` node inputs instead of `reference_image`, so profiles can offer optional extra reference slots.
 - Replace the legacy frontend with Mantine, shared responsive generation controls and Images, Videos and Chat views. Gallery generation stays at the bottom; Chat combines text conversation with generation inputs, media results and session history.

@@ -1048,12 +1048,12 @@ export class McpMedia {
     return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}`;
   }
   available(job, index) {
-    if (
-      !finished.has(job.status) ||
-      !Number.isInteger(index) ||
-      index < 0 ||
-      !mcpOutputPath(job.outputs?.[index]?.url)
-    )
+    // An unfinished job has no output to choose yet; saying so keeps a chat from retrying at a finished job.
+    if (!finished.has(job.status))
+      throw new Error(
+        `This result is still ${job.status || "running"}. Share its link and try again when it finishes.`,
+      );
+    if (!Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url))
       throw new Error("Choose an available output from this completed job.");
     return job.outputs[index];
   }
@@ -1165,17 +1165,24 @@ export class McpMedia {
     return { profile, args };
   }
   /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
-  async animate(owner, jobId, index, item, { tier, prompt, count = 1, cloud = false } = {}) {
+  async animate(
+    owner,
+    jobId,
+    index,
+    item,
+    { tier, prompt, count = 1, cloud = false, profile: named = null } = {},
+  ) {
     const output = await this.download(owner, jobId, index);
     if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
       throw new Error("Only image results can be animated.");
-    const base = await this.choose(owner, {
-      kind: "video",
-      tier,
-      references: 1,
-      firstFrame: true,
-      cloud,
-    });
+    // A named profile (the chat asking for Grok by name) picks the video model outright; otherwise the tier does.
+    const base =
+      named ||
+      (await this.choose(owner, { kind: "video", tier, references: 1, firstFrame: true, cloud }));
+    if (!(base.mediaInputs || []).some((slot) => slot.kind === "image"))
+      throw new Error(
+        `${base.label || base.id} takes no starting image, so it cannot animate this result. Pass tier instead, or a profile_id that takes one.`,
+      );
     const { asset } = await this.upload(
       owner,
       output.content.toString("base64"),

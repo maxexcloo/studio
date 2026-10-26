@@ -378,6 +378,52 @@ async function fixture(
   };
 }
 
+test("a headerless client connects at /mcp/<token>, and a URL carries only a personal account token", async (t) => {
+  const token = "account-mcp-token-that-is-long-enough-for-the-fixture";
+  const account = {
+    userId: "url-token-account",
+    role: "user",
+    authenticated: true,
+    generationProfiles: [imageProfile.id],
+    features: {},
+  };
+  const f = await fixture(t, {
+    enabled: false,
+    accountMode: true,
+    authenticateAccountToken: (value) => (value === token ? account : null),
+  });
+  const post = (url, headers = {}) =>
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...headers,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+  // The token in the path is the whole credential, for a client (a Grok connector) that can send no headers.
+  assert.equal((await post(`${f.base}/mcp/${token}`)).status, 200);
+  // The shared gateway and control keys are header-only: in a URL they are just an unknown token.
+  for (const value of [mediaKey, controlKey, "not-a-real-token"])
+    assert.equal((await post(`${f.base}/mcp/${value}`)).status, 401);
+  // A header still decides: a wrong one is refused even beside a valid path token.
+  assert.equal(
+    (await post(`${f.base}/mcp/${token}`, { authorization: "Bearer not-a-real-token" })).status,
+    401,
+  );
+  const client = new Client({ name: "studio-url-token-fixture", version: "1.0.0" });
+  t.after(() => client.close());
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${f.base}/mcp/${token}`)));
+  const result = await generate(client);
+  assert.equal(
+    f.requests.find((request) => request.path === "/generate")?.authorization,
+    `Bearer ${token}`,
+  );
+  const saved = JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8"));
+  assert.equal(saved.jobs[jobId(result)], "url-token-account");
+});
+
 test("account MCP tokens map requests and jobs to the stable account identity", async (t) => {
   const token = "account-mcp-token-that-is-long-enough-for-the-fixture";
   const account = {
@@ -1671,11 +1717,12 @@ test("signed links do not expire, preserve the configured public path and cannot
   assert.equal((await fetch(legacy)).status, 200);
 });
 
-test("MCP rejects hostile browser origins, rebound hosts and oversized forwarded identities", async (t) => {
+test("MCP serves browser-based clients and still rejects rebound hosts and oversized forwarded identities", async (t) => {
   const f = await fixture(t);
   const message = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" });
   for (const [headers, status] of [
-    [{ Origin: "https://hostile.example.test" }, 403],
+    [{ Origin: "https://hostile.example.test" }, 200],
+    [{ Origin: "null" }, 403],
     [{ Host: "rebound.example.test" }, 403],
     [{ "x-ai-user-id": "x".repeat(257) }, 400],
   ]) {
@@ -1704,6 +1751,32 @@ test("MCP rejects hostile browser origins, rebound hosts and oversized forwarded
     assert.equal(actual, status, JSON.stringify(headers));
   }
   assert.equal(f.requests.length, 0);
+  // A cross-origin call reads back: MCP takes no ambient credentials, so a browser client (a Grok connector)
+  // gets the CORS headers and the client's own token does the authorising.
+  const crossed = await fetch(f.base + "/mcp", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${mediaKey}`,
+      accept: "application/json, text/event-stream",
+      "content-type": "application/json",
+      origin: "https://grok.example.test",
+    },
+    body: message,
+  });
+  assert.equal(crossed.headers.get("access-control-allow-origin"), "https://grok.example.test");
+  // Its preflight gets the headers it needs, without a credential, and OAuth discovery misses cleanly.
+  const preflight = await fetch(f.base + "/mcp", {
+    method: "OPTIONS",
+    headers: {
+      origin: "https://grok.example.test",
+      "access-control-request-method": "POST",
+      "access-control-request-headers": "content-type",
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "https://grok.example.test");
+  assert.match(preflight.headers.get("access-control-allow-headers"), /authorization/);
+  assert.equal((await fetch(f.base + "/.well-known/oauth-protected-resource")).status, 404);
 });
 
 test("reference-mode capabilities override text controls without losing the profile LoRA options", async (t) => {
@@ -3251,7 +3324,7 @@ test("video never goes to the cloud by itself while the local video worker is of
   );
 });
 
-test("Reuse animates on the cloud only when asked while the local video worker is off", async (t) => {
+test("Reuse animates on the cloud only when asked or named while the local video worker is off", async (t) => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), {
     defaults: { image: imageProfile.id, video: "cloud-video" },
@@ -3259,6 +3332,14 @@ test("Reuse animates on the cloud only when asked while the local video worker i
   });
   const client = await f.client();
   data(await call(client, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
+  // Still rendering: the chat is told the result is not finished, never "choose an output" from a completed job.
+  const pending = await call(client, "Reuse", {
+    job_id: "result 1",
+    mode: "animate",
+    prompt: "The heron takes flight",
+  });
+  assert.equal(pending.isError, true);
+  assert.match(texts(pending), /^This result is still /);
   finish(f);
   const refused = await call(client, "Reuse", {
     job_id: "result 1",
@@ -3297,6 +3378,19 @@ test("Reuse animates on the cloud only when asked while the local video worker i
     ).profile.id,
     "cloud-video",
   );
+  // A named profile picks the video model outright, as the chat does when the user says "with grok imagine".
+  assert.equal(
+    data(
+      await call(client, "Reuse", {
+        job_id: "result 1",
+        mode: "animate",
+        profile_id: "cloud-video",
+        prompt: "The heron takes flight",
+      }),
+    ).profile.id,
+    "cloud-video",
+  );
+  assert.equal(f.submitted.at(-1).profileId, "cloud-video");
 });
 
 test("video stays local while the worker is up, and a plain request never reaches the cloud", async (t) => {
@@ -3357,6 +3451,12 @@ test("video stays local while the worker is up, and a plain request never reache
     data(await call(full, "Reuse", { job_id: "result 4", mode: "animate" })).profile.id,
     "fl-fast",
   );
+  // A named video profile that takes no starting image cannot animate, and says so.
+  await failure(full, "Reuse", {
+    job_id: "result 4",
+    mode: "animate",
+    profile_id: "fixture-video",
+  });
   await f.profiles(videoCatalogue(false), { videoAvailable: false });
   const restricted = await f.client("", Object.keys(tokens)[0]);
   const refused = await call(restricted, "Generate", { kind: "video", prompts: ["A wave"] });
