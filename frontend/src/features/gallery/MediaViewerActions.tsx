@@ -14,6 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
+  ChevronDown,
   Clapperboard,
   ClipboardCopy,
   Copy,
@@ -42,6 +43,7 @@ import { UpscaleControls } from "./UpscaleControls";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { animateThemes, useMediaAction, type AnimateTheme, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
+import classes from "./MediaViewer.module.css";
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
@@ -76,8 +78,8 @@ export function MediaViewerActions({
   onVersionChange: (id: string, active: boolean) => void;
 }) {
   const phone = usePhone();
-  // Phones keep 42px touch targets so eight actions still fit one row.
-  const size = phone ? 42 : undefined;
+  // Phones keep 40px touch targets so the actions and Regenerate's menu fit one 375px row.
+  const size = phone ? 40 : undefined;
   const ready = item.status === "done" && Boolean(item.url);
   const transfer = useMediaTransfer(item, true);
   const favorite = useMediaFavorite(item);
@@ -107,7 +109,7 @@ export function MediaViewerActions({
   );
   return (
     <Group
-      gap={phone ? 2 : 6}
+      gap={phone ? 0 : 6}
       justify={phone ? "space-between" : "center"}
       wrap="nowrap"
       role="group"
@@ -206,38 +208,52 @@ export function MediaViewerActions({
               </Menu.Dropdown>
             </Menu>
           )}
-          <Menu position="top" width={220}>
+          <ActionIcon.Group>
             {tip(
               "Regenerate",
-              <Menu.Target>
-                <ActionIcon
-                  variant="default"
-                  size={size}
-                  aria-label="Regenerate"
-                  loading={iterating === "regenerate" || iterating === "repeat"}
-                >
-                  <RefreshCw size={18} />
-                </ActionIcon>
-              </Menu.Target>,
-            )}
-            <Menu.Dropdown>
-              <Menu.Label>Regenerate</Menu.Label>
-              <Menu.Item
-                h={36}
-                leftSection={<Shuffle size={16} />}
+              <ActionIcon
+                variant="default"
+                size={size}
+                aria-label="Regenerate"
+                loading={iterating === "regenerate" || iterating === "repeat"}
                 onClick={() => iterate({ kind: "regenerate" })}
               >
-                New Seed
-              </Menu.Item>
-              <Menu.Item
-                h={36}
-                leftSection={<Repeat size={16} />}
-                onClick={() => iterate({ kind: "repeat" })}
-              >
-                Exact Repeat
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+                <RefreshCw size={18} />
+              </ActionIcon>,
+            )}
+            <Menu position="top" width={220}>
+              {tip(
+                "Regenerate Options",
+                <Menu.Target>
+                  <ActionIcon
+                    className={classes.splitMenu}
+                    variant="default"
+                    size={size}
+                    aria-label="Regenerate Options"
+                  >
+                    <ChevronDown size={14} />
+                  </ActionIcon>
+                </Menu.Target>,
+              )}
+              <Menu.Dropdown>
+                <Menu.Label>Regenerate</Menu.Label>
+                <Menu.Item
+                  h={36}
+                  leftSection={<Shuffle size={16} />}
+                  onClick={() => iterate({ kind: "regenerate" })}
+                >
+                  New Seed
+                </Menu.Item>
+                <Menu.Item
+                  h={36}
+                  leftSection={<Repeat size={16} />}
+                  onClick={() => iterate({ kind: "repeat" })}
+                >
+                  Exact Repeat
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </ActionIcon.Group>
           <Menu position="top" width={220}>
             {tip(
               "Copy",
