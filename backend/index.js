@@ -89,7 +89,6 @@ import {
   workerById,
 } from "./workers.js";
 import { registerWorkerRoutes } from "./worker-routes.js";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -143,7 +142,6 @@ import { civitaiTokenStatus } from "./civitai-access.js";
 import { hfTokenStatus } from "./hf-access.js";
 import { primeModelMetadata, setModelChoice } from "./model-families.js";
 import {
-  dedupeGallery,
   deleteOwnedGalleryItems,
   filterVisibleGallery,
   flushGalleryStrict,
@@ -151,7 +149,6 @@ import {
   replaceGalleryJob,
   makePendingItems,
   gallery,
-  galleryLimit,
   dataDir,
   recordsFromComfyHistory,
   saveGallery,
@@ -1652,7 +1649,7 @@ app.post("/api/workflows/import", async (req, res) => {
           }
         : raw;
     const workflow = saveImportedWorkflow(normalized, metadata);
-    const { graph, ...summary } = workflow;
+    const { graph: _graph, ...summary } = workflow;
     res.json({ ok: true, workflow: summary });
   } catch (error) {
     res.status(400).json({ ok: false, error: error.message });
