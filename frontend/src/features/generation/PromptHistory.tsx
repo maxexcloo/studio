@@ -164,6 +164,8 @@ export function PromptHistory({
                 {title}
               </Text>
               <Switch
+                // Remounts once loaded so the saved state appears without the thumb sliding.
+                key={history.data ? "loaded" : "loading"}
                 label="Save Recent Prompts"
                 description="Off forgets recent prompts; pinned prompts stay."
                 size="xs"

@@ -46,6 +46,8 @@ export function StudioPreferences() {
             description="Offer your recent prompts in the composer’s history. Pinned prompts stay either way."
           >
             <Switch
+              // Remounts once loaded so the saved state appears without the thumb sliding.
+              key={history.data ? "loaded" : "loading"}
               aria-label="Keep Recent Prompts"
               checked={keepPrompts.isPending ? keepPrompts.variables : !!history.data?.enabled}
               disabled={!history.data || keepPrompts.isPending}
