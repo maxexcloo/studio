@@ -65,6 +65,8 @@ Direct cloud work is independent of GPU admission. Studio records asynchronous v
 
 Cloud Models and NSFW access remain per-user permissions. Credentials never reach the browser or media-download URLs.
 
+While the local video worker is off, MCP video is refused with a note that Grok can be asked for. **Settings › Models › Video Cloud Fallback** (`STUDIO_VIDEO_CLOUD_FALLBACK=1`, off by default) sends it to a cloud profile the account is granted instead, and the reply says it went to the cloud. It applies at once and never affects Studio's own composer or held video work.
+
 ## Model Manifest
 
 `STUDIO_MODEL_STORAGE=worker` selects the worker with the `models` capability
