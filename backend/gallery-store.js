@@ -1133,9 +1133,14 @@ export function makePendingItems(id, body) {
     width: Number(body.inpaint?.image?.width || body.width || 0),
     height: Number(body.inpaint?.image?.height || body.height || 0),
     model: body.model || "",
-    referenceImage: body.startImageId || "",
-    referenceImageName: body.startImageName || "",
-    startImageId: body.startImageId || "",
+    // Legacy single-reference keys, only on records that still carry one (useMediaAction.ts reads them).
+    ...(body.startImageId
+      ? {
+          referenceImage: body.startImageId,
+          referenceImageName: body.startImageName || "",
+          startImageId: body.startImageId,
+        }
+      : {}),
     settings: generationSettings(body),
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
@@ -1335,9 +1340,13 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         width: Number(videoSize?.width || body.inpaint?.image?.width || body.width || 0),
         height: Number(videoSize?.height || body.inpaint?.image?.height || body.height || 0),
         model: body.model || "",
-        referenceImage: body.startImageId || "",
-        referenceImageName: body.startImageName || "",
-        startImageId: body.startImageId || "",
+        ...(body.startImageId
+          ? {
+              referenceImage: body.startImageId,
+              referenceImageName: body.startImageName || "",
+              startImageId: body.startImageId,
+            }
+          : {}),
         settings: generationSettings(body),
         ...(body.assistant ? { assistant: body.assistant } : {}),
         ...(body.chat ? { chat: body.chat } : {}),
