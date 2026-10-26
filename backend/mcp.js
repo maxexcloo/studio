@@ -24,7 +24,7 @@ import {
   replyRule,
 } from "./mcp-media.js";
 import { exactPromptInstructions, fullBodyPerson } from "./mcp-prompt-checks.js";
-import { livePrompting } from "./profile-store.js";
+import { canonicalProfileId, livePrompting } from "./profile-store.js";
 import {
   asksForCloud,
   familyMatches,
@@ -726,7 +726,15 @@ export function registerMcpRoutes(
             .optional()
             .describe("The whole prompting guide; rarely needed, as Studio applies it."),
         },
-        async ({ kind, tier: wanted, profile_id, lora_query, lora_names = [], full_guide }) => {
+        async ({
+          kind,
+          tier: wanted,
+          profile_id: named_id,
+          lora_query,
+          lora_names = [],
+          full_guide,
+        }) => {
+          const profile_id = canonicalProfileId(named_id);
           let profiles = await media.profiles(kind, owner);
           if (profile_id === undefined) {
             // Cloud (Grok) profiles list apart: Generate uses one only when the user asks for Grok or the cloud.

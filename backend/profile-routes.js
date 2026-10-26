@@ -15,6 +15,8 @@
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
+ *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
+ *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile-merge.js)
  *
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
@@ -27,6 +29,7 @@ import {
 } from "./profile-editor.js";
 import { profileBlock } from "./profile-block.js";
 import { writeExport } from "./profile-export.js";
+import { duplicateProfiles, mergeDuplicateProfiles } from "./profile-merge.js";
 
 const fail = (res, error) =>
   res.status(error.status || 400).json({
@@ -245,6 +248,24 @@ export function registerProfileRoutes(
     route((req, res) => {
       guides().pack(req.params.packId);
       res.json({ ok: true, meta: guides().approve(req.params.packId, { by: accountName(req) }) });
+    }),
+  );
+
+  app.get(
+    "/api/profiles/duplicates",
+    route((_req, res) => {
+      res.json({ ok: true, ...duplicateProfiles() });
+    }),
+  );
+  app.post(
+    "/api/profiles/duplicates/merge",
+    route(async (req, res) => {
+      const result = mergeDuplicateProfiles({
+        hash: String(req.body?.hash || ""),
+        by: accountName(req),
+      });
+      for (const { from } of result.merged) await onSaved(from);
+      res.json({ ok: true, ...result });
     }),
   );
 

@@ -29,6 +29,7 @@ import { SearchInput } from "../../ui/SearchInput";
 import { api, post } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
+import { isProfile } from "./payload";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, escapePanel } from "./chip";
 import classes from "./LoraPicker.module.css";
@@ -229,7 +230,7 @@ function LoraControls({
   const context = useGeneration();
   const input = value || context.input;
   const profile = value
-    ? context.profiles.find((profile) => profile.id === value.profileId)
+    ? context.profiles.find((profile) => isProfile(profile, value.profileId))
     : context.profile;
   const update = (loras: Lora[]) =>
     onChange ? onChange({ ...input, loras }) : context.update({ loras });

@@ -11,6 +11,7 @@ import { useForm } from "@mantine/form";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { api } from "../../api";
+import { isProfile } from "./payload";
 
 export const modelsQuery = queryOptions({
   queryKey: ["models"],
@@ -120,7 +121,7 @@ function useGenerationState(workspace: Workspace) {
   const models = useQuery({ ...modelsQuery, refetchInterval: 15000 });
   const profiles = models.data?.profiles ?? emptyProfiles;
   const profile = draft.input.profileId
-    ? profiles.find((profile) => profile.id === draft.input.profileId)
+    ? profiles.find((profile) => isProfile(profile, draft.input.profileId))
     : defaultProfile(models.data, draft.input.kind);
   function update(patch: Partial<GenerationInput>) {
     setDraft((previous) => ({ ...previous, input: { ...previous.input, ...patch } }));

@@ -2,6 +2,7 @@
 // Speed tiers for MCP: read from the tier segment of a profile label such as "Krea 2 Turbo · Super Fast · 2 Steps".
 
 import { isCloudProfile } from "./cloud-profiles.js";
+import { canonicalProfileId } from "./profile-store.js";
 
 export const mcpTiers = ["quality", "standard", "fast", "turbo"];
 
@@ -160,7 +161,8 @@ function scoredSearch(profiles, query) {
  * word picks within it; matches across families find nothing.
  */
 export function findProfile(profiles, value) {
-  const exact = profiles.find((profile) => profile.id === value);
+  const id = canonicalProfileId(value);
+  const exact = profiles.find((profile) => profile.id === id);
   if (exact) return exact;
   const key = squash(value);
   if (!key) return null;

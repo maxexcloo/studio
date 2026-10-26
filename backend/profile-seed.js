@@ -7,6 +7,7 @@
  * Settings › Profiles › Export, which has the same layout:
  *
  *   profiles/*.json       profiles
+ *   profile-aliases.json  merged profile ids (profile-merge.js), added before the profiles
  *   prompting.json        prompting guides
  *   lora-catalogue.json   the LoRA catalogue
  *   catalogue.json        editable model catalogue metadata
@@ -78,6 +79,27 @@ export function seedMissing({
       .sort();
   } catch {
     /* A seed without profiles. */
+  }
+  // A merged id the data folder doesn't hold stays merged, so its seed profile is skipped below.
+  let aliases = {};
+  try {
+    aliases = JSON.parse(fs.readFileSync(path.join(seedDir, "profile-aliases.json"), "utf8"));
+  } catch {
+    /* A seed without merged profiles. */
+  }
+  const held = store.aliases();
+  const added = Object.entries(aliases || {})
+    .filter(
+      ([id, alias]) =>
+        validId(id) &&
+        validId(String(alias?.to || "")) &&
+        !Object.hasOwn(held, id) &&
+        !fs.existsSync(path.join(workflowsDir, `${id}.json`)),
+    )
+    .map(([from, alias]) => ({ from, to: alias.to, reason: alias.reason || "" }));
+  if (added.length) {
+    store.addAliases(added, { by: "seed" });
+    result.aliases = added.map(({ from }) => from);
   }
   for (const name of names) {
     const id = name.slice(0, -5);

@@ -6,6 +6,7 @@ import { loadCustomWorkflows, workflowOptionIssues } from "./custom-workflows.js
 import { classifyModel, modelTypeChoices } from "./model-families.js";
 import { familyProfiles } from "./family-profiles.js";
 import { families } from "./family-catalog.js";
+import { canonicalProfileId } from "./profile-store.js";
 import {
   builtInProfilesEnabled,
   inpaintingEnabled,
@@ -533,9 +534,11 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
   const videoProfiles = profiles.filter((profile) => profile.kind === "video");
   const unsupportedModels = modelFiles.filter((file) => !file.supported).map((file) => file.name);
   // A ready model is the better first pick than one still waiting on files.
-  const firstReady = (list, configured) =>
+  const firstReady = (list, setting) =>
     (
-      list.find((profile) => profile.id === configured && profile.ready !== false) ||
+      list.find(
+        (profile) => profile.id === canonicalProfileId(setting) && profile.ready !== false,
+      ) ||
       list.find((profile) => profile.ready !== false) ||
       list[0]
     )?.id || "";
