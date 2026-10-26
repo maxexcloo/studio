@@ -17,7 +17,8 @@ function ChatComposer() {
   const ideas = usePromptIdeas({
     kind: "image",
     empty: !text.trim(),
-    onPick: setText,
+    // An idea is an image to make, so Chat asks for it rather than discussing it.
+    onPick: (idea) => setText(`Create an image: ${idea}`),
     className: classes.ideas,
     stacked: phone,
   });
@@ -62,7 +63,14 @@ function ChatComposer() {
           variant="unstyled"
           size="xs"
           searchable={models.length > 8}
-          w={{ base: 80, sm: 160 }}
+          // Sizes the field to the chosen model's name where `field-sizing` is unsupported.
+          style={{
+            "--model-chars": Math.max(
+              5,
+              models.find((model) => model.id === modelId)?.label.length || 0,
+            ),
+          }}
+          maw={{ base: 112, sm: 220 }}
           miw={0}
           className={classes.model}
           comboboxProps={{ withinPortal: true, width: 280, position: "top-end" }}

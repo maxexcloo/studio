@@ -7,7 +7,7 @@ import path from "node:path";
 import test, { type TestContext } from "node:test";
 import express from "express";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
-import { createTaste, registerTasteRoutes, tasteSignal } from "./taste.ts";
+import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./taste.ts";
 
 function tasteFixture(t: TestContext, options: Partial<Parameters<typeof createTaste>[0]> = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-taste-"));
@@ -37,6 +37,12 @@ test("signals keep their prompt, profile and enabled LoRAs, newest first, capped
   for (let index = 0; index < 205; index++)
     taste.record("alice", [tasteSignal("star", `job-${index}`)]);
   taste.record("bob", [tasteSignal("unstar", "theirs")]);
+  // A bulk star adds at most 20 signals.
+  taste.record(
+    "carol",
+    Array.from({ length: 30 }, (_, index) => tasteSignal("star", `bulk-${index}`)),
+  );
+  assert.equal(taste.read("carol").signals.length, 20);
   const alice = taste.read("alice");
   assert.equal(alice.signals.length, 200);
   assert.equal(alice.signals[0].jobId, "job-204");
@@ -189,4 +195,35 @@ test("every eighth signal rewrites the summary in the background, at most every 
   };
   await assert.rejects(taste.refresh("bob"), { status: 502, message: /\(timeout\)/ });
   assert.equal(taste.read("bob").summary, reply);
+});
+
+test("a compare winner is preferred over each other variant, which the summary treats as relative", async (t) => {
+  const calls: { messages: { role: string; content: string }[] }[] = [];
+  const taste = tasteFixture(t, {
+    writer: () => ({
+      settings: () => ({ model: "fixture-text" }),
+      chat: async (request) => {
+        calls.push(request);
+        return { text: "Prefers flux-2 for harbours." };
+      },
+    }),
+  });
+  const signal = preferenceSignal(
+    { jobId: "won", values: { prompt: "a harbour", profileId: "flux-2" } },
+    { jobId: "lost", values: { prompt: "a harbour", profileId: "qwen", loras: ["film"] } },
+  );
+  assert.deepEqual(signal, {
+    kind: "preferred",
+    jobId: "won",
+    prompt: "a harbour",
+    profileId: "flux-2",
+    over: { jobId: "lost", prompt: "a harbour", profileId: "qwen", loras: ["film"] },
+  });
+  taste.record("alice", [signal]);
+  await taste.refresh("alice");
+  assert.match(calls[0].messages[0].content, /relative.*may still be good.*no dislike/);
+  assert.match(
+    calls[0].messages[1].content,
+    /^- preferred; model flux-2; prompt "a harbour"; over; model qwen; LoRAs film; prompt "a harbour"$/m,
+  );
 });
