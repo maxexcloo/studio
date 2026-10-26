@@ -12,6 +12,7 @@ const store = await import("./gallery-store.js");
 const {
   filterVisibleGallery,
   flushGallery,
+  flushGalleryStrict,
   galleryDelta,
   galleryPath,
   galleryRevisionValue,
@@ -244,6 +245,20 @@ test("saving a large gallery is compact, runs in the background and reads back",
   assert.deepEqual(
     JSON.parse(fs.readFileSync(galleryPath, "utf8")).map((item) => item.id),
     saved.slice(0, 3).map((item) => item.id),
+  );
+});
+
+test("a strict save is not failed by a change made while it is writing", async () => {
+  setGallery([output("first.png")]);
+  const saving = flushGalleryStrict();
+  setGallery([output("first.png"), output("second.png")]);
+  await saving;
+  await flushGalleryStrict();
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(galleryPath, "utf8"))
+      .map((item) => item.id)
+      .sort(),
+    ["first.png", "second.png"],
   );
 });
 
