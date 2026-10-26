@@ -101,6 +101,10 @@ export function writeRuntimeDocument(dataDir: string, name: string, value: unkno
     .run(name, JSON.stringify(value));
 }
 
+export function deleteRuntimeDocument(dataDir: string, name: string): void {
+  runtimeDatabase(dataDir).prepare("DELETE FROM studio_documents WHERE name = ?").run(name);
+}
+
 export function closeRuntimeDatabase(dataDir: string): void {
   const filename = databaseFile(dataDir);
   databases.get(filename)?.close();
