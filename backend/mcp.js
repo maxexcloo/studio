@@ -191,6 +191,8 @@ export function registerMcpRoutes(
     domainRequest,
     gatewayAdminTools = () => false,
     claimHandover = () => false,
+    // The owner's taste profile summary, or "", as context for the auto model pick.
+    taste = () => "",
   } = {},
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
@@ -570,7 +572,13 @@ export function registerMcpRoutes(
       if (pool.length < 2) return { profile, note: fallback };
       const choice =
         writer && request
-          ? await writer.pick({ request, profiles: pool, preferred: profile, signal })
+          ? await writer.pick({
+              request,
+              profiles: pool,
+              preferred: profile,
+              taste: taste(owner),
+              signal,
+            })
           : null;
       const chosen = choice?.profile || profile;
       return {
