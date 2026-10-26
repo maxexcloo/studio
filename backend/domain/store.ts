@@ -191,7 +191,7 @@ export class RewriteStore {
     const jobResource = resource.startsWith("provider:cliproxyapi")
       ? `provider:cliproxyapi:${id}`
       : resource;
-    const backend = /^(worker|cloud):/.test(resource)
+    const backend = resource.startsWith("worker:")
       ? resource.slice(resource.indexOf(":") + 1)
       : undefined;
     const job: OwnedJob = {
@@ -244,6 +244,16 @@ export class RewriteStore {
         `SELECT record FROM studio_queue${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""} ORDER BY created_at, rowid`,
       )
       .all(...values)
+      .map((row) => JSON.parse(row.record as string));
+  }
+
+  /** Every owner's failed jobs on a resource prefix updated since an ISO time, newest first. */
+  failedJobs(resourcePrefix: string, since: string): OwnedJob[] {
+    return this.db
+      .prepare(
+        "SELECT record FROM studio_queue WHERE status = 'failed' AND substr(json_extract(record, '$.resource'), 1, length(?)) = ? AND json_extract(record, '$.updatedAt') >= ? ORDER BY json_extract(record, '$.updatedAt') DESC",
+      )
+      .all(resourcePrefix, resourcePrefix, since)
       .map((row) => JSON.parse(row.record as string));
   }
 

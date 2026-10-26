@@ -4,6 +4,16 @@ import type { OwnedJob } from "../domain/store.ts";
 import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
 
 type Value = Record<string, any>;
+// Discovery publishes no resolution schemas; an unlisted model takes the provider's default.
+const resolutions: Record<string, string[]> = {
+  "grok-imagine-image": [],
+  "grok-imagine-image-2.0": ["1k", "2k"],
+  "grok-imagine-image-quality": [],
+  "grok-imagine-video": ["480p", "720p"],
+  "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
+};
+// Longest reference edge sent to the provider, which works at 1080p or 2k at most.
+const referenceEdge = 2048;
 interface ProfileOptions {
   provider: CliProxyMedia;
   workflows(): Value[];
@@ -134,15 +144,26 @@ export function studioCloudProfiles(options: ProfileOptions) {
     if (referenceId) reference = await options.reference(account, referenceId);
     else if (input.startImage)
       reference = Buffer.from(String(input.startImage).split(",")[1], "base64");
-    if (reference) reference = await sharp(reference).png().toBuffer();
-    const width = Number(input.width ?? defaults.width);
-    const height = Number(input.height ?? defaults.height);
+    let width = Number(input.width ?? defaults.width);
+    let height = Number(input.height ?? defaults.height);
+    if (reference) {
+      const { data, info } = await sharp(reference)
+        .rotate()
+        .resize(referenceEdge, referenceEdge, { fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer({ resolveWithObject: true });
+      reference = data;
+      // A first frame gives the video its shape.
+      if (profile.kind === "video") ({ width, height } = info);
+    }
     let resolution = String(input.resolution ?? defaults.resolution ?? "");
-    // Match the existing bridge's defaults; discovery does not publish resolution schemas.
-    if (!resolution && model === "grok-imagine-image-2.0")
-      resolution = Math.max(width, height) > 1024 ? "2k" : "1k";
-    if (!resolution && ["grok-imagine-video", "grok-imagine-video-1.5"].includes(model))
-      resolution = "720p";
+    const allowed = resolutions[model];
+    if (allowed?.length) {
+      resolution ||=
+        profile.kind === "video" ? "720p" : Math.max(width, height) > 1024 ? "2k" : "1k";
+      if (!allowed.includes(resolution))
+        throw new Error(`${model} supports ${allowed.join(", ")} resolution, not ${resolution}.`);
+    } else if (allowed && resolution) throw new Error(`${model} has no resolution setting.`);
     return {
       kind: profile.kind,
       model,

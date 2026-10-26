@@ -184,6 +184,8 @@ export function registerMcpRoutes(
     internalCredential = () => ({}),
     resolveSignedResult,
     domainRequest,
+    // Failed cloud video jobs updated since a time, as { reason, at }, so a provider refusal pauses cloud video.
+    cloudVideoFailures,
     gatewayAdminTools = () => false,
     claimHandover = () => false,
     // The owner's taste profile summary, or "", as context for the auto model pick and prompt writing.
@@ -223,6 +225,7 @@ export function registerMcpRoutes(
           fetchImpl,
           resolveSignedResult,
           domainRequest,
+          cloudVideoFailures,
         })
       : null;
   // Studio's guide store (guides/prompting.json) first, the deployment's MCP_PROMPTING_PATH as seed, reloaded on change.
