@@ -168,15 +168,23 @@ export class McpMedia {
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
    * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
-   * unavailable, video is refused with what to tell the user, never sent to the cloud by itself.
+   * unavailable, video goes to a granted cloud profile with a note to pass on; without one it is refused with what
+   * to tell the user.
    */
   async choose(owner, { kind = 'image', tier, references = 0, firstFrame = false, loras = [], cloud = false } = {}) {
     const models = await this.catalogue(owner);
-    let profiles = await this.profiles(kind, owner);
+    const ready = await this.profiles(kind, owner);
+    let profiles = ready;
+    let note = '';
     if (!cloud) {
-      const cloudOffered = profiles.some(isCloudProfile);
-      profiles = profiles.filter(profile => !isCloudProfile(profile));
-      if (kind === 'video' && models.backends?.video?.available === false) throw new Error(localVideoUnavailable(cloudOffered));
+      const cloudOffered = ready.some(isCloudProfile);
+      profiles = ready.filter(profile => !isCloudProfile(profile));
+      if (kind === 'video' && models.backends?.video?.available === false) {
+        if (!cloudOffered) throw new Error(localVideoUnavailable(false));
+        // The local video worker is offline; a granted cloud (Grok) profile is the only way this runs, so use it.
+        profiles = ready.filter(isCloudProfile);
+        note = 'The local video worker is offline, so this went to the cloud. Tell the user. ';
+      }
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
@@ -189,7 +197,7 @@ export class McpMedia {
       if (!profiles.length) throw new Error(`No ready ${kind} profile can use ${loras.map(({ name }) => name).join(', ')}. Call Models with lora_query to look it up.`);
     }
     const defaultId = models.defaults?.[kind === 'video' ? 'videoModel' : 'imageModel'];
-    return chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId });
+    return { profile: chooseProfile(profiles, { kind, tier, references, firstFrame, defaultId }), note };
   }
   async catalogue(owner = "") {
     // Each owner's catalogue is cached briefly and separately: accounts may see different profiles and LoRAs.
@@ -499,7 +507,9 @@ export class McpMedia {
   }
   url(owner, jobId, index) { return `${this.publicUrl}/mcp/results/${this.shortId(owner, jobId, index)}`; }
   available(job, index) {
-    if (!finished.has(job.status) || !Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
+    // An unfinished job has no output to choose yet; saying so keeps a chat from retrying at a finished job.
+    if (!finished.has(job.status)) throw new Error(`This result is still ${job.status || 'running'}. Share its link and try again when it finishes.`);
+    if (!Number.isInteger(index) || index < 0 || !mcpOutputPath(job.outputs?.[index]?.url)) throw new Error('Choose an available output from this completed job.');
     return job.outputs[index];
   }
   async download(owner, jobId, index, options = {}) {
@@ -545,10 +555,13 @@ export class McpMedia {
     return { profile, args };
   }
   /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
-  async animate(owner, jobId, index, item, { tier, prompt, count = 1, cloud = false } = {}) {
+  async animate(owner, jobId, index, item, { tier, prompt, count = 1, cloud = false, profile: named = null, tierNote = '' } = {}) {
     const output = await this.download(owner, jobId, index);
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(output.mime)) throw new Error('Only image results can be animated.');
-    const base = await this.choose(owner, { kind: 'video', tier, references: 1, firstFrame: true, cloud });
+    // A named profile (the chat asking for Grok by name) picks the video model outright; otherwise the tier does.
+    const chosen = named ? { profile: named, note: tierNote } : await this.choose(owner, { kind: 'video', tier, references: 1, firstFrame: true, cloud });
+    const base = chosen.profile;
+    if (!(base.mediaInputs || []).some(slot => slot.kind === 'image')) throw new Error(`${base.label || base.id} takes no starting image, so it cannot animate this result. Pass tier instead, or a profile_id that takes one.`);
     const { asset } = await this.upload(owner, output.content.toString('base64'), `first-frame.${output.mime.split('/')[1]}`);
     const profile = { ...base, ...base.imageModes?.reference };
     const args = { profile_id: base.id, prompts: [prompt || item.prompt], count, reference_asset_ids: [asset.id] };
@@ -558,7 +571,7 @@ export class McpMedia {
     const scale = Math.sqrt((profile.defaults?.width * profile.defaults?.height) / (width * height));
     const size = controls.width && controls.height && scale > 0 ? referenceImageSize(profile, { width: width * scale, height: height * scale }) : null;
     if (size && (size.width !== profile.defaults?.width || size.height !== profile.defaults?.height)) Object.assign(args, size);
-    return { profile: base, args };
+    return { profile: base, args, tierNote: chosen.note };
   }
   async signedResult(owner, jobId, index) {
     if (!this.resolveSignedResult) throw new Error('The signed result is unavailable.');

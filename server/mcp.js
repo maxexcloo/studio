@@ -30,7 +30,7 @@ const stableJson = (value) => JSON.stringify(value, (_key, item) => item && type
 // Every client gets the same workflow rules from Studio itself, so a client needs no prompt prefix; tool descriptions
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords = '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = (writing) => `Studio makes images and videos. For each one the user asks for, follow their instructions: call Generate once with request (the user's words, with anything they refer back to), kind and tier (${tierWords}). ${writing
+const mediaInstructions = (writing) => `Studio makes images and videos. For what the user asks for, follow their instructions: one ask is one Generate call with request (the user's words, with anything they refer back to), kind and tier (${tierWords}); several images are count or several prompts in it, never repeated calls. ${writing
   ? "Studio writes the prompt; don't expand the request."
   : "Write request as one clear prompt that keeps the user's subjects and scene."} "landscape" or "16:9" is aspect and "2K" size. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref${writing ? ' and the change as request' : ' and, to change it, a new prompt'}. Reply briefly as each result says; if queued, share the result links and end the turn. Call Result only when the user asks to see results (job_id "all"). Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Only when asked to judge, compare or improve images, call Review. Assess its pixels; rerender only when asked. When the host reports about 90% context used, call Handover with decisions and unfinished work and show its copy-paste summary. Never estimate usage yourself.`;
 const controlInstructions = 'GPU allocation is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes allocation.';
@@ -319,12 +319,12 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         };
         return mcpJson(detail);
       }, { readOnlyHint: true });
-      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. For several different images ("six photos" is count 6; if unsure, separate images), use one call with count (1–${maxJobsPerCall}${writer ? ', a distinct prompt each' : ''}) or prompts; don't make repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Cloud profiles only if asked. Never switches GPUs.`, {
+      tool(server, 'Generate', 'Generate', `Queue images or videos. Pass request with kind and tier; Studio picks the profile${writer ? ' and writes the prompt' : ''}. One ask is one call: "six photos" is count 6${writer ? ' (a distinct prompt each)' : ''}; different scenes are one call with several prompts. Never repeated calls. When the user names a model or family (MOSS, FLUX.3, Krea, Qwen, Boogu), pass it in profile_id; plain names are fine. prompts (one per different image), or exact_prompt (a finished prompt only; for variations use count), use your text verbatim. Pass only controls Models lists. Face detail turns on for full-body people only with a chosen upscale_quality. Cloud profiles only if asked. Never switches GPUs.`, {
         request: z.string().trim().min(1).max(4000).optional(), exact_prompt: z.boolean().optional(),
         profile_id: z.string().min(1).optional().describe('A model, family or id, e.g. "fast moss".'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), prompts: z.array(z.string().trim().min(1)).min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall}.`),
         loras: z.array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }).strict()).max(8).optional().describe('Up to 8; a profile may take fewer (Models).'), reference_asset_ids: z.array(z.string().min(1)).max(16).optional(), reference_role: z.enum(['edit', 'reference']).optional(),
         aspect: z.string().optional().describe('landscape, portrait, square or a ratio like 16:9; prefer to width/height.'), size: z.enum(['2k', '4k']).optional(),
-        width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe(`1–${maxJobsPerCall} per prompt; default 1.`), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
+        width: z.number().int().positive().max(16384).optional(), height: z.number().int().positive().max(16384).optional(), count: z.number().int().min(1).max(maxSchemaItems).optional().describe('Per prompt; one ask for several images is count N on one call. 1–10, default 1.'), steps: z.number().int().positive().max(10000).optional(), seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER - 4).optional(),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional(), negative_prompt: z.string().optional(), cfg: z.number().finite().optional(), denoise: z.number().finite().optional(), sampler: z.string().optional(), scheduler: z.string().optional(), upscale_quality: z.enum(['fast', 'balanced', 'high']).optional(), face_detail: z.boolean().optional()
       }, (input, signal) => {
         // A chat that sends the same Generate again within a minute (a retry, a doubled tool call) gets the first call's
@@ -355,7 +355,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const fromRequest = args.profile_id === undefined && request && !args.loras?.length ? profileFromRequest(localUnlessAsked(await media.profiles(kind || 'image', owner), { request }), request, wanted) : null;
         const fits = fromRequest && (fromRequest.profile.mediaInputs || []).length >= references;
         const { profile, note: tierNote } = args.profile_id === undefined
-          ? (fits ? fromRequest : { profile: await media.choose(owner, { kind, tier: wanted, references, loras: args.loras || [], cloud }), note: '' })
+          ? (fits ? fromRequest : await media.choose(owner, { kind, tier: wanted, references, loras: args.loras || [], cloud }))
           : namedInTier(await media.profiles(kind || 'all', owner), args.profile_id, wanted);
         const sized = mcpSize(profile, { aspect, size });
         if (sized && (args.width !== undefined || args.height !== undefined)) throw new Error('Pass aspect and size, or width and height, not both.');
@@ -418,7 +418,7 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         return mcpJson(await media.request('POST', `/api/jobs/${encodeURIComponent(id)}/cancel`, {}, owner));
       }, { destructiveHint: true });
       tool(server, 'Upload', 'Upload Reference', 'Upload a PNG, JPEG or WebP image (base64, at most 20 MB) as a reference asset for Generate.', { content_base64: z.string().min(1).max(28000000), filename: z.string().default('reference.png') }, async ({ content_base64, filename }) => mcpJson(await media.upload(owner, content_base64, filename)));
-      tool(server, 'Reuse', 'Reuse Result', `Follow up on one finished result. Same kind: run again with a new seed; request applies a change, prompt replaces it, tier or profile_id picks another model. kind=video animates an image. preserve_seed keeps a recorded seed for a same-profile comparison. Without kind, returns it as a Generate reference.`, {
+      tool(server, 'Reuse', 'Reuse Result', `Follow up on one finished result. Same kind: run again with a new seed; request applies a change, prompt replaces it, tier or profile_id picks another model. kind=video animates an image; profile_id or tier picks the video model, cloud when named. preserve_seed keeps a recorded seed for a same-profile comparison. Without kind, returns it as a Generate reference.`, {
         ...output, job_id: z.string().min(1).max(200).describe('Its ref as the reply header shows it ("result 1") or job_id, never "all". Link ids work; refs are preferred.'), kind: z.enum(['image', 'video']).optional(), tier: tier.optional(), profile_id: z.string().min(1).optional(),
         preserve_seed: z.boolean().default(false), request: z.string().trim().min(1).max(2000).optional(), prompt: z.string().trim().min(1).optional(), count: z.number().int().min(1).max(maxSchemaItems).default(1).describe(`1–${maxJobsPerCall}.`),
         wait_seconds: z.number().int().min(0).max(maxGenerateWaitSeconds).optional()
@@ -435,14 +435,15 @@ export function registerMcpRoutes(app, { dataDir, baseUrl, environment = process
         const item = await media.source(owner, id, output_index);
         const own = item.type === 'video' ? 'video' : 'image';
         if (kind !== own && own === 'video') throw new Error('A video result can only run again as a video.');
-        if (kind !== own && profile_id) throw new Error('Pass tier, not profile_id, to choose the video model when animating.');
         if (preserve_seed && (kind !== own || wanted || profile_id)) throw new Error('preserve_seed is for a same-profile revision, not animation or a model/tier change.');
         let plan;
-        const cloud = asksForCloud(request);
-        if (kind !== own) plan = await media.animate(owner, id, output_index, item, { tier: wanted, count, cloud });
+        // Animating may name the video model ("grok imagine") in profile_id; naming a cloud profile asks for the cloud.
+        const named = kind !== own && profile_id ? namedInTier(await media.profiles('video', owner), profile_id, wanted) : null;
+        const cloud = asksForCloud(request) || asksForCloud(prompt) || Boolean(named && isCloudProfile(named.profile));
+        if (kind !== own) plan = await media.animate(owner, id, output_index, item, { tier: wanted, count, cloud, profile: named?.profile, tierNote: named?.note });
         else if (wanted || profile_id) {
           const references = (item.settings?.referenceAssets || []).filter(asset => asset?.assetId).length;
-          const target = profile_id ? namedInTier(await media.profiles(kind, owner), profile_id, wanted) : { profile: await media.choose(owner, { kind, tier: wanted, references, cloud }), note: '' };
+          const target = profile_id ? namedInTier(await media.profiles(kind, owner), profile_id, wanted) : await media.choose(owner, { kind, tier: wanted, references, cloud });
           plan = { ...media.retarget(item, target.profile, { count }), tierNote: target.note };
         } else plan = await media.rerun(owner, item, { count });
         // Changes re-expand the original request for the target profile, so no prompt or guide piles up in the chat.
