@@ -629,6 +629,24 @@ export async function fixtures(page: Page) {
     comparisons,
   };
 }
+/** Serves `/api/models` with these profiles in place of the fixture catalogue. */
+export async function serveProfiles(
+  page: Page,
+  profiles: Profile[],
+  features?: { library: boolean; presets: boolean },
+) {
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { profiles, features } }),
+  );
+}
+
+/** Signs `account` in to a multi-user instance. */
+export async function signIn(page: Page, account: { id: string; role: string }) {
+  await page.route("**/api/accounts/status", (route) =>
+    route.fulfill({ json: { mode: "multi-user", signedIn: true, account } }),
+  );
+}
+
 export async function create(page: Page) {
   await page.goto("/images?compose=1");
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();

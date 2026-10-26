@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, profiles, stamp } from "./fixtures";
+import { fixtures, image, openTheme, profiles, stamp } from "./fixtures";
 
 const at = (seconds: number) => new Date(Date.parse(stamp) + seconds * 1000).toISOString();
 
@@ -182,4 +182,126 @@ test("Chats can be renamed and deleted with an opt-in results checklist", async 
   expect(state.gallery.map((item) => item.id)).toEqual(["job-a:0"]);
   list = await chats(page, isMobile);
   await expect(list.getByText("No Chats", { exact: true })).toBeVisible();
+});
+
+test("Chat keeps discussion, requested generation inputs and variation results together", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await page.goto("/chat");
+  await page
+    .getByRole("textbox", { name: "Message", exact: true })
+    .fill("Let’s discuss soft daylight");
+  await page.getByRole("button", { name: "Send Message", exact: true }).click();
+  await expect(
+    page.getByText("Let's shape the lighting before we generate.", { exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/chat\/session-1$/);
+  await expect(page.getByRole("heading", { name: "Lighting Direction" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Lighting reference" })).toHaveAttribute(
+    "rel",
+    "noopener noreferrer",
+  );
+  expect(state.jobs).toHaveLength(0);
+  await page.getByRole("textbox", { name: "Message", exact: true }).fill("Create a blue bird");
+  await page.getByRole("button", { name: "Send Message", exact: true }).click();
+  const first = page.getByRole("article", { name: "Iteration 1", exact: true });
+  await expect(first.getByText("A blue bird in soft daylight", { exact: true })).toBeVisible();
+  await expect(
+    first.getByRole("button", { name: "Open image: A blue bird in soft daylight", exact: true }),
+  ).toBeVisible();
+  expect(state.chatRequests[1].generation.input.profileId).toBe("image:test");
+  expect(state.chatRequests[1].generation.input.backendId).toBe("worker-a");
+  await first.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
+  // The card's output switch picks a profile like the gallery and explains why Generate waits.
+  const output = first.getByRole("radiogroup", { name: "Generation Output", exact: true });
+  await output.locator("label").filter({ hasText: "Video" }).click();
+  await expect(first.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
+    "Motion Quality",
+  );
+  await expect(
+    first.getByRole("button", { name: "Generate Video", exact: true }),
+  ).toHaveAccessibleDescription("This workflow requires a reference image.");
+  await output.locator("label").filter({ hasText: "Image" }).click();
+  await first
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("A blue bird in watercolour");
+  await first.getByRole("button", { name: "Generate Image", exact: true }).click();
+  const variation = page.getByRole("article", { name: "Iteration 2", exact: true });
+  await expect(
+    variation.getByRole("button", { name: "Open image: A blue bird in watercolour", exact: true }),
+  ).toBeVisible();
+  await expect(first.getByText("A blue bird in soft daylight", { exact: true })).toBeVisible();
+  expect(state.jobs[1].parentJobId).toBe(state.jobs[0].id);
+  expect(state.chatRequests[2].revision.input.prompt).toBe("A blue bird in watercolour");
+  expect(state.chatRequests[2].modelId).toBe("text:test");
+  await page.reload();
+  await expect(
+    page.getByText("I’ll create a blue bird with your selected settings.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("article", { name: "Iteration 2", exact: true })).toBeVisible();
+});
+
+test("Waiting jobs show their reason and cancellation is scoped to the recorded job", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.sessions.push({
+    id: "session-1",
+    title: "Waiting Study",
+    createdAt: stamp,
+    updatedAt: stamp,
+    inputs: {},
+  });
+  state.jobs.push({
+    id: "job-wait",
+    jobId: "job-wait",
+    sessionId: "session-1",
+    operation: "image",
+    status: "waiting",
+    reason: "Waiting for Media Worker to become available.",
+    input: { prompt: "Waiting bird", kind: "image", profileId: "image:test" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  await page.goto("/chat/session-1");
+  await expect(page.getByText("Waiting for Media Worker to become available.")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel Waiting bird", exact: true }).click();
+  await expect.poll(() => state.jobs[0].status).toBe("cancelled");
+  await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
+});
+
+test("Chat layout respects workspace width and keeps a structural sessions sidebar", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  if (!testInfo.project.use.isMobile) await page.setViewportSize({ width: 1920, height: 1000 });
+  await page.goto("/chat");
+  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Creative Modes" });
+  expect(
+    await nav
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("aria-label"))),
+  ).toEqual(["Chat", "Images", "Videos"]);
+  await openTheme(page);
+  await page.getByText("Fixed Width", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  const fixed = await page.locator("[data-chat-workspace]").boundingBox();
+  if (!testInfo.project.use.isMobile) {
+    expect(fixed?.width).toBe(1600);
+    const side = await page.getByRole("complementary", { name: "Chats" }).boundingBox();
+    expect(side?.y).toBe(68);
+    expect(side!.height + side!.y).toBe(1000);
+  }
+  await openTheme(page);
+  await page.getByText("Full Width", { exact: true }).click();
+  await page.keyboard.press("Escape");
+  const full = await page.locator("[data-chat-workspace]").boundingBox();
+  if (!testInfo.project.use.isMobile) expect(full!.width).toBeGreaterThan(fixed!.width);
+  const composer = await page.locator("[data-composer-dock]").boundingBox();
+  expect(composer!.width).toBeLessThanOrEqual(780);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
