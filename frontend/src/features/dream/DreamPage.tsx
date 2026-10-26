@@ -40,8 +40,11 @@ function statusLine(dream: Dream) {
   };
 }
 
-/** What the deck shows once every card is judged, or before Dream is on. */
-function Empty({ dream }: { dream: Dream }) {
+/**
+ * What the deck shows once every card is judged, or before Dream is on. `onTune` starts
+ * calibration with gallery images, which needs no GPU and so works while Dream is off.
+ */
+function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   const save = useDreamSettings();
   if (!dream.settings.enabled)
     return (
@@ -49,10 +52,19 @@ function Empty({ dream }: { dream: Dream }) {
         <EmptyState title="Dream Is Off">
           Dream makes new images from your taste profile while Studio is idle, then shows them here
           as a deck: swipe right to keep one in your gallery, left to discard it, up for variations.
+          {onTune &&
+            " Meanwhile, tune your taste with your gallery: judging older images teaches Dream what you like without using the GPU or changing the gallery."}
         </EmptyState>
-        <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
-          Turn On
-        </Button>
+        <Group gap="sm">
+          <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
+            Turn On
+          </Button>
+          {onTune && (
+            <Button variant="default" onClick={onTune}>
+              Tune Your Taste
+            </Button>
+          )}
+        </Group>
         {save.error && (
           <Alert color="red" title="Couldn’t Turn On Dream">
             {save.error.message}
@@ -82,6 +94,7 @@ export function DreamPage() {
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
   const [view, setView] = useState<"deck" | "discarded">("deck");
+  const [tuning, setTuning] = useState(false);
   const data = dream.data;
   const status = data && statusLine(data);
   return (
@@ -133,10 +146,14 @@ export function DreamPage() {
         <Alert color="red" title="Couldn’t Load Dream">
           {dream.error.message}
         </Alert>
-      ) : data!.unseen.length ? (
-        <DreamDeck items={data!.unseen} empty={<Empty dream={data!} />} />
       ) : (
-        <Empty dream={data!} />
+        <DreamDeck
+          items={data!.unseen}
+          calibrate={tuning || data!.settings.enabled}
+          empty={(calibration) => (
+            <Empty dream={data!} onTune={calibration ? () => setTuning(true) : undefined} />
+          )}
+        />
       )}
     </div>
   );

@@ -800,7 +800,14 @@ export const dreamItem = (id: string, extra: Record<string, unknown> = {}) => ({
 /** Serves `/api/dream` from this state and records each verdict and settings change. */
 export async function serveDream(
   page: Page,
-  options: { enabled?: boolean; unseen?: any[]; discarded?: any[]; spicyAvailable?: boolean } = {},
+  options: {
+    enabled?: boolean;
+    unseen?: any[];
+    discarded?: any[];
+    spicyAvailable?: boolean;
+    /** Older gallery images offered for calibration until judged. */
+    calibration?: any[];
+  } = {},
 ) {
   const state = {
     settings: {
@@ -815,6 +822,8 @@ export async function serveDream(
     unseen: options.unseen ?? [],
     discarded: options.discarded ?? [],
     spicyAvailable: options.spicyAvailable ?? false,
+    calibration: options.calibration ?? [],
+    judged: new Set<string>(),
     requests: [] as { method: string; path: string; body: any }[],
   };
   const show = () => ({
@@ -838,6 +847,14 @@ export async function serveDream(
     if (path === "/api/dream/settings") {
       Object.assign(state.settings, body);
       return route.fulfill({ json: show() });
+    }
+    if (path === "/api/dream/calibration") {
+      if (method === "GET")
+        return route.fulfill({
+          json: { items: state.calibration.filter((item) => !state.judged.has(item.id)) },
+        });
+      for (const id of [...(body.liked || []), ...(body.passed || [])]) state.judged.add(id);
+      return route.fulfill({ json: { ok: true } });
     }
     if (path === "/api/dream/discarded") {
       const start = Number(url.searchParams.get("cursor") || 0);
