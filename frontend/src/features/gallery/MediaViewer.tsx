@@ -10,14 +10,12 @@ import {
   Stack,
   Text,
   Tooltip,
-  Transition,
   VisuallyHidden,
 } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
 import { ChevronLeft, ChevronRight, Info, PanelRightClose, PanelRightOpen, X } from "lucide-react";
 import { glass } from "../../theme";
 import type { MediaItem } from "../../types";
-import { useMotionDuration } from "../../ui/Appearance";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
@@ -83,7 +81,6 @@ export function MediaViewer({
   onReturnFocus?: (item: MediaItem) => void;
 }) {
   const phone = usePhone();
-  const motion = useMotionDuration();
   const [version, setVersion] = useState<{ id: string; active: boolean } | null>(null);
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
@@ -374,30 +371,28 @@ export function MediaViewer({
             />
           </div>
           {!phone && (
-            <Transition mounted={details} transition="slide-left" duration={motion}>
-              {(styles) => (
-                <aside
-                  className={classes.aside}
-                  style={styles}
-                  aria-label="Generation Details"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <ScrollArea h="100%" type="hover" offsetScrollbars>
-                    <Stack gap="lg" p="md" pt="lg">
-                      <Stack gap={2}>
-                        <Text fw={600} lineClamp={2}>
-                          {mediaTitle(item)}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          {subtitle}
-                        </Text>
-                      </Stack>
-                      <MediaDetails item={displayed} />
+            // The track's width animates so the stage re-centres in step with the sliding panel.
+            <div className={classes.asideTrack} data-open={details || undefined}>
+              <aside
+                className={classes.aside}
+                aria-label="Generation Details"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <ScrollArea h="100%" type="hover" offsetScrollbars>
+                  <Stack gap="lg" p="md" pt="lg">
+                    <Stack gap={2}>
+                      <Text fw={600} lineClamp={2}>
+                        {mediaTitle(item)}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        {subtitle}
+                      </Text>
                     </Stack>
-                  </ScrollArea>
-                </aside>
-              )}
-            </Transition>
+                    <MediaDetails item={displayed} />
+                  </Stack>
+                </ScrollArea>
+              </aside>
+            </div>
           )}
         </div>
         {phone && (
