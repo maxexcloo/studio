@@ -59,6 +59,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["GET", "/comfy/view"],
     ["HEAD", "/comfy/thumb"],
     ["POST", "/api/accounts/mcp-token/revoke"],
+    ["POST", "/api/suggestions"],
   ])
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
