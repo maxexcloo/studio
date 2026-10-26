@@ -3,6 +3,7 @@ import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { RuntimePanel } from "../runtime/RuntimePanel";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
+import { TasteProfile } from "../taste/TasteProfile";
 import { AboutStudio } from "./AboutStudio";
 import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { MaintenanceSettings } from "./MaintenanceSettings";
@@ -66,6 +67,7 @@ export function SettingsPage() {
                 mode.
               </Text>
             )}
+            <TasteProfile />
           </Stack>
         ),
         groups: <GroupsAdmin />,
