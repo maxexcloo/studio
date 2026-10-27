@@ -27,9 +27,10 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
     modelReads++;
     const fresh = !new URL(route.request().url()).searchParams.has("cached");
     if (fresh) freshModelReads++;
+    // Like the server, a fresh read refreshes the cached catalogue that later cached reads return.
     return route.fulfill({
       json: {
-        profiles: fresh ? [...profiles, downloadedProfile] : profiles,
+        profiles: freshModelReads ? [...profiles, downloadedProfile] : profiles,
         features: { library: true, presets: true },
       },
     });
