@@ -138,7 +138,7 @@ export function createSuggestions({
           { role: "user", content: context },
         ],
         temperature: surface === "chat" ? 0.3 : 0.9,
-        maxTokens: surface === "viewer" ? 1500 : 500,
+        maxTokens: 1500,
         timeout: 45_000,
       }));
     } catch (error) {
