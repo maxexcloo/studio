@@ -7,7 +7,7 @@ import { copyText } from "../../ui/clipboard";
 import { useIsAdmin } from "../auth/AccountGate";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
-/** A Caption Gallery pass (backend/domain/captions.ts). */
+/** A Caption Gallery pass (backend/domain/idle-work.ts). */
 export interface CaptionStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
   active: boolean;
