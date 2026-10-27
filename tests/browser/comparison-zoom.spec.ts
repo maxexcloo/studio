@@ -112,7 +112,8 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
   const blank =
     bounds.x - area.x > 4
       ? { x: area.x + 2, y: area.y + area.height / 2 }
-      : { x: area.x + area.width / 2, y: area.y + 2 };
+      : // Clear of the top-centre zoom controls' near-miss margin.
+        { x: area.x + area.width / 4, y: area.y + 2 };
   expect(
     blank.x < bounds.x ||
       blank.x > bounds.x + bounds.width ||

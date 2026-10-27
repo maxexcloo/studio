@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
@@ -10,10 +10,13 @@ export function ZoomImage({
   alt,
   width,
   height,
+  placeholder,
   swipe,
 }: {
   src: string;
   alt: string;
+  /** The gallery's already-loaded thumbnail, shown at full size until the image itself loads. */
+  placeholder?: string;
   width?: number;
   height?: number;
   /** Touch swipes at Fit: left/right navigate, down closes, up reveals details. */
@@ -28,6 +31,7 @@ export function ZoomImage({
   const [versionRetry, setVersionRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const zoom = useMediaZoom({ ...size, disabled: loading || failed });
+  const image = useRef<HTMLImageElement>(null);
   const suppressClick = useRef(false);
   const touched = useRef(false);
   const lastTap = useRef<{ at: number; x: number; y: number } | null>(null);
@@ -71,6 +75,16 @@ export function ZoomImage({
       current = false;
     };
   }, [src, displayedSrc, versionRetry]);
+
+  function loaded(node: HTMLImageElement) {
+    setFailed(false);
+    setSize({ width: node.naturalWidth, height: node.naturalHeight });
+    setLoading(false);
+  }
+  // A cached image shows in the first frame rather than after its load event.
+  useLayoutEffect(() => {
+    if (image.current?.complete && image.current.naturalWidth) loaded(image.current);
+  }, []);
 
   // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
   function down(event: PointerEvent<HTMLDivElement>) {
@@ -152,7 +166,6 @@ export function ZoomImage({
       </VisuallyHidden>
       <TransformWrapper
         ref={zoom.transform}
-        fitOnInit
         minScale={0.0001}
         maxScale={1000}
         limitToBounds
@@ -187,7 +200,9 @@ export function ZoomImage({
             style={{
               width: size.width,
               height: size.height,
-              visibility: loading ? "hidden" : "visible",
+              visibility: loading && !placeholder ? "hidden" : "visible",
+              backgroundImage:
+                loading && placeholder ? `url(${JSON.stringify(placeholder)})` : undefined,
             }}
             onClick={(event) => {
               event.stopPropagation();
@@ -196,19 +211,14 @@ export function ZoomImage({
             }}
           >
             <img
+              ref={image}
               src={displayedSrc}
               alt={alt}
               draggable={false}
               width={size.width}
               height={size.height}
-              onLoad={(event) => {
-                setFailed(false);
-                setSize({
-                  width: event.currentTarget.naturalWidth,
-                  height: event.currentTarget.naturalHeight,
-                });
-                setLoading(false);
-              }}
+              style={{ visibility: loading ? "hidden" : undefined }}
+              onLoad={(event) => loaded(event.currentTarget)}
               onError={() => {
                 setFailed(true);
                 setLoading(false);
@@ -217,7 +227,7 @@ export function ZoomImage({
           </button>
         </TransformComponent>
       </TransformWrapper>
-      {(loading || switching) && (
+      {((loading && !placeholder) || switching) && (
         <Loader
           className={classes.loading}
           aria-label={switching ? "Loading Selected Version" : "Loading Image"}

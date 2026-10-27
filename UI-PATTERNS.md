@@ -213,15 +213,22 @@ primary component reference and verify APIs against the installed version.
   makes it current. Always-visible actions: Star, Download (Share on phones),
   Upscale, Animate with an LLM prompt menu (Cinematic Camera, Living Photo,
   Action, Spicy for NSFW-granted accounts, Custom Instruction), Regenerate (new
-  seed, with Exact Repeat in its menu) and Copy Prompt/Settings. The desktop details sidebar is open by
+  seed, with Exact Repeat in its menu) and Copy Prompt/Settings. Details lists
+  every input in run order with Copy Prompt and Copy Settings beside its title;
+  prompts sit on a subtle surface aligned with the column and scroll within a
+  bounded height. The desktop details sidebar is open by
   default and its toggle is remembered. Phones show the image full-bleed with
   an icon row and prompt bar; swipe left/right navigates, down closes and up
   reveals details and further options.
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub.
 - Viewers always fill the viewport independently of workspace width. Transparent
-  stage/content reveal the blurred gallery behind. Empty-stage clicks close;
-  media, native video controls and details/actions remain interactive. Keep
+  stage/content reveal the blurred gallery behind. Empty-stage clicks close,
+  including just outside the image; a near-miss within an invisible margin
+  around the viewer's controls does not. Media, native video controls and
+  details/actions remain interactive. Images open fitted but never beyond
+  their actual size, showing the gallery thumbnail until the full image has
+  loaded. Opened videos play, muted when the browser refuses sound. Keep
   focus trapping, Escape and return focus. Image zoom and bottom details are
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
@@ -237,7 +244,7 @@ primary component reference and verify APIs against the installed version.
   image action. Upscale quality, size and optional face detail use the worker’s
   reported capabilities and the durable queue.
 - Reserve media dimensions, virtualise large galleries, lazy-load images and
-  avoid autoplaying gallery videos. Closing a viewer releases its player;
+  avoid autoplaying gallery tile videos. Closing a viewer releases its player;
   hiding the tab pauses playback. Heavy tools load only when opened. Near-bottom
   paging preserves loaded results and exposes a retry after failure. Closing
   after viewer navigation reveals and focuses the current gallery item.

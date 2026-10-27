@@ -306,25 +306,101 @@ test("With neither local video nor Grok, Animate says why and queues nothing", a
   expect(state.jobs).toHaveLength(1);
 });
 
-test("Copy Prompt beside the details heading copies in one click", async ({ page }, testInfo) => {
+test("Details copy the prompt in one click and Copy Settings copies every input", async ({
+  page,
+}, testInfo) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
         writeText: async (text: string) => {
-          (window as any).copiedPrompt = text;
+          (window as any).copied = text;
         },
       },
     });
   });
-  const { viewer } = await seed(page);
+  const { viewer } = await seed(page, {
+    negative: "blurry",
+    settings: {
+      profileId: "image:test",
+      seed: 1234567,
+      steps: 28,
+      cfg: 4,
+      sampler: "euler",
+      vae: "models/vae/ae.safetensors",
+    },
+  });
   let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
   if (testInfo.project.use.isMobile) {
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     details = page.getByRole("dialog", { name: "An amber bird", exact: true });
   }
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as any).copiedPrompt)).toBe("An amber bird");
+  await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
+  await details.getByRole("button", { name: "Copy Settings", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).copied))
+    .toBe(
+      [
+        "An amber bird",
+        "Negative Prompt: blurry",
+        "Profile: Image Quality",
+        "VAE: ae",
+        "Steps: 28",
+        "CFG: 4",
+        "Sampler: euler",
+        "Seed: 1234567",
+        "Dimensions: 1024 × 1024",
+      ].join("\n"),
+    );
+});
+
+test("Near-misses beside the viewer's controls keep it open; the empty stage closes it", async ({
+  page,
+}) => {
+  const { viewer } = await seed(page);
+  const prompt = (await viewer
+    .getByRole("textbox", { name: "Variation Prompt", exact: true })
+    .boundingBox())!;
+  await page.mouse.click(prompt.x + prompt.width / 2, prompt.y - 10);
+  await expect(viewer).toBeVisible();
+  const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
+  const picture = (await viewer
+    .getByRole("button", { name: "Change Image Zoom", exact: true })
+    .boundingBox())!;
+  // The square image leaves empty stage above or beside it.
+  const blank =
+    picture.x - stage.x > 80
+      ? { x: stage.x + 20, y: stage.y + stage.height / 3 }
+      : { x: stage.x + stage.width / 2, y: stage.y + 20 };
+  await page.mouse.click(blank.x, blank.y);
+  await expect(viewer).toBeHidden();
+});
+
+test("An opened video plays, muted when the browser refuses sound", async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      (window as any).played = { muted: this.muted };
+      return this.muted
+        ? Promise.resolve()
+        : Promise.reject(new DOMException("Sound needs a gesture", "NotAllowedError"));
+    };
+  });
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    prompt: "A rolling wave",
+    width: 1280,
+    height: 720,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: true });
 });
 
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
