@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-27
+
 > Prompt writing on the queue with live thinking, one table for every list, email-named accounts and captions working again
 
 ### Changed
@@ -2108,7 +2110,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/maxexcloo/studio/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/maxexcloo/studio/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/maxexcloo/studio/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/maxexcloo/studio/compare/v0.51.0...v1.0.0
