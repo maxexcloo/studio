@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Publishes 1.0.6 and 1.0.7, whose images never shipped
+
+### Fixed
+
+- The release check for saved presets follows the outside-tap rule, so this release and the changes listed under 1.0.6 and 1.0.7 publish.
+
 ## [1.0.7] - 2026-10-27
 
 > Gallery titles, one Studio chat per LibreChat conversation and a steadier composer
