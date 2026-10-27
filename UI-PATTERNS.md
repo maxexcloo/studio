@@ -254,18 +254,26 @@ primary component reference and verify APIs against the installed version.
   movement cancellation; its release must not also open the viewer.
 - Every interaction should feel fluid and intuitive: state changes (opening,
   expanding, fanning out run stacks, swiping cards, variations arriving, chips
-  updating) use short, tasteful shared-token transitions rather than jumps, and
+  updating) use short, subtle shared-token transitions rather than jumps, and
   never shift layout unexpectedly or block input. Treat visible jank, flashes
   of empty content and layout jumps as defects.
-- Prefer transform/opacity for interaction motion, no decorative hover movement
-  or layout animation in hot paths. Respect reduced motion in CSS and Mantine
-  transitions. Persist Off/Fast/Standard/Relaxed through one motion token; reduced
-  motion takes precedence. Desktop composer expansion uses a bottom-anchored
-  transform/opacity transition. Background previews use labelled, contrasting
-  swatches and preserve readable elevated surfaces in both schemes.
-  Disable native pressed translation centrally with Mantine’s
-  `activeClassName`; retain colour and focus feedback. Aim for smooth 120Hz interaction; report measured environment
-  and frame intervals rather than claiming hardware-independent frame rates.
+- `theme.ts` owns one motion system: the duration token (`--studio-motion-duration`,
+  Off/Fast/Standard/Relaxed, 160ms by default, 0 under reduced motion), quicker
+  exits (`--studio-motion-exit`) and ease-out entrances without bounce or overshoot
+  (`--studio-ease-enter`, `--studio-ease-exit`; `easing` in code). Mantine popups,
+  menus and modals grow from scale 0.98 on their trigger side; drawers slide;
+  selection indicators slide between items. Items appearing move a few pixels or
+  scale from 0.98 at most. Motion makes a change continuous and never adds a wait
+  before content: switching pages, tabs and sections is instant, without fades.
+- Animate only transform and opacity (Mantine's sliding indicators also size
+  themselves); no decorative hover movement or layout animation in hot paths.
+  Respect reduced motion in CSS and Mantine transitions. Desktop composer
+  expansion uses a bottom-anchored transform/opacity transition. Background
+  previews use labelled, contrasting swatches and preserve readable elevated
+  surfaces in both schemes. Disable native pressed translation centrally with
+  Mantine’s `activeClassName`; retain colour and focus feedback. Aim for smooth
+  120Hz interaction; report measured environment and frame intervals rather than
+  claiming hardware-independent frame rates.
 - Browser tests cover meaningful desktop, Chromium phone and WebKit phone
   flows using accessible roles and event-driven fixtures. Avoid exact animation
   timing and cosmetic-only tests. Fixtures are never production fallbacks.

@@ -6,6 +6,7 @@ import {
   Button,
   createTheme,
   Drawer,
+  FloatingIndicator,
   Input,
   Menu,
   Modal,
@@ -14,6 +15,7 @@ import {
   Paper,
   Popover,
   ScrollArea,
+  SegmentedControl,
   Select,
   Switch,
   Tooltip,
@@ -34,6 +36,19 @@ export const backgrounds = {
 export type Background = keyof typeof backgrounds;
 export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
 export type MotionSpeed = keyof typeof motionSpeeds;
+// Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
+// overshoots. CSS reads the same values as --studio-ease-enter/-exit and --studio-motion-exit.
+export const easing = {
+  enter: "cubic-bezier(0.2, 0, 0, 1)",
+  exit: "cubic-bezier(0.4, 0, 1, 1)",
+} as const;
+const exitDuration = (duration: number) => Math.round(duration * 0.7);
+// Popups and dialogs grow slightly from their trigger side instead of fading in place.
+const raise = {
+  in: { opacity: 1, transform: "scale(1)" },
+  out: { opacity: 0, transform: "scale(0.98)" },
+  transitionProperty: "transform, opacity",
+};
 export type Rounding = "square" | "soft" | "round";
 
 // Translucent blurred surface for custom chrome (viewer controls, docks) that is not a Mantine
@@ -69,7 +84,12 @@ export function studioTheme({
   transparency: boolean;
 }) {
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
-  const transitionProps = { duration: motionDuration };
+  const transitionProps = {
+    duration: motionDuration,
+    exitDuration: exitDuration(motionDuration),
+    timingFunction: easing.enter,
+  };
+  const popupTransition = { ...transitionProps, transition: raise };
   return createTheme({
     primaryColor,
     // Match both schemes so contrast resolves against the displayed amber shade.
@@ -166,12 +186,20 @@ export function studioTheme({
         defaultProps: { overlayProps: { blur: 6, backgroundOpacity: 0.4 }, transitionProps },
         styles: { header: overlayHeader, title: overlayTitle },
       }),
+      // Selection indicators slide between items with the shared motion.
+      FloatingIndicator: FloatingIndicator.extend({
+        defaultProps: { transitionDuration: motionDuration },
+        styles: { root: { transitionTimingFunction: easing.enter } },
+      }),
       Input: Input.extend({ defaultProps: { size: "md" } }),
-      Menu: Menu.extend({ defaultProps: { transitionProps }, styles: { dropdown } }),
+      Menu: Menu.extend({
+        defaultProps: { transitionProps: popupTransition },
+        styles: { dropdown },
+      }),
       Modal: Modal.extend({
         defaultProps: {
           overlayProps: { blur: 6, backgroundOpacity: 0.4 },
-          transitionProps: { transition: "fade", ...transitionProps },
+          transitionProps: popupTransition,
           radius: "lg",
         },
         styles: { header: overlayHeader, title: overlayTitle },
@@ -186,7 +214,7 @@ export function studioTheme({
       Popover: Popover.extend({
         defaultProps: {
           middlewares: { flip: true, shift: { padding: 12, crossAxis: true } },
-          transitionProps,
+          transitionProps: popupTransition,
         },
         styles: { dropdown },
       }),
@@ -198,6 +226,12 @@ export function studioTheme({
       // Vertical panels must shrink to their viewport instead of long labels’ min-content width.
       ScrollAreaAutosize: ScrollArea.Autosize.extend({
         defaultProps: { scrollbars: "y", type: "hover" },
+      }),
+      SegmentedControl: SegmentedControl.extend({
+        defaultProps: {
+          transitionDuration: motionDuration,
+          transitionTimingFunction: easing.enter,
+        },
       }),
       Select: Select.extend({ defaultProps: { checkIconPosition: "right" } }),
       Switch: Switch.extend({
@@ -250,6 +284,9 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "780px",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
+      "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
+      "--studio-ease-enter": easing.enter,
+      "--studio-ease-exit": easing.exit,
       "--studio-glass-filter": transparency ? "blur(24px) saturate(1.5)" : "none",
       "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),
     },
