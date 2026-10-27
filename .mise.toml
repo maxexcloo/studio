@@ -45,7 +45,6 @@ run = "node backend/commands/import-studio.mjs"
 run = """
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
-python -B -m unittest discover -s worker -p 'test_*.py'
 """
 
 # Offline runtime migration is a dry run unless --apply is supplied.
