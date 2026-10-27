@@ -24,6 +24,10 @@ version opens with a `> ` summary line.
 - Viewer next steps are written ahead of time while Studio is idle (from the image too when the text model reads images), so they show as soon as the viewer opens; placeholder chips hold their row while they load.
 - A next step generates its change at once, with progress on the chip, and a refresh action beside the steps asks for different ones.
 
+### Fixed
+
+- In Chat and the Generations queue, every result of a cloud (Grok) run now shows its prompt, settings, title and star in the viewer, and Star, Delete and deleting a chat with its results reach the gallery item. Chat used to show the provider's bare files. Every run's results now come from the gallery, so later changes such as titles and stars show there too.
+
 ## [1.0.11] - 2026-10-27
 
 > The prompt assistant stops failing with "unusable reply"
