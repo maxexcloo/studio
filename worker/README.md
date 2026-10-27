@@ -25,19 +25,13 @@ and 1 replicas; see
 are not listed stay unmanaged. Active streams and media output saving retain
 admission until finished, so a switch waits for them. Idle workers stay warm.
 
-Managed local text reaches Studio's authenticated admission endpoint: Bifrost
-calls `/api/local-text/v1/chat/completions`, and Studio's target is the direct
-Radiance worker with its own server-side key (the workload's `apiKeyEnv`).
-Pointing that target at Bifrost would create a routing loop. Set
-`STUDIO_TEXT_WORKLOAD` to the text workload identifier and
-`STUDIO_TEXT_ADMISSION_TOKEN` to the separate bearer credential used by Bifrost.
-The browser never receives either credential. Configure `STUDIO_BIFROST_URL` when used;
+Configure `STUDIO_BIFROST_URL` when used;
 Studio refuses to target that gateway origin as a worker.
 
 Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) never stops or starts
 text workers; only an administrator's change in Settings › Workers or the control
 MCP tools does. Runtime status and control are administrator-only at
-`/api/runtime`; text admission uses its own bearer authentication.
+`/api/runtime`.
 
 CPU checks: `node --test backend/runtime/*.test.ts` and
 `python3 -m unittest discover -s worker -p 'test_*.py'`. Lease tests require Linux

@@ -91,7 +91,6 @@ test(
         STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS: "1",
         STUDIO_CONFIG_DIR: "",
         STUDIO_RUNTIME_AUTOMATIC: "",
-        STUDIO_TEXT_ADMISSION_TOKEN: "",
         STUDIO_CLIPROXYAPI_URL: providerUrl,
         STUDIO_CLIPROXYAPI_KEY: "fixture-value",
       },

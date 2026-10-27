@@ -29,7 +29,7 @@ Build the worker from the Studio checkout:
 docker build -f worker/Dockerfile -t studio-worker:development .
 ```
 
-[Worker operations](worker/README.md) describe fixed placements, lease mounts, media/text launch modes, the forwarded Docker Engine connection and text admission. Keep compatible workers warm. Lifecycle switching stays disabled until AI Control has relinquished ownership and local text traffic uses Studio admission.
+[Worker operations](worker/README.md) describe fixed placements, lease mounts, media/text launch modes and the forwarded Docker Engine connection. Keep compatible workers warm. Lifecycle switching stays disabled until AI Control has relinquished ownership and local text traffic uses Studio admission.
 
 ## Updating & Rollback
 

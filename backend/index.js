@@ -46,7 +46,7 @@ import { composeWorkflowPrompt } from "./graphs.js";
 import { configuredAccountJobLimit } from "./account-jobs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./domain/routes.ts";
-import { loadRuntime, registerTextAdmission, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createServicesObserver, createTextVision } from "./runtime/services.ts";
 import { legacyRecoverySwitchGuard } from "./runtime/legacy-recovery.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
@@ -425,7 +425,6 @@ const directCloud =
     reference: async (account, id) =>
       (await bytesForReferenceAccount(account || undefined, id)).buffer,
   });
-registerTextAdmission(app, runtime);
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
 app.use((error, _req, res, next) => {
   if (!error || (error.type !== "entity.parse.failed" && error.type !== "entity.too.large"))
@@ -1967,7 +1966,7 @@ const queueAdapter = createLegacyQueueAdapter({
     mediaLeases.delete(job.id);
   },
 });
-// Reconstruct leases synchronously before the HTTP listener can accept text admission.
+// Reconstruct leases synchronously before the HTTP listener accepts work.
 for (const job of rewriteStore
   .jobs()
   .filter(

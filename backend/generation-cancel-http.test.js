@@ -91,8 +91,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
         STUDIO_KUBERNETES_WORKLOADS: workloads,
         STUDIO_RUNTIME_AUTOMATIC: "1",
-        STUDIO_TEXT_WORKLOAD: "text",
-        STUDIO_TEXT_ADMISSION_TOKEN: "fixture-admission",
         STUDIO_FIXTURE_TEXT_KEY: "fixture-text",
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
@@ -185,13 +183,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   worker.setDown(true);
   if (!lostAcknowledgement)
     assert.equal((await api(`/api/queue/${accepted.body.jobId}/cancel`, {})).status, 503);
-  const textRequest = () =>
-    api(
-      "/api/local-text/v1/chat/completions",
-      { model: "local", messages: [{ role: "user", content: "Fixture" }] },
-      { Authorization: "Bearer fixture-admission" },
-    );
-  assert.equal((await textRequest()).status, 503);
   worker.setDown(false);
   // The worker accepts an interrupt request but deliberately leaves this prompt running.
   await waitFor(
@@ -209,7 +200,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     signature: preview.body.signature,
   });
   assert.equal(apply.status, 202);
-  assert.equal((await textRequest()).status, 503);
   assert.deepEqual(operations, []);
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
   worker.finish(prompt.id, {
@@ -227,7 +217,10 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   assert.equal(saved.status, 200);
   assert.ok((await saved.arrayBuffer()).byteLength > 0);
   // The switch waited for the saved output; now it stops media, waits for its pod and starts text.
-  await waitFor(textRequest, (response) => response.status === 200);
+  await waitFor(
+    async () => operations,
+    (list) => list.includes("scale gpu/text 1"),
+  );
   assert.deepEqual(operations, ["scale gpu/media 0", "gone gpu/media", "scale gpu/text 1"]);
   assert.equal(worker.prompts.length, 1);
 }

@@ -139,7 +139,6 @@ test(
           STUDIO_ENABLE_GROK: "0",
           STUDIO_ENABLE_BUILTIN_PROFILES: "1",
           STUDIO_OUTPUT_STORAGE: "studio",
-          STUDIO_TEXT_ADMISSION_TOKEN: "",
           STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
           STUDIO_CLIPROXYAPI_URL: "",
           STUDIO_COMFY_OUTPUT_DIR: "",
