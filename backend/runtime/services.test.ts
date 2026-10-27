@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { RuntimeController, type Workload } from "./controller.ts";
-import { createServicesObserver } from "./services.ts";
+import { createServicesObserver, createTextVision } from "./services.ts";
+import { KubernetesEngine } from "./kubernetes.ts";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";
@@ -273,3 +275,58 @@ test(
     );
   },
 );
+
+test("vision follows the running text workloads' own /props, briefly cached", async () => {
+  const text = (id: string, apiKeyEnv?: string): Workload => ({
+    id,
+    label: id,
+    kind: "text",
+    namespace: "text",
+    deployment: id,
+    pool: "gpu",
+    gpus: 1,
+    url: `http://${id}.invalid:8000`,
+    ...(apiKeyEnv ? { apiKeyEnv } : {}),
+  });
+  const kube = fakeKubernetes([
+    { namespace: "text", name: "radiance" },
+    { namespace: "text", name: "maya" },
+  ]);
+  const controller = new RuntimeController({
+    engine: new KubernetesEngine(kube.request),
+    workloads: [text("radiance", "STUDIO_TEXT_KEY"), text("maya")],
+    pools: { gpu: 2 },
+  });
+  const calls: string[] = [];
+  let time = 0;
+  const vision = createTextVision({
+    controller,
+    environment: { STUDIO_TEXT_KEY: "secret" },
+    now: () => time,
+    fetchImpl: (async (url: string, options: RequestInit) => {
+      calls.push(`${url} ${(options.headers as Record<string, string>).Authorization ?? ""}`);
+      // Radiance and llama.cpp report modalities; Maya has no /props.
+      return url.startsWith("http://radiance.invalid")
+        ? Response.json({ modalities: { vision: true, audio: false } })
+        : new Response("", { status: 404 });
+    }) as typeof fetch,
+  });
+  const scale = (name: string, replicas: number) =>
+    kube.request("PATCH", `/apis/apps/v1/namespaces/text/deployments/${name}/scale`, {
+      spec: { replicas },
+    });
+
+  assert.equal(await vision(), false, "nothing running reads no images");
+  assert.deepEqual(calls, []);
+  await scale("radiance", 1);
+  assert.equal(await vision(), false, "the answer is cached");
+  time += 30_000;
+  assert.equal(await vision(), true);
+  assert.deepEqual(calls, ["http://radiance.invalid:8000/props Bearer secret"]);
+  await scale("maya", 1);
+  time += 30_000;
+  assert.equal(await vision(), false, "a running text-only model may answer instead");
+  kube.denied.add("text");
+  time += 30_000;
+  assert.equal(await vision(), false, "an unreadable cluster counts as text-only");
+});

@@ -42,7 +42,7 @@ import { configuredAccountJobLimit } from "./account-jobs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerTextAdmission, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createServicesObserver } from "./runtime/services.ts";
+import { createServicesObserver, createTextVision } from "./runtime/services.ts";
 import { legacyRecoverySwitchGuard } from "./runtime/legacy-recovery.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
@@ -1399,6 +1399,8 @@ const assistantGuide = (profile) => {
   }
 };
 const assistantEngine = registerAssistantRoutes(app, {
+  // Without a runtime Studio can't see which text model runs, so it counts as text-only.
+  ...(runtime && { supportsVision: createTextVision({ controller: runtime.controller }) }),
   profiles: assistantProfiles,
   guide: assistantGuide,
   loras: assistantLoras,

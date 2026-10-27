@@ -708,7 +708,7 @@ export function createImportEngine({
         }));
         if (!sight.available) {
           record.state = "failed";
-          record.error = `This image has no generation metadata. ${sight.reason || "The assistant model can’t read images."}`;
+          record.error = `This image has no generation metadata. ${sight.reason || "The running text model can’t read images."}`;
           record.grade = { value: "partial", reasons: [record.error], missingFields: [] };
           return store.put(record);
         }
@@ -799,7 +799,8 @@ export function createImportEngine({
     const source = store.get(id);
     if (!source?.picture) throw new Error("Only an imported image can be described.");
     const sight = await vision();
-    if (!sight.available) throw new Error(sight.reason || "The assistant model can’t read images.");
+    if (!sight.available)
+      throw new Error(sight.reason || "The running text model can’t read images.");
     const record = store.put({
       id: importId(),
       createdAt: now(),

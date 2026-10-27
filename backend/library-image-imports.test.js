@@ -157,7 +157,7 @@ function harness(t, { vision = true, resolveCivitai = null, preset = null } = {}
     vision: async () =>
       vision
         ? { available: true, reason: "" }
-        : { available: false, reason: "The assistant model can’t read images." },
+        : { available: false, reason: "The running text model can’t read images." },
   });
   return { dir, store, engine, installed, hashes, state, started, described, pictures };
 }
@@ -391,7 +391,7 @@ test("without a vision model, a bare image says why; Describe on request makes a
   assert.equal(failed.state, "failed");
   assert.equal(
     failed.error,
-    "This image has no generation metadata. The assistant model can’t read images.",
+    "This image has no generation metadata. The running text model can’t read images.",
   );
   assert.equal(blind.described.length, 0);
   await assert.rejects(blind.engine.describeImport(failed.id), /can’t read images/);
