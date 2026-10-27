@@ -44,7 +44,7 @@
     "@types/node": "^26.0.0",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@vitejs/plugin-react": "^6.0.0",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
