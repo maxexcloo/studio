@@ -4224,6 +4224,8 @@ test("without a named model, Studio picks a suitable one from the request and sa
     /^Queued on Other Image\. Chose Other Image: it renders the sign text cleanly\. /,
   );
   const [pick] = f.writerRequests;
+  // A reasoning model thinks before it answers, so the pick leaves it room.
+  assert.ok(pick.body.max_tokens >= 1500);
   assert.match(pick.body.messages[0].content, /^- fixture-image: Fixture Image \(default\)\./m);
   assert.match(pick.body.messages[0].content, /^- fixture-other: Other Image\./m);
   assert.equal(pick.body.messages[1].content, 'Request: a neon sign that says "OPEN"');

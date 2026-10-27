@@ -240,7 +240,8 @@ export function createPromptWriter(
             { role: "user", content: `Request: ${clean(request)}` },
           ],
           temperature: 0,
-          maxTokens: 300,
+          // Reasoning models spend part of this on thinking before the choice.
+          maxTokens: 1500,
           timeout: 8000,
           signal,
         });
