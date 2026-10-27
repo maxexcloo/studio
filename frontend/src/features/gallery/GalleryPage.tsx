@@ -13,12 +13,7 @@ import {
 } from "@mantine/core";
 import { LayoutGrid, Layers, SquareCheck } from "lucide-react";
 import { useDebouncedValue, useLocalStorage } from "@mantine/hooks";
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery, terminal } from "../generation/Queue";
@@ -100,8 +95,9 @@ export function GalleryPage() {
       return api<Page>(`/api/gallery?${params}`);
     },
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
-    // Search and filter changes keep the current results until the new ones arrive.
-    placeholderData: keepPreviousData,
+    // Search and filter changes keep the current results until the new ones arrive; switching
+    // between Images and Videos never shows the other mode's results.
+    placeholderData: (previous, query) => (query?.queryKey[2] === kind ? previous : undefined),
     refetchInterval: jobs?.active ? 3000 : false,
   });
   const seenJobs = useRef(jobs?.key);
