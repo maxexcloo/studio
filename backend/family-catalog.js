@@ -10,17 +10,13 @@ import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 const hf = (repo, file) => `https://huggingface.co/${repo}/resolve/main/${file}`;
 
-/** Images per run for the built-in families: the graph renders at most this many, whatever the latent node accepts. */
-export const MAX_BATCH = 8;
-
 /* ------------------------------------------------------------ Downloads */
 
 // Where to get each part. The first entry is what a Download button fetches;
 // abliterated builds lead wherever a ComfyUI-ready one exists. `fp8`: the file
 // is quantized fp8 (per-layer scales, read from its header), which ComfyUI
-// keeps in fp8 and a Mac cannot load, so there these go last (forDevice in
-// family-profiles.js). A plain fp8 file loads at full precision on a Mac and
-// is not flagged. `sha256` is the file's Hugging Face LFS hash (its paths-info
+// keeps in fp8 and a Mac cannot load. A plain fp8 file loads at full precision
+// on a Mac and is not flagged. `sha256` is the file's Hugging Face LFS hash (its paths-info
 // API), checked after every download; an entry without one is checked by
 // length only.
 export const encoderDownloads = {
@@ -747,8 +743,7 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * A variant's `apple` replaces some of its defaults when ComfyUI runs on Apple
  * Silicon (MPS), where a setting is known to break; `stepsFromName` takes the
  * steps from a count in the file name ("…_4step"), for files distilled for
- * exactly that many (see variantDefaults).
- * MODELS.md walks through adding a family.
+ * exactly that many.
  */
 /**
  * Whether a family draws at 2K/4K itself, per size: "yes" where its makers
@@ -756,7 +751,6 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * mixed or missing (the size menu shows it disabled). Left
  * out only where it plainly breaks: the 1 MP generation (SD 1.5/2) at 2K, and
  * models documented at ~1 MP at 4K.
- * Sources per family: MODELS.md, "Native 2K".
  */
 const drawsNone = {};
 const draws2kMaybe = { "2k": "maybe" };
@@ -2108,166 +2102,6 @@ export const families = {
   },
 };
 
-/**
- * The two packs that run Sana, by model source. ExtraModels samples with
- * ComfyUI's own KSampler (live previews) and fetches its presets itself, but
- * its encoder and attention are CUDA-or-CPU only. ComfyUI-SANA wraps the
- * diffusers pipeline, so it also runs on Apple Silicon, and loads folders from
- * models/diffusers. Local Sana checkpoints go through ExtraModels.
- */
-/**
- * ExtraModels' EmptySanaLatentImage reads a `device` that ComfyUI's
- * EmptyLatentImage no longer has, so it fails on current ComfyUI. Sana's
- * latent is 32 channels at 1/32 scale; ComfyUI's own Hunyuan Image latent has
- * that scale, and the sampler trims an empty latent to the model's channels.
- */
-export const sanaLatentNode = "EmptyHunyuanImageLatent";
-
-export const sanaRunners = {
-  sana: {
-    pack: "extramodels",
-    variantNodes: { sprint: ["ScmModelSampling"] },
-    note: "Sana isn’t built into ComfyUI. These custom nodes run it.",
-    sizeNode: sanaLatentNode,
-  },
-  sana_diffusers: {
-    pack: "comfyui_sana",
-    note: "Sana isn’t built into ComfyUI. These custom nodes run it, on Apple Silicon too.",
-    sizeNode: "SanaGenerate",
-    // The diffusers pipeline's flow DPM-solver needs fewer steps than KSampler's
-    // Euler, at the pipeline's own guidance (ComfyUI-SANA's README: ~20, ~4.5).
-    // Sprint keeps its own.
-    defaults: { steps: 20, cfg: 4.5 },
-  },
-};
-
-const sanaRunnerFor = (source) =>
-  sanaRunners[source === "sana_diffusers" ? "sana_diffusers" : "sana"];
-/** The custom-node runner a family uses for one model source (see `runners`), or null for ComfyUI's own nodes. */
-export function runnerFor(family, source) {
-  if (!family) return null;
-  if (family.sampling === "sana") return sanaRunnerFor(source);
-  return family.runners?.[source] || null;
-}
-
-/** A friendly name for a Sana preset or a diffusers folder of one. */
-export function sanaLabel(name = "") {
-  const base = String(name).split(/[\\/]/).pop() || "";
-  const preset = sanaPresets.find(
-    (item) => item.name.split("/").pop() === base.replace(/_diffusers$/i, ""),
-  );
-  return preset?.label || "";
-}
-
-/**
- * Sana models the ExtraModels loader fetches by name, in the order Studio lists
- * them. `conf` is the loader's model config (it picks its own for these, but
- * the input is required); `dir` is where the loader downloads it, under
- * ComfyUI/models/sana. Older duplicates of the same weights are left out.
- */
-export const sanaPresets = [
-  {
-    name: "Efficient-Large-Model/SANA1.5_4.8B_1024px",
-    dir: "models--sana--sana-1.5-4800m-1024px",
-    label: "SANA 1.5 4.8B",
-    conf: "SanaMS1.5_4800M_P1_D60",
-  },
-  {
-    name: "Efficient-Large-Model/SANA1.5_1.6B_1024px",
-    dir: "models--sana--sana-1.5-1600m-1024px",
-    label: "SANA 1.5 1.6B",
-    conf: "SanaMS1.5_1600M_P1_D20",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_Sprint_1.6B_1024px",
-    dir: "models--sana--sana-sprint-1600m-1024px",
-    label: "SANA Sprint 1.6B",
-    conf: "SanaSprint_1600M_P1_D20",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_Sprint_0.6B_1024px",
-    dir: "models--sana--sana-sprint-600m-1024px",
-    label: "SANA Sprint 0.6B",
-    conf: "SanaSprint_600M_P1_D28",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_1600M_4Kpx_BF16",
-    dir: "models--sana--sana-1600m-4kpx-bf16",
-    label: "Sana 1.6B 4K",
-    conf: "SanaMS_1600M_P1_D20_4K",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_1600M_2Kpx_BF16",
-    dir: "models--sana--sana-1600m-2kpx-bf16",
-    label: "Sana 1.6B 2K",
-    conf: "SanaMS_1600M_P1_D20_2K",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_1600M_1024px_MultiLing",
-    dir: "models--sana--sana-1600m-1024px-multilingual",
-    label: "Sana 1.6B Multilingual",
-    conf: "SanaMS_1600M_P1_D20",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_600M_1024px",
-    dir: "models--sana--sana-600m-1024px",
-    label: "Sana 0.6B",
-    conf: "SanaMS_600M_P1_D28",
-  },
-  {
-    name: "Efficient-Large-Model/Sana_600M_512px",
-    dir: "models--sana--sana-600m-512px",
-    label: "Sana 0.6B 512px",
-    conf: "SanaMS_600M_P1_D28",
-    hidden: true,
-  },
-  {
-    name: "Efficient-Large-Model/Sana_1600M_1024px",
-    dir: "models--sana--sana-1600m-1024px",
-    label: "Sana 1.6B",
-    conf: "SanaMS_1600M_P1_D20",
-    hidden: true,
-  },
-];
-
-/**
- * The ExtraModels config for a Sana file of our own: a preset's, else from the
- * header's depth and width (1.5 adds q/k norms, Sprint a CFG embedder), else
- * from the name.
- */
-export function sanaConf(name = "", detail = null) {
-  const preset = sanaPresets.find((item) => item.name === name);
-  if (preset) return preset.conf;
-  const base = String(name).split(/[\\/]/).pop() || "";
-  const sprint = detail?.sprint ?? /sprint/i.test(base);
-  const depth =
-    detail?.depth || (/4[._]?8b|4800m/i.test(base) ? 60 : /0[._]?6b|600m/i.test(base) ? 28 : 20);
-  if (depth === 60) return "SanaMS1.5_4800M_P1_D60";
-  if (depth === 28) return sprint ? "SanaSprint_600M_P1_D28" : "SanaMS_600M_P1_D28";
-  if (sprint) return "SanaSprint_1600M_P1_D20";
-  if (/4k/i.test(base)) return "SanaMS_1600M_P1_D20_4K";
-  if (/2k/i.test(base)) return "SanaMS_1600M_P1_D20_2K";
-  return (detail?.qkNorm ?? /1[._]?5/.test(base))
-    ? "SanaMS1.5_1600M_P1_D20"
-    : "SanaMS_1600M_P1_D20";
-}
-
-// Recognised so Studio can say what they are, but not runnable here yet.
-export const knownFamilies = {
-  ltx: "LTX-2 video (needs its two-stage audio pipeline)",
-  ltxv: "LTX-Video",
-  hunyuan_video: "HunyuanVideo 1.0",
-  newbie: "NewBie (Lumina-based, needs its own text encoders)",
-  wan_i2v: "Wan 2.1 image-to-video (needs CLIP vision)",
-  wan_other: "Wan VACE / Fun / camera model",
-  qwen_image_edit: "Qwen-Image Edit (image editing model)",
-  sdxl_refiner: "SDXL Refiner (used after a base model, not on its own)",
-  inpaint: "Inpainting model",
-  kandinsky5: "Kandinsky 5",
-  cosmos: "Cosmos",
-  other: "Unknown architecture",
-};
-
 /* ------------------------------------------------------------ Names */
 
 function isKrea2Raw(name = "") {
@@ -2513,30 +2347,6 @@ export function familyFromHeader(header) {
 
 /* ------------------------------------------------------------ Quantized files */
 
-/**
- * Quantized formats ComfyUI's own loaders cannot read. The family detection
- * above still names the model (an NF4 Flux keeps Flux's keys), but the file
- * only runs through its format's loader, so it is never "ready" without one.
- * `loaders`: per model source, the node that loads it in place of ComfyUI's
- * own (same inputs), from `pack`. No loader for a source: not runnable here,
- * and `reason` says why.
- */
-export const quantFormats = {
-  svdq: {
-    label: "Nunchaku SVDQuant",
-    loaders: {},
-    reason:
-      "A Nunchaku (SVDQuant) file. These only run through the ComfyUI-nunchaku loader nodes, which aren’t supported yet. Use a regular or GGUF build of this model.",
-  },
-  nf4: {
-    label: "bitsandbytes NF4",
-    pack: "bnb_nf4",
-    loaders: { checkpoint: "CheckpointLoaderNF4" },
-    reason:
-      "A bitsandbytes NF4 file outside checkpoints/. Only the NF4 checkpoint loader reads these. Put the all-in-one NF4 checkpoint in checkpoints/, or use a regular build.",
-  },
-};
-
 // Tensor suffixes each format adds next to (or instead of) the plain weights.
 const quantMarkers = [
   ["svdq", /\.(qweight|wscales|wcscales|wtscale|smooth_factor|smooth_factor_orig)$/],
@@ -2594,25 +2404,6 @@ export function refinedFamily(familyId = "", name = "", weightsRead = false) {
 }
 
 /* ------------------------------------------------------------ Speed LoRAs */
-
-/**
- * The settings a model file starts at: its variant's defaults, the step count
- * in its name where the variant is distilled for exactly that many
- * (`stepsFromName`), and the variant's `apple` overrides when ComfyUI runs on
- * Apple Silicon.
- */
-export function variantDefaults(variant, name = "", { apple = false } = {}) {
-  const steps = variant.stepsFromName ? stepsInName(name) : 0;
-  return { ...variant.defaults, ...(steps ? { steps } : null), ...(apple ? variant.apple : null) };
-}
-
-/** "sdxl_lightning_4step", "Qwen-Image-Lightning-8steps-V1.1" → 4, 8; 0 when the name gives none. */
-export function stepsInName(name = "") {
-  const base = String(name).split(/[\\/]/).pop() || "";
-  const match = /(?:^|[^a-z0-9.])(\d{1,2})[-_ ]?steps?(?![a-z])/i.exec(base);
-  const steps = Number(match?.[1] || 0);
-  return steps >= 1 && steps <= 50 ? steps : 0;
-}
 
 /** The variant of a family a file is, by name (and header where it can tell). */
 export function variantFor(familyId, name = "", header = null, detail = null) {

@@ -14,10 +14,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const { duplicateProfiles, mergeDuplicateProfiles } = await import("./profile-merge.js");
-const { canonicalProfileId, createProfileStore, guideStore, profileStore } =
-  await import("./profile-store.js");
+const { canonicalProfileId, guideStore, profileStore } = await import("./profile-store.js");
 const { getCustomWorkflow, userWorkflowsDir } = await import("./custom-workflows.js");
-const { seedMissing } = await import("./profile-seed.js");
 const { buildExport } = await import("./profile-export.js");
 const { profileStats } = await import("./stats.js");
 const { matchesGalleryFilters } = await import("./gallery-filters.js");
@@ -25,7 +23,6 @@ const { effectiveAccountAccess, mayUseGenerationProfile } = await import("./acco
 const { findProfile } = await import("./mcp-tiers.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("./workflow-catalog.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-const quiet = { info: () => {}, warn: () => {} };
 
 const graph = (model) => ({
   1: { class_type: "UNETLoader", inputs: { unet_name: model }, _meta: { title: "Model" } },
@@ -177,21 +174,7 @@ test("every reader resolves a merged id to the kept profile", () => {
   assert.ok(mayUseGenerationProfile(access, { id: kept }));
 });
 
-test("seeding never brings back a merged id, and an export's aliases seed a new install", (t) => {
-  const seed = fs.mkdtempSync(path.join(os.tmpdir(), "studio-merge-seed-"));
-  t.after(() => fs.rmSync(seed, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(seed, "profiles"), { recursive: true });
-  fs.writeFileSync(path.join(seed, "profiles", `${oldId}.json`), profile(oldId, "H3"));
-  const result = seedMissing({
-    seedDir: seed,
-    dataDir: temporary,
-    workflowsDir: userWorkflowsDir,
-    store: profileStore(),
-    log: quiet,
-  });
-  assert.deepEqual(result.skipped, [oldId]);
-  assert.ok(!fs.existsSync(path.join(userWorkflowsDir, `${oldId}.json`)));
-
+test("an export carries the merged ids as aliases", () => {
   const { files } = buildExport({
     workflowsDir: userWorkflowsDir,
     profiles: profileStore(),
@@ -199,20 +182,4 @@ test("seeding never brings back a merged id, and an export's aliases seed a new 
   });
   const aliases = files.find((file) => file.name === "profile-aliases.json");
   assert.equal(JSON.parse(aliases.body)[oldId].to, keptId);
-
-  const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "studio-merge-fresh-"));
-  t.after(() => fs.rmSync(fresh, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(seed, "profile-aliases.json"), aliases.body);
-  const workflows = path.join(fresh, "workflows");
-  const store = createProfileStore({ dataDir: fresh, workflowsDir: workflows, log: quiet });
-  const seeded = seedMissing({
-    seedDir: seed,
-    dataDir: fresh,
-    workflowsDir: workflows,
-    store,
-    log: quiet,
-  });
-  assert.deepEqual(seeded.aliases, [oldId]);
-  assert.deepEqual(seeded.skipped, [oldId]);
-  assert.equal(store.canonical(`custom:${oldId}`), `custom:${keptId}`);
 });

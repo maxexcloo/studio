@@ -197,7 +197,6 @@ export function registerMcpRoutes(
     // Failed cloud video jobs updated since a time, as { reason, at }, so a provider refusal pauses cloud video.
     cloudVideoFailures,
     gatewayAdminTools = () => false,
-    claimHandover = () => false,
     // The owner's taste profile summary, or "", as context for the auto model pick and prompt writing.
     taste = () => "",
   } = {},
@@ -401,17 +400,7 @@ export function registerMcpRoutes(
           }
         },
       );
-    // A job handed over to the chat (chat-handover.js) becomes this account's for the chat (chat-handover.js).
-    const resolve = (value) => {
-      const id = media.resolve(owner, refs, value);
-      if (
-        typeof id === "string" &&
-        !media.owns(owner, id) &&
-        claimHandover(owner, id, { accountMode })
-      )
-        media.adopt(owner, id);
-      return id;
-    };
+    const resolve = (value) => media.resolve(owner, refs, value);
     /** A submission's reply: finished markdown when every job ends within the wait, otherwise result links for the queued jobs, which end the agent's turn. */
     const respond = async (
       submission,

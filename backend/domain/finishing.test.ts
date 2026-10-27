@@ -68,7 +68,6 @@ function fixture(t: TestContext) {
         undefined,
         "worker:image",
         undefined,
-        undefined,
         { priority: queuePriority.finishing },
       );
       const item = state.items.find((entry) => entry.id === request.galleryItemId)!;

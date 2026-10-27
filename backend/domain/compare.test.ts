@@ -36,7 +36,6 @@ test("compare runs queue one seeded set, read back per owner and record the star
       { id: `${id}-0`, jobId: id, type: "image", status: "pending", prompt: input.prompt },
     ],
     revision: () => 0,
-    jobLimit: 10,
   });
   const votes: string[][] = [];
   const app = express();

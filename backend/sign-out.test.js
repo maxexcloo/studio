@@ -34,7 +34,6 @@ test(
   async (t) => {
     const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-sign-out-"));
     const port = await freePort();
-    const setupToken = crypto.randomBytes(24).toString("base64url");
     const child = spawn(process.execPath, ["backend/index.js"], {
       env: {
         ...process.env,
@@ -53,7 +52,6 @@ test(
         PORT: String(port),
         STUDIO_ALLOWED_HOSTS: "studio.example",
         STUDIO_MULTI_USER: "1",
-        STUDIO_SETUP_TOKEN: setupToken,
         STUDIO_OIDC_ISSUER: "https://identity.example",
         STUDIO_OIDC_CLIENT_ID: "studio",
         STUDIO_OIDC_REDIRECT_URI: "https://studio.example/api/accounts/oidc/callback",
@@ -92,13 +90,13 @@ test(
       });
     const status = async () => await (await browser("/api/accounts/status")).json();
 
-    const bootstrap = await browser("/api/accounts/bootstrap", {
+    // The recovery administrator is created on the computer running Studio.
+    const bootstrap = await fetch(`${base}/api/accounts/bootstrap`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "sec-fetch-site": "same-origin" },
       body: JSON.stringify({
         username: "admin@example.com",
         password: crypto.randomBytes(12).toString("base64url"),
-        setupToken,
       }),
     });
     assert.equal(bootstrap.status, 201);

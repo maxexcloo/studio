@@ -10,7 +10,7 @@ fs.mkdirSync(path.join(scratch, "ComfyUI", "models", "text_encoders"), { recursi
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { downloadState, setDownloadTransport, startDownload } = await import("./model-downloads.js");
-const { catalogDownload, downloadSource } = await import("./family-profiles.js");
+const { catalogDownload, downloadSource } = await import("./catalog-downloads.js");
 
 const spec = (file, extra = {}) => ({
   id: `encoder:test:${file}`,

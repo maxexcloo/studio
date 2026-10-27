@@ -20,10 +20,13 @@ depends = [
 ]
 
 [tasks.dev]
-run = "npm run dev"
+run = "node dev.mjs"
+
+[tasks."dev:demo"]
+run = "node dev.mjs --demo"
 
 [tasks.test]
-run = "npm test"
+run = "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
 
 [tasks."test:browser"]
 run = "playwright test"
@@ -36,16 +39,11 @@ run = "npm ci --no-audit --no-fund"
 [tasks."eval:assistant"]
 run = "node backend/commands/assistant-eval.mjs"
 
-# Studio Import (a dry run unless --apply; see CONFIGURATION.md)
-[tasks."import:studio"]
-run = "node backend/commands/import-studio.mjs"
-
 # Native bridge checks live with each custom node, outside tests/.
 [tasks."test:python"]
 run = """
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
-python -B -m unittest discover -s worker -p 'test_*.py'
 """
 
 # Offline runtime migration is a dry run unless --apply is supplied.

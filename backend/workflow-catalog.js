@@ -10,7 +10,7 @@ import {
   workflowMissingFiles,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { catalogDownloadsForFile } from "./family-profiles.js";
+import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { workflowRisks } from "./workflow-risk.js";
 
@@ -224,23 +224,8 @@ export function workflowSummaries({
       ...(profile.nsfw ? { nsfw: true } : {}),
       ...(profile.aiDrafted || custom?.aiDrafted ? { aiDrafted: true } : {}),
       familyName: profile.familyName || "",
-      // Every workflow-JSON profile is `custom:*`, bundled or not, so the id
-      // prefix cannot tell them apart - use the record's actual folder.
-      source: custom
-        ? custom.source === "bundled"
-          ? "builtin"
-          : "custom"
-        : isCustom
-          ? "custom"
-          : "builtin",
-      // Only workflows you imported can be deleted; bundled templates are part of the repo.
-      deleteId: custom
-        ? custom.source === "bundled"
-          ? ""
-          : custom.id
-        : isCustom
-          ? profile.id.replace(/^custom:/, "")
-          : "",
+      source: custom || isCustom ? "custom" : "builtin",
+      deleteId: custom ? custom.id : isCustom ? profile.id.replace(/^custom:/, "") : "",
       controls: [],
       capabilities: profile.capabilities || {},
       mediaInputs: profile.mediaInputs || custom?.mediaInputs || [],
@@ -288,8 +273,8 @@ export function workflowSummaries({
       description: workflow.description || "",
       kind: workflow.kind,
       family: workflow.family,
-      source: workflow.source === "bundled" ? "builtin" : "custom",
-      deleteId: workflow.source === "bundled" ? "" : workflow.id,
+      source: "custom",
+      deleteId: workflow.id,
       controls: controlsList(workflow.controls),
       capabilities: workflow.capabilities || {},
       mediaInputs: workflow.mediaInputs || [],

@@ -15,7 +15,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 delete process.env.STUDIO_MCP_PROMPTING_PATH;
-delete process.env.STUDIO_SEED_DIR;
 const { userWorkflowsDir } = await import("./custom-workflows.js");
 const { profileStore, guideStore, createProfileStore } = await import("./profile-store.js");
 const editor = await import("./profile-editor.js");
@@ -240,7 +239,7 @@ test("a profile’s guide view, guide edits, guide versions, revert and approve"
   fs.rmSync(path.join(userWorkflowsDir, "owned.json"));
 });
 
-test("the export bundle has the ai layout, says what changed and lists unreviewed drafts", async (t) => {
+test("the export bundle says what changed and lists unreviewed drafts", async (t) => {
   const { call } = await serve(t);
   // An AI draft that is not yet approved.
   editor.createEditableProfile(

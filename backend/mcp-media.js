@@ -252,25 +252,6 @@ export class McpMedia {
         `Choose ${kind === "jobs" ? "a job" : "a reference"} submitted by this account to this studio.`,
       );
   }
-  /** Whether this owner holds the job. */
-  owns(owner, id) {
-    return (
-      typeof id === "string" && Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] === owner
-    );
-  }
-  /** Takes a Studio job into this owner's MCP jobs (a Refine in Chat handover); never one another owner holds. */
-  adopt(owner, id) {
-    if (
-      typeof id !== "string" ||
-      !id ||
-      !owner ||
-      (Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] !== owner)
-    )
-      return false;
-    this.state.jobs[id] = owner;
-    this.save();
-    return true;
-  }
   async response(
     method,
     route,
@@ -683,7 +664,7 @@ export class McpMedia {
             }
             if (cloud && this.noteCloudRefusal(error.message))
               error.message = `${cloudQuotaMessage} ${error.message}`;
-            // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
+            // The studio's reason tells the agent why the rest did not queue.
             if (queued.length)
               return {
                 status: "partially_queued",

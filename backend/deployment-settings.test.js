@@ -27,7 +27,7 @@ test("values report their source and only deployment values are locked", () => {
     source: "default",
     locked: false,
   });
-  // Settings no longer switches built-in profiles or Tessera, and LoRAs, Cloud Models and presets are access-profile features.
+  // Settings no longer switches Tessera, and LoRAs, Cloud Models and presets are access-profile features.
   assert.deepEqual(
     settings.catalogueFlags.map((item) => item.key),
     ["STUDIO_ENABLE_INPAINT", "STUDIO_VIDEO_CLOUD_FALLBACK", "STUDIO_GALLERY_CAPTIONS"],
