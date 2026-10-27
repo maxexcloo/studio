@@ -767,13 +767,11 @@ app.get("/api/diagnostics", async (_req, res) => {
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
 
-// When this server process started, so the app can tell a restart (e.g. after an update) happened.
 const serverStartedAt = Date.now();
-// How the last run ended, when it went wrong (exit-record.js): told once in the studio, via /api/health.
+// How the last run ended, when it went wrong (exit-record.js), logged at start.
 // Read once listening: a second copy that finds this one running must not take over its record.
-let previousExit = null;
 function beginSession() {
-  previousExit = startSession({ now: serverStartedAt });
+  const previousExit = startSession({ now: serverStartedAt });
   if (previousExit)
     logWarning("The last run stopped unexpectedly", {
       who: previousExit.who,
@@ -783,43 +781,6 @@ function beginSession() {
     });
   setInterval(() => noteAlive(), 60_000).unref();
 }
-
-app.get("/api/health", async (req, res) => {
-  // No workers at all is a setup Studio runs in: it says so plainly instead of naming an address.
-  if (!listWorkers().length && !demoMode) {
-    res.status(503).json({
-      ok: false,
-      noWorkers: true,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      error: noWorkerMessage("image"),
-      startedAt: serverStartedAt,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-    return;
-  }
-  try {
-    // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
-    await comfy("/system_stats");
-    res.json({
-      ok: true,
-      ...(req.studioAccount && !canAdmin(req) ? {} : { comfyUrl }),
-      startedAt: serverStartedAt,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-  } catch (error) {
-    res.status(503).json({
-      ok: false,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      error: error.message,
-      startedAt: serverStartedAt,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-  }
-});
 
 // Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
@@ -2874,48 +2835,6 @@ async function queueUpscaleOnWorker(account, request, origin) {
 app.post("/api/upscale", async (req, res) => {
   const { status, payload } = await queueUpscale(req.studioAccount, req.body || {});
   res.status(status).json(payload);
-});
-
-// Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
-app.post("/api/upscale/cancel", async (req, res) => {
-  const itemId = String(req.body?.galleryItemId || "");
-  const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-  if (req.studioAccount && !ownedItem)
-    return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
-  const queued = rewriteStore
-    .jobs(ownerIdForRequest(req))
-    .find(
-      (job) =>
-        job.operation === "upscale" &&
-        job.input.galleryItemId === itemId &&
-        !["completed", "failed", "cancelled"].includes(job.status),
-    );
-  if (queued) {
-    await generationQueue.cancel(queued.ownerId, queued.id);
-    return res.json({ ok: true });
-  }
-  const entry = [...jobs].find(
-    ([, job]) =>
-      job.kind === "upscale" &&
-      job.galleryItemId === itemId &&
-      !job.terminalAt &&
-      (!req.studioAccount || job.ownerId === req.studioAccount.userId),
-  );
-  if (!entry) {
-    // Nothing is running it (the server restarted mid-upscale): just clear the spinner.
-    const item = findUpscaleTarget(itemId);
-    if (item?.upscale?.status === "running")
-      updateGalleryJob(item.id, {
-        upscale: { ...item.upscale, status: "canceled", progress: null },
-      });
-    res.json({ ok: true, stale: true });
-    return;
-  }
-  const [jobId, job] = entry;
-  setTerminalJob(jobId, { status: "canceled" });
-  if (job.promptId)
-    await withComfyBackend(job.comfyBackend, () => cancelPrompt(job.promptId)).catch(() => null);
-  res.json({ ok: true });
 });
 
 app.post("/api/upscale/toggle", (req, res) => {

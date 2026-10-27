@@ -98,9 +98,6 @@ test(
   async () => {
     await start({ STUDIO_WORKERS: "[]" });
     try {
-      const health = await api("/api/health");
-      assert.equal(health.status, 503);
-      assert.equal(health.body.noWorkers, true);
       const models = (await api("/api/models")).body;
       assert.match(models.reason, /No workers are set up/);
       assert.equal(models.backends.video.configured, false);

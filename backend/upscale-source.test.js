@@ -250,7 +250,7 @@ test(
       // Planning probes bytes without changing the original gallery dimensions.
       const galleryResponse = await fetch(base + "/api/gallery");
       const gallery = await galleryResponse.json();
-      const original = Array.isArray(gallery) ? gallery : gallery.items || gallery.outputs || [];
+      const original = gallery.items;
       const originals = original.filter((item) => items.some((source) => source.id === item.id));
       assert.equal(originals.length, 3);
       for (const item of originals) {
@@ -297,10 +297,10 @@ test(
       const saved = await fetch(base + square.upscale.url);
       assert.equal(saved.status, 200);
       assert.equal((await sharp(Buffer.from(await saved.arrayBuffer())).metadata()).width, 640);
-      const cancellation = await fetch(base + "/api/upscale/cancel", {
+      const cancellation = await fetch(base + `/api/queue/${accepted[2]}/cancel`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ galleryItemId: "active" }),
+        body: "{}",
       });
       assert.equal(cancellation.status, 200);
       await waitFor(base, (job) => job.id === accepted[2] && job.status === "cancelled");
