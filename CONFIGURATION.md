@@ -267,6 +267,8 @@ Verify account ownership, profile identifiers and existing result links on the c
 
 Development uses `data/development` with SQLite migration applied only to that isolated directory. Recovery follows recorded job IDs and never scans or adopts a shared worker's full history.
 
+The same command also rewrites the profile ids that production's 20 and 24 Oct 2026 renames left behind (`backend/persistence/profile-ids.ts` holds the mapping): each `custom:<old id>` in the SQLite rows (gallery records, access grants) and the data folder's JSON (workflow preferences, LoRA stacks) becomes the profile's current id. Profiles, guides, backups and the JSON the SQLite import read are left alone, and ids of removed profiles stay. The dry run reports the changes per store and per old id under `profileIds`; `--apply` writes them with Studio stopped, without a backup, and a second run finds nothing.
+
 ## Queue, Sessions & Runtime Control
 
 `/api/sessions` stores generation inputs and result relationships; `/api/queue` exposes writing, queued, waiting, starting, running, saving, completed, failed and cancelled operations.
