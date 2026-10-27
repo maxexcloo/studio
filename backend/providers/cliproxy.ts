@@ -72,10 +72,14 @@ export class CliProxyMedia {
     });
     if (!response.ok) {
       // The provider's own message says why it refused (moderation, size, parameters); keep it short.
-      const detail = await response
-        .json()
-        .then((answer) => String(answer?.error?.message || answer?.error || answer?.message || ""))
-        .catch(() => "");
+      const text = await response.text().catch(() => "");
+      let detail = text;
+      try {
+        const answer = JSON.parse(text);
+        detail = String(answer?.error?.message || answer?.error || answer?.message || text);
+      } catch {
+        // A plain-text refusal is the message itself.
+      }
       const reason = detail.replace(/\s+/g, " ").trim().slice(0, 200);
       throw Object.assign(
         new Error(
