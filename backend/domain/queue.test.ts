@@ -470,6 +470,35 @@ test("the writing stage streams into the item, then queues the written prompt", 
   }
 });
 
+test("at most two prompts are written at once; the next waits in order", async () => {
+  const { store, adapter } = fixture();
+  const steps = new Map<string, ReturnType<typeof deferred>>();
+  const queue = new GenerationQueue(store, adapter, async (job) => {
+    const step = deferred();
+    steps.set(job.id, step);
+    await step.promise;
+    return { prompt: "Written.", thinking: "", model: "ai/text" };
+  });
+  try {
+    const session = store.createSession("alice");
+    const writing = { kind: "request", request: "a fox" };
+    const [first, second, third] = [1, 2, 3].map(() =>
+      store.enqueue("alice", session.id, { prompt: "", writing }, "image"),
+    );
+    await queue.tick();
+    assert.deepEqual([...steps.keys()], [first.id, second.id]);
+    assert.equal(store.job("alice", third.id)?.reason, "Waiting for another prompt to be written.");
+    steps.get(first.id)!.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.deepEqual([...steps.keys()], [first.id, second.id, third.id]);
+    assert.equal(store.job("alice", third.id)?.reason, "");
+    for (const step of steps.values()) step.resolve();
+  } finally {
+    await queue.stop();
+    store.close();
+  }
+});
+
 test("a writing failure fails the item with its reason; cancelling stops the writing", async () => {
   const { store, adapter, submitted, events } = fixture();
   let aborted = false;

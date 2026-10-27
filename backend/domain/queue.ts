@@ -52,6 +52,8 @@ const accepted = (job: OwnedJob) =>
   !terminalStatuses.has(job.status) && !unsubmitted.has(job.status);
 const started = (job: OwnedJob) => !unsubmitted.has(job.status) && job.status !== "cancelled";
 const progressMs = 250;
+const maxWrites = 2;
+const writeWaitReason = "Waiting for another prompt to be written.";
 
 /** The job once its prompt is written: the prompt runs, its record keeps the thinking, and it queues. */
 export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
@@ -149,6 +151,7 @@ export class GenerationQueue {
   private write(initial: OwnedJob) {
     const controller = new AbortController();
     this.writing.set(initial.id, controller);
+    if (initial.reason) this.store.save({ ...initial, reason: "" });
     const current = () => {
       const latest = this.store.job(initial.ownerId, initial.id);
       return latest?.status === "writing" && !controller.signal.aborted ? latest : undefined;
@@ -178,7 +181,6 @@ export class GenerationQueue {
         const latest = current();
         if (!latest) return;
         this.store.save(writtenJob(latest, written));
-        void this.tick().catch(() => undefined);
       } catch (error) {
         clearTimeout(pending);
         const latest = current();
@@ -192,6 +194,8 @@ export class GenerationQueue {
         await this.adapter.settled?.(failed);
       } finally {
         this.writing.delete(initial.id);
+        // The written job queues for its worker, and the freed slot starts the next write.
+        void this.tick().catch(() => undefined);
       }
     })()
       .catch(() => undefined)
@@ -209,8 +213,15 @@ export class GenerationQueue {
   }
 
   private async run() {
-    for (const job of this.store.jobs())
-      if (job.status === "writing" && !this.writing.has(job.id)) this.write(job);
+    // The shared text model writes at most maxWrites prompts at once, higher tiers first, then FIFO;
+    // the rest wait in their writing stage.
+    const unwritten = this.store
+      .jobs()
+      .filter((job) => job.status === "writing" && !this.writing.has(job.id))
+      .sort((a, b) => (a.priority ?? queuePriority.manual) - (b.priority ?? queuePriority.manual));
+    for (const job of unwritten)
+      if (this.writing.size < maxWrites) this.write(job);
+      else if (job.reason !== writeWaitReason) this.store.save({ ...job, reason: writeWaitReason });
     await Promise.all(
       this.store
         .jobs()
