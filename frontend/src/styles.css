@@ -19,6 +19,15 @@ textarea,
 select {
   touch-action: manipulation;
 }
+/* iOS zooms into a focused field whose text is under 16px and leaves the page zoomed. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select,
+  .mantine-Input-input {
+    font-size: max(16px, 1em);
+  }
+}
 .studio-page {
   margin-inline: auto;
 }
