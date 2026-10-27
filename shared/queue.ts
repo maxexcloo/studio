@@ -1,4 +1,5 @@
 export type QueueStatus =
+  | "writing"
   | "queued"
   | "waiting"
   | "starting"
@@ -9,6 +10,23 @@ export type QueueStatus =
   | "cancelled";
 export type GenerationOperation = "image" | "refine" | "animate" | "upscale";
 export type GenerationInput = Record<string, unknown>;
+/**
+ * A generation whose prompt the prompt assistant writes as the queue item's first stage
+ * (`input.writing`). The surface sets `kind` and its request; the stage adds the written `prompt`,
+ * the `thinking` behind it and the text `model`, and the item then queues for generation.
+ */
+export interface PromptWriting {
+  kind: "animate" | "request" | "dream";
+  prompt?: string;
+  thinking?: string;
+  model?: string;
+  [request: string]: unknown;
+}
+/** Whether an input still waits for its prompt to be written. */
+export const awaitsWriting = (input: GenerationInput) => {
+  const writing = input.writing as PromptWriting | undefined;
+  return Boolean(writing && typeof writing === "object" && typeof writing.prompt !== "string");
+};
 export type QueueMedia = Record<string, unknown> & { id?: string; url?: string };
 
 export interface StudioSession {

@@ -17,6 +17,7 @@ import {
   assistantSettings,
   assistantSpicyModelKey,
   createAssistant,
+  spicyModelOf,
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
@@ -269,11 +270,7 @@ export function registerAssistantRoutes(
       const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       if (streaming) {
         // Before the first byte, so a refusal (Spicy without a model) is still a plain JSON error.
-        if (preset === "spicy" && !engine.settings().spicyModel)
-          throw new AssistantError(
-            "Spicy needs a Spicy model. An administrator chooses one in Settings › Models › Integrations.",
-            { status: 409 },
-          );
+        if (preset === "spicy") spicyModelOf(engine.settings());
         res.writeHead(200, {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-store",

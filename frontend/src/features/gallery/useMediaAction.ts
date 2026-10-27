@@ -158,6 +158,8 @@ export async function mediaDraft(
         referenceAssets: operation === "image" ? restored : [],
         referenceDetails: preparedReferences,
         profileBackend,
+        // A reused prompt is the person's now; how the assistant wrote it stays with its result.
+        writing: undefined,
       },
     },
   };
@@ -211,7 +213,7 @@ export type Iteration =
 /**
  * Queues a new run from a saved result without leaving the viewer: a variation with a new prompt
  * (the composer's Count), a new seed, an exact repeat, or an animation whose motion prompt the
- * assistant writes from a theme. Resolves to the new job's ID.
+ * assistant writes from a theme as the queue item's first stage. Resolves to the new job's ID.
  */
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
@@ -228,18 +230,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
       );
       if (note) notifications.show({ message: note });
       const prompt =
-        iteration.kind === "variation"
-          ? iteration.prompt
-          : animate
-            ? (
-                await post<{ prompt: string }>("/api/assistant/animate", {
-                  profileId: profile.id,
-                  prompt: item.prompt,
-                  theme: iteration.theme,
-                  instruction: iteration.instruction,
-                })
-              ).prompt
-            : draft.input.prompt;
+        iteration.kind === "variation" ? iteration.prompt : animate ? "" : draft.input.prompt;
       const repeat = iteration.kind === "repeat";
       const payload = {
         ...generationInput(
@@ -252,6 +243,17 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
           profile,
           draft.references,
         ),
+        // The queue item writes the motion prompt first (backend/prompt-stage.js), then animates.
+        ...(animate
+          ? {
+              writing: {
+                kind: "animate",
+                theme: iteration.theme,
+                instruction: iteration.instruction,
+                source: item.prompt || "",
+              },
+            }
+          : {}),
         operation: draft.input.kind === "video" ? "animate" : "image",
         parentJobId: draft.parentJobId,
       };

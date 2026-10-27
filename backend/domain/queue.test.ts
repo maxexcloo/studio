@@ -425,3 +425,113 @@ test("durable admission enforces the existing per-user job limit across cloud an
     store.close();
   }
 });
+
+test("the writing stage streams into the item, then queues the written prompt", async () => {
+  const { store, adapter, submitted } = fixture();
+  const step = deferred();
+  const queue = new GenerationQueue(store, adapter, async (_job, { onThinking }) => {
+    onThinking("A slow ");
+    onThinking("push-in suits it.");
+    await step.promise;
+    return {
+      prompt: "The camera pushes in.",
+      thinking: "A slow push-in suits it.",
+      model: "ai/text",
+    };
+  });
+  try {
+    const session = store.createSession("alice");
+    const writing = { kind: "animate", theme: "cinematic" };
+    const job = store.enqueue("alice", session.id, { prompt: "", writing }, "animate");
+    assert.equal(job.status, "writing");
+    await queue.tick();
+    assert.deepEqual(submitted, []);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.deepEqual(store.job("alice", job.id)?.progress, {
+      thinking: "A slow push-in suits it.",
+      prompt: "",
+    });
+    step.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await queue.tick();
+    const written = store.job("alice", job.id)!;
+    assert.deepEqual(submitted, [job.id]);
+    assert.equal(written.input.prompt, "The camera pushes in.");
+    assert.deepEqual(written.input.writing, {
+      ...writing,
+      prompt: "The camera pushes in.",
+      model: "ai/text",
+      thinking: "A slow push-in suits it.",
+    });
+    assert.equal(written.progress, undefined);
+  } finally {
+    await queue.stop();
+    store.close();
+  }
+});
+
+test("at most two prompts are written at once; the next waits in order", async () => {
+  const { store, adapter } = fixture();
+  const steps = new Map<string, ReturnType<typeof deferred>>();
+  const queue = new GenerationQueue(store, adapter, async (job) => {
+    const step = deferred();
+    steps.set(job.id, step);
+    await step.promise;
+    return { prompt: "Written.", thinking: "", model: "ai/text" };
+  });
+  try {
+    const session = store.createSession("alice");
+    const writing = { kind: "request", request: "a fox" };
+    const [first, second, third] = [1, 2, 3].map(() =>
+      store.enqueue("alice", session.id, { prompt: "", writing }, "image"),
+    );
+    await queue.tick();
+    assert.deepEqual([...steps.keys()], [first.id, second.id]);
+    assert.equal(store.job("alice", third.id)?.reason, "Waiting for another prompt to be written.");
+    steps.get(first.id)!.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.deepEqual([...steps.keys()], [first.id, second.id, third.id]);
+    assert.equal(store.job("alice", third.id)?.reason, "");
+    for (const step of steps.values()) step.resolve();
+  } finally {
+    await queue.stop();
+    store.close();
+  }
+});
+
+test("a writing failure fails the item with its reason; cancelling stops the writing", async () => {
+  const { store, adapter, submitted, events } = fixture();
+  let aborted = false;
+  const queue = new GenerationQueue(store, adapter, (job, { signal }) =>
+    job.input.prompt === "fail"
+      ? Promise.reject(new Error("unusable reply"))
+      : new Promise((_resolve, reject) =>
+          signal.addEventListener("abort", () => {
+            aborted = true;
+            reject(new Error("cancelled"));
+          }),
+        ),
+  );
+  try {
+    const session = store.createSession("alice");
+    const writing = { kind: "animate" };
+    const failing = store.enqueue("alice", session.id, { prompt: "fail", writing }, "animate");
+    const cancelled = store.enqueue("alice", session.id, { prompt: "", writing }, "animate");
+    await queue.tick();
+    await queue.cancel("alice", cancelled.id);
+    await queue.stop();
+    assert.equal(store.job("alice", failing.id)?.status, "failed");
+    assert.equal(
+      store.job("alice", failing.id)?.reason,
+      "Writing the prompt failed: unusable reply",
+    );
+    assert.equal(store.job("alice", cancelled.id)?.status, "cancelled");
+    assert.ok(aborted);
+    assert.deepEqual(submitted, []);
+    assert.deepEqual(events.sort(), [`released:${cancelled.id}`, `released:${failing.id}`].sort());
+    // A retry writes the prompt again.
+    assert.equal(queue.retry("alice", failing.id)?.status, "writing");
+  } finally {
+    store.close();
+  }
+});

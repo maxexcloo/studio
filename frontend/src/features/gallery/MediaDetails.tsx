@@ -6,6 +6,7 @@ import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { WritingThinking } from "../generation/PromptWriting";
 import { referenceLabel } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 
@@ -222,6 +223,7 @@ export function MediaDetails({ item }: { item: MediaItem }) {
         <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
           {item.prompt || "No prompt recorded."}
         </Text>
+        <WritingThinking writing={item.writing} />
         {item.negative && (
           <Text size="sm" c="dimmed">
             Negative: {item.negative}
