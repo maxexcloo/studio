@@ -1,5 +1,4 @@
 import { generationRecord } from "./generation-record.js";
-import { cloudJobExpired, cloudJobFailedMessage, cloudJobLostMessage } from "./cloud-jobs.js";
 
 /** When ComfyUI's history says a run started and ended (ms), from its status messages. */
 function historyRunTimes(entry) {
@@ -273,9 +272,7 @@ export function createJobRecovery({
             } else {
               const failed = done.entry.status?.status_str === "error";
               const error = failed
-                ? current?.cloud
-                  ? cloudJobFailedMessage
-                  : "ComfyUI could not finish this generation."
+                ? "ComfyUI could not finish this generation."
                 : "ComfyUI finished without an available output file.";
               setGallery(
                 getGallery().map((item) =>
@@ -294,18 +291,11 @@ export function createJobRecovery({
           } else if (current?.recovered && current.comfyBackend) {
             const misses = (missing.get(id) || 0) + 1;
             missing.set(id, misses);
-            // A cloud run past the provider's own deadline cannot reappear, so one confirmed miss settles it.
-            const expired = current.cloud && cloudJobExpired(current);
-            if (misses < 2 && !expired) continue;
+            if (misses < 2) continue;
             const status = ["canceling", "canceled"].includes(current.status)
               ? "canceled"
               : "error";
-            const lost = current.cloud
-              ? expired
-                ? cloudJobFailedMessage
-                : cloudJobLostMessage
-              : "ComfyUI no longer has this generation.";
-            const error = status === "error" ? lost : undefined;
+            const error = status === "error" ? "ComfyUI no longer has this generation." : undefined;
             setGallery(
               getGallery().map((item) =>
                 item.jobId === id ? { ...item, status, error, progress: null } : item,

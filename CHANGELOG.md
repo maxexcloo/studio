@@ -53,12 +53,14 @@ version opens with a `> ` summary line.
 
 - Remove the Docker Engine runtime and its settings (`STUDIO_DOCKER_URL`, `STUDIO_RUNTIME_OWNERSHIP_ACKNOWLEDGED`, the `workloads.json` `studio` mapping) and the AI Control client (`CONTROL_URL`, `CONTROL_API_KEY`).
 - Remove single-user LAN access: the studio password, device sign-ins and their `/api/access` routes, `--lan`, `STUDIO_LAN`, `STUDIO_ALLOW_LAN` and `STUDIO_DEVICE_SESSION_DAYS`. Single-user mode answers only the computer running Studio; other devices use account mode. An existing `access.json` is left in the data folder, unread.
+- Remove the worker's `GrokMedia` ComfyUI node and Studio's tracking of cloud runs on ComfyUI: Grok runs only through Studio's direct CLIProxyAPI path (`STUDIO_CLIPROXYAPI_URL`, `STUDIO_CLIPROXYAPI_KEY`). The `CLIPROXYAPI_URL` and `CLIPROXYAPI_KEY` fallbacks are no longer read, and workers no longer use `CLIPROXYAPI_*`. An existing `cloud-jobs.json` is left in the data folder, unread.
 - Remove every old setting and request name; Studio reads only Studio names ([Renamed Settings](CONFIGURATION.md#renamed-settings)). The `HEISS_*` aliases are gone (use each `STUDIO_*` name), as are the `X-HEISS` request header (send `X-Studio`) and the start-up notice about old names.
 - Rename the unprefixed Studio settings with no aliases: `MCP_SIGNING_KEY` → `STUDIO_MCP_SIGNING_KEY`, `MCP_PUBLIC_URL` → `STUDIO_MCP_PUBLIC_URL`, `MCP_PROMPTING_PATH` → `STUDIO_MCP_PROMPTING_PATH`, `COMFY_OUTPUT_DIR` → `STUDIO_COMFY_OUTPUT_DIR`, `COMFY_INPUT_DIR` → `STUDIO_COMFY_INPUT_DIR`, `BIFROST_URL` → `STUDIO_BIFROST_URL` and `CIVITAI_DNS_SERVERS` → `STUDIO_CIVITAI_DNS_SERVERS`. `HF_TOKEN` and `CIVITAI_API_TOKEN` keep their standard names.
 - Workers come only from `STUDIO_WORKERS` and Studio's own `workers.json`: `COMFY_URL` and `COMFY_VIDEO_URL`, the `.env` seed and its default local address, `STUDIO_DEFAULT_COMFY_URL` and finding ComfyUI by itself (`STUDIO_COMFY_SEARCH`) are gone. A fresh install has no workers until one is configured.
 
 ### Fixed
 
+- Animating an image on Grok takes the video's shape from the image: the first frame is turned upright, scaled to at most 2048 px and sent as PNG, and the request asks for the closest aspect ratio the provider accepts. A resolution the model does not offer is refused before anything is submitted.
 - A finished run no longer fails with "The gallery could not be saved" when another gallery change lands while its outputs are being saved; a real save failure now names its cause.
 
 ## [0.51.0] - 2026-10-24

@@ -18,7 +18,7 @@ const info = {
   VAEDecode: {},
   SaveImage: {},
   KSampler: {},
-  GrokMedia: {
+  FixtureMedia: {
     input: {
       required: {
         kind: [["image", "video"]],
@@ -41,7 +41,7 @@ for (const kind of ["image", "video"]) {
     heissUi: {
       id: `provider-${kind}`,
       kind,
-      family: "grok",
+      family: "custom",
       capabilities: { steps: false },
       controls: {
         model: { node: "1", input: "model" },
@@ -52,7 +52,7 @@ for (const kind of ["image", "video"]) {
       options: { resolutions: video ? ["480p", "720p", "1080p"] : ["1k", "2k"] },
     },
     1: {
-      class_type: "GrokMedia",
+      class_type: "FixtureMedia",
       inputs: {
         kind,
         model: video ? "grok-imagine-video-1.5" : "grok-imagine-image-2.0",

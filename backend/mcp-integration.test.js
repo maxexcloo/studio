@@ -312,6 +312,17 @@ async function fixture(
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
     ...(claimHandover ? { claimHandover } : {}),
     ...(taste ? { taste } : {}),
+    // Like Studio's queue: failed direct cloud video jobs since a time.
+    cloudVideoFailures: (since) =>
+      [...jobs.values()]
+        .filter(
+          (job) =>
+            job.provider === "cliproxyapi" &&
+            job.kind === "video" &&
+            job.status === "error" &&
+            Date.parse(job.updatedAt) >= since,
+        )
+        .map((job) => ({ reason: job.error, at: Date.parse(job.updatedAt) })),
     resolveSignedResult,
     fetchImpl: async (url, init) => {
       if (String(url).startsWith("http://fixture-writer.invalid")) {
@@ -4373,7 +4384,9 @@ test("a cloud quota refusal reads as cloud video unavailable and pauses cloud vi
   assert.equal(first.profile.remote, true);
   Object.assign(f.jobs.get(first.jobs[0].job_id), {
     status: "error",
-    error: "CLIProxyAPI returned HTTP 401",
+    error: "CLIProxyAPI returned HTTP 401; inspect provider health.",
+    provider: "cliproxyapi",
+    updatedAt: new Date().toISOString(),
   });
   // The next cloud video reads the failed job first, so it queues nothing that would fail.
   const refused = await call(client, "Generate", {

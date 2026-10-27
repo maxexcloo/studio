@@ -56,7 +56,7 @@ written there.
 
 ## Cloud Models
 
-Set `STUDIO_CLIPROXYAPI_URL` to the direct CLIProxyAPI base URL and `STUDIO_CLIPROXYAPI_KEY` to its server-side credential. Existing `CLIPROXYAPI_URL`/`CLIPROXYAPI_KEY` names remain readable for compatibility with worker configuration. Runtime profiles retain their identifiers; direct generation supports single `GrokMedia` workflows whose models are advertised by the provider. Other custom provider graphs can use the existing worker bridge.
+Set `STUDIO_CLIPROXYAPI_URL` to the CLIProxyAPI base URL and `STUDIO_CLIPROXYAPI_KEY` to its server-side credential; Studio calls it directly, never through a ComfyUI worker. A cloud profile is a workflow whose every mode is one `GrokMedia` node, and it is listed only while the provider advertises its model. `STUDIO_CLIPROXYAPI_IMAGE_MODEL` and `STUDIO_CLIPROXYAPI_VIDEO_MODEL` pick the model for a profile that names none; otherwise the first advertised one is used. A workflow that mixes `GrokMedia` with other nodes runs nowhere.
 
 Direct cloud work is independent of GPU admission. Studio records asynchronous video request IDs and recovers them before resubmitting. A synchronous image request has no resumable provider ID: an interrupted response remains visible as unknown and is never retried automatically. Cancelling that operation ends Studio's wait; the provider may still finish or charge for work already accepted. Saved results retain the actual provider/model and the existing media result-link shape.
 
