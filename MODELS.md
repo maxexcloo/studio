@@ -154,7 +154,6 @@ catalog, so a family that is described correctly needs no UI work.
 10. **Check it against a real ComfyUI.** Save `/object_info` and
     `/system_stats`, feed them to `inferModels`, build the graph through
     `sanitizeGenerateBody` and `familyGraph`, and queue it once on `/prompt`.
-    Then add a line under **Unreleased** in `CHANGELOG.md`.
 
 ## Rules of thumb
 

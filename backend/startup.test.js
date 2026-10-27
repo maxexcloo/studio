@@ -6,19 +6,19 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const version = JSON.parse(
-  fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-).version;
+const commit = "0123456789abcdef0123456789abcdef01234567";
+const version = commit.slice(0, 7);
 
 for (const development of [false, true]) {
   test(
-    `startup reports the packaged version and ${development ? "Vite preview" : "bound API"} URL`,
+    `startup reports the image commit and ${development ? "Vite preview" : "bound API"} URL`,
     { timeout: 15000 },
     async (t) => {
       const data = fs.mkdtempSync(path.join(os.tmpdir(), "studio-startup-"));
       const child = fork(new URL("./index.js", import.meta.url), [], {
         env: {
           ...process.env,
+          STUDIO_COMMIT: commit,
           STUDIO_CONFIG_DIR: "",
           STUDIO_DATA_DIR: data,
           STUDIO_ENV_FILE: path.join(data, ".env"),
@@ -59,7 +59,7 @@ for (const development of [false, true]) {
       });
       await reported;
       assert.equal(ready.version, version);
-      assert.ok(output.includes(`Studio v${version}\nOpen ${ready.url}`));
+      assert.ok(output.includes(`Studio ${version}\nOpen ${ready.url}`));
       if (development) assert.equal(ready.url, "http://localhost:5173");
       else {
         const response = await fetch(`${ready.url}/api/stats`);

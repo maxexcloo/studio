@@ -10,13 +10,16 @@
 - Keep the credit and licence notices for HEISS UI and J-AI Studio (MIT) in Settings › About, `LICENSE` and `README.md`, and the AGPL notice for the native MCP modules.
 - Read `UI-PATTERNS.md` before UI work. Keep this guide to cross-cutting interaction rules and apply each rule everywhere it occurs.
 - The phone UI and the standard UI are one responsive implementation (shared item actions, selection and sheets).
+- `frontend` holds the React app and Vite build; `backend` the API, persistence, providers, commands and bundled workflows; `shared` the API contracts; `worker` the GPU image and its ComfyUI nodes.
 - Mise owns local task orchestration; npm installs dependencies and retains commands required by container builds.
 
 ## Delivery
 
 - The container image on GHCR, built and verified by CI, is the only delivery. There is no `docs/` website, desktop launcher, packaged download, self-updater or release signing; do not add them.
 - Studio builds the app image and the `studio-worker` GPU runtime image. The deployment lives in kubelab (`apps/base/studio`); GPU workloads are Kubernetes deployments switched by scaling replicas, and ai supplies seed definitions. AI Control is retired; Studio scales those deployments from Settings › Workers and the control MCP tools, and its automatic lifecycle control stays off by default.
-- A `v*` tag publishes the verified image under its version tags and a GitHub release with notes from `CHANGELOG.md`.
+- Every green `main` commit deploys. Its run publishes `sha-<commit>` images, tags them with a `YYYY.M.D.N` version and creates a GitHub release with generated notes; kubelab's Renovate auto-merges the new tag. There is no changelog or release script; the app shows its commit.
+- Push small changes straight to `main` and open a pull request for large ones. Merge only what is ready for production, including any real-model verification it needs.
+- Take a ZFS snapshot of Studio's data before merging a change that runs a data migration.
 - Single-user mode keeps working for local development.
 
 ## Verification

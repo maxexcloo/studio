@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react";
 import { precompressDir } from "./precompress.mjs";
-import packageJson from "../package.json" with { type: "json" };
 
 // Brotli and gzip copies of the built files, which the server sends to browsers that take them.
 function precompress(): Plugin {
@@ -38,8 +37,6 @@ const api: ProxyOptions = {
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   build: { outDir: "../dist", emptyOutDir: true },
-  // Settings › About names the release this build came from.
-  define: { __STUDIO_VERSION__: JSON.stringify(packageJson.version) },
   plugins: [react(), precompress()],
   server: {
     host: "127.0.0.1",
