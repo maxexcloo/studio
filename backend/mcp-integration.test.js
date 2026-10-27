@@ -878,7 +878,7 @@ test("media and administrator credentials discover only their own friendly tools
   // Schemas state the per-call limit their descriptions give.
   const generateSchema = tools.find((tool) => tool.name === "Generate").inputSchema.properties;
   assert.equal(generateSchema.count.maximum, 10);
-  assert.equal(generateSchema.prompts.maxItems, 10);
+  assert.equal(generateSchema.prompts.anyOf[0].maxItems, 10);
   assert.doesNotMatch(media.getInstructions(), /GPU|Apply/);
   assert.match(admin.getInstructions(), /get approval before Apply/);
   assert.doesNotMatch(admin.getInstructions(), /Generate|Result/);
@@ -1265,6 +1265,17 @@ test("image variants queue separately with incrementing seeds and video keeps th
   await generate(client, { profile_id: videoProfile.id });
   assert.equal(f.submitted.at(-1).kind, "video");
   assert.equal(f.submitted.at(-1).workflow, videoProfile.workflow);
+});
+
+test("Generate accepts prompts sent as one JSON string", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const result = await generate(client, { prompts: JSON.stringify(["A tree", "A flower"]) });
+  assert.equal(result.jobs.length, 2);
+  assert.deepEqual(
+    f.submitted.map((body) => body.prompt),
+    ["A tree", "A flower"],
+  );
 });
 
 test("partial queue failures retain successful owned jobs without retrying the submission", async (t) => {
