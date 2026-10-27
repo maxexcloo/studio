@@ -2,7 +2,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
 import { missingNodes, nodeRange, optionsFor, textRange } from "./comfy.js";
-import { loadCustomWorkflows, usesGrokMedia, workflowOptionIssues } from "./custom-workflows.js";
+import {
+  loadCustomWorkflows,
+  profileBackendLabels,
+  usesGrokMedia,
+  workflowOnBackend,
+  workflowOptionIssues,
+} from "./custom-workflows.js";
 import { classifyModel } from "./model-families.js";
 import { familyProfiles } from "./family-profiles.js";
 import { families } from "./family-catalog.js";
@@ -156,6 +162,8 @@ export function buildProfile({
   prompting,
   nsfw = false,
   aiDrafted = false,
+  backend = "",
+  backendOptions = [],
 }) {
   // A mode overrides only these: a mode's own id, media slots or graph must never replace the profile's.
   const imageModes = Object.fromEntries(
@@ -172,6 +180,8 @@ export function buildProfile({
     id,
     kind,
     label,
+    // A combined profile: the backend it runs on now and each one it can run on, with whether it is ready.
+    ...(backend ? { backend, backendOptions } : {}),
     ...(nsfw === true ? { nsfw: true } : {}),
     // Drafted by the assistant and not yet reviewed: administrators only (account-policy.js).
     ...(aiDrafted === true ? { aiDrafted: true } : {}),
@@ -287,7 +297,15 @@ export function sizedRange(range, familyStep) {
   };
 }
 
-export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
+/**
+ * `profileBackends` (`{"custom:<id>": backend}`) builds those combined profiles on another of their
+ * backends, as a run that asked for it validates against.
+ */
+export function inferModels(
+  info,
+  stats = {},
+  { configuredOnly = false, profileBackends = {} } = {},
+) {
   const missingCoreImageNodes = missingNodes(info, [
     "KSampler",
     "CLIPTextEncode",
@@ -338,11 +356,29 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
     : [];
   const modelFiles = detectedFiles.filter((file) => modelFamilyEnabled(file.family, file.name));
 
-  for (const workflow of loadCustomWorkflows()) {
-    if (usesGrokMedia(workflow)) continue;
+  // Why a workflow can't run on this worker, in words; "" when it can.
+  const unready = (workflow) => {
     const missing = missingNodes(info, workflow.requiredNodes);
-    if (!configuredOnly && (missing.length || workflowOptionIssues(workflow, info).length))
-      continue;
+    return missing.length
+      ? `missing ${missing.join(", ")} on this worker`
+      : workflowOptionIssues(workflow, info).join(" ");
+  };
+  for (const listed of loadCustomWorkflows()) {
+    const workflow = workflowOnBackend(listed, profileBackends[listed.profileId]);
+    if (usesGrokMedia(workflow)) continue;
+    // A combined profile lists while any of its backends could run here; its own backend not being
+    // ready shows as Needs Setup with the reason, never as a quiet switch to the other one.
+    const backendOptions = (workflow.backendIds || []).map((id) => {
+      const reason = configuredOnly ? "" : unready(workflowOnBackend(listed, id));
+      return {
+        id,
+        label: profileBackendLabels[id] || id,
+        ...(configuredOnly ? {} : { ready: !reason }),
+        ...(reason ? { reason } : {}),
+      };
+    });
+    const reason = configuredOnly ? "" : unready(workflow);
+    if (reason && !backendOptions.some((option) => option.ready)) continue;
     const defaults = workflow.defaults || {};
     const controls = workflow.controls || {};
     const familyStep = workflowFamilyStep(workflow);
@@ -499,12 +535,19 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
         mediaInputs: workflow.mediaInputs || [],
         aspectPolicy: workflow.aspectPolicy,
         maxLoras: workflow.loraStack?.max,
+        backend: workflow.backend,
+        backendOptions,
         // Radiance video takes a request's LoRAs through one rank-64 slot (ai's video runtime), so the picker says so.
         ...(workflow.kind === "video" && workflow.loraStack?.adapter === "radiance-tags-v1"
           ? { loraNote: "Up to rank 64 in total" }
           : {}),
       }),
     );
+    if (reason)
+      Object.assign(profiles.at(-1), {
+        ready: false,
+        readyReason: `${profileBackendLabels[workflow.backend] || workflow.backend} isn’t ready: ${reason}`,
+      });
   }
 
   // Legacy runtime titles stay readable only when ai is not the configuration owner.

@@ -7,7 +7,10 @@ import { root } from "./comfy.js";
 import { workflowIds } from "./workflow-registry.js";
 import { writeJsonFile } from "./json-store.js";
 import { builtInProfilesEnabled, grokEnabled, modelFamilyEnabled } from "./features.js";
-import { canonicalProfileId } from "./profile-store.js";
+import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
+import { profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
+
+export { profileBackendLabels, sharedProfileFields };
 
 const bundledWorkflowsDir = path.join(root, "backend", "workflows");
 export const userWorkflowsDir = path.join(dataDir, "workflows");
@@ -170,7 +173,42 @@ export function detectWorkflowFormat(raw) {
   return "unsupported";
 }
 
-export function metadataFromJson(raw, file) {
+const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+/** A combined profile's backend ids, in file order; empty for a profile with one graph. */
+export const backendIdsOf = (raw) =>
+  isRecord(raw?.studio?.backends) ? Object.keys(raw.studio.backends) : [];
+
+/**
+ * The single-graph profile a combined one runs on `requested` (else its `backend`, else its first):
+ * the shared fields with that backend's block over them. A profile with one graph is returned as is.
+ */
+export function profileOnBackend(raw, requested = "") {
+  const ids = backendIdsOf(raw);
+  if (!ids.length) return { raw, backend: "", backendIds: [] };
+  const { backends, backend: chosen, ...shared } = raw.studio;
+  const backend = ids.includes(requested) ? requested : ids.includes(chosen) ? chosen : ids[0];
+  const { graph, ...own } = isRecord(backends[backend]) ? backends[backend] : {};
+  return { raw: { graph: graph || {}, studio: { ...shared, ...own } }, backend, backendIds: ids };
+}
+
+/** A workflow record (metadataFromJson) on another of its backends; the record itself when it already runs there or has one graph. */
+export function workflowOnBackend(workflow, backend) {
+  if (!workflow?.backendIds?.includes(backend) || workflow.backend === backend || !workflow.raw)
+    return workflow;
+  const { raw, path: file, source, aiDrafted } = workflow;
+  return {
+    ...metadataFromJson(raw, file, { backend }),
+    source,
+    raw,
+    ...(aiDrafted ? { aiDrafted } : {}),
+  };
+}
+
+export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
+  if (backendIdsOf(raw).length) {
+    const { raw: single, backend, backendIds } = profileOnBackend(raw, requested);
+    return { ...metadataFromJson(single, file), backend, backendIds };
+  }
   const meta = workflowMeta(raw);
   const id = safeId(meta.id || path.basename(file || "", path.extname(file || "")));
   const graph = graphFromJson(raw);
@@ -460,16 +498,19 @@ export function loadCustomWorkflows() {
   });
 }
 
-export function getCustomWorkflow(requested) {
+/**
+ * The workflow a profile id names (merged ids resolve), on `backend` when it is one of the
+ * profile's; an old per-backend id of a combined profile runs on its own backend.
+ */
+export function getCustomWorkflow(requested, backend = profileAliasBackend(requested)) {
   const profileId = canonicalProfileId(requested);
-  return (
-    loadCustomWorkflows().find(
-      (workflow) =>
-        workflow.profileId === profileId ||
-        workflow.id === profileId ||
-        `custom:${workflow.id}` === profileId,
-    ) || null
+  const workflow = loadCustomWorkflows().find(
+    (workflow) =>
+      workflow.profileId === profileId ||
+      workflow.id === profileId ||
+      `custom:${workflow.id}` === profileId,
   );
+  return workflow ? workflowOnBackend(workflow, backend) : null;
 }
 
 /**

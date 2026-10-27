@@ -17,6 +17,8 @@
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
  *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile-merge.js)
+ *   GET  /api/profiles/backends                     Radiance and ComfyUI profiles Combine Backends could make one
+ *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile-backends.js)
  *
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
@@ -28,6 +30,7 @@ import {
   revertEditableProfile,
 } from "./profile-editor.js";
 import { writeExport } from "./profile-export.js";
+import { backendCandidates, combineBackends } from "./profile-backends.js";
 import { duplicateProfiles, mergeDuplicateProfiles } from "./profile-merge.js";
 
 const fail = (res, error) =>
@@ -264,6 +267,26 @@ export function registerProfileRoutes(
         by: accountName(req),
       });
       for (const { from } of result.merged) await onSaved(from);
+      res.json({ ok: true, ...result });
+    }),
+  );
+
+  app.get(
+    "/api/profiles/backends",
+    route((_req, res) => {
+      res.json({ ok: true, ...backendCandidates() });
+    }),
+  );
+  app.post(
+    "/api/profiles/backends/combine",
+    route(async (req, res) => {
+      const result = combineBackends({
+        hash: String(req.body?.hash || ""),
+        selections: req.body?.selections,
+        by: accountName(req),
+      });
+      for (const { id, from } of result.combined)
+        for (const changed of [id, ...from]) await onSaved(changed);
       res.json({ ok: true, ...result });
     }),
   );

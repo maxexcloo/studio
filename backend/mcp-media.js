@@ -18,7 +18,7 @@ import {
 import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
 import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
-import { canonicalProfileId } from "./profile-store.js";
+import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -476,6 +476,7 @@ export class McpMedia {
   async queue(owner, args, scope = "", record = {}) {
     const {
       profile_id,
+      profile_backend,
       prompts,
       loras = [],
       reference_asset_ids = [],
@@ -553,6 +554,14 @@ export class McpMedia {
       ...(record.conversation ? { chat: { conversationId: record.conversation } } : {}),
       kind: profile.kind,
       profileId: profile_id,
+      // A combined profile runs on the backend a call or record named while it has it, else its current one.
+      ...(profile.backend
+        ? {
+            profileBackend: profile.backendOptions?.some((option) => option.id === profile_backend)
+              ? profile_backend
+              : profile.backend,
+          }
+        : {}),
       model: profile.model,
       workflow: profile.workflow,
       count: 1,
@@ -670,6 +679,7 @@ export class McpMedia {
         kind: body.kind,
         model: body.model || "",
         profileId: body.profileId,
+        ...(body.profileBackend ? { profileBackend: body.profileBackend } : {}),
         family: body.family || "",
         width: body.width || 0,
         height: body.height || 0,
@@ -1104,8 +1114,11 @@ export class McpMedia {
       .filter(Boolean);
     const profile = references.length ? { ...base, ...base.imageModes?.reference } : base;
     const controls = mcpControls(profile);
+    // The backend it ran on: recorded, else the one its old per-backend id names.
+    const backend = settings.profileBackend || profileAliasBackend(settings.profileId);
     const args = {
       profile_id: base.id,
+      ...(backend && base.backend ? { profile_backend: backend } : {}),
       prompts: [prompt || item.prompt],
       count,
       ...(references.length ? { reference_asset_ids: references } : {}),
@@ -1162,6 +1175,7 @@ export class McpMedia {
       .filter(Boolean);
     const args = {
       profile_id: profile.id,
+      ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
       prompts: [item.prompt],
       count,
       ...(references.length ? { reference_asset_ids: references } : {}),

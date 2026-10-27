@@ -83,18 +83,21 @@ function MappingCells({
 
 export function WorkflowConnections({
   id,
+  backend = "",
   raw,
   metadata,
   onChange,
 }: {
   id: string;
+  /** A combined profile's backend, whose graph `raw` holds. */
+  backend?: string;
   raw: Record<string, unknown>;
   metadata: Record<string, unknown>;
   onChange: (field: "controls" | "mediaInputs", value: unknown) => void;
 }) {
   // This tab mounts anew after Advanced JSON editing; metadata-only changes keep the graph's choices.
   const preview = useQuery({
-    queryKey: ["workflow-connections", id],
+    queryKey: ["workflow-connections", id, backend],
     queryFn: async () =>
       (
         await post<{ preview: { detected: { nodes: WorkflowNode[] } } }>(

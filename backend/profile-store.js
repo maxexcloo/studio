@@ -9,8 +9,10 @@ import { configurationFile } from "./config-directory.js";
  * marker and who saved it. profile-editor.js still writes `.studio-edits.json` for every profile
  * Studio changed or drafted (the retired seed deploy read it to skip them).
  * `<data>/workflows/.studio-aliases.json` maps a removed profile id to the profile that replaced it
- * (`{"<old id>": {"to": "<kept id>", "at", "by", "reason"}}`, written by profile-merge.js), so
- * records that still name the old id resolve to the kept profile through `canonical`.
+ * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile-merge.js
+ * and profile-backends.js), so records that still name the old id resolve to the kept profile
+ * through `canonical`, and a per-backend id merged into a combined profile runs on its own backend
+ * (`aliasBackend`).
  *
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
@@ -301,12 +303,34 @@ export function createProfileStore({
     return prefixed ? `custom:${id}` : id;
   }
 
-  /** Records `{from, to, reason}` aliases: `from` now resolves to `to`. */
+  /**
+   * The backend an old id ran on, when it was merged into a combined profile: the first alias on
+   * its way to the kept id that names one. Takes `custom:<id>` or a bare id; "" otherwise.
+   */
+  function aliasBackend(value) {
+    if (typeof value !== "string" || !value) return "";
+    let id = value.startsWith("custom:") ? value.slice(7) : value;
+    const map = aliases();
+    for (const seen = new Set([id]); typeof map[id]?.to === "string"; seen.add(id)) {
+      if (typeof map[id].backend === "string" && map[id].backend) return map[id].backend;
+      if (seen.has(map[id].to)) break;
+      id = map[id].to;
+    }
+    return "";
+  }
+
+  /** Records `{from, to, backend?, reason}` aliases: `from` now resolves to `to` (on `backend`). */
   function addAliases(entries, { by = "", at = stamp() } = {}) {
     const next = { ...aliases() };
-    for (const { from, to, reason = "" } of entries) {
+    for (const { from, to, backend = "", reason = "" } of entries) {
       if (!validId(from) || !validId(to) || from === to) throw new Error("Choose two profile ids.");
-      next[from] = { to, at, by: String(by || ""), ...(reason ? { reason } : {}) };
+      next[from] = {
+        to,
+        ...(backend ? { backend: String(backend) } : {}),
+        at,
+        by: String(by || ""),
+        ...(reason ? { reason } : {}),
+      };
     }
     writeJsonFile(aliasFile, next);
     return next;
@@ -326,6 +350,7 @@ export function createProfileStore({
     aliasFile,
     aliases,
     canonical,
+    aliasBackend,
     addAliases,
     record,
     versions,
@@ -588,6 +613,22 @@ export function createGuideStore({
     writeStore(store);
   }
 
+  /**
+   * Gives profile `to` (`custom:<id>`) the guide binding and negatives profile `from` has, where
+   * `to` has none of its own, as a combined profile takes its default backend's.
+   */
+  function copyProfileGuide(from, to) {
+    const store = read();
+    if (!store) return;
+    let changed = false;
+    for (const key of ["profiles", "negatives"])
+      if (isObject(store[key]?.[from]) && !Object.hasOwn(store[key], to)) {
+        store[key] = { ...store[key], [to]: structuredClone(store[key][from]) };
+        changed = true;
+      }
+    if (changed) writeStore(store);
+  }
+
   /** Records what an export held, so the next export can say what changed since. */
   function markExported(hashes) {
     const store = read();
@@ -616,6 +657,7 @@ export function createGuideStore({
     approve,
     resolve,
     bind,
+    copyProfileGuide,
     markExported,
     configFile,
     read,
@@ -686,6 +728,8 @@ export function profileStore(options = {}) {
 }
 /** The id a profile goes by now in the current data folder (profile ids merged away resolve to the kept one). */
 export const canonicalProfileId = (id) => profileStore().canonical(id);
+/** The backend a merged per-backend profile id ran on ("" for any other id). */
+export const profileAliasBackend = (id) => profileStore().aliasBackend(id);
 /** A record whose settings name a merged profile, as a copy with the kept id; otherwise the record itself. */
 export function withCanonicalProfile(item) {
   const id = item?.settings?.profileId;
