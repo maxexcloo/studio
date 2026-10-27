@@ -639,7 +639,7 @@ export async function uploadBufferToComfy({ buffer, mime, name }, { unique = fal
   // Content-named files are shared between runs; a run-only copy gets its own name,
   // so removing it afterwards can never pull an input out from under another job.
   const filename = unique
-    ? `heiss-ui-${crypto.randomUUID()}.${mimeExtension(mime)}`
+    ? `studio-${crypto.randomUUID()}.${mimeExtension(mime)}`
     : referenceInputName(buffer, mime);
   const form = new FormData();
   form.append("image", new Blob([buffer], { type: mime }), filename);

@@ -23,7 +23,7 @@ const write = (root, name, value) => {
   fs.writeFileSync(file, JSON.stringify(value));
 };
 const rawProfile = {
-  heissUi: {
+  studio: {
     id: "owned",
     name: "Seed Profile",
     kind: "image",
@@ -39,7 +39,7 @@ const guides = {
 write(config, "profiles/owned.json", rawProfile);
 write(config, "profiles/removed.json", {
   ...rawProfile,
-  heissUi: { ...rawProfile.heissUi, id: "removed" },
+  studio: { ...rawProfile.studio, id: "removed" },
 });
 write(config, "prompting.json", guides);
 write(config, "lora-catalogue.json", { "owned.safetensors": { title: "Seed LoRA", nsfw: true } });
@@ -80,9 +80,8 @@ test("ai seeds runtime definitions once; Studio edits, history and removed IDs s
   assert.deepEqual(seeded.skipped, ["removed"]);
   assert.equal(workflows.allCustomWorkflowRecords()[0].name, "Seed Profile");
   const current = editor.readEditableProfile("owned");
-  assert.equal(current.blockName, "heissUi");
   const raw = JSON.parse(current.text);
-  raw.heissUi.name = "Studio Edit";
+  raw.studio.name = "Studio Edit";
   editor.saveEditableProfile("owned", JSON.stringify(raw), { baseHash: current.hash });
   assert.match(editor.readEditableProfile("owned").text, /Studio Edit/);
   assert.equal(profiles.versions("owned").length, 2);

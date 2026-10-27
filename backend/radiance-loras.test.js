@@ -26,7 +26,7 @@ const raw = (loraStack, id = "radiance-loras") => ({
       },
     },
   },
-  heissUi: {
+  studio: {
     id,
     capabilities: { lora: true },
     controls: { prompt: { node: "1", input: "prompt" }, seed: { node: "1", input: "seed" } },

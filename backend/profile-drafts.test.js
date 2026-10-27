@@ -11,16 +11,13 @@ import { draftedProfile } from "./assistant.js";
 import { validateProfileText } from "./profile-editor.js";
 
 const sha = (char) => char.repeat(64);
-const template = (
-  id,
-  { family = "krea2", loader = "UNETLoader", block = "heissUi", prompting = null } = {},
-) => ({
+const template = (id, { family = "krea2", loader = "UNETLoader", prompting = null } = {}) => ({
   id,
   family,
   kind: "image",
   aiDrafted: false,
   raw: {
-    [block]: {
+    studio: {
       id,
       name: `Template ${id}`,
       kind: "image",
@@ -193,24 +190,24 @@ test("a checkpoint import drafts an NSFW-by-default profile with the page’s se
   const { text, options } = d.saved.profiles["real-skin-v3-2"];
   assert.equal(options.by, "assistant");
   const raw = JSON.parse(text);
-  assert.ok(raw.heissUi, "written as heissUi");
+  assert.ok(raw.studio, "written as studio");
   assert.deepEqual(
-    [raw.heissUi.id, raw.heissUi.name, raw.heissUi.nsfw, raw.heissUi.family],
+    [raw.studio.id, raw.studio.name, raw.studio.nsfw, raw.studio.family],
     ["real-skin-v3-2", "Real Skin V3", true, "krea2"],
     "unknown NSFW counts as NSFW",
   );
   assert.deepEqual(
     [
-      raw.heissUi.defaults.model,
-      raw.heissUi.defaults.steps,
-      raw.heissUi.defaults.cfg,
-      raw.heissUi.defaults.sampler,
-      raw.heissUi.defaults.scheduler,
+      raw.studio.defaults.model,
+      raw.studio.defaults.steps,
+      raw.studio.defaults.cfg,
+      raw.studio.defaults.sampler,
+      raw.studio.defaults.scheduler,
     ],
     ["real-skin-v3.safetensors", 12, 1.5, "dpmpp_2m", "karras"],
   );
   assert.equal(raw.graph["1"].inputs.unet_name, "real-skin-v3.safetensors");
-  assert.match(raw.heissUi.description, /Drafted from https:\/\/civitai\.com/);
+  assert.match(raw.studio.description, /Drafted from https:\/\/civitai\.com/);
   // The VAE ComfyUI lacks joins the import with its download; the installed encoder doesn't.
   assert.deepEqual(
     target.resources.map((resource) => [
@@ -250,16 +247,13 @@ test("a source that says safe is not NSFW, and the template’s own guidance is 
   };
   const d = deps({
     engine,
-    templates: async () => [
-      template("owned", { block: "studio", prompting: { id: "own", summary: "Own." } }),
-    ],
+    templates: async () => [template("owned", { prompting: { id: "own", summary: "Own." } })],
   });
   const target = record({ nsfw: false });
   await draftProfileFromImport(target, {}, d);
   const raw = JSON.parse(d.saved.profiles["real-skin-v3-2"].text);
-  assert.equal(raw.studio, undefined, "a studio template is written as heissUi");
   assert.deepEqual(
-    [raw.heissUi.nsfw, raw.heissUi.prompting, raw.heissUi.name, raw.heissUi.defaults.steps],
+    [raw.studio.nsfw, raw.studio.prompting, raw.studio.name, raw.studio.defaults.steps],
     [false, undefined, "Real Skin V3", 20],
   );
   assert.deepEqual(d.saved.packs["real-skin-v3-2"].options, {

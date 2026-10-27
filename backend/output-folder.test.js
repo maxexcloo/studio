@@ -15,7 +15,7 @@ const item = (filename, subfolder = "") => ({
 });
 
 test("folder input tolerates quotes, file URLs and ~", () => {
-  const dir = path.join(os.tmpdir(), "heiss out");
+  const dir = path.join(os.tmpdir(), "studio out");
   assert.equal(normalizeFolderInput(`"${dir}"`), dir);
   assert.equal(normalizeFolderInput(pathToFileURL(dir).href), dir);
   assert.equal(normalizeFolderInput(`${dir}${path.sep}`), dir);

@@ -101,7 +101,7 @@ function sweep() {
   try {
     const cutoff = Date.now() - keepDays * 86_400_000;
     for (const name of fs.readdirSync(logDir)) {
-      if (!/^(?:studio|heiss)-\d{4}-\d{2}-\d{2}\.log$/.test(name)) continue;
+      if (!/^studio-\d{4}-\d{2}-\d{2}\.log$/.test(name)) continue;
       const file = path.join(logDir, name);
       if (fs.statSync(file).mtimeMs < cutoff) fs.rmSync(file, { force: true });
     }

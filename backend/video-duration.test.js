@@ -34,7 +34,7 @@ const info = {
 test("custom H3 duration selections reach their mapped graph input with the fixed workflow FPS", async () => {
   for (const family of ["minimax-h3", "minimax_h3"]) {
     saveCustomWorkflow({
-      heissUi: {
+      studio: {
         id: "duration-h3",
         kind: "video",
         family,
@@ -119,7 +119,7 @@ test("custom H3 duration selections reach their mapped graph input with the fixe
 
 test("a node that declares fewer H3 frames than the model can render sets the limit", () => {
   saveCustomWorkflow({
-    heissUi: {
+    studio: {
       id: "radiance-h3",
       kind: "video",
       family: "minimax-h3",

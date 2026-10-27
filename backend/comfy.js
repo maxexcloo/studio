@@ -40,7 +40,7 @@ export function setListeningPort(value) {
 }
 /**
  * A subfolder with a dot folder anywhere in it: the gallery's trash
- * (.heiss-trash) and anything else kept out of sight. Never served, whether
+ * (.studio-trash) and anything else kept out of sight. Never served, whether
  * from the output folder or through ComfyUI.
  */
 export function inDotFolder(subfolder = "") {

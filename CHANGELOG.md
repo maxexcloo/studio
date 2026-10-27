@@ -49,6 +49,7 @@ version opens with a `> ` summary line.
 - Replace Reuse's `kind` with `mode` (`again` by default, `animate`, `reference`), and remove Generate's `exact_prompt` and `wait_seconds` and Result's `delivery` and `detail`; Status and Result wait 20 seconds at most.
 - Move the profiles that name a Library update's old file to the new one, each as a new version, so the old file is removed when nothing else uses it. Civitai image imports get the same nearest installed stand-ins as dropped images, with Use Prompt and Use Settings.
 - Export profiles, guides and catalogues in the ai repository's flat layout (`profiles/`, `prompting.json` and the other files at the root, `EXPORT.json` format 2), the layout the seed already reads; older nested exports still seed.
+- **Breaking:** rename the names kept on disk from HEISS UI in the runtime migration (`migrate-runtime`, a dry run unless `--apply`, recoverable with `--undo`): the `heiss-ui` media folder and `.heiss-trash` become `studio` and `.studio-trash` with every gallery, trash, session and job record that names them; the `heissUi` profile block becomes `studio` in profiles and their version history; old `heiss-*.log` files go. Studio reads and writes only the Studio names, including `studio-reference-*` and `studio-upscale-*` input files and `studio_*` model-path sections, so run the migration before starting this version on existing data, and switch ai's profile seeds to `studio` at the same time.
 
 ### Removed
 
