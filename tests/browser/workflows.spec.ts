@@ -161,7 +161,7 @@ test("Retry pending state is shared while unrelated jobs remain cancellable", as
     await page.getByRole("button", { name: "Open Status", exact: true }).click();
     const queue = page.getByRole("dialog", { name: "Generations", exact: true });
     await expect(queue.getByRole("button", { name: "Retry", exact: true })).toBeDisabled();
-    await queue.getByRole("button", { name: "Cancel", exact: true }).click();
+    await queue.getByRole("button", { name: "Stop", exact: true }).click();
     await expect.poll(() => state.jobs[1].status).toBe("cancelled");
     expect(calls).toBe(1);
     await page.keyboard.press("Escape");

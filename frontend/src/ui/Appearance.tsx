@@ -110,7 +110,7 @@ export function AppearanceControls() {
   const scheme = useComputedColorScheme("light");
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   return (
-    <ScrollArea.Autosize mah="calc(100dvh - 105px)" type="hover" scrollbars="y">
+    <ScrollArea.Autosize mah="calc(100dvh - 105px)">
       <Stack gap="sm">
         <Stack gap={6}>
           <Text size="sm" fw={500}>

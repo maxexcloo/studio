@@ -14,6 +14,7 @@ import { GenerationForm } from "./GenerationForm";
 import { galleryReferenceType, useGalleryReference, useReferenceFiles } from "./references";
 import { api, failure } from "../../api";
 import type { ReferenceAsset } from "../../types";
+import { closingPopup, popupLayer } from "../../ui/popupClicks";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 function GenerationScrollArea(props: ScrollAreaProps) {
@@ -25,8 +26,7 @@ function GenerationScrollArea(props: ScrollAreaProps) {
     />
   );
 }
-const composerLayers =
-  '[role="dialog"], [data-composer-layer], .mantine-Combobox-dropdown, .mantine-Popover-dropdown';
+const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
 /** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
 export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
@@ -132,7 +132,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }
   const outside = useClickOutside<HTMLDivElement>(
     (event) => {
-      if ((event.target as HTMLElement).closest(composerLayers)) return;
+      if (closingPopup() || (event.target as HTMLElement).closest(composerLayers)) return;
       collapse(false);
     },
     ["mousedown", "touchstart"],
