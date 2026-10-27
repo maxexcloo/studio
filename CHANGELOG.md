@@ -15,6 +15,10 @@ version opens with a `> ` summary line.
 
 - Every prompt assistant call shares one 4,000-token budget, so long thinking no longer cuts a reply short.
 
+### Fixed
+
+- In Chat and the Generations queue, every result of a cloud (Grok) run now shows its prompt, settings, title and star in the viewer, and Star, Delete and deleting a chat with its results reach the gallery item. Chat used to show the provider's bare files. Every run's results now come from the gallery, so later changes such as titles and stars show there too.
+
 ## [1.0.11] - 2026-10-27
 
 > The prompt assistant stops failing with "unusable reply"
