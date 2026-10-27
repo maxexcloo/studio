@@ -57,6 +57,9 @@ jobs:
     needs: check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
     container:
       image: ${{ needs.check.outputs.browser-image }}
       options: --init --ipc=host
@@ -76,12 +79,12 @@ jobs:
           name: frontend
           path: dist
       - name: Check Studio Interactions
-        run: mise run test:browser
+        run: mise run test:browser -- --shard=${{ matrix.shard }}
       - name: Save Browser Failure Traces
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-failure-traces
+          name: browser-failure-traces-${{ strategy.job-index }}
           path: test-results
           retention-days: 7
 
