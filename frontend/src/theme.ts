@@ -210,6 +210,11 @@ export function studioTheme({
       Paper: Paper.extend({
         styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
       }),
+      // Every popover, menu and combobox dropdown renders PopoverDropdown; `data-popup` marks them
+      // for the shared outside-click rule (ui/popupClicks.ts) and their transform origin.
+      PopoverDropdown: Popover.Dropdown.extend({
+        defaultProps: { "data-popup": true } as Record<string, unknown>,
+      }),
       // Popover also renders Combobox dropdowns (Select, Autocomplete and similar).
       Popover: Popover.extend({
         defaultProps: {

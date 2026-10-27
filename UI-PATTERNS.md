@@ -77,6 +77,12 @@ primary component reference and verify APIs against the installed version.
   phones drop secondary columns into the main cell); preview cards are for visual
   content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
+- A click outside an open popover, menu or dropdown only closes it; nothing
+  beneath reacts until no popup is open. `ui/popupClicks.ts` owns this for every
+  Mantine dropdown (marked `data-popup` by the theme); outside-click handlers
+  check `closingPopup()` and match popup layers with `popupLayer`. A trigger's
+  Tooltip wraps `Popover.Target`/`Menu.Target`, so the trigger itself carries
+  `aria-expanded` and pressing it still toggles the popup.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
   parent controls and keyboard focus.
