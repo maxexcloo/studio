@@ -70,11 +70,20 @@ export class CliProxyMedia {
       },
       ...(body ? { body: multipart ? body : JSON.stringify(body) } : {}),
     });
-    if (!response.ok)
+    if (!response.ok) {
+      // The provider's own message says why it refused (moderation, size, parameters); keep it short.
+      const detail = await response
+        .json()
+        .then((answer) => String(answer?.error?.message || answer?.error || answer?.message || ""))
+        .catch(() => "");
+      const reason = detail.replace(/\s+/g, " ").trim().slice(0, 200);
       throw Object.assign(
-        new Error(`CLIProxyAPI returned HTTP ${response.status}; inspect provider health.`),
+        new Error(
+          `CLIProxyAPI returned HTTP ${response.status}${reason ? `: ${reason}` : "; inspect provider health."}`,
+        ),
         { providerRejected: response.status >= 400 && response.status < 500 },
       );
+    }
     return (await response.json()) as T;
   }
 
