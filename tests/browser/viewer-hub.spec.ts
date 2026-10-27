@@ -166,30 +166,64 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   expect(state.jobs[1].input.profileBackend).toBeUndefined();
 });
 
-test("Animate themes write the motion prompt and queue a video from the image", async ({
+test("An Animate theme queues a video in one click; the queue item writes its motion prompt", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Registered after the shared fixtures so it takes precedence.
-  const written: any[] = [];
-  await page.route("**/api/assistant/animate", (route) => {
-    written.push(route.request().postDataJSON());
-    return route.fulfill({ json: { ok: true, prompt: "The bird takes flight" } });
-  });
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Spicy", exact: true })).toHaveCount(0);
   await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
-  expect(written).toEqual([{ profileId: "video:test", prompt: "An amber bird", theme: "living" }]);
   expect(state.jobs[1]).toMatchObject({
     operation: "animate",
     parentJobId: "job-hub",
     input: {
       kind: "video",
-      prompt: "The bird takes flight",
+      prompt: "",
+      writing: { kind: "animate", theme: "living", source: "An amber bird" },
       referenceAssets: [{ assetId: "asset-hub", slot: "start" }],
     },
   });
+});
+
+test("A queue item streams its prompt's thinking; the result keeps it collapsed under the prompt", async ({
+  page,
+}, testInfo) => {
+  const thinking = "The bird is perched, so a gentle take-off reads best.";
+  const { state, viewer } = await seed(page, {
+    writing: { kind: "animate", model: "ai/text", thinking },
+  });
+  state.jobs.push({
+    id: "job-writing",
+    jobId: "job-writing",
+    sessionId: "session-hub",
+    status: "writing",
+    operation: "animate",
+    input: { kind: "video", prompt: "", writing: { kind: "animate", theme: "action" } },
+    progress: { thinking: "Wings first, then", prompt: "The bird spreads its wings" },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: "An amber bird", exact: true });
+  }
+  await expect(details.getByText("Written by ai/text", { exact: true })).toBeVisible();
+  const toggle = details.getByRole("button", { name: "Thinking", exact: true });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(details.getByText(thinking, { exact: true })).toBeHidden();
+  await toggle.click();
+  await expect(details.getByText(thinking, { exact: true })).toBeVisible();
+  // The queue item, as a fresh page loads it.
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const queue = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(queue.getByText("Writing Prompt", { exact: true })).toBeVisible();
+  await expect(queue.getByText("Wings first, then", { exact: true })).toBeVisible();
+  await expect(queue.getByText("The bird spreads its wings", { exact: true })).toBeVisible();
 });
 
 // Local video is stopped and the account is granted Grok: Animate goes there and says so first.
@@ -226,9 +260,6 @@ test("With local video stopped, an Animate theme says it runs on Grok and queues
   page,
 }) => {
   const { state, viewer } = await seed(page, {}, offline);
-  await page.route("**/api/assistant/animate", (route) =>
-    route.fulfill({ json: { ok: true, prompt: "The bird takes flight" } }),
-  );
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await expect(page.getByText(note, { exact: true })).toBeVisible();
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
@@ -238,7 +269,7 @@ test("With local video stopped, an Animate theme says it runs on Grok and queues
     input: {
       kind: "video",
       profileId: grok.id,
-      prompt: "The bird takes flight",
+      writing: { kind: "animate", theme: "cinematic" },
       width: 960,
       height: 960,
       duration: 6,

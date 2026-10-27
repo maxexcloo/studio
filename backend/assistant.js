@@ -108,6 +108,16 @@ export function assistantSettings(environment = process.env) {
   };
 }
 
+/** The Spicy model from the assistant's settings, or a 409 AssistantError while none is chosen. */
+export function spicyModelOf(settings) {
+  if (!settings?.spicyModel)
+    throw new AssistantError(
+      "Spicy needs a Spicy model. An administrator chooses one in Settings › Models › Integrations.",
+      { status: 409 },
+    );
+  return settings.spicyModel;
+}
+
 /** The guide without provenance or sampling notes, as compact JSON. */
 export function writerGuide(guide) {
   const prune = (value) =>
@@ -135,11 +145,25 @@ export function stripThinking(text) {
   return body.trim();
 }
 
+/** The reasoning in a reply: its `<think>` blocks (an orphan `</think>` closes one opened by the template). */
+function replyThinking(text) {
+  const body = String(text || "");
+  const orphan = body.search(/<\/think>/i);
+  const parts = [];
+  if (orphan >= 0 && !/<think>/i.test(body.slice(0, orphan))) parts.push(body.slice(0, orphan));
+  for (const match of body.matchAll(/<think>([\s\S]*?)(?:<\/think>|$)/gi)) parts.push(match[1]);
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /**
  * Strips `<think>` blocks from a stream as it arrives, holding back only what could still be the
  * start of a tag. push() returns the text safe to show; flush() returns what is left at the end.
+ * `onThinking` hears the reasoning inside the blocks as it arrives.
  */
-export function createThinkFilter() {
+export function createThinkFilter(onThinking = () => {}) {
   const open = "<think>";
   const close = "</think>";
   let pending = "";
@@ -166,9 +190,12 @@ export function createThinkFilter() {
         if (thinking) {
           const end = lower.indexOf(close);
           if (end < 0) {
-            pending = pending.slice(pending.length - partial(pending, close));
+            const keep = partial(pending, close);
+            if (pending.length > keep) onThinking(pending.slice(0, pending.length - keep));
+            pending = pending.slice(pending.length - keep);
             break;
           }
+          if (end) onThinking(pending.slice(0, end));
           pending = pending.slice(end + close.length);
           thinking = false;
           continue;
@@ -511,9 +538,10 @@ export function createAssistant(
   }
 
   /**
-   * One chat completion. With `onDelta`, it streams: visible text (reasoning stripped) is passed on
-   * as it arrives, and a gateway that answers without streaming hands over the whole reply at once.
-   * Resolves to { text, model, ms } with the final, reasoning-free text; throws AssistantError.
+   * One chat completion. With `onDelta` or `onThinking`, it streams: visible text (reasoning
+   * stripped) goes to `onDelta` and reasoning (`reasoning_content` deltas and `<think>` blocks) to
+   * `onThinking` as they arrive; a gateway that answers without streaming hands over each at once.
+   * Resolves to { text, thinking, model, ms } with the final, reasoning-free text; throws AssistantError.
    */
   async function chat({
     model,
@@ -522,11 +550,22 @@ export function createAssistant(
     maxTokens = 800,
     signal,
     onDelta,
+    onThinking,
     timeout: ms,
   } = {}) {
     const { endpoint, key } = settings();
     const started = now();
-    const stream = typeof onDelta === "function";
+    const stream = typeof onDelta === "function" || typeof onThinking === "function";
+    const shown = typeof onDelta === "function" ? onDelta : () => {};
+    let reasoning = "";
+    let source = "";
+    // Reasoning from `reasoning_content` and from `<think>` blocks reads as separate paragraphs.
+    const thought = (piece, from = "think") => {
+      const text = `${reasoning && from !== source ? "\n\n" : ""}${piece}`;
+      source = from;
+      reasoning += text;
+      onThinking?.(text);
+    };
     const timer = AbortSignal.timeout(ms ?? (stream ? streamTimeoutMs : timeoutMs));
     const body = { model, messages, temperature, max_tokens: maxTokens, stream };
     let response;
@@ -562,28 +601,29 @@ export function createAssistant(
         /text\/event-stream/i.test(response.headers.get("content-type") || "") &&
         response.body
       ) {
-        const filter = createThinkFilter();
+        const filter = createThinkFilter(thought);
         for await (const event of readServerSentEvents(response.body)) {
           if (event?.error)
             throw new AssistantError(one(event.error.message || "stream error", 120));
           const choice = event?.choices?.[0];
-          const piece =
-            typeof choice?.delta?.content === "string"
-              ? choice.delta.content
-              : typeof choice?.message?.content === "string"
-                ? choice.message.content
-                : "";
+          const part = choice?.delta || choice?.message;
+          if (typeof part?.reasoning_content === "string" && part.reasoning_content)
+            thought(part.reasoning_content, "reasoning");
+          const piece = typeof part?.content === "string" ? part.content : "";
           if (!piece) continue;
           raw += piece;
-          const shown = filter.push(piece);
-          if (shown) onDelta(shown);
+          const visible = filter.push(piece);
+          if (visible) shown(visible);
         }
         const rest = filter.flush();
-        if (rest) onDelta(rest);
+        if (rest) shown(rest);
       } else {
-        const answer = await response.json();
-        raw = String(answer?.choices?.[0]?.message?.content || "");
-        if (stream && stripThinking(raw)) onDelta(stripThinking(raw));
+        const message = (await response.json())?.choices?.[0]?.message;
+        raw = String(message?.content || "");
+        const reasoned = String(message?.reasoning_content || "").trim();
+        if (reasoned) thought(reasoned, "reasoning");
+        if (replyThinking(raw)) thought(replyThinking(raw));
+        if (stripThinking(raw)) shown(stripThinking(raw));
       }
     } catch (error) {
       if (error instanceof AssistantError) throw error;
@@ -593,7 +633,13 @@ export function createAssistant(
         cause: error,
       });
     }
-    return { text: stripThinking(raw), raw, model, ms: now() - started };
+    return {
+      text: stripThinking(raw),
+      thinking: reasoning.trim(),
+      raw,
+      model,
+      ms: now() - started,
+    };
   }
 
   const note = (operation, profile, started, reason = "") => {
@@ -609,13 +655,7 @@ export function createAssistant(
   /** The model for a preset: Spicy's own (refused while none is set), else the assistant model. */
   function modelFor(preset) {
     const resolved = settings();
-    if (!preset.spicy) return resolved.model;
-    if (!resolved.spicyModel)
-      throw new AssistantError(
-        "Spicy needs a Spicy model. An administrator chooses one in Settings › Models › Integrations.",
-        { status: 409 },
-      );
-    return resolved.spicyModel;
+    return preset.spicy ? spicyModelOf(resolved) : resolved.model;
   }
 
   /**

@@ -94,6 +94,8 @@ export interface MediaItem {
   status: string;
   prompt?: string;
   negative?: string;
+  /** How the prompt assistant wrote the prompt in the queue: its text model and thinking. */
+  writing?: { kind: string; model?: string; thinking?: string };
   /** What the image shows, from Gallery Captions; older captions have no tags. */
   caption?: { text: string; tags?: string[]; model?: string; at?: string };
   createdAt?: string;
@@ -134,7 +136,8 @@ export type QueueJob = Omit<SharedQueueJob, "input" | "items" | "outputs" | "pro
   input: GenerationInput;
   items: MediaItem[];
   outputs: MediaItem[];
-  progress?: { value: number; max: number; phase?: string };
+  /** Generation steps, or while the prompt is written its streamed thinking and prompt. */
+  progress?: { value?: number; max?: number; phase?: string; thinking?: string; prompt?: string };
 };
 export type Session = Omit<StudioSession, "inputs"> & { inputs: Partial<GenerationInput> };
 export interface Account {

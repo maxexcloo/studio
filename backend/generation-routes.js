@@ -21,6 +21,7 @@ import {
   setGallery,
   galleryRevisionValue,
   storedChatRecord,
+  storedWritingRecord,
 } from "./gallery-store.js";
 import { recordPrompt } from "./prompt-history.js";
 import { jobs, runJob, runMockJob } from "./jobs.js";
@@ -328,6 +329,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         : null;
     if (assistant) body.assistant = assistant;
     else delete body.assistant;
+    // The queue's writing stage wrote the prompt (prompt-stage.js): its results keep the thinking.
+    const writing = storedWritingRecord(req.body?.writing);
+    if (writing) body.writing = writing;
+    else delete body.writing;
     // The chat conversation that asked for it (Studio MCP), so the gallery can link back to it.
     const chat = storedChatRecord(req.body?.chat);
     if (chat) body.chat = chat;

@@ -488,6 +488,9 @@ export class McpMedia {
       profile_id,
       profile_backend,
       prompts,
+      // With `write` ({ changes, role }), each prompt is a request Studio writes in the queue:
+      // every job writes its own prompt as its first stage, one of `count` for its request.
+      write,
       loras = [],
       reference_asset_ids = [],
       reference_role,
@@ -589,7 +592,19 @@ export class McpMedia {
       (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)
     )
       body.tiledDecode = true;
-    const preparedPrompts = prompts.map(styled);
+    const preparedPrompts = write ? prompts : prompts.map(styled);
+    // The writing stage adds the tag line once the prompt is written (prompt-stage.js).
+    const writing = (request, index) =>
+      write && {
+        kind: "request",
+        request,
+        changes: write.changes || [],
+        role: write.role || "",
+        references: reference_asset_ids.length,
+        index,
+        of: runs,
+        ...(record.styled ? { loraTags: true } : {}),
+      };
     // How long the set should take, asked alongside submission; it never holds up or fails the set.
     const estimate = this.runEstimate(
       owner,
@@ -610,6 +625,9 @@ export class McpMedia {
       for (const prompt of preparedPrompts)
         for (let variant = 0; variant < runs; variant++) {
           const id = crypto.randomUUID();
+          const writes = writing(prompt, variant);
+          // A prompt written in the queue is not known yet; its outputs carry it.
+          const ran = writes ? undefined : prompt;
           try {
             // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
             this.state.jobs[id] = owner;
@@ -621,7 +639,8 @@ export class McpMedia {
                 ...body,
                 clientJobId: id,
                 queueSet,
-                prompt,
+                prompt: ran ?? "",
+                ...(writes ? { writing: writes } : {}),
                 seed: seed === undefined ? "" : String(seed + queued.length),
               },
               owner,
@@ -635,7 +654,7 @@ export class McpMedia {
             this.state.jobs[result.jobId] = owner;
             // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
             this.recordPrompt(result.jobId, {
-              prompt,
+              ...(ran ? { prompt: ran } : {}),
               set: queueSet,
               ...(record.request ? { request: record.request } : {}),
               ...(record.changes?.length ? { changes: record.changes } : {}),
@@ -645,7 +664,7 @@ export class McpMedia {
             queued.push({
               job_id: result.jobId,
               ...this.handle(owner, scope, result.jobId),
-              prompt,
+              ...(ran ? { prompt: ran } : {}),
             });
           } catch (error) {
             if (error.submissionUncertain) {
@@ -653,7 +672,7 @@ export class McpMedia {
                 job_id: id,
                 ...this.handle(owner, scope, id),
                 status: "unknown",
-                prompt,
+                ...(ran ? { prompt: ran } : {}),
               });
               return {
                 status: "partially_queued",
@@ -762,7 +781,7 @@ export class McpMedia {
       options,
     );
     const outputs = new Map();
-    let kind, profileId;
+    let kind, profileId, prompt;
     for (const item of items) {
       const index = outputIndex(item);
       if (
@@ -775,6 +794,7 @@ export class McpMedia {
         outputs.set(index, { url: item.url });
         kind = item.type;
         profileId ||= canonicalProfileId(item.settings?.profileId);
+        prompt ||= item.prompt;
       }
     }
     return outputs.size
@@ -782,6 +802,7 @@ export class McpMedia {
           status: "done",
           kind,
           profileId,
+          ...(prompt ? { prompt } : {}),
           outputs: Array.from(
             { length: Math.max(...outputs.keys()) + 1 },
             (_, index) => outputs.get(index) || {},
@@ -876,6 +897,7 @@ export class McpMedia {
                 outputs: visible.outputs,
                 kind: visible.kind || job.kind,
                 profileId: visible.profileId,
+                ...(visible.prompt ? { prompt: visible.prompt } : {}),
               };
       }
       // A cloud video job refused for authorisation or quota reads as such, and pauses further cloud video.
@@ -1658,14 +1680,14 @@ export class McpMedia {
             )
           : [];
         if (!outputs.length)
-          return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : "This generation did not produce a result."}</p>${this.promptHtml(jobId)}</section>`;
+          return `<section>${heading}<p>${job.cloudQuota ? `${cloudQuotaMessage} This generation did not run.` : "This generation did not produce a result."}</p>${this.promptHtml(jobId, job)}</section>`;
         return `<section>${heading}${outputs
           .map((token) =>
             job.kind === "video"
               ? `<figure><video src="${token}" controls playsinline preload="metadata"></video><a href="${token}">View Original</a></figure>`
               : `<figure><a href="${token}"><img src="${token}" alt="Result ${number}"></a><a href="${token}">View Original</a></figure>`,
           )
-          .join("")}${this.promptHtml(jobId)}</section>`;
+          .join("")}${this.promptHtml(jobId, job)}</section>`;
       })
       .join("");
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>All Results</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>All Results</h1>${sections}</body></html>`;
@@ -1708,12 +1730,12 @@ export class McpMedia {
         ? `<p>Still generating${escapeHtml(progress)}. This page refreshes automatically.</p>`
         : outputs.length
           ? media
-          : ended) + this.promptHtml(claims.jobId);
+          : ended) + this.promptHtml(claims.jobId, job);
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer">${pending ? '<meta http-equiv="refresh" content="5">' : ""}<title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark}figure{margin:0 0 1.5rem}img,video{display:block;max-width:100%;max-height:85vh;margin-bottom:.5rem}.prompt{max-width:60rem;opacity:.8;white-space:pre-wrap}</style></head><body><h1>${title}</h1>${body}</body></html>`;
   }
-  /** The full prompt a job ran, for its result pages. */
-  promptHtml(jobId) {
-    const prompt = this.promptRecord(jobId)?.prompt;
+  /** The full prompt a job ran, for its result pages; one Studio wrote in the queue comes from its results. */
+  promptHtml(jobId, job) {
+    const prompt = this.promptRecord(jobId)?.prompt || job?.prompt;
     return prompt ? `<p class="prompt">${escapeHtml(prompt)}</p>` : "";
   }
   summary(job) {
