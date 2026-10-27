@@ -72,7 +72,7 @@ export function GalleryFilterPicker({
             leftSection={<Icon size={15} />}
             rightSection={
               value.length > 0 ? (
-                <Badge size="xs" circle aria-hidden>
+                <Badge size="xs" circle variant="filled" aria-hidden>
                   {value.length}
                 </Badge>
               ) : (

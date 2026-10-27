@@ -40,6 +40,13 @@ primary component reference and verify APIs against the installed version.
   defaults, with readable contrast over media. Follow the system colour scheme by
   default. The header Theme popover owns persisted Animations, Background, Colour,
   Colour Scheme, Corners and Layout controls in that order; Settings does not duplicate appearance controls.
+- Controls follow one size and emphasis scale from the `theme.ts` defaults.
+  Standard: Button and inputs `md`, ActionIcon 36 px, SegmentedControl `sm`.
+  Compact surfaces (list rows, toolbars, chip rails, popover forms) step down
+  one tier: Button `compact-sm`, inputs and SegmentedControl `xs`/`sm`, Badge
+  `xs`/`sm`. Emphasis: one filled primary action per view, `default` for
+  secondary actions, `subtle` for row and toolbar actions, `light` status
+  Badges and filled count dots. Set a per-call size only to step down a tier, never to restate a default.
 - Use Mantine spacing, typography, colours and breakpoints, including custom
   media CSS. Give Paper padding and borders explicitly where needed; do not
   apply global Paper defaults that leak into dialogs and navigation.
