@@ -13,7 +13,10 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
   const file = path.join(dir, "settings.env");
   try {
-    fs.writeFileSync(file, "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\nSTUDIO_VIDEO_PREVIEW_CACHE_MB=9\n");
+    fs.writeFileSync(
+      file,
+      "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\nSTUDIO_VIDEO_PREVIEW_CACHE_MB=9\n",
+    );
     const output = execFileSync(
       process.execPath,
       [

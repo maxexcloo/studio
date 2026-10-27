@@ -27,11 +27,9 @@ const { matchesGalleryFilters } = await import("./gallery-filters.js");
 const { effectiveAccountAccess, mayUseGenerationProfile } = await import("./account-policy.js");
 const { findProfile } = await import("./mcp-tiers.js");
 const { buildExport } = await import("./profile-export.js");
-const { seedMissing } = await import("./profile-seed.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("./workflow-catalog.js");
 const { McpMedia } = await import("./mcp-media.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-const quiet = { info: () => {}, warn: () => {} };
 
 const radianceBlock = {
   controls: { prompt: { node: "1", input: "prompt" }, steps: { node: "1", input: "steps" } },
@@ -393,22 +391,7 @@ test("switching the backend is an ordinary versioned edit, and records and timin
   );
 });
 
-test("seeding keeps a combined id's aliases with their backends and never revives the old files", (t) => {
-  const seed = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backends-seed-"));
-  t.after(() => fs.rmSync(seed, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(seed, "profiles"), { recursive: true });
-  fs.writeFileSync(
-    path.join(seed, "profiles", `${radianceId}.json`),
-    single(radianceId, "Krea 2 Turbo · Radiance", radianceBlock, radianceGraph),
-  );
-  const result = seedMissing({
-    seedDir: seed,
-    dataDir: temporary,
-    workflowsDir: userWorkflowsDir,
-    store: profileStore(),
-    log: quiet,
-  });
-  assert.deepEqual(result.skipped, [radianceId]);
+test("an export keeps a combined id's aliases with their backends", () => {
   const { files } = buildExport({
     workflowsDir: userWorkflowsDir,
     profiles: profileStore(),

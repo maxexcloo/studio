@@ -19,7 +19,6 @@ for (const development of [false, true]) {
         env: {
           ...process.env,
           STUDIO_COMMIT: commit,
-          STUDIO_CONFIG_DIR: "",
           STUDIO_DATA_DIR: data,
           STUDIO_ENV_FILE: path.join(data, ".env"),
           STUDIO_DEMO: "1",

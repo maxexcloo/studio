@@ -85,7 +85,6 @@ test(
         STUDIO_WORKERS: "[]",
         STUDIO_DEMO: "0",
         STUDIO_MULTI_USER: "1",
-        STUDIO_CONFIG_DIR: "",
         STUDIO_RUNTIME_AUTOMATIC: "",
         STUDIO_CLIPROXYAPI_URL: providerUrl,
         STUDIO_CLIPROXYAPI_KEY: "fixture-value",

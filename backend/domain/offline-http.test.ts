@@ -19,8 +19,7 @@ test(
   async () => {
     const temporary = mkdtempSync(path.join(os.tmpdir(), "studio-offline-"));
     const dataDir = path.join(temporary, "runtime");
-    const config = path.join(temporary, "ai");
-    mkdirSync(path.join(config, "profiles"), { recursive: true });
+    mkdirSync(path.join(dataDir, "workflows"), { recursive: true });
     const raw = {
       studio: {
         id: "cold",
@@ -84,19 +83,8 @@ test(
         ]),
       ),
     );
-    const profileFile = path.join(config, "profiles", "cold.json");
+    const profileFile = path.join(dataDir, "workflows", "cold.json");
     writeFileSync(profileFile, JSON.stringify(raw));
-    const removedFile = path.join(config, "profiles", "removed.json");
-    writeFileSync(
-      removedFile,
-      JSON.stringify({
-        ...raw,
-        studio: { ...raw.studio, id: "removed", name: "Removed Profile" },
-      }),
-    );
-    writeFileSync(path.join(config, "models.json"), "[]");
-    writeFileSync(path.join(config, "lora-catalogue.json"), "{}");
-    writeFileSync(path.join(config, "prompting.json"), "{}");
     const info = JSON.parse(
       readFileSync(new URL("../fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
     );
@@ -133,11 +121,9 @@ test(
           HOST: "127.0.0.1",
           STUDIO_ENV_FILE: "/dev/null",
           STUDIO_DATA_DIR: dataDir,
-          STUDIO_CONFIG_DIR: config,
           STUDIO_DEMO: "0",
           STUDIO_MULTI_USER: "1",
           STUDIO_ENABLE_GROK: "0",
-          STUDIO_ENABLE_BUILTIN_PROFILES: "1",
           STUDIO_OUTPUT_STORAGE: "studio",
           STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
           STUDIO_CLIPROXYAPI_URL: "",
@@ -336,32 +322,13 @@ test(
       const saved = await waitFor(accepted.jobId, (job) => job.status === "completed");
       assert.equal(new URL(saved.outputs[0].url!, base).searchParams.get("type"), "media");
       assert.equal(chosen.prompts.length, 1);
-      const observed = await api("/api/models");
-      const builtin = observed.profiles.find((item: any) => !item.id.startsWith("custom:"));
-      assert.ok(builtin);
       await stop();
       chosen.setDown(true);
       other.setDown(true);
       deployment.replicas = 0;
       deployment.pods = [];
       writeFileSync(
-        path.join(dataDir, "per-model-workflows.json"),
-        JSON.stringify([{ id: profile.id, model: profile.model, name: "Stale Runtime Title" }]),
-      );
-      writeFileSync(
         profileFile,
-        JSON.stringify({
-          ...raw,
-          studio: {
-            ...raw.studio,
-            name: "Changed Seed Title",
-            nsfw: true,
-            defaults: { steps: 9 },
-          },
-        }),
-      );
-      writeFileSync(
-        path.join(dataDir, "workflows", "cold.json"),
         JSON.stringify({
           ...raw,
           studio: {
@@ -372,21 +339,14 @@ test(
           },
         }),
       );
-      rmSync(removedFile);
       await start();
       const reopened = await api("/api/models");
       const current = reopened.profiles.find((item: any) => item.id === profile.id);
       assert.equal(current.label, "Current Studio Title");
       assert.equal(current.defaults.steps, 7);
       assert.equal(current.nsfw, true);
-      assert.equal(
-        reopened.profiles.some((item: any) => item.id === "custom:removed"),
-        true,
-        "removing an ai seed does not delete Studio’s existing runtime profile",
-      );
-      const cached = reopened.profiles.find((item: any) => item.id === builtin.id);
-      assert.equal(cached.availability, "offline");
-      assert.equal(cached.ready, undefined);
+      assert.equal(current.availability, "offline");
+      assert.equal(current.ready, undefined);
     } finally {
       await stop();
       await Promise.all([chosen.close(), other.close()]);

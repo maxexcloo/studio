@@ -644,7 +644,6 @@ test("imported-only deployments retain user workflows and model files while hidi
     delete process.env.STUDIO_ENABLE_BUILTIN_PROFILES;
     const ordinary = inferModels(info);
     assert(ordinary.profiles.some((profile) => !profile.id.startsWith("custom:")));
-    assert(allCustomWorkflowRecords().some((workflow) => workflow.source === "bundled"));
     process.env.STUDIO_ENABLE_BUILTIN_PROFILES = "0";
     const imported = inferModels(info);
     assert.deepEqual(
@@ -653,7 +652,6 @@ test("imported-only deployments retain user workflows and model files while hidi
     );
     assert.equal(imported.defaults.imageModel, "custom:imported-only");
     assert.deepEqual(imported.modelFiles, ordinary.modelFiles);
-    assert(allCustomWorkflowRecords().every((workflow) => workflow.source === "custom"));
   } finally {
     if (previous === undefined) delete process.env.STUDIO_ENABLE_BUILTIN_PROFILES;
     else process.env.STUDIO_ENABLE_BUILTIN_PROFILES = previous;

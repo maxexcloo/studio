@@ -550,11 +550,11 @@ export function inferModels(
       });
   }
 
-  // Legacy runtime titles stay readable only when ai is not the configuration owner.
+  // Legacy runtime titles stay readable.
   try {
-    const saved = process.env.STUDIO_CONFIG_DIR
-      ? []
-      : JSON.parse(fs.readFileSync(path.join(dataDir, "per-model-workflows.json"), "utf8"));
+    const saved = JSON.parse(
+      fs.readFileSync(path.join(dataDir, "per-model-workflows.json"), "utf8"),
+    );
     for (const row of saved) {
       const profile =
         profiles.find((item) => item.id === row.id) ||

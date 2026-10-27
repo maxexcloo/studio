@@ -60,7 +60,7 @@ import {
 } from "./profile-editor.js";
 import { registerProfileRoutes } from "./profile-routes.js";
 import { draftProfileFromImport } from "./profile-drafts.js";
-import { seedDirectory, seedMissing } from "./profile-seed.js";
+import { seedSamples } from "./profile-seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./family-profiles.js";
@@ -349,20 +349,11 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     return null;
   }
 }
-// Once per start and safe to repeat: the seed (STUDIO_SEED_DIR) fills only what is missing, then the
-// catalogue, guide and profile stores take in what the older files hold, which stay where they are
+// Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue,
+// guide and profile stores take in what the older files hold, which stay where they are
 // (profile-seed.js, library-catalogue.js, profile-store.js). Before MCP reads guides.
 for (const [name, migrate] of [
-  [
-    "seed",
-    () =>
-      seedMissing({
-        seedDir: seedDirectory(),
-        dataDir,
-        workflowsDir: userWorkflowsDir,
-        store: profileStore(),
-      }),
-  ],
+  ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
   ["guides", () => guideStore().migrate()],
   ["profiles", () => profileStore().migrate()],
@@ -382,8 +373,7 @@ const mcp = registerMcpRoutes(app, {
   runtime: runtime?.controller,
   gatewayAdminTools,
   baseUrl: () => `http://127.0.0.1:${port}`,
-  allowedHost: (req) =>
-    hostAllowed(req.headers.host, { network: networkListening }),
+  allowedHost: (req) => hostAllowed(req.headers.host, { network: networkListening }),
   accountMode: multiUserEnabled,
   authenticateAccountToken: verifyAccountMcpToken,
   authenticateGatewayIdentity: gatewayAccountAccess,

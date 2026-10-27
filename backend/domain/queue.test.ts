@@ -186,16 +186,7 @@ test("manual requests run before queued MCP work, FIFO within each tier", async 
   try {
     const session = store.createSession("alice");
     const enqueue = (origin = {}) =>
-      store.enqueue(
-        "alice",
-        session.id,
-        {},
-        "image",
-        undefined,
-        undefined,
-        undefined,
-        origin,
-      ).id;
+      store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, origin).id;
     const order = [enqueue(mcp("a")), enqueue(mcp("b")), enqueue(), enqueue()];
     await drain(queue);
     assert.deepEqual(queue.submitted, [order[2], order[3], order[0], order[1]]);
@@ -210,16 +201,7 @@ test("a started MCP set stays contiguous and its order survives restart", async 
   const first = fixture(filename);
   const session = first.store.createSession("alice");
   const enqueue = (store: RewriteStore, origin = {}) =>
-    store.enqueue(
-      "alice",
-      session.id,
-      {},
-      "image",
-      undefined,
-      undefined,
-      undefined,
-      origin,
-    ).id;
+    store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, origin).id;
   const a1 = enqueue(first.store, mcp("a"));
   const a2 = enqueue(first.store, mcp("a"));
   const b1 = enqueue(first.store, mcp("b"));

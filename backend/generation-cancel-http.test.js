@@ -14,8 +14,6 @@ import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
-  const config = path.join(directory, "config");
-  fs.mkdirSync(config);
   const info = JSON.parse(
     fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
   );
@@ -82,7 +80,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         HOST: "127.0.0.1",
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: path.join(directory, "runtime"),
-        STUDIO_CONFIG_DIR: config,
         STUDIO_ENABLE_BUILTIN_PROFILES: "1",
         STUDIO_WORKERS: JSON.stringify([
           { id: "chosen", name: "Chosen", url: worker.url, capabilities: ["image"] },

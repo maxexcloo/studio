@@ -35,7 +35,6 @@ test(
           STUDIO_DEMO: "1",
           STUDIO_WORKERS: "[]",
           STUDIO_MULTI_USER: "",
-          STUDIO_CONFIG_DIR: "",
           STUDIO_RUNTIME_AUTOMATIC: "",
         },
         stdio: ["ignore", "pipe", "pipe"],

@@ -11,9 +11,7 @@ export function presetsEnabled() {
 }
 
 export function builtInProfilesEnabled() {
-  if (process.env.STUDIO_ENABLE_BUILTIN_PROFILES !== undefined)
-    return process.env.STUDIO_ENABLE_BUILTIN_PROFILES !== "0";
-  return !process.env.STUDIO_CONFIG_DIR;
+  return process.env.STUDIO_ENABLE_BUILTIN_PROFILES !== "0";
 }
 
 export function modelFamilyEnabled(family, model = "") {
