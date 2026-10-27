@@ -321,9 +321,9 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     assert.equal(body.duration, 8);
     assert.equal(body.resolution, "720p");
     const frame = String((body.image as { url: string }).url);
-    assert.match(frame, /^data:image\/png;base64,/);
+    assert.match(frame, /^data:image\/jpeg;base64,/);
     const sent = await sharp(Buffer.from(frame.split(",")[1], "base64")).metadata();
-    assert.deepEqual([sent.format, sent.width, sent.height], ["png", 600, 1000]);
+    assert.deepEqual([sent.format, sent.width, sent.height], ["jpeg", 600, 1000]);
 
     // Limits are refused before anything reaches the provider.
     const submissions = () =>
