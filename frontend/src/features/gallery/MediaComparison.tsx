@@ -64,7 +64,6 @@ export function MediaComparison({
       >
         <TransformWrapper
           ref={zoom.transform}
-          fitOnInit
           minScale={0.0001}
           maxScale={1000}
           limitToBounds

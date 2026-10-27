@@ -19,7 +19,7 @@ import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaDetails } from "./MediaDetails";
+import { DetailsCopyActions, MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
@@ -38,6 +38,53 @@ const loadZoomImage = () =>
   import("./ZoomImage").then((module) => ({ default: (zoomImage = module.ZoomImage) }));
 const LazyZoomImage = lazy(loadZoomImage);
 (window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
+
+// Clicks this close to a visible control are near-misses, not a request to close. The zoomable
+// picture is not a control: a click just outside the image still closes.
+const deadZone = 24;
+function nearControl(event: React.MouseEvent<HTMLElement>) {
+  return [
+    ...event.currentTarget.querySelectorAll(
+      "button, a[href], input, textarea, video, [role=slider]",
+    ),
+  ].some((control) => {
+    if (
+      control.closest(".react-transform-wrapper") ||
+      !control.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+    )
+      return false;
+    const box = control.getBoundingClientRect();
+    return (
+      event.clientX > box.left - deadZone &&
+      event.clientX < box.right + deadZone &&
+      event.clientY > box.top - deadZone &&
+      event.clientY < box.bottom + deadZone
+    );
+  });
+}
+
+/**
+ * Plays each opened video, muted if the browser refuses sound, pauses it while the tab is hidden
+ * and releases the player when it leaves. The keyed element gets a fresh call per source.
+ */
+function playVideo(media: HTMLVideoElement | null) {
+  if (!media) return;
+  const pause = () => {
+    if (document.hidden) media.pause();
+  };
+  document.addEventListener("visibilitychange", pause);
+  media.play().catch((error: DOMException) => {
+    if (error.name !== "NotAllowedError" || media.muted) return;
+    media.muted = true;
+    void media.play().catch(() => {});
+  });
+  return () => {
+    document.removeEventListener("visibilitychange", pause);
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+  };
+}
 
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
@@ -141,22 +188,6 @@ export function MediaViewer({
     },
     [],
   );
-  const video = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const media = video.current;
-    const pause = () => {
-      if (document.hidden) media?.pause();
-    };
-    document.addEventListener("visibilitychange", pause);
-    return () => {
-      document.removeEventListener("visibilitychange", pause);
-      if (media) {
-        media.pause();
-        media.removeAttribute("src");
-        media.load();
-      }
-    };
-  }, [item.id, item.type, source.url]);
   const subtitle = [
     item.type === "video" ? "Video" : "Image",
     String(item.settings?.profileName || ""),
@@ -236,7 +267,9 @@ export function MediaViewer({
             event.stopPropagation();
             gestureClick.current = false;
           }}
-          onClick={close}
+          onClick={(event) => {
+            if (!nearControl(event)) close();
+          }}
         >
           <div className={classes.main}>
             <Group
@@ -315,13 +348,12 @@ export function MediaViewer({
                 <MediaJobStatus item={item} onRetried={setReplacement} />
               ) : item.type === "video" ? (
                 <video
-                  ref={video}
+                  ref={playVideo}
                   key={`${item.id}:${source.url}`}
                   src={source.url}
                   width={source.width}
                   height={source.height}
                   controls
-                  autoPlay={false}
                   playsInline
                   className={classes.video}
                   onClick={(event) => event.stopPropagation()}
@@ -343,6 +375,7 @@ export function MediaViewer({
                     key={item.id}
                     src={source.url}
                     alt={item.prompt || "Generated Image"}
+                    placeholder={source.thumbnailUrl}
                     width={source.width}
                     height={source.height}
                     swipe={(direction) => {
@@ -400,14 +433,17 @@ export function MediaViewer({
               >
                 <ScrollArea h="100%" type="hover" offsetScrollbars>
                   <Stack gap="lg" p="md" pt="lg">
-                    <Stack gap={2}>
-                      <Text fw={600} lineClamp={2}>
-                        {mediaTitle(item)}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {subtitle}
-                      </Text>
-                    </Stack>
+                    <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+                      <Stack gap={2} miw={0}>
+                        <Text fw={600} lineClamp={2}>
+                          {mediaTitle(item)}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {subtitle}
+                        </Text>
+                      </Stack>
+                      <DetailsCopyActions item={displayed} />
+                    </Group>
                     <MediaDetails item={displayed} />
                   </Stack>
                 </ScrollArea>
@@ -427,9 +463,12 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Text size="xs" c="dimmed" mt={-8}>
-                {subtitle}
-              </Text>
+              <Group justify="space-between" wrap="nowrap" gap="xs" mt={-8}>
+                <Text size="xs" c="dimmed">
+                  {subtitle}
+                </Text>
+                <DetailsCopyActions item={displayed} />
+              </Group>
               <MediaDetails item={displayed} />
             </Stack>
           </Drawer>
