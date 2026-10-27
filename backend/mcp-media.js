@@ -141,6 +141,16 @@ function runCaption(labels, images) {
     : labels.join(", ");
 }
 
+/**
+ * A gallery item's output number. Records from before 0.4x carry it only in their id
+ * (`<jobId>-<n>`), and single-output ones may carry neither, which means the first output.
+ */
+function outputIndex(item) {
+  if (Number.isInteger(item.index)) return item.index;
+  const suffix = /-(\d+)$/.exec(String(item.id || "").slice(String(item.jobId || "").length));
+  return suffix ? Number(suffix[1]) : 0;
+}
+
 export class McpMedia {
   constructor({
     dataDir,
@@ -743,19 +753,20 @@ export class McpMedia {
     );
     const outputs = new Map();
     let kind, profileId;
-    for (const item of items)
+    for (const item of items) {
+      const index = outputIndex(item);
       if (
         item.jobId === jobId &&
         item.status === "done" &&
-        Number.isInteger(item.index) &&
-        item.index >= 0 &&
-        item.index < 1000 &&
+        index >= 0 &&
+        index < 1000 &&
         mcpOutputPath(item.url)
       ) {
-        outputs.set(item.index, { url: item.url });
+        outputs.set(index, { url: item.url });
         kind = item.type;
         profileId ||= canonicalProfileId(item.settings?.profileId);
       }
+    }
     return outputs.size
       ? {
           status: "done",
@@ -1081,7 +1092,7 @@ export class McpMedia {
       owner,
     );
     const item = items.find(
-      (entry) => entry.jobId === jobId && entry.index === index && entry.status === "done",
+      (entry) => entry.jobId === jobId && outputIndex(entry) === index && entry.status === "done",
     );
     if (!item?.settings?.profileId || !item.prompt)
       throw new Error(

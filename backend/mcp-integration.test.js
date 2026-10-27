@@ -5320,3 +5320,28 @@ test("Models shows only a guide's gist unless the whole guide is asked for", asy
     long,
   );
 });
+
+test("an older gallery record without an output index still counts as a finished result", async (t) => {
+  const f = await fixture(t);
+  const client = await f.client();
+  const id = jobId(await generate(client));
+  // Records from before 0.4x carry the output number only in their id, or not at all.
+  Object.assign(f.jobs.get(id), {
+    status: "missing",
+    outputs: [],
+    gallery: [
+      { id, jobId: id, status: "done", type: "image", url: "/comfy/view?filename=old-a.png" },
+      {
+        id: `${id}-1`,
+        jobId: id,
+        status: "done",
+        type: "image",
+        url: "/comfy/view?filename=old-b.png",
+      },
+    ],
+  });
+  const result = await call(client, "Result", { job_id: id });
+  assert.notEqual(result.isError, true);
+  // Both outputs count, shown on one contact sheet.
+  assert.match(texts(result), /Result 1 \(2 images\)/);
+});
