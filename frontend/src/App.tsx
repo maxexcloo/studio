@@ -20,12 +20,10 @@ import { usePhone } from "./ui/usePhone";
 const ComparePage = lazy(() =>
   import("./features/compare/ComparePage").then((module) => ({ default: module.ComparePage })),
 );
-const DreamPage = lazy(() =>
-  import("./features/dream/DreamPage").then((module) => ({ default: module.DreamPage })),
-);
-const ChatPage = lazy(() =>
-  import("./features/sessions/SessionsPage").then((module) => ({ default: module.ChatPage })),
-);
+const loadDream = () => import("./features/dream/DreamPage");
+const loadChat = () => import("./features/sessions/SessionsPage");
+const DreamPage = lazy(() => loadDream().then((module) => ({ default: module.DreamPage })));
+const ChatPage = lazy(() => loadChat().then((module) => ({ default: module.ChatPage })));
 function Workspace() {
   const { appearance } = useAppearance();
   const library = useLibraryAccess();
@@ -42,6 +40,11 @@ function Workspace() {
   useEffect(() => {
     if (overlay) setLastPanel(overlay);
   }, [overlay]);
+  // The other modes load once the first one is up, so switching never shows their loader.
+  useEffect(() => {
+    void loadDream();
+    void loadChat();
+  }, []);
   const background = location.state?.backgroundLocation || {
     pathname: "/images",
     search: "",
