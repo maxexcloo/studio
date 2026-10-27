@@ -210,18 +210,21 @@ export function studioTheme({
       Paper: Paper.extend({
         styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
       }),
-      // Every popover, menu and combobox dropdown renders PopoverDropdown; `data-popup` marks them
-      // for the shared outside-click rule (ui/popupClicks.ts) and their transform origin.
-      PopoverDropdown: Popover.Dropdown.extend({
-        defaultProps: { "data-popup": true } as Record<string, unknown>,
-      }),
-      // Popover also renders Combobox dropdowns (Select, Autocomplete and similar).
+      // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
+      // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
+      // page scrolls, instead of scrolling away and being pulled back a frame later.
       Popover: Popover.extend({
         defaultProps: {
+          floatingStrategy: "fixed",
           middlewares: { flip: true, shift: { padding: 12, crossAxis: true } },
           transitionProps: popupTransition,
         },
         styles: { dropdown },
+      }),
+      // Every popover, menu and combobox dropdown renders PopoverDropdown; `data-popup` marks them
+      // for the shared outside-click rule (ui/popupClicks.ts) and their transform origin.
+      PopoverDropdown: Popover.Dropdown.extend({
+        defaultProps: { "data-popup": true } as Record<string, unknown>,
       }),
       ScrollArea: ScrollArea.extend({
         defaultProps: { type: "never" },
