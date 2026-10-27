@@ -48,7 +48,7 @@ primary component reference and verify APIs against the installed version.
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
   (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Sparkles, Image and Video icons with
   accessible names and tooltips. The selected mode's pill slides between items (`FloatingIndicator`). On every breakpoint one status action sits
-  left of the Studio logo: a spinner while work is generating, otherwise an
+  right of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
   cloud configuration alone is not proof of availability). It opens the same
   slideout everywhere: Chats in Chat, active and failed generations with Cancel
