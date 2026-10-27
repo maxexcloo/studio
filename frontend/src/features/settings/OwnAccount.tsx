@@ -9,37 +9,29 @@ import { ownAccountQuery } from "../auth/AccountGate";
 import { PersonalMcpToken } from "./PersonalMcpToken";
 function AccountForm({ account }: { account: Account }) {
   const client = useQueryClient();
-  const name = useForm({ initialValues: { displayName: account.displayName } });
   const security = useForm({
     initialValues: { username: account.username, currentPassword: "", newPassword: "" },
   });
   const save = useMutation({
     meta: { inlineError: true },
-    mutationFn: (kind: "name" | "security") => {
+    mutationFn: () => {
       const current = security.getValues();
-      const changes =
-        kind === "name"
-          ? name.getValues()
-          : {
-              ...(current.username !== account.username ? { username: current.username } : {}),
-              currentPassword: current.currentPassword,
-              ...(current.newPassword ? { newPassword: current.newPassword } : {}),
-            };
       return api<{ account: Account }>("/api/accounts/me", {
         method: "PATCH",
-        body: JSON.stringify(changes),
+        body: JSON.stringify({
+          ...(current.username !== account.username ? { username: current.username } : {}),
+          currentPassword: current.currentPassword,
+          ...(current.newPassword ? { newPassword: current.newPassword } : {}),
+        }),
       });
     },
-    onSuccess: ({ account }, kind) => {
-      if (kind === "name") name.setValues({ displayName: account.displayName });
-      else security.setValues({ username: account.username, currentPassword: "", newPassword: "" });
+    onSuccess: ({ account }) => {
+      security.setValues({ username: account.username, currentPassword: "", newPassword: "" });
       void client.invalidateQueries({ queryKey: ownAccountQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["account-admin"] });
       notifications.show({ message: "Account updated" });
     },
-    onSettled: (_, __, kind) => {
-      if (kind === "security") security.setValues({ currentPassword: "", newPassword: "" });
-    },
+    onSettled: () => security.setValues({ currentPassword: "", newPassword: "" }),
   });
   const securityChanged =
     security.values.username !== account.username || !!security.values.newPassword;
@@ -50,27 +42,6 @@ function AccountForm({ account }: { account: Account }) {
           Access group: {account.accessProfile.name}
         </Text>
       )}
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          save.mutate("name");
-        }}
-      >
-        <Stack>
-          <TextInput
-            label="Display Name"
-            autoComplete="name"
-            required
-            {...name.getInputProps("displayName")}
-          />
-          {save.error && save.variables === "name" && (
-            <Alert color="red">{save.error.message}</Alert>
-          )}
-          <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
-            Save Display Name
-          </Button>
-        </Stack>
-      </form>
       {account.canChangeEmail || account.canChangePassword ? (
         <Accordion transitionDuration={0}>
           <Accordion.Item value="security">
@@ -79,7 +50,7 @@ function AccountForm({ account }: { account: Account }) {
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  save.mutate("security");
+                  save.mutate();
                 }}
               >
                 <Stack>
@@ -109,9 +80,7 @@ function AccountForm({ account }: { account: Account }) {
                   <Text size="xs" c="dimmed">
                     Changing your password signs out your other browser sessions.
                   </Text>
-                  {save.error && save.variables === "security" && (
-                    <Alert color="red">{save.error.message}</Alert>
-                  )}
+                  {save.error && <Alert color="red">{save.error.message}</Alert>}
                   <Button
                     type="submit"
                     disabled={!securityChanged}

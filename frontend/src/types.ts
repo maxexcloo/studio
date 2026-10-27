@@ -143,7 +143,6 @@ export type Session = Omit<StudioSession, "inputs"> & { inputs: Partial<Generati
 export interface Account {
   id: string;
   username: string;
-  displayName: string;
   role: "administrator" | "user";
   features?: Record<string, boolean>;
   accessProfileId?: string;

@@ -88,7 +88,6 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   );
   await store.createLocalAccount({
     username: "artist@example.test",
-    displayName: "Artist",
     ["pass" + "word"]: secret("first"),
     accessProfileId: "artists",
   });
@@ -125,17 +124,9 @@ test("an account reads itself and its MCP token in one request, and ordinary acc
   assert.equal(anonymous.statusCode, 401);
 });
 
-test("display name, email and password changes, with the current password where it matters", async () => {
+test("email and password changes, with the current password where it matters", async () => {
   const cookie = await signIn("artist@example.test", secret("first"));
   const other = await signIn("artist@example.test", secret("first"));
-
-  const renamed = await call(
-    routes["PATCH /api/accounts/me"],
-    as(cookie, { displayName: "  Painter  " }),
-  );
-  assert.equal(renamed.body.account.displayName, "Painter");
-  const blank = await call(routes["PATCH /api/accounts/me"], as(cookie, { displayName: " " }));
-  assert.equal(blank.statusCode, 400);
 
   const wrong = await call(
     routes["PATCH /api/accounts/me"],
@@ -176,7 +167,6 @@ test("display name, email and password changes, with the current password where 
 test("an ordinary account may start without a password and links to single sign-on by its email", async () => {
   const created = await store.createLocalAccount({
     username: "nopass@example.test",
-    displayName: "No Pass",
     accessProfileId: "artists",
   });
   assert.equal("password" in created, false);
@@ -201,7 +191,6 @@ test("single sign-on accounts can't change their email or password here", async 
     subject: "sub-1",
     email: "sso@example.test",
     emailVerified: true,
-    name: "SSO",
   });
   assert.equal(result.pending, true);
   const account = store.listAccounts().find((item) => item.username === "sso@example.test");
@@ -211,9 +200,5 @@ test("single sign-on accounts can't change their email or password here", async 
   await assert.rejects(
     store.updateOwnAccount(account.id, { newPassword: secret("third"), currentPassword: "" }),
     /single sign-on/,
-  );
-  assert.equal(
-    (await store.updateOwnAccount(account.id, { displayName: "Still Me" })).displayName,
-    "Still Me",
   );
 });
