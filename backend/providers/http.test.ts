@@ -148,6 +148,11 @@ test(
       );
       assert.equal(output.provider, "cliproxyapi");
       assert.equal(output.settings.modelName, "grok-imagine-image-2.0");
+      // Chat shows the gallery's record, with its prompt and settings, not the provider's bare file.
+      const [shown] = (await api(`/api/sessions/${accepted.sessionId}`)).jobs[0].items;
+      assert.equal(shown.id, output.id);
+      assert.equal(shown.prompt, "A white bird");
+      assert.equal(shown.settings.modelName, "grok-imagine-image-2.0");
       const media = await fetch(base + output.url, { headers: { cookie } });
       assert.equal(media.ok, true);
       const downloaded = Buffer.from(await media.arrayBuffer());
