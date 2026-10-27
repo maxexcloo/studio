@@ -42,7 +42,6 @@ function fixture(items: CaptionItem[], saved: CaptionDocument | null = null) {
   };
   const release = () => state.waiting.splice(0).forEach((resolve) => resolve());
   const writer: CaptionWriter = {
-    settings: () => ({ model: "vision-model" }),
     supportsVision: async () => state.vision,
     caption: async ({ image: picture, signal }) => {
       state.sent.push(picture.data);
@@ -154,10 +153,10 @@ test("skips text-only models (saying so once), the switch off and accounts witho
   later();
   assert.equal(await captioner.tick(), "text-only");
   assert.equal(state.logs.length, 1);
-  assert.match(state.logs[0], /vision-model can't read images/);
+  assert.match(state.logs[0], /running text model can't read images/);
   assert.deepEqual(
     [(await captioner.status()).state, (await captioner.status()).reason],
-    ["unavailable", "The assistant model vision-model can't read images."],
+    ["unavailable", "The running text model can't read images."],
   );
 
   state.vision = true;

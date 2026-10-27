@@ -48,6 +48,47 @@ function directAddress(value: string, path: string) {
   return url.href;
 }
 
+/**
+ * Whether the running text model reads images: every text workload scaled up must say so on its
+ * `/props` (Radiance and llama.cpp report `modalities.vision` there), and at least one must run.
+ * Anything unclear counts as text-only. The answer is cached briefly, so a switch shows soon.
+ */
+export function createTextVision({
+  controller,
+  environment = process.env,
+  fetchImpl = fetch,
+  now = Date.now,
+  cacheMs = 30_000,
+}: Pick<Options, "environment" | "fetchImpl" | "now" | "cacheMs"> & {
+  controller: RuntimeController;
+}) {
+  let cached: { until: number; result: Promise<boolean> } | undefined;
+  const reads = async ({ url, apiKeyEnv }: { url: string; apiKeyEnv?: string }) => {
+    const response = await fetchImpl(directAddress(url, "props")!, {
+      headers: apiKeyEnv ? { Authorization: `Bearer ${environment[apiKeyEnv]}` } : {},
+      redirect: "error",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      return false;
+    }
+    return (await response.json())?.modalities?.vision === true;
+  };
+  return () => {
+    if (cached && cached.until > now()) return cached.result;
+    const result = controller
+      .running("text")
+      .then(
+        async (running) =>
+          running.length > 0 && (await Promise.all(running.map(reads))).every(Boolean),
+      )
+      .catch(() => false);
+    cached = { until: now() + cacheMs, result };
+    return result;
+  };
+}
+
 /** Observe the direct runtimes only. This never starts, stops or acquires a workload. */
 export function createServicesObserver({
   workers,

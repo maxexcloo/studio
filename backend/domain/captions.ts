@@ -22,8 +22,8 @@ interface CaptionImage {
 }
 /** The assistant gateway (assistant.js). */
 export interface CaptionWriter {
-  settings(): { model: string };
-  supportsVision(model: string): Promise<boolean>;
+  /** Whether the running text model reads images. */
+  supportsVision(): Promise<boolean>;
   caption(request: {
     image: CaptionImage;
     signal?: AbortSignal;
@@ -89,7 +89,7 @@ const rateWindow = 20;
  * most one every 10 s and `dailyCaptions` a day (the server's local day). An administrator's pass
  * runs flat out, `passConcurrency` at a time, until every image has a current-format caption or it
  * is stopped. Either yields the moment work appears: the calls are aborted and those images are
- * tried again later. Only with a vision assistant model, never with cloud, and only for owners
+ * tried again later. Only while the running text model reads images, never with cloud, and only for owners
  * `allowed` to use the prompt assistant. An image that fails is skipped until the next start.
  */
 export function createCaptioner(options: {
@@ -169,9 +169,8 @@ export function createCaptioner(options: {
       if (trickle.day !== day(time)) trickle = { day: day(time), count: 0 };
       if (trickle.count >= dailyCaptions) return "capped";
     }
-    const { model } = writer.settings();
-    if (!(await writer.supportsVision(model))) {
-      note(`the assistant model ${model} can't read images.`);
+    if (!(await writer.supportsVision())) {
+      note("the running text model can't read images.");
       return "text-only";
     }
     // Choosing and claiming happen together, so parallel ticks never take the same image.
@@ -258,9 +257,7 @@ export function createCaptioner(options: {
   async function unavailable() {
     if (!options.enabled()) return "Gallery Captions is off in Settings › Models.";
     if (!writer) return "No assistant model is configured.";
-    const { model } = writer.settings();
-    if (!(await writer.supportsVision(model)))
-      return `The assistant model ${model} can't read images.`;
+    if (!(await writer.supportsVision())) return "The running text model can't read images.";
     if (now() < backoff.until)
       return `The assistant model is failing (${backoff.reason}); retrying shortly.`;
     return "";

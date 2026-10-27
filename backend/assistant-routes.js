@@ -135,17 +135,16 @@ export async function assistantIntegration({ environment = process.env, engine, 
       spicy: row(assistantSpicyModelKey, ""),
       writerModel: "",
     };
-  const [models, vision, spicyVision] = await Promise.all([
-    engine.listModels(),
-    engine.supportsVision(settings.model),
-    settings.spicyModel ? engine.supportsVision(settings.spicyModel) : false,
-  ]);
+  const [models, vision] = await Promise.all([engine.listModels(), engine.supportsVision()]);
   return {
     available: true,
     writerModel: settings.writerModel,
     models,
     model: { ...row(assistantModelKey, settings.model), vision },
-    spicy: { ...row(assistantSpicyModelKey, settings.spicyModel), vision: spicyVision },
+    spicy: {
+      ...row(assistantSpicyModelKey, settings.spicyModel),
+      vision: Boolean(settings.spicyModel) && vision,
+    },
   };
 }
 
@@ -167,7 +166,8 @@ export function registerAssistantRoutes(
   {
     environment = process.env,
     fetchImpl = fetch,
-    engine = createAssistant(environment, { fetchImpl }),
+    supportsVision,
+    engine = createAssistant(environment, { fetchImpl, supportsVision }),
     profiles = async () => [],
     guide = () => null,
     loras = async () => [],
@@ -237,7 +237,7 @@ export function registerAssistantRoutes(
         ok: true,
         available: true,
         model: settings.model,
-        vision: await engine.supportsVision(settings.model),
+        vision: await engine.supportsVision(),
         defaultPreset,
         presets: assistantPresets
           .filter((preset) => !preset.spicy || spicy)
