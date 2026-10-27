@@ -29,11 +29,13 @@ function setup(chunks: string[]) {
     admit: async (request) => {
       admissions.push(request);
       return {
-        id: request.turnId,
-        sessionId: request.sessionId,
-        input: request.draft.input,
-        parentJobId: request.draft.parentJobId,
-      } as QueueJob;
+        job: {
+          id: request.turnId,
+          sessionId: request.sessionId,
+          input: request.draft.input,
+          parentJobId: request.draft.parentJobId,
+        } as QueueJob,
+      };
     },
     fetchImpl: async (_url, options) => {
       requests.push(JSON.parse(String(options?.body)));
@@ -390,6 +392,45 @@ test("media admission rejection leaves selected settings and a recoverable inlin
   assert.equal(message.status, "completed");
   assert.ok(message.content);
   assert.equal(message.jobId, undefined);
+  fixture.db.close();
+});
+test("an admission note, such as Animate going to Grok, joins the reply", async () => {
+  const fixture = setup([
+    frame({
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                function: {
+                  name: "request_media",
+                  arguments: '{"operation":"animate","prompt":"slow pan"}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    "data: [DONE]\n\n",
+  ]);
+  const note = "Local video isn't running, so this runs on Grok Video.";
+  fixture.service.options.admit = async (request) => ({
+    job: { id: request.turnId, input: request.draft.input } as QueueJob,
+    note,
+  });
+  const events: ChatEvent[] = [];
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    { content: "Animate this", generation: { operation: "image", input: {} } },
+    new AbortController().signal,
+    (event) => events.push(event),
+  );
+  const message = fixture.service.messages("alice", fixture.session.id)[1];
+  assert.equal(message.content, `I'll animate the selected image with these settings.\n\n${note}`);
+  assert.ok(events.some((event) => event.event === "delta" && event.data.text.endsWith(note)));
   fixture.db.close();
 });
 

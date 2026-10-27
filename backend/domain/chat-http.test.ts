@@ -245,9 +245,10 @@ test(
         1,
         "follow-up anchors the latest own output",
       );
+      // Animate picks its own video model, and says why when this account has none to use.
       const invalid = await chat(session.id, "Animate this.", { operation: "image", input });
       const explanation = invalid.filter((event) => event.event === "message").at(-1)!.data;
-      assert.match(explanation.actionError, /Choose a video model/);
+      assert.match(explanation.actionError, /No video profile that takes a starting image/);
       assert.equal((await api("/api/queue")).jobs.length, 2);
       const png = await sharp({
         create: { width: 32, height: 16, channels: 3, background: "white" },
