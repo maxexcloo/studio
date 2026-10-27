@@ -27,6 +27,7 @@ version opens with a `> ` summary line.
 - One motion system (short ease-out transform and opacity, no bounce, reduced motion respected) and one control size and emphasis scale come from the theme.
 - The viewer opens an image fitted but never enlarged beyond its actual size, shows the gallery thumbnail instead of a blank stage while the full image loads, and plays videos when they open (muted when the browser refuses sound).
 - Viewer Details lists every recorded input in the order it shapes the run, with timings in the order they ran; Copy Prompt and Copy Settings sit beside its title, Copy Settings copies every input one per line, and long prompts scroll on a subtle surface.
+- On Kubernetes, the image and video workers come from `STUDIO_KUBERNETES_WORKLOADS`, one per address, with `worker` and `capabilities` on the workload, so each address is given once; leave `STUDIO_WORKERS` unset there. When set, `STUDIO_WORKERS` still lists the workers, as for local and single-user setups.
 
 ### Fixed
 

@@ -47,7 +47,12 @@ worker by id. `STUDIO_WORKERS='[]'` runs Studio with no workers: it says so
 plainly and refuses generation. A malformed value stops Studio at start with
 the reason.
 
-Without `STUDIO_WORKERS`, Studio starts with no workers until an administrator
+On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video workloads in
+[`STUDIO_KUBERNETES_WORKLOADS`](#queue-sessions--runtime-control) are the
+workers, one per address. When `STUDIO_WORKERS` is set, it lists the workers
+instead.
+
+Without either, Studio starts with no workers until an administrator
 adds them in **Settings › Workers**, which saves Studio's own list to
 `workers.json` in the data folder. Deployment workers come first and are never
 written there.
@@ -273,13 +278,14 @@ Studio switches the GPU workloads itself: each is a Kubernetes deployment it sca
 ```bash
 STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
 STUDIO_KUBERNETES_WORKLOADS='{
-  "comfyui": {"kind": "image", "label": "Image", "namespace": "comfyui", "deployment": "comfyui", "pool": "gpu", "gpus": 1, "url": "http://comfyui.comfyui.svc.cluster.local:8188"},
+  "comfyui": {"kind": "image", "label": "Image", "namespace": "comfyui", "deployment": "comfyui", "pool": "gpu", "gpus": 1, "url": "http://comfyui.comfyui.svc.cluster.local:8188", "worker": "primary", "capabilities": ["image", "upscale", "models"]},
+  "comfyui-video": {"kind": "video", "label": "Video", "namespace": "comfyui-video", "deployment": "comfyui-video", "pool": "gpu", "gpus": 1, "url": "http://comfyui-video.comfyui-video.svc.cluster.local:8188", "worker": "video"},
   "comfyui-video-tp2": {"kind": "video", "label": "Video · 2 GPUs", "namespace": "comfyui-video", "deployment": "comfyui-video-tp2", "pool": "gpu", "gpus": 2, "url": "http://comfyui-video.comfyui-video.svc.cluster.local:8188"},
   "text-qwen-mxfp4": {"kind": "text", "label": "Qwen MXFP4", "namespace": "text", "deployment": "text-qwen-mxfp4", "pool": "gpu", "gpus": 1, "url": "http://qwen-mxfp4.text.svc.cluster.local:8000", "apiKeyEnv": "STUDIO_TEXT_KEY"}
 }'
 ```
 
-`kind` is `image`, `video` or `text`; `url` is the workload's direct address (media workloads match their worker by it, and several deployments may share one); text workloads name the variable holding their Radiance key in `apiKeyEnv`. A malformed value stops Studio at start with the reason. Studio uses its pod's service account, which needs a role in each workload namespace to read deployments and pods and to update `deployments/scale`; `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
+`kind` is `image`, `video` or `text`; `url` is the workload's direct address, which several deployments may share. Without `STUDIO_WORKERS`, each address of the image and video workloads is one [worker](#workers): `worker` gives its id (else the first workload's id; keep `primary` and `video` so earlier jobs keep their worker) and `capabilities` what it runs (else the workloads' kinds); with `STUDIO_WORKERS`, media workloads match their worker by address. Text workloads name the variable holding their Radiance key in `apiKeyEnv`. A malformed value stops Studio at start with the reason. Studio uses its pod's service account, which needs a role in each workload namespace to read deployments and pods and to update `deployments/scale`; `STUDIO_KUBERNETES_URL` (such as `kubectl proxy`) replaces it for local development.
 
 **Settings › Workers** shows each workload's state, GPU use and why a pod is not ready (such as a GPU claim that cannot be allocated). An administrator ticks the workloads that should run and reviews a preview before applying it; every workload left out stops. Restart scales a running workload to 0 and back. One change runs at a time: Studio stops accepting new work on the workloads that leave, waits for their accepted work to finish and save, scales them to 0, waits for their pods to go (their GPU claims are released only then), then starts the others and waits for them to be ready. Each change is recorded with its requester, timestamps, steps and the placement before and after, and the history survives restarts; a change cut short by a restart is marked interrupted. A deployment stopped outside Studio, such as by a Flux upgrade that resets replicas, shows as changed outside Studio.
 
@@ -303,7 +309,7 @@ Studio 1.0 reads only Studio names: every Studio setting starts with `STUDIO_`, 
 
 - Each `HEISS_*` setting is now `STUDIO_*` with the same suffix, such as `HEISS_DATA_DIR` → `STUDIO_DATA_DIR`.
 - `MCP_SIGNING_KEY`, `MCP_PUBLIC_URL`, `MCP_PROMPTING_PATH`, `COMFY_OUTPUT_DIR`, `COMFY_INPUT_DIR`, `BIFROST_URL` and `CIVITAI_DNS_SERVERS` gain the prefix: `STUDIO_MCP_SIGNING_KEY`, `STUDIO_MCP_PUBLIC_URL`, `STUDIO_MCP_PROMPTING_PATH`, `STUDIO_COMFY_OUTPUT_DIR`, `STUDIO_COMFY_INPUT_DIR`, `STUDIO_BIFROST_URL` and `STUDIO_CIVITAI_DNS_SERVERS`.
-- `COMFY_URL` and `COMFY_VIDEO_URL` are gone: list the workers in `STUDIO_WORKERS` (keep the ids `primary` and `video` so earlier jobs keep their worker) or add them in Settings › Workers. `STUDIO_DEFAULT_COMFY_URL` and `STUDIO_COMFY_SEARCH` are gone too; Studio no longer looks for ComfyUI by itself.
+- `COMFY_URL` and `COMFY_VIDEO_URL` are gone: list the workers in `STUDIO_WORKERS` or `STUDIO_KUBERNETES_WORKLOADS` (keep the ids `primary` and `video` so earlier jobs keep their worker) or add them in Settings › Workers. `STUDIO_DEFAULT_COMFY_URL` and `STUDIO_COMFY_SEARCH` are gone too; Studio no longer looks for ComfyUI by itself.
 - Scripts send the `X-Studio` header; `X-HEISS` is refused.
 
 Browser storage and the account cookie (`studio_account`) already used Studio names.

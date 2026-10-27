@@ -20,6 +20,9 @@ export interface Workload {
   gpus: number;
   url: string;
   apiKeyEnv?: string;
+  /** A media workload's worker id and what it runs (workers.js), for workers derived from workloads. */
+  worker?: string;
+  capabilities?: string[];
 }
 
 interface RuntimeEngine {

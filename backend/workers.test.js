@@ -66,6 +66,54 @@ test("STUDIO_WORKERS defines any number of locked workers with their capabilitie
   assert.deepEqual(deploymentWorkers({ STUDIO_WORKERS: "[]" }).workers, []);
 });
 
+test("without STUDIO_WORKERS, the image and video workloads give one worker per address", () => {
+  const workload = (kind, url, extra = {}) => ({
+    kind,
+    namespace: kind,
+    deployment: kind,
+    pool: "gpu",
+    gpus: 1,
+    url,
+    ...extra,
+  });
+  const environment = {
+    STUDIO_KUBERNETES_GPUS: '{"gpu": 2}',
+    STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
+      comfyui: workload("image", "http://comfyui:8188", {
+        worker: "primary",
+        capabilities: ["image", "upscale", "models"],
+      }),
+      "comfyui-video": workload("video", "http://comfyui-video:8188/", { worker: "video" }),
+      "comfyui-video-tp2": workload("video", "http://comfyui-video:8188", { gpus: 2 }),
+      "text-qwen": workload("text", "http://qwen:8000"),
+    }),
+  };
+  const { variable, workers: list } = deploymentWorkers(environment);
+  assert.equal(variable, "STUDIO_KUBERNETES_WORKLOADS");
+  assert.deepEqual(list, [
+    {
+      id: "primary",
+      name: "Image Worker",
+      url: "http://comfyui:8188",
+      capabilities: ["image", "upscale", "models"],
+    },
+    {
+      id: "video",
+      name: "Video Worker",
+      url: "http://comfyui-video:8188",
+      capabilities: ["video"],
+    },
+  ]);
+  const listed = [{ id: "local", url: "http://local:8188", capabilities: ["image"] }];
+  assert.deepEqual(
+    deploymentWorkers({ ...environment, STUDIO_WORKERS: JSON.stringify(listed) }).workers.map(
+      (worker) => worker.id,
+    ),
+    ["local"],
+    "STUDIO_WORKERS, when set, lists them instead",
+  );
+});
+
 test("STUDIO_WORKERS refuses what it can't use, plainly", () => {
   for (const [value, pattern] of [
     ["not json", /JSON list/],
