@@ -25,6 +25,8 @@ import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { WorkflowConnections } from "./WorkflowConnections";
+import { backendLabel } from "../generation/payload";
+import { sharedProfileFields } from "../../../../shared/profiles";
 import { usePhone } from "../../ui/usePhone";
 
 export type DefinitionKind = "profile" | "guide";
@@ -86,10 +88,24 @@ function DefinitionForm({
   } catch (cause) {
     error = (cause as Error).message;
   }
-  const metadata = kind === "profile" ? (raw && object(raw.studio) ? raw.studio : undefined) : raw;
+  const block = kind === "profile" ? (raw && object(raw.studio) ? raw.studio : undefined) : raw;
+  // A combined profile: the structured fields show and edit the backend it runs on, over the shared ones.
+  const backends = kind === "profile" && object(block?.backends) ? block.backends : undefined;
+  const backendIds = Object.keys(backends || {});
+  const backend = backends
+    ? backendIds.includes(String(block!.backend))
+      ? String(block!.backend)
+      : backendIds[0]
+    : "";
+  const backendBlock = backends && object(backends[backend]) ? backends[backend] : undefined;
+  const metadata = block && backendBlock ? { ...block, ...backendBlock } : block;
+  const metadataRaw = backendBlock ? { graph: backendBlock.graph, studio: metadata } : raw;
   function field(name: string, value: unknown) {
-    if (!raw || !metadata) return;
-    const next = { ...metadata, [name]: value };
+    if (!raw || !block) return;
+    const next =
+      backendBlock && name !== "backend" && !sharedProfileFields.includes(name)
+        ? { ...block, backends: { ...backends, [backend]: { ...backendBlock, [name]: value } } }
+        : { ...block, [name]: value };
     form.setFieldValue("text", pretty(kind === "profile" ? { ...raw, studio: next } : next));
     setCheck(null);
   }
@@ -218,6 +234,16 @@ function DefinitionForm({
                   />
                   {kind === "profile" ? (
                     <>
+                      {backends && (
+                        <Select
+                          label="Backend"
+                          description="Where this profile runs. Details and Connections edit this backend; Advanced JSON holds every backend."
+                          data={backendIds.map((id) => ({ value: id, label: backendLabel(id) }))}
+                          value={backend}
+                          allowDeselect={false}
+                          onChange={(value) => value && field("backend", value)}
+                        />
+                      )}
                       <SimpleGrid cols={{ base: 1, sm: 2 }}>
                         <TextInput
                           label="Family ID"
@@ -371,7 +397,8 @@ function DefinitionForm({
               {raw && metadata ? (
                 <WorkflowConnections
                   id={form.values.id}
-                  raw={raw}
+                  backend={backend}
+                  raw={metadataRaw!}
                   metadata={metadata}
                   onChange={field}
                 />

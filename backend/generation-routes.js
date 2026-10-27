@@ -170,9 +170,25 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           };
       }
       if (demoMode && !workers.length) return { backend: currentComfyBackend() };
+      // A combined profile runs only on the backend it names; one that isn't ready refuses with why.
+      const backend = profile.backendOptions?.find(
+        (option) => option.id === (input?.profileBackend || profile.backend),
+      );
+      if (backend && backend.ready === false)
+        return {
+          status: 409,
+          payload: {
+            ok: false,
+            reason: "backend-not-ready",
+            error: `${backend.label} isn’t ready for ${profile.label}: ${backend.reason}`,
+          },
+        };
       const worker = pinnedBackend
         ? workerById(pinnedBackend)
-        : routeProfile(profile, { prefers: input?.autoUpscale ? ["upscale"] : [] });
+        : routeProfile(profile, {
+            prefers: input?.autoUpscale ? ["upscale"] : [],
+            backend: backend ? backend.id : "",
+          });
       if (!worker)
         return {
           status: 503,
@@ -513,7 +529,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         quality: body.autoUpscale?.quality,
       };
     const customWorkflow = String(body.model || "").startsWith("custom:")
-      ? getCustomWorkflow(body.model)
+      ? getCustomWorkflow(body.model, body.profileBackend)
       : null;
     return planRunUpscale(graph, body, info, customWorkflow);
   }

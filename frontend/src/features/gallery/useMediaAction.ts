@@ -1,4 +1,5 @@
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { notifications } from "@mantine/notifications";
 import { useLocation, useNavigate } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
@@ -7,7 +8,7 @@ import {
   useGeneration,
   useGenerationActions,
 } from "../generation/GenerationProvider";
-import { generationInput, isProfile } from "../generation/payload";
+import { backendLabel, generationInput, isProfile } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
@@ -113,8 +114,21 @@ export async function mediaDraft(
   const preparedReferences = asset
     ? [{ ...asset, slot: profile.mediaInputs?.[0]?.id || "image" }]
     : references;
+  // A combined profile reruns on the backend that ran (an old per-backend id names its own) while
+  // the profile still has it; otherwise on its current one, and the note says so.
+  const ran = String(
+    item.settings?.profileBackend || saved.profileBackend || profile.aliasBackends?.[priorId] || "",
+  );
+  const rerun = operation === "image" && profile.backend && ran;
+  const profileBackend =
+    rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined;
+  const note =
+    rerun && !profileBackend
+      ? `${backendLabel(ran)} is no longer a backend of ${profile.displayName || profile.label}, so this run uses ${backendLabel(profile.backend!)}.`
+      : undefined;
   return {
     profile,
+    note,
     seed: (item.settings?.seed ?? saved.seed) as string | number | undefined,
     draft: {
       sessionId: sourceSession,
@@ -143,6 +157,7 @@ export async function mediaDraft(
           (item.width ? { width: item.width, height: item.height || item.width } : {})),
         referenceAssets: operation === "image" ? restored : [],
         referenceDetails: preparedReferences,
+        profileBackend,
       },
     },
   };
@@ -156,7 +171,8 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (operation: Operation) => {
-      const { draft } = await mediaDraft(item, operation, profiles, client, sessionId);
+      const { draft, note } = await mediaDraft(item, operation, profiles, client, sessionId);
+      if (note) notifications.show({ message: note });
       // Chat stages a card with its own input; the gallery loads the composer.
       if (location.pathname.startsWith("/chat")) setStaged(draft);
       else setDraft(draft);
@@ -203,13 +219,14 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
-      const { profile, seed, draft } = await mediaDraft(
+      const { profile, seed, draft, note } = await mediaDraft(
         item,
         animate ? "animate" : "image",
         profiles,
         client,
         sessionId,
       );
+      if (note) notifications.show({ message: note });
       const prompt =
         iteration.kind === "variation"
           ? iteration.prompt

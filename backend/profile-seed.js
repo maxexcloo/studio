@@ -96,7 +96,12 @@ export function seedMissing({
         !Object.hasOwn(held, id) &&
         !fs.existsSync(path.join(workflowsDir, `${id}.json`)),
     )
-    .map(([from, alias]) => ({ from, to: alias.to, reason: alias.reason || "" }));
+    .map(([from, alias]) => ({
+      from,
+      to: alias.to,
+      backend: typeof alias.backend === "string" ? alias.backend : "",
+      reason: alias.reason || "",
+    }));
   if (added.length) {
     store.addAliases(added, { by: "seed" });
     result.aliases = added.map(({ from }) => from);

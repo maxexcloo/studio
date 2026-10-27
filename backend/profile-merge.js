@@ -23,7 +23,7 @@ import { dataDir } from "./gallery-store.js";
 import { writeJsonFile } from "./json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./profile-editor.js";
 import { guideStore, hashOf, profileStore } from "./profile-store.js";
-import { loadWorkflowPreferences, saveWorkflowPreferences } from "./workflow-catalog.js";
+import { loadWorkflowPreferences, repointWorkflowPreferences } from "./workflow-catalog.js";
 
 const newerId = /^(image|video)-[a-z0-9._-]+-(comfyui|radiance|cloud)$/;
 const ignoredFields = new Set(["id", "name", "description"]);
@@ -182,23 +182,7 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
     { by, at },
   );
   for (const { from } of plan.merges) fs.rmSync(path.join(userWorkflowsDir, `${from}.json`));
-  const canonical = (id) => store.canonical(id);
-  saveWorkflowPreferences(
-    {
-      favorites: [...new Set(preferences.favorites.map(canonical))],
-      lastUsed: Object.entries(preferences.lastUsed).reduce((next, [id, when]) => {
-        const kept = canonical(id);
-        if (!next[kept] || String(when) > String(next[kept])) next[kept] = when;
-        return next;
-      }, {}),
-      thumbnails: Object.entries(preferences.thumbnails).reduce((next, [id, url]) => {
-        const kept = canonical(id);
-        if (!next[kept] || kept === id) next[kept] = url;
-        return next;
-      }, {}),
-    },
-    { immediate: true },
-  );
+  repointWorkflowPreferences((id) => store.canonical(id));
   return {
     merged: plan.merges.map(({ from, to, name, kind }) => ({ from, to, name, kind })),
     backup: path.relative(dataDir, backup),
