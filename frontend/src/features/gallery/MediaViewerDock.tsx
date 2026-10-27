@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon,
   Button,
@@ -21,6 +21,7 @@ import { PromptHistory } from "../generation/PromptHistory";
 import { queueQuery, terminal } from "../generation/Queue";
 import { usePhone } from "../../ui/usePhone";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
+import { versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 
 interface Entry {
@@ -29,37 +30,46 @@ interface Entry {
 }
 
 /**
- * Every result of the item's run family, oldest first: the root run, the runs iterated from it
- * (`parentJobId`) and runs this viewer queued without a parent. Queued work shows placeholders.
+ * The item's versions, oldest first: its version group (`versionGroups`, as the grid groups them)
+ * and the runs this viewer queued without a parent. Work still queued from one of them shows as
+ * placeholders.
  */
 export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
-  const queue = useQuery(queueQuery);
-  const jobs = queue.data?.jobs ?? [];
-  const byId = new Map(jobs.map((job) => [job.id, job]));
-  let root: QueueJob | undefined = item.jobId ? byId.get(item.jobId) : undefined;
-  while (root?.parentJobId && byId.has(root.parentJobId)) root = byId.get(root.parentJobId);
-  const members = new Set([root?.id, ...extra].filter(Boolean) as string[]);
-  for (let grew = true; grew;) {
-    grew = false;
-    for (const job of jobs)
-      if (job.parentJobId && members.has(job.parentJobId) && !members.has(job.id)) {
-        members.add(job.id);
-        grew = true;
-      }
-  }
-  const entries = jobs
-    .filter((job) => members.has(job.id))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .flatMap((job): Entry[] => {
-      const media = job.items?.length ? job.items : job.outputs || [];
-      if (media.length) return media.map((result) => ({ key: result.id, item: result }));
-      if (terminal.has(job.status)) return [];
-      return Array.from({ length: Number(job.input.count) || 1 }, (_, index) => ({
-        key: `${job.id}:${index}`,
-      }));
-    });
-  if (!entries.some((entry) => entry.item?.id === item.id)) entries.unshift({ key: item.id, item });
-  return entries;
+  const jobs = useQuery(queueQuery).data?.jobs;
+  return useMemo(() => {
+    const all = [...(jobs ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const results = (job: QueueJob) => (job.items?.length ? job.items : job.outputs || []);
+    const loaded = all.flatMap(results);
+    if (!loaded.some((result) => result.id === item.id)) loaded.push(item);
+    const group = versionGroups(loaded, all).find((versions) =>
+      versions.some((version) => version.id === item.id),
+    )!;
+    const queued = all.filter((job) => extra.includes(job.id)).reverse();
+    const versions = [
+      ...group,
+      ...queued.flatMap(results).filter((result) => !group.some(({ id }) => id === result.id)),
+    ];
+    const ids = new Set(versions.map((version) => version.id));
+    const runs = new Set(versions.map((version) => version.jobId));
+    const from = (job: QueueJob) =>
+      job.parentItemId
+        ? ids.has(job.parentItemId)
+        : Boolean(job.parentJobId) && runs.has(job.parentJobId);
+    const waiting = all
+      .filter(
+        (job) =>
+          !terminal.has(job.status) &&
+          !results(job).length &&
+          (extra.includes(job.id) || from(job)),
+      )
+      .reverse()
+      .flatMap((job) =>
+        Array.from({ length: Number(job.input.count) || 1 }, (_, index) => ({
+          key: `${job.id}:${index}`,
+        })),
+      );
+    return [...versions.map((version) => ({ key: version.id, item: version })), ...waiting];
+  }, [jobs, item, extra]);
 }
 
 /** Whether the viewer offers next steps for this item: a finished image, with the prompt assistant. */
@@ -192,7 +202,7 @@ export function MediaViewerDock({
             gap={6}
             wrap="nowrap"
             role="list"
-            aria-label="Variations"
+            aria-label="Versions"
             justify="center"
             px={2}
             py={2}
@@ -211,8 +221,8 @@ export function MediaViewerDock({
                   aria-current={current || undefined}
                   aria-label={
                     result
-                      ? `Show Variation ${family.findIndex((entry) => entry.key === key) + 1}`
-                      : "Variation in Progress"
+                      ? `Show Version ${family.findIndex((entry) => entry.key === key) + 1}`
+                      : "Version in Progress"
                   }
                   disabled={!result}
                   onClick={() => result && !current && choose?.(result)}

@@ -13,7 +13,7 @@ import {
 async function seed(
   page: Page,
   extra: Record<string, unknown> = {},
-  routes?: (page: Page) => Promise<unknown>,
+  routes?: (page: Page, state: Awaited<ReturnType<typeof fixtures>>) => Promise<unknown>,
 ) {
   const state = await fixtures(page);
   const settings = { profileId: "image:test", seed: 1234567, steps: 28, count: 2 };
@@ -52,7 +52,7 @@ async function seed(
   });
   state.gallery.push(item);
   // Registered after the shared fixtures, these take precedence over them.
-  await routes?.(page);
+  await routes?.(page, state);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
@@ -73,9 +73,9 @@ test("The viewer prompt bar queues variations into a strip and choosing one make
     operation: "image",
     input: { prompt: "An amber bird in snow", seed: "", count: 1, steps: 28 },
   });
-  const strip = viewer.getByRole("list", { name: "Variations", exact: true });
+  const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
-  await strip.getByRole("listitem", { name: "Show Variation 2", exact: true }).click();
+  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(
     viewer.getByRole("img", { name: "An amber bird in snow", exact: true }),
   ).toBeVisible();
@@ -102,6 +102,22 @@ test("A regenerated result joins its source's grid tile as a version until All V
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "All Versions", exact: true }).click();
   await expect(tiles).toHaveCount(2);
+});
+
+test("The strip holds the item's versions, not the other results of its run", async ({ page }) => {
+  const { state, viewer } = await seed(page, {}, async (_page, state) => {
+    const sibling = { ...state.gallery[0], id: "hub-2", prompt: "A grey heron" };
+    state.jobs[0].items.push(sibling);
+    state.gallery.push(sibling);
+  });
+  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
+  const strip = viewer.getByRole("list", { name: "Versions", exact: true });
+  await expect(strip.getByRole("listitem")).toHaveCount(2);
+  await expect(strip.getByRole("listitem").first()).toHaveAttribute("aria-current", "true");
+  await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
+  await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
 test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", async ({ page }) => {

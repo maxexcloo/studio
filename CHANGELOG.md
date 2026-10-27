@@ -24,6 +24,7 @@ version opens with a `> ` summary line.
 - Viewer next steps are written ahead of time while Studio is idle (from the image too when the text model reads images), so they show as soon as the viewer opens; placeholder chips hold their row while they load.
 - A next step generates its change at once, with progress on the chip, and a refresh action beside the steps asks for different ones.
 - Running work opens in the viewer from Chat as well as the gallery, showing its status and its prompt once written, and the viewer moves to the result when it is saved.
+- The viewer's strip holds the item's versions (each run made from it, and those made from them), grouped as the grid groups them, so switching moves between versions of one image rather than every result of the run.
 
 ### Fixed
 
