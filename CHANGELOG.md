@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-10-27
+
 > One picker for references, LoRAs and presets, with saved stacks and a clearer chip rail; ships everything listed under 1.0.6–1.0.8, whose images never published
 
 ### Changed
@@ -2186,7 +2188,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/maxexcloo/studio/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/maxexcloo/studio/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/maxexcloo/studio/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/maxexcloo/studio/compare/v1.0.5...v1.0.6
