@@ -18,7 +18,7 @@ import { legacyRecoverySwitchGuard } from "./legacy-recovery.ts";
 const workloads: Workload[] = [
   ["image", "image", "http://image:8188"],
   ["independent", "video", "http://video:8188"],
-  ["text", "text", "http://text:8000"],
+  ["second", "video", "http://second:8188"],
 ].map(([id, kind, url]) => ({
   id,
   label: id,
@@ -88,21 +88,21 @@ test("migrated accepted legacy generation holds a switch until its own outputs a
         saved.push("saved");
       },
     });
-    // Text needs a GPU, so the idle image worker would stop; its unsaved legacy job holds it.
-    await assert.rejects(runtime.acquire("text"), /legacy generations/);
+    // Second needs a GPU, so the idle image worker would stop; its unsaved legacy job holds it.
+    await assert.rejects(runtime.acquire("second"), /legacy generations/);
     phase = "running";
     (await runtime.acquire("image")).release();
     (await runtime.acquire("independent")).release();
-    await assert.rejects(runtime.acquire("text"), /legacy generations/);
+    await assert.rejects(runtime.acquire("second"), /legacy generations/);
     phase = "done";
-    await assert.rejects(runtime.acquire("text"), /storage is full/);
+    await assert.rejects(runtime.acquire("second"), /storage is full/);
     assert.deepEqual(kube.log, []);
     saveFails = false;
-    await assert.rejects(runtime.acquire("text"), /Waiting for text to start/);
+    await assert.rejects(runtime.acquire("second"), /Waiting for second to start/);
     await runtime.settled;
     assert.deepEqual(saved, ["saved"]);
-    assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/text 1"]);
-    (await runtime.acquire("text")).release();
+    assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/second 1"]);
+    (await runtime.acquire("second")).release();
     assert.match(
       (readRuntimeDocument(directory, "gallery") as { url: string }[])[0].url,
       /type=media/,
@@ -125,7 +125,7 @@ test("a known legacy operation on another worker does not block a switch", async
       throw new Error("Independent output must not be saved by this switch");
     },
   });
-  await assert.rejects(runtime.acquire("text"), /Waiting for text to start/);
+  await assert.rejects(runtime.acquire("second"), /Waiting for second to start/);
   await runtime.settled;
-  assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/text 1"]);
+  assert.deepEqual(kube.log, ["scale gpu/image 0", "gone gpu/image", "scale gpu/second 1"]);
 });

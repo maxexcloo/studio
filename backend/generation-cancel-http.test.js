@@ -91,7 +91,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
         STUDIO_KUBERNETES_WORKLOADS: workloads,
         STUDIO_RUNTIME_AUTOMATIC: "1",
-        STUDIO_TEXT_ADMISSION_ACKNOWLEDGED: "1",
         STUDIO_TEXT_WORKLOAD: "text",
         STUDIO_TEXT_ADMISSION_TOKEN: "fixture-admission",
         STUDIO_FIXTURE_TEXT_KEY: "fixture-text",
@@ -202,6 +201,14 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   const active = (await api("/api/queue")).body.jobs.find((job) => job.id === accepted.body.jobId);
   assert.equal(recordedJob(active.id).cancelRequested, true);
   assert.equal(active.status, "running");
+  // An administrator switches the GPU to text; the change waits for the cancelled job.
+  const preview = await api("/api/runtime/preview", { workloads: ["text"] });
+  assert.equal(preview.status, 200);
+  const apply = await api("/api/runtime/apply", {
+    workloads: ["text"],
+    signature: preview.body.signature,
+  });
+  assert.equal(apply.status, 202);
   assert.equal((await textRequest()).status, 503);
   assert.deepEqual(operations, []);
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
@@ -219,7 +226,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   const saved = await fetch(new URL(completed.outputs[0].url, base));
   assert.equal(saved.status, 200);
   assert.ok((await saved.arrayBuffer()).byteLength > 0);
-  // Text waited for the saved output; now the switch stops media, waits for its pod and starts text.
+  // The switch waited for the saved output; now it stops media, waits for its pod and starts text.
   await waitFor(textRequest, (response) => response.status === 200);
   assert.deepEqual(operations, ["scale gpu/media 0", "gone gpu/media", "scale gpu/text 1"]);
   assert.equal(worker.prompts.length, 1);

@@ -9,11 +9,7 @@ import { KubernetesEngine } from "./kubernetes.ts";
 import { createRuntimeRouter, createTextAdmissionRouter } from "./routes.ts";
 
 /** One GPU, shared by every workload given; `running` start with a ready pod. */
-function runtime(
-  workloads: Pick<Workload, "id" | "kind" | "url">[],
-  running: string[],
-  automaticLifecycle = false,
-) {
+function runtime(workloads: Pick<Workload, "id" | "kind" | "url">[], running: string[]) {
   const kube = fakeKubernetes(
     workloads.map(({ id }) => ({
       namespace: "gpu",
@@ -32,7 +28,6 @@ function runtime(
       gpus: 1,
     })),
     pools: { gpu: 1 },
-    automaticLifecycle,
     sleep: async () => {
       kube.tick();
       await new Promise((resolve) => setTimeout(resolve, 5));
@@ -134,7 +129,6 @@ test("caller disconnect drains the real Radiance response and blocks conflicting
       { id: "media", kind: "image", url: "http://comfy.invalid" },
     ],
     ["text"],
-    true,
   );
   let markReleased!: () => void;
   const released = new Promise<void>((resolve) => {
@@ -179,8 +173,9 @@ test("caller disconnect drains the real Radiance response and blocks conflicting
   await disconnected;
   assert.equal(upstreamClosed, false, "closing the caller must not cancel Radiance's response");
   assert.equal(controller.status()[0].acceptedOperations, 1);
-  // Media needs the GPU: the switch begins but waits for the open text stream.
-  await assert.rejects(controller.acquire("media"), /Waiting for media to start/);
+  // An administrator gives the GPU to media: the switch begins but waits for the open text stream.
+  const preview = await controller.preview(["media"]);
+  await controller.apply(["media"], preview.signature, "account:admin");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.match(
     (await controller.observe()).operation!.progress,

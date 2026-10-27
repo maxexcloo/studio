@@ -61,11 +61,12 @@ test("in-cluster access needs the mounted service account", () => {
   );
 });
 
-test("automatic control is off by default and needs the text admission acknowledgement", () => {
+test("automatic control is off by default", () => {
   assert.equal(loadRuntime(environment())!.controller.automaticLifecycle, false);
-  assert.throws(
-    () => loadRuntime(environment(undefined, { STUDIO_RUNTIME_AUTOMATIC: "1" })),
-    /STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1/,
+  assert.equal(
+    loadRuntime(environment(undefined, { STUDIO_RUNTIME_AUTOMATIC: "1" }))!.controller
+      .automaticLifecycle,
+    true,
   );
 });
 
