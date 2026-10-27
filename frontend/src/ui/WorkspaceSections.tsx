@@ -10,14 +10,14 @@ import classes from "./WorkspaceSections.module.css";
  * One Library or Settings section; `admin` sections are hidden from other accounts and `apart`
  * sections (About) follow a divider in the desktop navigation.
  */
-export interface SectionDefinition {
+interface SectionDefinition {
   label: string;
   description: string;
   icon: LucideIcon;
   admin?: boolean;
   apart?: boolean;
 }
-export type WorkspaceSection = SectionDefinition & { value: string };
+type WorkspaceSection = SectionDefinition & { value: string };
 
 /** Lists the sections the account may open, in definition order. */
 export function visibleSections<Key extends string>(

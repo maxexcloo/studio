@@ -1,12 +1,7 @@
 import { loraInfos } from "./lora-info.js";
 import { optionalLoraIssue } from "./lora-catalogue.js";
 import { withLoraTriggers } from "./lora-prompts.js";
-import {
-  currentComfyBackend,
-  isDefaultBackend,
-  routeProfile,
-  withComfyBackend,
-} from "./comfy-backends.js";
+import { currentComfyBackend, routeProfile, withComfyBackend } from "./comfy-backends.js";
 import {
   capabilityForProfile,
   listWorkers,
@@ -35,7 +30,6 @@ import { markWorkflowUsed } from "./workflow-catalog.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { referenceExistsForAccount, stageReferenceAssets } from "./reference-assets.js";
-import { comfyRestarting } from "./comfy-restart.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
@@ -240,7 +234,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           status: 503,
           payload: {
             ok: false,
-            restarting: isDefaultBackend() && comfyRestarting(),
             error: comfyDownMessage(error?.message),
           },
         };

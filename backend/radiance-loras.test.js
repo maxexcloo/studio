@@ -8,7 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-radiance-loras-"))
 process.env.STUDIO_DATA_DIR = scratch;
 process.env.STUDIO_ENABLE_BUILTIN_PROFILES = "0";
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
-const { metadataFromJson, saveCustomWorkflow } = await import("./custom-workflows.js");
+const { metadataFromJson, saveImportedWorkflow } = await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
 
 const prompt = "A lighthouse at dusk";
@@ -33,7 +33,7 @@ const raw = (loraStack, id = "radiance-loras") => ({
     loraStack,
   },
 });
-saveCustomWorkflow(raw({ adapter: "radiance-tags-v1", node: "1" }));
+saveImportedWorkflow(raw({ adapter: "radiance-tags-v1", node: "1" }));
 const build = (loras) =>
   customWorkflowGraph({
     workflow: "custom:radiance-loras",
@@ -92,7 +92,7 @@ test("the Radiance node gets the enabled LoRAs as one JSON string, and the promp
 });
 
 test("the Radiance stack stops at its max", async () => {
-  saveCustomWorkflow(raw({ adapter: "radiance-tags-v1", node: "1", max: 2 }, "radiance-two"));
+  saveImportedWorkflow(raw({ adapter: "radiance-tags-v1", node: "1", max: 2 }, "radiance-two"));
   const graph = await customWorkflowGraph({
     workflow: "custom:radiance-two",
     prompt,
@@ -110,7 +110,7 @@ test("the Radiance stack stops at its max", async () => {
 test("LoRAs the profile names stay ahead of the request stack", async () => {
   const fixed = raw({ adapter: "radiance-tags-v1", node: "1" }, "radiance-fixed");
   fixed.graph[1].inputs.loras = '[{"name":"speed/lightning.safetensors","strength":1}]';
-  saveCustomWorkflow(fixed);
+  saveImportedWorkflow(fixed);
   const graph = await customWorkflowGraph({
     workflow: "custom:radiance-fixed",
     prompt,

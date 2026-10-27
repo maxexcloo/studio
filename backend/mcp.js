@@ -54,7 +54,7 @@ export const generateWaitSeconds = 30;
 // How long Generate reads the first job for its end time while the queue picks it up.
 const etaProbeMilliseconds = 2000;
 // An identical Generate from the same conversation within this window is the same request (see Generate).
-export const generateDedupeWindowMs = 120_000;
+const generateDedupeWindowMs = 120_000;
 // A preview's prompts wait this long for the user's go-ahead.
 const previewMs = 30 * 60 * 1000;
 /** A set's expected wait for the reply: "about 40 s", "about 3 min". */
@@ -126,7 +126,7 @@ const maxGuideCharacters = 1200;
 const maxShownGuideCharacters = 500;
 const maxListedLoras = 30;
 /** A profile guide's essentials as one capped paragraph: summary, rules and pitfalls, without sources or examples. */
-export function compactGuide(guide, max = maxGuideCharacters) {
+function compactGuide(guide, max = maxGuideCharacters) {
   if (!guide || typeof guide !== "object") return "";
   const parts = [];
   const add = (value) => {

@@ -2,7 +2,6 @@ import { families } from "./family-catalog.js";
 import { catalogDownloadsForFile } from "./family-profiles.js";
 import { packInstallPlan } from "./node-install.js";
 import { nodePack, nodePacks } from "./node-packs.js";
-import { packInstallRoutes } from "./pack-installer.js";
 
 /**
  * What the viewer can offer as a button for a failure describeFailure
@@ -64,7 +63,6 @@ export function withFixes(failure, body = {}) {
         note: pack.note || "",
       };
       next.install = packInstallPlan(pack);
-      next.autoInstall = packInstallRoutes(pack.id);
     }
   }
   if (failure.fix === "redownload") {

@@ -14,7 +14,7 @@ export interface Taste {
   /** Whether the text model may write this account's profile. */
   writer: boolean;
 }
-export const tasteQuery = queryOptions({
+const tasteQuery = queryOptions({
   queryKey: ["taste"],
   queryFn: () => api<Taste>("/api/taste"),
 });

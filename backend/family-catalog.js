@@ -580,7 +580,6 @@ export const modelDownloads = {
       sha256: "cd03ed94f244c9cb705e7d30ca0f40b5f5b004bb20674117adff88d16416c23d",
     },
   ],
-  // Starter models (see starterModels below).
   krea2_turbo_fp8: [
     {
       file: "krea2_turbo_fp8_scaled.safetensors",
@@ -674,118 +673,6 @@ export const checkpointDownloads = {
   ],
 };
 
-/**
- * First models for an empty studio: three families, each in three versions
- * sized for different amounts of memory, small to large. Every file is
- * ungated, so one tap fetches it all without a Hugging Face login.
- *
- * model: the catalog download of the model file. encoders: a slot's download
- * when it is not the slot's first. memory: GPU memory (GB) the version runs
- * comfortably in. appleMemory: what a Mac would need instead (the size at full
- * precision), and appleDetail how the version is described there. A model
- * download flagged `fp8` cannot load on a Mac (MODELS.md#worker-memory), so
- * there that version never counts as fitting. ram: system memory it wants
- * besides. The studio highlights the largest version that fits and never
- * hides the others.
- */
-export const starterModels = [
-  {
-    family: "krea2",
-    title: "Krea 2",
-    blurb: "Photographic, with natural light and real texture.",
-    versions: [
-      {
-        id: "turbo-fp8",
-        label: "Turbo",
-        detail: "8 steps · compact",
-        appleDetail: "8 steps · fp8, not for Macs",
-        model: "model:krea2_turbo_fp8:0",
-        memory: 16,
-        appleMemory: 32,
-      },
-      {
-        id: "turbo",
-        label: "Turbo",
-        detail: "8 steps · full precision",
-        model: "model:krea2_turbo_bf16:0",
-        memory: 32,
-        ram: 48,
-      },
-      {
-        id: "raw",
-        label: "Raw",
-        detail: "28 steps · follows a negative prompt",
-        model: "model:krea2_raw_bf16:0",
-        memory: 32,
-        ram: 48,
-      },
-    ],
-  },
-  {
-    family: "flux2_klein_4b",
-    title: "Flux.2",
-    blurb: "Quick and versatile, and it can work from reference images.",
-    versions: [
-      {
-        id: "klein-fp8",
-        label: "Klein 4B",
-        detail: "4 steps · compact",
-        appleDetail: "4 steps · fp8, not for Macs",
-        model: "model:flux2_klein_4b_fp8:0",
-        memory: 8,
-        appleMemory: 12,
-      },
-      {
-        id: "klein",
-        label: "Klein 4B",
-        detail: "4 steps · full precision",
-        model: "model:flux2_klein_4b:0",
-        memory: 12,
-      },
-      {
-        id: "dev",
-        label: "Dev",
-        family: "flux2_dev",
-        detail: "28 steps · the largest Flux",
-        appleDetail: "28 steps · fp8, not for Macs",
-        model: "model:flux2_dev_fp8:0",
-        encoders: { encoder: "encoder:mistral3_24b:0" },
-        memory: 32,
-        appleMemory: 80,
-        ram: 64,
-      },
-    ],
-  },
-  {
-    family: "sdxl",
-    title: "SDXL",
-    blurb: "Light and quick, with the largest world of LoRAs.",
-    versions: [
-      {
-        id: "lightning",
-        label: "RealVisXL Lightning",
-        detail: "6 steps · fastest",
-        model: "checkpoint:realvisxl5_lightning:0",
-        memory: 6,
-      },
-      {
-        id: "realvis",
-        label: "RealVisXL",
-        detail: "25 steps · photographic",
-        model: "checkpoint:realvisxl5:0",
-        memory: 8,
-      },
-      {
-        id: "base",
-        label: "SDXL 1.0",
-        detail: "25 steps · the original, for its LoRAs",
-        model: "checkpoint:sdxl_base:0",
-        memory: 8,
-      },
-    ],
-  },
-];
-
 /* ------------------------------------------------------------ Families */
 
 const square = [
@@ -846,8 +733,6 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * after the shift), requiredNodes (core nodes those need) and
  * folders { classNames }: which models/diffusers folders are this family, by
  * their transformer/config.json.
- * setup: a guided setup dialog for a family that runs more than one way
- * (backend/family-setup.js reads it).
  * upsampler: a small language model the family is meant to run behind (FLUX.3),
  * which rewrites your prompt into the long caption the model was trained on,
  * through ComfyUI's TextGenerate: slot (an encoder slot, `only` its own build),
@@ -2206,8 +2091,6 @@ export const families = {
         folders: { classNames: ["MOSImageTransformer", "MOSSImageTransformer"] },
       },
     },
-    // Two ways to run one model: a guided setup walks through the one its file needs.
-    setup: "moss_image",
     variants: [
       {
         id: "base",
@@ -2387,12 +2270,12 @@ export const knownFamilies = {
 
 /* ------------------------------------------------------------ Names */
 
-export function isKrea2Raw(name = "") {
+function isKrea2Raw(name = "") {
   const base = String(name).split(/[\\/]/).pop() || "";
   return /raw|base/i.test(base) && !/turbo|tdm|distill/i.test(base);
 }
 
-export function isZImageBase(name = "") {
+function isZImageBase(name = "") {
   const base = String(name).split(/[\\/]/).pop() || "";
   if (/turbo|distill|lightning|\d+[-_ ]?steps?/i.test(base)) return false;
   if (/base|raw/i.test(base)) return true;
