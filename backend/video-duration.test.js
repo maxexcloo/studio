@@ -6,7 +6,7 @@ import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-duration-"));
 process.env.STUDIO_DATA_DIR = scratch;
-const { saveCustomWorkflow } = await import("./custom-workflows.js");
+const { saveImportedWorkflow } = await import("./custom-workflows.js");
 const { inferModels } = await import("./models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 const { customWorkflowGraph } = await import("./graphs.js");
@@ -33,7 +33,7 @@ const info = {
 
 test("custom H3 duration selections reach their mapped graph input with the fixed workflow FPS", async () => {
   for (const family of ["minimax-h3", "minimax_h3"]) {
-    saveCustomWorkflow({
+    saveImportedWorkflow({
       studio: {
         id: "duration-h3",
         kind: "video",
@@ -118,7 +118,7 @@ test("custom H3 duration selections reach their mapped graph input with the fixe
 });
 
 test("a node that declares fewer H3 frames than the model can render sets the limit", () => {
-  saveCustomWorkflow({
+  saveImportedWorkflow({
     studio: {
       id: "radiance-h3",
       kind: "video",

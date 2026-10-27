@@ -14,7 +14,7 @@ import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "./civitai-imp
 import { civitaiAvailability } from "./library-availability.js";
 import { nameParts } from "./library-substitutes.js";
 
-export const offerLimit = 12;
+const offerLimit = 12;
 
 /** A file's format and precision in words: "GGUF Q4_K_M", "FP8", "BF16". */
 export function variantWords(file = "", metadata = {}) {

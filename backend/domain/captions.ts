@@ -16,7 +16,7 @@ export interface CaptionItem {
   library?: unknown;
   caption?: Partial<Caption>;
 }
-export interface CaptionImage {
+interface CaptionImage {
   mime: string;
   data: string;
 }
@@ -29,7 +29,7 @@ export interface CaptionWriter {
     signal?: AbortSignal;
   }): Promise<{ text: string; tags: string[]; model: string }>;
 }
-export type CaptionTick =
+type CaptionTick =
   | "off"
   | "busy"
   | "spaced"
@@ -42,7 +42,7 @@ export type CaptionTick =
   | "failed";
 
 /** An administrator's Caption Gallery pass, saved so a restart resumes or reports it. */
-export interface CaptionPass {
+interface CaptionPass {
   state: "running" | "stopped" | "finished";
   startedAt: string;
   endedAt?: string;
@@ -334,7 +334,7 @@ export function createCaptioner(options: {
     },
   };
 }
-export type Captioner = ReturnType<typeof createCaptioner>;
+type Captioner = ReturnType<typeof createCaptioner>;
 
 interface Request {
   body?: Record<string, unknown>;

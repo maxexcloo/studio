@@ -28,7 +28,7 @@ import { catalogueKinds } from "./library-catalogue.js";
 import { imageRecipe, readImageMetadata } from "./image-metadata.js";
 import { publicOffers } from "./library-offers.js";
 
-export const importLimit = 500;
+const importLimit = 500;
 const idPattern = /^imp-[a-z0-9]{6,40}$/;
 const states = new Set(["resolving", "needs-files", "downloading", "ready", "failed", "cancelled"]);
 const folders = new Set(Object.keys(catalogueKinds));
@@ -146,7 +146,7 @@ export function publicImport(record) {
 }
 
 /** The import's state from its resources. */
-export function importState(record) {
+function importState(record) {
   if (record.state === "failed" || record.state === "cancelled" || record.state === "resolving")
     return record.state;
   const resources = record.resources || [];
@@ -171,7 +171,7 @@ export function importState(record) {
 const modelRoles = new Set(["checkpoint", "diffusion_model"]);
 
 /** Grade a model-file import (no prompt to grade), a saved image (its preset), a dropped image (its recipe) or a described one. */
-export function gradeRecord(record, preset = null) {
+function gradeRecord(record, preset = null) {
   if (preset) return presetGrade(preset);
   const resources = (record.resources || []).map((resource) => ({
     ...resource,

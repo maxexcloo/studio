@@ -424,7 +424,7 @@ function fallbackFor(failed) {
 }
 
 /** Free space where each kind of model lands, and which disk that is, so a batch can be checked before it starts. */
-export function downloadSpace() {
+function downloadSpace() {
   if (remoteModelsEnabled()) return workerInventory().space;
   const space = {};
   if (!comfyModelsDir()) return space;
@@ -655,32 +655,6 @@ export function discardDownload(spec) {
     fs.rmSync(path.join(dir, `${spec.file}.part`), { force: true });
     removeJsonFile(path.join(dir, `${spec.file}.part.json`));
   }
-}
-
-/**
- * A catalog file ComfyUI could not read (a download that stopped early, a web
- * page saved under its name): the broken copy goes, and a fresh one is queued.
- * Only ever the catalog's own file name in ComfyUI's folder for that kind.
- */
-export function replaceDownload(spec) {
-  targetFor(spec);
-  if (remoteModelsEnabled()) {
-    spec = { ...spec, workerUrl: spec.workerUrl || comfyUrl };
-    if (
-      [active, ...queue].some((entry) => entry?.folder === spec.folder && entry.file === spec.file)
-    )
-      return startDownload(spec);
-    return workerModelFile(spec, "replace")
-      .then(() => workerModelFile(spec, "discard"))
-      .then(() => refreshWorkerModels({ force: true, workerUrl: spec.workerUrl }))
-      .then(() => startDownload(spec));
-  }
-  const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
-  if (same(active) || queue.some(same)) return startDownload(spec);
-  for (let broken = existingCopy(spec); broken; broken = existingCopy(spec))
-    fs.rmSync(broken, { force: true });
-  discardDownload(spec);
-  return startDownload(spec);
 }
 
 /** Studio keeps provider credentials; only streamed weights and resume metadata reach the worker. */

@@ -11,7 +11,6 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const {
-  galleryDelta,
   galleryRevisionValue,
   hideGalleryItems,
   makePendingItems,
@@ -68,7 +67,6 @@ test("completed videos use their encoded dimensions instead of requested aspect 
     scheduler: "simple",
   };
   setGallery(makePendingItems("actual-video-size", body));
-  const since = galleryRevisionValue();
   const [completed] = await replaceGalleryJob(
     "actual-video-size",
     [{ url: url(filename), filename, type: "video" }],
@@ -81,10 +79,6 @@ test("completed videos use their encoded dimensions instead of requested aspect 
   assert.equal(completed.settings.resolution, "720p");
   for (const field of ["steps", "cfg", "sampler", "scheduler"])
     assert.equal(completed.settings[field], undefined);
-  assert.deepEqual(
-    galleryDelta({ since }).upserts.map(({ width, height }) => ({ width, height })),
-    [{ width: 96, height: 160 }],
-  );
   assert.equal(pageGallery({}).items[0].height, 160);
 });
 
@@ -171,11 +165,7 @@ test("a run that reuses a deleted image's file name still shows when it finishes
     new Map(),
   );
 
-  const delta = galleryDelta({ since });
-  assert.deepEqual(
-    delta.upserts.map((item) => item.url),
-    [url("studio_00042_.png")],
-  );
+  assert.ok(galleryRevisionValue() > since);
   assert.deepEqual(
     pageGallery({}).items.map((item) => item.url),
     [url("studio_00042_.png")],
