@@ -44,6 +44,21 @@ export function generationWarm(body, now = Date.now()) {
   return isWarm(load().runs, timingKey(body), now);
 }
 
+/** Moves earlier runs to new history keys (`{old: new}`), as when per-backend profiles become one; returns how many moved. */
+export function renameTimingKeys(keys) {
+  const current = load();
+  let moved = 0;
+  const runs = current.runs.map((run) => {
+    if (!Object.hasOwn(keys, run.key)) return run;
+    moved += 1;
+    return { ...run, key: keys[run.key] };
+  });
+  if (!moved) return 0;
+  timings = { ...current, runs };
+  save("generation");
+  return moved;
+}
+
 export function recordGeneration(entry) {
   const current = load();
   const runs = addRun(current.runs, entry);

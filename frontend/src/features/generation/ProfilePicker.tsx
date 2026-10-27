@@ -2,7 +2,7 @@ import { Badge, Button, ColorSwatch, ComboboxPopover, Group, Text } from "@manti
 import { ChevronDown } from "lucide-react";
 import { inputForProfile, useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Models, Profile } from "../../types";
-import { isProfile } from "./payload";
+import { backendLabel, isProfile } from "./payload";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { chipProps } from "./chip";
 import classes from "./GenerationInputControls.module.css";
@@ -50,6 +50,8 @@ export function ProfilePicker({
     ...new Set(available.map((profile) => modelFamilyLabel(profile.family, profile.familyName))),
   ].sort((a, b) => a.localeCompare(b));
   const readiness = selected && profileReadiness(selected, workers);
+  // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the profile's.
+  const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
   return (
     <ComboboxPopover
       searchable
@@ -78,6 +80,15 @@ export function ProfilePicker({
               {option.label}
             </Text>
             <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+              {profile?.backend && (
+                <Badge size="xs" variant="default" title={profile.readyReason}>
+                  {backendLabel(
+                    profile.id === selected?.id && selectedBackend
+                      ? selectedBackend
+                      : profile.backend,
+                  )}
+                </Badge>
+              )}
               {profile?.aiDrafted && (
                 <Badge size="xs" variant="light" color="orange">
                   AI-Drafted
@@ -117,10 +128,23 @@ export function ProfilePicker({
           }
           rightSection={<ChevronDown size={14} />}
           title={
-            selectedLabel && (readiness ? `${selectedLabel} · ${readiness.label}` : selectedLabel)
+            selectedLabel &&
+            [
+              selectedLabel,
+              selectedBackend && backendLabel(selectedBackend),
+              readiness?.label,
+              selected?.readyReason,
+            ]
+              .filter(Boolean)
+              .join(" · ")
           }
         >
           <span className={classes.label}>{selectedLabel || "Choose a Profile"}</span>
+          {selectedBackend && (
+            <Badge size="xs" variant="default" ml={6}>
+              {backendLabel(selectedBackend)}
+            </Badge>
+          )}
         </Button>
       </ComboboxPopover.Target>
     </ComboboxPopover>
