@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Checkbox, Group, Select, Stack, Table, Text, TextInput } from "@mantine/core";
+import { Alert, Checkbox, Group, Select, Stack, Text, TextInput } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { backendLabel } from "../generation/payload";
 
@@ -76,26 +77,18 @@ function PairRow({
         </Group>
       )}
       {pair.differences.length ? (
-        <Table.ScrollContainer minWidth={320}>
-          <Table aria-label={`Differences for ${pair.name}`} fz="xs" verticalSpacing={2}>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Differs</Table.Th>
-                <Table.Th>Radiance</Table.Th>
-                <Table.Th>ComfyUI</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {pair.differences.map((row) => (
-                <Table.Tr key={row.label}>
-                  <Table.Td>{row.label}</Table.Td>
-                  <Table.Td>{row.radiance}</Table.Td>
-                  <Table.Td>{row.comfyui}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+        <DataTable
+          label={`Differences for ${pair.name}`}
+          rows={pair.differences}
+          rowKey={(row) => row.label}
+          rowName={(row) => row.label}
+          empty="No Differences"
+          columns={[
+            { key: "label", header: "Differs", cell: (row) => row.label },
+            { key: "radiance", header: "Radiance", cell: (row) => row.radiance },
+            { key: "comfyui", header: "ComfyUI", cell: (row) => row.comfyui },
+          ]}
+        />
       ) : (
         <Text size="xs" c="dimmed">
           Same steps, size, references, modes, LoRAs and guide.

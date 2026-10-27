@@ -1,19 +1,5 @@
-import {
-  ActionIcon,
-  Alert,
-  Badge,
-  Button,
-  Checkbox,
-  Group,
-  Loader,
-  Menu,
-  Stack,
-  Table,
-  Text,
-  VisuallyHidden,
-} from "@mantine/core";
+import { Alert, Badge, Button, Checkbox, Group, Loader, Menu, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
 import { useState } from "react";
 import type {
   RuntimeOperation,
@@ -23,6 +9,7 @@ import type {
 } from "../../../../shared/runtime";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeading } from "../../ui/SectionHeading";
 
@@ -95,6 +82,10 @@ export function RuntimeWorkloads() {
   const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
   const chosen = selection ?? running;
+  const change = (entry: RuntimeOperation) =>
+    entry.type === "restart"
+      ? `Restart ${names(entry.start)}`
+      : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`;
   const drifted = Boolean(desired && !operation && !sameSet(desired, running));
   return (
     <Stack gap="md" component="section" aria-label="GPU Workloads">
@@ -122,36 +113,39 @@ export function RuntimeWorkloads() {
           </Stack>
         </Alert>
       )}
-      <Table aria-label="GPU Workloads" verticalSpacing="xs" highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th w={44}>Run</Table.Th>
-            <Table.Th>Workload</Table.Th>
-            <Table.Th visibleFrom="sm">GPUs</Table.Th>
-            <Table.Th>State</Table.Th>
-            <Table.Th w={44}>
-              <VisuallyHidden>Actions</VisuallyHidden>
-            </Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {workloads.map((item) => (
-            <Table.Tr key={item.id}>
-              <Table.Td>
-                <Checkbox
-                  aria-label={`Run ${item.label}`}
-                  checked={chosen.includes(item.id)}
-                  disabled={Boolean(operation)}
-                  onChange={(event) =>
-                    setSelection(
-                      event.currentTarget.checked
-                        ? [...chosen, item.id]
-                        : chosen.filter((id) => id !== item.id),
-                    )
-                  }
-                />
-              </Table.Td>
-              <Table.Td>
+      <DataTable
+        label="GPU Workloads"
+        rows={workloads}
+        rowKey={(item) => item.id}
+        rowName={(item) => item.label}
+        empty="No GPU Workloads"
+        columns={[
+          {
+            key: "run",
+            header: "Run",
+            width: 44,
+            cell: (item) => (
+              <Checkbox
+                aria-label={`Run ${item.label}`}
+                checked={chosen.includes(item.id)}
+                disabled={Boolean(operation)}
+                onChange={(event) =>
+                  setSelection(
+                    event.currentTarget.checked
+                      ? [...chosen, item.id]
+                      : chosen.filter((id) => id !== item.id),
+                  )
+                }
+              />
+            ),
+          },
+          {
+            key: "workload",
+            header: "Workload",
+            main: true,
+            sortValue: (item) => item.label,
+            cell: (item) => (
+              <>
                 <Text size="sm" fw={500}>
                   {item.label}
                 </Text>
@@ -161,42 +155,40 @@ export function RuntimeWorkloads() {
                       ? `${item.acceptedOperations} accepted ${item.acceptedOperations === 1 ? "operation" : "operations"}`
                       : item.id)}
                 </Text>
-              </Table.Td>
-              <Table.Td visibleFrom="sm">
-                <Text size="sm">
-                  {item.gpus} · {item.pool}
-                </Text>
-              </Table.Td>
-              <Table.Td>
-                <Badge variant="light" color={phaseColour(item.phase)}>
-                  {phaseLabel(item.phase)}
-                </Badge>
-              </Table.Td>
-              <Table.Td>
-                <Menu position="bottom-end">
-                  <Menu.Target>
-                    <ActionIcon
-                      variant="subtle"
-                      color="gray"
-                      aria-label={`Actions for ${item.label}`}
-                    >
-                      <Ellipsis size={18} />
-                    </ActionIcon>
-                  </Menu.Target>
-                  <Menu.Dropdown>
-                    <Menu.Item
-                      disabled={Boolean(operation) || item.phase !== "running"}
-                      onClick={() => setRestarting(item.id)}
-                    >
-                      Restart
-                    </Menu.Item>
-                  </Menu.Dropdown>
-                </Menu>
-              </Table.Td>
-            </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
+              </>
+            ),
+          },
+          {
+            key: "gpus",
+            header: "GPUs",
+            visibleFrom: "sm",
+            sortValue: (item) => item.gpus,
+            cell: (item) => (
+              <Text size="sm">
+                {item.gpus} · {item.pool}
+              </Text>
+            ),
+          },
+          {
+            key: "state",
+            header: "State",
+            sortValue: (item) => phaseLabel(item.phase),
+            cell: (item) => (
+              <Badge variant="light" color={phaseColour(item.phase)}>
+                {phaseLabel(item.phase)}
+              </Badge>
+            ),
+          },
+        ]}
+        rowActions={(item) => (
+          <Menu.Item
+            disabled={Boolean(operation) || item.phase !== "running"}
+            onClick={() => setRestarting(item.id)}
+          >
+            Restart
+          </Menu.Item>
+        )}
+      />
       <Group justify="flex-end" gap="xs">
         <Button
           variant="default"
@@ -253,39 +245,45 @@ export function RuntimeWorkloads() {
         model and GPUs.
       </ConfirmDialog>
       {!!history.length && (
-        <Table aria-label="Runtime Changes" verticalSpacing="xs">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Change</Table.Th>
-              <Table.Th visibleFrom="sm">Started</Table.Th>
-              <Table.Th>Status</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {history.map((entry) => (
-              <Table.Tr key={entry.id}>
-                <Table.Td>
-                  <Text size="sm">
-                    {entry.type === "restart"
-                      ? `Restart ${names(entry.start)}`
-                      : `${names(entry.before)} → ${names(entry.after ?? entry.target)}`}
-                  </Text>
+        <DataTable
+          label="Runtime Changes"
+          rows={history}
+          rowKey={(entry) => entry.id}
+          rowName={change}
+          empty="No Changes"
+          columns={[
+            {
+              key: "change",
+              header: "Change",
+              main: true,
+              cell: (entry) => (
+                <>
+                  <Text size="sm">{change(entry)}</Text>
                   <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
                     {entry.error || entry.progress} · {entry.requestedBy}
                   </Text>
-                </Table.Td>
-                <Table.Td visibleFrom="sm">
-                  <Text size="xs">{new Date(entry.startedAt).toLocaleString()}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge variant="light" color={operationColour(entry.status)}>
-                    {operationLabel(entry.status)}
-                  </Badge>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+                </>
+              ),
+            },
+            {
+              key: "started",
+              header: "Started",
+              visibleFrom: "sm",
+              sortValue: (entry) => new Date(entry.startedAt).getTime(),
+              cell: (entry) => <Text size="xs">{new Date(entry.startedAt).toLocaleString()}</Text>,
+            },
+            {
+              key: "status",
+              header: "Status",
+              sortValue: (entry) => operationLabel(entry.status),
+              cell: (entry) => (
+                <Badge variant="light" color={operationColour(entry.status)}>
+                  {operationLabel(entry.status)}
+                </Badge>
+              ),
+            },
+          ]}
+        />
       )}
     </Stack>
   );

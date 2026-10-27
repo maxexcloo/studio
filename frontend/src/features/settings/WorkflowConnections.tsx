@@ -1,6 +1,7 @@
-import { Alert, Button, Select, Stack, Table, Text } from "@mantine/core";
+import { Alert, Button, Select, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { post } from "../../api";
+import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 
 interface WorkflowNode {
@@ -12,72 +13,124 @@ interface WorkflowNode {
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
-function MappingCells({
-  mapping,
-  nodes,
-  label,
-  disabled,
-  readOnly,
-  onChange,
-}: {
-  mapping: unknown;
-  nodes: WorkflowNode[];
+interface Connection {
+  key: string;
   label: string;
-  disabled: boolean;
+  /** Names the row's node and input selectors. */
+  field: string;
+  detail?: string;
+  mapping: unknown;
   readOnly?: boolean;
   onChange: (mapping: Record<string, unknown>) => void;
+}
+
+/** One control or reference per row, choosing the workflow node and input it feeds. */
+function ConnectionTable({
+  label,
+  heading,
+  rows,
+  nodes,
+  disabled,
+  empty,
+}: {
+  label: string;
+  heading: string;
+  rows: Connection[];
+  nodes: WorkflowNode[];
+  disabled: boolean;
+  empty: string;
 }) {
-  if (!record(mapping))
-    return (
-      <Table.Td colSpan={2}>
-        <Text size="xs" c="dimmed">
-          Edit this mapping in Advanced JSON.
-        </Text>
-      </Table.Td>
-    );
-  const node = mapping.node == null || mapping.node === "" ? null : String(mapping.node);
-  const input = mapping.input == null || mapping.input === "" ? null : String(mapping.input);
-  const selected = nodes.find((entry) => entry.id === node);
-  const nodeOptions = nodes.map((entry) => ({
-    value: entry.id,
-    label: `${entry.title || entry.classType} #${entry.id}`,
-  }));
-  if (node && !selected)
-    nodeOptions.push({ value: node, label: disabled ? node : `${node} · Missing Node` });
-  const inputOptions = (selected?.inputs || []).map((value) => ({ value, label: value }));
-  if (input && !selected?.inputs.includes(input))
-    inputOptions.push({ value: input, label: disabled ? input : `${input} · Missing Input` });
+  const nodeOf = (mapping: Record<string, unknown>) =>
+    mapping.node == null || mapping.node === "" ? null : String(mapping.node);
+  const inputOf = (mapping: Record<string, unknown>) =>
+    mapping.input == null || mapping.input === "" ? null : String(mapping.input);
+  const nodeOptions = (mapping: Record<string, unknown>) => {
+    const node = nodeOf(mapping);
+    const options = nodes.map((entry) => ({
+      value: entry.id,
+      label: `${entry.title || entry.classType} #${entry.id}`,
+    }));
+    if (node && !nodes.some((entry) => entry.id === node))
+      options.push({ value: node, label: disabled ? node : `${node} · Missing Node` });
+    return options;
+  };
+  const selectedNode = (mapping: Record<string, unknown>) =>
+    nodes.find((entry) => entry.id === nodeOf(mapping));
+  const inputOptions = (mapping: Record<string, unknown>) => {
+    const input = inputOf(mapping);
+    const inputs = selectedNode(mapping)?.inputs || [];
+    const options = inputs.map((value) => ({ value, label: value }));
+    if (input && !inputs.includes(input))
+      options.push({ value: input, label: disabled ? input : `${input} · Missing Input` });
+    return options;
+  };
   return (
-    <>
-      <Table.Td>
-        <Select
-          aria-label={`${label} Node`}
-          placeholder="Choose Node"
-          searchable
-          allowDeselect={false}
-          data={nodeOptions}
-          value={node}
-          disabled={disabled || readOnly}
-          onChange={(value) => {
-            if (value !== null) onChange({ ...mapping, node: value });
-          }}
-        />
-      </Table.Td>
-      <Table.Td>
-        <Select
-          aria-label={`${label} Input`}
-          placeholder="Choose Input"
-          searchable
-          allowDeselect={false}
-          data={inputOptions}
-          value={input}
-          disabled={disabled || readOnly || !selected}
-          onChange={(value) => {
-            if (value !== null) onChange({ ...mapping, input: value });
-          }}
-        />
-      </Table.Td>
-    </>
+    <DataTable
+      label={label}
+      rows={rows}
+      rowKey={(row) => row.key}
+      rowName={(row) => row.label}
+      empty={empty}
+      minWidth={580}
+      columns={[
+        {
+          key: "connection",
+          header: heading,
+          cell: (row) => (
+            <>
+              <Text size="sm">{row.label}</Text>
+              {row.detail && (
+                <Text size="xs" c="dimmed">
+                  {row.detail}
+                </Text>
+              )}
+            </>
+          ),
+        },
+        {
+          key: "node",
+          header: "Node",
+          cell: ({ field, mapping, readOnly, onChange }) =>
+            record(mapping) ? (
+              <Select
+                aria-label={`${field} Node`}
+                placeholder="Choose Node"
+                searchable
+                allowDeselect={false}
+                data={nodeOptions(mapping)}
+                value={nodeOf(mapping)}
+                disabled={disabled || readOnly}
+                onChange={(value) => {
+                  if (value !== null) onChange({ ...mapping, node: value });
+                }}
+              />
+            ) : (
+              <Text size="xs" c="dimmed">
+                Edit this mapping in Advanced JSON.
+              </Text>
+            ),
+        },
+        {
+          key: "input",
+          header: "Input",
+          cell: ({ field, mapping, readOnly, onChange }) =>
+            record(mapping) && (
+              <Select
+                aria-label={`${field} Input`}
+                placeholder="Choose Input"
+                searchable
+                allowDeselect={false}
+                data={inputOptions(mapping)}
+                value={inputOf(mapping)}
+                disabled={disabled || readOnly || !selectedNode(mapping)}
+                onChange={(value) => {
+                  if (value !== null) onChange({ ...mapping, input: value });
+                }}
+              />
+            ),
+        },
+      ]}
+    />
   );
 }
 
@@ -131,95 +184,49 @@ export function WorkflowConnections({
           </Stack>
         </Alert>
       )}
-      <Table.ScrollContainer minWidth={580}>
-        <Table aria-label="Control Connections" verticalSpacing="sm">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Control</Table.Th>
-              <Table.Th>Node</Table.Th>
-              <Table.Th>Input</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {Object.entries(controls).map(([key, mapping]) => {
-              const legacy = key === "startImage" && mediaInputs.length > 0;
-              return (
-                <Table.Tr key={key}>
-                  <Table.Td>
-                    <Text size="sm">{key}</Text>
-                    {legacy && (
-                      <Text size="xs" c="dimmed">
-                        Reference inputs below take precedence.
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <MappingCells
-                    mapping={mapping}
-                    nodes={nodes}
-                    label={`Control ${key}`}
-                    disabled={disabled}
-                    readOnly={legacy}
-                    onChange={(next) => onChange("controls", { ...controls, [key]: next })}
-                  />
-                </Table.Tr>
-              );
-            })}
-            {!Object.keys(controls).length && (
-              <Table.Tr>
-                <Table.Td colSpan={3}>
-                  <Text size="sm" c="dimmed">
-                    No existing control mappings. Add declarations in Advanced JSON.
-                  </Text>
-                </Table.Td>
-              </Table.Tr>
-            )}
-          </Table.Tbody>
-        </Table>
-      </Table.ScrollContainer>
+      <ConnectionTable
+        label="Control Connections"
+        heading="Control"
+        nodes={nodes}
+        disabled={disabled}
+        empty="No Control Mappings"
+        rows={Object.entries(controls).map(([key, mapping]) => {
+          const legacy = key === "startImage" && mediaInputs.length > 0;
+          return {
+            key,
+            label: key,
+            field: `Control ${key}`,
+            detail: legacy ? "Reference inputs below take precedence." : undefined,
+            mapping,
+            readOnly: legacy,
+            onChange: (next) => onChange("controls", { ...controls, [key]: next }),
+          };
+        })}
+      />
       {!!mediaInputs.length && (
-        <Table.ScrollContainer minWidth={580}>
-          <Table aria-label="Reference Connections" verticalSpacing="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Reference</Table.Th>
-                <Table.Th>Node</Table.Th>
-                <Table.Th>Input</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {mediaInputs.map((slot, index) => (
-                <Table.Tr key={index}>
-                  <Table.Td>
-                    <Text size="sm">
-                      {record(slot)
-                        ? String(slot.label || slot.id || `Reference ${index + 1}`)
-                        : `Reference ${index + 1}`}
-                    </Text>
-                    {record(slot) && (
-                      <Text size="xs" c="dimmed">
-                        {String(slot.id || "")}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <MappingCells
-                    mapping={record(slot) ? slot.control : undefined}
-                    nodes={nodes}
-                    label={`Reference ${record(slot) ? String(slot.id || index + 1) : index + 1}`}
-                    disabled={disabled}
-                    onChange={(next) =>
-                      onChange(
-                        "mediaInputs",
-                        mediaInputs.map((entry, entryIndex) =>
-                          entryIndex === index ? { ...slot, control: next } : entry,
-                        ),
-                      )
-                    }
-                  />
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
+        <ConnectionTable
+          label="Reference Connections"
+          heading="Reference"
+          nodes={nodes}
+          disabled={disabled}
+          empty="No Reference Inputs"
+          rows={mediaInputs.map((slot, index) => ({
+            key: `${index}`,
+            label: record(slot)
+              ? String(slot.label || slot.id || `Reference ${index + 1}`)
+              : `Reference ${index + 1}`,
+            field: `Reference ${record(slot) ? String(slot.id || index + 1) : index + 1}`,
+            detail: record(slot) ? String(slot.id || "") : undefined,
+            mapping: record(slot) ? slot.control : undefined,
+            onChange: (next) =>
+              onChange(
+                "mediaInputs",
+                mediaInputs.map((entry, entryIndex) =>
+                  entryIndex === index ? { ...slot, control: next } : entry,
+                ),
+              ),
+          }))}
+        />
       )}
     </Stack>
   );
