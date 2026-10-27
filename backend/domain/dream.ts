@@ -25,9 +25,9 @@ export interface DreamOrigin {
   at: string;
   spicy?: true;
 }
-export type DreamState = "unseen" | "kept" | "discarded";
+type DreamState = "unseen" | "kept" | "discarded";
 /** A gallery item's Dream record; only a kept item shows in the gallery. */
-export interface DreamMark extends DreamOrigin {
+interface DreamMark extends DreamOrigin {
   state: DreamState;
   decidedAt?: string;
 }
@@ -70,7 +70,7 @@ export interface DreamAccess {
   nsfw: boolean;
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply without reasoning. */
-export interface DreamWriter {
+interface DreamWriter {
   settings(): { model: string; spicyModel?: string };
   chat(request: {
     model: string;
@@ -108,7 +108,7 @@ interface Router {
   put(path: string, handler: Handler): unknown;
 }
 
-export const defaultDreamSettings: DreamSettings = {
+const defaultDreamSettings: DreamSettings = {
   enabled: false,
   paused: false,
   buffer: 12,

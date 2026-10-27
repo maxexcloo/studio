@@ -15,7 +15,7 @@ interface DuplicatePreview {
   differing: { name: string; ids: string[]; differences: string[] }[];
   unresolved: { name: string; ids: string[]; reason: string }[];
 }
-export const duplicateProfilesQuery = queryOptions({
+const duplicateProfilesQuery = queryOptions({
   queryKey: ["profile-duplicates"],
   queryFn: () => api<DuplicatePreview>("/api/profiles/duplicates"),
 });

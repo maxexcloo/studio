@@ -18,8 +18,7 @@ const publicAccountPaths = new Set([
  * route is closed to ordinary accounts until it is reviewed and added.
  */
 const ordinaryRoutes = [
-  ["GET", /^\/api\/(ping|health|models|estimate|workflows|stats|paths|animate\/profile)$/],
-  ["GET", /^\/api\/comfy\/status$/],
+  ["GET", /^\/api\/(ping|health|models|estimate|workflows|stats|animate\/profile)$/],
   ["GET", /^\/api\/services\/status$/],
   ["GET", /^\/api\/accounts\/(mcp-token|me)$/],
   ["PATCH", /^\/api\/accounts\/me$/],
@@ -35,7 +34,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["POST", /^\/api\/queue\/cancel$/],
-  ["GET", /^\/api\/gallery(\/delta|\/export|\/filters|\/jobs\/[\w-]+)?$/],
+  ["GET", /^\/api\/gallery(\/export|\/filters|\/jobs\/[\w-]+)?$/],
   ["POST", /^\/api\/gallery\/(favorite|errors\/clear)$/],
   ["DELETE", /^\/api\/gallery\/[^/]+$/],
   ["GET", /^\/api\/chat$/],

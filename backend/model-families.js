@@ -6,8 +6,6 @@ import {
   families,
   familyFromHeader,
   familyFromName,
-  isKrea2Raw,
-  isZImageBase,
   knownFamilies,
   quantFromHeader,
   refinedFamily,
@@ -81,45 +79,6 @@ function parseChoice(value, source) {
   if (!family || !family.sources.includes(source)) return null;
   if (variantId && !family.variants.some((variant) => variant.id === variantId)) return null;
   return { family: familyId, variant: variantId };
-}
-
-/** Remember "Use as …" for one file; an empty choice goes back to detection. */
-export function setModelChoice(source, name, choice) {
-  const safeSource = String(source || "");
-  const safeName = String(name || "").trim();
-  const safeChoice = String(choice || "");
-  if (!modelSources.includes(safeSource)) throw new Error("Unknown model folder.");
-  if (!safeName || safeName.length > 1024) throw new Error("Choose a model file.");
-  if (safeChoice && !parseChoice(safeChoice, safeSource)) {
-    const family = families[safeChoice.split("/")[0]];
-    throw new Error(
-      family ? `${family.label} can’t load from this folder.` : "Unknown model type.",
-    );
-  }
-  const next = { ...loadModelChoices() };
-  if (safeChoice) next[choiceKey(safeSource, safeName)] = safeChoice;
-  else delete next[choiceKey(safeSource, safeName)];
-  saveChoices(next);
-  return next;
-}
-
-/** Options for the "Use as …" picker: every family, and each variant where there is a choice to make. */
-export function modelTypeChoices() {
-  return Object.fromEntries(
-    modelSources.map((source) => [
-      source,
-      Object.entries(families)
-        .filter(([, family]) => family.sources.includes(source))
-        .flatMap(([id, family]) =>
-          family.variants.length > 1
-            ? family.variants.map((variant) => ({
-                value: `${id}/${variant.id}`,
-                label: `${family.label} · ${variant.label}`,
-              }))
-            : [{ value: id, label: family.label }],
-        ),
-    ]),
-  );
 }
 
 /* ------------------------------------------------------------ Tensor headers */
@@ -221,7 +180,7 @@ function bundledParts(header) {
 const metadataCache = new Map();
 
 /** A family from safetensors metadata (modelspec, kohya ss_* fields), or "". */
-export function familyFromMetadata(metadata = {}) {
+function familyFromMetadata(metadata = {}) {
   const text = [
     metadata["modelspec.architecture"],
     metadata["modelspec.title"],
@@ -387,5 +346,3 @@ export function krea2RawShift(width, height) {
   const mu = 0.5 + ((tokens - 256) * (1.15 - 0.5)) / (6400 - 256);
   return Math.round(mu * 1000) / 1000;
 }
-
-export { isKrea2Raw as isKrea2RawName, isZImageBase as isZImageBaseName };

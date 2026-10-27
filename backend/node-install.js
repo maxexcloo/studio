@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { comfyModelsDir, missingNodes } from "./comfy.js";
 import { nodePack } from "./node-packs.js";
-import { packInstallRoutes } from "./pack-installer.js";
 
 /**
  * How to add a custom node pack to ComfyUI when Studio cannot do it itself:
@@ -11,13 +10,13 @@ import { packInstallRoutes } from "./pack-installer.js";
  */
 
 /** The ComfyUI folder itself, when it sits on this machine next to the models folder we found. */
-export function comfyRootDir() {
+function comfyRootDir() {
   const models = comfyModelsDir();
   return models ? path.dirname(models) : "";
 }
 
 /** The local ComfyUI virtual environment, when Studio can see it. */
-export function comfyPython(root) {
+function comfyPython(root) {
   if (!root) return "";
   return (
     [
@@ -90,6 +89,5 @@ export function missingPackPart(info, packId, { detail = "", extra = [] } = {}) 
       ...(pack.subdir ? { subdir: pack.subdir } : {}),
     },
     install: packInstallPlan(pack),
-    autoInstall: packInstallRoutes(pack.id),
   };
 }

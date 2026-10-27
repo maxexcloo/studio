@@ -3,7 +3,6 @@ import path from "node:path";
 
 /** A resolved native path for comparisons on Studio's Linux and macOS hosts. */
 export const pathKey = (value) => path.resolve(String(value || ""));
-export const samePath = (a, b) => pathKey(a) === pathKey(b);
 
 /** Whether a native path is inside a folder, optionally including the folder itself. */
 export function isInside(base, file, { orSame = false } = {}) {

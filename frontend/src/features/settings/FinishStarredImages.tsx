@@ -8,7 +8,7 @@ import type {
 import { api } from "../../api";
 import { SettingRow } from "./SettingRows";
 
-export const finishingQuery = queryOptions({
+const finishingQuery = queryOptions({
   queryKey: ["finishing"],
   queryFn: () => api<FinishingStatus>("/api/finishing"),
 });

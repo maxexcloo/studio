@@ -2,16 +2,10 @@ import "./fixtures/local-worker.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import {
-  comfyBusyGraceMs,
-  isComfyTimeout,
-  noteComfyFetchError,
-  noteComfyReachable,
-  noteComfySilent,
-} from "./comfy.js";
+import { isComfyTimeout, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 
-/** What a status check to `url` throws, cut short after `ms` the way the status route does it. */
+/** What a check to `url` throws, cut short after `ms`. */
 async function checkError(url, ms) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
@@ -50,33 +44,6 @@ test("a ComfyUI that answers late reads as a timeout, one that has stopped does 
   }
 });
 
-test("busy lasts as long as a run would wait, from when ComfyUI went quiet", () => {
-  noteComfyReachable();
-  const start = 1_000_000;
-  const first = noteComfySilent(start, start + 8000);
-  assert.deepEqual({ busy: first.busy, first: first.first }, { busy: true, first: true });
-  // Later checks count from the first unanswered one, not from their own.
-  const later = noteComfySilent(start + comfyBusyGraceMs - 5000, start + comfyBusyGraceMs - 1);
-  assert.deepEqual({ busy: later.busy, first: later.first }, { busy: true, first: false });
-  assert.equal(
-    noteComfySilent(start + comfyBusyGraceMs, start + comfyBusyGraceMs + 8000).busy,
-    false,
-  );
-});
-
-test("any answer, including a run's progress, starts the quiet clock over", () => {
-  noteComfyReachable();
-  const start = 2_000_000;
-  noteComfySilent(start, start + 8000);
-  noteComfyReachable();
-  const again = noteComfySilent(
-    start + comfyBusyGraceMs + 10_000,
-    start + comfyBusyGraceMs + 18_000,
-  );
-  assert.deepEqual({ busy: again.busy, first: again.first }, { busy: true, first: true });
-  noteComfyReachable();
-});
-
 test("a bug report tells a busy ComfyUI from one that is not answering", () => {
   assert.match(
     diagnosticsText(diagnostics({ version: "0.18.0", stats: null, comfyBusy: true })),
@@ -88,21 +55,7 @@ test("a bug report tells a busy ComfyUI from one that is not answering", () => {
   );
 });
 
-test("one backend answering does not reset another backend's busy grace", async () => {
-  const { withComfyBackend } = await import("./comfy-backends.js");
-  const at = 3_000_000;
-  withComfyBackend("video", () => {
-    noteComfyReachable();
-    assert.equal(noteComfySilent(at, at + 100).first, true);
-  });
-  withComfyBackend("primary", () => noteComfyReachable());
-  withComfyBackend("video", () => {
-    assert.equal(noteComfySilent(at + 1000, at + comfyBusyGraceMs).busy, false);
-    noteComfyReachable();
-  });
-});
-
-test("outage logs skip busy timeouts, say refused or unreachable and count from the first silence", (t) => {
+test("outage logs skip busy timeouts and say refused or unreachable", (t) => {
   const lines = [];
   t.mock.method(console, "error", (line) => lines.push(String(line)));
   noteComfyReachable();
@@ -116,13 +69,4 @@ test("outage logs skip busy timeouts, say refused or unreachable and count from 
   assert.match(lines.join("\n"), /ComfyUI stopped answering .*"code":"ECONNREFUSED"/);
   noteComfyReachable();
   assert.match(lines.at(-1), /ComfyUI answering again/);
-  // Silence past the grace is an outage that began at the first unanswered check.
-  const start = Date.now() - comfyBusyGraceMs - 30_000;
-  noteComfySilent(start, start + 1000);
-  lines.length = 0;
-  noteComfySilent(Date.now() - 1000, Date.now());
-  assert.match(lines.join("\n"), /ComfyUI stopped answering/);
-  noteComfyReachable();
-  const downFor = Number(/"downForS":(\d+)/.exec(lines.at(-1))?.[1]);
-  assert.ok(downFor >= comfyBusyGraceMs / 1000 + 29, `down for ${downFor} s`);
 });

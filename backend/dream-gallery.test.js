@@ -8,7 +8,6 @@ import test from "node:test";
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-gallery-"));
 const {
   filterVisibleGallery,
-  galleryDelta,
   galleryRevisionValue,
   makePendingItems,
   pageGallery,
@@ -40,7 +39,6 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
   });
   assert.equal(pending.dream.state, "unseen");
   setGallery([item("mine"), item("unseen", "unseen"), item("gone", "discarded"), pending]);
-  const since = galleryRevisionValue();
   const shown = () => pageGallery({}).items.map((entry) => entry.id);
   assert.deepEqual(shown(), ["mine"]);
   assert.deepEqual(
@@ -52,15 +50,11 @@ test("Dream results stay out of the gallery, its delta and MCP job reads until k
   const alice = { userId: "alice", role: "user", authenticated: true, features: { gallery: true } };
   assert.deepEqual(galleryJobResponse(alice, "job-unseen").payload.items, []);
 
-  // A change to an unkept result never reaches a browser.
+  // A change to an unkept result keeps it out of the gallery.
   updateGalleryJob("unseen", { favorite: true });
-  assert.deepEqual(galleryDelta({ since, owner: "alice" }).upserts, []);
+  assert.deepEqual(shown(), ["mine"]);
   // Keeping it makes it an ordinary gallery item everywhere.
   updateGalleryJob("unseen", { dream: { ...mark, state: "kept" } });
-  assert.deepEqual(
-    galleryDelta({ since, owner: "alice" }).upserts.map((entry) => entry.id),
-    ["unseen"],
-  );
   assert.deepEqual(shown().sort(), ["mine", "unseen"]);
   assert.equal(galleryJobResponse(alice, "job-unseen").payload.items.length, 1);
 });
