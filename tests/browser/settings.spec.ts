@@ -124,6 +124,45 @@ test("Tile Captions in Settings › Studio pin phone tile captions", async ({ pa
   await expect(caption).toBeVisible();
 });
 
+test("Finish Starred Images in Settings › Studio saves its switch, quality and face detail", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const status = {
+    settings: { enabled: false, quality: "balanced", faceDetail: true },
+    waiting: 0,
+  };
+  const saves: Record<string, unknown>[] = [];
+  await page.route("**/api/finishing**", (route) => {
+    if (route.request().method() === "PUT") {
+      const patch = route.request().postDataJSON();
+      saves.push(patch);
+      Object.assign(status.settings, patch);
+      if (patch.enabled) status.waiting = 3;
+    }
+    return route.fulfill({ json: status });
+  });
+  await page.goto("/settings#studio");
+  const toggle = page.getByRole("switch", { name: "Finish Starred Images", exact: true });
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByRole("combobox", { name: "Finishing Quality", exact: true })).toHaveCount(
+    0,
+  );
+  await toggle.click({ force: true });
+  await expect(toggle).toBeChecked();
+  await expect(
+    page.getByText("Upscale images you star while the GPU is idle. 3 waiting.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("combobox", { name: "Finishing Quality", exact: true }).click();
+  await page.getByRole("option", { name: "High", exact: true }).click();
+  const face = page.getByRole("switch", { name: "Face Detail", exact: true });
+  await face.click({ force: true });
+  await expect(face).not.toBeChecked();
+  await expect
+    .poll(() => saves)
+    .toEqual([{ enabled: true }, { quality: "high" }, { faceDetail: false }]);
+});
+
 test("Header appearance preferences persist across reloads", async ({ page }) => {
   await fixtures(page);
   await page.goto("/");

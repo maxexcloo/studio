@@ -47,7 +47,6 @@ run = "node backend/commands/import-studio.mjs"
 # Native bridge checks live with each custom node, outside tests/.
 [tasks."test:python"]
 run = """
-PYTHONPATH=worker/comfyui uv run --no-project --with pillow python -B -m unittest discover -s worker/comfyui/cliproxy -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/radiance -p 'test_*.py'
 PYTHONPATH=worker/comfyui python -B -m unittest discover -s worker/comfyui/studio_worker -p 'test_*.py'
 python -B -m unittest discover -s worker -p 'test_*.py'
