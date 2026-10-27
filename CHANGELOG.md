@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> One picker for references, LoRAs and presets, with saved stacks and a clearer chip rail; ships everything listed under 1.0.6–1.0.8, whose images never published
+
 ### Changed
 
 - References, LoRAs and Presets share one picker: tabs, search and filters on one row, a selected image or LoRA fades with a check and a second click removes it, and Clear References, Clear LoRAs and Clear Preset sit in the footer.
