@@ -245,10 +245,7 @@ export class RuntimeController {
     const target = [...new Set(requested)];
     for (const id of target) this.workload(id);
     for (const [pool, capacity] of Object.entries(this.pools)) {
-      const needed = target
-        .map((id) => this.workload(id))
-        .filter((workload) => workload.pool === pool)
-        .reduce((sum, workload) => sum + workload.gpus, 0);
+      const needed = this.usage(target, pool);
       if (needed > capacity)
         throw new RuntimeRequestError(
           `The ${pool} pool has ${plural(capacity, "GPU")}; this placement needs ${needed}.`,
@@ -469,6 +466,10 @@ export class RuntimeController {
         "The selected worker is offline; automatic lifecycle control is disabled.",
       );
     const [workload] = choices;
+    if (workload.kind === "text")
+      throw new RuntimeUnavailable(
+        `${workload.label} is stopped; automatic control never starts text workloads. Start it in Settings › Workers.`,
+      );
     if (this.current || this.claimed)
       throw new RuntimeUnavailable(
         `Waiting for ${workload.label} to start after the current runtime change.`,
@@ -477,26 +478,49 @@ export class RuntimeController {
     throw new RuntimeUnavailable(`Waiting for ${workload.label} to start.`);
   }
 
-  /** Automatic lifecycle: keep what fits beside the requested workload and stop the rest of its pool. */
+  /** GPUs the given workloads claim in one pool. */
+  private usage(ids: string[], pool: string) {
+    return ids
+      .map((id) => this.workload(id))
+      .filter((item) => item.pool === pool)
+      .reduce((sum, item) => sum + item.gpus, 0);
+  }
+
+  /** Running text workloads. Automatic control never stops them: callers outside Studio use them. */
+  private runningText(states: Map<string, DeploymentState>) {
+    return this.workloads
+      .filter((item) => item.kind === "text" && states.get(item.id)!.replicas > 0)
+      .map((item) => item.id);
+  }
+
+  /**
+   * Automatic lifecycle: start a media workload, stopping media in its pool to make room, idle ones
+   * first. If running text holds the GPUs it needs, nothing changes and the work waits.
+   */
   private async switchTo(workload: Workload) {
     this.claim();
     try {
       const states = await this.states();
+      const text = this.runningText(states);
+      const blocking = text.filter((id) => this.workload(id).pool === workload.pool);
+      if (
+        blocking.length &&
+        this.usage([...blocking, workload.id], workload.pool) > this.pools[workload.pool]
+      )
+        throw new RuntimeUnavailable(
+          `Waiting for a GPU: ${blocking.map((id) => this.workload(id).label).join(", ")} ${blocking.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`,
+        );
       const target = this.workloads
-        .filter((item) => holds(states.get(item.id)!))
+        .filter((item) => states.get(item.id)!.replicas > 0)
         .map((item) => item.id)
         .concat(workload.id);
-      const capacity = this.pools[workload.pool];
-      const usage = () =>
-        target
-          .map((id) => this.workload(id))
-          .filter((item) => item.pool === workload.pool)
-          .reduce((sum, item) => sum + item.gpus, 0);
-      // Idle holders leave first.
       const candidates = target
-        .filter((id) => id !== workload.id && this.workload(id).pool === workload.pool)
+        .filter(
+          (id) =>
+            id !== workload.id && !text.includes(id) && this.workload(id).pool === workload.pool,
+        )
         .sort((a, b) => (this.active.get(a) ?? 0) - (this.active.get(b) ?? 0));
-      while (usage() > capacity && candidates.length)
+      while (this.usage(target, workload.pool) > this.pools[workload.pool] && candidates.length)
         target.splice(target.indexOf(candidates.shift()!), 1);
       const plan = this.plan(this.validate(target), states);
       // A guard that refuses (such as unsaved legacy outputs) becomes the waiting reason; nothing is recorded.
@@ -507,7 +531,10 @@ export class RuntimeController {
     }
   }
 
-  /** Automatic lifecycle: restore Studio's last placement after something else stopped a workload. */
+  /**
+   * Automatic lifecycle: restore Studio's last placement after something else stopped a workload.
+   * Running text stays; a restore that needs its GPUs is skipped until it is stopped in Studio.
+   */
   async reconcile() {
     const desired = this.record.desired?.filter((id) =>
       this.workloads.some((item) => item.id === id),
@@ -517,11 +544,12 @@ export class RuntimeController {
     try {
       const states = await this.states();
       if (desired.every((id) => holds(states.get(id)!))) return;
-      this.begin(
-        "apply",
-        this.plan(this.validate(desired), states),
-        "automatic: restoring the last placement",
-      );
+      const target = [...new Set([...desired, ...this.runningText(states)])];
+      if (
+        Object.entries(this.pools).some(([pool, capacity]) => this.usage(target, pool) > capacity)
+      )
+        return;
+      this.begin("apply", this.plan(target, states), "automatic: restoring the last placement");
     } finally {
       this.claimed = false;
     }
