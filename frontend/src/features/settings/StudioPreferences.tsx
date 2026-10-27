@@ -5,6 +5,7 @@ import { api, post } from "../../api";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useShareWithoutSettings } from "../gallery/mediaShare";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
+import { FinishStarredImages } from "./FinishStarredImages";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
 const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
@@ -26,6 +27,7 @@ export function StudioPreferences() {
   const account = useAccount();
   const admin = useIsAdmin();
   const historyAllowed = admin || account.data?.account?.features?.promptHistory === true;
+  const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
   const history = useQuery({
     queryKey: ["prompt-history", "positive"],
     queryFn: () => api<{ enabled: boolean }>("/api/prompts?kind=positive"),
@@ -77,6 +79,7 @@ export function StudioPreferences() {
             onChange={(event) => setTileCaptions(event.currentTarget.checked)}
           />
         </SettingRow>
+        {galleryAllowed && <FinishStarredImages />}
       </SettingGroup>
       <SettingGroup title="Keyboard Shortcuts">
         {shortcuts.map((shortcut) => (
