@@ -58,14 +58,20 @@ test("A tile can be starred and read back without opening the viewer", async ({
   const state = await galleryFixture(page);
   const tile = page.getByRole("button", { name: "Open image: A copper bird", exact: true });
   await tile.hover();
+  // Phones show a tile's star once it is starred; until then, selection stars it.
   if (testInfo.project.use.isMobile) {
-    await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
-    await page.getByRole("menuitem", { name: "Star", exact: true }).click();
+    await page.getByRole("button", { name: "Select Items", exact: true }).click();
+    await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
+    await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+    await page
+      .getByRole("group", { name: "Selected Item Actions", exact: true })
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
   } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Unstar A copper bird", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  expect(state.gallery[0].favorite).toBe(true);
+  await expect.poll(() => state.gallery[0].favorite).toBe(true);
   await expect(page).toHaveURL(/\/images$/);
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.reload();
@@ -81,11 +87,18 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
-  await expect(page.getByRole("menuitem", { name: "Refine", exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Download", exact: true })).toHaveAttribute(
-    "href",
-    image,
-  );
+  // One shared order: Animate, Edit, Recreate, Reference | Create Comparison, Upscale | Copy
+  // Details, Copy Prompt (and Copy Image where supported) | Delete.
+  await expect(page.getByRole("menuitem")).toContainText([
+    "Animate",
+    "Edit",
+    "Recreate",
+    "Create Comparison",
+    "Upscale",
+    "Copy Details",
+    "Copy Prompt",
+    "Delete",
+  ]);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
   const more = page.getByRole("button", { name: "More Actions for A copper bird", exact: true });
@@ -94,14 +107,14 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeVisible();
   await expect(page.getByRole("menu").locator(":focus")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Refine", exact: true })).toBeFocused();
-  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
 
-for (const operation of ["Refine", "Animate"] as const) {
+for (const operation of ["Edit", "Animate"] as const) {
   test(`Tile ${operation} stages its owned result as a reference without submitting`, async ({
     page,
   }) => {
@@ -110,10 +123,10 @@ for (const operation of ["Refine", "Animate"] as const) {
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
-    // An Animate draft opens the Videos composer, a Refine draft stays in Images.
+    // An Animate draft opens the Videos composer, an Edit draft stays in Images.
     await expect(page).toHaveURL(operation === "Animate" ? /\/video\?compose=1/ : /\/images/);
     // Videos opens with its composer expanded; Images keeps the compact bar until it is clicked.
-    if (operation === "Refine") await page.locator("[data-composer-prompt]").click();
+    if (operation === "Edit") await page.locator("[data-composer-prompt]").click();
     await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
       "A copper bird",
     );
@@ -168,7 +181,7 @@ test("A failed tile retries its owned durable job and refreshes the gallery", as
 });
 
 for (const surface of ["tile", "viewer"]) {
-  test(`Reference This Image from the ${surface} retains the current draft instead of recreating the source`, async ({
+  test(`Reference from the ${surface} retains the current draft instead of recreating the source`, async ({
     page,
   }) => {
     const state = await galleryFixture(page);
@@ -196,12 +209,12 @@ for (const surface of ["tile", "viewer"]) {
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
-      await viewerAction(page, "Reference This Image");
+      await viewerAction(page, "Reference");
     } else {
       await page
         .getByRole("button", { name: "More Actions for A copper bird", exact: true })
         .click();
-      await page.getByRole("menuitem", { name: "Reference This Image", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Reference", exact: true }).click();
     }
     const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toHaveValue("Keep this separate visual direction");

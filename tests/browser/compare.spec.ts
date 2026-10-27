@@ -59,7 +59,7 @@ test("Compare Variants from the viewer keeps the result's seed and opens variant
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
-  await viewerAction(page, "Compare Variants");
+  await viewerAction(page, "Create Comparison");
   const dialog = page.getByRole("dialog", { name: "Compare Variants", exact: true });
   await expect(dialog).toContainText("Every variant uses seed 1234567.");
   await dialog.getByText("Steps & Guidance", { exact: true }).click();

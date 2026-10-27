@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActionIcon, Badge, Button, Group, Scroller, Tooltip } from "@mantine/core";
+import { Badge, Button, Group, Scroller, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Boxes,
+  GalleryVertical,
   Layers,
   MessageCircle,
   Ratio,
@@ -13,12 +13,13 @@ import {
   Search,
   SlidersHorizontal,
   Star,
-  X,
 } from "lucide-react";
 import { api } from "../../api";
 import { SearchInput } from "../../ui/SearchInput";
+import { usePhone } from "../../ui/usePhone";
 import type { MediaKind } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { chipProps, iconChipProps } from "../generation/chip";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { GalleryFilterPicker, type GalleryFilterOption } from "./GalleryFilterPicker";
 import classes from "./GalleryFilters.module.css";
@@ -69,33 +70,35 @@ interface GalleryFiltersProps {
   starred: boolean;
   onStarredChange: (value: boolean) => void;
   withinPortal?: boolean;
+  /** Grid's version grouping: on (the default) shows one tile per version chain. */
+  allVersions?: boolean;
+  onAllVersionsChange?: (value: boolean) => void;
 }
 /**
- * Normal, search and filter modes share one toolbar row. Search expands into a full-width input;
- * filters expand into a row of labelled facets that apply as they change.
+ * Normal, search and filter modes share one toolbar row. Desktop keeps the search box in the row;
+ * phones open it from an icon into the full row. The Filter chip swaps the leading controls for a
+ * row of labelled facets that apply as they change; Filter again ends it.
  */
 export function GalleryFilterToolbar({
   query,
   onQueryChange,
-  filtersInitiallyOpen = false,
   leading,
   actions,
   ...props
 }: GalleryFiltersProps & {
   query: string;
   onQueryChange: (value: string) => void;
-  filtersInitiallyOpen?: boolean;
   leading?: ReactNode;
   actions?: ReactNode;
 }) {
-  const [mode, setMode] = useState<"normal" | "search" | "filters">(
-    filtersInitiallyOpen ? "filters" : "normal",
-  );
+  const phone = usePhone();
+  const [mode, setMode] = useState<"normal" | "search" | "filters">("normal");
   const searchOpen = mode === "search";
-  // A search set from elsewhere (a caption tag) opens the field so it shows what is filtered.
+  // A search set from elsewhere (a caption tag) opens the phone's field so it shows what is
+  // filtered; desktop always shows its box.
   useEffect(() => {
-    if (query) setMode((current) => (current === "normal" ? "search" : current));
-  }, [query]);
+    if (query && phone) setMode((current) => (current === "normal" ? "search" : current));
+  }, [query, phone]);
   const selectedCount = galleryFilterCount(props.value, props.starred);
   const toolbar = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -115,99 +118,110 @@ export function GalleryFilterToolbar({
     );
     if (owner ? !owner.contains(event.target as Node) : layers.length) return;
     event.preventDefault();
-    if (searchOpen) searchInput.current?.focus();
-    else setMode("search");
+    if (phone && !searchOpen) setMode("search");
+    else {
+      setMode((current) => (current === "filters" ? "normal" : current));
+      requestAnimationFrame(() => searchInput.current?.focus());
+    }
   }
   useHotkeys([
     ["/", openSearch, { preventDefault: false }],
     ["mod+f", openSearch, { preventDefault: false }],
   ]);
   function dismiss() {
-    setMode("normal");
     const trigger = mode === "filters" ? filtersButton : searchButton;
+    setMode("normal");
     requestAnimationFrame(() => trigger.current?.focus());
   }
-  if (mode === "search")
+  const search = (
+    <SearchInput
+      ref={searchInput}
+      aria-label="Search Gallery"
+      placeholder="Search your generations…"
+      size="sm"
+      radius="xl"
+      value={query}
+      onChange={(event) => onQueryChange(event.currentTarget.value)}
+      onClear={() => onQueryChange("")}
+      onClose={phone ? dismiss : undefined}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (phone) dismiss();
+        else event.currentTarget.blur();
+      }}
+      className={phone ? classes.searchOpen : classes.search}
+    />
+  );
+  if (searchOpen)
     return (
-      <Group key="search" ref={toolbar} mih={44} w="100%" className={classes.mode}>
-        <SearchInput
-          ref={searchInput}
-          aria-label="Search Gallery"
-          placeholder="Search your generations…"
-          value={query}
-          onChange={(event) => onQueryChange(event.currentTarget.value)}
-          onClear={() => onQueryChange("")}
-          onClose={dismiss}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              event.stopPropagation();
-              dismiss();
-            }
-          }}
-          w="100%"
-        />
+      <Group key="search" ref={toolbar} mih={44} wrap="nowrap" className={classes.mode}>
+        {search}
       </Group>
     );
-  if (mode === "filters")
-    return (
-      <Group key="filters" ref={toolbar} gap={4} mih={44} wrap="nowrap" className={classes.mode}>
-        <Tooltip label="Close Filters">
-          <ActionIcon aria-label="Close Filters" variant="subtle" color="gray" onClick={dismiss}>
-            <ArrowLeft size={18} />
-          </ActionIcon>
-        </Tooltip>
-        <GalleryFilters {...props} />
-      </Group>
-    );
+  const filtering = mode === "filters";
   return (
-    <Group key="normal" ref={toolbar} gap="xs" mih={44} wrap="nowrap" className={classes.mode}>
-      <Tooltip label="Search Gallery">
-        <ActionIcon
-          ref={searchButton}
-          aria-label="Search Gallery"
-          aria-expanded={false}
-          onClick={() => setMode("search")}
-          variant={query ? "light" : "subtle"}
-          color={query ? undefined : "gray"}
-        >
-          <Search size={19} />
-        </ActionIcon>
-      </Tooltip>
-      {leading}
+    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap">
+      {filtering ? (
+        <Group key="filters" gap={6} wrap="nowrap" className={`${classes.mode} ${classes.lead}`}>
+          <GalleryFilters {...props} />
+        </Group>
+      ) : (
+        <Group key="normal" gap="xs" wrap="nowrap" className={`${classes.mode} ${classes.lead}`}>
+          {phone ? (
+            <Tooltip label="Search Gallery" disabled={phone}>
+              <Button
+                {...iconChipProps}
+                ref={searchButton}
+                aria-label="Search Gallery"
+                aria-expanded={false}
+                variant={query ? "light" : "default"}
+                onClick={() => setMode("search")}
+              >
+                <Search size={16} />
+              </Button>
+            </Tooltip>
+          ) : (
+            search
+          )}
+          {leading}
+        </Group>
+      )}
       <Group gap="xs" ml="auto" wrap="nowrap">
-        {selectedCount > 0 && (
-          <Tooltip label="Clear Filters">
-            <ActionIcon
-              aria-label="Clear Filters"
-              variant="subtle"
-              color="gray"
-              onClick={() => {
-                props.onStarredChange(false);
-                props.onChange(emptyGalleryFilters);
-              }}
-            >
-              <X size={18} />
-            </ActionIcon>
-          </Tooltip>
-        )}
-        <Tooltip label="Gallery Filters">
-          <ActionIcon
+        <Tooltip label="Gallery Filters" disabled={!phone}>
+          <Button
+            {...(phone ? iconChipProps : chipProps)}
             ref={filtersButton}
             aria-label="Gallery Filters"
-            aria-expanded={false}
-            variant={selectedCount ? "light" : "subtle"}
-            color={selectedCount ? undefined : "gray"}
+            aria-expanded={filtering}
+            variant={selectedCount || filtering ? "light" : "default"}
+            leftSection={phone ? undefined : <SlidersHorizontal size={15} />}
+            rightSection={
+              selectedCount > 0 && !phone ? (
+                <Badge size="xs" circle aria-hidden>
+                  {selectedCount}
+                </Badge>
+              ) : undefined
+            }
             pos="relative"
-            onClick={() => setMode("filters")}
+            onClick={() => (filtering ? dismiss() : setMode("filters"))}
           >
-            <SlidersHorizontal size={19} />
-            {selectedCount > 0 && (
-              <Badge size="xs" circle variant="filled" pos="absolute" top={0} right={0} aria-hidden>
+            {phone ? <SlidersHorizontal size={16} /> : "Filter"}
+            {phone && selectedCount > 0 && (
+              <Badge
+                size="xs"
+                circle
+                variant="filled"
+                pos="absolute"
+                top={-2}
+                right={-2}
+                aria-hidden
+              >
                 {selectedCount}
               </Badge>
             )}
-          </ActionIcon>
+          </Button>
         </Tooltip>
         {actions}
       </Group>
@@ -223,6 +237,8 @@ export function GalleryFilters({
   starred,
   onStarredChange,
   withinPortal,
+  allVersions,
+  onAllVersionsChange,
 }: GalleryFiltersProps) {
   const { profiles } = useGenerationActions();
   const facets = useQuery(galleryFacetsQuery(kind));
@@ -274,10 +290,9 @@ export function GalleryFilters({
           {facets.error && (
             <Tooltip label={facets.error.message}>
               <Button
+                {...chipProps}
                 color="red"
                 variant="light"
-                size="compact-md"
-                radius="xl"
                 leftSection={<RotateCw size={15} />}
                 loading={facets.isFetching}
                 onClick={() => void facets.refetch()}
@@ -287,16 +302,27 @@ export function GalleryFilters({
             </Tooltip>
           )}
           <Button
+            {...chipProps}
             aria-label="Starred"
             aria-pressed={starred}
             variant={starred ? "light" : "default"}
-            size="compact-md"
-            radius="xl"
             leftSection={<Star size={15} fill={starred ? "currentColor" : "none"} />}
             onClick={() => onStarredChange(!starred)}
           >
             Starred
           </Button>
+          {onAllVersionsChange && (
+            <Button
+              {...chipProps}
+              aria-label="All Versions"
+              aria-pressed={Boolean(allVersions)}
+              variant={allVersions ? "light" : "default"}
+              leftSection={<GalleryVertical size={15} />}
+              onClick={() => onAllVersionsChange(!allVersions)}
+            >
+              All Versions
+            </Button>
+          )}
           {picker("model", "Models", Boxes, options("model"), true)}
           {picker("lora", "LoRAs", Layers, options("lora"), true)}
           {picker("size", "Size", Ruler, facets.data?.sizes || [])}
@@ -306,13 +332,11 @@ export function GalleryFilters({
       </Scroller>
       {active && (
         <Button
+          {...chipProps}
           aria-label="Clear Filters"
           variant="subtle"
           color="gray"
-          size="compact-md"
-          radius="xl"
-          leftSection={<X size={15} />}
-          className={classes.clear}
+          className={`${chipProps.className} ${classes.clear}`}
           onClick={() => {
             onStarredChange(false);
             onChange(emptyGalleryFilters);

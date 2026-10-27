@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { MediaItem } from "../../types";
 import { MediaTile } from "./MediaTile";
+import type { VersionGroup } from "./versions";
 import type { GallerySelection } from "./useGallerySelection";
 import { galleryGap, useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 
@@ -20,6 +21,8 @@ export interface GalleryViewProps {
   ) => ReactNode;
   onSelectionMenu: (x: number, y: number) => void;
   onTryAgain: (item: MediaItem) => void;
+  /** Each tile's versions, by its latest item; Grid shows one tile per group. */
+  versions?: Map<string, VersionGroup>;
 }
 
 /**
@@ -39,7 +42,7 @@ export function focusTile(host: HTMLElement | null, id: string) {
 
 const arrows: Record<string, number> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
 
-/** A virtualised masonry of every loaded item. */
+/** A virtualised masonry of every loaded item, or of each version group's latest. */
 export function MediaGrid({
   items,
   open,
@@ -50,8 +53,11 @@ export function MediaGrid({
   renderActions,
   onSelectionMenu,
   onTryAgain,
+  versions,
 }: GalleryViewProps) {
   const { columns, host, width, cell } = useGalleryLayout();
+  // The version each tile shows while flipping, by the tile's latest item.
+  const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
   const hold = useHoldToSelect(items, selection);
@@ -85,11 +91,22 @@ export function MediaGrid({
       style={{ height: virtual.getTotalSize(), position: "relative" }}
     >
       {virtual.getVirtualItems().map((placement) => {
-        const item = items[placement.index];
+        const latest = items[placement.index];
+        const group = versions?.get(latest.id);
+        const version = selection.selecting ? undefined : shown[latest.id];
+        const item = (version !== undefined && group?.[version]) || latest;
         return (
           <MediaTile
-            key={item.id}
+            key={latest.id}
             item={item}
+            group={[latest]}
+            versions={group}
+            version={version}
+            onVersion={(index) =>
+              setShown(({ [latest.id]: _, ...rest }) =>
+                index === undefined ? rest : { ...rest, [latest.id]: index },
+              )
+            }
             selection={selection}
             hold={hold}
             caption={caption}

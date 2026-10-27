@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActionIcon,
   Alert,
   Button,
   Center,
@@ -30,6 +29,7 @@ import { GallerySelectionBar } from "./GallerySelectionBar";
 import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "./useGalleryLayout";
 import { useTryAgain } from "./useTryAgain";
+import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
 import {
   GalleryFilterToolbar,
@@ -39,6 +39,7 @@ import {
   hasGalleryFilters,
 } from "./GalleryFilters";
 import { usePhone } from "../../ui/usePhone";
+import { chipProps, iconChipProps } from "../generation/chip";
 import classes from "./GalleryPage.module.css";
 
 interface Page {
@@ -62,6 +63,11 @@ export function GalleryPage() {
     getInitialValueInEffect: false,
   });
   const [starred, setStarred] = useState(false);
+  const [allVersions, setAllVersions] = useLocalStorage({
+    key: "studio-gallery-all-versions",
+    defaultValue: false,
+    getInitialValueInEffect: false,
+  });
   const [filters, setFilters] = useState(emptyGalleryFilters);
   const hasFilters = starred || hasGalleryFilters(filters);
   const [pagingFailed, setPagingFailed] = useState(false);
@@ -153,9 +159,23 @@ export function GalleryPage() {
     gallery.fetchNextPage,
     selected,
   ]);
-  const items = gallery.data?.pages.flatMap((page) => page.items) || [];
+  const loaded = useMemo(
+    () => gallery.data?.pages.flatMap((page) => page.items) || [],
+    [gallery.data],
+  );
+  // Grid shows each version chain as one tile, its latest version; Runs and All Versions show all.
+  const groups = useVersionGroups(loaded);
+  const grouped = view === "grid" && !allVersions;
+  const versions = useMemo(
+    () => (grouped ? new Map(groups.map((group) => [group.at(-1)!.id, group])) : undefined),
+    [grouped, groups],
+  );
+  const items = useMemo(
+    () => (versions ? [...versions.values()].map((group) => group.at(-1)!) : loaded),
+    [versions, loaded],
+  );
   const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
-  const tryAgain = useTryAgain(items);
+  const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   const selectionButton = useRef<HTMLButtonElement>(null);
   function doneSelecting() {
@@ -198,10 +218,17 @@ export function GalleryPage() {
           onChange={setFilters}
           starred={starred}
           onStarredChange={setStarred}
+          allVersions={allVersions}
+          onAllVersionsChange={view === "grid" ? setAllVersions : undefined}
           leading={
             <SegmentedControl
               aria-label="Gallery View"
               size="sm"
+              classNames={{
+                root: classes.view,
+                control: classes.viewControl,
+                label: classes.viewControl,
+              }}
               radius="xl"
               value={view}
               onChange={(value) => setView(value as "grid" | "runs")}
@@ -212,17 +239,17 @@ export function GalleryPage() {
             />
           }
           actions={
-            <Tooltip label="Select Items">
-              <ActionIcon
+            <Tooltip label="Select Items" disabled={!phone}>
+              <Button
+                {...(phone ? iconChipProps : chipProps)}
                 ref={selectionButton}
                 aria-label="Select Items"
-                variant="subtle"
-                color="gray"
+                leftSection={phone ? undefined : <SquareCheck size={15} />}
                 disabled={!items.length}
                 onClick={selection.start}
               >
-                <SquareCheck size={19} />
-              </ActionIcon>
+                {phone ? <SquareCheck size={16} /> : "Select"}
+              </Button>
             </Tooltip>
           }
         />
@@ -240,6 +267,7 @@ export function GalleryPage() {
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
           <View
             items={items}
+            versions={versions}
             focusItem={focusItem}
             open={(item) => {
               setFocusItem(null);
@@ -252,15 +280,7 @@ export function GalleryPage() {
             onSelectionMenu={(x, y) => setMenu({ x, y })}
             onTryAgain={(item) => tryAgain([item.jobId || ""]).then(() => undefined)}
             renderActions={(item, opened, onOpenedChange) => (
-              <MediaTileActions
-                item={item}
-                opened={opened}
-                onOpenedChange={onOpenedChange}
-                onSelect={() => {
-                  selection.start();
-                  selection.toggle([item]);
-                }}
-              />
+              <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />
             )}
           />
         </div>
@@ -300,8 +320,14 @@ export function GalleryPage() {
       {!selection.selecting && <ComposerDock />}
       {selected && (
         <MediaViewer
-          item={items.find((i) => i.id === selected.id) || selected}
-          items={items}
+          item={loaded.find((i) => i.id === selected.id) || selected}
+          items={
+            versions
+              ? [...versions.values()].map(
+                  (group) => group.find((version) => version.id === selected.id) || group.at(-1)!,
+                )
+              : items
+          }
           navigate={setSelected}
           onReturnFocus={(item) => setFocusItem(item.id)}
           close={() => setSelected(null)}
