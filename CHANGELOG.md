@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-10-27
+
 > The prompt assistant stops failing with "unusable reply"
 
 ### Fixed
@@ -2202,7 +2204,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.11...HEAD
+[1.0.11]: https://github.com/maxexcloo/studio/compare/v1.0.10...v1.0.11
 [1.0.10]: https://github.com/maxexcloo/studio/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/maxexcloo/studio/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/maxexcloo/studio/compare/v1.0.7...v1.0.8
