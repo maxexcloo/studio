@@ -3854,7 +3854,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(f.submitted.length, 4);
 });
 
-test("ten images in one Generate call queue ten separate jobs, and the account job limit still stops the rest", async (t) => {
+test("ten images in one Generate call queue ten separate jobs, and a refusal stops the rest", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const ten = await generate(client, { count: 10, seed: 1 });
@@ -3873,16 +3873,12 @@ test("ten images in one Generate call queue ten separate jobs, and the account j
     f.submitted.slice(10).map((body) => body.prompt),
     prompts,
   );
-  // The studio's outstanding-job limit refuses further jobs; those queued so far are kept and the reason is passed on.
-  f.failAfter(22, 429, {
-    ok: false,
-    reason: "job-limit",
-    error: "You can have up to 2 outstanding jobs.",
-  });
+  // When the studio refuses further jobs, those queued so far are kept and the reason is passed on.
+  f.failAfter(22, 422, { ok: false, error: "This profile can't run right now." });
   const limited = await generate(client, { count: 10 });
   assert.equal(limited.status, "partially_queued");
   assert.equal(limited.jobs.length, 2);
-  assert.match(limited.error, /up to 2 outstanding jobs/);
+  assert.match(limited.error, /can't run right now/);
   assert.equal(f.submitted.length, 22);
 });
 

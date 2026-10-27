@@ -42,7 +42,6 @@ import { providerMediaWriter } from "./providers/media.ts";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
-import { configuredAccountJobLimit } from "./account-jobs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
@@ -1782,7 +1781,6 @@ const generationRoutes = registerGenerationRoutes(app, {
 });
 
 // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
-const accountJobLimit = configuredAccountJobLimit();
 const mediaLeases = new Map();
 async function queueResourceFor(input) {
   if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
@@ -2084,7 +2082,6 @@ registerRewriteRoutes(app, {
   queue: generationQueue,
   resourceFor: queueResourceFor,
   validate: validateGenerationInput,
-  jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
   media: (ownerId) => {
     const byJob = new Map();
@@ -2103,7 +2100,6 @@ const admitGeneration = createGenerationAdmission({
   resourceFor: queueResourceFor,
   pendingItems: makePendingItems,
   revision: galleryRevisionValue,
-  jobLimit: accountJobLimit,
   validate: validateGenerationInput,
   admitted: jobAdmitted,
 });
@@ -2798,29 +2794,21 @@ async function queueUpscaleOnWorker(account, request, origin) {
   const session = parent
     ? rewriteStore.session(ownerId, parent.sessionId)
     : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-  let queued;
-  try {
-    queued = rewriteStore.enqueue(
-      ownerId,
-      session.id,
-      {
-        prompt: item.prompt || "",
-        galleryItemId: item.id,
-        upscaleBody: body,
-        upscalePlan: plan,
-      },
-      "upscale",
-      parent?.id,
-      `worker:${currentComfyBackend()}`,
-      undefined,
-      account?.role === "user" && !origin ? accountJobLimit : undefined,
-      origin,
-    );
-  } catch (error) {
-    if (error.status === 429)
-      return { status: 429, payload: { ok: false, reason: error.reason, error: error.message } };
-    throw error;
-  }
+  const queued = rewriteStore.enqueue(
+    ownerId,
+    session.id,
+    {
+      prompt: item.prompt || "",
+      galleryItemId: item.id,
+      upscaleBody: body,
+      upscalePlan: plan,
+    },
+    "upscale",
+    parent?.id,
+    `worker:${currentComfyBackend()}`,
+    undefined,
+    origin,
+  );
   updateGalleryJob(item.id, {
     upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
   });

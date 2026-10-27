@@ -31,7 +31,6 @@ test("MCP generation uses shared durable admission and owned reads without HTTP"
   const admit = createGenerationAdmission({
     store,
     queue,
-    jobLimit: 2,
     async validate(input) {
       return input.prompt
         ? { status: 200, payload: {} }

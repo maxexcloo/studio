@@ -664,7 +664,7 @@ export class McpMedia {
             }
             if (cloud && this.noteCloudRefusal(error.message))
               error.message = `${cloudQuotaMessage} ${error.message}`;
-            // The studio's reason (such as its outstanding-job limit) tells the agent why the rest did not queue.
+            // The studio's reason tells the agent why the rest did not queue.
             if (queued.length)
               return {
                 status: "partially_queued",

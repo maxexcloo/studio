@@ -5,7 +5,7 @@ import { loraCompatibility, strengthRange } from "./lora-policy.js";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
-/** Jobs one Generate call may queue: every prompt times count. The account's outstanding-job limit still applies to each. */
+/** Jobs one Generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 10;
 
 const fixedRange = (range) =>

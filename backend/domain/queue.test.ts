@@ -194,7 +194,6 @@ test("manual requests run before queued MCP work, FIFO within each tier", async 
         undefined,
         undefined,
         undefined,
-        undefined,
         origin,
       ).id;
     const order = [enqueue(mcp("a")), enqueue(mcp("b")), enqueue(), enqueue()];
@@ -216,7 +215,6 @@ test("a started MCP set stays contiguous and its order survives restart", async 
       session.id,
       {},
       "image",
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -248,7 +246,6 @@ const loading =
       sessionId,
       { model, ...(loras ? { loras } : {}) },
       "image",
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -415,35 +412,6 @@ test("editable user presets are independent from profiles and owner scoped", () 
   } finally {
     store.close();
     rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test("durable admission enforces the existing per-user job limit across cloud and GPU work", () => {
-  const { store } = fixture();
-  try {
-    const session = store.createSession("alice");
-    const first = store.enqueue(
-      "alice",
-      session.id,
-      {},
-      "image",
-      undefined,
-      "provider:cliproxyapi",
-      undefined,
-      1,
-    );
-    assert.throws(
-      () => store.enqueue("alice", session.id, {}, "image", undefined, "local-media", undefined, 1),
-      { status: 429 },
-    );
-    store.save({ ...first, status: "completed" });
-    assert.equal(
-      store.enqueue("alice", session.id, {}, "image", undefined, "local-media", undefined, 1)
-        .status,
-      "queued",
-    );
-  } finally {
-    store.close();
   }
 });
 
