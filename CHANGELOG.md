@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Gallery versions and a new item menu, a full composer in the viewer, and Chat results with their details
+
 ### Added
 
 - Grid groups each image's versions (Edit, Recreate, Regenerate and the like) under one tile showing the latest, with a version count; hover across it, or swipe sideways on a phone, to flip through them. The All Versions filter lists them separately. New runs record the result they came from as `parentItemId`.
