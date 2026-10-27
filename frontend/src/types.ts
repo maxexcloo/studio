@@ -23,6 +23,13 @@ export interface Profile {
   aiDrafted?: boolean;
   /** Merged profile ids that now resolve to this one; older records may still name them. */
   aliases?: string[];
+  /** The backend each merged per-backend id ran on, so reruns of its records keep it. */
+  aliasBackends?: Record<string, string>;
+  /** A combined profile: the backend it runs on now, and every backend it has. */
+  backend?: string;
+  backendOptions?: { id: string; label: string; ready?: boolean; reason?: string }[];
+  /** Why it isn't ready, such as its backend's missing nodes. */
+  readyReason?: string;
   defaults: Record<string, string | number>;
   capabilities: Record<string, boolean>;
   mediaInputs?: {
@@ -72,6 +79,8 @@ export interface GenerationInput extends Record<string, unknown> {
   textEncoder?: string;
   textEncoders?: string[];
   weightDtype?: string;
+  /** The backend a combined profile runs on; the profile's current one when absent. */
+  profileBackend?: string;
 }
 export interface MediaItem {
   id: string;

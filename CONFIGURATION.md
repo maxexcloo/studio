@@ -211,6 +211,32 @@ prompting.json
 
 Settings › Profiles › Merge Duplicate Profiles is an explicit administrator action, never run at startup. It previews profiles with the same name and kind whose graph (node titles aside), profile block (apart from id, name and description), guide binding, negatives and AI-Drafted state are identical, keeps the id that follows `<kind>-…-<backend>` and lists same-named profiles that differ or have no single id to keep. Applying copies the removed files and the previous aliases and workflow preferences to `backups/profile-merges/<time>/`, records each removed id in `workflows/.studio-aliases.json` and removes its file; its version history stays. Records that name an old id (gallery items, presets, jobs, Chats, MCP calls, access grants, taste signals) are left as they are and resolve to the kept profile. Exports carry the aliases as `profile-aliases.json`, and seeding adds aliases the data folder lacks before profiles, so a merged id is never seeded back.
 
+### Profile Backends
+
+A profile can run one model on Radiance or ComfyUI. Its `studio` block then holds the shared fields (`id`, `name`, `kind`, `family`, `nsfw`, `prompting`; the guide binding and negatives follow the profile id), the backend it runs on and each backend's own block with its graph:
+
+```json
+{
+  "studio": {
+    "id": "image-krea2-turbo",
+    "name": "Krea 2 Turbo · Fast · 8 Steps",
+    "kind": "image",
+    "family": "krea2",
+    "backend": "radiance",
+    "backends": {
+      "comfyui": { "graph": {}, "controls": {}, "mediaInputs": [], "defaults": {} },
+      "radiance": { "graph": {}, "controls": {}, "loraStack": {}, "defaults": {} }
+    }
+  }
+}
+```
+
+Each backend's fields (`controls`, `mediaInputs`, `loraStack`, `defaults`, `capabilities`, `aspectRatios`, `imageModes`, `requiredNodes`, `description` and the rest) replace the shared ones of the same name, so the profile runs as the single-graph profile they make together. `backend` must name one of `backends`, which take `comfyui` and `radiance`; saving checks every backend's graph and connections.
+
+Readiness, worker routing, validation, the graph, timings and labels follow the backend a run uses. A backend that isn't ready shows the profile as Needs Setup with the reason; Studio never runs it on the other backend instead. Switching `backend` (the Backend select in Settings › Profiles) is an ordinary versioned edit. Jobs and gallery records keep `profileBackend`: Exact Repeat, Recreate and MCP's Reuse run on the backend that ran while the profile still has it, otherwise on its current one, with a note.
+
+Settings › Profiles › Combine Backends is an explicit administrator action, never run at startup. It previews pairs of one model's profiles (the same kind, family and name before its first `·`), one running Radiance nodes and one ComfyUI's, with what differs (steps, size, references, modes, LoRAs, guide and negative prompt). The administrator picks pairs, each one's name and default backend; a profile joins one pair at most. Applying refuses a stale preview, copies both files, the aliases, workflow preferences, `guides/prompting.json` and `timings.json` to `backups/profile-backends/<time>/`, writes the combined profile as a new profile (its id is the ComfyUI id without `-comfyui`) with the default backend's guide binding and negatives, records both old ids in `workflows/.studio-aliases.json` as `{"to": "<combined id>", "backend": "<its backend>"}`, removes their files (their version history stays) and moves their run timings to the combined profile's backends. An old id in a record, a generation request or an MCP call runs on that id's backend (Exact Repeat, Recreate and Reuse included); records themselves are not rewritten. Applying again does nothing; an apply that stopped part way finishes. Exports carry the aliases with their backends, so a seed never brings the old ids back.
+
 ## SQLite Migration & Rollback
 
 Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. The same command then renames the [names Studio kept on disk](#studio-names) from HEISS UI.

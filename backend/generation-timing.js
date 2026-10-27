@@ -34,10 +34,11 @@ const DEFAULT_EXPONENT = 1.15;
 // A model used within this long is most likely still loaded.
 const WARM_WINDOW_MS = 30 * 60_000;
 
-/** Which history a run belongs to: its kind and the model or workflow it ran. */
+/** Which history a run belongs to: its kind and the model or workflow it ran, on a combined profile's backend. */
 export function timingKey(body = {}) {
   const model = String(body.model || body.profileId || body.workflow || "").trim();
-  return model ? `${body.kind === "video" ? "video" : "image"}:${model}` : "";
+  const backend = body.profileBackend ? `@${body.profileBackend}` : "";
+  return model ? `${body.kind === "video" ? "video" : "image"}:${model}${backend}` : "";
 }
 
 /** The work one step does, in megapixels × batch × frames. */

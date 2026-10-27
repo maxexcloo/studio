@@ -76,6 +76,7 @@ import {
   canonicalProfileId,
   guideStore,
   livePrompting,
+  profileAliasBackend,
   profileStore,
   withCanonicalProfile,
 } from "./profile-store.js";
@@ -90,6 +91,7 @@ import {
   mergeWorkerModels,
   noteWorkerProfiles,
   noteWorkerReachable,
+  profileOnBackendKey,
   routeJob,
   workerAvailability,
   withComfyBackend,
@@ -725,6 +727,7 @@ app.get("/api/estimate", (req, res) => {
     kind: query.kind === "video" ? "video" : "image",
     model: String(query.model || ""),
     profileId: String(query.profileId || ""),
+    ...(query.profileBackend ? { profileBackend: String(query.profileBackend) } : {}),
     family: String(query.family || ""),
     width: Number(query.width) || 0,
     height: Number(query.height) || 0,
@@ -763,7 +766,10 @@ app.get("/api/estimate", (req, res) => {
       })
     : null;
   const trusted = estimate?.trusted && (runs === 1 || rest?.trusted) && (!plan || upscale?.trusted);
-  const backend = routeJob(capabilityForProfile(body), { profileId: body.profileId })?.id || "";
+  const backend =
+    routeJob(capabilityForProfile(body), {
+      profileId: profileOnBackendKey(body.profileId, body.profileBackend),
+    })?.id || "";
   const clears = backend ? queueClearsAt(now, backend) : null;
   const queueMs = clears === null ? null : Math.max(0, clears - now);
   const upscaleMs = upscale?.totalMs || 0;
@@ -1264,14 +1270,23 @@ async function mediaModels(force = false) {
         ),
         backends,
       };
-  models.profiles = (models.profiles || []).map((profile) => ({
-    ...profile,
-    workerIds: catalogues
-      .filter(({ result }) =>
-        result.models.profiles?.some((candidate) => candidate.id === profile.id),
-      )
-      .map(({ worker }) => worker.id),
-  }));
+  models.profiles = (models.profiles || []).map((profile) => {
+    const listing = catalogues.filter(({ result }) =>
+      result.models.profiles?.some((candidate) => candidate.id === profile.id),
+    );
+    // Where a combined profile's backend is ready on some workers only, those are its workers.
+    const ready = listing.filter(({ result }) =>
+      result.models.profiles.some(
+        (candidate) => candidate.id === profile.id && candidate.ready !== false,
+      ),
+    );
+    return {
+      ...profile,
+      workerIds: (profile.backendOptions && ready.length ? ready : listing).map(
+        ({ worker }) => worker.id,
+      ),
+    };
+  });
   if (direct.length) {
     const ids = new Set(direct.map((profile) => profile.id));
     models.profiles = [...models.profiles.filter((profile) => !ids.has(profile.id)), ...direct];
@@ -1342,16 +1357,30 @@ function modelsForAccount(models, req) {
   };
 }
 
-/** Each profile lists the merged ids that now resolve to it, so the browser can match records that name them. */
+/**
+ * Each profile lists the merged ids that now resolve to it, so the browser can match records that
+ * name them, and the backend each per-backend id ran on (`aliasBackends`), so reruns keep it.
+ */
 function withProfileAliases(models) {
   const aliases = {};
-  for (const id of Object.keys(profileStore().aliases()))
-    (aliases[canonicalProfileId(`custom:${id}`)] ||= []).push(`custom:${id}`);
+  const backends = {};
+  for (const id of Object.keys(profileStore().aliases())) {
+    const kept = canonicalProfileId(`custom:${id}`);
+    (aliases[kept] ||= []).push(`custom:${id}`);
+    const backend = profileAliasBackend(id);
+    if (backend) (backends[kept] ||= {})[`custom:${id}`] = backend;
+  }
   if (!Object.keys(aliases).length || !models?.profiles) return models;
   return {
     ...models,
     profiles: models.profiles.map((profile) =>
-      aliases[profile.id] ? { ...profile, aliases: aliases[profile.id] } : profile,
+      aliases[profile.id]
+        ? {
+            ...profile,
+            aliases: aliases[profile.id],
+            ...(backends[profile.id] ? { aliasBackends: backends[profile.id] } : {}),
+          }
+        : profile,
     ),
   };
 }
@@ -2301,7 +2330,7 @@ async function queueResourceFor(input) {
   const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input.profileId));
   const worker = routeJob(
     profile ? capabilityForProfile(profile) : input.kind === "video" ? "video" : "image",
-    { profileId: input.profileId },
+    { profileId: profileOnBackendKey(input.profileId, input.profileBackend) },
   );
   const backend =
     typeof input.backendId === "string" && input.backendId
@@ -2555,9 +2584,21 @@ const generationQueue = new GenerationQueue(
   ),
 );
 async function validateGenerationInput(input, account) {
+  // A per-backend id merged into a combined profile runs on the backend it named.
+  const named = profileAliasBackend(input.profileId);
   // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
   for (const key of ["profileId", "model", "workflow"])
     if (typeof input[key] === "string") input[key] = canonicalProfileId(input[key]);
+  // The backend a combined profile's run uses, stored with it: the one asked for while the profile
+  // still defines it, else its current one. Any other profile runs without one.
+  const combined =
+    typeof input.profileId === "string" && input.profileId.startsWith("custom:")
+      ? getCustomWorkflow(input.profileId)
+      : null;
+  const wanted = input.profileBackend || named;
+  if (combined?.backendIds?.length)
+    input.profileBackend = combined.backendIds.includes(wanted) ? wanted : combined.backend;
+  else delete input.profileBackend;
   if (directCloud?.isProfile(input)) {
     try {
       await directCloud.resolve({ ownerId: account?.userId || "", input });
@@ -3300,7 +3341,7 @@ async function queueUpscaleOnWorker(account, request, origin) {
       },
     };
   const customWorkflow = String(item.model || "").startsWith("custom:")
-    ? getCustomWorkflow(item.model)
+    ? getCustomWorkflow(item.model, item.settings?.profileBackend)
     : null;
   const { body, plan } = prepareUpscale({
     item: upscaleItem,

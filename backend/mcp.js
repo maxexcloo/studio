@@ -835,6 +835,13 @@ export function registerMcpRoutes(
                 .map((key) => [key, profile[key]]),
             ),
             tier: tierOf(profile),
+            // A combined profile: the backend it runs on (an old per-backend id names its own) and the others it has.
+            ...(profile.backend
+              ? {
+                  backend: profile.namedBackend || profile.backend,
+                  backends: profile.backendOptions.map((option) => option.label),
+                }
+              : {}),
             ...(tierNote ? { note: tierNote.trim() } : {}),
             defaults,
             controls,
@@ -1057,7 +1064,12 @@ export function registerMcpRoutes(
                   const sized = mcpSize(profile, { aspect, size });
                   if (sized && (args.width !== undefined || args.height !== undefined))
                     throw new Error("Pass aspect and size, or width and height, not both.");
-                  const plan = { ...args, ...sized, profile_id: profile.id };
+                  const plan = {
+                    ...args,
+                    ...sized,
+                    profile_id: profile.id,
+                    ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
+                  };
                   const suggest = Boolean(preview && index === 0);
                   let source = "exact";
                   let suggestions = [];

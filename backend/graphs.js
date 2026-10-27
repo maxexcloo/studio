@@ -274,7 +274,7 @@ export function saveIntoStudioFolder(graph, ownerId = "") {
 }
 
 export async function customWorkflowGraph(body) {
-  const installed = getCustomWorkflow(body.workflow);
+  const installed = getCustomWorkflow(body.workflow, body.profileBackend);
   const workflow = installed && selectImageMode(installed, body);
   if (!workflow) throw new Error("This workflow isn’t installed.");
   const graph = cloneGraph(workflow.graph);

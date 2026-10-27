@@ -4,7 +4,7 @@ import { Copy } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { isProfile } from "../generation/payload";
+import { backendLabel, isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { referenceLabel } from "../generation/references";
 import { mediaSource } from "./mediaSource";
@@ -82,6 +82,8 @@ function generationDetails(
       })),
     references,
     settings: rows([
+      // The backend a combined profile ran on.
+      ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
       ["Seed", settings.seed],
       ["Steps", settings.steps],
       ["CFG", settings.cfg],

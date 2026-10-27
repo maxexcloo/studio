@@ -267,3 +267,131 @@ test("Merge Duplicate Profiles previews the merge and applies exactly that previ
   await expect(dialog.getByRole("button", { name: "Merge Profiles", exact: true })).toBeDisabled();
   expect(posted).toEqual([{ hash: "plan-1" }]);
 });
+
+test("A combined profile's Backend select is a saved edit that switches what the editor shows", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const document = {
+    studio: {
+      id: "krea",
+      name: "Krea 2 Turbo · Fast",
+      kind: "image",
+      family: "krea2",
+      backend: "radiance",
+      backends: {
+        comfyui: {
+          description: "ComfyUI graph.",
+          controls: { prompt: { node: "1", input: "text" } },
+          graph: { 1: { class_type: "CLIPTextEncode", inputs: { text: "" } } },
+        },
+        radiance: {
+          description: "Radiance runtime.",
+          controls: { prompt: { node: "1", input: "prompt" } },
+          graph: { 1: { class_type: "RadianceImageGenerate", inputs: { prompt: "" } } },
+        },
+      },
+    },
+  };
+  const saved: { text: string; baseHash: string }[] = [];
+  await page.route("**/api/profiles/editable**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/profiles/editable")
+      return route.fulfill({
+        json: {
+          profiles: [
+            {
+              id: "krea",
+              name: document.studio.name,
+              family: "krea2",
+              version: 1,
+              backend: "radiance",
+            },
+          ],
+        },
+      });
+    if (path !== "/api/profiles/editable/krea") return route.fallback();
+    if (route.request().method() === "PUT") saved.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: { id: "krea", text: JSON.stringify(document), hash: "opened", version: { version: 1 } },
+    });
+  });
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  const table = page.getByRole("table", { name: "Editable Profiles", exact: true });
+  await expect(table).toContainText("Radiance");
+  const editor = await editDefinition(page, "Profile");
+  const description = editor.getByRole("textbox", { name: "Description", exact: true });
+  await expect(description).toHaveValue("Radiance runtime.");
+  await editor.getByRole("combobox", { name: "Backend", exact: true }).click();
+  await page.getByRole("option", { name: "ComfyUI", exact: true }).click();
+  await expect(description).toHaveValue("ComfyUI graph.");
+  await description.fill("ComfyUI graph, edited.");
+  await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
+  await expect(editor).toBeHidden();
+  const studio = JSON.parse(saved[0].text).studio;
+  expect(saved[0].baseHash).toBe("opened");
+  expect(studio.backend).toBe("comfyui");
+  expect(studio.backends.comfyui.description).toBe("ComfyUI graph, edited.");
+  expect(studio.backends.radiance).toEqual(document.studio.backends.radiance);
+  expect(studio.description).toBeUndefined();
+});
+
+test("Combine Backends previews pairs with their differences and combines the picked ones", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const posted: unknown[] = [];
+  const pair = {
+    key: "image-krea2-turbo-radiance+image-krea2-turbo-comfyui",
+    id: "image-krea2-turbo",
+    name: "Krea 2 Turbo · Fast · 8 Steps",
+    radiance: { id: "image-krea2-turbo-radiance", name: "Krea 2 Turbo · Radiance · Fast" },
+    comfyui: { id: "image-krea2-turbo-comfyui", name: "Krea 2 Turbo · ComfyUI · Fast" },
+    differences: [{ label: "References", radiance: "0", comfyui: "1" }],
+  };
+  let combined = false;
+  await page.route("**/api/profiles/backends**", async (route) => {
+    if (route.request().method() === "POST") {
+      posted.push(route.request().postDataJSON());
+      combined = true;
+      return route.fulfill({
+        json: {
+          combined: [{ id: pair.id, name: "Krea 2 Turbo", backend: "radiance", from: [] }],
+          backup: "backups/profile-backends/now",
+        },
+      });
+    }
+    return route.fulfill({ json: { hash: "plan-1", pairs: combined ? [] : [pair] } });
+  });
+  await page.goto("/images");
+  await openNav(page, "Settings");
+  await section(page, "Settings", "Profiles");
+  await page.getByRole("button", { name: "Combine Backends", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Combine Backends", exact: true });
+  await expect(
+    dialog.getByRole("table", { name: `Differences for ${pair.name}`, exact: true }),
+  ).toContainText("References01");
+  await expect(dialog.getByRole("button", { name: "Combine Pairs", exact: true })).toBeDisabled();
+  await dialog.getByRole("checkbox", { name: pair.name, exact: true }).check();
+  await dialog.getByRole("textbox", { name: "Combined Name", exact: true }).fill("Krea 2 Turbo");
+  await dialog.getByRole("combobox", { name: "Default Backend", exact: true }).click();
+  await dialog.getByRole("option", { name: "Radiance", exact: true }).click();
+  await dialog.getByRole("button", { name: "Combine 1 Pair", exact: true }).click();
+  await expect(dialog).toContainText("backups/profile-backends/now");
+  expect(posted).toEqual([
+    {
+      hash: "plan-1",
+      selections: [
+        {
+          radiance: pair.radiance.id,
+          comfyui: pair.comfyui.id,
+          name: "Krea 2 Turbo",
+          backend: "radiance",
+        },
+      ],
+    },
+  ]);
+  await expect(dialog).not.toContainText(pair.radiance.id);
+});

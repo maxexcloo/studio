@@ -280,7 +280,9 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     return sanitizeFamilyBody(input, info, stats);
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
-  const installed = workflow.startsWith("custom:") ? getCustomWorkflow(workflow) : null;
+  const installed = workflow.startsWith("custom:")
+    ? getCustomWorkflow(workflow, input.profileBackend)
+    : null;
   const customWorkflow = installed && resolveImageMode(installed, input);
   const workflowInfo = workflowFor(workflow) || customWorkflow;
   const prompt = String(input.prompt || "").trim();
@@ -306,7 +308,10 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const missing = missingNodes(info, workflowInfo.requiredNodes);
   if (missing.length)
     throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
-  const profiles = inferModels(info, stats).profiles || [];
+  const profiles =
+    inferModels(info, stats, {
+      profileBackends: installed?.backend ? { [workflow]: installed.backend } : {},
+    }).profiles || [];
   const available = profiles.find(
     (item) => item.kind === kind && item.workflow === workflow && item.model === input.model,
   );
