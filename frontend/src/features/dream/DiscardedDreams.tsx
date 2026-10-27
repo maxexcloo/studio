@@ -53,12 +53,7 @@ export function DiscardedDreams() {
       </Alert>
     );
   const items = discarded.data.pages.flatMap((page) => page.items);
-  if (!items.length)
-    return (
-      <EmptyState fill title="No Discards">
-        Results you discard stay here, so you can keep one after all.
-      </EmptyState>
-    );
+  if (!items.length) return <EmptyState fill>No Discards</EmptyState>;
   return (
     <ScrollArea flex={1} mih={0}>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">

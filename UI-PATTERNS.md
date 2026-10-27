@@ -90,8 +90,9 @@ primary component reference and verify APIs against the installed version.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
   parent controls and keyboard focus.
-- Use shared `EmptyState` for centred, subdued welcome/empty copy without a
-  decorative card or redundant creation button. Use the exact empty copy
+- Use shared `EmptyState` for empty views: one short, centred, subdued Title
+  Case line with no title, explanation or decorative card, and at most the one
+  action that fills the view (Turn On, Resume, New Chat on phones). Use the exact empty copy
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
   the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.

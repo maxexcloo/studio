@@ -21,7 +21,6 @@ import { ArrowLeft, Check, Layers, Star, X } from "lucide-react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoraStacks, loraLibraryQuery, type LoraLibrary } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
-import { modelFamilyLabel } from "../../ui/modelFamily";
 import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
@@ -240,7 +239,6 @@ function LoraControls({
   const favourite = useFavourite();
   const metadata = info.data?.loras || {};
   const family = profile?.family || "";
-  const familyLabel = modelFamilyLabel(family, profile?.familyName);
   const title = (file: string) => loraTitle(metadata[file], file);
   const typeOf = (file: string) => metadata[file]?.type || "unclassified";
   const compatible = (profile?.options?.loras || []).filter(
@@ -283,10 +281,10 @@ function LoraControls({
     );
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
   const empty = !compatible.length
-    ? { title: "No LoRAs", text: `No installed LoRAs fit ${familyLabel}.` }
+    ? "No LoRAs"
     : filter === "favourites" && !favourites.size
-      ? { title: "No Favourites", text: "Star a LoRA to keep it here." }
-      : { title: "No Matching LoRAs", text: "Try another search or filter." };
+      ? "No Favourites"
+      : "No Matching LoRAs";
   const choices = info.isPending ? (
     <LoadingState label="Loading LoRAs" />
   ) : info.error ? (
@@ -308,9 +306,7 @@ function LoraControls({
       ))}
     </div>
   ) : (
-    <EmptyState fill title={empty.title}>
-      {empty.text}
-    </EmptyState>
+    <EmptyState fill>{empty}</EmptyState>
   );
   const browser = (
     <>
