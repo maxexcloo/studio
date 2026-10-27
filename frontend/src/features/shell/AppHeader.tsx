@@ -80,10 +80,10 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
       <Group gap="xs" wrap="nowrap">
-        <StatusAction chat={chat} />
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />
         </Link>
+        <StatusAction chat={chat} />
       </Group>
       <ModeSwitcher mode={mode} />
       <Group gap="xs" visibleFrom="sm">
