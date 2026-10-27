@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * The prompt assistant engine: one LiteLLM (OpenAI-compatible) adapter behind every assistant
+ * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
  * operation, shared by the Studio UI routes (assistant-routes.js), MCP Generate's prompt writer
  * (prompt-writer.js) and later the MCP assistant and admin tools, so they cannot drift apart.
  *
@@ -34,7 +34,7 @@ const captionTags = 15;
 const captionInstructions = `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under ${captionCharacters} characters", "tags": ["8 to ${captionTags} short lowercase search tags"]}`;
 const maxCandidates = 20;
 const maxExamples = 6;
-const visionTtlMs = 10 * 60_000;
+const lookupTtlMs = 10 * 60_000;
 const failedLookupTtlMs = 60_000;
 
 /** An assistant failure with a short reason for logs and callers ("HTTP 401", "timeout"); never prompt text. */
@@ -90,7 +90,6 @@ export function gatewayAddress(value, setting) {
     : /\/v1$/.test(base)
       ? `${base}/chat/completions`
       : `${base}/v1/chat/completions`;
-  // LiteLLM's management routes (/model/info) sit beside /v1, at the gateway's root.
   const root = endpoint.replace(/\/(?:v1\/)?chat\/completions$/, "");
   return { endpoint, root };
 }
@@ -450,6 +449,8 @@ export function createAssistant(
     log = console,
     now = Date.now,
     resolveSettings = () => assistantSettings(environment),
+    // Whether the running text model reads images (runtime/services.ts); unknown without a runtime.
+    supportsVision = async () => false,
   } = {},
 ) {
   if (!resolveSettings()) return null;
@@ -479,26 +480,10 @@ export function createAssistant(
         ok = true;
       } else await response.body?.cancel?.();
     } catch {
-      /* Unreachable or not LiteLLM: treated as unknown. */
+      /* Unreachable or not OpenAI-compatible: treated as unknown. */
     }
-    lookups.set(key, { value, until: now() + (ok ? visionTtlMs : failedLookupTtlMs) });
+    lookups.set(key, { value, until: now() + (ok ? lookupTtlMs : failedLookupTtlMs) });
     return value;
-  }
-
-  /** Whether LiteLLM reports `supports_vision` for the model; anything unclear counts as text-only. */
-  async function supportsVision(model) {
-    if (!model) return false;
-    return lookup(
-      `vision:${model}`,
-      "/model/info",
-      (answer) => {
-        const entry = (Array.isArray(answer?.data) ? answer.data : []).find(
-          (item) => item?.model_name === model || item?.litellm_params?.model === model,
-        );
-        return entry?.model_info?.supports_vision === true;
-      },
-      false,
-    );
   }
 
   /** The gateway's model names, for Settings; empty when it can't be asked. */
@@ -685,7 +670,7 @@ export function createAssistant(
     const model = modelFor(preset);
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
-    const vision = images.length ? await supportsVision(model) : false;
+    const vision = images.length ? await supportsVision() : false;
     const upsampler = preset.id === "enhance" ? familyUpsampler(profile) : null;
     let system;
     let user = original;
@@ -890,14 +875,14 @@ export function createAssistant(
     const model = settings().model;
     const started = now();
     const pictures = images.filter((image) => image?.data);
-    const vision = pictures.length ? await supportsVision(model) : false;
+    const vision = pictures.length ? await supportsVision() : false;
     if (!vision && !String(hint).trim())
       return {
         available: false,
         vision: false,
         model,
         reason: pictures.length
-          ? "The assistant model can’t read images."
+          ? "The running text model can’t read images."
           : "Add an image to describe.",
       };
     const system = [
