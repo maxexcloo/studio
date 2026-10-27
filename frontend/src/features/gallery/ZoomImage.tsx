@@ -166,7 +166,6 @@ export function ZoomImage({
       </VisuallyHidden>
       <TransformWrapper
         ref={zoom.transform}
-        fitOnInit
         minScale={0.0001}
         maxScale={1000}
         limitToBounds

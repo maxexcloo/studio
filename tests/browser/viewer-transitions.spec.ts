@@ -154,3 +154,46 @@ for (const failFirst of [false, true]) {
       .toEqual({ mode: "Fit", contained: true });
   });
 }
+
+test("The viewer fits a large image but never enlarges a small one beyond its actual size", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  const small = await sharp({
+    create: { width: 120, height: 80, channels: 3, background: "#46a3ff" },
+  })
+    .png()
+    .toBuffer();
+  for (const [id, url, width, height] of [
+    ["small", "/test-media/small.png", 120, 80],
+    ["large", "/test-media/large.png", 2048, 3072],
+  ] as const)
+    state.gallery.push({
+      id,
+      jobId: `job-${id}`,
+      type: "image",
+      status: "done",
+      prompt: `A ${id} image`,
+      url,
+      thumbnailUrl: url,
+      width,
+      height,
+      createdAt: stamp,
+    });
+  await page.route("**/test-media/small.png", (route) =>
+    route.fulfill({ contentType: "image/png", body: small }),
+  );
+  await page.route("**/test-media/large.png", (route) =>
+    route.fulfill({ contentType: "image/png", body: upscaled }),
+  );
+  await page.goto("/images");
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const zoom = viewer.locator("[data-zoom-mode]");
+  await page.getByRole("button", { name: "Open image: A small image", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "A small image", exact: true })).toBeVisible();
+  await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBe(1);
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await page.getByRole("button", { name: "Open image: A large image", exact: true }).click();
+  await expect(viewer.getByRole("img", { name: "A large image", exact: true })).toBeVisible();
+  await expect.poll(async () => Number(await zoom.getAttribute("data-zoom-scale"))).toBeLessThan(1);
+});
