@@ -60,7 +60,10 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await assist(page, "Improve Prompt");
     await expect.poll(() => started).toBe(true);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Stop Assistance", exact: true }).click();
+    // The action spins and says what it is doing until it finishes or is stopped.
+    const stop = page.getByRole("button", { name: "Stop Assistance", exact: true });
+    await expect(stop).toHaveAccessibleDescription("Improving the prompt…");
+    await stop.click();
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     await expect(prompt).toHaveValue("Keep my original bird");
     release();
@@ -251,4 +254,49 @@ test("Prompt history reuses positive and negative prompts independently and pers
   });
   await expect(prompt).toHaveValue("Earlier landscape");
   expect(histories.positive[0].pinned).toBe(true);
+});
+
+test("Recent Prompts pins and switches at once, and a refused change is undone", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let history = {
+    prompts: [{ text: "Earlier landscape", at: stamp, uses: 2 }] as {
+      text: string;
+      at: string;
+      uses: number;
+      pinned?: boolean;
+    }[],
+    enabled: true,
+  };
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/prompts**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/pin")) {
+      await held;
+      history.prompts[0].pinned = true;
+    }
+    if (path.endsWith("/enabled")) {
+      const { enabled } = route.request().postDataJSON();
+      // Switching off saves; switching back on fails the way a dropped connection did.
+      if (enabled) return route.fulfill({ status: 502, body: "Bad Gateway" });
+      history = { prompts: history.prompts.filter((entry) => entry.pinned), enabled };
+    }
+    return route.fulfill({ json: history });
+  });
+  await create(page);
+  await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
+  // The pin shows while the server is still answering.
+  await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Unpin Prompt", exact: true })).toBeVisible();
+  release();
+  const save = panel.getByRole("switch", { name: "Save Recent Prompts", exact: true });
+  await save.click();
+  await expect(save).not.toBeChecked();
+  await save.click();
+  await expect(page.getByText("Studio returned 502", { exact: true })).toBeVisible();
+  await expect(save).not.toBeChecked();
+  await expect(panel.getByRole("option", { name: "Use Prompt: Earlier landscape" })).toBeVisible();
 });

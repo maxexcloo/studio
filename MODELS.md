@@ -170,8 +170,8 @@ catalog, so a family that is described correctly needs no UI work.
 
 `native` on a family (or a variant) declares support for 2K and 4K output.
 The size menu offers only entries marked `"yes"`, within the selected model's
-dimension limits. Two choices use buttons; more than two use a dropdown.
-Models without additional supported native sizes hide the Resolution control.
+dimension limits; the other of 2K and 4K shows disabled beside them. Models
+without additional supported native sizes hide the Resolution control.
 Custom dimensions and aspect ratios remain available separately.
 
 A selected 2K or 4K resolution draws the chosen shape with its long side at

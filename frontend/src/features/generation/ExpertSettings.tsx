@@ -254,7 +254,7 @@ export function ExpertSettings({
           />
         </>
       )}
-      {(worker?.gpuDevices?.length || profile?.provider || profile?.description) && (
+      {(worker?.gpuDevices?.length || profile?.provider) && (
         <Stack gap={2}>
           {!!worker?.gpuDevices?.length && (
             <Text size="xs" c="dimmed">
@@ -264,11 +264,6 @@ export function ExpertSettings({
           {profile?.provider && (
             <Text size="xs" c="dimmed">
               Provider: {profile.provider === "cliproxyapi" ? "CLIProxyAPI" : profile.provider}
-            </Text>
-          )}
-          {profile?.description && (
-            <Text size="xs" c="dimmed">
-              {profile.description}
             </Text>
           )}
           {profile?.encoderBuiltIn && (
