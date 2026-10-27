@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Cloud failures say why
+
+### Fixed
+
+- A Grok (CLIProxyAPI) refusal now shows the provider's own reason, such as a moderation or parameter error, instead of only its HTTP status.
+
 ## [1.0.3] - 2026-10-27
 
 > Prompt writing on the queue with live thinking, one table for every list, email-named accounts and captions working again
