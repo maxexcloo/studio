@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 // A whole run against a stand-in ComfyUI: the graph is queued, progress
 // arrives over the socket (Node 22+, where WebSocket is built in; Node 20
@@ -14,6 +15,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
 ]);
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
+writeTestWorkflows(process.env.STUDIO_DATA_DIR);
 process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery-store.js");
@@ -25,14 +27,9 @@ function sdxlRequest(overrides = {}) {
   return {
     kind: "image",
     family: "sdxl",
-    variant: "standard",
-    source: "checkpoint",
-    workflow: "family:sdxl",
-    profileId: "image:checkpoint:sd_xl_base_1.0.safetensors",
-    model: "sd_xl_base_1.0.safetensors",
-    bundled: { encoder: true, vae: true },
-    encoders: [],
-    vae: "",
+    workflow: "custom:test-image",
+    profileId: "custom:test-image",
+    model: "custom:test-image",
     prompt: "a lighthouse in fog",
     negative: "",
     width: 1024,

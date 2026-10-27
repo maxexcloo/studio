@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 // Workers end to end: zero workers, several from STUDIO_WORKERS (locked), Studio's own list, and routing by capability.
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,7 +16,7 @@ const source = JSON.parse(
 const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 const videoInfo = structuredClone(source);
-videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = [];
+videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["minimax_h3_test.safetensors"];
 videoInfo.UNETLoader.input.required.unet_name[0] = [
   "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
 ];
@@ -35,6 +36,7 @@ let dataDir;
 
 async function start(environment) {
   dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-worker-routes-"));
+  writeTestWorkflows(dataDir);
   const env = {
     ...process.env,
     PORT: "0",
@@ -243,9 +245,9 @@ test(
       const refused = await api("/api/generate", {
         kind: "video",
         prompt: "a teapot",
-        profileId: "video:anything",
-        workflow: "family:minimax_h3",
-        model: "minimax_h3.safetensors",
+        profileId: "custom:test-video",
+        workflow: "custom:test-video",
+        model: "custom:test-video",
         count: 1,
       });
       assert.equal(refused.status, 503, JSON.stringify(refused.body));

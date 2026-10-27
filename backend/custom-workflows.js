@@ -3,7 +3,6 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { dataDir } from "./gallery-store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
-import { workflowIds } from "./workflow-registry.js";
 import { writeJsonFile } from "./json-store.js";
 import { grokEnabled, modelFamilyEnabled } from "./features.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
@@ -502,23 +501,6 @@ export function getCustomWorkflow(requested, backend = profileAliasBackend(reque
   return workflow ? workflowOnBackend(workflow, backend) : null;
 }
 
-/**
- * An import whose id is a built-in registry workflow's gets its own id instead.
- * Re-importing over an existing user copy still overwrites, so updates work.
- */
-function unshadowedId(id) {
-  const records = allCustomWorkflowRecords({ dedupe: false });
-  const reserved = new Set(workflowIds());
-  const shadowed = (candidate) => reserved.has(candidate);
-  if (!shadowed(id)) return id;
-  for (let suffix = 2; suffix < 100; suffix += 1) {
-    const candidate = safeId(`${id}-${suffix}`);
-    if (!shadowed(candidate) && !records.some((record) => record.id === candidate))
-      return candidate;
-  }
-  return safeId(`${id}-${crypto.randomUUID().slice(0, 8)}`);
-}
-
 export function saveImportedWorkflow(raw, meta = {}) {
   const mergedMeta = {
     ...workflowMeta(raw),
@@ -527,7 +509,6 @@ export function saveImportedWorkflow(raw, meta = {}) {
   const { studio: _block, ...rest } = raw;
   const profile = { studio: mergedMeta, ...rest };
   const workflow = metadataFromJson(profile);
-  workflow.id = unshadowedId(workflow.id);
   mergedMeta.id = workflow.id;
   workflow.profileId = `custom:${workflow.id}`;
   fs.mkdirSync(userWorkflowsDir, { recursive: true });

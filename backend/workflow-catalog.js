@@ -10,7 +10,7 @@ import {
   workflowMissingFiles,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { catalogDownloadsForFile } from "./family-profiles.js";
+import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { workflowRisks } from "./workflow-risk.js";
 

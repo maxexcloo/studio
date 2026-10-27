@@ -2151,7 +2151,6 @@ test(
         HOST: "127.0.0.1",
         STUDIO_DATA_DIR: dir,
         STUDIO_ENV_FILE: path.join(dir, ".env"),
-        STUDIO_ENABLE_BUILTIN_PROFILES: "0",
         STUDIO_MCP_API_KEY: mediaKey,
         STUDIO_WORKERS: JSON.stringify([
           {
@@ -2212,51 +2211,19 @@ test(
   },
 );
 
-test("MCP advertises native sizing and submits tiled 2K with an explicit reference role", async (t) => {
+test("MCP advertises native sizing and submits tiled 2K", async (t) => {
   const f = await fixture(t);
   const client = await f.client("native-sizing");
-  const profile = {
-    ...imageProfile,
-    aspectPolicy: "reference",
-    family: "flux3",
-    native: { "2k": "yes" },
-    workflow: "family:flux3",
-  };
+  const profile = { ...imageProfile, family: "flux3", native: { "2k": "yes" } };
   await f.profiles([profile]);
   const detail = data(await call(client, "Models", { profile_id: profile.id }));
   assert.deepEqual(detail.native, { "2k": "yes" });
-  const uploaded = data(
-    await call(client, "Upload", {
-      content_base64: png.toString("base64"),
-      filename: "reference.png",
-    }),
-  );
-  const assetId = uploaded.asset?.id || uploaded.id;
-  await generate(client, {
-    height: 1152,
-    reference_asset_ids: [assetId],
-    reference_role: "reference",
-    width: 2048,
-  });
-  assert.equal(f.submitted[0].referenceRole, "reference");
+  await generate(client, { height: 1152, width: 2048 });
   assert.equal(f.submitted[0].tiledDecode, true);
   assert.equal(f.submitted[0].autoUpscale, null);
   assert.deepEqual([f.submitted[0].width, f.submitted[0].height], [2048, 1152]);
-  await generate(client, { reference_asset_ids: [assetId], reference_role: "edit" });
-  assert.equal(f.submitted[1].referenceRole, "edit");
+  await generate(client, {});
   assert.equal(f.submitted[1].tiledDecode, undefined);
-  await failure(client, "Generate", {
-    profile_id: profile.id,
-    prompts: ["A scene"],
-    reference_role: "reference",
-  });
-  await f.profiles([imageProfile]);
-  await failure(client, "Generate", {
-    profile_id: profile.id,
-    prompts: ["A scene"],
-    reference_asset_ids: [assetId],
-    reference_role: "reference",
-  });
   assert.equal(f.submitted.length, 2);
 });
 

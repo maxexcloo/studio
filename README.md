@@ -29,7 +29,7 @@ mise run test:browser
 
 The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Every verified `main` commit publishes both under a `YYYY.M.D.N` version with a [GitHub release](https://github.com/maxexcloo/studio/releases). Deploy an exact version.
 
-Mount a writable Studio data directory for media and editable definitions; it is the only source of live profiles, guides and catalogue data. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [worker operations](worker/README.md) and [models and workflows](MODELS.md).
+Mount a writable Studio data directory for media and editable definitions; it is the only source of live profiles, guides and catalogue data. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [worker operations](worker/README.md) and [profiles](backend/samples/README.md).
 
 Run one application replica with `Recreate`; two schedulers must not control the same workers or SQLite database. Back up data while Studio is stopped, or use a SQLite-aware snapshot for the database alongside its media files; never copy a live SQLite database without its WAL state. Before an update that migrates data, rehearse the [migration and restore](CONFIGURATION.md#sqlite-migration--rollback) on a copy.
 

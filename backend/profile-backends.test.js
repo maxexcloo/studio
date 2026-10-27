@@ -211,7 +211,7 @@ test("readiness follows the selected backend, with the reason, and never falls b
     // No backend can run here: not listed, as any other profile whose nodes are missing.
     const { LoadImage: _loadImage, ...neither } = comfyNodes;
     const listed = inferModels(neither).profiles;
-    assert.ok(listed.length && !listed.some((profile) => profile.id === "custom:combined"));
+    assert.ok(!listed.some((profile) => profile.id === "custom:combined"));
     // The worker's inventory names each backend it can run, so routing follows the run's backend.
     noteWorkerProfiles("second", [comfyOnly]);
     noteWorkerProfiles("primary", [everything]);

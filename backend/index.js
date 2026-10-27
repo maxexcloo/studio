@@ -63,7 +63,7 @@ import { draftProfileFromImport } from "./profile-drafts.js";
 import { seedSamples } from "./profile-seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings } from "./chat-settings.js";
-import { catalogDownloadsForFile } from "./family-profiles.js";
+import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { familyFromName } from "./family-catalog.js";
 import {
   assistantIntegration,

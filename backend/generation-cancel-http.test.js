@@ -10,10 +10,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
+  writeTestWorkflows(path.join(directory, "runtime"));
   const info = JSON.parse(
     fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
   );
@@ -80,7 +82,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         HOST: "127.0.0.1",
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: path.join(directory, "runtime"),
-        STUDIO_ENABLE_BUILTIN_PROFILES: "1",
         STUDIO_WORKERS: JSON.stringify([
           { id: "chosen", name: "Chosen", url: worker.url, capabilities: ["image"] },
         ]),
@@ -143,7 +144,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     throw new Error("Cancellation fixture did not reach the observed provider state");
   };
   const profile = (await api("/api/models")).body.profiles.find(
-    (profile) => profile.model === "sd_xl_base_1.0.safetensors",
+    (profile) => profile.id === "custom:test-image",
   );
   assert.ok(profile);
   const submitted = worker.nextPrompt();

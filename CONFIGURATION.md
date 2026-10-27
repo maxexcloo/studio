@@ -2,8 +2,6 @@
 
 Copy `.env.example` to `.env` when you need different ports or paths.
 
-Set `STUDIO_ENABLE_BUILTIN_PROFILES=0` to use only imported workflows. This hides detected model profiles and bundled workflow templates from the generation catalogue; their definitions and model files remain intact. With a configuration mount, seeded and runtime profiles are used by default; standalone configuration keeps built-in profiles enabled. Set the switch explicitly to opt into detected model profiles.
-
 ```bash
 HOST=127.0.0.1
 PORT=8787

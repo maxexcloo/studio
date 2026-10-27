@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import {
   backendUrl,
   currentComfyBackend,
@@ -23,6 +24,7 @@ const bothWorkers = JSON.stringify([
 ]);
 process.env.STUDIO_WORKERS = bothWorkers;
 process.env.STUDIO_DATA_DIR = temporary;
+writeTestWorkflows(temporary);
 process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const { comfy } = await import("./comfy.js");
@@ -64,29 +66,19 @@ function request(backend) {
       ...common,
       kind: "video",
       family: "minimax_h3",
-      variant: "standard",
-      source: "unet",
-      workflow: "family:minimax_h3",
-      profileId: "video:h3",
-      model: "minimax_h3.safetensors",
-      encoders: ["qwen3vl.safetensors"],
-      vae: "h3-video.safetensors",
-      audioVae: "h3-audio.safetensors",
-      frames: 29,
+      workflow: "custom:test-video",
+      profileId: "custom:test-video",
+      model: "custom:test-video",
+      frames: 124,
       fps: 24,
     };
   return {
     ...common,
     kind: "image",
     family: "sdxl",
-    variant: "standard",
-    source: "checkpoint",
-    workflow: "family:sdxl",
-    profileId: "image:sdxl",
-    model: "sd_xl_base_1.0.safetensors",
-    bundled: { encoder: true, vae: true },
-    encoders: [],
-    vae: "",
+    workflow: "custom:test-image",
+    profileId: "custom:test-image",
+    model: "custom:test-image",
   };
 }
 

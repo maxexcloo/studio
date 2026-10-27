@@ -65,15 +65,6 @@ export function mcpControls(profile) {
   const slots = profile.mediaInputs || [];
   if (slots.length)
     controls.reference_asset_ids = { max: slots.length, slots: slots.map((slot) => slot.id) };
-  if (
-    slots.length &&
-    profile.aspectPolicy === "reference" &&
-    String(profile.workflow || "").startsWith("family:")
-  )
-    controls.reference_role = {
-      options: ["edit", "reference"],
-      note: "Requires reference_asset_ids.",
-    };
   if (profile.kind === "image") {
     controls.upscale_quality = {
       options: ["fast", "balanced", "high"],
