@@ -88,6 +88,22 @@ test("The viewer prompt bar queues variations into a strip and choosing one make
   await expect(strip.getByRole("listitem")).toHaveCount(3);
 });
 
+test("A regenerated result joins its source's grid tile as a version until All Versions", async ({
+  page,
+}) => {
+  const { state, viewer } = await seed(page);
+  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  const tiles = page.getByRole("button", { name: /^Open image: An amber bird/ });
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 2 of 2");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "All Versions", exact: true }).click();
+  await expect(tiles).toHaveCount(2);
+});
+
 test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
   const { state, viewer } = await seed(page);
   // One click regenerates with a new seed; the menu holds New Seed and Exact Repeat.

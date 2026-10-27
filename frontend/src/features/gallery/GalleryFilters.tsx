@@ -4,6 +4,7 @@ import { useHotkeys } from "@mantine/hooks";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
   Boxes,
+  GalleryVertical,
   Layers,
   MessageCircle,
   Ratio,
@@ -69,6 +70,9 @@ interface GalleryFiltersProps {
   starred: boolean;
   onStarredChange: (value: boolean) => void;
   withinPortal?: boolean;
+  /** Grid's version grouping: on (the default) shows one tile per version chain. */
+  allVersions?: boolean;
+  onAllVersionsChange?: (value: boolean) => void;
 }
 /**
  * Normal, search and filter modes share one toolbar row. Desktop keeps the search box in the row;
@@ -233,6 +237,8 @@ export function GalleryFilters({
   starred,
   onStarredChange,
   withinPortal,
+  allVersions,
+  onAllVersionsChange,
 }: GalleryFiltersProps) {
   const { profiles } = useGenerationActions();
   const facets = useQuery(galleryFacetsQuery(kind));
@@ -305,6 +311,18 @@ export function GalleryFilters({
           >
             Starred
           </Button>
+          {onAllVersionsChange && (
+            <Button
+              {...chipProps}
+              aria-label="All Versions"
+              aria-pressed={Boolean(allVersions)}
+              variant={allVersions ? "light" : "default"}
+              leftSection={<GalleryVertical size={15} />}
+              onClick={() => onAllVersionsChange(!allVersions)}
+            >
+              All Versions
+            </Button>
+          )}
           {picker("model", "Models", Boxes, options("model"), true)}
           {picker("lora", "LoRAs", Layers, options("lora"), true)}
           {picker("size", "Size", Ruler, facets.data?.sizes || [])}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -29,6 +29,7 @@ import { GallerySelectionBar } from "./GallerySelectionBar";
 import { useGallerySelection } from "./useGallerySelection";
 import { useTileCaptions } from "./useGalleryLayout";
 import { useTryAgain } from "./useTryAgain";
+import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
 import {
   GalleryFilterToolbar,
@@ -62,6 +63,11 @@ export function GalleryPage() {
     getInitialValueInEffect: false,
   });
   const [starred, setStarred] = useState(false);
+  const [allVersions, setAllVersions] = useLocalStorage({
+    key: "studio-gallery-all-versions",
+    defaultValue: false,
+    getInitialValueInEffect: false,
+  });
   const [filters, setFilters] = useState(emptyGalleryFilters);
   const hasFilters = starred || hasGalleryFilters(filters);
   const [pagingFailed, setPagingFailed] = useState(false);
@@ -153,9 +159,23 @@ export function GalleryPage() {
     gallery.fetchNextPage,
     selected,
   ]);
-  const items = gallery.data?.pages.flatMap((page) => page.items) || [];
+  const loaded = useMemo(
+    () => gallery.data?.pages.flatMap((page) => page.items) || [],
+    [gallery.data],
+  );
+  // Grid shows each version chain as one tile, its latest version; Runs and All Versions show all.
+  const groups = useVersionGroups(loaded);
+  const grouped = view === "grid" && !allVersions;
+  const versions = useMemo(
+    () => (grouped ? new Map(groups.map((group) => [group.at(-1)!.id, group])) : undefined),
+    [grouped, groups],
+  );
+  const items = useMemo(
+    () => (versions ? [...versions.values()].map((group) => group.at(-1)!) : loaded),
+    [versions, loaded],
+  );
   const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
-  const tryAgain = useTryAgain(items);
+  const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   const selectionButton = useRef<HTMLButtonElement>(null);
   function doneSelecting() {
@@ -198,6 +218,8 @@ export function GalleryPage() {
           onChange={setFilters}
           starred={starred}
           onStarredChange={setStarred}
+          allVersions={allVersions}
+          onAllVersionsChange={view === "grid" ? setAllVersions : undefined}
           leading={
             <SegmentedControl
               aria-label="Gallery View"
@@ -245,6 +267,7 @@ export function GalleryPage() {
         <div className={classes.results} data-stale={gallery.isPlaceholderData || undefined}>
           <View
             items={items}
+            versions={versions}
             focusItem={focusItem}
             open={(item) => {
               setFocusItem(null);
@@ -297,8 +320,14 @@ export function GalleryPage() {
       {!selection.selecting && <ComposerDock />}
       {selected && (
         <MediaViewer
-          item={items.find((i) => i.id === selected.id) || selected}
-          items={items}
+          item={loaded.find((i) => i.id === selected.id) || selected}
+          items={
+            versions
+              ? [...versions.values()].map(
+                  (group) => group.find((version) => version.id === selected.id) || group.at(-1)!,
+                )
+              : items
+          }
           navigate={setSelected}
           onReturnFocus={(item) => setFocusItem(item.id)}
           close={() => setSelected(null)}

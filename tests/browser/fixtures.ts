@@ -496,6 +496,7 @@ export async function fixtures(page: Page) {
         items: gallery.filter(
           (i) =>
             (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
+            (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
             (!url.searchParams.has("chat") ||
               url.searchParams.getAll("chat").includes(i.sessionId)),
         ),
