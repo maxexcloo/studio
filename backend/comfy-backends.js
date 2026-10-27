@@ -44,11 +44,22 @@ export const noteWorkerReachable = (id, up) => {
   if (id) reachable.set(id, Boolean(up));
 };
 const workerReachable = (id) => (reachable.has(id) ? reachable.get(id) : null);
+/** How a worker's inventory names a profile on one backend of a combined profile. */
+export const profileOnBackendKey = (profileId, backend = "") =>
+  backend ? `${profileId}@${backend}` : profileId;
 export const noteWorkerProfiles = (id, profiles = []) => {
   if (id)
     inventories.set(
       id,
-      new Set(profiles.filter((profile) => profile.ready !== false).map((profile) => profile.id)),
+      new Set(
+        profiles.flatMap((profile) => [
+          ...(profile.ready !== false ? [profile.id] : []),
+          // Each backend this worker can run it on, so a run on the other backend routes to it.
+          ...(profile.backendOptions || [])
+            .filter((option) => option.ready)
+            .map((option) => profileOnBackendKey(profile.id, option.id)),
+        ]),
+      ),
     );
 };
 export function forgetWorkerState(id) {
@@ -73,7 +84,10 @@ export function routeJob(capability, { profileId = "", prefers = [] } = {}) {
 /** routeJob for a profile, or an error that says plainly why nothing can run it. */
 export function routeProfile(profile, options = {}) {
   const capability = capabilityForProfile(profile);
-  const worker = routeJob(capability, { profileId: profile?.id || "", ...options });
+  const worker = routeJob(capability, {
+    profileId: profileOnBackendKey(profile?.id || "", options.backend),
+    ...options,
+  });
   if (!worker)
     throw Object.assign(new Error(noWorkerMessage(capability)), {
       status: 503,
@@ -98,13 +112,28 @@ const allowedProfile = (worker, profile) =>
  * order, for the workers that answered; `empty` stands in when none did.
  */
 export function mergeWorkerModels(entries, empty = {}) {
-  const seen = new Set();
+  const seen = new Map();
   const profiles = [];
   for (const { worker, models } of entries) {
     for (const profile of models.profiles || []) {
-      if (seen.has(profile.id) || !allowedProfile(worker, profile)) continue;
-      seen.add(profile.id);
-      profiles.push(profile);
+      if (!allowedProfile(worker, profile)) continue;
+      const index = seen.get(profile.id);
+      if (index === undefined) {
+        seen.set(profile.id, profiles.length);
+        profiles.push(profile);
+        continue;
+      }
+      // A combined profile is ready where any worker runs its backend: that worker's entry wins.
+      const kept = profiles[index];
+      if (!kept.backendOptions?.length) continue;
+      const backendOptions = kept.backendOptions.map((option) => {
+        const other = profile.backendOptions?.find((candidate) => candidate.id === option.id);
+        return option.ready || !other || other.ready === undefined ? option : other;
+      });
+      profiles[index] = {
+        ...(kept.ready === false && profile.ready !== false ? profile : kept),
+        backendOptions,
+      };
     }
   }
   const images = profiles.filter((profile) => profile.kind === "image");

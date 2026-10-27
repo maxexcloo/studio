@@ -110,6 +110,62 @@ test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", asyn
   await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
 });
 
+/** A profile with a ComfyUI and a Radiance backend that runs on `backend`, defining `defined`. */
+const combined = (backend: string, defined = ["comfyui", "radiance"]) => ({
+  ...profiles[0],
+  id: "custom:krea",
+  label: "Krea 2 Turbo · Fast",
+  model: "custom:krea",
+  workflow: "custom:krea",
+  backend,
+  backendOptions: defined.map((id) => ({
+    id,
+    label: id === "comfyui" ? "ComfyUI" : "Radiance",
+    ready: true,
+  })),
+});
+const ranOn = (backend: string) => ({
+  settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
+});
+
+test("Exact Repeat and Recreate keep the backend a combined profile ran on", async ({ page }) => {
+  const { state, viewer } = await seed(page, ranOn("radiance"), () =>
+    serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
+  );
+  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({
+    profileId: "custom:krea",
+    profileBackend: "radiance",
+    seed: 1234567,
+  });
+  await viewerAction(page, "Recreate in Composer");
+  await expect(viewer).toBeHidden();
+  // The picker shows the backend this draft runs on, not the profile's current one.
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
+    "Radiance",
+  );
+});
+
+test("A rerun whose backend the profile no longer has runs on its current one and says so", async ({
+  page,
+}) => {
+  const { state, viewer } = await seed(page, ranOn("radiance"), () =>
+    serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
+  );
+  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Radiance is no longer a backend of Krea 2 Turbo · Fast, so this run uses ComfyUI.",
+    ),
+  ).toBeVisible();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input.profileBackend).toBeUndefined();
+});
+
 test("Animate themes write the motion prompt and queue a video from the image", async ({
   page,
 }) => {

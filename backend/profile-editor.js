@@ -2,7 +2,10 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  backendIdsOf,
   metadataFromJson,
+  profileBackendLabels,
+  profileOnBackend,
   userWorkflowsDir,
   validateGraph,
   workflowMissingFiles,
@@ -62,6 +65,8 @@ export function listEditableProfiles() {
         origin: version?.origin || "seed",
         aiDrafted: version?.aiDrafted === true,
         nsfw: meta.nsfw === true,
+        // A combined profile's current backend.
+        ...(backendIdsOf(raw).length ? { backend: profileOnBackend(raw).backend } : {}),
       };
     })
     .filter((item) => validId(item.id))
@@ -167,25 +172,57 @@ export function validateProfileText(id, text, { info = null } = {}) {
       errors.push(`studio.kind must be image or video.`);
     if ("nsfw" in meta && typeof meta.nsfw !== "boolean")
       errors.push(`studio.nsfw must be true or false.`);
+    if ("backends" in meta) {
+      const ids = backendIdsOf(raw);
+      if (!ids.length) errors.push("studio.backends must hold at least one backend.");
+      for (const backend of ids)
+        if (!Object.hasOwn(profileBackendLabels, backend))
+          errors.push(
+            `studio.backends.${backend} isn’t a backend Studio runs: use ${Object.keys(profileBackendLabels).join(" or ")}.`,
+          );
+      if (meta.backend !== undefined && !ids.includes(meta.backend))
+        errors.push("studio.backend must name one of studio.backends.");
+    }
+  }
+  // A combined profile is checked on each of its backends, as each of them may run.
+  const backends = backendIdsOf(raw);
+  for (const backend of backends.length ? backends : [""]) {
+    const where = backend ? `studio.backends.${backend}: ` : "";
+    const view = backend ? profileOnBackend(raw, backend).raw : raw;
+    const checked = checkGraph(view, id, { info, where });
+    errors.push(...checked.errors);
+    for (const warning of checked.warnings) if (!warnings.includes(warning)) warnings.push(warning);
+  }
+  return { ok: !errors.length, errors, warnings, raw: errors.length ? undefined : raw };
+}
+
+/** The graph and control checks for one single-graph profile (`where` prefixes each message). */
+function checkGraph(raw, id, { info, where = "" }) {
+  const errors = [];
+  const warnings = [];
+  const meta = metaOf(raw);
+  if (meta && typeof meta === "object") {
     if (!meta.controls || typeof meta.controls !== "object")
-      errors.push(`studio.controls is required.`);
-    else if (!meta.controls.prompt) errors.push(`studio.controls.prompt is required.`);
+      errors.push(`${where}studio.controls is required.`);
+    else if (!meta.controls.prompt) errors.push(`${where}studio.controls.prompt is required.`);
   }
   let workflow = null;
   try {
     workflow = metadataFromJson(raw, fileFor(id));
     validateGraph(workflow.graph);
   } catch (error) {
-    errors.push(error.message);
+    errors.push(`${where}${error.message}`);
   }
   if (workflow && meta) {
     for (const [key, target] of controlTargets(meta)) {
       const node = workflow.graph?.[String(target.node)];
       if (!node)
-        errors.push(`controls.${key} points at node ${target.node}, which isn’t in the graph.`);
+        errors.push(
+          `${where}controls.${key} points at node ${target.node}, which isn’t in the graph.`,
+        );
       else if (target.input && !(String(target.input) in (node.inputs || {})))
         errors.push(
-          `controls.${key} points at input "${target.input}", which node ${target.node} (${node.class_type}) doesn’t have.`,
+          `${where}controls.${key} points at input "${target.input}", which node ${target.node} (${node.class_type}) doesn’t have.`,
         );
     }
     if (info && Object.keys(info).length) {
@@ -197,15 +234,15 @@ export function validateProfileText(id, text, { info = null } = {}) {
         ),
       ];
       if (unknown.length)
-        warnings.push(`ComfyUI doesn’t know these node types: ${unknown.join(", ")}.`);
+        warnings.push(`${where}ComfyUI doesn’t know these node types: ${unknown.join(", ")}.`);
       for (const missing of workflowMissingFiles(workflow, info))
         warnings.push(
-          `ComfyUI doesn’t list the ${missing.kind} ${missing.file} (models/${missing.folder}).`,
+          `${where}ComfyUI doesn’t list the ${missing.kind} ${missing.file} (models/${missing.folder}).`,
         );
     } else
       warnings.push("ComfyUI couldn’t be asked, so node types and model files weren’t checked.");
   }
-  return { ok: !errors.length, errors, warnings, raw: errors.length ? undefined : raw };
+  return { errors, warnings };
 }
 
 /**
