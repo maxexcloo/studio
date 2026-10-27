@@ -65,6 +65,27 @@ test("sessions and queue records are scoped to the authenticated owner", () => {
   }
 });
 
+test("an MCP conversation goes on in the first of the Chats its earlier jobs split into", () => {
+  const { store } = fixture();
+  try {
+    const chat = { conversationId: "librechat-conversation" };
+    const [first, second] = ["A first turn", "A second turn"].map((prompt) => {
+      const split = store.createSession("alice", prompt);
+      store.enqueue("alice", split.id, { prompt, chat }, "image");
+      return split;
+    });
+    const joined = store.mcpSession("alice", "A third turn", {}, chat.conversationId);
+    assert.equal(joined.id, first.id);
+    assert.deepEqual(store.session("alice", first.id)?.mcp, chat);
+    assert.equal(store.mcpSession("alice", "A fourth turn", {}, chat.conversationId).id, first.id);
+    assert.equal(store.session("alice", second.id)?.mcp, undefined);
+    // Another account's conversation of the same name is its own Chat.
+    assert.notEqual(store.mcpSession("bob", "A turn", {}, chat.conversationId).id, first.id);
+  } finally {
+    store.close();
+  }
+});
+
 test("conflicting work waits until outputs save; independent cloud work proceeds", async () => {
   const { store, queue, submitted, observations, events } = fixture();
   try {

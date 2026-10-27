@@ -1,6 +1,6 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { GenerationQueue } from "./queue.ts";
-import { RewriteStore, type OwnedJob, type QueueOrigin } from "./store.ts";
+import { queuePriority, RewriteStore, type OwnedJob, type QueueOrigin } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;
@@ -65,13 +65,18 @@ export function createGenerationAdmission(options: AdmissionOptions) {
       if (!job) {
         const checked = await options.validate(input, account);
         if (checked.status >= 400) return checked;
+        const title = String(input.prompt || "Generation").slice(0, 100);
+        // MCP work (its queue tier) joins its conversation's Chat; other unscoped work gets its own.
         const session =
           scopedSession ||
-          options.store.createSession(
-            ownerId,
-            String(input.prompt || "Generation").slice(0, 100),
-            input,
-          );
+          (origin?.priority === queuePriority.mcp
+            ? options.store.mcpSession(
+                ownerId,
+                title,
+                input,
+                (input.chat as { conversationId?: string } | undefined)?.conversationId,
+              )
+            : options.store.createSession(ownerId, title, input));
         try {
           job = options.store.enqueue(
             ownerId,

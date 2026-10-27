@@ -1,5 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Alert, Button, Group, NavLink, Stack, Title, type ButtonProps } from "@mantine/core";
+import {
+  Alert,
+  Badge,
+  Button,
+  Group,
+  NavLink,
+  Stack,
+  Title,
+  type ButtonProps,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Link, useMatch } from "react-router";
@@ -45,7 +54,7 @@ function ChatRow({
         component={Link}
         to={`/chat/${session.id}`}
         label={chatTitle(session)}
-        description={updated(session.updatedAt)}
+        description={[session.mcp && "MCP", updated(session.updatedAt)].filter(Boolean).join(" · ")}
         active={active}
         aria-current={active ? "page" : undefined}
         onClick={close}
@@ -113,6 +122,11 @@ function ChatHeading({ session }: { session: Session }) {
           <Title order={2} size="h4" lineClamp={1} title={chatTitle(current)} miw={0}>
             {chatTitle(current)}
           </Title>
+          {current.mcp && (
+            <Badge variant="default" style={{ flexShrink: 0 }}>
+              MCP Chat
+            </Badge>
+          )}
           <ChatMenu session={current} onRename={() => setRenaming(true)} />
         </>
       )}
