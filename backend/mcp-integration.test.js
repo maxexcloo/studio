@@ -4739,6 +4739,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "CatalogueEdit",
     "Profiles",
     "ProfileEdit",
+    "CombineBackends",
     "Export",
     "Placement",
   ]);
@@ -4935,6 +4936,13 @@ test("admin tools go through the Library and profile routes with the administrat
       warnings: [],
     }),
   );
+  const backendPair = { key: "fast|fast-comfyui", id: "fast", name: "Fast", differences: [] };
+  f.app.get("/api/profiles/backends", (_req, res) =>
+    res.json({ ok: true, hash: "pairs-hash", pairs: [backendPair] }),
+  );
+  f.app.post("/api/profiles/backends/combine", (_req, res) =>
+    res.json({ ok: true, combined: [{ id: "fast", from: ["fast-radiance", "fast-comfyui"] }] }),
+  );
   f.app.get("/api/profiles/export", (_req, res) => {
     fs.mkdirSync(path.join(f.dataDir, "exports"), { recursive: true });
     fs.writeFileSync(
@@ -5107,6 +5115,18 @@ test("admin tools go through the Library and profile routes with the administrat
     [JSON.parse(put.body.text).steps, put.body.baseHash, put.body.draft],
     [6, profileHash, true],
   );
+
+  const preview = data(await call(client, "CombineBackends"));
+  assert.deepEqual([preview.hash, preview.pairs], ["pairs-hash", [backendPair]]);
+  const selections = [{ radiance: "fast-radiance", comfyui: "fast-comfyui", backend: "comfyui" }];
+  const combined = data(
+    await call(client, "CombineBackends", { action: "apply", hash: "pairs-hash", selections }),
+  );
+  assert.equal(combined.combined[0].id, "fast");
+  assert.deepEqual(seen.find((item) => item.path === "/profiles/backends/combine").body, {
+    hash: "pairs-hash",
+    selections,
+  });
 
   const bundle = data(await call(client, "Export"));
   assert.deepEqual(

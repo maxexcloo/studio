@@ -513,6 +513,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
 
   assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
+  assert.equal(mcpAdminRouteAllowed("POST", "/api/profiles/backends/combine"), true);
   // Nothing that deletes or replaces files, and no account or GPU administration.
   for (const [method, routePath] of [
     ["DELETE", "/api/loras"],
