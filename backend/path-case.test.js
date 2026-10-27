@@ -8,14 +8,7 @@ import test from "node:test";
 import { gatedPath } from "./gated-path.js";
 
 test("every casing of the API and ComfyUI prefixes is gated", () => {
-  for (const value of [
-    "/api/paths",
-    "/API/paths",
-    "/Api/x",
-    "/comfy/view",
-    "/COMFY/view",
-    "/cOmFy",
-  ])
+  for (const value of ["/api/ping", "/API/ping", "/Api/x", "/comfy/view", "/COMFY/view", "/cOmFy"])
     assert.equal(gatedPath(value), true, value);
   for (const value of ["/", "/assets/app.js", "/apix", "/media"])
     assert.equal(gatedPath(value), value === "/apix");
@@ -76,11 +69,11 @@ test(
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      for (const route of ["/API/paths", "/Api/workflows", "/API/comfy/status"]) {
+      for (const route of ["/API/workers", "/Api/workflows", "/API/health"]) {
         const response = await fetch(`${base}${route}`, { headers: { host: "evil.example" } });
         const text = await response.text();
         assert.equal(
-          /outputDir|galleryDir|comfyUrl|"workflows"/.test(text),
+          /comfyUrl|"workers"|"workflows"/.test(text),
           false,
           `${multiUser ? "multi" : "single"}-user ${route} leaked: ${text.slice(0, 120)}`,
         );

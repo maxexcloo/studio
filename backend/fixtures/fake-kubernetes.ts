@@ -43,7 +43,7 @@ export function fakeKubernetes(
   function tick() {
     for (const deployment of deployments.values()) {
       const before = ready(deployment) > 0;
-      for (const item of deployment.pods.filter((entry) => entry.deleting))
+      for (const _ of deployment.pods.filter((entry) => entry.deleting))
         log.push(`gone ${deployment.namespace}/${deployment.name}`);
       deployment.pods = deployment.pods.filter((entry) => !entry.deleting);
       if (!deployment.unschedulable) for (const item of deployment.pods) item.ready = true;

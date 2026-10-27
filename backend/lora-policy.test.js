@@ -4,14 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  compatibilityNote,
-  compatibleLoras,
-  loraCompatibility,
-  loraName,
-  sameLoraFamily,
-  strengthRange,
-} from "./lora-policy.js";
+import { compatibleLoras, loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./lora-catalogue.js";
 
 const profile = {
@@ -57,7 +50,6 @@ test("Boogu verified base and turbo targets leave unverified edit variants avail
   assert.equal(loraCompatibility(info, base), "fits");
   const edit = { ...base, defaults: { model: "boogu_edit.safetensors" } };
   assert.equal(loraCompatibility(info, edit), "unknown");
-  assert.match(compatibilityNote(info, edit), /not been verified/);
   assert.equal(optionalLoraPolicyIssue({ name: "effect", strength: 1 }, info, edit), "");
   assert.equal(loraCompatibility(undefined, edit), "unknown");
 });
@@ -236,20 +228,4 @@ test("a LoRA reads by its catalogue title, else a cleaned Title Case stem", () =
   assert.equal(loraName("pawg_krea2.safetensors", { title: "PAWG Krea 2" }), "PAWG Krea 2");
   assert.equal(loraName("loras/krea/soft_light-v3.safetensors"), "Soft Light V3");
   assert.equal(loraName("detailer.gguf", { title: "   " }), "Detailer");
-});
-
-test("model changes retain stacks only within a known shared LoRA family", () => {
-  assert.equal(
-    sameLoraFamily({ id: "base", family: "moss" }, { id: "fast", family: "moss" }),
-    true,
-  );
-  assert.equal(sameLoraFamily({ family: "flux3_klein" }, { family: "flux3" }), true);
-  assert.equal(sameLoraFamily({ family: "minimax-h3" }, { family: "minimax_h3" }), true);
-  assert.equal(sameLoraFamily({ family: "moss" }, { family: "boogu" }), false);
-  assert.equal(sameLoraFamily({ family: "custom" }, { family: "custom" }), false);
-  assert.equal(
-    sameLoraFamily({ id: "same", family: "custom" }, { id: "same", family: "custom" }),
-    true,
-  );
-  assert.equal(sameLoraFamily(undefined, { family: "moss" }), false);
 });

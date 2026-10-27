@@ -8,7 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-workflow-modes-"))
 process.env.STUDIO_DATA_DIR = scratch;
 process.env.STUDIO_ENABLE_BUILTIN_PROFILES = "0";
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
-const { metadataFromJson, saveCustomWorkflow, validateGraph } =
+const { metadataFromJson, saveImportedWorkflow, validateGraph } =
   await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
 const { inferModels } = await import("./models.js");
@@ -66,7 +66,7 @@ info.KSampler = list({
   denoise: ["FLOAT", { default: 1, min: 0, max: 1, step: 0.01 }],
 });
 
-saveCustomWorkflow(raw);
+saveImportedWorkflow(raw);
 
 test("mode metadata derives controls independently and checks nodes used only by generation", () => {
   const workflow = metadataFromJson(raw);
@@ -87,7 +87,7 @@ test("custom profile discovery advertises installed LoRAs and compact mode capab
   assert.equal(profile.imageModes.reference.capabilities.negativePrompt, true);
   assert.equal(profile.mediaInputs.length, 1);
   assert.ok(!("graph" in profile.imageModes.generate));
-  saveCustomWorkflow({
+  saveImportedWorkflow({
     ...raw,
     studio: { ...raw.studio, id: "no-loras", capabilities: { lora: false } },
   });
@@ -132,7 +132,7 @@ test("recipe-owned graph adapters are not inspected as optional stack entries", 
   };
   prepared.graph["90"] = fixed;
   prepared.studio.imageModes.generate.graph["90"] = fixed;
-  saveCustomWorkflow(prepared);
+  saveImportedWorkflow(prepared);
   const body = sanitizeGenerateBody(
     {
       kind: "image",
@@ -154,7 +154,7 @@ test("trusted optional adapter policy validates conditioning and full publisher 
   prepared.studio.id = "effect-policy";
   prepared.studio.family = "minimax_h3";
   prepared.studio.recipe = { modelLabel: "H3", label: "Standard", conditioning: "FL2VA" };
-  saveCustomWorkflow(prepared);
+  saveImportedWorkflow(prepared);
   const catalogue = {
     "style.safetensors": {
       baseModel: "MiniMax H3",
@@ -188,7 +188,7 @@ test("trusted optional adapter policy validates conditioning and full publisher 
     /published range/,
   );
   prepared.studio.recipe.conditioning = "Ref2VA";
-  saveCustomWorkflow(prepared);
+  saveImportedWorkflow(prepared);
   assert.throws(() => sanitizeGenerateBody(request, info), /conditioning variant/);
   assert.deepEqual(
     sanitizeGenerateBody(
@@ -220,7 +220,7 @@ test("runtime profiles expose owned prompting and select explicit image-mode gui
     summary: "Reference guidance",
     mode: { id: "reference", example: "Preserve the tree" },
   };
-  saveCustomWorkflow({
+  saveImportedWorkflow({
     ...raw,
     studio: {
       ...raw.studio,
@@ -237,7 +237,7 @@ test("runtime profiles expose owned prompting and select explicit image-mode gui
   assert.deepEqual(profile.imageModes.generate.prompting, generation);
   assert.deepEqual(profile.imageModes.reference.prompting, reference);
   assert.equal(profile.imageModes.reference.graph, undefined);
-  saveCustomWorkflow({ ...raw, studio: { ...raw.studio, id: "inherited-prompting", prompting } });
+  saveImportedWorkflow({ ...raw, studio: { ...raw.studio, id: "inherited-prompting", prompting } });
   const inherited = inferModels(info).profiles.find(
     (item) => item.id === "custom:inherited-prompting",
   );

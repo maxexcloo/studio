@@ -46,7 +46,6 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   const user = { userId: "user", role: "user" };
   for (const [method, path] of [
     ["GET", "/api/gallery"],
-    ["GET", "/api/gallery/delta"],
     ["GET", "/api/gallery/filters"],
     ["POST", "/api/generate"],
     ["GET", "/api/jobs/abc-1"],
@@ -55,7 +54,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["POST", "/api/reference-assets/upload"],
     ["POST", "/api/reference-assets/a1/gallery"],
     ["GET", "/api/loras/library"],
-    ["GET", "/api/comfy/status"],
+    ["GET", "/api/services/status"],
     ["GET", "/comfy/view"],
     ["HEAD", "/comfy/thumb"],
     ["POST", "/api/accounts/mcp-token/revoke"],
@@ -63,30 +62,26 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
   ])
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
-    ["POST", "/api/comfy/free"],
-    ["GET", "/api/model-folders"],
     ["GET", "/api/presets"],
     ["GET", "/api/library/file"],
     ["POST", "/api/models/downloads"],
     ["GET", "/api/accounts/admin"],
     ["POST", "/api/accounts/users"],
-    ["PUT", "/api/workflows/preferences"],
     ["POST", "/comfy/prompt"],
     ["GET", "/comfy/history"],
     ["DELETE", "/api/loras"],
-    ["POST", "/api/start-image"],
     ["GET", "/api/logs"],
     ["GET", "/api/workers"],
     ["PUT", "/api/workers"],
     ["POST", "/api/workers/test"],
-    ["POST", "/api/comfy/restart"],
+    ["POST", "/api/runtime/restart"],
   ]) {
     const denied = call(path, user, method);
     assert.equal(denied.continued, false, `${method} ${path}`);
     assert.equal(denied.res.statusCode, 403, `${method} ${path}`);
   }
   assert.equal(
-    call("/api/comfy/free", { userId: "admin", role: "administrator" }, "POST").continued,
+    call("/api/workers", { userId: "admin", role: "administrator" }, "PUT").continued,
     true,
   );
   assert.equal(

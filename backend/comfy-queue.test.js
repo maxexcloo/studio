@@ -1,12 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  cancelPrompt,
-  cancelPrompts,
-  isTransientComfyError,
-  promptTracker,
-  queuePlace,
-} from "./comfy-queue.js";
+import { cancelPrompt, isTransientComfyError, promptTracker, queuePlace } from "./comfy-queue.js";
 
 /** A fake ComfyUI: answers by path from a table, records every call. */
 function fakeComfy(routes) {
@@ -88,16 +82,6 @@ test("a prompt that is neither queued nor running is left alone", async () => {
         call.pathname === "/interrupt" || (call.pathname === "/queue" && call.method === "POST"),
     ),
   );
-});
-
-test("cancelPrompts never clears the whole queue and reports failures", async () => {
-  const { request, calls } = fakeComfy({
-    "POST /api/jobs/a/cancel": { cancelled: true },
-    "POST /api/jobs/b/cancel": refused(),
-    "GET /queue": refused(),
-  });
-  assert.equal(await cancelPrompts(["a", "b", "a", ""], request), 1);
-  assert.ok(!calls.some((call) => call.body?.clear), "no queue clear");
 });
 
 test("transient errors are network trouble and 5xx, not answers", () => {

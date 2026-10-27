@@ -34,9 +34,7 @@ export const galleryPath = path.join(dataDir, "gallery.json");
 const hiddenGalleryPath = path.join(dataDir, "gallery-hidden.json");
 export const galleryLimit = Number(process.env.STUDIO_GALLERY_LIMIT || 50000);
 
-const changeLogLimit = Number(process.env.STUDIO_GALLERY_CHANGELOG_LIMIT || 10000);
 let galleryRevision = Date.now();
-const galleryChanges = [];
 // Bumped whenever the hide markers change, so a cached page list knows to rebuild.
 let hiddenVersion = 0;
 
@@ -162,64 +160,38 @@ export function sortGallery(items = gallery) {
   return [...items].sort(compareGalleryItems);
 }
 
-function bumpRevision(changes = {}) {
+function bumpRevision() {
   galleryRevision = Math.max(galleryRevision + 1, Date.now());
-  const upserts = Array.isArray(changes.upserts) ? changes.upserts : [];
-  const removes = Array.isArray(changes.removes) ? changes.removes : [];
-  // Each removed key keeps its owner, so an account's delta never names another owner's item.
-  const removeOwners = Array.isArray(changes.removeOwners) ? changes.removeOwners : [];
-  if (upserts.length || removes.length || changes.reset) {
-    // Live previews are base64 frames: the log keeps up to changeLogLimit entries, so
-    // they stay out of it and a delta attaches the item's current one instead.
-    const logged = upserts.map((item) => (item.preview ? withoutPreview(item) : item));
-    galleryChanges.push({
-      revision: galleryRevision,
-      upserts: logged,
-      removes,
-      removeOwners,
-      reset: Boolean(changes.reset),
-    });
-    if (galleryChanges.length > changeLogLimit)
-      galleryChanges.splice(0, galleryChanges.length - changeLogLimit);
-  }
   return galleryRevision;
 }
 
-/** Something the delta log cannot express changed (run grouping): browsers reload the page. */
+/** Something the item diff cannot see changed (run grouping): the revision moves on. */
 export function markGalleryReset() {
-  return bumpRevision({ reset: true });
+  return bumpRevision();
 }
 
 function withoutPreview({ preview, ...rest }) {
   return rest;
 }
 
-function diffGallery(before, after) {
+/** Whether any item was added, removed or replaced with different content. */
+function galleryChanged(before, after) {
   const beforeMap = new Map(before.map((item) => [galleryKey(item), item]).filter(([key]) => key));
   const afterMap = new Map(after.map((item) => [galleryKey(item), item]).filter(([key]) => key));
-  const upserts = [];
-  const removes = [];
-  const removeOwners = [];
+  if (beforeMap.size !== afterMap.size) return true;
   for (const [key, item] of afterMap) {
     const previous = beforeMap.get(key);
     if (previous === item) continue;
-    if (!previous || JSON.stringify(previous) !== JSON.stringify(item)) upserts.push(item);
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(item)) return true;
   }
-  for (const [key, item] of beforeMap) {
-    if (!afterMap.has(key)) {
-      removes.push(key);
-      removeOwners.push(item?.ownerId || "");
-    }
-  }
-  return { upserts, removes, removeOwners };
+  return false;
 }
 
 export function setGallery(items, options = {}) {
   const before = gallery;
   gallery = sortGallery(items).slice(0, galleryLimit);
   if (options.track !== false) {
-    const changes = diffGallery(before, gallery);
-    if (changes.upserts.length || changes.removes.length) bumpRevision(changes);
+    if (galleryChanged(before, gallery)) bumpRevision();
   }
   if (options.persist !== false) saveGallery();
 }
@@ -230,17 +202,15 @@ export function isComfyOutputItem(item) {
 
 export function hideGalleryItems(items) {
   const hiddenAt = Date.now();
-  const removes = [];
-  const removeOwners = [];
+  let marked = false;
   for (const item of items) {
     const key = galleryKey(item);
     if (key) {
       hiddenGalleryIds.set(markerOf(key), hiddenAt);
-      removes.push(key);
-      removeOwners.push(item?.ownerId || "");
+      marked = true;
     }
   }
-  if (removes.length) bumpRevision({ removes, removeOwners });
+  if (marked) bumpRevision();
   saveHiddenGalleryIds();
 }
 
@@ -256,7 +226,7 @@ export function isGalleryHidden(item) {
 }
 
 /** A Dream result the person has not kept: it lives in Dream's own pool (domain/dream.ts), not the gallery. */
-export const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept");
+const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept");
 
 export function filterVisibleGallery(items) {
   return items.filter((item) => {
@@ -416,7 +386,7 @@ export function setGalleryFavorites(keys, favorite) {
     return next;
   });
   if (upserts.length) {
-    bumpRevision({ upserts });
+    bumpRevision();
     saveGallery();
   }
   return upserts;
@@ -471,63 +441,6 @@ export function pageGallery({
     revision: galleryRevision,
     totalApprox: all.length,
   };
-}
-
-/** `owner` (account mode) keeps only that owner's upserts and removes; other owners' changes stay invisible. */
-export function galleryDelta({
-  since = 0,
-  type = "",
-  includeFailed = true,
-  filter = null,
-  owner = null,
-} = {}) {
-  const mine = (ownerId) => owner === null || (ownerId || "") === owner;
-  const numericSince = Number(since || 0);
-  const earliest = galleryChanges[0]?.revision || galleryRevision;
-  if (!numericSince || numericSince < earliest - 1) {
-    return { revision: galleryRevision, reset: true, upserts: [], removes: [] };
-  }
-  const upsertMap = new Map();
-  const removes = new Set();
-  for (const change of galleryChanges) {
-    if (change.revision <= numericSince) continue;
-    if (change.reset) return { revision: galleryRevision, reset: true, upserts: [], removes: [] };
-    for (const item of change.upserts || []) {
-      const key = galleryKey(item);
-      if (!key || !mine(item.ownerId)) continue;
-      upsertMap.set(key, item);
-      removes.delete(key);
-    }
-    (change.removes || []).forEach((key, index) => {
-      if (
-        owner !== null &&
-        (change.removeOwners?.[index] === undefined || !mine(change.removeOwners[index]))
-      )
-        return;
-      removes.add(key);
-      upsertMap.delete(key);
-    });
-  }
-  const upserts = [...upsertMap.values()]
-    .filter((item) => {
-      if (type && item.type !== type) return false;
-      if (!includeFailed && item.status === "error") return false;
-      if (item.status === "canceled" || isGalleryHidden(item) || inDreamPool(item)) return false;
-      // With a search on, what no longer matches (unstarred, or a run that
-      // finished with another prompt) leaves the results instead of going stale.
-      if (filter && !filter(item)) {
-        removes.add(galleryKey(item));
-        return false;
-      }
-      return true;
-    })
-    .map((item) => {
-      if (item.status !== "pending" && item.status !== "running") return item;
-      const key = galleryKey(item);
-      const preview = gallery.find((live) => galleryKey(live) === key)?.preview;
-      return preview ? { ...item, preview } : item;
-    });
-  return { revision: galleryRevision, reset: false, upserts, removes: [...removes] };
 }
 
 /** Imported image paths are derived from the provider ID, never supplied paths. */
@@ -933,13 +846,6 @@ export function flushPendingGallery() {
   }
 }
 
-/** Items drop out of the gallery as if deleted, without a delete marker left behind. */
-export function removeGalleryItems(items) {
-  const keys = new Set(items.map(galleryKey).filter(Boolean));
-  if (!keys.size) return;
-  setGallery(gallery.filter((item) => !keys.has(galleryKey(item))));
-}
-
 /** Viewer deletion for several of one owner's items: files, delete markers and records. */
 export function deleteOwnedGalleryItems(ownerId, ids) {
   const wanted = new Set(ids);
@@ -1207,7 +1113,6 @@ export function cleanupGalleryState(jobs) {
   // and no upscale running, and one pass says so without building anything.
   if (!gallery.some((item) => item.status === "pending" || item.upscale?.status === "running"))
     return;
-  const before = gallery;
   const runKey = (item) =>
     `${item.jobId || ""}|${item.prompt || ""}|${item.model || ""}|${item.width || ""}|${item.height || ""}`;
   const doneJobs = new Set();
@@ -1220,8 +1125,7 @@ export function cleanupGalleryState(jobs) {
   const next = [];
   let changed = false;
   for (let item of gallery) {
-    // Replaced, never changed in place: diffGallery tells changes by identity,
-    // and an item edited in place would never reach other open galleries.
+    // Replaced, never changed in place: other readers compare items by identity.
     // An upscale whose job this server never ran (it restarted mid-upscale) is not running anymore.
     if (item.upscale?.status === "running" && !jobs.has(item.upscale.jobId)) {
       item = { ...item, upscale: { ...item.upscale, status: "canceled", progress: null } };
@@ -1240,7 +1144,7 @@ export function cleanupGalleryState(jobs) {
   }
   if (!changed) return;
   gallery = next;
-  bumpRevision(diffGallery(before, gallery));
+  bumpRevision();
   saveGallery();
 }
 
@@ -1444,7 +1348,7 @@ export function updateGalleryJob(id, patch, options = {}) {
     return item;
   });
   if (changed) {
-    if (upserts.length) bumpRevision({ upserts });
+    if (upserts.length) bumpRevision();
     if (options.persist !== false) saveGallery();
   }
   return changed;
@@ -1464,6 +1368,6 @@ export function updateGalleryJobPreviews(id, previews = []) {
     upserts.push(next);
     return next;
   });
-  if (upserts.length) bumpRevision({ upserts });
+  if (upserts.length) bumpRevision();
   return upserts.length > 0;
 }
