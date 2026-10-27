@@ -13,7 +13,7 @@ mise run setup
 mise run dev
 ```
 
-Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. When the sibling `ai` checkout exists, development reads its definitions and worker addresses. Automatic worker lifecycle control is disabled.
+Open <http://localhost:5173>. Vite provides HMR and the API watches its source on port 18787. Development data, media and local settings stay in `data/development`, separate from existing runtime data and the root `.env`. When the sibling `ai` checkout exists, development reads its definitions. Automatic worker lifecycle control is disabled.
 
 `mise run dev:demo` uses explicit sample generations without a GPU. Its SVG outputs are fixtures, not model inference.
 
@@ -29,9 +29,9 @@ mise run test:browser
 
 The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Every verified `main` commit publishes both under a `YYYY.M.D.N` version with a [GitHub release](https://github.com/maxexcloo/studio/releases). Deploy an exact version.
 
-Mount a writable Studio data directory for media and editable definitions, and a read-only `ai` configuration directory for missing-definition seeds. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [container operations](DOCKER.md), [worker operations](worker/README.md) and [models and workflows](MODELS.md).
+Mount a writable Studio data directory for media and editable definitions, and a read-only `ai` configuration directory for missing-definition seeds. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [worker operations](worker/README.md) and [models and workflows](MODELS.md).
 
-Existing runtime state requires an offline [migration rehearsal and restore check](CONFIGURATION.md#sqlite-migration--rollback). Keep the current deployment until retained workflows and migration have been verified. Production remains single-replica with `Recreate` deployment behaviour.
+Run one application replica with `Recreate`; two schedulers must not control the same workers or SQLite database. Back up data while Studio is stopped, or use a SQLite-aware snapshot for the database alongside its media files; never copy a live SQLite database without its WAL state. Before an update that migrates data, rehearse the [migration and restore](CONFIGURATION.md#sqlite-migration--rollback) on a copy.
 
 ## Credits & Licence
 

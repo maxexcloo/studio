@@ -133,7 +133,7 @@ Studio's Chat tab uses its own OpenAI-compatible text gateway, configured with t
 
 Chat uses the Prompt Assistant account permission; known Spicy models also require NSFW Models. Its gateway is independent of prompt assistance. Chat preserves the selected media model and backend. Explicit requests to create, refine or animate media use the normal generation admission path; discussion alone does not generate media. Editing and submitting a generation card records its changed settings in the conversation, then generates once after the assistant finishes its reply. Each iteration retains the assistant's text, generation inputs, actual text model and linked results; a model without a name of its own (a routing alias such as `ai/text`) is listed under the model that last answered for it. Interrupted text responses retain their partial content, and recorded media actions are not automatically resubmitted.
 
-MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account. Existing gateway settings remain supported while the separate Bifrost migration is pending.
+MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account.
 
 `STUDIO_ENABLE_GROK=0`, `STUDIO_ENABLE_KROMA=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. All three are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
 
@@ -259,15 +259,12 @@ The same command also rewrites the profile ids that production's 20 and 24 Oct 2
 
 Work waits for the selected worker by default. Independent resources can run concurrently. A worker's admission remains held until results are safely saved. Runtime status is administrator-only.
 
-Studio switches the GPU workloads itself: each is a Kubernetes deployment it scales between 0 and 1 replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool and `STUDIO_KUBERNETES_WORKLOADS` the deployments, keyed by a stable workload id:
+Studio switches the GPU workloads itself: each is a Kubernetes deployment it scales between 0 and 1 replicas. `STUDIO_KUBERNETES_GPUS` gives the GPUs per node pool and `STUDIO_KUBERNETES_WORKLOADS` the deployments, keyed by a stable workload id (kubelab's `apps/base/studio` holds the full value):
 
 ```bash
 STUDIO_KUBERNETES_GPUS='{"gpu": 2, "gaming": 1}'
 STUDIO_KUBERNETES_WORKLOADS='{
-  "comfyui": {"kind": "image", "label": "Image", "namespace": "comfyui", "deployment": "comfyui", "pool": "gpu", "gpus": 1, "url": "http://comfyui.comfyui.svc.cluster.local:8188", "worker": "primary", "capabilities": ["image", "upscale", "models"]},
-  "comfyui-video": {"kind": "video", "label": "Video", "namespace": "comfyui-video", "deployment": "comfyui-video", "pool": "gpu", "gpus": 1, "url": "http://comfyui-video.comfyui-video.svc.cluster.local:8188", "worker": "video"},
-  "comfyui-video-tp2": {"kind": "video", "label": "Video · 2 GPUs", "namespace": "comfyui-video", "deployment": "comfyui-video-tp2", "pool": "gpu", "gpus": 2, "url": "http://comfyui-video.comfyui-video.svc.cluster.local:8188"},
-  "text-qwen-mxfp4": {"kind": "text", "label": "Qwen MXFP4", "namespace": "text", "deployment": "text-qwen-mxfp4", "pool": "gpu", "gpus": 1, "url": "http://qwen-mxfp4.text.svc.cluster.local:8000", "apiKeyEnv": "STUDIO_TEXT_KEY"}
+  "comfyui": {"kind": "image", "label": "Image", "namespace": "comfyui", "deployment": "comfyui", "pool": "gpu", "gpus": 1, "url": "http://comfyui.comfyui.svc.cluster.local:8188", "worker": "primary", "capabilities": ["image", "upscale", "models"]}
 }'
 ```
 
