@@ -26,16 +26,16 @@ select {
   min-width: 0;
 }
 /* Popups grow from the side that faces their trigger (the theme's raise transition). */
-[data-position^="top"].mantine-Popover-dropdown {
+[data-popup][data-position^="top"] {
   transform-origin: bottom;
 }
-[data-position^="bottom"].mantine-Popover-dropdown {
+[data-popup][data-position^="bottom"] {
   transform-origin: top;
 }
-[data-position^="left"].mantine-Popover-dropdown {
+[data-popup][data-position^="left"] {
   transform-origin: right;
 }
-[data-position^="right"].mantine-Popover-dropdown {
+[data-popup][data-position^="right"] {
   transform-origin: left;
 }
 @media (max-width: 48em) {
