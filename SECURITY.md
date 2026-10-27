@@ -15,7 +15,7 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 \* Models and downloads, workers and their restarts, the output folder, workflow files, presets, logs and raw ComfyUI access.
 
 - **Signing in.** Accounts sign in with their email address and password (stored only as a scrypt hash) or through single sign-on (`STUDIO_OIDC_*`). Wrong passwords are limited per address and email, one try at a time: after five, each one locks that pair out twice as long as the last (up to 15 minutes), answered with `429` and `Retry-After`. A sign-in lasts 30 days, in an `HttpOnly`, `SameSite=Strict` cookie. Changing your password in **Settings › Account** ends your other sessions; disabling an account ends all of its sessions.
-- **The first administrator** is created on the first visit from the computer running Studio. On a container platform, where nobody opens it there, set `STUDIO_SETUP_TOKEN` (at least 32 characters): the setup screen accepts it from any address until the first account exists. Remove it afterwards.
+- **The first administrator** is created on the first visit from the computer running Studio.
 - **Ordinary accounts** only reach routes that were reviewed and check the owner; any new route stays administrator-only until it is added. Their outputs, prompt history, LoRA stacks, references and jobs are private to them.
 - **Personal MCP tokens** are shown once, stored only as hashes, and work only for MCP. They never act as an administrator, even when an administrator issued them.
 - **Probes.** `/api/ping` and `/api/ready` answer without an account and reveal nothing private.
