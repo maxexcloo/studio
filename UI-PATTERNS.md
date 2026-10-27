@@ -43,11 +43,11 @@ primary component reference and verify APIs against the installed version.
 - Use Mantine spacing, typography, colours and breakpoints, including custom
   media CSS. Give Paper padding and borders explicitly where needed; do not
   apply global Paper defaults that leak into dialogs and navigation.
-- Primary modes are Chat, Images, Videos and Dream in that order; Images is the
+- Primary modes are Chat, Dream, Images and Videos in that order; Images is the
   landing page at `/images`; videos use `/video`, conversation uses
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
-  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image, Video and Sparkles icons with
-  accessible names and tooltips. On every breakpoint one status action sits
+  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Sparkles, Image and Video icons with
+  accessible names and tooltips. The selected mode's pill slides between items (`FloatingIndicator`). On every breakpoint one status action sits
   left of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
   cloud configuration alone is not proof of availability). It opens the same

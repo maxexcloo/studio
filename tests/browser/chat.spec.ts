@@ -324,7 +324,7 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
     await nav
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => link.getAttribute("aria-label"))),
-  ).toEqual(["Chat", "Images", "Videos", "Dream"]);
+  ).toEqual(["Chat", "Dream", "Images", "Videos"]);
   await openTheme(page);
   await page.getByText("Fixed Width", { exact: true }).click();
   await page.keyboard.press("Escape");
