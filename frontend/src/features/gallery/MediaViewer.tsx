@@ -464,6 +464,8 @@ export function MediaViewer({
             radius="lg"
             title={mediaTitle(item)}
             closeButtonProps={{ "aria-label": "Close Details" }}
+            // The title scrolls away with the details instead of staying pinned.
+            styles={{ header: { position: "static" } }}
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
