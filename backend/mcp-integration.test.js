@@ -1924,7 +1924,6 @@ test(
         STUDIO_DATA_DIR: dir,
         STUDIO_ENV_FILE: envFile,
         STUDIO_DEMO: "1",
-        STUDIO_LAN: "0",
         STUDIO_MCP_API_KEY: mediaKey,
         STUDIO_WORKERS: JSON.stringify([
           {
@@ -2155,7 +2154,6 @@ test(
         STUDIO_DATA_DIR: dir,
         STUDIO_ENV_FILE: path.join(dir, ".env"),
         STUDIO_ENABLE_BUILTIN_PROFILES: "0",
-        STUDIO_LAN: "0",
         STUDIO_MCP_API_KEY: mediaKey,
         STUDIO_WORKERS: JSON.stringify([
           {
