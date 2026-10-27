@@ -120,6 +120,16 @@ const job = {
 const output = { ...job, output_index: z.number().int().min(0).max(999).default(0) };
 const tier = z.enum(mcpTiers).describe("turbo is Super Fast.");
 const jobCount = z.number().int().min(1).max(maxJobsPerCall);
+const promptList = z.array(z.string().trim().min(1)).min(1).max(maxJobsPerCall);
+/** A JSON array sent as one string, or a single prompt. */
+const promptListText = z.string().transform((text) => {
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [text];
+  } catch {
+    return [text];
+  }
+});
 // A prompting guide and a LoRA library are long; chat gets their essentials (lora_query finds the rest).
 const maxGuideCharacters = 1200;
 // Models shows a guide's gist; Generate's prompt writer applies the whole guide.
@@ -716,7 +726,11 @@ export function registerMcpRoutes(
             .max(200)
             .optional()
             .describe("Looks up LoRAs by name, title or trigger."),
-          lora_names: z.array(z.string().min(1)).max(5).optional(),
+          // Clients validate against the published schema, so extra names are dropped here, not rejected.
+          lora_names: z
+            .array(z.string().min(1))
+            .transform((names) => names.slice(0, 5))
+            .optional(),
           full_guide: z
             .boolean()
             .optional()
@@ -871,10 +885,9 @@ export function registerMcpRoutes(
             .max(4000)
             .optional()
             .describe("The user's words, with anything they refer back to."),
+          // Models sometimes send the list as one string; clients reject what the published schema doesn't allow.
           prompts: z
-            .array(z.string().trim().min(1))
-            .min(1)
-            .max(maxJobsPerCall)
+            .union([promptList, promptListText.pipe(promptList)])
             .optional()
             .describe("Run as written, one image each."),
           apply_guide: z.boolean().optional(),
@@ -889,12 +902,9 @@ export function registerMcpRoutes(
             .describe('A model, family or id, e.g. "fast moss".'),
           profile_ids: z.array(z.string().min(1)).min(1).max(maxJobsPerCall).optional(),
           each_profile: z.boolean().optional(),
+          // Unknown keys (a misspelt "strength") are dropped rather than rejected.
           loras: z
-            .array(
-              z
-                .object({ name: z.string().min(1), strength: z.number().finite().optional() })
-                .strict(),
-            )
+            .array(z.object({ name: z.string().min(1), strength: z.number().finite().optional() }))
             .max(8)
             .optional()
             .describe("Up to 8; a profile may take fewer (Models)."),
