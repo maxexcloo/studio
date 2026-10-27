@@ -8,6 +8,7 @@ import { MediaTileActions } from "../gallery/MediaTileActions";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useMediaAction } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { WritingStream } from "../generation/PromptWriting";
 import { QueueJobAction, terminal } from "../generation/Queue";
 import { referenceLabel } from "../generation/references";
 import { GenerationCard } from "./GenerationCard";
@@ -284,6 +285,7 @@ export function SessionIteration({
         <Text size="xs" c="dimmed">
           {label}
         </Text>
+        {job.status === "writing" && <WritingStream progress={job.progress} />}
         {tiles.length === 0 ? null : single ? (
           <ResultTile item={tiles[0]} sessionId={job.sessionId} single hold={hold} open={open} />
         ) : (

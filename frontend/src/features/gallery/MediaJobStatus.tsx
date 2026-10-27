@@ -3,7 +3,14 @@ import { useState } from "react";
 import { Link } from "react-router";
 import type { MediaItem } from "../../types";
 import { useTryAgain } from "./useTryAgain";
-import { QueueJobAction, statusLabels, terminal, useQueue } from "../generation/Queue";
+import {
+  progressPercent,
+  QueueJobAction,
+  statusLabels,
+  terminal,
+  useQueue,
+} from "../generation/Queue";
+import { WritingStream } from "../generation/PromptWriting";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({
@@ -59,16 +66,15 @@ export function MediaJobStatus({
           {job?.reason || savedError}
         </Text>
       )}
-      {progress && active && (
+      {progress && active && job?.status !== "writing" && (
         <Progress
           aria-label="Generation Progress"
           w="100%"
-          value={
-            progress.max > 0 ? Math.max(0, Math.min(100, (progress.value / progress.max) * 100)) : 0
-          }
+          value={progressPercent(progress)}
           animated
         />
       )}
+      {active && job?.status === "writing" && <WritingStream progress={progress} />}
       {item.jobId && queue.error ? (
         <Alert color="red" title="Couldn’t Load Generation Status">
           <Stack gap="sm">

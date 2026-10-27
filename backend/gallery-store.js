@@ -956,6 +956,18 @@ export function storedChatRecord(value) {
   return id && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id) ? { conversationId: id } : null;
 }
 
+/**
+ * How the queue's writing stage wrote a result's prompt (prompt-stage.js): its kind, text model
+ * and thinking; null for anything else.
+ */
+export function storedWritingRecord(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (!["animate", "request", "dream"].includes(value.kind)) return null;
+  const model = typeof value.model === "string" ? value.model.trim().slice(0, 200) : "";
+  const thinking = typeof value.thinking === "string" ? value.thinking.trim().slice(0, 20_000) : "";
+  return { kind: value.kind, ...(model ? { model } : {}), ...(thinking ? { thinking } : {}) };
+}
+
 function storedAssistantRecord(value) {
   if (
     !value ||
@@ -1042,6 +1054,9 @@ export function recordsFromComfyHistory(history) {
           ? { assistant: storedAssistantRecord(saved.assistant) }
           : {}),
         ...(storedChatRecord(saved.chat) ? { chat: storedChatRecord(saved.chat) } : {}),
+        ...(storedWritingRecord(saved.writing)
+          ? { writing: storedWritingRecord(saved.writing) }
+          : {}),
         // A rebuilt Dream result goes back to Dream's pool rather than into the gallery.
         ...(saved.dream && typeof saved.dream === "object"
           ? {
@@ -1091,6 +1106,8 @@ export function makePendingItems(id, body) {
     settings: generationSettings(body),
     // Written by the prompt assistant: its preset, model and chosen LoRAs (assistant-routes.js assistantRecord).
     ...(body.assistant ? { assistant: body.assistant } : {}),
+    // The prompt the queue's writing stage wrote keeps its thinking, under the prompt in Details.
+    ...(storedWritingRecord(body.writing) ? { writing: storedWritingRecord(body.writing) } : {}),
     ...(body.chat ? { chat: body.chat } : {}),
     ...(body.dream ? { dream: body.dream } : {}),
     ...(typeof body.ownerId === "string" && body.ownerId ? { ownerId: body.ownerId } : {}),
@@ -1297,6 +1314,9 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
           : {}),
         settings: generationSettings(body),
         ...(body.assistant ? { assistant: body.assistant } : {}),
+        ...(storedWritingRecord(body.writing)
+          ? { writing: storedWritingRecord(body.writing) }
+          : {}),
         ...(body.chat ? { chat: body.chat } : {}),
         ...(body.dream ? { dream: body.dream } : {}),
         outputName: item.filename,
