@@ -3286,11 +3286,6 @@ test("with Video Cloud Fallback on, video runs on a granted cloud profile while 
   const fallback = await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.match(texts(fallback), /local video worker is offline, so this went to the cloud/i);
   assert.equal(data(fallback).profile.remote, true);
-  data(await call(client, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
-  finish(f);
-  const animation = await call(client, "Reuse", { job_id: "result 2", mode: "animate" });
-  assert.match(texts(animation), /went to the cloud/);
-  assert.equal(f.submitted.at(-1).profileId, "cloud-video-fast");
 });
 
 test("by default, video never goes to the cloud by itself while the local video worker is off", async (t) => {
@@ -3380,7 +3375,7 @@ test("by default, video never goes to the cloud by itself while the local video 
   );
 });
 
-test("Reuse animates on the cloud only when asked or named while the local video worker is off", async (t) => {
+test("Reuse animates on a granted Grok profile while the local video worker is off, and says so", async (t) => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), {
     defaults: { image: imageProfile.id, video: "cloud-video" },
@@ -3397,18 +3392,24 @@ test("Reuse animates on the cloud only when asked or named while the local video
   assert.equal(pending.isError, true);
   assert.match(texts(pending), /^This result is still /);
   finish(f);
-  const refused = await call(client, "Reuse", {
+  // Unlike Generate, Animate needs no Video Cloud Fallback: it goes to Grok and says so.
+  const moved = await call(client, "Reuse", {
     job_id: "result 1",
     mode: "animate",
     prompt: "The heron takes flight",
   });
-  assert.equal(refused.isError, true);
-  assert.match(texts(refused), /^Local video is unavailable right now/);
+  assert.match(
+    texts(moved),
+    /Local video isn't running, so this runs on Cloud Video · Fast · Cloud\. Tell the user\./,
+  );
+  // Grok takes only standard aspects: the 64×48 image becomes 4:3 at the profile's pixel count.
+  assert.deepEqual([f.submitted.at(-1).width, f.submitted.at(-1).height], [1108, 831]);
   const animation = await call(client, "Reuse", {
     job_id: "result 1",
     mode: "animate",
     request: "animate it with Grok",
   });
+  assert.doesNotMatch(texts(animation), /isn't running/, "asked for, Grok needs no note");
   // Without a tier, the fastest cloud profile that takes the image.
   assert.deepEqual(data(animation).profile, {
     id: "cloud-video-fast",
@@ -3520,7 +3521,9 @@ test("video stays local while the worker is up, and a plain request never reache
   assert.match(refused.content[0].text, /^Local video is unavailable right now/);
   data(await call(restricted, "Generate", { kind: "image", prompts: ["A heron"], count: 1 }));
   finish(f);
-  await failure(restricted, "Reuse", { job_id: "result 1", mode: "animate" });
+  const nowhere = await call(restricted, "Reuse", { job_id: "result 1", mode: "animate" });
+  assert.equal(nowhere.isError, true);
+  assert.match(texts(nowhere), /Local video isn't running and this account has no Grok access/);
   assert.deepEqual(
     f.submitted.map((body) => body.profileId),
     ["fl-fast", videoProfile.id, "fl-fast", imageProfile.id, "fl-fast", imageProfile.id],

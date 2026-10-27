@@ -32,7 +32,7 @@ export interface ChatOptions {
     turnId: string;
     draft: ChatDraft;
     revision?: ChatRevision;
-  }) => Promise<QueueJob>;
+  }) => Promise<{ job: QueueJob; note?: string }>;
   /** The owner's taste summary, or "" where there is none or the account may not share it. */
   taste?: (ownerId: string) => string;
   fetchImpl?: typeof fetch;
@@ -473,13 +473,19 @@ export class ChatService {
         }
         this.options.store.save(ownerId, assistant);
         try {
-          const job = await this.options.admit({
+          const { job, note } = await this.options.admit({
             ownerId,
             sessionId,
             turnId: assistant.id,
             draft: assistant.draft,
             revision,
           });
+          // Animate's own pick says where it went when the user chose no video model.
+          if (note) {
+            const text = `${assistant.content ? "\n\n" : ""}${note}`;
+            assistant.content += text;
+            emit({ event: "delta", data: { id: assistant.id, text } });
+          }
           assistant.jobId = job.id;
           assistant.draft = {
             operation: assistant.draft.operation,
