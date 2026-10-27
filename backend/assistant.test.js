@@ -179,6 +179,39 @@ test("a gateway that does not stream hands over the whole reply; a guide may ove
   assert.match(calls[0].body.messages[0].content, /Style: House concise rule\.$/);
 });
 
+test("chat streams reasoning_content and <think> blocks as thinking, apart from the reply", async () => {
+  const reasoning = (text) =>
+    `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: text } }] })}\n\n`;
+  const { fetchImpl } = fakeGateway(() =>
+    sse([reasoning("Consider "), reasoning("the light."), event("<think>Warm.</think>A cabin.")]),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl, log: quiet });
+  const thinking = [];
+  const shown = [];
+  const reply = await engine.chat({
+    model: "ai/text",
+    messages: [],
+    onThinking: (piece) => thinking.push(piece),
+    onDelta: (piece) => shown.push(piece),
+  });
+  assert.equal(thinking.join(""), "Consider the light.\n\nWarm.");
+  assert.equal(shown.join(""), "A cabin.");
+  assert.deepEqual([reply.text, reply.thinking], ["A cabin.", "Consider the light.\n\nWarm."]);
+  // Without streaming, both kinds come back with the reply.
+  const whole = createAssistant(gateway(), {
+    fetchImpl: fakeGateway(() =>
+      Response.json({
+        choices: [
+          { message: { reasoning_content: "Plan.", content: "<think>More.</think>Done." } },
+        ],
+      }),
+    ).fetchImpl,
+    log: quiet,
+  });
+  const answer = await whole.chat({ model: "ai/text", messages: [] });
+  assert.deepEqual([answer.text, answer.thinking], ["Done.", "Plan.\n\nMore."]);
+});
+
 test("failures fall back to the original prompt with the reason, and a timeout aborts the call", async () => {
   const failing = [
     () => new Response("busy", { status: 503 }),
