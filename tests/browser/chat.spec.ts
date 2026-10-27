@@ -288,6 +288,67 @@ test("Waiting jobs show their reason and cancellation is scoped to the recorded 
   await expect(page.getByText("Cancelled", { exact: true })).toBeVisible();
 });
 
+test("Running work opens with its status and written prompt, then follows it to the result", async ({
+  page,
+}, testInfo) => {
+  const state = await fixtures(page);
+  state.sessions.push({
+    id: "session-1",
+    title: "Running Study",
+    createdAt: stamp,
+    updatedAt: stamp,
+    inputs: {},
+  });
+  const job = {
+    id: "job-run",
+    jobId: "job-run",
+    sessionId: "session-1",
+    operation: "image",
+    status: "running",
+    reason: "",
+    input: { prompt: "A heron wading at dawn", kind: "image", profileId: "image:test" },
+    items: [] as Record<string, unknown>[],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+  state.jobs.push(job);
+  await page.goto("/chat/session-1");
+  await page.getByRole("button", { name: /^Open image: /, exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(
+    viewer.getByRole("status", { name: "Generation Status", exact: true }),
+  ).toBeVisible();
+  let details = viewer.getByRole("complementary", { name: "Generation Details", exact: true });
+  if (testInfo.project.use.isMobile) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    details = page.getByRole("dialog", { name: /heron/i });
+  }
+  // The title stands in from the prompt's words until one is written; the prompt follows it.
+  await expect(details.getByText("A heron wading at dawn", { exact: true }).last()).toBeVisible();
+  if (testInfo.project.use.isMobile) await page.keyboard.press("Escape");
+  Object.assign(job, {
+    status: "completed",
+    items: [
+      {
+        id: "/media/heron.png",
+        jobId: "job-run",
+        index: 0,
+        type: "image",
+        status: "done",
+        url: image,
+        thumbnailUrl: image,
+        prompt: "A heron wading at dawn",
+        width: 1024,
+        height: 1024,
+        createdAt: stamp,
+      },
+    ],
+  });
+  await expect(viewer.getByRole("status", { name: "Generation Status", exact: true })).toBeHidden();
+  await expect(viewer.getByRole("img", { name: "A heron wading at dawn" })).toBeVisible();
+});
+
 test("Chat layout respects workspace width and keeps a structural sessions sidebar", async ({
   page,
 }, testInfo) => {

@@ -22,6 +22,7 @@ import { MediaGrid } from "./MediaGrid";
 import { RunsView } from "./RunsView";
 import { MediaTileActions } from "./MediaTileActions";
 import { MediaViewer } from "./MediaViewer";
+import { currentMedia } from "./mediaSource";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { ComposerDock } from "../generation/ComposerDock";
@@ -320,7 +321,7 @@ export function GalleryPage() {
       {!selection.selecting && <ComposerDock />}
       {selected && (
         <MediaViewer
-          item={loaded.find((i) => i.id === selected.id) || selected}
+          item={currentMedia(loaded, selected)}
           items={
             versions
               ? [...versions.values()].map(

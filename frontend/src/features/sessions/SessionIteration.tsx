@@ -41,9 +41,15 @@ function settingChips(input: QueueJob["input"], profile?: Profile) {
   ].filter(Boolean);
 }
 
-/** Saved results, then placeholders for outputs still generating or a run that failed. */
-function iterationTiles(job: QueueJob): MediaItem[] {
-  const saved = jobResults(job).filter((item) => item.status === "done" || item.url);
+/**
+ * Saved results, then placeholders for outputs still generating or a run that failed. Each carries
+ * the run's prompt (once written) when its record has none, so running work opens with it.
+ */
+export function iterationTiles(job: QueueJob): MediaItem[] {
+  const prompt = String(job.input.prompt || "");
+  const saved = jobResults(job)
+    .filter((item) => item.status === "done" || item.url)
+    .map((item) => (item.prompt ? item : { ...item, prompt }));
   const expected = terminal.has(job.status)
     ? job.status === "completed" || saved.length
       ? 0
@@ -56,10 +62,11 @@ function iterationTiles(job: QueueJob): MediaItem[] {
     ...Array.from({ length: Math.max(0, expected) }, (_, index) => ({
       id: `${job.id}:pending:${index}`,
       jobId: job.id,
+      index: saved.length + index,
       type: job.input.kind === "video" ? ("video" as const) : ("image" as const),
       url: "",
       status,
-      prompt: String(job.input.prompt || ""),
+      prompt,
       width: Number(job.input.width) || 1024,
       height: Number(job.input.height) || 1024,
       createdAt: job.createdAt,
@@ -97,7 +104,7 @@ function ResultTile({
           ...(["error", "canceled"].includes(item.status) && { "--chat-media-height": "12rem" }),
         } as CSSProperties
       }
-      onOpen={() => item.status === "done" && open(item)}
+      onOpen={() => open(item)}
       onMenu={() => setMenu(true)}
       actions={
         item.status === "done" && (

@@ -9,13 +9,14 @@ import { usePhone } from "../../ui/usePhone";
 import type { MediaItem, QueueJob } from "../../types";
 import { useGeneration, initialInput } from "../generation/GenerationProvider";
 import { MediaViewer } from "../gallery/MediaViewer";
+import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
 import { ChatWorkspace, NewChatButton } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
-import { jobResults, sessionQuery } from "./queries";
-import { SessionIteration } from "./SessionIteration";
+import { sessionQuery } from "./queries";
+import { iterationTiles, SessionIteration } from "./SessionIteration";
 import classes from "./SessionsPage.module.css";
 
 export function ChatPage() {
@@ -164,6 +165,8 @@ function SessionPage() {
   const jobs = session.data.jobs;
   const messages = chat.data?.messages || [];
   const jobIndex = new Map(jobs.map((job, index) => [job.id, index]));
+  // Running and failed work opens too, showing its status and the prompt once written.
+  const tiles = jobs.flatMap(iterationTiles);
   // A reply that started a generation shows its card directly below its text.
   const replies = new Map(
     messages.flatMap((message) =>
@@ -262,8 +265,8 @@ function SessionPage() {
         <ChatDock />
         {selected && (
           <MediaViewer
-            item={selected}
-            items={jobs.flatMap(jobResults).filter((item) => item.status === "done")}
+            item={currentMedia(tiles, selected)}
+            items={tiles}
             navigate={setSelected}
             sessionId={id}
             close={() => setSelected(null)}

@@ -249,7 +249,10 @@ primary component reference and verify APIs against the installed version.
   bounded height. The desktop details sidebar is open by
   default and its toggle is remembered. Phones show the image full-bleed with
   an icon row and prompt bar; swipe left/right navigates, down closes and up
-  reveals details and further options.
+  reveals details and further options. Running, failed and cancelled work opens
+  too, in the gallery and in Chat: the stage shows its status (streaming the
+  prompt while it is written) and Details its prompt; once saved, the viewer
+  follows it to the result (`currentMedia`).
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows a
   result and its versions (runs made from it: Edit, Recreate, Regenerate and the

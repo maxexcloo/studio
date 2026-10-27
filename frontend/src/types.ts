@@ -87,6 +87,8 @@ export interface GenerationInput extends Record<string, unknown> {
 export interface MediaItem {
   id: string;
   jobId?: string;
+  /** Its place among the job's outputs; a saved result keeps its pending tile's place. */
+  index?: number;
   url: string;
   thumbnailUrl?: string;
   preview?: string;
