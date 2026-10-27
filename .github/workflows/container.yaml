@@ -60,6 +60,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     strategy:
+      # Every shard reports its failures; one failing shard doesn't hide the others'.
+      fail-fast: false
       matrix:
         shard: [1/4, 2/4, 3/4, 4/4]
     container:
