@@ -9,6 +9,7 @@ import { BrowserRouter } from "react-router";
 import { failure } from "./api";
 import { App } from "./App";
 import { AppearanceProvider } from "./ui/Appearance";
+import "./ui/popupClicks";
 
 declare module "@tanstack/react-query" {
   interface Register {

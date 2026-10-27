@@ -16,7 +16,9 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { CircleAlert, Image, RotateCw, Video, X } from "lucide-react";
+import { useState } from "react";
+import { CircleAlert, Eraser, Image, RotateCw, Video, X } from "lucide-react";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import classes from "./Queue.module.css";
@@ -36,7 +38,11 @@ export function useQueue() {
   return useQuery(queueQuery);
 }
 const queueActionKey = ["queue-action"];
-type QueueAction = { id: string; action: "cancel" | "retry" | "cancel-all" };
+/** An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`). */
+type QueueAction = {
+  id: string;
+  action: "cancel" | "clear" | "retry" | "cancel-all" | "clear-failed";
+};
 export function useQueueAction(jobId?: string) {
   const client = useQueryClient();
   const pending = useIsMutating({
@@ -80,7 +86,7 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
   const action = useQueueAction(job.id);
   if (terminal.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
-  const label = retry ? "Retry" : "Cancel";
+  const label = retry ? "Retry" : "Stop";
   const onClick = () => action.mutate({ id: job.id, action: retry ? "retry" : "cancel" });
   return compact ? (
     <Tooltip label={label}>
@@ -160,36 +166,89 @@ function QueueRow({ job }: { job: QueueJob }) {
           <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
         ))}
       <QueueJobAction job={job} compact />
+      {failed && <ClearJob job={job} />}
     </Group>
   );
 }
+function ClearJob({ job }: { job: QueueJob }) {
+  const action = useQueueAction(job.id);
+  return (
+    <Tooltip label="Clear">
+      <ActionIcon
+        aria-label="Clear"
+        variant="subtle"
+        color="gray"
+        loading={action.isPending}
+        disabled={action.isPending}
+        onClick={() => action.mutate({ id: job.id, action: "clear" })}
+      >
+        <Eraser size={16} />
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+const bulk = {
+  "cancel-all": {
+    label: "Stop All",
+    title: "Stop All Generations?",
+    text: "Studio stops every active generation. Results already saving are kept.",
+  },
+  "clear-failed": {
+    label: "Clear Failed",
+    title: "Clear Failed Generations?",
+    text: "Failed generations leave the queue. Their chat cards stay and can still be retried.",
+  },
+} as const;
 export function Queue() {
   const queue = useQueue();
   const action = useQueueAction();
+  const [confirming, setConfirming] = useState<keyof typeof bulk>();
   const jobs = (queue.data?.jobs ?? []).filter(
     (job) => !["completed", "cancelled"].includes(job.status),
   );
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
   if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
   if (!jobs.length) return <EmptyState fill>Empty Queue</EmptyState>;
+  const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
+    jobs.some((job) =>
+      key === "cancel-all" ? !terminal.has(job.status) : job.status === "failed",
+    ),
+  );
   return (
     <Stack gap={0} aria-label="Queue">
-      {jobs.some((job) => !terminal.has(job.status)) && (
-        <Button
-          variant="subtle"
-          color="gray"
-          size="compact-sm"
-          style={{ alignSelf: "end" }}
-          loading={action.isPending}
-          disabled={action.isPending}
-          onClick={() => action.mutate({ id: "", action: "cancel-all" })}
-        >
-          Cancel All
-        </Button>
-      )}
+      <Group gap="xs" justify="flex-end">
+        {available.map((key) => (
+          <Button
+            key={key}
+            variant="subtle"
+            color="gray"
+            size="compact-sm"
+            disabled={action.isPending}
+            onClick={() => setConfirming(key)}
+          >
+            {bulk[key].label}
+          </Button>
+        ))}
+      </Group>
       {jobs.map((job) => (
         <QueueRow key={job.id} job={job} />
       ))}
+      <ConfirmDialog
+        opened={confirming !== undefined}
+        title={confirming ? bulk[confirming].title : ""}
+        action={confirming ? bulk[confirming].label : ""}
+        pending={action.isPending}
+        onClose={() => setConfirming(undefined)}
+        onConfirm={() =>
+          action
+            .mutateAsync({ id: "", action: confirming! })
+            .then(() => setConfirming(undefined))
+            // The MutationCache notification reports a failure; the dialog stays open to retry.
+            .catch(() => undefined)
+        }
+      >
+        {confirming && bulk[confirming].text}
+      </ConfirmDialog>
     </Stack>
   );
 }

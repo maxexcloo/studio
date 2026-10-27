@@ -3,9 +3,11 @@ import {
   ActionIcon,
   alpha,
   AppShell,
+  Badge,
   Button,
   createTheme,
   Drawer,
+  FloatingIndicator,
   Input,
   Menu,
   Modal,
@@ -14,6 +16,7 @@ import {
   Paper,
   Popover,
   ScrollArea,
+  SegmentedControl,
   Select,
   Switch,
   Tooltip,
@@ -34,6 +37,19 @@ export const backgrounds = {
 export type Background = keyof typeof backgrounds;
 export const motionSpeeds = { off: 0, fast: 100, standard: 160, relaxed: 260 } as const;
 export type MotionSpeed = keyof typeof motionSpeeds;
+// Entrances ease out over the motion duration; exits are quicker and accelerate away. Neither
+// overshoots. CSS reads the same values as --studio-ease-enter/-exit and --studio-motion-exit.
+export const easing = {
+  enter: "cubic-bezier(0.2, 0, 0, 1)",
+  exit: "cubic-bezier(0.4, 0, 1, 1)",
+} as const;
+const exitDuration = (duration: number) => Math.round(duration * 0.7);
+// Popups and dialogs grow slightly from their trigger side instead of fading in place.
+const raise = {
+  in: { opacity: 1, transform: "scale(1)" },
+  out: { opacity: 0, transform: "scale(0.98)" },
+  transitionProperty: "transform, opacity",
+};
 export type Rounding = "square" | "soft" | "round";
 
 // Translucent blurred surface for custom chrome (viewer controls, docks) that is not a Mantine
@@ -69,7 +85,12 @@ export function studioTheme({
   transparency: boolean;
 }) {
   const radius = rounding === "square" ? 0 : rounding === "round" ? 0.75 : 0.5;
-  const transitionProps = { duration: motionDuration };
+  const transitionProps = {
+    duration: motionDuration,
+    exitDuration: exitDuration(motionDuration),
+    timingFunction: easing.enter,
+  };
+  const popupTransition = { ...transitionProps, transition: raise };
   return createTheme({
     primaryColor,
     // Match both schemes so contrast resolves against the displayed amber shade.
@@ -134,6 +155,8 @@ export function studioTheme({
     cursorType: "pointer",
     activeClassName: "",
     other: { background, motionDuration, transparency },
+    // One size and emphasis scale (UI-PATTERNS › Theme & Layout). Standard controls take these
+    // defaults; compact surfaces (rows, toolbars, chip rails, popover forms) step down one tier.
     components: {
       ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
       // One size for header and toolbar icons; the radius follows the Corners setting. Default
@@ -161,20 +184,43 @@ export function studioTheme({
           navbar: chrome,
         },
       }),
+      // Status pills are light; filled colour is for the one primary action in a view.
+      Badge: Badge.extend({ defaultProps: { variant: "light" } }),
       Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
       Drawer: Drawer.extend({
         defaultProps: { overlayProps: { blur: 6, backgroundOpacity: 0.4 }, transitionProps },
         styles: { header: overlayHeader, title: overlayTitle },
       }),
+      // Selection indicators slide between items with the shared motion.
+      FloatingIndicator: FloatingIndicator.extend({
+        defaultProps: { transitionDuration: motionDuration },
+        styles: { root: { transitionTimingFunction: easing.enter } },
+      }),
       Input: Input.extend({ defaultProps: { size: "md" } }),
-      Menu: Menu.extend({ defaultProps: { transitionProps }, styles: { dropdown } }),
+      Menu: Menu.extend({
+        defaultProps: { transitionProps: popupTransition },
+        styles: { dropdown },
+      }),
+      // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
+      // deep shadow. Full-screen dialogs (the viewer, phone panels) fill the viewport instead.
       Modal: Modal.extend({
         defaultProps: {
-          overlayProps: { blur: 6, backgroundOpacity: 0.4 },
-          transitionProps: { transition: "fade", ...transitionProps },
+          centered: true,
+          overlayProps: { blur: 8, backgroundOpacity: 0.55 },
+          transitionProps: popupTransition,
           radius: "lg",
+          size: "lg",
         },
-        styles: { header: overlayHeader, title: overlayTitle },
+        styles: (_theme, props) => ({
+          content: props.fullScreen
+            ? {}
+            : {
+                border: "1px solid var(--mantine-color-default-border)",
+                boxShadow: "var(--mantine-shadow-xl)",
+              },
+          header: overlayHeader,
+          title: overlayTitle,
+        }),
       }),
       NavLink: NavLink.extend({ styles: { root: { borderRadius: "var(--mantine-radius-md)" } } }),
       Notification: Notification.extend({ styles: { root: glass } }),
@@ -182,22 +228,38 @@ export function studioTheme({
       Paper: Paper.extend({
         styles: { root: { ...glass, "--paper-border-color": "var(--studio-glass-border)" } },
       }),
-      // Popover also renders Combobox dropdowns (Select, Autocomplete and similar).
+      // Popover also renders Menu and Combobox dropdowns (Select, Autocomplete and similar).
+      // Fixed positioning keeps a popup anchored to fixed chrome (header, composer) still while the
+      // page scrolls, instead of scrolling away and being pulled back a frame later.
       Popover: Popover.extend({
         defaultProps: {
+          floatingStrategy: "fixed",
           middlewares: { flip: true, shift: { padding: 12, crossAxis: true } },
-          transitionProps,
+          transitionProps: popupTransition,
         },
         styles: { dropdown },
       }),
+      // Every popover, menu and combobox dropdown renders PopoverDropdown; `data-popup` marks them
+      // for the shared outside-click rule (ui/popupClicks.ts) and their transform origin.
+      PopoverDropdown: Popover.Dropdown.extend({
+        defaultProps: { "data-popup": true } as Record<string, unknown>,
+      }),
       ScrollArea: ScrollArea.extend({
+        defaultProps: { type: "never" },
         styles: (_theme, props) => ({
           content: { minWidth: props.scrollbars === "y" ? 0 : undefined },
         }),
       }),
       // Vertical panels must shrink to their viewport instead of long labels’ min-content width.
       ScrollAreaAutosize: ScrollArea.Autosize.extend({
-        defaultProps: { scrollbars: "y", type: "hover" },
+        defaultProps: { scrollbars: "y", type: "never" },
+      }),
+      SegmentedControl: SegmentedControl.extend({
+        defaultProps: {
+          size: "sm",
+          transitionDuration: motionDuration,
+          transitionTimingFunction: easing.enter,
+        },
       }),
       Select: Select.extend({ defaultProps: { checkIconPosition: "right" } }),
       Switch: Switch.extend({
@@ -250,6 +312,9 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
       "--studio-workspace-width": "1600px",
       "--studio-composer-width": "780px",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
+      "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
+      "--studio-ease-enter": easing.enter,
+      "--studio-ease-exit": easing.exit,
       "--studio-glass-filter": transparency ? "blur(24px) saturate(1.5)" : "none",
       "--mantine-primary-color-filled-hover": alpha("var(--mantine-primary-color-filled)", 0.9),
     },

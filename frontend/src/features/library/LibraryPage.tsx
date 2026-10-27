@@ -105,9 +105,7 @@ export function LibraryPage() {
           ) : presets.error ? (
             <Alert color="red">{presets.error.message}</Alert>
           ) : !presets.data.presets.length ? (
-            <EmptyState title="No Inspiration">
-              Prompts and settings saved from imports appear here.
-            </EmptyState>
+            <EmptyState>No Inspiration</EmptyState>
           ) : (
             <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
               {presets.data.presets.map((preset) => (

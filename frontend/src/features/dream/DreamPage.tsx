@@ -48,45 +48,45 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
   const save = useDreamSettings();
   if (!dream.settings.enabled)
     return (
-      <Stack flex={1} justify="center" align="center" gap="md">
-        <EmptyState title="Dream Is Off">
-          Dream makes new images from your taste profile while Studio is idle, then shows them here
-          as a deck: swipe right to keep one in your gallery, left to discard it, up for variations.
-          {onTune &&
-            " Meanwhile, tune your taste with your gallery: judging older images teaches Dream what you like without using the GPU or changing the gallery."}
-        </EmptyState>
-        <Group gap="sm">
-          <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
-            Turn On
-          </Button>
-          {onTune && (
-            <Button variant="default" onClick={onTune}>
-              Tune Your Taste
-            </Button>
-          )}
-        </Group>
-        {save.error && (
-          <Alert color="red" title="Couldn’t Turn On Dream">
-            {save.error.message}
-          </Alert>
-        )}
-      </Stack>
+      <EmptyState
+        fill
+        action={
+          <Stack align="center" gap="sm">
+            <Group gap="sm">
+              <Button loading={save.isPending} onClick={() => save.mutate({ enabled: true })}>
+                Turn On
+              </Button>
+              {onTune && (
+                <Button variant="default" onClick={onTune}>
+                  Tune Your Taste
+                </Button>
+              )}
+            </Group>
+            {save.error && (
+              <Alert color="red" title="Couldn’t Turn On Dream">
+                {save.error.message}
+              </Alert>
+            )}
+          </Stack>
+        }
+      >
+        Dream Is Off
+      </EmptyState>
     );
   if (dream.status === "paused")
     return (
-      <Stack flex={1} justify="center" align="center" gap="md">
-        <EmptyState title="Dream Is Paused">Resume to let Dream make new results.</EmptyState>
-        <Button loading={save.isPending} onClick={() => save.mutate({ paused: false })}>
-          Resume
-        </Button>
-      </Stack>
+      <EmptyState
+        fill
+        action={
+          <Button loading={save.isPending} onClick={() => save.mutate({ paused: false })}>
+            Resume
+          </Button>
+        }
+      >
+        Dream Is Paused
+      </EmptyState>
     );
-  const { label } = statusLine(dream);
-  return (
-    <EmptyState fill title="Nothing New Yet">
-      {dream.reason || `${label}. New results appear here as Dream makes them.`}
-    </EmptyState>
-  );
+  return <EmptyState fill>Nothing New Yet</EmptyState>;
 }
 
 /** Dream: the deck of unseen results with its status, pause and settings, or the discards. */

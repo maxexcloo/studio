@@ -312,19 +312,18 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
     expect(field).toBeGreaterThan(text - 1);
     expect(field - text).toBeLessThan(8);
   }
-  // Without a sidebar, the phone's empty state says where the Chats are and offers New Chat.
-  const hint = page.getByText("Your Chats are behind the status button at the top left.");
+  // Without a sidebar, the phone's empty state offers New Chat.
+  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   if (testInfo.project.use.isMobile) {
-    await expect(hint).toBeVisible();
     await page.getByRole("link", { name: "New Chat", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeFocused();
-  } else await expect(hint).toHaveCount(0);
+  }
   const nav = page.getByRole("navigation", { name: "Creative Modes" });
   expect(
     await nav
       .getByRole("link")
       .evaluateAll((links) => links.map((link) => link.getAttribute("aria-label"))),
-  ).toEqual(["Chat", "Images", "Videos", "Dream"]);
+  ).toEqual(["Chat", "Dream", "Images", "Videos"]);
   await openTheme(page);
   await page.getByText("Fixed Width", { exact: true }).click();
   await page.keyboard.press("Escape");

@@ -207,7 +207,7 @@ function DeleteChatDialog({ session, onClose }: { session: Session; onClose: () 
                 setSelected(all ? new Set() : new Set(results.map(({ item }) => item.id)))
               }
             />
-            <ScrollArea.Autosize mah={280} offsetScrollbars>
+            <ScrollArea.Autosize mah={280}>
               <Stack gap="xs" role="group" aria-label="Results to Delete">
                 {results.map(({ item, iteration }) => {
                   const thumbnail = mediaSource(item).thumbnailUrl || item.preview;
