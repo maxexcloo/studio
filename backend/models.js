@@ -150,13 +150,24 @@ export function buildProfile({
   mediaInputs = [],
   aspectPolicy = "manual",
   maxLoras = 8,
-  imageModes = {},
+  imageModes: modes = {},
   native = {},
   recipe,
   prompting,
   nsfw = false,
   aiDrafted = false,
 }) {
+  // A mode overrides only these: a mode's own id, media slots or graph must never replace the profile's.
+  const imageModes = Object.fromEntries(
+    Object.entries(modes).map(([name, mode]) => [
+      name,
+      {
+        capabilities: mode.capabilities,
+        defaults: mode.defaults,
+        ...(mode.prompting ? { prompting: mode.prompting } : {}),
+      },
+    ]),
+  );
   return {
     id,
     kind,
@@ -483,16 +494,7 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
           duration: durationRange,
           ...samplerRange,
         },
-        imageModes: Object.fromEntries(
-          Object.entries(workflow.imageModes || {}).map(([name, mode]) => [
-            name,
-            {
-              capabilities: mode.capabilities,
-              defaults: mode.defaults,
-              ...(mode.prompting ? { prompting: mode.prompting } : {}),
-            },
-          ]),
-        ),
+        imageModes: workflow.imageModes,
         capabilities: workflow.capabilities,
         mediaInputs: workflow.mediaInputs || [],
         aspectPolicy: workflow.aspectPolicy,
