@@ -219,13 +219,14 @@ export function studioTheme({
         styles: { dropdown },
       }),
       ScrollArea: ScrollArea.extend({
+        defaultProps: { type: "never" },
         styles: (_theme, props) => ({
           content: { minWidth: props.scrollbars === "y" ? 0 : undefined },
         }),
       }),
       // Vertical panels must shrink to their viewport instead of long labels’ min-content width.
       ScrollAreaAutosize: ScrollArea.Autosize.extend({
-        defaultProps: { scrollbars: "y", type: "hover" },
+        defaultProps: { scrollbars: "y", type: "never" },
       }),
       SegmentedControl: SegmentedControl.extend({
         defaultProps: {

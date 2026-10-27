@@ -60,7 +60,7 @@ export function DiscardedDreams() {
       </EmptyState>
     );
   return (
-    <ScrollArea flex={1} mih={0} type="auto">
+    <ScrollArea flex={1} mih={0}>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5, lg: 6 }} spacing="sm" pb="md">
         {items.map((item) => (
           <Card key={item.id} withBorder padding={0} radius="md">
