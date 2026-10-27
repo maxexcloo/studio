@@ -4,7 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, RotateCw, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
-import { queueQuery, statusLabels, terminal, useQueueAction } from "../generation/Queue";
+import {
+  progressPercent,
+  queueQuery,
+  statusLabels,
+  terminal,
+  useQueueAction,
+} from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
@@ -40,10 +46,7 @@ function TileStatus({
   const active = !finished(item);
   const failed = item.status === "error";
   const progress = job?.progress;
-  const percent =
-    active && progress && progress.max > 0
-      ? Math.max(0, Math.min(100, Math.round((progress.value / progress.max) * 100)))
-      : undefined;
+  const percent = active && progress?.max ? Math.round(progressPercent(progress)) : undefined;
   const label = active
     ? job?.status === "running" && progress?.phase
       ? titleCase(progress.phase)

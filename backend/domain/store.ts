@@ -8,6 +8,7 @@ import type {
   QueueJob,
   StudioSession,
 } from "../../shared/queue.ts";
+import { awaitsWriting } from "../../shared/queue.ts";
 import type { DreamOrigin } from "./dream.ts";
 
 /** Queue tiers on one resource, lower first; Dream's and finishing's background work run below MCP. */
@@ -206,7 +207,8 @@ export class RewriteStore {
       priority: origin.priority ?? queuePriority.manual,
       queueSet: origin.queueSet,
       ...(origin.dream ? { dream: origin.dream } : {}),
-      status: "queued",
+      // A prompt the assistant writes is the item's first stage (queue.ts); it then queues.
+      status: awaitsWriting(input) ? "writing" : "queued",
       reason: "",
       input: { ...input, clientJobId: id },
       items: [],

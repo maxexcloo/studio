@@ -608,6 +608,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
             settings: generationSettings(body),
             ...(body.ownerId ? { ownerId: body.ownerId } : {}),
             ...(body.assistant ? { assistant: body.assistant } : {}),
+            ...(body.writing ? { writing: body.writing } : {}),
             ...(body.chat ? { chat: body.chat } : {}),
             ...(body.dream ? { dream: body.dream } : {}),
           },

@@ -184,6 +184,9 @@ primary component reference and verify APIs against the installed version.
   the user explicitly permits fallback. Animate is the exception: without a
   chosen profile it takes the shared backend pick (local video while it runs,
   otherwise granted Grok) and shows that model, and any note, before queuing. Show truthful queue states and reasons.
+  A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
+  in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
+  the thinking collapsed under the prompt.
 - The status panel shows compact active rows with a muted spinner and Cancel;
   completed/cancelled work leaves the list, failed work retains Retry. Cancel
   All requests cancellation of owned active jobs; accepted work may remain

@@ -656,19 +656,13 @@ export function registerMcpRoutes(
         throw error;
       }
     };
-    /** Prompts for a target profile: written from the request and its changes, or the fallback when writing is off or fails. */
+    /**
+     * A preview's prompts for a target profile, written from the request, or the fallback when writing
+     * is off or fails. Queued work writes its prompts in the queue instead (prompt-stage.js).
+     */
     const write = async (
       profile,
-      {
-        request,
-        changes = [],
-        count,
-        references = 0,
-        role = "",
-        suggest = false,
-        fallback,
-        signal,
-      },
+      { request, count, references = 0, role = "", suggest = false, fallback, signal },
     ) => {
       if (!writer) return { prompts: fallback, source: "request" };
       const guided =
@@ -679,7 +673,6 @@ export function registerMcpRoutes(
         profile,
         guide: prompting(guided, true),
         request,
-        changes,
         count,
         references,
         role,
@@ -1073,7 +1066,11 @@ export function registerMcpRoutes(
                   const suggest = Boolean(preview && index === 0);
                   let source = "exact";
                   let suggestions = [];
-                  if (!args.prompts) {
+                  if (!preview && writer && (!args.prompts || apply_guide)) {
+                    // Each job writes its own prompt as its queue item's first stage (prompt-stage.js).
+                    Object.assign(plan, { prompts: args.prompts || [request], write: { role } });
+                    source = "studio";
+                  } else if (!args.prompts) {
                     const written = await write(profile, {
                       request,
                       count,
@@ -1438,25 +1435,25 @@ export function registerMcpRoutes(
           if (prompt) usePrompts(plan.args, { prompts: [prompt], source: "exact" }, count);
           else if (request || (moved && writer)) {
             const references = plan.args.reference_asset_ids?.length || 0;
-            const fallback = [request ? `${item.prompt}, ${request}` : item.prompt];
-            source = usePrompts(
-              plan.args,
-              await write(plan.profile, {
-                request: base,
-                changes,
+            const role =
+              kind !== own
+                ? "first-frame"
+                : references
+                  ? item.settings?.referenceRole || "reference"
+                  : "";
+            if (writer) {
+              // Each job writes its own prompt as its queue item's first stage (prompt-stage.js).
+              Object.assign(plan.args, { prompts: [base], write: { changes, role }, count });
+              source = "studio";
+            } else
+              source = usePrompts(
+                plan.args,
+                {
+                  prompts: [request ? `${item.prompt}, ${request}` : item.prompt],
+                  source: "request",
+                },
                 count,
-                references,
-                role:
-                  kind !== own
-                    ? "first-frame"
-                    : references
-                      ? item.settings?.referenceRole || "reference"
-                      : "",
-                fallback,
-                signal,
-              }),
-              count,
-            );
+              );
           }
           // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
           const carried =

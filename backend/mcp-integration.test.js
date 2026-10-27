@@ -13,6 +13,8 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./mcp-media.js";
 import { adminToolNames } from "./mcp-admin.js";
+import { createPromptStage } from "./prompt-stage.js";
+import { createPromptWriter } from "./prompt-writer.js";
 import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
 import { RuntimeController } from "./runtime/controller.ts";
 import { KubernetesEngine } from "./runtime/kubernetes.ts";
@@ -171,17 +173,46 @@ async function fixture(
   });
   app.get("/api/access/status", (_req, res) => res.json({ signedIn: true }));
   app.get("/api/loras/info", (_req, res) => res.json({ ok: true, loras: loraInfo }));
-  app.post("/api/generate", (req, res) => {
+  const writerFetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    writerRequests.push({ url: String(url), authorization: init.headers.Authorization, body });
+    return writerReply(body, writerRequests.length);
+  };
+  // Like Studio's queue: a prompt Studio writes is the job's first stage (prompt-stage.js).
+  const stage = (input) =>
+    createPromptStage({
+      engine: {},
+      writer: createPromptWriter(environment, { fetchImpl: writerFetch, log: {} }),
+      account: () => undefined,
+      profiles: async () => profiles,
+      guide: (profile) => profile.prompting ?? null,
+      loraInfos: async () => loraInfo,
+      taste: (owner) => taste?.(owner) ?? "",
+    })(
+      { ownerId: "", input },
+      { signal: new AbortController().signal, onThinking() {}, onDelta() {} },
+    );
+  app.post("/api/generate", async (req, res) => {
     if (submitted.length >= failAfter) return res.status(failResponse[0]).json(failResponse[1]);
     if (req.body.prompt === "refuse with reason")
       return res
         .status(400)
         .json({ ok: false, error: "Fixture LoRA supports strength 0.2 to 1.2." });
+    let failed = "";
+    if (req.body.writing)
+      try {
+        const written = await stage(req.body);
+        req.body.prompt = written.prompt;
+        req.body.writing = { ...req.body.writing, ...written };
+      } catch (error) {
+        failed = `Writing the prompt failed: ${error.message}`;
+      }
     submitted.push(req.body);
     const id = req.body.clientJobId || `fixture-job-${submitted.length}`;
     jobs.set(id, {
       id,
-      status: completeOnSubmit ? "done" : "running",
+      status: failed ? "error" : completeOnSubmit ? "done" : "running",
+      ...(failed ? { error: failed } : {}),
       kind: req.body.kind,
       outputs: completeOnSubmit ? [{ url: "/comfy/view?filename=immediate.png" }] : [],
       settings: req.body,
@@ -325,11 +356,7 @@ async function fixture(
         .map((job) => ({ reason: job.error, at: Date.parse(job.updatedAt) })),
     resolveSignedResult,
     fetchImpl: async (url, init) => {
-      if (String(url).startsWith("http://fixture-writer.invalid")) {
-        const body = JSON.parse(init.body);
-        writerRequests.push({ url: String(url), authorization: init.headers.Authorization, body });
-        return writerReply(body, writerRequests.length);
-      }
+      if (String(url).startsWith("http://fixture-writer.invalid")) return writerFetch(url, init);
       const response = await fetch(url, init);
       if (dropAck && new URL(url).pathname === "/api/generate") {
         dropAck = false;
@@ -4072,10 +4099,16 @@ const writes = (body) => {
       choices: [{ message: { content: JSON.stringify({ id, reason: "it suits the scene" }) } }],
     });
   }
-  const count = Number(/exactly (\d+)/.exec(body.messages[0].content)[1]);
   const user = body.messages[1].content.replace(/\n/g, " | ");
   const prompt = (index) =>
     `${/long/.test(user) ? "very ".repeat(80) : ""}Written ${index + 1}: ${user}`;
+  // A queued job writes one prompt, as plain text, numbered within its set.
+  const exactly = /exactly (\d+)/.exec(body.messages[0].content);
+  if (!exactly) {
+    const index = Number(/This is \w+ (\d+) of/.exec(body.messages[0].content)?.[1] || 1) - 1;
+    return Response.json({ choices: [{ message: { content: prompt(index) } }] });
+  }
+  const count = Number(exactly[1]);
   const suggestions = /Also add "suggestions"/.test(body.messages[0].content)
     ? { suggestions: ["Add a warm rim light.", "Try a low camera angle."] }
     : {};
@@ -4090,7 +4123,7 @@ const writes = (body) => {
   });
 };
 
-test("Studio writes every prompt of a Generate call in one writer call from the request and the full guide", async (t) => {
+test("each job of a Generate call writes its prompt in the queue from the request and the full guide", async (t) => {
   const f = await fixture(t, { environment: writerEnvironment, writerReply: writes });
   await f.profiles(guidedCatalogue());
   const client = await f.client();
@@ -4107,15 +4140,24 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
   assert.equal(result.prompt_source, "studio");
   assert.equal(guideOf(reply), undefined, "no guide reaches the chat");
   assert.equal(reply.content.length, 1);
-  assert.equal(written(f).length, 1, "one call writes every prompt");
-  const [{ url, authorization, body }] = written(f);
+  // The chat waits for nothing: every job is queued with its request and writes its own prompt.
+  assert.deepEqual(
+    f.submitted.map(({ writing }) => [writing.kind, writing.request, writing.index, writing.of]),
+    [
+      ["request", "a cosy cabin in snow", 0, 2],
+      ["request", "a cosy cabin in snow", 1, 2],
+    ],
+  );
+  assert.equal(written(f).length, 2, "one writer call per job");
+  const [{ url, authorization, body }, second] = written(f);
   assert.equal(url, "http://fixture-writer.invalid:4000/v1/chat/completions");
   assert.equal(authorization, "Bearer fixture-writer-key");
   assert.equal(body.model, "ai/text-quick");
   assert.match(
     body.messages[0].content,
-    /Fixture Image[\s\S]*exactly 2 complete[\s\S]*Lead with the light\.[\s\S]*Name the light source\./,
+    /Fixture Image[\s\S]*one complete, standalone prompt only[\s\S]*image 1 of 2[\s\S]*Lead with the light\.[\s\S]*Name the light source\./,
   );
+  assert.match(second.body.messages[0].content, /image 2 of 2/);
   assert.doesNotMatch(
     body.messages[0].content,
     /guide\.example\.test|2026-10-01/,
@@ -4129,25 +4171,26 @@ test("Studio writes every prompt of a Generate call in one writer call from the 
       ["Written 2: Request: a cosy cabin in snow", imageProfile.id],
     ],
   );
-  assert.match(
-    texts(reply),
-    /\n\nResult 1 prompt: Written 1: Request: a cosy cabin in snow\nResult 2 prompt: Written 2: Request: a cosy cabin in snow$/,
-  );
-  // The chat shows at most 200 characters of a long prompt; its result page shows all of it.
+  assert.doesNotMatch(texts(reply), /prompt:/i, "a prompt still to be written is not shown");
+  // A written prompt's result page shows all of it.
   const long = await call(client, "Generate", { kind: "image", request: "a long cabin" });
-  const line = /Prompt: (.+)$/.exec(texts(long))[1];
-  assert.equal(line.length, 200);
-  assert.ok(line.endsWith("…"));
+  finish(f);
   const page = await (await fetch(localLink(f, data(long).jobs[0].link))).text();
   assert.ok(
     page.includes(`${"very ".repeat(80)}Written 1: Request: a long cabin`),
     "the full prompt on its page",
   );
-  // prompts pass through unwritten.
-  const prompts = data(await call(client, "Generate", { kind: "image", prompts: ["A nest"] }));
-  assert.equal(prompts.prompt_source, "exact");
-  assert.equal(f.submitted.at(-1).prompt, "A nest");
-  assert.equal(written(f).length, 2);
+  // prompts pass through unwritten, and the chat shows at most 200 characters of a long one.
+  const prompts = await call(client, "Generate", {
+    kind: "image",
+    prompts: [`A ${"very ".repeat(80)}long nest`],
+  });
+  assert.equal(data(prompts).prompt_source, "exact");
+  assert.equal(f.submitted.at(-1).prompt, `A ${"very ".repeat(80)}long nest`);
+  const line = /Prompt: (.+)$/.exec(texts(prompts))[1];
+  assert.equal(line.length, 200);
+  assert.ok(line.endsWith("…"));
+  assert.equal(written(f).length, 3);
   await failure(client, "Generate", { kind: "image" });
 });
 
@@ -4181,6 +4224,8 @@ test("without a named model, Studio picks a suitable one from the request and sa
     /^Queued on Other Image\. Chose Other Image: it renders the sign text cleanly\. /,
   );
   const [pick] = f.writerRequests;
+  // A reasoning model thinks before it answers, so the pick leaves it room.
+  assert.ok(pick.body.max_tokens >= 1500);
   assert.match(pick.body.messages[0].content, /^- fixture-image: Fixture Image \(default\)\./m);
   assert.match(pick.body.messages[0].content, /^- fixture-other: Other Image\./m);
   assert.equal(pick.body.messages[1].content, 'Request: a neon sign that says "OPEN"');
@@ -4225,7 +4270,9 @@ test("six individual photos are one Generate call: six jobs, each with its own w
     }),
   );
   assert.equal(result.jobs.length, 6);
-  assert.equal(written(f).length, 1, "one writer call for all six");
+  // Each job writes its own prompt in the queue, knowing which of the six it is.
+  assert.equal(written(f).length, 6);
+  assert.match(written(f)[5].body.messages[0].content, /image 6 of 6/);
   assert.equal(new Set(f.submitted.map((item) => item.prompt)).size, 6, "no copies of one prompt");
   assert.deepEqual(
     f.submitted.map((item) => item.count),
@@ -4306,7 +4353,7 @@ test("tweaks and model changes re-expand the original request for the target pro
   assert.equal(f.submitted.at(-1).prompt, "A red cabin");
 });
 
-test("prompt writing falls back to the request when the writer fails, and stays off without settings", async (t) => {
+test("a prompt the writer can't write fails its job with the reason, and writing stays off without settings", async (t) => {
   let answer = () => new Response("busy", { status: 503 });
   const f = await fixture(t, { environment: writerEnvironment, writerReply: () => answer() });
   await f.profiles(guidedCatalogue());
@@ -4314,28 +4361,18 @@ test("prompt writing falls back to the request when the writer fails, and stays 
   const unavailable = data(
     await call(client, "Generate", { kind: "image", request: "a cosy cabin in snow", count: 2 }),
   );
-  assert.equal(unavailable.prompt_source, "request");
-  assert.deepEqual(
-    f.submitted.map((item) => item.prompt),
-    ["a cosy cabin in snow", "a cosy cabin in snow"],
-    "each image keeps its own seed",
-  );
+  assert.equal(unavailable.prompt_source, "studio");
+  const reason = async (job) => data(await call(client, "Status", { job_id: job.job_id })).error;
+  assert.equal(await reason(unavailable.jobs[0]), "Writing the prompt failed: HTTP 503");
   answer = () => Response.json({ choices: [{ message: { content: "" } }] });
-  assert.equal(
-    data(await call(client, "Generate", { kind: "image", request: "an egg" })).prompt_source,
-    "request",
-  );
+  const empty = data(await call(client, "Generate", { kind: "image", request: "an egg" }));
+  assert.equal(await reason(empty.jobs[0]), "Writing the prompt failed: unusable reply");
   answer = () => {
     throw new TypeError("fetch failed");
   };
-  assert.equal(
-    data(await call(client, "Generate", { kind: "image", request: "a nest" })).prompt_source,
-    "request",
-  );
-  assert.equal(f.submitted.at(-1).prompt, "a nest");
-  finish(f);
-  data(await call(client, "Reuse", { job_id: "result 1", request: "warmer" }));
-  assert.equal(f.submitted.at(-1).prompt, "a cosy cabin in snow, warmer");
+  const unreachable = data(await call(client, "Generate", { kind: "image", request: "a nest" }));
+  assert.equal(await reason(unreachable.jobs[0]), "Writing the prompt failed: unreachable");
+  assert.equal(f.submitted.at(-1).prompt, "");
 
   // Without settings the request is the prompt, the chat writes it, and the guide still goes to the chat once.
   const off = await fixture(t);
@@ -5295,7 +5332,8 @@ test("apply_guide rewrites supplied prompts for the model's guide, keeping them 
     apply_guide: true,
     count: 2,
   });
-  assert.equal(f.writerRequests.length, 1);
+  // Each of the two jobs rewrites it in the queue.
+  assert.equal(f.writerRequests.length, 2);
   assert.match(f.writerRequests[0].body.messages[0].content, /Tags, comma separated\./);
   assert.deepEqual(
     f.submitted.map((body) => body.prompt),

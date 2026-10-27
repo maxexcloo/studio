@@ -1,0 +1,11 @@
+/* Reversed, so the newest thinking stays in view while the user remains at the end. */
+.thinking {
+  display: flex;
+  flex-direction: column-reverse;
+  max-height: 6rem;
+  overflow-y: auto;
+}
+
+.text {
+  white-space: pre-wrap;
+}
