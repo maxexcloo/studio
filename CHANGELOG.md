@@ -11,7 +11,7 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Media sessions, conversational iteration and durable jobs
+> Studio 1.0: the rebuilt app (chip composer, viewer hub, Chat, Dream and a learned taste profile), Studio-managed GPU workloads, Grok animation and Studio names throughout
 
 ### Added
 
