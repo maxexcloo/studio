@@ -1,8 +1,12 @@
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import { profileBackendLabels } from "../../../../shared/profiles";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */
 export const isProfile = (profile: Profile, id: unknown) =>
   profile.id === id || (typeof id === "string" && Boolean(profile.aliases?.includes(id)));
+
+/** A combined profile's backend by name ("Radiance"). */
+export const backendLabel = (id: string) => profileBackendLabels[id] || id;
 
 export function referenceDetails(
   references: ReferenceAsset[],

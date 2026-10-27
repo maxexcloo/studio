@@ -53,6 +53,27 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
   writeJsonFile(preferencesPath, preferences);
 }
 
+/** Moves favourites, last used and thumbnails to the id `canonical` gives each (merged profiles), saved at once. */
+export function repointWorkflowPreferences(canonical) {
+  const preferences = loadWorkflowPreferences();
+  saveWorkflowPreferences(
+    {
+      favorites: [...new Set(preferences.favorites.map(canonical))],
+      lastUsed: Object.entries(preferences.lastUsed).reduce((next, [id, when]) => {
+        const kept = canonical(id);
+        if (!next[kept] || String(when) > String(next[kept])) next[kept] = when;
+        return next;
+      }, {}),
+      thumbnails: Object.entries(preferences.thumbnails).reduce((next, [id, url]) => {
+        const kept = canonical(id);
+        if (!next[kept] || kept === id) next[kept] = url;
+        return next;
+      }, {}),
+    },
+    { immediate: true },
+  );
+}
+
 function updateWorkflowPreferencePatch(patch = {}) {
   const current = loadWorkflowPreferences();
   const next = {

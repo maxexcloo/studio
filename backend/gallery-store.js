@@ -1155,6 +1155,8 @@ export function generationSettings(body) {
     comfyBackend: body.comfyBackend || defaultWorkerId(),
     workflow: body.workflow || "",
     profileId: body.profileId || "",
+    // The backend a combined profile ran on, so Exact Repeat and Recreate run it there again.
+    ...(body.profileBackend ? { profileBackend: String(body.profileBackend) } : {}),
     // The profile's name when it ran, for Details once the profile is renamed or removed.
     ...(body.profileName ? { profileName: String(body.profileName).slice(0, 200) } : {}),
     ...(body.variationCount ? { variationCount: Number(body.variationCount) } : {}),

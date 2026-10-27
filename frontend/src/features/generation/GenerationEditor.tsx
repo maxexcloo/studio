@@ -52,12 +52,18 @@ export function useSubmitState({
       !referenceDetails(references, input, profile).some((asset) => asset.slot === slot.id) &&
       !input.referenceAssets.some((asset) => asset.slot === slot.id),
   );
+  // A combined profile is ready when the backend this run uses is, whatever its current one is.
+  const backend = profile?.backendOptions?.find(
+    (option) => option.id === (input.profileBackend || profile.backend),
+  );
   const reason =
     blockedReason ||
     (!profile
       ? "Choose an available profile first."
-      : profile.ready === false
-        ? "This model is not ready to run."
+      : (backend ? backend.ready === false : profile.ready === false)
+        ? backend?.reason
+          ? `${backend.label} isn’t ready: ${backend.reason}`
+          : "This model is not ready to run."
         : !input.prompt.trim()
           ? "Describe what you want to create."
           : requiredReference

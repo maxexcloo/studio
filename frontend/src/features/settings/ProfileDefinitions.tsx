@@ -14,7 +14,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Ellipsis, FileDown, Merge, Plus, Upload } from "lucide-react";
+import { Combine, Ellipsis, FileDown, Merge, Plus, Upload } from "lucide-react";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
@@ -23,6 +23,8 @@ import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
+import { CombineBackends } from "./CombineBackends";
+import { backendLabel } from "../generation/payload";
 
 interface DefinitionRow {
   id?: string;
@@ -32,6 +34,8 @@ interface DefinitionRow {
   kind?: string;
   version: number;
   aiDrafted?: boolean;
+  /** A combined profile's current backend. */
+  backend?: string;
 }
 const nouns = { profile: "Profile", guide: "Guide" } as const;
 
@@ -82,6 +86,7 @@ export function ProfileDefinitions() {
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState<LoadedDefinition | null>(null);
   const [merging, setMerging] = useState(false);
+  const [combining, setCombining] = useState(false);
   const noun = nouns[kind];
   const list = useQuery({
     queryKey: ["definition-list", kind],
@@ -224,6 +229,18 @@ export function ProfileDefinitions() {
                 </ActionIcon>
               </Tooltip>
             )}
+            {kind === "profile" && (
+              <Tooltip label="Combine Backends">
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  aria-label="Combine Backends"
+                  onClick={() => setCombining(true)}
+                >
+                  <Combine size={18} />
+                </ActionIcon>
+              </Tooltip>
+            )}
             <Tooltip label="Export Definitions">
               <ActionIcon
                 component="a"
@@ -272,9 +289,16 @@ export function ProfileDefinitions() {
               return (
                 <Table.Tr key={id}>
                   <Table.Td>
-                    <Text size="sm" fw={500} lineClamp={1}>
-                      {name}
-                    </Text>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text size="sm" fw={500} lineClamp={1}>
+                        {name}
+                      </Text>
+                      {entry.backend && (
+                        <Badge size="xs" variant="default">
+                          {backendLabel(entry.backend)}
+                        </Badge>
+                      )}
+                    </Group>
                     <Text size="xs" c="dimmed" lineClamp={1} style={{ overflowWrap: "anywhere" }}>
                       {id}
                     </Text>
@@ -324,6 +348,7 @@ export function ProfileDefinitions() {
         </Table>
       )}
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
+      <CombineBackends opened={combining} onClose={() => setCombining(false)} />
       {selected !== null && (
         <DefinitionEditor
           kind={kind}
