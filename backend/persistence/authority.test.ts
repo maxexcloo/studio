@@ -22,7 +22,6 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
         ...process.env,
         STUDIO_DATA_DIR: dataDir,
         STUDIO_ENV_FILE: "/dev/null",
-        STUDIO_CONFIG_DIR: "",
         STUDIO_MULTI_USER: "",
         STUDIO_WORKERS: JSON.stringify([
           {

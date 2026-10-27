@@ -23,7 +23,6 @@ interface AdmissionOptions {
   resourceFor(input: GenerationInput): Promise<string>;
   pendingItems(id: string, input: GenerationInput): QueueMedia[];
   revision(): number;
-  jobLimit: number;
   /** Hears each newly queued job, for the taste profile; must not throw. */
   admitted?(job: OwnedJob): void;
 }
@@ -86,16 +85,10 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             scope?.parentJobId,
             await options.resourceFor(input),
             clientId || undefined,
-            account?.role === "user" ? options.jobLimit : undefined,
             origin,
           );
         } catch (error) {
-          const failure = error as Error & { code?: string; status?: number; reason?: string };
-          if (failure.status === 429)
-            return {
-              status: 429,
-              payload: { ok: false, reason: failure.reason, error: failure.message },
-            };
+          const failure = error as Error & { code?: string };
           if (String(failure.code || "").startsWith("ERR_SQLITE"))
             return {
               status: 409,

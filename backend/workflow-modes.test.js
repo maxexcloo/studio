@@ -6,7 +6,6 @@ import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-workflow-modes-"));
 process.env.STUDIO_DATA_DIR = scratch;
-process.env.STUDIO_ENABLE_BUILTIN_PROFILES = "0";
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow, validateGraph } =
   await import("./custom-workflows.js");

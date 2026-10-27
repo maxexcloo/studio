@@ -8,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { testImageProfile, writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = JSON.parse(
@@ -16,21 +17,41 @@ const source = JSON.parse(
 const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
 imageInfo.UNETLoader.input.required.unet_name[0] = ["kroma-v0.3.1-turbo-opd-W8A8.safetensors"];
+imageInfo["Power Lora Loader (rgthree)"] = { input: { required: {} } };
 imageInfo.LoraLoader.input.required.lora_name[0] = ["private-lora.safetensors"];
 const videoInfo = structuredClone(source);
-videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = [];
-videoInfo.UNETLoader.input.required.unet_name[0] = [
-  "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-];
-videoInfo.CLIPLoader.input.required.clip_name[0] = ["qwen3vl_32b_h3.safetensors"];
-videoInfo.VAELoader.input.required.vae_name[0] = [
-  "minimax_h3_video_vae.safetensors",
-  "minimax_h3_audio_vae.safetensors",
-];
+videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["minimax_h3_test.safetensors"];
 const primary = await startFakeComfy({ objectInfo: imageInfo });
 const video = await startFakeComfy({ objectInfo: videoInfo });
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backend-routes-"));
-fs.mkdirSync(path.join(dataDir, "workflows"));
+writeTestWorkflows(dataDir);
+// A Kroma profile, which an SFW instance hides, and LoRAs on the test image profile.
+const kroma = {
+  studio: {
+    id: "test-kroma",
+    name: "Test Kroma",
+    kind: "image",
+    family: "kroma",
+    controls: { prompt: { node: "2", input: "text" } },
+  },
+  1: { class_type: "UNETLoader", inputs: { unet_name: "kroma-v0.3.1-turbo-opd-W8A8.safetensors" } },
+  2: { class_type: "CLIPTextEncode", inputs: { text: "" } },
+};
+fs.writeFileSync(path.join(dataDir, "workflows", "test-kroma.json"), JSON.stringify(kroma));
+fs.writeFileSync(
+  path.join(dataDir, "workflows", "test-image.json"),
+  JSON.stringify({
+    ...testImageProfile,
+    studio: {
+      ...testImageProfile.studio,
+      loraStack: { adapter: "rgthree-power-v1", node: "8" },
+    },
+    8: {
+      class_type: "Power Lora Loader (rgthree)",
+      inputs: { model: ["1", 0], clip: ["1", 1] },
+    },
+  }),
+);
 fs.writeFileSync(
   path.join(dataDir, "lora-catalogue.json"),
   JSON.stringify({ "private-lora.safetensors": { triggers: ["privfx"] } }),
@@ -62,7 +83,6 @@ async function start(useVideo = true, restrictModels = false, runtimeDir = dataD
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
       STUDIO_COMFY_OUTPUT_DIR: "",
-      npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
@@ -187,7 +207,8 @@ test(
   { timeout: 10000 },
   async () => {
     const sdxl = (await api("/api/models")).body.profiles.find(
-      (profile) => profile.capabilities?.lora && profile.kind === "image" && profile.ready,
+      (profile) =>
+        profile.capabilities?.lora && profile.kind === "image" && profile.ready !== false,
     );
     assert.ok(sdxl);
     const run = async (lora) => {
@@ -222,15 +243,13 @@ test(
   async () => {
     const models = (await api("/api/models")).body;
     const h3 = models.profiles.find((profile) => profile.family === "minimax_h3");
-    assert.ok(h3?.ready, JSON.stringify(h3));
+    assert.ok(h3 && h3.ready !== false, JSON.stringify(h3));
     const videoQueued = video.nextPrompt();
     const accepted = await api("/api/generate", generation(h3));
     assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
     const h3Prompt = await videoQueued;
     assert.equal(h3Prompt.client_id, accepted.body.jobId);
-    assert.ok(
-      Object.values(h3Prompt.prompt).some((node) => node.class_type === "MiniMaxH3ImageToVideo"),
-    );
+    assert.ok(Object.values(h3Prompt.prompt).some((node) => node.class_type === "SaveVideo"));
     const before = primary.requests.length;
     await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
     assert.equal(
@@ -309,7 +328,7 @@ test(
       profiles.some((profile) => profile.family === "minimax_h3"),
       false,
     );
-    const image = profiles.find((profile) => profile.kind === "image" && profile.ready);
+    const image = profiles.find((profile) => profile.kind === "image" && profile.ready !== false);
     const secondaryCount = video.prompts.length;
     const queued = primary.nextPrompt();
     const accepted = await api("/api/generate", {
@@ -329,7 +348,7 @@ test(
   { timeout: 10000 },
   async () => {
     const before = (await api("/api/models")).body;
-    assert.ok(before.modelFiles.some((file) => file.name.startsWith("kroma-")));
+    assert.ok(before.profiles.some((profile) => profile.family === "kroma"));
     assert.ok(before.loras.includes("private-lora.safetensors"));
     try {
       for (const useVideo of [true, false]) {
@@ -337,11 +356,7 @@ test(
         await start(useVideo, true);
         const models = (await api("/api/models")).body;
         assert.equal(
-          models.profiles.some((profile) => profile.model.startsWith("kroma-")),
-          false,
-        );
-        assert.equal(
-          models.modelFiles.some((file) => file.name.startsWith("kroma-")),
+          models.profiles.some((profile) => profile.family === "kroma"),
           false,
         );
         assert.deepEqual(models.loras, []);
@@ -441,6 +456,7 @@ test(
   async () => {
     const actual = video.url;
     const isolatedData = fs.mkdtempSync(path.join(os.tmpdir(), "studio-held-catalogue-"));
+    writeTestWorkflows(isolatedData);
     let holdSchema = false,
       holdMetadata = false,
       schemaRequests = 0,

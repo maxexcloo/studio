@@ -6,7 +6,7 @@ import { removeJsonFile, writeJsonFile } from "./json-store.js";
 
 /**
  * Why Studio stopped last time, so a studio that "just exited" has a reason
- * on its next start (and in a toast, /api/health previousExit).
+ * on its next start.
  *
  * - The server notes when its run starts and, every minute, that it's alive
  *   (data/logs/session.json).

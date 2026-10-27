@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 // The real server, started the way the launcher starts it, against a stand-in
 // ComfyUI that answers with a recorded /object_info (fixtures/) plus one model.
@@ -20,6 +21,7 @@ objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0
 
 const fake = await startFakeComfy({ objectInfo });
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-routes-"));
+writeTestWorkflows(dataDir);
 let server;
 let base = "";
 
@@ -35,7 +37,6 @@ test.before(async () => {
       ]),
       STUDIO_DATA_DIR: dataDir,
       STUDIO_COMFY_OUTPUT_DIR: "",
-      npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
@@ -83,15 +84,6 @@ test("the server says who it is, and an unknown API route fails as JSON", async 
   assert.match(unknown.body.error, /Unknown API route/);
 });
 
-test("health says whether ComfyUI answers, and keeps its system stats (command line, paths) to itself", async () => {
-  const { status, body } = await api("/api/health");
-  assert.equal(status, 200);
-  assert.equal(body.ok, true);
-  assert.equal(body.comfyUrl, fake.url);
-  assert.equal("stats" in body, false);
-  assert.equal(JSON.stringify(body).includes("Fake GPU"), false);
-});
-
 test("diagnostics name this setup for a bug report", async () => {
   const { body } = await api("/api/diagnostics");
   assert.match(body.text, /^Studio development/);
@@ -110,10 +102,10 @@ test(
   },
 );
 
-test("a model ComfyUI lists becomes a ready profile, and a generate request runs it to the gallery", async () => {
+test("a ready profile runs a generate request to the gallery", async () => {
   const models = await api("/api/models");
-  const profile = models.body.profiles.find((item) => item.model === "sd_xl_base_1.0.safetensors");
-  assert.ok(profile, "the checkpoint is offered");
+  const profile = models.body.profiles.find((item) => item.id === "custom:test-image");
+  assert.ok(profile, "the profile is offered");
   assert.equal(profile.family, "sdxl");
 
   const queued = fake.nextPrompt();
@@ -157,7 +149,7 @@ test("a model ComfyUI lists becomes a ready profile, and a generate request runs
 
 test("a generate request with no prompt is refused plainly", async () => {
   const models = await api("/api/models");
-  const profile = models.body.profiles.find((item) => item.model === "sd_xl_base_1.0.safetensors");
+  const profile = models.body.profiles.find((item) => item.id === "custom:test-image");
   const refused = await api("/api/generate", {
     method: "POST",
     body: {

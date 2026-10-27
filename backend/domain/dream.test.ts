@@ -78,7 +78,6 @@ function fixture(t: TestContext) {
       { id: `${id}-0`, jobId: id, status: "pending", prompt: input.prompt },
     ],
     revision: () => 0,
-    jobLimit: 10,
     admitted: (job) => dream.admitted(job),
   });
   dream = createDream({
@@ -198,7 +197,6 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
     undefined,
     "worker:image",
     undefined,
-    undefined,
     { priority: queuePriority.mcp },
   );
   await dream.tick();
@@ -244,7 +242,7 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   store.save({ ...next, status: "running" });
   await admission({ prompt: "later" }, { userId: "bob", role: "user" });
   assert.equal(store.job("alice", next.id)?.status, "running");
-  // The person's queue never lists Dream jobs, and they don't count towards the job limit.
+  // The person's queue never lists Dream jobs.
   const app = express();
   app.use((req, _res, nextHandler) => {
     Object.assign(req, { studioAccount: { userId: "alice", role: "user" } });

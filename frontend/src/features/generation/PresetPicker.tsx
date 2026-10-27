@@ -26,7 +26,7 @@ export interface PresetSelection {
   presetTitle?: string;
 }
 /** The account's saved presets, newest first. */
-export const presetsQuery = queryOptions({
+const presetsQuery = queryOptions({
   queryKey: ["user-presets"],
   queryFn: () => api<{ presets: Preset[] }>("/api/user-presets"),
 });

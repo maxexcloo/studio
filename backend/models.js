@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-import { dataDir } from "./gallery-store.js";
 import { missingNodes, nodeRange, optionsFor, textRange } from "./comfy.js";
 import {
   loadCustomWorkflows,
@@ -10,73 +7,12 @@ import {
   workflowOptionIssues,
 } from "./custom-workflows.js";
 import { classifyModel } from "./model-families.js";
-import { familyProfiles } from "./family-profiles.js";
 import { families } from "./family-catalog.js";
 import { canonicalProfileId } from "./profile-store.js";
-import {
-  builtInProfilesEnabled,
-  inpaintingEnabled,
-  lorasEnabled,
-  modelFamilyEnabled,
-  presetsEnabled,
-} from "./features.js";
+import { inpaintingEnabled, lorasEnabled, presetsEnabled } from "./features.js";
 
 function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
-}
-
-const modelLabels = {
-  "flux-2-klein-9b-fp8.safetensors": "FLUX.2 Klein 9B Fast (FP8)",
-  "flux-2-klein-base-9b-fp8.safetensors": "FLUX.2 Klein 9B Base (FP8)",
-  "ideogram4_fp8_scaled.safetensors": "Ideogram 4 (FP8)",
-  "krea2_turbo_fp8_scaled.safetensors": "Krea 2 Turbo (FP8)",
-  "kroma-v0.3-base-dtype-mapped.safetensors": "Kroma 0.3 Base (BF16)",
-  "kroma-v0.3.1-turbo-opd-W8A8.safetensors": "Kroma 0.3.1 Turbo (W8A8)",
-  "kroma-v0.3.1-turbo-opd-int8-convrot.safetensors": "Kroma 0.3.1 Turbo (INT8 ConvRot)",
-  "kroma-v0.3.1-turbo-opd.safetensors": "Kroma 0.3.1 Turbo (Original BF16)",
-  "minimax_h3_fl2va_pruned_fp8_scaled.safetensors": "MiniMax H3 Video (FP8)",
-  "minimax_h3_fl2va_pruned_int8_convrot.safetensors": "MiniMax H3 Video (INT8)",
-  "minimax_h3_ref2va_pruned_int8_convrot.safetensors": "MiniMax H3 Reference Video (INT8)",
-  "minimax_h3_turbo_4step.safetensors": "MiniMax H3 Turbo 4-Step",
-  "minimax_h3_turbo_8step.safetensors": "MiniMax H3 Turbo 8-Step",
-  "qwen_image_2.1_bf16.safetensors": "Qwen Image 2.1 (BF16)",
-  "qwen_image_2.1_int8_convrot.safetensors": "Qwen Image 2.1 (INT8)",
-  "qwen_image_2.1_turbo_bf16.safetensors": "Qwen Image 2.1 Turbo (BF16)",
-};
-
-export function prettyModelName(name = "") {
-  const label = modelLabels[modelBasename(name)];
-  if (label) return label;
-  const base = modelBasename(name).replace(/\.(safetensors|ckpt|pt|bin|gguf)$/i, "");
-  return base
-    .replace(/distill/gi, "")
-    .replace(/aio/gi, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\bfp(\d+)\b/gi, "FP$1")
-    .replace(/\bti2v\b/gi, "TI2V")
-    .replace(/\b(\d+)step\b/gi, "$1-Step")
-    .replace(/\bz anime\b/gi, "Z-Anime")
-    .replace(/\bz image\b/gi, "Z-Image")
-    .replace(/\bwan(\d)/gi, "Wan $1")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function isNvfp4Model(name = "") {
-  return /nvfp4/i.test(name);
-}
-
-function torchVersionAtLeast(version = "", major, minor) {
-  const match = String(version).match(/(\d+)\.(\d+)/);
-  if (!match) return false;
-  const currentMajor = Number(match[1]);
-  const currentMinor = Number(match[2]);
-  return currentMajor > major || (currentMajor === major && currentMinor >= minor);
-}
-
-function torchSupportsNvfp4(stats = {}) {
-  return torchVersionAtLeast(stats?.system?.pytorch_version, 2, 8);
 }
 
 function snapDimension(value, meta = {}) {
@@ -92,7 +28,7 @@ function detectedDefault(meta = {}, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-export function aspectSet(defaults, ratios, ranges = {}) {
+function aspectSet(defaults, ratios, ranges = {}) {
   const defaultArea = Math.max(1, Number(defaults.width || 1024) * Number(defaults.height || 1024));
   const seen = new Set();
   return ratios
@@ -317,8 +253,6 @@ export function inferModels(
       reason: `ComfyUI is missing required image nodes: ${missingCoreImageNodes.join(", ")}`,
     });
   }
-  const unets = optionsFor(info, "UNETLoader", "unet_name");
-  const checkpoints = optionsFor(info, "CheckpointLoaderSimple", "ckpt_name");
   const clips = optionsFor(info, "CLIPLoader", "clip_name");
   const clipTypes = optionsFor(info, "CLIPLoader", "type");
   const vaes = optionsFor(info, "VAELoader", "vae_name");
@@ -326,35 +260,13 @@ export function inferModels(
   const schedulers = optionsFor(info, "KSampler", "scheduler");
   const weightDtypes = optionsFor(info, "UNETLoader", "weight_dtype");
   const loras = lorasEnabled ? optionsFor(info, "LoraLoader", "lora_name") : [];
-  const canUseLoras = Boolean(info.LoraLoader && loras.length);
-  const incompatibleModels = unets.filter(
-    (name) => isNvfp4Model(name) && !torchSupportsNvfp4(stats),
-  );
   const textMeta = textRange(info, "CLIPTextEncode", "text");
   const samplerRange = {
     steps: nodeRange(info, "KSampler", "steps", { default: 20, min: 1, max: 10000, step: 1 }),
     cfg: nodeRange(info, "KSampler", "cfg", { default: 8, min: 0, max: 100, step: 0.1 }),
     denoise: nodeRange(info, "KSampler", "denoise", { default: 1, min: 0, max: 1, step: 0.01 }),
   };
-  const { profiles: detectedProfiles, modelFiles: detectedFiles } = familyProfiles(info, {
-    prettyModelName,
-    buildProfile,
-    aspectSet,
-    textMeta,
-    samplerRange,
-    samplers,
-    schedulers,
-    weightDtypes,
-    loras,
-    canUseLoras,
-    incompatible: (name) => incompatibleModels.includes(name),
-    cuda: (stats?.devices || []).some((device) => device?.type === "cuda"),
-    apple: (stats?.devices || []).some((device) => device?.type === "mps"),
-  });
-  const profiles = builtInProfilesEnabled()
-    ? detectedProfiles.filter((profile) => modelFamilyEnabled(profile.family, profile.model))
-    : [];
-  const modelFiles = detectedFiles.filter((file) => modelFamilyEnabled(file.family, file.name));
+  const profiles = [];
 
   // Why a workflow can't run on this worker, in words; "" when it can.
   const unready = (workflow) => {
@@ -550,27 +462,6 @@ export function inferModels(
       });
   }
 
-  // Legacy runtime titles stay readable only when ai is not the configuration owner.
-  try {
-    const saved = process.env.STUDIO_CONFIG_DIR
-      ? []
-      : JSON.parse(fs.readFileSync(path.join(dataDir, "per-model-workflows.json"), "utf8"));
-    for (const row of saved) {
-      const profile =
-        profiles.find((item) => item.id === row.id) ||
-        (profiles.filter((item) => item.model === row.model).length === 1
-          ? profiles.find((item) => item.model === row.model)
-          : null);
-      if (!profile || profile.model !== row.model || typeof row.name !== "string") continue;
-      profile.label = row.name;
-      profile.displayName = row.name;
-      if (typeof row.profile?.description === "string")
-        profile.description = row.profile.description;
-    }
-  } catch {
-    // A fresh installation has no saved profile catalogue yet.
-  }
-
   if (!lorasEnabled)
     for (const profile of profiles) {
       profile.capabilities.lora = false;
@@ -578,7 +469,6 @@ export function inferModels(
     }
   const imageProfiles = profiles.filter((profile) => profile.kind === "image");
   const videoProfiles = profiles.filter((profile) => profile.kind === "video");
-  const unsupportedModels = modelFiles.filter((file) => !file.supported).map((file) => file.name);
   // A ready model is the better first pick than one still waiting on files.
   const firstReady = (list, setting) =>
     (
@@ -592,8 +482,6 @@ export function inferModels(
     imageModels: imageProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     videoModels: videoProfiles.map((profile) => ({ label: profile.label, value: profile.id })),
     profiles,
-    unsupportedModels,
-    modelFiles,
     // Release switches the studio needs to know about (features.js).
     features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
     textEncoders: clips,

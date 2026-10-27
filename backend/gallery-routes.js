@@ -185,10 +185,6 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
           ? { ...listed(item), sessionId: chats.get(item.jobId).id }
           : listed(item),
       ),
-      // The whole list, for callers from before paging. A page is in `items` already.
-      ...(cursor || limit
-        ? {}
-        : { outputs: filterVisibleGallery(recordsForRequest(gallery, req)).map(listed) }),
     });
   });
 }

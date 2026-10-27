@@ -22,7 +22,6 @@ interface AccountStatus {
   mode: string;
   signedIn: boolean;
   needsRecoveryAdmin?: boolean;
-  setupTokenAccepted?: boolean;
   account?: Pick<Account, "id" | "role" | "features"> | null;
   oidc?: { label: string };
 }
@@ -46,8 +45,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const status = useAccount();
   const [username, setUsername] = useState(""),
-    [password, setPassword] = useState(""),
-    [setupToken, setSetupToken] = useState("");
+    [password, setPassword] = useState("");
   const [outcome] = useState(
     () =>
       ({
@@ -73,11 +71,9 @@ export function AccountGate({ children }: { children: ReactNode }) {
       post(bootstrap ? "/api/accounts/bootstrap" : "/api/accounts/sign-in", {
         username,
         password,
-        ...(bootstrap ? { setupToken } : {}),
       }),
     onSuccess: async () => {
       setPassword("");
-      setSetupToken("");
       client.clear();
       await status.refetch();
     },
@@ -150,14 +146,6 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     value={password}
                     onChange={(e) => setPassword(e.currentTarget.value)}
                   />
-                  {bootstrap && status.data?.setupTokenAccepted && (
-                    <PasswordInput
-                      label="Setup Token"
-                      autoComplete="off"
-                      value={setupToken}
-                      onChange={(e) => setSetupToken(e.currentTarget.value)}
-                    />
-                  )}
                   {signIn.error && <Alert color="red">{signIn.error.message}</Alert>}
                   <Button type="submit" loading={signIn.isPending} fullWidth mt="sm">
                     {bootstrap ? "Create Administrator" : "Sign In"}

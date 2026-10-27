@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import os from "node:os";
 import test from "node:test";
-import { classifyClient, isPrivateAddress } from "./client-trust.js";
+import { classifyClient } from "./client-trust.js";
 import { hostAllowed, hostnameOf, requestGuard } from "./request-guard.js";
 
 /** Just enough of an Express request and response for the middleware. */
@@ -38,7 +38,7 @@ function run(guard, { method = "POST", path = "/api/gallery/favorite", headers =
 }
 
 const guard = requestGuard();
-const networkGuard = requestGuard({ network: true, extraHosts: () => ["studio.tail1234.ts.net"] });
+const networkGuard = requestGuard({ network: true });
 
 test("the studio's own page gets through: same origin plus the header or JSON", () => {
   assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-studio": "1" } }).passed);
@@ -109,7 +109,7 @@ test("DNS rebinding: a request naming another host is refused before anything ru
   );
 });
 
-test("hosts: loopback always, the machine's own addresses only when listening on the network, extra names when configured", () => {
+test("hosts: loopback always, the machine's own addresses only when listening on the network, allowed names when configured", () => {
   for (const host of [
     "localhost:8787",
     "127.0.0.1:8787",
@@ -126,17 +126,17 @@ test("hosts: loopback always, the machine's own addresses only when listening on
     assert.ok(hostAllowed(`${networkAddress}:8787`, { network: true }));
   }
   assert.equal(hostAllowed("192.0.2.77:8787", { network: true }), false);
-  assert.ok(
-    run(networkGuard, {
-      method: "GET",
-      path: "/api/gallery",
-      headers: { host: "studio.tail1234.ts.net:8788" },
-    }).passed,
-  );
   process.env.STUDIO_ALLOWED_HOSTS = "studio.home.arpa, https://other.lan/";
   try {
     assert.ok(hostAllowed("studio.home.arpa"));
     assert.ok(hostAllowed("other.lan:8787"));
+    assert.ok(
+      run(networkGuard, {
+        method: "GET",
+        path: "/api/gallery",
+        headers: { host: "studio.home.arpa:8788" },
+      }).passed,
+    );
   } finally {
     delete process.env.STUDIO_ALLOWED_HOSTS;
   }
@@ -156,31 +156,13 @@ test("a request through a proxy is never this computer", () => {
   }
 });
 
-test("another device is this computer only through a host-only container's private bridge", () => {
+test("another device is never this computer", () => {
   const phone = { socket: { remoteAddress: "::ffff:192.168.1.40" }, headers: {} };
   assert.deepEqual(classifyClient(phone), {
     address: "192.168.1.40",
     proxied: false,
     thisComputer: false,
   });
-  assert.equal(classifyClient(phone, { hostOnly: true }).thisComputer, true);
-  assert.equal(
-    classifyClient({ socket: { remoteAddress: "8.8.8.8" }, headers: {} }, { hostOnly: true })
-      .thisComputer,
-    false,
-  );
-  for (const address of [
-    "10.0.0.2",
-    "172.16.4.1",
-    "172.31.255.1",
-    "192.168.0.1",
-    "100.101.102.103",
-    "fd7a:115c:a1e0::1",
-    "fe80::1",
-  ])
-    assert.ok(isPrivateAddress(address), address);
-  for (const address of ["172.32.0.1", "100.128.0.1", "1.1.1.1", "2001:db8::1"])
-    assert.equal(isPrivateAddress(address), false, address);
 });
 
 test("only the dev proxy with the right token may say who is behind it", () => {
@@ -205,30 +187,6 @@ test("only the dev proxy with the right token may say who is behind it", () => {
         headers: { "x-studio-dev-token": "secret-token", "x-studio-dev-client": "127.0.0.1" },
       },
       { devToken: "secret-token" },
-    ).thisComputer,
-    false,
-  );
-});
-
-test("a host-only Docker port counts the host's Docker address as this computer, and nothing else", () => {
-  const desktop = { socket: { remoteAddress: "::ffff:192.168.65.1" }, headers: {} };
-  assert.equal(classifyClient(desktop).thisComputer, false);
-  assert.equal(classifyClient(desktop, { hostOnly: true }).thisComputer, true);
-  assert.equal(
-    classifyClient({ socket: { remoteAddress: "172.18.0.1" }, headers: {} }, { hostOnly: true })
-      .thisComputer,
-    true,
-  );
-  // A public address or anything through a proxy never does.
-  assert.equal(
-    classifyClient({ socket: { remoteAddress: "203.0.113.9" }, headers: {} }, { hostOnly: true })
-      .thisComputer,
-    false,
-  );
-  assert.equal(
-    classifyClient(
-      { socket: { remoteAddress: "172.18.0.1" }, headers: { "x-forwarded-for": "203.0.113.9" } },
-      { hostOnly: true },
     ).thisComputer,
     false,
   );

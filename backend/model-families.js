@@ -6,13 +6,12 @@ import {
   families,
   familyFromHeader,
   familyFromName,
-  knownFamilies,
   quantFromHeader,
   refinedFamily,
   variantFor,
 } from "./family-catalog.js";
 import { isGguf, readGgufHeader } from "./gguf.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { readJsonFile } from "./json-store.js";
 
 /**
  * Which family (and variant) a model file belongs to, and which parts an
@@ -61,12 +60,6 @@ function loadModelChoices() {
     choicesCache = {};
   }
   return choicesCache;
-}
-
-function saveChoices(next) {
-  fs.mkdirSync(dataDir, { recursive: true });
-  writeJsonFile(choicesPath(), next);
-  choicesCache = next;
 }
 
 /** "family" or "family/variant", checked against what that folder can load. */
@@ -122,16 +115,6 @@ function localModelFile(source, name) {
     }
   }
   return "";
-}
-
-/** A model file's size in bytes when it is on this computer, else 0 (a remote ComfyUI's). */
-export function modelFileBytes(source, name) {
-  const file = localModelFile(source, name);
-  try {
-    return file ? fs.statSync(file).size : 0;
-  } catch {
-    return 0;
-  }
 }
 
 /** The local header of a model file, cached by size and mtime; null when out of reach. */
@@ -238,29 +221,10 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6, signal }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
 }
 
-/* ------------------------------------------------------------ Learned facts */
-
-// Checkpoints that turned out to lack a text encoder or VAE when ComfyUI loaded
-// them. Only needed where the header is out of reach; kept with the choices.
-const learnedKey = (name) => `learned:${name}`;
-
-export function rememberMissingParts(name, missing = {}) {
-  const current = loadModelChoices()[learnedKey(name)] || {};
-  saveChoices({
-    ...loadModelChoices(),
-    [learnedKey(name)]: {
-      encoder: Boolean(current.encoder || missing.encoder),
-      vae: Boolean(current.vae || missing.vae),
-    },
-  });
-}
-
-/** Which parts a checkpoint carries: its header, what a failed run taught us, or an assumption. */
+/** Which parts a checkpoint carries: its header, or an assumption. */
 function bundledFor(name, header) {
   const fromHeader = bundledParts(header);
   if (fromHeader) return { ...fromHeader, known: true };
-  const learned = loadModelChoices()[learnedKey(name)];
-  if (learned) return { encoder: !learned.encoder, vae: !learned.vae, known: true };
   // Unknown until ComfyUI tries: assume all-in-one, which is what checkpoints/ usually holds.
   return { encoder: true, vae: true, known: false };
 }
@@ -328,21 +292,4 @@ export function classifyModel(source, name) {
     return finish(/1[._]?5|sd15|v1[-_]5/i.test(base) ? "sd15" : "sdxl", "default");
   if (fromName && families[fromName]?.sources.includes(source)) return finish(fromName, "name");
   return finish("", "");
-}
-
-export function familyLabel(id) {
-  return families[id]?.label || knownFamilies[id] || "";
-}
-
-/* ------------------------------------------------------------ Krea 2 Raw shift */
-
-/**
- * Raw samples with a resolution-dependent timestep shift: mu runs linearly from
- * 0.5 at 256 image tokens to 1.15 at 6400 (16 px per token), like diffusers'
- * Krea2Pipeline. Turbo is distilled for a fixed 1.15, which ComfyUI already uses.
- */
-export function krea2RawShift(width, height) {
-  const tokens = Math.ceil(Number(width || 1024) / 16) * Math.ceil(Number(height || 1024) / 16);
-  const mu = 0.5 + ((tokens - 256) * (1.15 - 0.5)) / (6400 - 256);
-  return Math.round(mu * 1000) / 1000;
 }

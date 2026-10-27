@@ -26,8 +26,6 @@ test(
       .toBuffer();
     let submissions = 0;
     const providerPrompts: string[] = [];
-    let withheldImage: Promise<void> | undefined;
-    let resumeImage = () => {};
     const provider = createServer(async (req, res) => {
       res.setHeader("content-type", "application/json");
       if (req.url === "/v1/models") {
@@ -39,7 +37,6 @@ test(
         for await (const chunk of req) body += chunk;
         providerPrompts.push(JSON.parse(body).prompt);
         submissions++;
-        await withheldImage;
         res.end(JSON.stringify({ data: [{ b64_json: pixels.toString("base64") }] }));
         return;
       }
@@ -88,10 +85,7 @@ test(
         STUDIO_WORKERS: "[]",
         STUDIO_DEMO: "0",
         STUDIO_MULTI_USER: "1",
-        STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS: "1",
-        STUDIO_CONFIG_DIR: "",
         STUDIO_RUNTIME_AUTOMATIC: "",
-        STUDIO_TEXT_ADMISSION_TOKEN: "",
         STUDIO_CLIPROXYAPI_URL: providerUrl,
         STUDIO_CLIPROXYAPI_KEY: "fixture-value",
       },
@@ -240,22 +234,11 @@ test(
         features: { imageGeneration: true, gallery: true, cloudModels: true, nsfwModels: false },
       });
       cookie = artistCookie;
-      withheldImage = new Promise<void>((resolve) => {
-        resumeImage = resolve;
-      });
       const own = await api("/api/generate", "POST", {
         profileId: profile.id,
         model: profile.model,
         prompt: "An artist's bird",
       });
-      const limited = await fetch(base + "/api/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ profileId: profile.id, prompt: "Another bird" }),
-      });
-      assert.equal(limited.status, 429);
-      assert.equal((await limited.json()).reason, "job-limit");
-      resumeImage();
       const ownDeadline = Date.now() + 10_000;
       let ownJob: QueueJob | undefined;
       while (Date.now() < ownDeadline) {
@@ -272,7 +255,6 @@ test(
         true,
       );
     } finally {
-      resumeImage();
       if (server.exitCode === null) {
         const exit = once(server, "exit");
         server.kill("SIGTERM");

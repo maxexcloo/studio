@@ -5,8 +5,6 @@ import { getCustomWorkflow } from "./custom-workflows.js";
 import { startImageDataUrl } from "./start-images.js";
 import { prepareInputImage } from "./input-image-sizing.js";
 import { families } from "./family-catalog.js";
-import { familyGraph } from "./family-graph.js";
-import { withGgufLoaders } from "./gguf.js";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { outputFolderName } from "./data-names.js";
 
@@ -56,48 +54,6 @@ export function composeWorkflowPrompt(workflow, userPrompt = "") {
   const prefix = String(composition.prefix || "");
   const suffix = String(composition.suffix || "").trim();
   return `${prefix}${prompt}${suffix ? `\n\n${suffix}` : ""}`.trim();
-}
-
-export async function imageGraph(body) {
-  if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
-  const graph = await builtInGraph(body);
-  // Account outputs always land in the owner's folder; single-user images keep upstream's names.
-  return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
-}
-
-export async function videoGraph(body) {
-  if (body.workflow?.startsWith("custom:")) return customWorkflowGraph(body);
-  const graph = await builtInGraph(body);
-  return body.ownerId ? saveIntoStudioFolder(graph, body.ownerId) : graph;
-}
-
-/**
- * Every built-in family. The start image is the reference the composer staged in
- * ComfyUI (already uploaded, by name), or a legacy start image uploaded now.
- */
-async function builtInGraph(body) {
-  const referenceImages = (body.referenceAssets || [])
-    .map((item) => item?.comfyName)
-    .filter(Boolean);
-  const staged = referenceImages[0] || "";
-  const startImageComfy =
-    staged || (body.startImage || body.startImageId ? await uploadBodyStartImage(body) : "");
-  // Inpainting samples the crop around the painted part, at its own working size (inpaint.js).
-  const inpaint = body.inpaint?.crop ? body.inpaint : null;
-  if (inpaint) {
-    return withGgufLoaders(
-      familyGraph({
-        ...body,
-        width: inpaint.work.width,
-        height: inpaint.work.height,
-        startImageComfy: inpaint.crop,
-        // Edit models edit the crop itself; only the painted part is stitched back.
-        referenceImages: [inpaint.crop, ...referenceImages.slice(1)],
-        inpaint,
-      }),
-    );
-  }
-  return withGgufLoaders(familyGraph({ ...body, startImageComfy, referenceImages, inpaint: null }));
 }
 
 function cloneGraph(graph) {

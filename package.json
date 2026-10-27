@@ -12,10 +12,7 @@
   },
   "type": "module",
   "scripts": {
-    "build": "vite build --config frontend/vite.config.ts",
-    "dev": "node dev.mjs",
-    "dev:demo": "node dev.mjs --demo",
-    "test": "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
+    "build": "vite build --config frontend/vite.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

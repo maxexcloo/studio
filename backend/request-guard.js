@@ -79,23 +79,13 @@ function configuredHosts(value = process.env.STUDIO_ALLOWED_HOSTS || "") {
 
 /**
  * Whether a Host header names this server. `network`: it listens beyond this computer, so its
- * network addresses count. `extra`: more names (the HTTPS certificate's).
+ * network addresses count.
  */
-export function hostAllowed(hostHeader, { network = false, extra = [] } = {}) {
+export function hostAllowed(hostHeader, { network = false } = {}) {
   const name = hostnameOf(hostHeader);
   if (!name) return false;
   if (name === "localhost" || name.endsWith(".localhost")) return true;
   if (/^127\.\d+\.\d+\.\d+$/.test(name) || name === "::1") return true;
-  if (
-    extra.some(
-      (item) =>
-        item === name ||
-        (item.startsWith("*.") &&
-          name.endsWith(item.slice(1)) &&
-          name.split(".").length === item.split(".").length),
-    )
-  )
-    return true;
   if (configuredHosts().includes(name)) return true;
   return network && machineNames().has(name);
 }
@@ -119,13 +109,12 @@ function refuse(res, reason, error) {
 }
 
 /**
- * The middleware. `network`: as for hostAllowed. `extraHosts()` returns the certificate's names,
- * asked per request so they follow changes.
+ * The middleware. `network`: as for hostAllowed.
  */
-export function requestGuard({ network = false, extraHosts = () => [] } = {}) {
+export function requestGuard({ network = false } = {}) {
   return (req, res, next) => {
     if (!gatedPath(req.path)) return next();
-    if (!hostAllowed(req.headers.host, { network, extra: extraHosts() })) {
+    if (!hostAllowed(req.headers.host, { network })) {
       refuse(
         res,
         "host",
