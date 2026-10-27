@@ -162,7 +162,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   );
   assert.equal(current.civitai.sourceMetadata.prompt, sourcePrompt);
   sourcePrompt = "a landscape";
-  store.removeGalleryItems([current]);
+  store.setGallery(store.gallery.filter((item) => item.id !== current.id));
   assert.equal((await fetch(base + "/api/presets/42/media")).status, 404);
   assert.equal((await fetch(base + "/api/presets/42/thumbnail")).status, 404);
   assert.equal((await api("/api/presets/resolve", { id: "42" })).status, 400);

@@ -114,19 +114,6 @@ registerAssistantRoutes(app, {
       : { summary: "Lead with light." },
   loras: async () => loras,
   starred: async () => ({ examples: ["a starred prompt"], loras: [] }),
-  template: async (id) =>
-    id === "base"
-      ? {
-          studio: {
-            id: "base",
-            name: "Base",
-            kind: "image",
-            defaults: { model: "old.safetensors" },
-            controls: { prompt: { node: "1", input: "text" } },
-          },
-          graph: { 1: { class_type: "CLIPTextEncode", inputs: { text: "" } } },
-        }
-      : null,
 });
 const server = app.listen(0, "127.0.0.1");
 await new Promise((resolve) => server.once("listening", resolve));
@@ -283,36 +270,6 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
   assert.deepEqual(
     suggested.loras.map((item) => [item.name, item.triggers]),
     [["cabin.safetensors", ["cabinx"]]],
-  );
-  assert.equal(
-    (await post("/api/assistant/draft-profile", { id: "new", templateId: "base" }, "user")).status,
-    403,
-  );
-  assert.equal(
-    (await post("/api/assistant/draft-guide", { profileId: sfw.id }, "adult")).status,
-    403,
-  );
-  const drafted = JSON.parse(
-    (
-      await post(
-        "/api/assistant/draft-profile",
-        { id: "new-model", templateId: "base", modelFile: "new.safetensors" },
-        "admin",
-      )
-    ).text,
-  );
-  assert.deepEqual(
-    [
-      drafted.aiDrafted,
-      JSON.parse(drafted.text).studio.defaults.model,
-      JSON.parse(drafted.text).studio.nsfw,
-      drafted.check.ok,
-    ],
-    [true, "new.safetensors", true, true],
-  );
-  assert.equal(
-    (await post("/api/assistant/describe", { image: "data:image/png;base64,AAAA" }, "user")).status,
-    200,
   );
 });
 

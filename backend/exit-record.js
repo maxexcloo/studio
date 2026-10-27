@@ -120,25 +120,3 @@ export function noteAlive(now = Date.now()) {
   if (session && session.pid === process.pid)
     writeSync(sessionFile(), { ...session, lastSeen: now });
 }
-
-/** The last lines a child printed to stderr, kept so its stop can say why. */
-export function tailKeeper(limit = 30) {
-  const lines = [];
-  let partial = "";
-  return {
-    push(chunk) {
-      const text = partial + String(chunk);
-      const parts = text.split(/\r?\n/);
-      partial = parts.pop() || "";
-      for (const line of parts) {
-        // Colour codes out: the record is read as plain text.
-        const plain = line.replace(/\u001b\[[0-9;]*m/g, "").trimEnd();
-        if (plain) lines.push(plain);
-      }
-      while (lines.length > limit) lines.shift();
-    },
-    text() {
-      return [...lines, partial].filter(Boolean).join("\n");
-    },
-  };
-}

@@ -9,7 +9,7 @@ import {
  * "calibrate-like" and "calibrate-pass" on older gallery images Dream showed them again, and
  * "preferred" is a compare winner chosen over one other variant.
  */
-export type TasteKind =
+type TasteKind =
   | "star"
   | "unstar"
   | "compare"
@@ -20,13 +20,13 @@ export type TasteKind =
   | "calibrate-like"
   | "calibrate-pass";
 /** The result a signal is about: its job, prompt, profile and enabled LoRAs. */
-export interface TasteChoice {
+interface TasteChoice {
   jobId?: string;
   prompt?: string;
   profileId?: string;
   loras?: string[];
 }
-export interface TasteSignal extends TasteChoice {
+interface TasteSignal extends TasteChoice {
   at: string;
   kind: TasteKind;
   /** For "preferred": the variant the result was liked more than, which may still be good. */
@@ -69,7 +69,7 @@ interface Router {
   delete(path: string, handler: Handler): unknown;
 }
 
-export const maxSummary = 1000;
+const maxSummary = 1000;
 const maxSignals = 200;
 /** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
 const maxPerCall = 20;

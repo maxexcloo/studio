@@ -13,7 +13,7 @@ export interface FinishingItem {
   upscale?: { status?: string; url?: string };
 }
 /** Whether smart upscale can run now, and with face detail. */
-export type FinishingReadiness = { reason: string } | { reason?: undefined; faceDetail: boolean };
+type FinishingReadiness = { reason: string } | { reason?: undefined; faceDetail: boolean };
 interface FinishingRecord {
   settings: FinishingSettings;
   /** Starred item IDs waiting to be finished, oldest first. */
@@ -33,7 +33,7 @@ interface Router {
   put(path: string, handler: Handler): unknown;
 }
 
-export const defaultFinishingSettings: FinishingSettings = {
+const defaultFinishingSettings: FinishingSettings = {
   enabled: false,
   quality: "balanced",
   faceDetail: true,

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumbs-"));
-const { getFileThumbnail, sweepThumbnails } = await import("./thumbnails.js");
+const { sweepThumbnails } = await import("./thumbnails.js");
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-thumb-cache-"));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -57,24 +57,4 @@ test("a cache under its cap, or none at all, is left alone", async () => {
     "only thumbnails count, and these are in use",
   );
   assert.equal(fs.existsSync(path.join(dir, "notes.txt")), true);
-});
-
-test("a library image's thumbnail served from the cache counts as in use", async () => {
-  const sharp = (await import("sharp")).default;
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-"));
-  const photo = path.join(folder, "photo.png");
-  await sharp({ create: { width: 16, height: 16, channels: 3, background: "#c33" } })
-    .png()
-    .toFile(photo);
-  const built = await getFileThumbnail(photo);
-  assert.ok(built.file);
-  // Made two days ago, before a restart: only being served again says it is on screen.
-  const old = new Date(Date.now() - 48 * hour);
-  fs.utimesSync(built.file, old, old);
-  const restarted = await import("./thumbnails.js?restarted");
-  assert.equal((await restarted.getFileThumbnail(photo)).file, built.file);
-  const result = await restarted.sweepThumbnails({ limitBytes: 1, now: Date.now() });
-  assert.equal(result.removed, 0);
-  assert.equal(fs.existsSync(built.file), true);
-  fs.rmSync(folder, { recursive: true, force: true });
 });

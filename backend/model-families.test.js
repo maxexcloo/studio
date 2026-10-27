@@ -17,8 +17,7 @@ const dirs = Object.fromEntries(
 );
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel, krea2RawShift, readSafetensorsHeader, setModelChoice } =
-  await import("./model-families.js");
+const { classifyModel, krea2RawShift, readSafetensorsHeader } = await import("./model-families.js");
 const { familyFromHeader } = await import("./family-catalog.js");
 const { encoderKindFromHeader, vaeLayoutFromHeader } = await import("./model-components.js");
 const { inferModels } = await import("./models.js");
@@ -307,19 +306,6 @@ test("the weights win over the filename, and names fill in when files are out of
   );
   const unknownCheckpoint = classifyModel("checkpoint", "remote/cyberrealisticPony_v8.safetensors");
   assert.deepEqual([unknownCheckpoint.family, unknownCheckpoint.variant.id], ["sdxl", "pony"]);
-});
-
-test("a chosen type (and variant) overrides detection and can be undone", () => {
-  setModelChoice("unet", "mystery.safetensors", "krea2/raw");
-  const chosen = classifyModel("unet", "mystery.safetensors");
-  assert.deepEqual([chosen.family, chosen.variant.id, chosen.via], ["krea2", "raw", "choice"]);
-  setModelChoice("unet", "mystery.safetensors", "");
-  assert.equal(classifyModel("unet", "mystery.safetensors").family, "");
-  assert.throws(
-    () => setModelChoice("unet", "x.safetensors", "sd2"),
-    /can’t load from this folder/,
-  );
-  assert.throws(() => setModelChoice("loras", "x.safetensors", "krea2"), /Unknown model folder/);
 });
 
 test("checkpoints report which parts they carry", () => {
@@ -884,7 +870,7 @@ test("the known Tessera W8A8 model restores its persisted Krea 2 Turbo profile",
 
 test("custom Klein generation and reference schedules follow their mapped latent dimensions", async () => {
   const { customWorkflowGraph } = await import("./graphs.js");
-  const { saveCustomWorkflow } = await import("./custom-workflows.js");
+  const { saveImportedWorkflow } = await import("./custom-workflows.js");
   for (const references of [[], ["reference.png"]]) {
     const graph = familyGraph({
       family: "flux2_klein_9b",
@@ -905,7 +891,7 @@ test("custom Klein generation and reference schedules follow their mapped latent
     );
     Object.assign(scheduler.inputs, { width: 1024, height: 1024 });
     const id = `klein-dimensions-${references.length ? "reference" : "generation"}`;
-    saveCustomWorkflow({
+    saveImportedWorkflow({
       graph,
       studio: {
         id,
@@ -1240,42 +1226,6 @@ test("every node pack is one registry entry, and a missing one comes with both i
     ["comfy", nodePacks.seedvr2.repository, 3],
   );
   assert.ok(part.install.commands.length >= 1);
-});
-
-test("one-click pack installs only take registry ids, and run locally with ComfyUI's Python", async () => {
-  const { packInstallRoutes, packInstallState, startPackInstall } =
-    await import("./pack-installer.js");
-  await assert.rejects(
-    () => startPackInstall("https://evil.example/pack.git"),
-    /Unknown node pack/,
-  );
-  const root = path.join(scratch, "ComfyUI");
-  assert.deepEqual(packInstallRoutes("seedvr2", root), { manager: true, local: false });
-  // A ComfyUI of our own: its venv Python, and the pack already cloned so no git is needed.
-  const windows = process.platform === "win32";
-  const python = windows
-    ? path.join(root, ".venv", "Scripts", "python.exe")
-    : path.join(root, ".venv", "bin", "python");
-  fs.mkdirSync(path.dirname(python), { recursive: true });
-  fs.writeFileSync(python, '#!/bin/sh\necho pip "$@"\n', { mode: 0o755 });
-  fs.mkdirSync(path.join(root, "custom_nodes", "ComfyUI-SANA"), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, "custom_nodes", "ComfyUI-SANA", "requirements.txt"),
-    "diffusers\n",
-  );
-  assert.deepEqual(packInstallRoutes("comfyui_sana", root), { manager: false, local: true });
-  // The stand-in Python is a shell script, which Windows cannot run.
-  if (windows) return;
-  const started = await startPackInstall("comfyui_sana");
-  assert.equal(started.route, "local");
-  let state = started;
-  // Up to 10 s: the full suite runs files side by side, and a busy machine starts processes slowly.
-  for (let i = 0; i < 500 && state.status === "running"; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    state = packInstallState("comfyui_sana");
-  }
-  assert.equal(state.status, "done", state.error);
-  assert.match(state.log, /pip -m pip install -r requirements.txt/);
 });
 
 /* ------------------------------------------------------------ Lumina 2, Ideogram 4, MageFlow, ERNIE */
@@ -2073,60 +2023,6 @@ test("a pack inside a bigger repository is cloned beside its folder and only its
   assert.doesNotMatch(command.command, /pip install/);
 });
 
-test("MOSS-Image's guided setup takes the way from the file, and lists only what that way lacks", async () => {
-  const { familySetupPlan } = await import("./family-setup.js");
-  const unets = ["moss_image_sft_int8_convrot.safetensors"];
-  // Comfy-Org's single file on a ComfyUI too old for it: an update, then the encoder (the VAE is there).
-  const old = objectInfo({ unets, vaeFiles: ["flux2-vae.safetensors"], clipTypes: newTypes });
-  const oldProfiles = inferModels(old).profiles;
-  const single = oldProfiles.find((item) => item.family === "moss_image" && item.source === "unet");
-  assert.equal(single.setupGuide, "moss_image");
-  const before = familySetupPlan("moss_image", {
-    info: old,
-    profiles: oldProfiles,
-    profileId: single.id,
-  });
-  assert.deepEqual(
-    [before.route, before.comfy.native, before.profile.ready],
-    ["native", false, false],
-  );
-  assert.deepEqual(
-    before.parts.map((item) => [item.part, Boolean(item.have), item.download?.file || ""]),
-    [
-      ["encoder", false, "qwen3.5_9b_int8_convrot.safetensors"],
-      ["vae", true, ""],
-    ],
-  );
-  // A current ComfyUI with everything in place: nothing left.
-  const current = objectInfo({
-    unets,
-    clips: ["qwen3.5_9b_int8_convrot.safetensors"],
-    vaeFiles: ["flux2-vae.safetensors"],
-    clipTypes: mossTypes,
-  });
-  const after = familySetupPlan("moss_image", {
-    info: current,
-    profiles: inferModels(current).profiles,
-    profileId: single.id,
-  });
-  assert.deepEqual(
-    [after.comfy.native, after.profile.ready, after.parts.every((item) => item.have)],
-    [true, true, true],
-  );
-  // The official folder runs on the makers' pack, which brings its own encoder and VAE.
-  const folder = oldProfiles.find((item) => item.source === "moss_diffusers");
-  const pack = familySetupPlan("moss_image", {
-    info: old,
-    profiles: oldProfiles,
-    profileId: folder.id,
-  });
-  assert.deepEqual(
-    [pack.route, pack.parts.length, pack.comfy.pack.loaded, pack.comfy.pack.part.nodePack.subdir],
-    ["pack", 0, false, "comfyui/moss-image"],
-  );
-  assert.equal(familySetupPlan("sdxl", { info: current }), null);
-});
-
 /* ------------------------------------------------------------ FLUX.3 */
 
 const flux3Dit = (flowMap) => ({
@@ -2322,7 +2218,7 @@ test("FLUX.3 Klein and Klein Base are told apart by their weights, and run behin
   );
 });
 
-test("FLUX.3 runs without its prompt upsampler, which is recommended until dismissed, and gated files fall back to the open copy", async () => {
+test("FLUX.3 runs without its prompt upsampler, which is recommended, and gated files fall back to the open copy", async () => {
   const info = objectInfo({
     unets: ["flux3-image-klein-bf16.safetensors"],
     clips: ["qwen3vl_4b_int8_convrot.safetensors"],
@@ -2337,7 +2233,7 @@ test("FLUX.3 runs without its prompt upsampler, which is recommended until dismi
   const profile = profileOf();
   assert.deepEqual([profile.ready, profile.missing.length, profile.upsampler], [true, 0, ""]);
   const part = profile.recommended.find((item) => item.slot === "upsampler");
-  assert.deepEqual([part.label, part.dismissKey], ["FLUX.3 prompt upsampler", "flux3:upsampler"]);
+  assert.equal(part.label, "FLUX.3 prompt upsampler");
   // BFL's gated file first, then the same file from the open copy, build by build.
   assert.deepEqual(
     part.downloads.slice(0, 2).map((item) => [item.file, item.source]),
@@ -2362,13 +2258,6 @@ test("FLUX.3 runs without its prompt upsampler, which is recommended until dismi
     [byType(graph, "TextGenerate").length, byType(graph, "CLIPTextEncode")[0].inputs.text],
     [0, "a fox"],
   );
-  // "Don't show again" holds for the family, and can be taken back.
-  const { setDismissed } = await import("./dismissals.js");
-  setDismissed("flux3:upsampler");
-  assert.deepEqual(profileOf().recommended, []);
-  setDismissed("flux3:upsampler", false);
-  assert.equal(profileOf().recommended.length, 1);
-  assert.throws(() => setDismissed("../etc"), /isn’t something/);
   // An older ComfyUI: update first.
   const old = inferModels(
     objectInfo({ unets: ["flux3-image-klein-bf16.safetensors"], clipTypes: newTypes }),

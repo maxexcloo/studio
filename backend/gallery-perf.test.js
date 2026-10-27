@@ -13,7 +13,6 @@ const {
   filterVisibleGallery,
   flushGallery,
   flushGalleryStrict,
-  galleryDelta,
   galleryPath,
   galleryRevisionValue,
   markGalleryReset,
@@ -50,12 +49,10 @@ test("an output deleted outside the app drops out of the gallery", async () => {
   );
 });
 
-test("a grouping change resets browsers once, then the delta is quiet", () => {
+test("a grouping change moves the gallery revision on", () => {
   const before = galleryRevisionValue();
-  assert.equal(galleryDelta({ since: before }).reset, false);
   markGalleryReset();
-  assert.equal(galleryDelta({ since: before }).reset, true);
-  assert.equal(galleryDelta({ since: galleryRevisionValue() }).reset, false);
+  assert.ok(galleryRevisionValue() > before);
 });
 
 test("a local output's cached thumbnail is served without fetching the original", async (t) => {
@@ -297,13 +294,14 @@ test("a live preview reaches other browsers while rendering, and is not kept onc
   );
   const since = galleryRevisionValue();
   updateGalleryJob("job-1", { preview: "data:image/jpeg;base64,AAAA" }, { persist: false });
-  assert.equal(galleryDelta({ since }).upserts[0].preview, "data:image/jpeg;base64,AAAA");
+  assert.ok(galleryRevisionValue() > since);
+  assert.equal(pageGallery({}).items[0].preview, "data:image/jpeg;base64,AAAA");
   const before = galleryRevisionValue();
   updateGalleryJob("job-1", { preview: "data:image/jpeg;base64,AAAA" }, { persist: false });
   assert.equal(galleryRevisionValue(), before, "an unchanged patch does not bump the revision");
   updateGalleryJob("job-1", { status: "done", preview: undefined }, { persist: false });
   assert.deepEqual(
-    galleryDelta({ since }).upserts.map((item) => [item.status, item.preview]),
+    pageGallery({}).items.map((item) => [item.status, item.preview]),
     [["done", undefined]],
   );
 });

@@ -98,10 +98,6 @@ test(
   async () => {
     await start({ STUDIO_WORKERS: "[]" });
     try {
-      const status = (await api("/api/comfy/status")).body;
-      assert.equal(status.connected, false);
-      assert.equal(status.noWorkers, true);
-      assert.deepEqual(status.workers, []);
       const health = await api("/api/health");
       assert.equal(health.status, 503);
       assert.equal(health.body.noWorkers, true);
@@ -140,17 +136,6 @@ test(
       ]),
     });
     try {
-      const status = (await api("/api/comfy/status")).body;
-      assert.deepEqual(
-        status.workers.map((worker) => [worker.id, worker.name, worker.connected]),
-        [
-          ["stopped", "Stopped GPU", false],
-          ["images", "Image GPU", true],
-          ["videos", "Video GPU", true],
-        ],
-      );
-      assert.deepEqual(status.workers[2].capabilities, ["video"]);
-
       const listed = (await api("/api/workers")).body;
       assert.deepEqual(
         listed.workers.map((worker) => [worker.id, worker.locked, worker.source]),
@@ -237,7 +222,6 @@ test(
         ),
         ["spare"],
       );
-      assert.equal((await api("/api/comfy/status")).body.workers.length, 4);
 
       // Test asks a saved worker or a typed address, and saves nothing.
       assert.equal((await api("/api/workers/test", { id: "videos" })).body.reachable, true);

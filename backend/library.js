@@ -42,7 +42,7 @@ const foldersPath = path.join(dataDir, "library-folders.json");
 export const imagePattern = /\.(png|jpe?g|webp|gif|avif)$/i;
 export const videoPattern = /\.(mp4|webm|mov|mkv)$/i;
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|mp4|webm|mov|mkv)$/i;
-export const scanFileLimit = 20000;
+const scanFileLimit = 20000;
 const scanDepth = 8;
 // Studio's output folder (data-names.js). Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in

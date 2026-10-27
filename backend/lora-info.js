@@ -344,11 +344,6 @@ export function loraInfo(name) {
   return info;
 }
 
-/** Only what is known already, without touching the disk: for hot paths such as every Generate. */
-export function cachedLoraAbout(name) {
-  return lastKnown.get(name)?.about || "";
-}
-
 /**
  * Every listed LoRA's info. A ComfyUI on another computer only hands out the
  * metadata block (no tensor names) through /view_metadata, so those are read
