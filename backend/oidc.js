@@ -198,9 +198,6 @@ export function createOidcClient(config, { fetchImpl = fetch, now = () => Date.n
       subject: claims.sub,
       email: typeof claims.email === "string" ? claims.email.trim() : "",
       emailVerified: claims.email_verified === true,
-      name: String(claims.name || claims.preferred_username || "")
-        .trim()
-        .slice(0, 80),
     };
   }
 

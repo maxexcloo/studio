@@ -38,10 +38,10 @@ test("Administrators explicitly link, dismiss and unlink chat identities with sa
   await page.goto("/settings#users");
   await page.getByRole("button", { name: "Chat Gateway", exact: true }).click();
   await page.getByRole("combobox", { name: "Account for chat-member", exact: true }).click();
-  await page.getByRole("option", { name: "Member (member@example.test)", exact: true }).click();
+  await page.getByRole("option", { name: "member@example.test", exact: true }).click();
   await page.getByRole("button", { name: "Link chat-member", exact: true }).click();
   const linked = page.getByRole("row", { name: "chat-member", exact: true });
-  await expect(linked).toContainText("Member (member@example.test)");
+  await expect(linked).toContainText("member@example.test");
   await expect(linked).not.toContainText("Awaiting Link");
   const rowAction = async (identity: string, action: string) => {
     await page.getByRole("button", { name: `Actions for ${identity}`, exact: true }).click();
@@ -195,12 +195,16 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
     )
     .toBe(true);
   await section(page, "Settings", "Users");
-  const member = page.getByRole("row", { name: "Member", exact: true });
-  await member.getByRole("combobox", { name: "Access Group for Member", exact: true }).click();
+  const member = page.getByRole("row", { name: "member@example.test", exact: true });
+  await member
+    .getByRole("combobox", { name: "Access Group for member@example.test", exact: true })
+    .click();
   await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
   await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
   await expect(member.getByText("NSFW Models On", { exact: true })).toBeVisible();
-  await member.getByRole("button", { name: "Actions for Member", exact: true }).click();
+  await member
+    .getByRole("button", { name: "Actions for member@example.test", exact: true })
+    .click();
   await page.getByRole("menuitem", { name: "Disable Account", exact: true }).click();
   await expect(member.getByText("Disabled", { exact: true })).toBeVisible();
   expect(state.administration.accounts.find((account) => account.id === "member")?.disabled).toBe(
@@ -208,19 +212,11 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
   );
 });
 
-test("Users update their own display name and retain password-protected email controls", async ({
-  page,
-}) => {
-  const state = await fixtures(page);
+test("Users change their email only behind password-protected controls", async ({ page }) => {
+  await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/settings");
   const own = page.getByRole("region", { name: "Your Account", exact: true });
-  await own.getByRole("textbox", { name: "Display Name", exact: true }).fill("Studio Maker");
-  await own.getByRole("button", { name: "Save Display Name", exact: true }).click();
-  await expect.poll(() => state.ownAccount.displayName).toBe("Studio Maker");
-  await expect(own.getByRole("textbox", { name: "Display Name", exact: true })).toHaveValue(
-    "Studio Maker",
-  );
   await own.getByRole("button", { name: "Email & Password", exact: true }).click();
   await expect(own.getByRole("textbox", { name: "Email", exact: true })).toHaveValue(
     "admin@example.test",
@@ -231,26 +227,17 @@ test("Users update their own display name and retain password-protected email co
   ).toBeDisabled();
 });
 
-test("Account menu opens the account workspace and reflects the saved name", async ({
+test("Account menu names the account by its email and opens the account workspace", async ({
   page,
 }, testInfo) => {
-  const state = await fixtures(page);
+  await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/");
-  async function account() {
-    if (testInfo.project.use.isMobile)
-      await page.getByRole("button", { name: "More Options", exact: true }).click();
-    else await page.getByRole("button", { name: "Your Account", exact: true }).click();
-  }
-  await account();
-  await expect(page.getByText("Administrator", { exact: true })).toBeVisible();
+  if (testInfo.project.use.isMobile)
+    await page.getByRole("button", { name: "More Options", exact: true }).click();
+  else await page.getByRole("button", { name: "Your Account", exact: true }).click();
+  await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
   await page.getByRole("menuitem", { name: "Account", exact: true }).click();
   await expect(page).toHaveURL(/\/settings#account$/);
-  await page.getByRole("textbox", { name: "Display Name", exact: true }).fill("Studio Artist");
-  await page.getByRole("button", { name: "Save Display Name", exact: true }).click();
-  await expect.poll(() => state.ownAccount.displayName).toBe("Studio Artist");
-  await page.getByRole("button", { name: "Close Settings", exact: true }).click();
-  await account();
-  await expect(page.getByText("Studio Artist", { exact: true })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
 });
