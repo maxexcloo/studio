@@ -40,10 +40,6 @@ export function noteIngested(jobIds) {
     console.warn(`[Studio] Could not record ingested runs: ${error.message}`);
   }
 }
-export function wasIngested(jobId) {
-  return Boolean(jobId && ingestedJobs().has(String(jobId)));
-}
-
 /**
  * ComfyUI as a worker (media-paths.js): a finished output is copied over
  * ComfyUI's /view API into Studio media, and only once that copy is safely on

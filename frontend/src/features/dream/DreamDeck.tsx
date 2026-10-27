@@ -15,7 +15,7 @@ import { calibrationQuery, dreamItemPath, dreamQuery, type DreamItem } from "./q
 import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
 import classes from "./DreamPage.module.css";
 
-export type Verdict = "discard" | "keep" | "variations" | "star" | "animate";
+type Verdict = "discard" | "keep" | "variations" | "star" | "animate";
 const directions: Record<Verdict, Direction> = {
   discard: "left",
   keep: "right",

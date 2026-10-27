@@ -2,7 +2,7 @@
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
  * access-profile feature, works only with profiles the account may use, and Spicy needs NSFW Models.
- * LoRA suggestions need the LoRAs feature. Drafting guides and profiles is for administrators.
+ * LoRA suggestions need the LoRAs feature.
  *
  *   GET  /api/assistant                 what this account may use: presets, models, vision, and the
  *                                       profiles whose guide takes no negative (noNegative)
@@ -10,12 +10,6 @@
  *                                       (text/event-stream: delta, done, error) or JSON
  *   POST /api/assistant/negative        { profileId, prompt, cfg?, loras? } → { negative | null, unused }
  *   POST /api/assistant/loras           { profileId, prompt } → { loras: [{ name, title, strength, triggers, reason }] }
- *   POST /api/assistant/describe        { image, hint?, profileId? } → { prompt, negative, profileId, loras }
- *   POST /api/assistant/draft-guide     admin: { profileId, sourceText, nearestPackId? } → { guide, aiDrafted }
- *   POST /api/assistant/draft-profile   admin: { id, templateId, modelFile, recommended?, sourceText? } → { text, check, aiDrafted }
- *   GET  /api/assistant/models          admin: the gateway's models, for Settings
- *
- * Nothing here saves a draft: later phases store them through profile-store.js.
  */
 import {
   AssistantError,
@@ -37,7 +31,6 @@ export const assistantSettingKeys = Object.freeze([assistantModelKey, assistantS
 
 /** Whether an account (or single-user Studio, with no account) has a feature. */
 const allowed = (req, feature) => !req.studioAccount || mayUseFeature(req.studioAccount, feature);
-const isAdministrator = (req) => !req.studioAccount || req.studioAccount.role === "administrator";
 
 const disconnectSignal = (res) => {
   const controller = new AbortController();
@@ -166,8 +159,7 @@ export function assistantSettingValue(key, value) {
 /**
  * `profiles(req)`: the generation profiles this account may use (account-scoped). `guide(profile)`:
  * its detailed prompting guide. `loras(req)`: [{ name, info }] the account may stack. `starred(req,
- * profile)`: { examples, loras } from starred results on the same family. `template(id)`: a profile's
- * workflow JSON. `checkProfile(id, text)`: validateProfileText's result. `pack(id)`: a guide pack.
+ * profile)`: { examples, loras } from starred results on the same family.
  */
 export function registerAssistantRoutes(
   app,
@@ -179,14 +171,6 @@ export function registerAssistantRoutes(
     guide = () => null,
     loras = async () => [],
     starred = async () => ({ examples: [], loras: [] }),
-    template = async () => null,
-    checkProfile = async () => ({ ok: true, errors: [], warnings: [] }),
-    pack = () => null,
-    requireAdmin = (req, res) => {
-      if (isAdministrator(req)) return true;
-      res.status(403).json({ ok: false, error: "This action is restricted to administrators." });
-      return false;
-    },
   } = {},
 ) {
   const fail = (res, error) => {
@@ -372,86 +356,6 @@ export function registerAssistantRoutes(
       if (signal.aborted) return res.end();
       fail(res, error);
     }
-  });
-
-  app.post("/api/assistant/describe", async (req, res) => {
-    const context = await ready(req, res, { profileRequired: false });
-    if (!context) return;
-    try {
-      const images = await downscaleReferences([req.body?.image].filter(Boolean));
-      const visible = (await profiles(req)).map(({ id, label }) => ({ id, label }));
-      const offered = allowed(req, "loras") ? await loras(req) : [];
-      res.json({
-        ok: true,
-        ...(await engine.describe({
-          images,
-          hint: req.body?.hint,
-          profile: context.profile,
-          guide: context.guide,
-          profiles: visible,
-          loras: offered,
-        })),
-      });
-    } catch (error) {
-      fail(res, error);
-    }
-  });
-
-  app.post("/api/assistant/draft-guide", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const context = await ready(req, res);
-    if (!context) return;
-    try {
-      const nearest = req.body?.nearestPackId
-        ? pack(String(req.body.nearestPackId))
-        : context.guide;
-      res.json({
-        ok: true,
-        ...(await engine.draftGuide({
-          profile: context.profile,
-          family: context.profile.family,
-          sourceText: req.body?.sourceText,
-          nearest,
-        })),
-      });
-    } catch (error) {
-      fail(res, error);
-    }
-  });
-
-  app.post("/api/assistant/draft-profile", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const context = await ready(req, res, { profileRequired: false });
-    if (!context) return;
-    try {
-      const id = String(req.body?.id || "");
-      if (!/^[a-z0-9][a-z0-9._-]{0,79}$/.test(id))
-        throw new Error(
-          "Choose a profile id: lowercase letters, digits, dots, dashes or underscores.",
-        );
-      const base = await template(String(req.body?.templateId || ""));
-      if (!base)
-        throw Object.assign(new Error("That template profile was not found."), { status: 404 });
-      const drafted = await engine.draftProfile({
-        id,
-        template: base,
-        modelFile: String(req.body?.modelFile || ""),
-        recommended: req.body?.recommended || {},
-        sourceText: req.body?.sourceText,
-        nsfw: typeof req.body?.nsfw === "boolean" ? req.body.nsfw : undefined,
-      });
-      const text = `${JSON.stringify(drafted.profile, null, 2)}\n`;
-      const { raw: _raw, ...check } = await checkProfile(id, text);
-      res.json({ ok: true, text, check, aiDrafted: true, source: drafted.source });
-    } catch (error) {
-      fail(res, error);
-    }
-  });
-
-  app.get("/api/assistant/models", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ ok: true, models: engine ? await engine.listModels() : [] });
   });
 
   return engine;

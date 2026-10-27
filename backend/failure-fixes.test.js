@@ -12,7 +12,6 @@ test("a missing node from a known pack gets that pack's install", () => {
   );
   assert.equal(failure.nodePack?.id, "impactpack");
   assert.ok(failure.install?.commands?.length);
-  assert.equal(typeof failure.autoInstall?.manager, "boolean");
 });
 
 test("a node no known pack brings keeps the hint only", () => {

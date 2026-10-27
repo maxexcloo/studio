@@ -83,7 +83,7 @@ function stagedAction(operation: string, source: QueueJob | undefined, number: n
     : { title: `${verb} Result`, request: `${verb} this result` };
 }
 
-export function SessionPage() {
+function SessionPage() {
   const { id } = useParams();
   const { draft, setDraft, staged, setStaged } = useGeneration();
   const thread = useRef<HTMLDivElement>(null);

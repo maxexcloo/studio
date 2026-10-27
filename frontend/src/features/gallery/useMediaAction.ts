@@ -12,7 +12,7 @@ import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
 
-export interface AnimateChoice {
+interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;

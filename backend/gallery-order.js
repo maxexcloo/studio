@@ -41,7 +41,3 @@ export function compareGalleryKeys(a, b) {
 export function compareGalleryItems(a, b) {
   return compareGalleryKeys(galleryOrderKey(a), galleryOrderKey(b));
 }
-
-export function sortGalleryItems(items) {
-  return [...items].sort(compareGalleryItems);
-}

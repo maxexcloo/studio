@@ -8,14 +8,12 @@ import {
   setGallery,
   cleanupGalleryState,
   pageGallery,
-  galleryDelta,
   galleryRevisionValue,
 } from "./gallery-store.js";
 import { galleryFilter, setGalleryFavorites } from "./gallery-store.js";
 import { jobs } from "./jobs.js";
 import { exportFilename, sendGalleryExport } from "./gallery-export.js";
 import {
-  ownerIdForRequest,
   recordBelongsToRequest,
   recordBelongsToAccount,
   recordsForRequest,
@@ -188,33 +186,6 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
         ? {}
         : { outputs: filterVisibleGallery(recordsForRequest(gallery, req)) }),
     });
-  });
-
-  app.get("/api/gallery/delta", (req, res) => {
-    if (!requireGalleryAccess(req, res))
-      return res.json({ revision: 0, reset: false, upserts: [], removes: [] });
-    const since = Number(req.query.since || 0);
-    if (req.studioAccount) {
-      const delta = galleryDelta({
-        since,
-        type: String(req.query.type || ""),
-        includeFailed: req.query.includeFailed !== "0",
-        owner: ownerIdForRequest(req),
-        filter: searchFilter(req),
-      });
-      res.json(delta);
-      return;
-    }
-    const type = String(req.query.type || "");
-    const includeFailed = req.query.includeFailed !== "0";
-    const delta = galleryDelta({
-      since,
-      type,
-      includeFailed,
-      filter: (item) =>
-        recordBelongsToRequest(item, req) && (!searchFilter(req) || searchFilter(req)(item)),
-    });
-    res.json(delta);
   });
 }
 

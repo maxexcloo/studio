@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { Readable, Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
 import {
   comfy,
   comfyModelsDir,
@@ -14,11 +12,8 @@ import {
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { nodePacks } from "./node-packs.js";
-import { writeJsonFile } from "./json-store.js";
 import { freeBytesAt } from "./paths.js";
 import { outputFolderName } from "./data-names.js";
-
-export { freeBytesAt };
 
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
 // the reference workflow: soften the source with a lanczos pre-scale, then let
@@ -28,8 +23,7 @@ export const upscaleQualities = ["fast", "balanced", "high"];
 /**
  * Every file Studio may download, with the exact size and SHA-256 Hugging Face
  * publishes for it (the same hashes the SeedVR2 node's own registry checks).
- * Knowing them up front means the download dialog never guesses a size and a
- * finished download is verified before anything tries to load it.
+ * A file on disk only counts as present at its published size.
  */
 export const modelFiles = {
   "seedvr2_ema_3b_fp8_e4m3fn.safetensors": {
@@ -115,19 +109,9 @@ const presets = {
 const upscaleNodeClasses = nodePacks.seedvr2.nodes;
 const faceDetailNodeClasses = ["FaceDetailer", "UltralyticsDetectorProvider", "SAMLoader"];
 
-const repoOverride = process.env.STUDIO_SEEDVR2_HF_REPO || "";
-
 export function normalizeQuality(value = "") {
   const quality = String(value || "").toLowerCase();
   return upscaleQualities.includes(quality) ? quality : "balanced";
-}
-
-function downloadUrl(file) {
-  const repo =
-    repoOverride && modelFiles[file].repo === "numz/SeedVR2_comfyUI"
-      ? repoOverride
-      : modelFiles[file].repo;
-  return `https://huggingface.co/${repo}/resolve/main/${encodeURIComponent(file)}?download=true`;
 }
 
 /**
@@ -262,36 +246,6 @@ function detectedSeedVR2Nodes(info) {
     .sort();
 }
 
-/* ------------------------------------------------------------ node install */
-
-/** Manager 4 (pip, off unless ComfyUI starts with --enable-manager) and the older git install answer on different routes. */
-export async function managerAvailable() {
-  return (await managerInfo()).available;
-}
-
-/** Which ComfyUI-Manager answers, if any; `connected` is false when ComfyUI itself is down. */
-export async function managerInfo() {
-  for (const route of ["/v2/manager/version", "/manager/version"]) {
-    try {
-      const answer = await comfy(route, { signal: AbortSignal.timeout(5000) });
-      const version =
-        typeof answer === "string"
-          ? answer
-          : answer instanceof ArrayBuffer
-            ? Buffer.from(answer).toString("utf8")
-            : String(answer?.version || "");
-      return { connected: true, available: true, version: version.trim().slice(0, 40) || null };
-    } catch {
-      // Try the next route.
-    }
-  }
-  const connected = await comfy("/system_stats", { signal: AbortSignal.timeout(5000) }).then(
-    () => true,
-    () => false,
-  );
-  return { connected, available: false, version: null };
-}
-
 export function upscaleStatus(info = {}, quality = "balanced") {
   const normalized = normalizeQuality(quality);
   const missingNodes = missingNodeClasses(info, upscaleNodeClasses);
@@ -336,284 +290,7 @@ export function upscaleStatus(info = {}, quality = "balanced") {
       detectors: optionsFor(info, "UltralyticsDetectorProvider", "model_name").map(String),
       samModels: optionsFor(info, "SAMLoader", "model_name").map(String),
     },
-    install: installSnapshot(),
   };
-}
-
-/* ---------------------------------------------------------------- downloads */
-
-let install = null;
-
-function installSnapshot() {
-  if (!install) return null;
-  const { controller, ...rest } = install;
-  return { ...rest, files: rest.files?.map((file) => ({ ...file })) };
-}
-
-export function installState() {
-  return installSnapshot();
-}
-
-class VerifyError extends Error {}
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Hashes what an earlier attempt left behind so a resumed file is still checked end to end. */
-async function hashExisting(file, hash, signal) {
-  await pipeline(
-    fs.createReadStream(file),
-    new Transform({
-      transform(chunk, _encoding, done) {
-        hash.update(chunk);
-        done();
-      },
-    }),
-    { signal },
-  );
-}
-
-/**
- * One file, resumable: a `.part` from a cancelled or failed attempt is picked up
- * with a Range request instead of starting over. Bytes are hashed as they
- * stream, so verification costs nothing extra, and the write respects
- * backpressure so a fast link cannot balloon memory.
- */
-async function downloadOne(entry, dir, onProgress, signal) {
-  const spec = modelFiles[entry.file];
-  const target = path.join(dir, entry.file);
-  const partial = `${target}.part`;
-  let offset = fileSize(partial);
-  if (offset > spec.bytes) {
-    fs.rmSync(partial, { force: true });
-    offset = 0;
-  }
-  let hash = crypto.createHash("sha256");
-  if (offset) {
-    entry.phase = "resuming";
-    await hashExisting(partial, hash, signal);
-  }
-  entry.phase = "downloading";
-  let received = offset;
-  onProgress(received);
-  if (offset < spec.bytes) {
-    const response = await fetch(downloadUrl(entry.file), {
-      redirect: "follow",
-      signal,
-      headers: offset ? { range: `bytes=${offset}-` } : {},
-    });
-    if (offset && response.status === 200) {
-      // The server ignored the range: start this file over.
-      offset = 0;
-      received = 0;
-      hash = crypto.createHash("sha256");
-    }
-    if (!response.ok || !response.body) {
-      throw new Error(
-        `Hugging Face answered ${response.status} for ${entry.file}. Try again, or put it in ${dir} yourself.`,
-      );
-    }
-    await pipeline(
-      Readable.fromWeb(response.body),
-      new Transform({
-        transform(chunk, _encoding, done) {
-          hash.update(chunk);
-          received += chunk.length;
-          onProgress(received);
-          done(null, chunk);
-        },
-      }),
-      fs.createWriteStream(partial, { flags: offset ? "a" : "w" }),
-      { signal },
-    );
-  }
-  entry.phase = "verifying";
-  const digest = hash.digest("hex");
-  if (received !== spec.bytes || digest !== spec.sha256) {
-    fs.rmSync(partial, { force: true });
-    throw new VerifyError(
-      `${entry.file} didn’t match its published checksum, so it was deleted. Try again.`,
-    );
-  }
-  fs.renameSync(partial, target);
-  rememberValidated(dir, entry.file, spec);
-  entry.phase = "verified";
-}
-
-/**
- * The SeedVR2 node re-hashes a registry model on first use unless its cache
- * already vouches for it. We just verified the same hash, so record it the way
- * the node does and spare the first upscale a multi-gigabyte re-read.
- */
-function rememberValidated(dir, file, spec) {
-  if (!nodeRegistryNames.has(file)) return;
-  const cachePath = path.join(dir, ".validation_cache.json");
-  try {
-    let cache = {};
-    try {
-      cache = JSON.parse(fs.readFileSync(cachePath, "utf8")) || {};
-    } catch {
-      cache = {};
-    }
-    const stat = fs.statSync(path.join(dir, file));
-    cache[file] = { size: stat.size, mtime: stat.mtimeMs / 1000, hash: spec.sha256 };
-    writeJsonFile(cachePath, cache);
-  } catch {
-    // Only a speed-up; the node validates on its own without it.
-  }
-}
-
-/** Retries network hiccups with backoff; a checksum miss gets one clean retry from zero. */
-async function downloadWithRetry(entry, dir, onProgress, signal) {
-  let verifyRetries = 1;
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await downloadOne(entry, dir, onProgress, signal);
-    } catch (error) {
-      if (signal.aborted) throw error;
-      if (error instanceof VerifyError) {
-        if (verifyRetries-- <= 0) throw error;
-        continue;
-      }
-      if (attempt >= 3) throw error;
-      entry.phase = "retrying";
-      await sleep(1500 * (attempt + 1));
-    }
-  }
-}
-
-function downloadPlan(quality, info) {
-  const dir = seedvr2ModelDir();
-  const files = requiredModelsFor(quality, info, dir)
-    .filter((model) => !model.present)
-    .map(({ key, file, label, detail, bytes, partialBytes }) => ({
-      key,
-      file,
-      label,
-      detail,
-      bytes,
-      partialBytes,
-    }));
-  const totalBytes = files.reduce((sum, file) => sum + file.bytes, 0);
-  const remainingBytes = files.reduce((sum, file) => sum + file.bytes - file.partialBytes, 0);
-  return {
-    quality: normalizeQuality(quality),
-    modelDir: dir,
-    files,
-    totalBytes,
-    remainingBytes,
-    freeBytes: freeBytesAt(dir),
-  };
-}
-
-export function startModelInstall(quality, info) {
-  if (install?.status === "running") return installSnapshot();
-  const plan = downloadPlan(quality, info);
-  const dir = plan.modelDir;
-  if (!dir)
-    throw new Error(
-      "Set ComfyUI’s output folder in Settings › Library first. The upscale models go in the models folder next to it.",
-    );
-  if (!plan.files.length) {
-    install = {
-      status: "done",
-      quality: plan.quality,
-      files: [],
-      receivedBytes: 0,
-      totalBytes: 0,
-      startedAt: Date.now(),
-      finishedAt: Date.now(),
-    };
-    return installSnapshot();
-  }
-  // Leave room to breathe: a disk filled to the last byte takes ComfyUI down with it.
-  const headroom = 512 * 1024 * 1024;
-  if (plan.freeBytes !== null && plan.freeBytes < plan.remainingBytes + headroom) {
-    const gb = (bytes) => `${(bytes / 1e9).toFixed(1)} GB`;
-    throw new Error(
-      `Not enough disk space. The models need ${gb(plan.remainingBytes)}, and the drive has ${gb(plan.freeBytes)} free.`,
-    );
-  }
-  fs.mkdirSync(dir, { recursive: true });
-  const controller = new AbortController();
-  install = {
-    status: "running",
-    dir,
-    quality: plan.quality,
-    current: plan.files[0].file,
-    files: plan.files.map((file) => ({
-      file: file.file,
-      label: file.label,
-      detail: file.detail,
-      bytes: file.partialBytes,
-      totalBytes: file.bytes,
-      phase: "queued",
-      done: false,
-    })),
-    receivedBytes: plan.totalBytes - plan.remainingBytes,
-    totalBytes: plan.totalBytes,
-    bytesPerSecond: 0,
-    startedAt: Date.now(),
-    error: "",
-    controller,
-  };
-  const state = install;
-  let sampleAt = Date.now();
-  let sampleBytes = state.receivedBytes;
-  (async () => {
-    try {
-      for (const entry of state.files) {
-        state.current = entry.file;
-        await downloadWithRetry(
-          entry,
-          dir,
-          (received) => {
-            entry.bytes = received;
-            state.receivedBytes = state.files.reduce((sum, item) => sum + item.bytes, 0);
-            const now = Date.now();
-            if (now - sampleAt >= 500) {
-              const rate = Math.max(
-                0,
-                (state.receivedBytes - sampleBytes) / ((now - sampleAt) / 1000),
-              );
-              state.bytesPerSecond = state.bytesPerSecond
-                ? state.bytesPerSecond * 0.7 + rate * 0.3
-                : rate;
-              sampleAt = now;
-              sampleBytes = state.receivedBytes;
-            }
-          },
-          controller.signal,
-        );
-        entry.done = true;
-        entry.bytes = entry.totalBytes;
-      }
-      if (install === state)
-        install = {
-          ...installSnapshot(),
-          status: "done",
-          current: "",
-          bytesPerSecond: 0,
-          finishedAt: Date.now(),
-        };
-    } catch (error) {
-      const canceled = controller.signal.aborted;
-      if (install === state) {
-        install = {
-          ...installSnapshot(),
-          status: canceled ? "canceled" : "error",
-          bytesPerSecond: 0,
-          error: canceled ? "" : error.message || "Model download failed.",
-          finishedAt: Date.now(),
-        };
-      }
-    }
-  })();
-  return installSnapshot();
-}
-
-export function cancelModelInstall() {
-  install?.controller?.abort();
-  return installSnapshot();
 }
 
 /* ------------------------------------------------------------------- sizing */

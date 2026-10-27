@@ -3,7 +3,7 @@ import { ActionIcon, Group, TextInput, type TextInputProps } from "@mantine/core
 import { useMergedRef } from "@mantine/hooks";
 import { ArrowLeft, Search, X } from "lucide-react";
 
-export interface SearchInputProps extends Omit<TextInputProps, "rightSection"> {
+interface SearchInputProps extends Omit<TextInputProps, "rightSection"> {
   onClear: () => void;
   onClose?: () => void;
 }

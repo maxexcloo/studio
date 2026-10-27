@@ -2,7 +2,7 @@ import type { ServiceKind } from "./services.ts";
 
 export type WorkloadPhase = "running" | "starting" | "stopping" | "stopped" | "unknown";
 
-export interface RuntimeWorkload {
+interface RuntimeWorkload {
   id: string;
   label: string;
   kind: ServiceKind;

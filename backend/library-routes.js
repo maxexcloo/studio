@@ -200,7 +200,7 @@ export async function removeInstalled(want, { foldersFor = modelFolders } = {}) 
 }
 
 /** Each import's own picture (longest edge 1280 px, WebP), beside the records. */
-export function importPictures({ dataDir = currentDataDir(), sharp = loadSharp } = {}) {
+function importPictures({ dataDir = currentDataDir(), sharp = loadSharp } = {}) {
   const dir = path.join(dataDir, "library", "import-pictures");
   const fileFor = (id) =>
     /^imp-[a-z0-9]{6,40}$/.test(String(id)) ? path.join(dir, `${id}.webp`) : "";

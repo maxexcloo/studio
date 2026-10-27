@@ -181,11 +181,8 @@ export const demoMode = process.env.STUDIO_DEMO === "1";
  * answer from ComfyUI, and expires on its own after a few seconds.
  */
 let comfyUnreachableUntil = 0;
-// When each backend went quiet without refusing; removed whenever that backend answers.
-const comfySilentSince = new Map();
 export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
-  comfySilentSince.delete(currentComfyBackend());
   noteWorkerReachable(currentComfyBackend(), true);
   if (isDefaultBackend()) {
     comfyUnreachableUntil = 0;
@@ -193,43 +190,13 @@ export function noteComfyReachable() {
   }
 }
 
-/*
- * Busy or stopped. A ComfyUI that has stopped refuses the connection at once;
- * one that is loading a model, building its node list or paging memory takes
- * the connection and answers late, and its runs carry on meanwhile. So a check
- * that timed out reads as busy, for as long as a run would wait for it
- * (comfy-queue.js), and only then as stopped.
- */
-export const comfyBusyGraceMs =
-  Number(process.env.STUDIO_COMFY_LOST_AFTER_MS) > 0
-    ? Number(process.env.STUDIO_COMFY_LOST_AFTER_MS)
-    : 60_000;
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
 export function isComfyTimeout(error) {
   return error?.name === "AbortError" || error?.name === "TimeoutError";
 }
 /**
- * A check sent at `sentAt` timed out: whether ComfyUI still counts as busy
- * rather than stopped. `first` is true on the first timeout since it last answered.
- */
-export function noteComfySilent(sentAt, now = Date.now()) {
-  const backend = currentComfyBackend();
-  const first = !comfySilentSince.has(backend);
-  if (first) comfySilentSince.set(backend, sentAt);
-  const silentForMs = now - comfySilentSince.get(backend);
-  const busy = silentForMs < comfyBusyGraceMs;
-  // Silent past the grace: it has stopped, since its first unanswered check.
-  if (!busy && isDefaultBackend())
-    noteComfyState(
-      false,
-      "No answer to checks within the busy grace",
-      comfySilentSince.get(backend),
-    );
-  return { busy, first, silentForMs };
-}
-/**
  * Call with what a fetch to ComfyUI threw. A canceled request says nothing about ComfyUI, and a timed-out
- * one reads as busy (noteComfySilent decides when silence becomes an outage).
+ * one reads as busy: a busy ComfyUI takes the connection and answers late while its runs carry on.
  */
 export function noteComfyFetchError(error) {
   if (error?.name === "AbortError") return;

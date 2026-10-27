@@ -15,9 +15,9 @@ export function requireLocal(req, res) {
 }
 
 /**
- * Looking after the computer (model folders and downloads, node installs,
- * ComfyUI's address and restarts, the output folder, updates and workflow
- * files) happens at that computer, or by an administrator in account mode.
+ * Looking after the computer (model downloads, workers, the output folder
+ * and workflow files) happens at that computer, or by an administrator in
+ * account mode.
  * Anywhere else the server refuses them and the app hides them.
  */
 export function requireAdmin(req, res) {

@@ -30,7 +30,7 @@ import { queueQuery } from "../generation/Queue";
 import type { Comparison } from "./queries";
 
 /** The settings a compare run starts from: the composer's draft or a saved result's. */
-export interface CompareBase {
+interface CompareBase {
   input: GenerationInput;
   references: ReferenceAsset[];
   sessionId?: string;
