@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import path from "node:path";
 import { migrateRuntime, restoreRuntimeBackup } from "../persistence/migration.ts";
+import { remapProfileIds } from "../persistence/profile-ids.ts";
 import { applyStudioNames, planStudioNames, undoStudioNames } from "../persistence/studio-names.ts";
 const { values } = parseArgs({
   options: {
@@ -38,7 +39,7 @@ else {
     const { changes: _changes, ...plan } = planStudioNames(dataDir, options);
     names = { ...plan, applied: false };
   }
-  result = { runtime, names };
+  result = { runtime, names, profileIds: remapProfileIds(dataDir, { apply: values.apply }) };
 }
 console.log(JSON.stringify(result, null, 2));
 if (result.conflicts?.length || result.runtime?.conflicts.length || result.names?.conflicts.length)
