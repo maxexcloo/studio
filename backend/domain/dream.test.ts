@@ -96,7 +96,11 @@ function fixture(t: TestContext) {
         state.calls.push({ model, system: messages[0].content, user: messages[1].content });
         state.prompts++;
         return {
-          text: JSON.stringify({ prompt: `dream ${state.prompts}`, why: "You star foxes." }),
+          text: JSON.stringify({
+            prompt: `dream ${state.prompts}`,
+            why: "You star foxes.",
+            title: "Fox Dream",
+          }),
         };
       },
     },
@@ -213,6 +217,8 @@ test("Dream is off until turned on, queues one hidden job only while Studio is i
   assert.equal(job.input.profileId, "flux");
   assert.equal(job.input.prompt, "dream 1");
   assert.equal(job.input.allowFallback, false);
+  // The title written with the prompt goes to the result (gallery-store.js).
+  assert.equal((job.input.writing as { title?: string }).title, "Fox Dream");
   assert.deepEqual(job.dream && { prompt: job.dream.prompt, why: job.dream.why }, {
     prompt: "dream 1",
     why: "You star foxes.",

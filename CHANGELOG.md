@@ -16,6 +16,7 @@ version opens with a `> ` summary line.
 ### Added
 
 - The Generations queue offers Stop and Clear per item, and Stop All and Clear Failed with a confirmation. Clearing a failed generation only takes it out of the queue.
+- Gallery titles: the text model titles each image and video in a few words from its prompt, as it completes and, for the rest of the gallery, while Studio is idle. The title shows wherever an item's title does; the prompt's first words stand in until it is written.
 
 ### Changed
 
