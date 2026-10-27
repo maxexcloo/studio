@@ -335,11 +335,12 @@ test("animating an image sends it as the first frame, shaped by the image, withi
     );
     assert.equal(submissions(), 1);
 
-    // A provider refusal fails the job with its status, which MCP reads to pause cloud video.
+    // A provider refusal fails the job with its status, which MCP reads to pause cloud video, and
+    // the provider's own reason.
     remote.rejectVideos(true);
     const refused = await run(animate);
     assert.equal(refused.status, "failed");
-    assert.match(refused.reason, /HTTP 429/);
+    assert.match(refused.reason, /HTTP 429: Quota exhausted/);
     const failed = store.failedJobs("provider:cliproxyapi:", new Date(0).toISOString());
     assert.equal(failed.length, 3);
     assert.ok(failed.some((job) => job.id === refused.id));
