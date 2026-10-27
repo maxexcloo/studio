@@ -14,7 +14,6 @@ on:
       - .github/workflows/worker.yaml
       - LICENSE
       - worker/**
-  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -25,7 +24,7 @@ concurrency:
   group: worker-${{ github.ref }}
 
 env:
-  PUBLISH: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+  PUBLISH: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
   image:
@@ -56,8 +55,6 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
       - name: Build Worker For Verification
         uses: docker/build-push-action@v7
         with:
