@@ -4783,7 +4783,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "never to ordinary accounts",
   );
   const instructions = (await f.client("", adminToken)).getInstructions();
-  assert.match(instructions, /no tool deletes files or touches GPUs/);
+  assert.match(instructions, /only CombineBackends apply removes files \(the profiles it combines, after a backup\), and no tool touches GPUs/);
   // Every admin tool is non-destructive; the read-only ones say so.
   const tools = (await (await f.client("", adminToken)).listTools()).tools.filter((tool) =>
     adminToolNames.includes(tool.name),

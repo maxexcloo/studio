@@ -30,7 +30,7 @@ export const adminToolNames = Object.freeze([
   "Placement",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles and guides only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, and no tool deletes files or touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles and guides only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
