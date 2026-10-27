@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+
+- References, LoRAs and Presets share one picker: tabs, search and filters on one row, a selected image or LoRA fades with a check and a second click removes it, and Clear References, Clear LoRAs and Clear Preset sit in the footer.
+- Saved LoRA stacks are a Stacks tab and presets a list, both sortable by name or date, with rename, update and delete in each row's menu, Save at the bottom left and a prompt before replacing the draft.
+- The chip rail runs Profile, Reference Role, References, LoRAs, Aspect, Count, Seed, Expert, Compare and Presets; Reference Role is a dropdown, a set seed is a chip that clears it, and several LoRAs show as stacked thumbnails like references.
+
 ## [1.0.8] - 2026-10-27
 
 > Publishes 1.0.6 and 1.0.7, whose images never shipped

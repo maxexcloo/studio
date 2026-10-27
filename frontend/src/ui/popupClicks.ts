@@ -20,7 +20,9 @@ window.addEventListener(
   "pointerdown",
   (event) => {
     const target = event.target as Element;
-    closing = !target.closest(`${popupLayer}, [aria-expanded="true"]`) && popupOpen();
+    // A dialog opened from a popup, such as a delete confirmation, sits above it and owns its clicks.
+    closing =
+      !target.closest(`${popupLayer}, [aria-expanded="true"], .mantine-Modal-root`) && popupOpen();
   },
   true,
 );
