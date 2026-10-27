@@ -10,9 +10,11 @@ on:
 permissions:
   contents: read
 
+# Only pull requests cancel superseded runs: every main commit must publish its sha image, which a
+# release tag of that commit promotes.
 concurrency:
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
-  group: studio-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: studio-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
