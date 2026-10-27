@@ -43,14 +43,15 @@ export interface TasteRecord {
   since: number;
 }
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
-export interface TasteWriter {
+export interface TasteWriter<Content = string> {
   settings(): { model: string };
   chat(request: {
     model: string;
-    messages: { role: "system" | "user"; content: string }[];
+    messages: { role: "system" | "user"; content: Content }[];
     temperature?: number;
     maxTokens?: number;
     timeout?: number;
+    signal?: AbortSignal;
   }): Promise<{ text: string }>;
 }
 interface Request {

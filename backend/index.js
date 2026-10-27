@@ -21,7 +21,11 @@ import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
 import { fullBodyPerson } from "./mcp-prompt-checks.js";
-import { createSuggestions, registerSuggestionRoutes } from "./domain/suggestions.ts";
+import {
+  createNextStepWork,
+  createSuggestions,
+  registerSuggestionRoutes,
+} from "./domain/suggestions.ts";
 import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
@@ -1565,6 +1569,7 @@ const jobAdmitted = (job) => {
   finishing.admitted(job);
   captioner.interrupt();
   titler.interrupt();
+  nextSteps.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
   starred: (req, items, favorite) => {
@@ -2248,17 +2253,18 @@ const textBusy = () =>
       .get(),
   );
 // Suggestions (domain/suggestions.ts): composer ideas, viewer next steps and Chat context from taste.
-registerSuggestionRoutes(app, {
-  suggestions: createSuggestions({
-    taste,
-    writer: tasteWriter,
-    online: textOnline,
-    item: (ownerId, jobId) =>
-      filterVisibleGallery(
-        gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
-      )[0],
-  }),
+const suggestions = createSuggestions({
+  taste,
+  writer: tasteWriter,
+  online: textOnline,
+  item: (ownerId, jobId) =>
+    filterVisibleGallery(
+      gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
+    )[0],
+  // The viewer asks by job, so every result of the run keeps the same steps.
+  save: (item, nextSteps) => updateGalleryJob(item.jobId, { nextSteps }),
 });
+registerSuggestionRoutes(app, { suggestions });
 // Dream (domain/dream.ts): idle-time results from the taste profile, off until an account turns it on.
 // It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
 const dream = createDream({
@@ -2361,6 +2367,17 @@ function promptAssistantOwner(ownerId) {
   const account = ownerId ? accountAccessForId(ownerId) : undefined;
   return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
 }
+/** A small (≤512 px) JPEG of a gallery image for the text model, or null without sharp. */
+async function smallImage(item) {
+  const sharp = await loadSharp();
+  if (!sharp) return null;
+  const data = await sharp((await publicGalleryBuffer(item)).buffer)
+    .rotate()
+    .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+  return { mime: "image/jpeg", data: data.toString("base64") };
+}
 // Gallery captions (domain/captions.ts) let search match what an image shows.
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
@@ -2369,16 +2386,7 @@ const captioner = createCaptioner({
   allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
-  image: async (item) => {
-    const sharp = await loadSharp();
-    if (!sharp) return null;
-    const data = await sharp((await publicGalleryBuffer(item)).buffer)
-      .rotate()
-      .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-    return { mime: "image/jpeg", data: data.toString("base64") };
-  },
+  image: smallImage,
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
   load: () => {
     try {
@@ -2399,6 +2407,16 @@ const titler = createTitler({
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   save: (item, title) => updateGalleryJob(galleryKey(item), { title }),
+});
+// Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
+const nextSteps = createNextStepWork({
+  suggestions,
+  writer: assistantEngine,
+  idle: studioIdle,
+  allowed: promptAssistantOwner,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  image: smallImage,
 });
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
@@ -2665,6 +2683,7 @@ dream.start();
 finishing.start();
 captioner.start();
 titler.start();
+nextSteps.start();
 
 /**
  * Upscaling runs on a worker with Upscale (workers.js): the routes below run

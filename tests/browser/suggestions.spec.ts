@@ -103,30 +103,42 @@ test("An idea chip fills the empty Chat message with a request to create it", as
   expect(state.chatRequests).toHaveLength(0);
 });
 
-test("A viewer next step stages its change in the prompt bar without queuing", async ({ page }) => {
+test("Viewer next steps load in place, a step generates its change and More asks for others", async ({
+  page,
+}) => {
   const state = await openViewer(page);
-  const asked = await suggest(page);
+  const asked: any[] = [];
+  const others = [{ label: "Snowfall", request: "add snow", prompt: "An amber bird in snow" }];
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/api/suggestions", async (route) => {
+    const body = route.request().postDataJSON();
+    asked.push(body);
+    if (!body.fresh) await held;
+    return route.fulfill({ json: { suggestions: body.fresh ? others : steps } });
+  });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const row = viewer.getByRole("group", { name: "Next Steps" });
-  await expect(row.getByRole("button")).toHaveText(steps.map((step) => step.label));
-  expect(asked).toContainEqual({ surface: "viewer", jobId: "job-hub" });
+  await expect(row).toHaveAttribute("aria-busy", "true");
+  release();
+  await expect(row).not.toHaveAttribute("aria-busy");
+  const more = row.getByRole("button", { name: "More Next Steps", exact: true });
+  await expect(row.getByRole("button")).toHaveText([...steps.map((step) => step.label), ""]);
+  expect(asked).toContainEqual({ surface: "viewer", jobId: "job-hub", fresh: false });
   await row.getByRole("button", { name: "Warmer Light" }).click();
-  const prompt = viewer.getByRole("textbox", { name: "Variation Prompt", exact: true });
-  await expect(prompt).toHaveValue("An amber bird, warm light");
-  await expect(prompt).toBeFocused();
-  await expect(row.getByRole("button", { name: "Warmer Light" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  expect(state.jobs).toHaveLength(1);
-  await prompt.press("Enter");
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     parentJobId: "job-hub",
     input: { prompt: "An amber bird, warm light" },
   });
+  await expect(viewer.getByRole("textbox", { name: "Variation Prompt", exact: true })).toHaveValue(
+    "An amber bird, warm light",
+  );
+  await more.click();
+  await expect(row.getByRole("button", { name: "Snowfall" })).toBeVisible();
+  expect(asked.at(-1)).toEqual({ surface: "viewer", jobId: "job-hub", fresh: true });
 });
 
 test("No ideas or next steps show when Studio has none", async ({ page }) => {

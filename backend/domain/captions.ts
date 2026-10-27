@@ -1,4 +1,5 @@
 import { createIdleWork, type IdleDocument, type IdleItem } from "./idle-work.ts";
+import type { ModelImage } from "./model-content.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
 export interface Caption {
@@ -12,16 +13,12 @@ export interface Caption {
 export interface CaptionItem extends IdleItem {
   caption?: Partial<Caption>;
 }
-interface CaptionImage {
-  mime: string;
-  data: string;
-}
 /** The assistant gateway (assistant.js). */
 export interface CaptionWriter {
   /** Whether the running text model reads images. */
   supportsVision(): Promise<boolean>;
   caption(request: {
-    image: CaptionImage;
+    image: ModelImage;
     signal?: AbortSignal;
   }): Promise<{ text: string; tags: string[]; model: string }>;
 }
@@ -41,7 +38,7 @@ export function createCaptioner(options: {
   items(): Iterable<CaptionItem>;
   visible(item: CaptionItem): boolean;
   /** A small (≤512 px) copy of the image, or null when there is none. */
-  image(item: CaptionItem): Promise<CaptionImage | null>;
+  image(item: CaptionItem): Promise<ModelImage | null>;
   save(item: CaptionItem, caption: Caption): void;
   load(): IdleDocument | null;
   persist(document: IdleDocument): void;

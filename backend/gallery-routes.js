@@ -176,15 +176,19 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
         (!search || search(item)),
     });
+    // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every page.
+    const listed = ({ nextSteps: _steps, ...item }) => item;
     res.json({
       ...page,
       items: page.items.map((item) =>
-        chats.has(item.jobId) ? { ...item, sessionId: chats.get(item.jobId).id } : item,
+        chats.has(item.jobId)
+          ? { ...listed(item), sessionId: chats.get(item.jobId).id }
+          : listed(item),
       ),
       // The whole list, for callers from before paging. A page is in `items` already.
       ...(cursor || limit
         ? {}
-        : { outputs: filterVisibleGallery(recordsForRequest(gallery, req)) }),
+        : { outputs: filterVisibleGallery(recordsForRequest(gallery, req)).map(listed) }),
     });
   });
 }
