@@ -1,36 +1,24 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActionBar, ActionIcon, Button, Group, Menu, Stack, Text, Tooltip } from "@mantine/core";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Download, RotateCw, Share, Square, SquareX, Star, Trash2, X } from "lucide-react";
-import { failure, post } from "../../api";
+import { useEffect, useRef, useState } from "react";
+import { ActionBar, Button, Group, Menu, Stack, Text } from "@mantine/core";
+import { useMutation } from "@tanstack/react-query";
+import { Download, RotateCw, Share, Square, Star, Trash2 } from "lucide-react";
+import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
+import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
+import { ActionBarGroups, ActionMenuItems, actionBarClass, type ActionGroups } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
+import { useFavorites } from "./useMediaFavorite";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
-
-interface SelectionAction {
-  id: string;
-  /** The accessible name; `short` is the visible label in the action bar. */
-  label: string;
-  short: string;
-  icon: ReactNode;
-  color?: string;
-  disabled?: boolean;
-  loading?: boolean;
-  /** A download link to `href`; other actions run `onClick`. */
-  link?: boolean;
-  href?: string;
-  onClick?: () => void;
-}
 
 const shareLimit = 20;
 
 /**
- * The selection header (count, quick selections, Clear and Done), the labelled bulk action bar and
- * the same actions as a context menu at `menu` for right-click or Shift+F10 on the selection.
+ * The selection header (count and quick selections), the bulk action bar, matching the viewer's,
+ * with Cancel, and the same actions as a context menu at `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -45,7 +33,6 @@ export function GallerySelectionBar({
 }) {
   const phone = usePhone();
   const [confirm, setConfirm] = useState(false);
-  const cache = useQueryClient();
   const queue = useQueue();
   const cancel = useQueueAction();
   const [busy, setBusy] = useState<"retry" | "stop" | null>(null);
@@ -65,19 +52,7 @@ export function GallerySelectionBar({
   const allStarred = ready.length > 0 && ready.every((item) => item.favorite);
   const downloadUrl = `/api/gallery/export?${new URLSearchParams({ ids: ready.map((item) => item.id).join(",") })}`;
   const downloadTooLarge = ready.length > 1000 || downloadUrl.length > 6000;
-  const star = useMutation({
-    mutationFn: async () => {
-      for (let offset = 0; offset < ready.length; offset += 500)
-        await post("/api/gallery/favorite", {
-          ids: ready.slice(offset, offset + 500).map((item) => item.id),
-          favorite: !allStarred,
-        });
-    },
-    onSettled: () =>
-      Promise.all(
-        ["gallery", "gallery-filters"].map((key) => cache.invalidateQueries({ queryKey: [key] })),
-      ),
-  });
+  const favorites = useFavorites();
   // Native sharing needs the tap itself, so the files are prepared first, as for one result.
   const shareKey = ready.map((item) => item.id).join("\n");
   const [shareFiles, setShareFiles] = useState<{ key: string; files: File[] } | null>(null);
@@ -127,74 +102,74 @@ export function GallerySelectionBar({
       setBusy(null);
     }
   }
-  const pending = star.isPending || busy !== null;
-  const actions: SelectionAction[] = [
-    {
-      id: "download",
-      label: "Download Selected",
-      short: "Download",
-      icon: <Download size={18} />,
-      disabled: !ready.length || downloadTooLarge,
-      link: true,
-      href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
-    },
-    ...(phone && typeof navigator.share === "function"
-      ? [
-          {
-            id: "share",
-            label: prepared ? "Share Selected" : "Prepare Share",
-            short: prepared ? "Share" : "Prepare",
-            icon: <Share size={18} />,
-            disabled: !ready.length || ready.length > shareLimit,
-            loading: prepare.isPending,
-            onClick: () => void share(),
-          },
-        ]
-      : []),
-    ...(failed.length || busy === "retry"
-      ? [
-          {
-            id: "retry",
-            label: "Retry Selected",
-            short: "Retry",
-            icon: <RotateCw size={18} />,
-            disabled: pending || !failed.length,
-            loading: busy === "retry",
-            onClick: () => void retrySelected(),
-          },
-        ]
-      : []),
-    ...(runningJobs.length || busy === "stop"
-      ? [
-          {
-            id: "stop",
-            label: "Stop Selected",
-            short: "Stop",
-            icon: <Square size={16} />,
-            disabled: pending || !runningJobs.length,
-            loading: busy === "stop",
-            onClick: () => void stopSelected(),
-          },
-        ]
-      : []),
-    {
-      id: "star",
-      label: allStarred ? "Unstar Selected" : "Star Selected",
-      short: allStarred ? "Unstar" : "Star",
-      icon: <Star size={18} fill={allStarred ? "currentColor" : "none"} />,
-      disabled: !ready.length || pending,
-      loading: star.isPending,
-      onClick: () => star.mutate(),
-    },
-    {
-      id: "delete",
-      label: "Delete Selected",
-      short: "Delete",
-      icon: <Trash2 size={18} />,
-      color: "red",
-      disabled: !deletable.length || pending,
-      onClick: () => setConfirm(true),
-    },
+  const pending = busy !== null;
+  const actions: ActionGroups = [
+    [
+      {
+        id: "star",
+        label: allStarred ? "Unstar Selected" : "Star Selected",
+        icon: Star,
+        pressed: allStarred,
+        disabled: !ready.length || pending,
+        onClick: () =>
+          favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+      },
+      {
+        id: "download",
+        label: "Download Selected",
+        icon: Download,
+        disabled: !ready.length || downloadTooLarge,
+        link: { href: ready.length && !downloadTooLarge ? downloadUrl : undefined, download: true },
+      },
+      ...(phone && typeof navigator.share === "function"
+        ? [
+            {
+              id: "share",
+              label: prepared ? "Share Selected" : "Prepare Share",
+              icon: Share,
+              disabled: !ready.length || ready.length > shareLimit,
+              loading: prepare.isPending,
+              onClick: () => void share(),
+            },
+          ]
+        : []),
+    ],
+    [
+      ...(failed.length || busy === "retry"
+        ? [
+            {
+              id: "retry",
+              label: "Retry Selected",
+              icon: RotateCw,
+              disabled: pending || !failed.length,
+              loading: busy === "retry",
+              onClick: () => void retrySelected(),
+            },
+          ]
+        : []),
+      ...(runningJobs.length || busy === "stop"
+        ? [
+            {
+              id: "stop",
+              label: "Stop Selected",
+              icon: Square,
+              disabled: pending || !runningJobs.length,
+              loading: busy === "stop",
+              onClick: () => void stopSelected(),
+            },
+          ]
+        : []),
+    ],
+    [
+      {
+        id: "delete",
+        label: "Delete Selected",
+        icon: Trash2,
+        color: "red",
+        disabled: !deletable.length || pending,
+        onClick: () => setConfirm(true),
+      },
+    ],
   ];
   useEffect(() => {
     if (confirm || pending) return;
@@ -233,7 +208,7 @@ export function GallerySelectionBar({
   ];
   return (
     <>
-      <Group gap={4} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
+      <Group gap={6} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
         <Text
           size="sm"
           fw={500}
@@ -248,8 +223,7 @@ export function GallerySelectionBar({
             (index === 0 || items.length > 0) && (
               <Button
                 key={name}
-                variant="subtle"
-                size="compact-sm"
+                {...chipProps}
                 aria-label={name}
                 disabled={!items.length || pending}
                 onClick={() => {
@@ -261,90 +235,47 @@ export function GallerySelectionBar({
               </Button>
             ),
         )}
-        <Group gap={4} ml="auto" wrap="nowrap">
-          <Tooltip label="Clear Selection" disabled={phone}>
-            <ActionIcon
-              aria-label="Clear Selection"
-              variant="subtle"
-              color="gray"
-              disabled={!selected.length || pending}
-              onClick={() => selection.retain([])}
-            >
-              <SquareX size={18} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Done Selecting" disabled={phone}>
-            <ActionIcon
-              aria-label="Done Selecting"
-              variant="subtle"
-              color="gray"
-              disabled={pending}
-              onClick={selection.end}
-            >
-              <X size={18} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+        <Button
+          {...chipProps}
+          aria-label="Clear Selection"
+          disabled={!selected.length || pending}
+          onClick={() => selection.retain([])}
+        >
+          Clear
+        </Button>
       </Group>
       <ActionBar
         opened={selection.selecting}
         aria-label="Selected Item Actions"
         radius="xl"
+        shadow="lg"
+        className={actionBarClass}
         position={{
           left: 0,
           right: 0,
           bottom: "calc(var(--studio-composer-gap) + env(safe-area-inset-bottom))",
         }}
-        w="calc(100% - 2 * var(--studio-composer-gap))"
-        maw="var(--studio-composer-width)"
         transitionProps={{ transition: "slide-up" }}
       >
-        <Stack gap={4} w="100%">
-          {/* 40px keeps the desktop bar the height of the composer it replaces. */}
-          <Group justify="center" gap={phone ? 0 : "xs"} wrap="nowrap" mih={phone ? undefined : 40}>
-            {actions.map((action) => {
-              const props = {
-                "aria-label": action.label,
-                variant: "subtle",
-                color: action.color || "gray",
-                size: phone ? "compact-xs" : "sm",
-                h: phone ? 52 : undefined,
-                px: phone ? 4 : undefined,
-                flex: phone ? 1 : undefined,
-                leftSection: phone ? undefined : action.icon,
-                loading: action.loading,
-                children: phone ? (
-                  <Stack gap={4} align="center">
-                    {action.icon}
-                    {action.short}
-                  </Stack>
-                ) : (
-                  action.short
-                ),
-              };
-              return action.link ? (
+        <Stack gap={4} align="center">
+          <Group gap={2} wrap="nowrap">
+            <ActionBarGroups
+              groups={actions}
+              trailing={
                 <Button
-                  key={action.id}
-                  component="a"
-                  href={action.href}
-                  download
-                  aria-disabled={action.disabled}
-                  data-disabled={action.disabled || undefined}
-                  onClick={(event) => action.disabled && event.preventDefault()}
-                  {...props}
-                />
-              ) : (
-                <Button
-                  key={action.id}
-                  disabled={action.disabled}
-                  onClick={action.onClick}
-                  {...props}
-                />
-              );
-            })}
+                  variant="subtle"
+                  color="gray"
+                  size="sm"
+                  disabled={pending}
+                  onClick={selection.end}
+                >
+                  Cancel
+                </Button>
+              }
+            />
           </Group>
           {downloadTooLarge && (
-            <Text size="xs" c="dimmed" ta="center">
+            <Text size="xs" c="dimmed" ta="center" px="sm">
               Select fewer items to download in one archive.
             </Text>
           )}
@@ -359,20 +290,7 @@ export function GallerySelectionBar({
         </Menu.Target>
         <Menu.Dropdown aria-label="Selection Actions">
           <Menu.Label>{selected.length} Selected</Menu.Label>
-          {actions.map((action) => (
-            <Menu.Item
-              key={action.id}
-              h={36}
-              color={action.color}
-              leftSection={action.icon}
-              disabled={action.disabled}
-              {...(action.link
-                ? { component: "a" as const, href: action.href, download: true }
-                : { onClick: action.onClick })}
-            >
-              {action.label}
-            </Menu.Item>
-          ))}
+          <ActionMenuItems groups={actions} />
         </Menu.Dropdown>
       </Menu>
       <DeleteMediaDialog

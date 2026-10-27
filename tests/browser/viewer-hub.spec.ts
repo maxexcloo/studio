@@ -102,7 +102,7 @@ test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", asyn
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(4);
   expect(state.jobs[3].input).toMatchObject({ seed: 1234567, steps: 28 });
-  await viewerAction(page, "Recreate in Composer");
+  await viewerAction(page, "Recreate");
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -140,7 +140,7 @@ test("Exact Repeat and Recreate keep the backend a combined profile ran on", asy
     profileBackend: "radiance",
     seed: 1234567,
   });
-  await viewerAction(page, "Recreate in Composer");
+  await viewerAction(page, "Recreate");
   await expect(viewer).toBeHidden();
   // The picker shows the backend this draft runs on, not the profile's current one.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
@@ -618,7 +618,7 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await viewerAction(page, "Recreate in Composer");
+  await viewerAction(page, "Recreate");
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");

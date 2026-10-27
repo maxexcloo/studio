@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ActionIcon,
   Alert,
   Button,
   Center,
@@ -39,6 +38,7 @@ import {
   hasGalleryFilters,
 } from "./GalleryFilters";
 import { usePhone } from "../../ui/usePhone";
+import { chipProps, iconChipProps } from "../generation/chip";
 import classes from "./GalleryPage.module.css";
 
 interface Page {
@@ -202,6 +202,11 @@ export function GalleryPage() {
             <SegmentedControl
               aria-label="Gallery View"
               size="sm"
+              classNames={{
+                root: classes.view,
+                control: classes.viewControl,
+                label: classes.viewControl,
+              }}
               radius="xl"
               value={view}
               onChange={(value) => setView(value as "grid" | "runs")}
@@ -212,17 +217,17 @@ export function GalleryPage() {
             />
           }
           actions={
-            <Tooltip label="Select Items">
-              <ActionIcon
+            <Tooltip label="Select Items" disabled={!phone}>
+              <Button
+                {...(phone ? iconChipProps : chipProps)}
                 ref={selectionButton}
                 aria-label="Select Items"
-                variant="subtle"
-                color="gray"
+                leftSection={phone ? undefined : <SquareCheck size={15} />}
                 disabled={!items.length}
                 onClick={selection.start}
               >
-                <SquareCheck size={19} />
-              </ActionIcon>
+                {phone ? <SquareCheck size={16} /> : "Select"}
+              </Button>
             </Tooltip>
           }
         />
@@ -252,15 +257,7 @@ export function GalleryPage() {
             onSelectionMenu={(x, y) => setMenu({ x, y })}
             onTryAgain={(item) => tryAgain([item.jobId || ""]).then(() => undefined)}
             renderActions={(item, opened, onOpenedChange) => (
-              <MediaTileActions
-                item={item}
-                opened={opened}
-                onOpenedChange={onOpenedChange}
-                onSelect={() => {
-                  selection.start();
-                  selection.toggle([item]);
-                }}
-              />
+              <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />
             )}
           />
         </div>

@@ -73,10 +73,16 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
     await expect(download).toHaveAttribute("download", `source.${upscaleExtension}`);
-    await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
-    if (kind === "image")
-      await expect(page.getByRole("menuitem", { name: "Compare", exact: true })).toBeVisible();
-    else await expect(page.getByRole("menuitem", { name: "Compare", exact: true })).toHaveCount(0);
+    // Phones keep Compare under More Viewer Actions.
+    const phone = test.info().project.use.isMobile;
+    if (phone)
+      await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
+    const compare = phone
+      ? page.getByRole("menuitem", { name: "Compare", exact: true })
+      : viewer.getByRole("button", { name: "Compare", exact: true });
+    if (kind === "image") await expect(compare).toBeVisible();
+    else await expect(compare).toHaveCount(0);
+    if (phone) await page.keyboard.press("Escape");
     await page.reload();
     await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
     await viewerOptions(page);
