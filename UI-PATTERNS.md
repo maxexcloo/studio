@@ -51,8 +51,8 @@ primary component reference and verify APIs against the installed version.
   right of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
   cloud configuration alone is not proof of availability). It opens the same
-  slideout everywhere: Chats in Chat, active and failed generations with Cancel
-  and Retry in gallery modes, and the compact service summary at the bottom.
+  slideout everywhere: Chats in Chat, active and failed generations with Stop,
+  Retry and Clear in gallery modes, and the compact service summary at the bottom.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Account, Library,
@@ -200,10 +200,12 @@ primary component reference and verify APIs against the installed version.
   A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
   in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
   the thinking collapsed under the prompt.
-- The status panel shows compact active rows with a muted spinner and Cancel;
-  completed/cancelled work leaves the list, failed work retains Retry. Cancel
-  All requests cancellation of owned active jobs; accepted work may remain
-  active until the provider confirms cancellation or outputs are safely saved.
+- The status panel shows compact active rows with a muted spinner and Stop;
+  completed/cancelled work leaves the list, failed work retains Retry and Clear.
+  Stop All and Clear Failed use `ConfirmDialog`. Stop All requests cancellation
+  of owned active jobs; accepted work may remain active until the provider
+  confirms cancellation or outputs are safely saved. Clearing only takes failed
+  jobs out of the queue; their records and chat cards stay.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Gallery search expands into a full-width focused input; Escape closes it
