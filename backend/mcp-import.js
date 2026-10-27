@@ -9,10 +9,6 @@ import { writeJsonFile } from "./json-store.js";
 import { mcpOwner } from "./mcp-media.js";
 
 const object = (value) => value && typeof value === "object" && !Array.isArray(value);
-export const mcpImportSupported = () => {
-  const [major, minor] = process.versions.node.split(".").map(Number);
-  return major > 23 || (major === 23 && minor >= 4) || (major === 22 && minor >= 13);
-};
 
 /** Run with both the bridge and destination studio stopped. Never starts either service. */
 export async function importMcpOwnership({ database, dataDir, studio, environment = process.env }) {
@@ -26,8 +22,6 @@ export async function importMcpOwnership({ database, dataDir, studio, environmen
     throw new Error(
       "Set STUDIO_MCP_SIGNING_KEY and this studio’s STUDIO_MCP_API_KEY in the environment.",
     );
-  if (!mcpImportSupported())
-    throw new Error("The offline ownership importer requires Node 22.13 or newer.");
   const file = path.join(dataDir, "mcp-ownership.json");
   let original = null;
   let state;
