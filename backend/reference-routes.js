@@ -13,22 +13,8 @@ import {
   saveUploadToGallery,
 } from "./reference-assets.js";
 import { requireLocal } from "./route-access.js";
-import { saveStartImage } from "./start-images.js";
 
 export function registerReferenceRoutes(app) {
-  app.post("/api/start-image", (req, res) => {
-    if (!requireLocal(req, res)) return;
-    try {
-      const result = saveStartImage({
-        dataUrl: req.body?.dataUrl || req.body?.startImage || "",
-        name: req.body?.name || req.body?.startImageName || "",
-      });
-      res.json({ ok: true, ...result });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
-  });
-
   app.get("/api/reference-assets", (req, res) => {
     try {
       const source = req.query.source === "generation" ? "generation" : "upload";

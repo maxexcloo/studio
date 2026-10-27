@@ -70,13 +70,6 @@ export async function cancelPrompt(promptId, request = comfy) {
   return "running";
 }
 
-/** Stops several of Studio's prompts; one that fails to stop does not keep the rest running. */
-export async function cancelPrompts(promptIds = [], request = comfy) {
-  const ids = [...new Set(promptIds.filter(Boolean))];
-  const results = await Promise.allSettled(ids.map((id) => cancelPrompt(id, request)));
-  return results.filter((result) => result.status === "rejected").length;
-}
-
 /**
  * Whether a failed request means ComfyUI is briefly out of reach (refused,
  * reset, timed out, a proxy's 5xx) rather than an answer that will not change.

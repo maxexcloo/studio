@@ -90,7 +90,6 @@ import {
   isDefaultBackend,
   mergeWorkerModels,
   noteWorkerProfiles,
-  noteWorkerReachable,
   profileOnBackendKey,
   routeJob,
   workerAvailability,
@@ -98,7 +97,6 @@ import {
 } from "./comfy-backends.js";
 import {
   capabilityForProfile,
-  defaultWorker,
   defaultWorkerId,
   listWorkers,
   noWorkerMessage,
@@ -118,12 +116,10 @@ import {
   inDotFolder,
   localOutputFile,
   outputMediaPattern,
-  comfyOutputDir,
   comfyUrl,
   host,
   noteComfyFetchError,
   noteComfyReachable,
-  noteComfySilent,
   isComfyTimeout,
   optionsFor,
   port,
@@ -156,7 +152,7 @@ import {
 } from "./deployment-settings.js";
 import { civitaiTokenStatus } from "./civitai-access.js";
 import { hfTokenStatus } from "./hf-access.js";
-import { primeModelMetadata, setModelChoice } from "./model-families.js";
+import { primeModelMetadata } from "./model-families.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -174,7 +170,7 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
 } from "./gallery-store.js";
-import { buildStats, getFileThumbnail, getThumbnail } from "./thumbnails.js";
+import { buildStats, getThumbnail } from "./thumbnails.js";
 import {
   clearPromptHistory,
   forgetPrompts,
@@ -188,8 +184,6 @@ import { fillVideoSizes, libraryFile, libraryFolders, rescanLibraryFolders } fro
 import {
   getComfyVideoPoster,
   getComfyVideoPreview,
-  getFileVideoPoster,
-  getFileVideoPreview,
   sendVideoPreview,
   sendVideoPoster,
 } from "./video-previews.js";
@@ -207,9 +201,6 @@ import {
   userWorkflowsDir,
 } from "./custom-workflows.js";
 import { galleryStats, profileStats } from "./stats.js";
-import { describeHardware } from "./hardware.js";
-import { familySetupPlan, guidedSetups } from "./family-setup.js";
-import { setDismissed } from "./dismissals.js";
 import {
   loadWorkflowPreferences,
   previewWorkflowImport,
@@ -233,39 +224,10 @@ import {
   referenceExistsForAccount,
   stageReferenceAssetsForAccount,
 } from "./reference-assets.js";
-import { nodePack, nodePacks } from "./node-packs.js";
-import {
-  beginComfyRestart,
-  comfyRestartStartedAt,
-  comfyRestarting,
-  finishComfyRestart,
-  lastComfyRestart,
-  noteComfyRestart,
-} from "./comfy-restart.js";
-import {
-  failedPacks,
-  loadedPacks,
-  logTextFromRaw,
-  packLabel,
-  restartChanges,
-} from "./restart-insights.js";
-import {
-  comfyRestartEstimate,
-  generationEstimate,
-  recordComfyRestart,
-  upscaleEstimate,
-} from "./timings.js";
+import { generationEstimate, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
-import { comfyRootDir, packInstallPlan } from "./node-install.js";
-import { linkModelFolders, modelFolderReport, unlinkModelFolder } from "./model-folders.js";
-import { packInstallRoutes, packInstallState, startPackInstall } from "./pack-installer.js";
 import {
-  cancelModelInstall,
-  installState,
-  managerAvailable,
-  managerInfo,
   normalizeQuality,
-  startModelInstall,
   upscalePlan,
   upscaleQualities,
   upscaleTargets,
@@ -481,7 +443,7 @@ const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
 // connection), so its failure is remembered briefly rather than retried on every
-// catalogue load and run. A status check that reaches it, or a new address, clears it.
+// catalogue load and run. A new address clears it.
 // The default worker is always asked: its absence is what the studio's offline screen shows.
 const workerUnreachableForMs = 30_000;
 const workerUnreachableUntil = new Map();
@@ -490,7 +452,6 @@ function forgetWorker(id) {
   contextCaches.delete(id);
   contextFailures.delete(id);
   workerUnreachableUntil.delete(id);
-  backendAnswers.delete(id);
   forgetWorkerState(id);
 }
 const backendUnreachable = (error) =>
@@ -797,14 +758,6 @@ app.get("/api/stats/profiles", (req, res) => {
   res.json({ ok: true, profiles: profileStats(filterVisibleGallery(gallery)) });
 });
 
-// What ComfyUI runs on (GPU, memory and the budget fit hints use). See backend/hardware.js.
-app.get("/api/hardware", async (_req, res) => {
-  const stats = contextFor().stats?.devices
-    ? contextFor().stats
-    : await comfy("/system_stats", { signal: AbortSignal.timeout(3000) }).catch(() => null);
-  res.json({ ok: true, hardware: await describeHardware({ stats, comfyUrl }) });
-});
-
 // Versions, system and GPU for a bug report (Settings › About, and a failed card's Copy report).
 app.get("/api/diagnostics", async (_req, res) => {
   // Long enough for a busy ComfyUI, whose slow answer is often what the report is about.
@@ -869,317 +822,20 @@ app.get("/api/health", async (req, res) => {
       ok: false,
       thisComputer: canAdmin(req),
       atComputer: clientOf(req).thisComputer,
-      restarting: comfyRestarting(),
-      error: comfyRestarting() ? "ComfyUI is restarting." : error.message,
+      error: error.message,
       startedAt: serverStartedAt,
       ...(previousExit && canAdmin(req) ? { previousExit } : {}),
     });
   }
 });
 
-// What the last answer said, for the status while ComfyUI is busy.
-let lastComfyAnswer = { url: "", version: "", device: "" };
-const backendAnswers = new Map();
-
 // Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
-
-/** Ordinary accounts see whether backends answer, never their addresses or nearby hosts. */
-function withoutBackendAddresses(status) {
-  // Error text can quote an address too; ordinary accounts get a plain one instead.
-  const plain = (value) =>
-    value &&
-    typeof value === "object" &&
-    typeof value.error === "string" &&
-    /:\/\/|\d+\.\d+\.\d+\.\d+|localhost/i.test(value.error)
-      ? { ...value, error: "Not connected" }
-      : value;
-  const { url: _url, backends, workers, ...rest } = plain(status) || {};
-  return {
-    ...rest,
-    ...(backends
-      ? {
-          backends: Object.fromEntries(
-            Object.entries(backends).map(([name, { url: _backendUrl, ...backend }]) => [
-              name,
-              plain(backend),
-            ]),
-          ),
-        }
-      : {}),
-    ...(workers ? { workers: workers.map(({ url: _workerUrl, ...worker }) => plain(worker)) } : {}),
-  };
-}
-
-/** One worker as the status poll reports it: who it is, what it runs and whether it answers. */
-const workerStatusEntry = (worker, answer) => ({
-  id: worker.id,
-  name: worker.name,
-  capabilities: worker.capabilities,
-  ...(isDefaultBackend(worker.id) ? { default: true } : {}),
-  ...answer,
-});
-
-app.get("/api/comfy/status", async function comfyStatus(req, res) {
-  if (req.studioAccount && !canAdmin(req) && !res.locals.ordinaryStatus) {
-    res.locals.ordinaryStatus = true;
-    const send = res.json.bind(res);
-    res.json = (body) => send(withoutBackendAddresses(body));
-  }
-  const workers = listWorkers();
-  // No workers is a setup Studio runs in: nothing to ask, and it says so.
-  if (!workers.length) {
-    if (demoMode)
-      return res.json({
-        connected: true,
-        isMock: true,
-        url: "",
-        latencyMs: 0,
-        device: "Demo mode",
-        workers: [],
-        backends: {},
-      });
-    return res.json({
-      connected: false,
-      noWorkers: true,
-      workers: [],
-      backends: {},
-      error: noWorkerMessage("image"),
-    });
-  }
-  if (workers.length > 1) {
-    const started = performance.now();
-    const sentAt = Date.now();
-    const results = await Promise.all(
-      workers.map((worker) =>
-        withComfyBackend(worker.id, async () => {
-          const url = worker.url;
-          try {
-            const stats = await comfy("/system_stats", { timeout: 1500 });
-            const answer = {
-              busy: false,
-              connected: true,
-              device: stats?.devices?.[0]?.name || "",
-              url,
-              version: stats?.system?.comfyui_version || "",
-            };
-            workerUnreachableUntil.delete(worker.id);
-            backendAnswers.set(worker.id, answer);
-            return answer;
-          } catch (error) {
-            const restarting = isDefaultBackend(worker.id) && comfyRestarting();
-            const busy = !restarting && isComfyTimeout(error) && noteComfySilent(sentAt).busy;
-            const known = backendAnswers.get(worker.id);
-            return {
-              busy: Boolean(busy),
-              connected: Boolean(busy),
-              ...(restarting ? { restarting: true } : {}),
-              device: busy && known?.url === url ? known.device : "",
-              version: busy && known?.url === url ? known.version : "",
-              url,
-              ...(busy ? {} : { error: "Not connected" }),
-            };
-          }
-        }),
-      ),
-    );
-    const backends = Object.fromEntries(
-      results.map((result, index) => [workers[index].id, result]),
-    );
-    return res.json({
-      connected: results.some((backend) => backend.connected),
-      backends,
-      workers: results.map((result, index) => workerStatusEntry(workers[index], result)),
-      ...restartFields(),
-      device: results
-        .map((backend, index) =>
-          backend.connected ? `${workers[index].name}: ${backend.device}` : "",
-        )
-        .filter(Boolean)
-        .join(" · "),
-      latencyMs: Math.round(performance.now() - started),
-      url: comfyUrl,
-    });
-  }
-  // One worker: upstream's status, with that worker named in the list as well.
-  if (!res.locals.oneWorker) {
-    res.locals.oneWorker = true;
-    const [worker] = workers;
-    const send = res.json.bind(res);
-    res.json = (body) => {
-      if (!body.busy) noteWorkerReachable(worker.id, Boolean(body.connected));
-      const answer = {
-        connected: Boolean(body.connected),
-        busy: Boolean(body.busy),
-        ...(body.restarting ? { restarting: true } : {}),
-        device: body.device || "",
-        version: body.version || "",
-        url: body.url || worker.url,
-        ...(body.error ? { error: body.error } : {}),
-      };
-      return send({ ...body, workers: [workerStatusEntry(worker, answer)] });
-    };
-  }
-  const startedAt = performance.now();
-  const sentAt = Date.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(`${comfyUrl}/system_stats`, { signal: controller.signal });
-    noteComfyReachable();
-    const latencyMs = Math.round(performance.now() - startedAt);
-    if (!response.ok) {
-      res.json({
-        connected: false,
-        isMock: demoMode,
-        url: comfyUrl,
-        latencyMs,
-        ...restartFields(),
-        error: `HTTP ${response.status}${demoMode ? " (Demo Mode Active)" : ""}`,
-      });
-      return;
-    }
-    const stats = await response.json();
-    const device = stats?.devices?.[0]?.name || "";
-    const version = stats?.system?.comfyui_version || "";
-    lastComfyAnswer = { url: comfyUrl, version, device };
-    res.json({
-      ...restartFields(),
-      connected: true,
-      url: comfyUrl,
-      latencyMs,
-      version,
-      device,
-    });
-  } catch (error) {
-    // Demo mode makes placeholder images without ComfyUI, so to the app it is connected.
-    if (demoMode) {
-      res.json({ connected: true, isMock: true, url: comfyUrl, latencyMs: 0, device: "Demo mode" });
-      return;
-    }
-    // It took the connection but hasn't answered: busy (comfy.js), not gone.
-    // Its runs carry on, so the studio stays connected, and nothing goes
-    // looking for another ComfyUI to replace it.
-    if (isComfyTimeout(error) && !comfyRestarting()) {
-      const silent = noteComfySilent(sentAt);
-      if (silent.first)
-        logWarning("ComfyUI is slow to answer", { url: comfyUrl, waitedMs: Date.now() - sentAt });
-      if (silent.busy) {
-        const known = lastComfyAnswer.url === comfyUrl ? lastComfyAnswer : {};
-        res.json({
-          ...restartFields(),
-          connected: true,
-          busy: true,
-          url: comfyUrl,
-          version: known.version || "",
-          device: known.device || "",
-        });
-        return;
-      }
-    }
-    // A timeout that outlasted the grace counts too: this poll is the app asking whether ComfyUI is there.
-    noteComfyFetchError(isComfyTimeout(error) ? new Error("timed out") : error);
-    const latencyMs = Math.round(performance.now() - startedAt);
-    const message = isComfyTimeout(error)
-      ? "Not answering for over a minute"
-      : error?.message || "Connection failed";
-    res.json({
-      connected: false,
-      isMock: demoMode,
-      url: comfyUrl,
-      latencyMs,
-      ...restartFields(),
-      error: `${message}${demoMode ? " (Demo Mode Active)" : ""}`,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
-/**
- * A restart Studio asked for, as the status poll reports it: restarting, since
- * when and how long it usually takes; and the one that just ended, so every
- * device that watched it can say how it went. The server's own watcher moves
- * the restart along; this only reads it.
- */
-function restartFields() {
-  const fields = {};
-  const last = lastComfyRestart();
-  if (last) fields.lastRestart = last;
-  if (!comfyRestarting()) return fields;
-  const estimate = comfyRestartEstimate();
-  const startedAt = comfyRestartStartedAt();
-  return {
-    ...fields,
-    restarting: true,
-    restartStartedAt: startedAt,
-    restartElapsedMs: Date.now() - startedAt,
-    ...(estimate ? { restartTypicalMs: estimate.typicalMs } : {}),
-  };
-}
-
-/** The node packs ComfyUI has loaded right now, or null when it cannot say. */
-async function currentPacks(timeout = 8000) {
-  try {
-    return loadedPacks(await comfy("/object_info", { signal: AbortSignal.timeout(timeout) }));
-  } catch {
-    return contextFor().info ? loadedPacks(contextFor().info) : null;
-  }
-}
-
-/**
- * Follows a restart until ComfyUI is back (or clearly is not), independent of
- * any tab polling, so its time is measured to about a second. Once back, it
- * compares the loaded packs with before and reads ComfyUI's startup log for
- * packs that failed to load. Only a plain restart, one that changed nothing,
- * counts toward the usual time.
- */
-let restartWatch = null;
-function watchComfyRestart() {
-  if (restartWatch) return restartWatch;
-  restartWatch = (async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    for (;;) {
-      const up = await fetch(`${comfyUrl}/system_stats`, {
-        signal: AbortSignal.timeout(1500),
-      }).then(
-        (response) => response.ok,
-        () => false,
-      );
-      const step = noteComfyRestart(up);
-      if (!step || step.phase === "failed") return;
-      if (step.phase === "back") {
-        const after = await currentPacks();
-        const log = await comfy("/internal/logs/raw", { signal: AbortSignal.timeout(4000) }).then(
-          logTextFromRaw,
-          () => "",
-        );
-        const changes = restartChanges(step.packs, after, failedPacks(log));
-        if (changes.plain && step.durationMs) recordComfyRestart(step.durationMs);
-        finishComfyRestart({
-          durationMs: step.durationMs,
-          newPacks: changes.newPacks.map(packLabel),
-          failedPacks: changes.failedPacks.map(packLabel),
-        });
-        refreshComfyContextSoon();
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  })()
-    .catch((error) => console.warn(`[Studio] Lost track of the ComfyUI restart: ${error.message}`))
-    .finally(() => {
-      restartWatch = null;
-    });
-  return restartWatch;
-}
 
 /** What to say when ComfyUI does not answer: restarting on purpose, or simply not there. */
 function comfyDownMessage(detail = "") {
   const worker = workerById(currentComfyBackend());
   if (!worker) return noWorkerMessage("image");
-  if (isDefaultBackend() && comfyRestarting())
-    return "ComfyUI is restarting. Try again in a few seconds.";
   if (!isDefaultBackend())
     return `Can’t reach ${worker.name} at ${worker.url}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
   return `Can’t reach ComfyUI at ${comfyUrl}. Start it, then try again.${detail ? ` (${detail})` : ""}`;
@@ -1452,53 +1108,7 @@ app.get("/api/animate/profile", async (req, res) => {
   }
 });
 
-app.put("/api/models/types", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    setModelChoice(req.body?.source, req.body?.name, req.body?.type);
-    const { info, stats } = await loadComfyContext();
-    res.json(inferModels(info, stats));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
 registerModelDownloadRoutes(app, { loadComfyContext });
-// Guided setup for a model already in ComfyUI that can run more than one way
-// (family-setup.js): how it runs and what that still needs, read fresh while the dialog watches.
-let setupContextAt = 0;
-app.get("/api/family-setup/:family", async (req, res) => {
-  const familyId = String(req.params.family);
-  if (!Object.hasOwn(guidedSetups, familyId))
-    return res.status(404).json({ ok: false, error: "No guided setup for that model." });
-  // The dialog polls; ComfyUI is asked again at most every few seconds.
-  const fresh = Date.now() - setupContextAt > 2500;
-  const context = await loadComfyContext({ force: fresh }).catch(() => null);
-  if (fresh && context) setupContextAt = Date.now();
-  const hardware = await describeHardware({ stats: context?.stats, comfyUrl }).catch(() => null);
-  const profiles = context?.info ? inferModels(context.info, context.stats).profiles : [];
-  const plan = familySetupPlan(familyId, {
-    info: context?.info || null,
-    profiles,
-    profileId: String(req.query.profile || ""),
-    device: { apple: Boolean(hardware?.unified) },
-    comfyVersion: String(context?.stats?.system?.comfyui_version || ""),
-  });
-  res.json({ ok: true, ...plan, local: downloadState().local });
-});
-
-// "Don't show again" for a recommended part (FLUX.3's prompt upsampler), kept in the data folder.
-app.put("/api/models/recommendations/:key", (req, res) => {
-  try {
-    res.json({
-      ok: true,
-      dismissed: setDismissed(String(req.params.key), req.body?.dismissed !== false),
-    });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
 const presetRoutes = registerPresetRoutes(app, {
   models: async () => {
     const { info, stats } = await loadComfyContext().catch(() => ({ info: null, stats: null }));
@@ -1612,13 +1222,6 @@ const library = registerLibraryRoutes(app, {
 });
 libraryUpdates = library.updates;
 
-app.get("/api/paths", async (req, res) => {
-  if (req.studioAccount && req.studioAccount.role !== "administrator")
-    return res.status(403).json({ ok: false, error: "Administrator access is required." });
-  await autoDetectOutputDir();
-  res.json({ outputDir: comfyOutputDir, galleryDir: dataDir, workflowsDir: userWorkflowsDir });
-});
-
 /** Ordinary accounts see only their permitted workflows, without server paths or delete handles. */
 function workflowsForRequest(req, workflows) {
   if (!req.studioAccount || canAdmin(req)) return workflows;
@@ -1660,25 +1263,6 @@ app.get("/api/workflows", async (req, res) => {
       ),
       preferences,
     });
-  }
-});
-
-app.put("/api/workflows/preferences", (req, res) => {
-  if (!requireLocal(req, res)) return;
-  try {
-    const current = loadWorkflowPreferences();
-    const favorites = Array.isArray(req.body?.favorites)
-      ? req.body.favorites.map(String)
-      : current.favorites;
-    const preferences = {
-      favorites,
-      lastUsed: { ...current.lastUsed, ...(req.body?.lastUsed || {}) },
-      thumbnails: { ...current.thumbnails, ...(req.body?.thumbnails || {}) },
-    };
-    saveWorkflowPreferences(preferences);
-    res.json({ ok: true, preferences });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
   }
 });
 
@@ -1842,27 +1426,6 @@ const assistantEngine = registerAssistantRoutes(app, {
       ],
     };
   },
-  template: async (id) => {
-    try {
-      return JSON.parse(readEditableProfile(id).text);
-    } catch {
-      return null;
-    }
-  },
-  checkProfile: async (id, text) =>
-    validateProfileText(id, text, {
-      info: await loadComfyContext()
-        .then((context) => context.info)
-        .catch(() => null),
-    }),
-  pack: (id) => {
-    try {
-      return guideStore().pack(id).pack;
-    } catch {
-      return null;
-    }
-  },
-  requireAdmin,
 });
 registerAnimatePromptRoute(app, {
   engine: assistantEngine,
@@ -2122,22 +1685,6 @@ app.get("/api/library/file", (req, res) => {
   });
 });
 
-app.get("/api/library/video-preview", async (req, res) => {
-  const file = libraryFile(req.query.folder, req.query.path);
-  if (!file || !/\.(mp4|webm|mov|mkv)$/i.test(file)) {
-    res.status(404).end();
-    return;
-  }
-  try {
-    const identity = `library:${String(req.query.folder)}:${String(req.query.path)}`;
-    if (req.query.poster === "1")
-      await sendVideoPoster(req, res, await getFileVideoPoster(file, identity));
-    else sendVideoPreview(req, res, await getFileVideoPreview(file, identity));
-  } catch {
-    if (!res.headersSent) res.status(503).end();
-  }
-});
-
 /**
  * A thumbnail's caching. The gallery asks for every thumbnail with a `v` that
  * names its item (mediaUrl.ts), so a reused file name is a new address: that
@@ -2150,36 +1697,6 @@ function thumbnailCacheControl(req) {
   if (req.query.type === mediaType) return derivedMediaCache;
   return req.query.v ? "private, max-age=600, stale-while-revalidate=2592000" : "private, no-cache";
 }
-
-app.get("/api/library/thumb", async (req, res) => {
-  const file = libraryFile(req.query.folder, req.query.path);
-  if (!file || !/\.(png|jpe?g|webp|gif|avif)$/i.test(file)) {
-    res.status(404).end();
-    return;
-  }
-  try {
-    const thumbnail = await getFileThumbnail(file);
-    if (!thumbnail) {
-      res.status(404).end();
-      return;
-    }
-    if (thumbnail.original) {
-      res.sendFile(file, { headers: { "Cache-Control": "private, max-age=0, must-revalidate" } });
-      return;
-    }
-    res.setHeader("Cache-Control", thumbnailCacheControl(req));
-    if (req.headers["if-none-match"] === thumbnail.etag) {
-      res.status(304).end();
-      return;
-    }
-    if (thumbnail.etag) res.setHeader("ETag", thumbnail.etag);
-    res.type("image/webp");
-    await pipeline(fs.createReadStream(thumbnail.file), res);
-  } catch (error) {
-    if (!res.headersSent) res.status(502).json({ ok: false, error: error.message });
-    else res.destroy();
-  }
-});
 
 registerReferenceRoutes(app);
 
@@ -3113,27 +2630,21 @@ const noUpscaleWorker = () => ({
     offline: true,
     noWorker: true,
     error: noWorkerMessage("upscale"),
-    install: installState(),
   },
 });
 
-/** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
+/** `force` reads ComfyUI again instead of the 30s cache. */
 async function upscaleInfo({ force = false } = {}) {
   try {
     return { info: (await loadComfyContext({ force })).info };
   } catch {
-    const restarting = isDefaultBackend() && comfyRestarting();
     return {
       failure: {
         status: 503,
         payload: {
           ok: false,
           offline: true,
-          restarting,
-          error: restarting
-            ? "ComfyUI is restarting. Smart upscale is back when it’s done."
-            : `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
-          install: installState(),
+          error: `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
         },
       },
     };
@@ -3159,56 +2670,9 @@ app.get(
       qualities: upscaleQualities,
       targets: upscaleTargets,
     };
-    // Install plans name server paths: they are for administrators only.
-    if (req.studioAccount && !canAdmin(req)) return res.json({ ok: true, ...status });
-    // Only worth the extra round trips while the nodes still need installing.
-    if (!status.nodesInstalled)
-      status.nodeSetup = {
-        manager: await managerAvailable(),
-        pack: nodePack("seedvr2"),
-        autoInstall: packInstallRoutes("seedvr2"),
-        ...packInstallPlan(nodePacks.seedvr2),
-      };
-    // The face pass has its own two packs; each missing one gets the same install panel.
-    if (!status.faceDetail.nodesInstalled) {
-      const missing = new Set(status.faceDetail.missingNodes);
-      const manager = await managerAvailable();
-      status.faceDetail.setup = ["impactpack", "impactsubpack"]
-        .filter((id) => nodePack(id).nodes.some((node) => missing.has(node)))
-        .map((id) => ({
-          manager,
-          pack: nodePack(id),
-          autoInstall: packInstallRoutes(id),
-          ...packInstallPlan(nodePacks[id], comfyRootDir(), process.platform),
-        }));
-    }
     res.json({ ok: true, ...status });
   }),
 );
-
-// Download progress never needs ComfyUI, so it keeps reporting while ComfyUI restarts.
-app.get("/api/upscale/install", (_req, res) => {
-  res.json({ ok: true, install: installState() });
-});
-
-app.post(
-  "/api/upscale/install",
-  onUpscaleWorker(async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const info = await upscaleContext(res);
-    if (!info) return;
-    try {
-      res.json({ ok: true, install: startModelInstall(normalizeQuality(req.body?.quality), info) });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
-  }),
-);
-
-app.post("/api/upscale/install/cancel", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.json({ ok: true, install: cancelModelInstall() });
-});
 
 /**
  * Queues a smart upscale of one of the account's gallery items on a worker with Upscale, answering
@@ -3548,17 +3012,6 @@ app.post("/api/queue/cancel", async (req, res) => {
 
 registerGalleryErrorRoutes(app);
 
-// Unloads models and frees what ComfyUI caches, without touching any run: ComfyUI does it between prompts.
-app.post("/api/comfy/free", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    await freeComfyMemory();
-    res.json({ ok: true });
-  } catch (error) {
-    res.status(503).json({ ok: false, error: comfyDownMessage(error?.message) });
-  }
-});
-
 /** Marks every Studio job still waiting or running as canceled, and returns the prompt ids ComfyUI knows them by. */
 function cancelOwnJobs(ownerId = "") {
   const promptIds = [];
@@ -3578,17 +3031,7 @@ function cancelOwnJobs(ownerId = "") {
   return promptIds;
 }
 
-function freeComfyMemory() {
-  return comfy("/free", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ unload_models: true, free_memory: true }),
-    timeout: 15_000,
-  });
-}
-
-// Model folders ComfyUI is not reading, and adding them to its extra_model_paths.yaml.
-// Studio can only look at (and change) the machine it runs on, so a remote ComfyUI gets none of this.
+// Whether ComfyUI runs on this machine, for the bug report.
 const comfyIsLocal = () => {
   try {
     return ["127.0.0.1", "localhost", "::1", "[::1]"].includes(new URL(comfyUrl).hostname);
@@ -3596,200 +3039,6 @@ const comfyIsLocal = () => {
     return false;
   }
 };
-
-app.get("/api/model-folders", async (_req, res) => {
-  try {
-    res.json(await modelFolderReport({ local: comfyIsLocal() }));
-  } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.post("/api/model-folders", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    const paths = Array.isArray(req.body?.paths) ? req.body.paths : [];
-    res.json(await linkModelFolders(paths, { picked: String(req.body?.picked || "") }));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.delete("/api/model-folders", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    res.json(await unlinkModelFolder(String(req.body?.path || "")));
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-// The person points at a folder the scan missed; it still has to read as a models folder.
-app.post("/api/model-folders/pick", (_req, res) => {
-  res.status(410).json({
-    ok: false,
-    error:
-      "Desktop folder picking is no longer supported. Configure model paths in the worker deployment.",
-  });
-});
-
-// One-click node pack installs, by registry id only (see pack-installer.js).
-app.post("/api/node-packs/:id/install", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  try {
-    // `override`: the person was told ComfyUI-Manager refused it and chose to install anyway.
-    res.json({
-      ok: true,
-      install: await startPackInstall(String(req.params.id), {
-        overrideManager: req.body?.override === "manager-security",
-      }),
-    });
-  } catch (error) {
-    res.status(400).json({ ok: false, error: error.message });
-  }
-});
-
-app.get("/api/node-packs/:id/install", (req, res) => {
-  res.json({ ok: true, install: packInstallState(String(req.params.id)) });
-});
-
-app.get("/api/comfy/manager", async (_req, res) => {
-  res.json({ ok: true, ...(await managerInfo()) });
-});
-
-// ComfyUI is started outside Studio, so only ComfyUI-Manager can restart it in place.
-// Every worker but the default restarts through its own ComfyUI-Manager; its status poll shows it going and coming back.
-async function restartOtherWorker(worker, res) {
-  const url = worker.url;
-  const up = await fetch(`${url}/system_stats`, { signal: AbortSignal.timeout(4000) }).then(
-    (response) => response.ok,
-    () => false,
-  );
-  if (!up) {
-    res
-      .status(503)
-      .json({ ok: false, error: `${worker.name} isn’t running. Start it and Studio connects.` });
-    return;
-  }
-  let sawManager = false;
-  for (const [method, route] of [
-    ["POST", "/v2/manager/reboot"],
-    ["POST", "/manager/reboot"],
-    ["GET", "/v2/manager/reboot"],
-    ["GET", "/api/manager/reboot"],
-    ["GET", "/manager/reboot"],
-  ]) {
-    let response;
-    try {
-      response = await fetch(`${url}${route}`, { method, signal: AbortSignal.timeout(5000) });
-    } catch {
-      forgetWorker(worker.id);
-      res.json({ ok: true, worker: worker.id });
-      return;
-    }
-    if (response.ok) {
-      forgetWorker(worker.id);
-      res.json({ ok: true, worker: worker.id });
-      return;
-    }
-    if (response.status === 403) {
-      res.status(403).json({
-        ok: false,
-        error: `ComfyUI-Manager’s security level blocks the restart. Set security_level = normal in Manager’s config.ini, or restart ${worker.name} yourself.`,
-      });
-      return;
-    }
-    if (response.status !== 404 && response.status !== 405) sawManager = true;
-  }
-  res.status(501).json({
-    ok: false,
-    error: sawManager
-      ? `ComfyUI-Manager couldn’t restart ${worker.name}.`
-      : `Restarting needs ComfyUI-Manager on ${worker.name}. Start its ComfyUI with --enable-manager.`,
-  });
-}
-
-/**
- * Restarts a worker: `worker` names one by id (Settings › Workers), and
- * without it the default worker, as upstream's restart buttons ask. The
- * default worker's restart is followed by the server (watchComfyRestart).
- */
-app.post("/api/comfy/restart", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const named = String(req.body?.worker || (req.body?.backend === "video" ? "video" : "") || "");
-  const worker = named ? workerById(named) : defaultWorker();
-  if (!worker) {
-    res.status(named ? 404 : 503).json({
-      ok: false,
-      error: named ? "That worker is no longer configured." : noWorkerMessage("image"),
-    });
-    return;
-  }
-  if (!isDefaultBackend(worker.id)) {
-    await restartOtherWorker(worker, res);
-    return;
-  }
-  // A dropped connection below means "already going down" only if ComfyUI was
-  // up to begin with; otherwise "restarting" would show for minutes over nothing.
-  const up = await fetch(`${comfyUrl}/system_stats`, { signal: AbortSignal.timeout(4000) }).then(
-    (response) => response.ok,
-    () => false,
-  );
-  if (!up) {
-    res
-      .status(503)
-      .json({ ok: false, error: "ComfyUI isn’t running. Start it and the studio connects." });
-    return;
-  }
-  // What ComfyUI has loaded now, so the restart can tell what it brought in.
-  const packs = await currentPacks(6000);
-  const begin = () => {
-    beginComfyRestart(Date.now(), { packs });
-    watchComfyRestart();
-  };
-  let sawManager = false;
-  // Manager 4 (built into ComfyUI) and the Manager custom node from 3.4x only
-  // take a bodyless POST; older custom nodes took a GET. A 404/405 just means
-  // "not this one", try the next.
-  const attempts = [
-    ["POST", "/v2/manager/reboot"],
-    ["POST", "/manager/reboot"],
-    ["GET", "/v2/manager/reboot"],
-    ["GET", "/api/manager/reboot"],
-    ["GET", "/manager/reboot"],
-  ];
-  for (const [method, route] of attempts) {
-    let response;
-    try {
-      response = await fetch(`${comfyUrl}${route}`, { method, signal: AbortSignal.timeout(5000) });
-    } catch {
-      // ComfyUI dropping the connection mid-answer means it is already going down.
-      begin();
-      res.json({ ok: true });
-      return;
-    }
-    if (response.ok) {
-      begin();
-      res.json({ ok: true });
-      return;
-    }
-    if (response.status === 403) {
-      res.status(403).json({
-        ok: false,
-        error:
-          "ComfyUI-Manager’s security level blocks the restart. Set security_level = normal in Manager’s config.ini, or restart ComfyUI yourself.",
-      });
-      return;
-    }
-    if (response.status !== 404 && response.status !== 405) sawManager = true;
-  }
-  res.status(501).json({
-    ok: false,
-    error: sawManager
-      ? "ComfyUI-Manager couldn’t restart ComfyUI."
-      : "Restarting needs ComfyUI-Manager, which newer ComfyUI versions turn off. Start ComfyUI with --enable-manager.",
-  });
-});
 
 registerGalleryDeleteRoute(app);
 

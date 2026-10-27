@@ -513,15 +513,6 @@ export function getCustomWorkflow(requested, backend = profileAliasBackend(reque
   return workflow ? workflowOnBackend(workflow, backend) : null;
 }
 
-export function saveCustomWorkflow(raw) {
-  const workflow = metadataFromJson(raw);
-  validateGraph(workflow.graph);
-  fs.mkdirSync(userWorkflowsDir, { recursive: true });
-  const file = path.join(userWorkflowsDir, `${workflow.id}.json`);
-  writeJsonFile(file, raw);
-  return { ...workflow, path: file };
-}
-
 /**
  * An import that collides with a bundled template would be written but never
  * shown, because the bundled copy wins the scan. Give it its own id instead.

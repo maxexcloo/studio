@@ -22,7 +22,7 @@ export interface Workload {
   apiKeyEnv?: string;
 }
 
-export interface RuntimeEngine {
+interface RuntimeEngine {
   state(workload: Workload): Promise<DeploymentState>;
   scale(workload: Workload, replicas: number): Promise<void>;
 }
@@ -30,7 +30,7 @@ export interface RuntimeEngine {
 export class RuntimeUnavailable extends Error {
   status = 503;
 }
-export class RuntimeConflict extends Error {
+class RuntimeConflict extends Error {
   status = 409;
 }
 export class RuntimeRequestError extends Error {

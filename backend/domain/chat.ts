@@ -10,12 +10,12 @@ import type {
 import type { GenerationInput, QueueJob } from "../../shared/queue.ts";
 import { ChatStore } from "./chat-store.ts";
 
-export interface ChatSettings {
+interface ChatSettings {
   endpoint: string;
   key: string;
   model: string;
 }
-export interface ChatOptions {
+interface ChatOptions {
   store: ChatStore;
   settings: () => ChatSettings | null;
   session: (ownerId: string, sessionId: string) => unknown;
@@ -140,7 +140,7 @@ const tool = {
 };
 
 /** A chat's title from its first prompt: the first clause, without weights or tags. */
-export function fallbackTitle(text: string) {
+function fallbackTitle(text: string) {
   const prompt = text
     .replace(/<[^>]*>/g, " ")
     .replace(/[()[\]{}]/g, "")

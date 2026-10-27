@@ -419,40 +419,6 @@ async function findOrBuild(filename, subfolder, type, size = "thumb") {
   return promise;
 }
 
-/**
- * A thumbnail for any image file on this computer (an image added from
- * another folder), cached like an output's, by the file's path, size and
- * modified time. The caller checks the file is one it may serve.
- */
-export async function getFileThumbnail(file) {
-  const result = await findOrBuildFile(file);
-  // Served now, so the cache cap keeps it like an output's thumbnail.
-  if (result?.file) noteUsed(result.file);
-  return result;
-}
-
-async function findOrBuildFile(file) {
-  const resolved = path.resolve(file);
-  const key = crypto
-    .createHash("sha1")
-    .update(`file:${resolved}:${longestEdge}:${quality}`)
-    .digest("hex");
-  if (!(await loadSharp())) return cachedThumbnail(key) || { original: true };
-  if (pending.has(key)) return pending.get(key);
-  const promise = (async () => {
-    const stat = await fs.promises.stat(resolved);
-    const sourceHash = crypto
-      .createHash("sha256")
-      .update(`local:${stat.size}:${stat.mtimeMs}`)
-      .digest("hex");
-    const cached = cachePath(key, sourceHash);
-    if (fs.existsSync(cached)) return { file: cached, etag: `"${sourceHash}"` };
-    return inSlot(() => writeThumbnail(key, sourceHash, resolved));
-  })().finally(() => pending.delete(key));
-  pending.set(key, promise);
-  return promise;
-}
-
 /** The filename, subfolder and type a /comfy/view or /comfy/thumb URL names, or null. */
 export function viewParams(url = "") {
   const text = String(url || "");

@@ -9,7 +9,7 @@ import {
   workflowOnBackend,
   workflowOptionIssues,
 } from "./custom-workflows.js";
-import { classifyModel, modelTypeChoices } from "./model-families.js";
+import { classifyModel } from "./model-families.js";
 import { familyProfiles } from "./family-profiles.js";
 import { families } from "./family-catalog.js";
 import { canonicalProfileId } from "./profile-store.js";
@@ -592,12 +592,6 @@ export function inferModels(
     profiles,
     unsupportedModels,
     modelFiles,
-    modelTypeChoices: Object.fromEntries(
-      Object.entries(modelTypeChoices()).map(([source, choices]) => [
-        source,
-        choices.filter((choice) => modelFamilyEnabled(choice.value.split("/")[0])),
-      ]),
-    ),
     // Release switches the studio needs to know about (features.js).
     features: { inpainting: inpaintingEnabled, presets: presetsEnabled() },
     textEncoders: clips,

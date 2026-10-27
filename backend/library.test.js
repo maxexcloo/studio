@@ -156,11 +156,12 @@ test("search looks through prompts, models and LoRAs; favourites filter by star"
   });
   assert.deepEqual([...page.items, ...next.items].map((item) => item.id).sort(), ["s2", "s3"]);
 
-  const since = store.galleryRevisionValue();
   store.setGalleryFavorites(["s2"], true);
   assert.deepEqual(ids(store.galleryFilter({ favorites: true })), ["s2", "s3"]);
   store.setGalleryFavorites(["s2"], false);
-  const delta = store.galleryDelta({ since, filter: store.galleryFilter({ favorites: true }) });
-  assert.deepEqual(delta.upserts, []);
-  assert.ok(delta.removes.includes("s2"), "an unstarred image leaves the favourites");
+  assert.deepEqual(
+    ids(store.galleryFilter({ favorites: true })),
+    ["s3"],
+    "an unstarred image leaves the favourites",
+  );
 });

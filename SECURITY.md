@@ -12,7 +12,7 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 | No account, or a waiting or disabled one | No                                                                                 | No                         | No                                                    |
 | Another website open in your browser     | No                                                                                 | No                         | No                                                    |
 
-\* Models, downloads and node packs, workers and ComfyUI's address and restarts, the output folder, workflow files, presets, logs and raw ComfyUI access.
+\* Models and downloads, workers and their restarts, the output folder, workflow files, presets, logs and raw ComfyUI access.
 
 - **Signing in.** Accounts sign in with their email address and password (stored only as a scrypt hash) or through single sign-on (`STUDIO_OIDC_*`). Wrong passwords are limited per address and email, one try at a time: after five, each one locks that pair out twice as long as the last (up to 15 minutes), answered with `429` and `Retry-After`. A sign-in lasts 30 days, in an `HttpOnly`, `SameSite=Strict` cookie. Changing your password in **Settings › Account** ends your other sessions; disabling an account ends all of its sessions.
 - **The first administrator** is created on the first visit from the computer running Studio. On a container platform, where nobody opens it there, set `STUDIO_SETUP_TOKEN` (at least 32 characters): the setup screen accepts it from any address until the first account exists. Remove it afterwards.
@@ -26,10 +26,9 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 
 - **Deleting.** Deleting a card deletes its file. Studio only deletes inside its own media folder or ComfyUI's output folder, never a file shown from somewhere else, and only ever serves images, videos and sound from those folders (never through a link out of them). A `.studio-trash` folder left by an older version's **Delete all finished images** is emptied after 30 days (`STUDIO_TRASH_DAYS`).
 - **Updates.** Studio doesn't update itself. New versions arrive as container images that CI builds and tests before publishing.
-- **Node packs** installed with one click come from a reviewed commit of each pack, and their Python requirements can't replace the PyTorch or NumPy ComfyUI runs on. When ComfyUI-Manager refuses an install because of its security level, Studio stops and asks.
 - **Model downloads** only come from Studio's own catalogue and reviewed Civitai and Hugging Face imports, resume only while the remote file is unchanged, and are checked against their published SHA-256. Provider tokens (`HF_TOKEN`, `CIVITAI_API_TOKEN`) come from the deployment's environment; Studio never shows, saves or changes them.
 - **Workflows** you import can contain custom nodes that run code, read or write any file, or go online; the import review names them. A workflow runs every node in it with ComfyUI's access to its computer, so only import workflows from people you trust.
-- **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or GitHub when you ask it to download or install something, and to the catalogue, text and cloud provider endpoints an administrator configures.
+- **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or Civitai when you ask it to download something, and to the catalogue, text and cloud provider endpoints an administrator configures.
 
 ## Reporting a vulnerability
 

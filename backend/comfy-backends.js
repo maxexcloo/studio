@@ -97,7 +97,7 @@ export function routeProfile(profile, options = {}) {
   return worker;
 }
 
-export const isLocalVideoProfile = (profile) => capabilityForProfile(profile) === "video";
+const isLocalVideoProfile = (profile) => capabilityForProfile(profile) === "video";
 
 const allowedProfile = (worker, profile) =>
   isLocalVideoProfile(profile)

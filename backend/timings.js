@@ -1,7 +1,6 @@
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { addRestartSample, restartEstimate } from "./restart-insights.js";
 import { addRun, estimateRun, isWarm, timingKey } from "./generation-timing.js";
 import { addUpscale, estimateUpscale } from "./upscale-timing.js";
 
@@ -18,12 +17,11 @@ function load() {
   try {
     const raw = readJsonFile(timingsPath);
     timings = {
-      restarts: Array.isArray(raw?.restarts) ? raw.restarts : [],
       runs: Array.isArray(raw?.runs) ? raw.runs : [],
       upscales: Array.isArray(raw?.upscales) ? raw.upscales : [],
     };
   } catch {
-    timings = { restarts: [], runs: [], upscales: [] };
+    timings = { runs: [], upscales: [] };
   }
   return timings;
 }
@@ -34,19 +32,6 @@ function save(label) {
   } catch (error) {
     console.warn(`[Studio] Could not save ${label} timing: ${error.message}`);
   }
-}
-
-/** How long a ComfyUI restart usually takes here, or null until restarts agree. */
-export function comfyRestartEstimate() {
-  return restartEstimate(load().restarts);
-}
-
-export function recordComfyRestart(ms, at = new Date().toISOString()) {
-  const current = load();
-  const restarts = addRestartSample(current.restarts, { at, ms });
-  if (restarts === current.restarts) return;
-  timings = { ...current, restarts };
-  save("restart");
 }
 
 /** What a generation of `body` should take here; see estimateRun. `warm` overrides the guess. */

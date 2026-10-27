@@ -338,7 +338,7 @@ test("Dream picks the most-starred ready profile and keeps Spicy to NSFW-granted
 });
 
 test("Dream skips accounts without the prompt assistant and offline services, logging each reason once", async (t) => {
-  const { dream, state, dreamJobs, store } = fixture(t);
+  const { dream, state, dreamJobs } = fixture(t);
   await dream.save("alice", { enabled: true });
   state.access.alice.assistant = false;
   await dream.tick();

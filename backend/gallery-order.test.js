@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { compareGalleryItems, sortGalleryItems } from "./gallery-order.js";
+import { compareGalleryItems } from "./gallery-order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
@@ -28,7 +28,7 @@ test("explicit Civitai imports stay newest first even without source prompts", (
     imported,
     item("scan", "2026-01-04", { prompt: "" }),
   ];
-  assert.deepEqual(ids(sortGalleryItems(items)), ["civitai:42", "generation", "scan"]);
+  assert.deepEqual(ids(sortGallery(items)), ["civitai:42", "generation", "scan"]);
   setGallery(items);
   assert.equal(pageGallery({ limit: 1 }).items[0].id, "civitai:42");
 });
@@ -46,7 +46,6 @@ test("server pages and client merges put blank imports last, newest first within
   ];
   const expected = ["failed", "pending", "generation", "history-import", "import-old"];
   assert.deepEqual(ids(sortGallery(items)), expected);
-  assert.deepEqual(ids(sortGalleryItems(items)), expected);
   assert.deepEqual(ids(items.slice().sort(compareGalleryItems)), expected);
   setGallery(items);
   const collected = [];
@@ -98,5 +97,4 @@ test("valid dates precede missing and invalid dates, retaining batch indices and
     "blank-invalid",
   ];
   assert.deepEqual(ids(sortGallery(items)), expected);
-  assert.deepEqual(ids(sortGalleryItems(items)), expected);
 });
