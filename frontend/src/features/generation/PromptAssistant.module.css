@@ -1,0 +1,36 @@
+/* Working assistance spins in place of its action; hovering or focusing it shows Stop instead. */
+.icons {
+  display: grid;
+  place-items: center;
+}
+
+.spinner,
+.stop {
+  grid-area: 1 / 1;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+.stop {
+  opacity: 0;
+}
+
+.working:hover .spinner,
+.working:focus-visible .spinner {
+  opacity: 0;
+}
+
+.working:hover .stop,
+.working:focus-visible .stop {
+  opacity: 1;
+}
+
+/* Touch has no hover: keep the spinner and let a tap stop it. */
+@media (hover: none) {
+  .working:hover .spinner {
+    opacity: 1;
+  }
+
+  .working:hover .stop {
+    opacity: 0;
+  }
+}

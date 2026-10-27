@@ -73,3 +73,33 @@ test(
     }
   },
 );
+
+test("an idle connection outlives a reverse proxy's pooled one, so a POST after a pause is answered", async () => {
+  const { server, port } = await listenOnPort(
+    (_req, res) => res.end(JSON.stringify({ ok: true })),
+    { port: 0, host: "127.0.0.1" },
+  );
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  const post = () =>
+    new Promise((resolve, reject) => {
+      const request = http.request(
+        { host: "127.0.0.1", port, method: "POST", path: "/api/prompts/enabled", agent },
+        (response) => {
+          response.resume();
+          response.on("end", () => resolve(request.socket));
+        },
+      );
+      request.on("error", reject);
+      request.end("{}");
+    });
+  try {
+    const first = await post();
+    // Traefik reuses idle upstream connections for up to 90 seconds without checking them.
+    assert.ok(server.keepAliveTimeout > 90_000);
+    assert.ok(server.headersTimeout > server.keepAliveTimeout);
+    assert.equal(await post(), first, "the second POST reuses the pooled connection");
+  } finally {
+    agent.destroy();
+    server.close();
+  }
+});

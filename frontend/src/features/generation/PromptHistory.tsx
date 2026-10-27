@@ -15,12 +15,19 @@ import {
   useCombobox,
 } from "@mantine/core";
 import { History, Pin, PinOff, Trash2 } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
+import { PickerFooter } from "./Picker";
 
 type PromptKind = "positive" | "negative";
 interface PromptEntry {
@@ -33,11 +40,89 @@ interface HistoryData {
   prompts: PromptEntry[];
   enabled: boolean;
 }
-type HistoryAction =
+type HistoryEdit =
   | { action: "pin"; text: string; pinned: boolean }
   | { action: "forget"; text: string }
-  | { action: "clear" }
-  | { action: "enabled"; enabled: boolean };
+  | { action: "clear" };
+
+/** One account's recent prompts of a kind, and whether new ones are kept. */
+export const promptHistoryQuery = (kind: PromptKind) =>
+  queryOptions({
+    queryKey: ["prompt-history", kind],
+    queryFn: () => api<HistoryData>(`/api/prompts?kind=${kind}`),
+  });
+const promptKey = (text: string) => text.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+
+/** The edit applied locally, as the server applies it, so pins and forgets show at once. */
+function editHistory(data: HistoryData, edit: HistoryEdit): HistoryData {
+  if (edit.action === "clear")
+    return { ...data, prompts: data.prompts.filter((entry) => entry.pinned) };
+  const key = promptKey(edit.text);
+  const found = data.prompts.some((entry) => promptKey(entry.text) === key);
+  if (edit.action === "forget")
+    return { ...data, prompts: data.prompts.filter((entry) => promptKey(entry.text) !== key) };
+  if (!found)
+    return edit.pinned
+      ? {
+          ...data,
+          prompts: [
+            { text: edit.text.trim(), at: new Date().toISOString(), uses: 0, pinned: true },
+            ...data.prompts,
+          ],
+        }
+      : data;
+  return {
+    ...data,
+    prompts: data.prompts.map((entry) =>
+      promptKey(entry.text) === key ? { ...entry, pinned: edit.pinned || undefined } : entry,
+    ),
+  };
+}
+
+/**
+ * Applies a change to the cached histories at once and rolls it back if the server refuses.
+ * Changes run in order; only the last one to settle writes the server's copy back.
+ */
+function optimistic<T>(
+  client: QueryClient,
+  kinds: PromptKind[],
+  change: (data: HistoryData, input: T) => HistoryData,
+) {
+  const keys = kinds.map((kind) => promptHistoryQuery(kind).queryKey);
+  return {
+    mutationKey: ["prompt-history"],
+    scope: { id: "prompt-history" },
+    // Synchronous, so a switch moves in the same frame as the tap.
+    onMutate: (input: T) => {
+      const previous = keys.map((queryKey) => client.getQueryData<HistoryData>(queryKey));
+      keys.forEach((queryKey) => {
+        void client.cancelQueries({ queryKey }, { revert: false });
+        client.setQueryData<HistoryData>(queryKey, (data) => data && change(data, input));
+      });
+      return previous;
+    },
+    onError: (_error: unknown, _input: T, previous?: (HistoryData | undefined)[]) =>
+      keys.forEach((queryKey, index) => client.setQueryData(queryKey, previous?.[index])),
+    onSettled: () => {
+      if (client.isMutating({ mutationKey: ["prompt-history"] }) <= 1)
+        void client.invalidateQueries({ queryKey: ["prompt-history"] });
+    },
+  };
+}
+
+/** Keep Recent Prompts, shared by the composer's history and Settings. Off forgets unpinned prompts. */
+export function useKeepRecentPrompts(enabled = true) {
+  const client = useQueryClient();
+  const history = useQuery({ ...promptHistoryQuery("positive"), enabled });
+  const change = useMutation({
+    mutationFn: (on: boolean) => post("/api/prompts/enabled", { enabled: on }),
+    ...optimistic<boolean>(client, ["positive", "negative"], (data, on) => ({
+      enabled: on,
+      prompts: on ? data.prompts : data.prompts.filter((entry) => entry.pinned),
+    })),
+  });
+  return { history, change };
+}
 
 export function PromptHistory({
   kind,
@@ -58,31 +143,19 @@ export function PromptHistory({
     [query, setQuery] = useState("");
   const combobox = useCombobox({ opened });
   const client = useQueryClient();
-  const key = ["prompt-history", kind];
-  const history = useQuery({
-    queryKey: key,
-    queryFn: () => api<HistoryData>(`/api/prompts?kind=${kind}`),
-    enabled: allowed && opened,
-  });
-  const action = useMutation({
-    meta: { inlineError: true },
-    mutationFn: (input: HistoryAction) =>
+  const history = useQuery({ ...promptHistoryQuery(kind), enabled: allowed && opened });
+  const keep = useKeepRecentPrompts(allowed && opened);
+  const edit = useMutation({
+    mutationFn: (input: HistoryEdit) =>
       post<HistoryData>(`/api/prompts/${input.action}`, {
         ...input,
         action: undefined,
         kind,
         ...(input.action === "clear" ? { keepPinned: true } : {}),
       }),
-    onSuccess: (data, input) => {
-      if (input.action === "enabled")
-        void client.invalidateQueries({ queryKey: ["prompt-history"] });
-      else
-        client.setQueryData<HistoryData>(key, (previous) => ({
-          prompts: data.prompts,
-          enabled: previous?.enabled ?? true,
-        }));
-    },
+    ...optimistic<HistoryEdit>(client, [kind], editHistory),
   });
+  const pin = (text: string, pinned: boolean) => edit.mutate({ action: "pin", text, pinned });
   const title = kind === "negative" ? "Recent Negative Prompts" : "Recent Prompts";
   const filtered = (history.data?.prompts || [])
     .filter((entry) => entry.text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
@@ -98,8 +171,7 @@ export function PromptHistory({
         ...filtered.filter((entry) => !entry.pinned).slice(0, 60),
       ];
   const currentPinned = history.data?.prompts.some(
-    (entry) =>
-      entry.pinned && entry.text.trim().toLocaleLowerCase() === value.trim().toLocaleLowerCase(),
+    (entry) => entry.pinned && promptKey(entry.text) === promptKey(value),
   );
   const optionsKey = visible.map((entry) => entry.text).join("\n");
   useEffect(() => {
@@ -125,10 +197,7 @@ export function PromptHistory({
               aria-expanded={opened}
               variant="subtle"
               color="gray"
-              onClick={() => {
-                action.reset();
-                setOpened((previous) => !previous);
-              }}
+              onClick={() => setOpened((previous) => !previous)}
             >
               <History size={16} />
             </ActionIcon>
@@ -146,8 +215,7 @@ export function PromptHistory({
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
             event.preventDefault();
-            if (value.trim() && !currentPinned && !action.isPending)
-              action.mutate({ action: "pin", text: value, pinned: true });
+            if (value.trim() && !currentPinned) pin(value, true);
           }
         }}
       >
@@ -159,21 +227,16 @@ export function PromptHistory({
           }}
         >
           <Stack gap="sm">
-            <Group justify="space-between">
-              <Text size="sm" fw={500}>
-                {title}
-              </Text>
+            <Group justify="space-between" wrap="nowrap">
+              <Text fw={500}>{title}</Text>
               <Switch
                 // Remounts once loaded so the saved state appears without the thumb sliding.
-                key={history.data ? "loaded" : "loading"}
+                key={keep.history.data ? "loaded" : "loading"}
                 label="Save Recent Prompts"
-                description="Off forgets recent prompts; pinned prompts stay."
-                size="xs"
-                checked={history.data?.enabled ?? false}
-                disabled={history.isPending || action.isPending}
-                onChange={(event) =>
-                  action.mutate({ action: "enabled", enabled: event.currentTarget.checked })
-                }
+                labelPosition="left"
+                checked={keep.history.data?.enabled ?? false}
+                disabled={!keep.history.data}
+                onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
               />
             </Group>
             <Combobox.EventsTarget>
@@ -186,7 +249,6 @@ export function PromptHistory({
                 data-autofocus
               />
             </Combobox.EventsTarget>
-            {action.error && <Alert color="red">{action.error.message}</Alert>}
             {history.isPending ? (
               <LoadingState label="Loading Prompt History" fill />
             ) : history.error ? (
@@ -218,14 +280,7 @@ export function PromptHistory({
                             aria-label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}
                             variant={entry.pinned ? "light" : "subtle"}
                             color={entry.pinned ? undefined : "gray"}
-                            disabled={action.isPending}
-                            onClick={() =>
-                              action.mutate({
-                                action: "pin",
-                                text: entry.text,
-                                pinned: !entry.pinned,
-                              })
-                            }
+                            onClick={() => pin(entry.text, !entry.pinned)}
                           >
                             {entry.pinned ? <PinOff size={16} /> : <Pin size={16} />}
                           </ActionIcon>
@@ -235,8 +290,7 @@ export function PromptHistory({
                             aria-label="Forget Prompt"
                             color="gray"
                             variant="subtle"
-                            disabled={action.isPending}
-                            onClick={() => action.mutate({ action: "forget", text: entry.text })}
+                            onClick={() => edit.mutate({ action: "forget", text: entry.text })}
                           >
                             <Trash2 size={16} />
                           </ActionIcon>
@@ -250,27 +304,26 @@ export function PromptHistory({
                     )}
                   </Combobox.Options>
                 </ScrollArea.Autosize>
-                <Group justify="space-between">
-                  <Button
-                    size="compact-xs"
-                    variant="subtle"
-                    disabled={!value.trim() || currentPinned || action.isPending}
-                    onClick={() => action.mutate({ action: "pin", text: value, pinned: true })}
-                  >
-                    Pin Current Prompt
-                  </Button>
-                  <Button
-                    size="compact-xs"
-                    variant="subtle"
-                    color="gray"
-                    disabled={
-                      !history.data?.prompts.some((entry) => !entry.pinned) || action.isPending
-                    }
-                    onClick={() => action.mutate({ action: "clear" })}
-                  >
-                    Clear Recent
-                  </Button>
-                </Group>
+                <PickerFooter
+                  start={
+                    <Button
+                      variant="default"
+                      disabled={!value.trim() || currentPinned}
+                      onClick={() => pin(value, true)}
+                    >
+                      Pin Current Prompt
+                    </Button>
+                  }
+                  end={
+                    <Button
+                      variant="default"
+                      disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
+                      onClick={() => edit.mutate({ action: "clear" })}
+                    >
+                      Clear Recent
+                    </Button>
+                  }
+                />
               </>
             )}
           </Stack>

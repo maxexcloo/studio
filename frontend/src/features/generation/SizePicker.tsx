@@ -51,12 +51,12 @@ export function SizePicker({
     profile?.constraints?.width?.max ?? 8192,
     profile?.constraints?.height?.max ?? 8192,
   );
-  // 2K/4K only where the model draws them itself and the output size is the composer's to pick.
+  // 2K/4K only where the model is documented to draw them itself and the output size is the
+  // composer's to pick; an undocumented size stays visible but disabled.
+  const sizable = input.kind === "image" && !input.inpaint;
   const tiers: Tier[] = [
     "standard",
-    ...(["2k", "4k"] as const).filter(
-      (tier) => input.kind === "image" && !input.inpaint && profile?.native?.[tier],
-    ),
+    ...(["2k", "4k"] as const).filter((tier) => sizable && profile?.native?.[tier] === "yes"),
   ];
   const current = { w: input.width, h: input.height };
   const same = (a: Size, b: Size) => a.w === b.w && a.h === b.h;
@@ -118,16 +118,14 @@ export function SizePicker({
               <SegmentedControl
                 aria-label="Resolution"
                 fullWidth
-                size="xs"
                 value={tier}
                 onChange={(value) => changeTier(value as Tier)}
-                data={tiers.map((value) => ({ value, label: tierLabels[value] }))}
+                data={(Object.keys(tierLabels) as Tier[]).map((value) => ({
+                  value,
+                  label: tierLabels[value],
+                  disabled: !tiers.includes(value),
+                }))}
               />
-            )}
-            {tier !== "standard" && profile?.native?.[tier] === "maybe" && (
-              <Text size="xs" c="dimmed">
-                This model isn’t known for {tierLabels[tier]}. Some pictures may repeat or warp.
-              </Text>
             )}
             {!!presets.length && (
               <Stack gap={4} role="group" aria-label="Aspect Presets">
@@ -137,7 +135,6 @@ export function SizePicker({
                   return (
                     <Button
                       key={preset.label}
-                      size="sm"
                       fullWidth
                       justify="space-between"
                       variant={selected ? "light" : "subtle"}
@@ -160,7 +157,6 @@ export function SizePicker({
               {(["width", "height"] as const).map((key) => (
                 <NumberInput
                   key={key}
-                  size="sm"
                   label={key === "width" ? "Width" : "Height"}
                   value={input[key]}
                   min={profile?.constraints?.[key]?.min}

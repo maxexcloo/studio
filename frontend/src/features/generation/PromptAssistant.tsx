@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionIcon, Button, Group, Menu, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Button, Group, Loader, Menu, Stack, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery } from "@tanstack/react-query";
-import { Sparkles, Square } from "lucide-react";
+import { Check, Sparkles, Square } from "lucide-react";
 import { api, failure, request } from "../../api";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
+import classes from "./PromptAssistant.module.css";
 
 interface AssistantStatus {
   available: boolean;
@@ -33,6 +34,11 @@ interface Result {
   model?: string;
 }
 type Action = "rewrite" | "negative" | "loras";
+const workingLabels: Record<Action, string> = {
+  rewrite: "Improving the prompt…",
+  negative: "Writing a negative prompt…",
+  loras: "Finding LoRAs…",
+};
 
 /** What the prompt assistant offers this account. */
 export const assistantQuery = queryOptions({
@@ -73,6 +79,7 @@ export function usePromptAssistant({
   scopeKey?: string;
 }) {
   const status = useQuery(assistantQuery);
+  // The style last used comes first and is marked, so repeating it is one click.
   const [presetId, setPresetId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const controller = useRef<AbortController | null>(null);
@@ -153,7 +160,7 @@ export function usePromptAssistant({
   }
   const assistance = useMutation({
     mutationKey: ["prompt-assistance"],
-    mutationFn: async (action: Action) => {
+    mutationFn: async ({ action, preset }: { action: Action; preset?: string }) => {
       if (!profile || !input.prompt.trim())
         throw new Error("Write a prompt and choose a profile first.");
       const source = {
@@ -168,7 +175,7 @@ export function usePromptAssistant({
       if (action !== "loras")
         body.loras = input.loras.filter((item) => item.enabled !== false).map((item) => item.name);
       if (action === "rewrite") {
-        body.preset = preset?.id;
+        body.preset = preset;
         body.stream = false;
         body.references = info?.vision
           ? await Promise.all(
@@ -184,7 +191,7 @@ export function usePromptAssistant({
       abort.signal.throwIfAborted();
       if (action !== "loras" && result.source === "fallback")
         throw new Error(result.reason || "Prompt assistance is unavailable.");
-      return { action, result, source, preset: preset?.id };
+      return { action, result, source, preset };
     },
     onSuccess: ({ action, result, source, preset }) => {
       if (!mounted.current || source.scope !== scope.current) return;
@@ -245,19 +252,30 @@ export function usePromptAssistant({
   }
   if (!info?.available || !profile || !info.presets.length)
     return { action: null, suggestions: null };
-  const disabled = !input.prompt.trim() || assistance.isPending;
+  const disabled = !input.prompt.trim();
+  const run = (action: Action, style?: string) => {
+    if (style) setPresetId(style);
+    assistance.mutate({ action, preset: style });
+  };
+  const working = assistance.variables && workingLabels[assistance.variables.action];
+  // While it works the action spins; hovering or focusing it offers Stop.
   const action = assistance.isPending ? (
-    <Tooltip label="Stop Assistance">
+    <Tooltip label={`${working} Click to Stop.`}>
       <ActionIcon
+        className={classes.working}
         variant="subtle"
         color="gray"
         aria-label="Stop Assistance"
+        aria-description={working}
         onClick={() => {
           controller.current?.abort();
           notifications.show({ message: "Assistance stopped" });
         }}
       >
-        <Square size={14} />
+        <span className={classes.icons}>
+          <Loader className={classes.spinner} size={16} />
+          <Square className={classes.stop} size={14} />
+        </span>
       </ActionIcon>
     </Tooltip>
   ) : (
@@ -270,37 +288,41 @@ export function usePromptAssistant({
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown data-composer-layer>
-        <Menu.Item disabled={disabled} onClick={() => assistance.mutate("rewrite")}>
-          Improve Prompt
-        </Menu.Item>
+        {info.presets.length > 1 ? (
+          <>
+            <Menu.Label>Improve Prompt</Menu.Label>
+            {/* Each style is a choice that runs at once; the last one used comes first. */}
+            {[preset!, ...info.presets.filter((item) => item.id !== preset?.id)].map((item) => (
+              <Menu.Item
+                key={item.id}
+                disabled={disabled}
+                aria-label={`Improve Prompt: ${item.label}`}
+                rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
+                onClick={() => run("rewrite", item.id)}
+              >
+                {item.label}
+              </Menu.Item>
+            ))}
+            <Menu.Divider />
+          </>
+        ) : (
+          <Menu.Item disabled={disabled} onClick={() => run("rewrite", preset?.id)}>
+            Improve Prompt
+          </Menu.Item>
+        )}
         {negativeOffered && (
-          <Menu.Item disabled={disabled} onClick={() => assistance.mutate("negative")}>
+          <Menu.Item disabled={disabled} onClick={() => run("negative")}>
             Write Negative
           </Menu.Item>
         )}
         {lorasOffered && (
-          <Menu.Item disabled={disabled} onClick={() => assistance.mutate("loras")}>
+          <Menu.Item disabled={disabled} onClick={() => run("loras")}>
             Suggest LoRAs
           </Menu.Item>
         )}
-        {info.presets.length > 1 && (
-          <>
-            <Menu.Divider />
-            <Menu.Label>Assistance Style</Menu.Label>
-            <Menu.RadioGroup value={preset?.id} onChange={setPresetId}>
-              {info.presets.map((item) => (
-                <Menu.RadioItem key={item.id} value={item.id}>
-                  {item.label}
-                </Menu.RadioItem>
-              ))}
-            </Menu.RadioGroup>
-          </>
-        )}
-        {!!references.length && (
+        {!!references.length && info.vision && (
           <Text size="xs" c="dimmed" px="sm" py={6}>
-            {info.vision
-              ? "Selected references are shared with the assistant when improving the prompt."
-              : "This assistant improves text without reading references."}
+            Selected references are shared with the assistant when improving the prompt.
           </Text>
         )}
       </Menu.Dropdown>

@@ -1,0 +1,290 @@
+/* Tabs, search and actions share one row; on narrow phones the search wraps under the tabs. */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+}
+
+.headerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+  align-items: center;
+}
+
+.tabs {
+  flex-shrink: 0;
+}
+
+.search {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.filters,
+.reveal {
+  animation: reveal var(--studio-motion-duration) ease-out;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--mantine-spacing-xs);
+}
+
+.grid[data-rows] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tile {
+  position: relative;
+  min-width: 0;
+}
+
+.toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border-radius: var(--mantine-radius-md);
+  transition: background-color var(--studio-motion-duration) ease;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-default-hover);
+  color: var(--mantine-color-dimmed);
+}
+
+.image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+.image:not([data-loaded]) {
+  opacity: 0;
+}
+
+/* A failed picture leaves the placeholder, never a broken-image icon. */
+.image[data-failed] {
+  visibility: hidden;
+}
+
+/* Selected choices fade under a check; choosing one again removes it. */
+.tile[data-selected] .image[data-loaded] {
+  opacity: 0.4;
+}
+
+.check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity var(--studio-motion-duration) ease-out,
+    transform var(--studio-motion-duration) ease-out;
+}
+
+.tile[data-selected] .check {
+  opacity: 1;
+  transform: none;
+}
+
+.text {
+  min-width: 0;
+  padding-inline: 2px;
+  text-align: left;
+}
+
+.action {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+/* Desktop tiles reveal their corner control on hover or focus; a pressed one (a favourite) stays. */
+@media (hover: hover) {
+  .tile:not([data-row], :hover, :focus-within) .action:not(:has([aria-pressed="true"])) {
+    opacity: 0;
+  }
+}
+
+/* Phone rows: the picture, then its text, with the corner control at the end. */
+.tile[data-row] .toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--mantine-spacing-sm);
+  min-height: 56px;
+  padding: 6px 52px 6px 6px;
+}
+
+.tile[data-row] .media {
+  flex-shrink: 0;
+  width: 44px;
+}
+
+.tile[data-row] .check {
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+}
+
+.tile[data-row] .action {
+  top: 50%;
+  right: 6px;
+  translate: 0 -50%;
+}
+
+/* Off screen while the browser takes the drag picture. */
+.ghost {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+}
+
+/* Saved stacks and presets: one row each, its menu at the end. */
+.saved {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.savedRow {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  min-width: 0;
+  padding: 4px 4px 4px 8px;
+  border-radius: var(--mantine-radius-md);
+  transition: background-color var(--studio-motion-duration) ease;
+}
+
+.savedRow:hover,
+.savedRow:focus-within {
+  background: var(--mantine-color-default-hover);
+}
+
+.savedRow[data-current] {
+  background: var(--mantine-primary-color-light);
+}
+
+.savedName {
+  flex: 1;
+  min-width: 0;
+  padding-block: 6px;
+  text-align: left;
+}
+
+.savedName:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* Chip thumbnails overlap like a stack, with a count beyond the first few. */
+.thumbs {
+  display: inline-flex;
+  align-items: center;
+}
+
+.thumb {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-sm);
+  outline: 2px solid var(--mantine-color-body);
+  background: var(--mantine-color-default-hover);
+  color: var(--mantine-color-dimmed);
+  animation: reveal var(--studio-motion-duration) ease-out;
+}
+
+.thumb + .thumb {
+  margin-left: -6px;
+}
+
+.thumb[data-off] {
+  opacity: 0.45;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.more {
+  margin-left: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filters,
+  .reveal,
+  .thumb {
+    animation: none;
+  }
+
+  .check {
+    transition: none;
+  }
+}
