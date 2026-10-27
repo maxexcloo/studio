@@ -170,7 +170,7 @@ export async function downloadPresetImage(
       { ...item.settings, prompt: item.prompt, negative: item.negative, model: item.model },
       { width: item.width, height: item.height, hashes },
     );
-    const annotated = withPngText(data, "heiss", JSON.stringify(metadata)) || data;
+    const annotated = withPngText(data, "civitai", JSON.stringify(metadata)) || data;
     const buffer = withPngText(annotated, "parameters", parameters) || annotated;
     await writeBytesFileAsync(file, buffer, { mode: 0o600 });
   }

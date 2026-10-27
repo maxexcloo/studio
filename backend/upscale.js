@@ -985,7 +985,7 @@ export async function uploadUpscaleVideoSource(item) {
   if (![".mp4", ".webm", ".mov", ".mkv", ".m4v"].includes(extension))
     throw new Error("Unsupported video format.");
   const buffer = fs.readFileSync(file);
-  const filename = `heiss-ui-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
+  const filename = `studio-upscale-${crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32)}${extension}`;
   const form = new FormData();
   form.append("image", new Blob([buffer]), filename);
   form.append("type", "input");

@@ -38,7 +38,7 @@ const info = {
 for (const kind of ["image", "video"]) {
   const video = kind === "video";
   saveCustomWorkflow({
-    heissUi: {
+    studio: {
       id: `provider-${kind}`,
       kind,
       family: "custom",

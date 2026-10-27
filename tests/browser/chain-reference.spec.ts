@@ -17,7 +17,7 @@ const workflow = JSON.parse(
     "utf8",
   ),
 );
-const declared: NonNullable<Profile["mediaInputs"]> = workflow.heissUi.mediaInputs;
+const declared: NonNullable<Profile["mediaInputs"]> = workflow.studio.mediaInputs;
 const slots = declared.map((slot, index) => ({
   ...slot,
   ...(index ? { follows: declared[index - 1].id } : {}),

@@ -44,11 +44,7 @@ async function serverRunning() {
         `http://${host.includes(":") ? `[${host}]` : host}:${port}/api/ping`,
         { signal: AbortSignal.timeout(800) },
       );
-      if (
-        response.ok &&
-        ["studio", "heiss-ui"].includes((await response.json().catch(() => ({}))).app)
-      )
-        return port;
+      if (response.ok && (await response.json().catch(() => ({}))).app === "studio") return port;
     } catch {
       /* nothing there */
     }

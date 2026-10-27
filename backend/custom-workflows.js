@@ -1,4 +1,3 @@
-import { profileBlock, profileBlockNames, withWrittenBlock } from "./profile-block.js";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -35,7 +34,7 @@ function readJson(file) {
 }
 
 function workflowMeta(raw = {}) {
-  return profileBlock(raw) || {};
+  return raw?.studio || {};
 }
 
 function loraStackConfig(meta = {}) {
@@ -105,7 +104,7 @@ export function graphFromJson(raw, info = {}) {
   if (raw?.graph && typeof raw.graph === "object") return raw.graph;
   if (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) return visualWorkflowToApi(raw, info);
   const copy = { ...raw };
-  for (const name of profileBlockNames) delete copy[name];
+  delete copy.studio;
   delete copy.metadata;
   return copy;
 }
@@ -191,7 +190,7 @@ export function metadataFromJson(raw, file) {
       metadataFromJson(
         {
           graph: variant.graph || graph,
-          heissUi: {
+          studio: {
             ...meta,
             ...variant,
             capabilities: variant.capabilities || {},
@@ -510,13 +509,15 @@ export function saveImportedWorkflow(raw, meta = {}) {
     ...workflowMeta(raw),
     ...meta,
   };
-  const workflow = metadataFromJson(withWrittenBlock(raw, mergedMeta));
+  const { studio: _block, ...rest } = raw;
+  const profile = { studio: mergedMeta, ...rest };
+  const workflow = metadataFromJson(profile);
   workflow.id = unshadowedId(workflow.id);
   mergedMeta.id = workflow.id;
   workflow.profileId = `custom:${workflow.id}`;
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
   const file = path.join(userWorkflowsDir, `${workflow.id}.json`);
-  writeJsonFile(file, withWrittenBlock(raw, mergedMeta));
+  writeJsonFile(file, profile);
   return { ...workflow, path: file };
 }
 

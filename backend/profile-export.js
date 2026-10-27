@@ -18,7 +18,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { zipBuffer } from "./gallery-export.js";
-import { profileBlock } from "./profile-block.js";
 import { hashOf } from "./profile-store.js";
 
 const exportsKept = 20;
@@ -68,7 +67,7 @@ export function buildExport({
     let label = id;
     try {
       const raw = JSON.parse(text);
-      label = String(profileBlock(raw)?.name || id);
+      label = String(raw?.studio?.name || id);
     } catch {
       /* Exported as it is. */
     }

@@ -81,12 +81,12 @@ test("GGUF files in models/unet_gguf are added as diffusion models, which ComfyU
   );
 });
 
-test("a section an older HEISS wrote under unet_gguf is rewritten; other lines are left alone", () => {
+test("a section written under unet_gguf is rewritten; other lines are left alone", () => {
   const old = [
     "comfyui:",
     "    unet_gguf: somewhere/else",
     "# >>> Added by Studio: D:\\ComfyUI\\models",
-    "heiss_comfyui_models:",
+    "studio_comfyui_models:",
     "    base_path: 'D:\\ComfyUI\\models'",
     "    unet_gguf: 'unet_gguf'",
     "    clip_gguf: 'clip_gguf'",

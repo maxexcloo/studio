@@ -47,10 +47,10 @@ const queued = (id, promptId = `${id}-prompt`) => [
   0,
   promptId,
   {},
-  { heiss_generation: { jobId: id } },
+  { studio_generation: { jobId: id } },
 ];
 const result = (id) => ({
-  prompt: [0, `${id}-prompt`, {}, { heiss_generation: { jobId: id } }],
+  prompt: [0, `${id}-prompt`, {}, { studio_generation: { jobId: id } }],
   outputs: [{ id: `${id}.mp4`, jobId: id, url: `${id}.mp4`, status: "done" }],
   status: { status_str: "success" },
 });
@@ -359,7 +359,7 @@ test("a restored long video keeps its index, request time, settings and elapsed 
   });
   // As recordsFromComfyHistory builds them: no index, no times, the graph's guess at settings.
   const history = {
-    prompt: [0, "fl20-prompt", {}, { heiss_generation: { jobId: "fl20" } }],
+    prompt: [0, "fl20-prompt", {}, { studio_generation: { jobId: "fl20" } }],
     outputs: [
       {
         id: "fl20.mp4",
@@ -434,7 +434,7 @@ test("a failure its runner recorded keeps its reason when ComfyUI has no output 
   });
   s.snapshots.video.history = {
     "failed-prompt": {
-      prompt: [0, "failed-prompt", {}, { heiss_generation: { jobId: "failed" } }],
+      prompt: [0, "failed-prompt", {}, { studio_generation: { jobId: "failed" } }],
       outputs: [],
       status: { status_str: "error" },
     },

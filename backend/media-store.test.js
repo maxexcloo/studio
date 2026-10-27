@@ -59,7 +59,7 @@ test.after(() => {
   fs.rmSync(temporary, { recursive: true, force: true });
 });
 
-const comfyOutput = (filename, subfolder = "heiss-ui") => ({
+const comfyOutput = (filename, subfolder = "studio") => ({
   type: "image",
   url: `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`,
   filename,
@@ -69,8 +69,8 @@ test("finished outputs move into the owner's Studio media folder and leave Comfy
   const { results, comfyFiles } = await media.ingestRunResults(
     [
       {
-        output: comfyOutput("image_00001_.png", "heiss-ui/accounts/x"),
-        upscale: comfyOutput("upscale_00001_.png", "heiss-ui/accounts/x"),
+        output: comfyOutput("image_00001_.png", "studio/accounts/x"),
+        upscale: comfyOutput("upscale_00001_.png", "studio/accounts/x"),
       },
       { output: comfyOutput("missing.png") },
     ],
@@ -93,7 +93,7 @@ test("finished outputs move into the owner's Studio media folder and leave Comfy
     ...comfyFiles,
     ...media.temporaryInputFiles({
       referenceAssets: [
-        { temporary: true, comfyName: "heiss-ui/ref-1.png" },
+        { temporary: true, comfyName: "studio/ref-1.png" },
         { comfyName: "shared.png" },
       ],
     }),
@@ -102,9 +102,9 @@ test("finished outputs move into the owner's Studio media folder and leave Comfy
   assert.deepEqual(
     deletes.at(-1).files.map((file) => [file.type, file.subfolder, file.filename]),
     [
-      ["output", "heiss-ui/accounts/x", "image_00001_.png"],
-      ["output", "heiss-ui/accounts/x", "upscale_00001_.png"],
-      ["input", "heiss-ui", "ref-1.png"],
+      ["output", "studio/accounts/x", "image_00001_.png"],
+      ["output", "studio/accounts/x", "upscale_00001_.png"],
+      ["input", "studio", "ref-1.png"],
     ],
   );
 });
@@ -121,14 +121,14 @@ test("media files are visible, deletable and confined to the media folder", asyn
     jobId: "job-media",
     index: 0,
   };
-  assert.equal(paths.mediaParams(item.url).subfolder, "heiss-ui");
+  assert.equal(paths.mediaParams(item.url).subfolder, "studio");
   assert.equal(store.hasExistingOutputFile(item), true);
   assert.equal(store.deleteGalleryFiles([item]).deleted, 1);
-  assert.equal(paths.mediaFile(paths.mediaParams(item.url).filename, "heiss-ui"), null);
+  assert.equal(paths.mediaFile(paths.mediaParams(item.url).filename, "studio"), null);
   for (const [filename, subfolder] of [
     ["../escape.png", ""],
     ["a.png", "../.."],
-    ["a.png", ".heiss-trash"],
+    ["a.png", ".studio-trash"],
     ["notes.txt", ""],
   ]) {
     assert.equal(paths.mediaPath(filename, subfolder), null, `${subfolder}/${filename}`);
@@ -159,9 +159,9 @@ test("clearing a gallery that mixes Studio media and older ComfyUI outputs trash
     "",
   );
   const mediaItem = { ...results[0].output, id: results[0].output.url, status: "done" };
-  fs.mkdirSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui"), { recursive: true });
+  fs.mkdirSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "studio"), { recursive: true });
   fs.writeFileSync(
-    path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png"),
+    path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "studio", "old_00001_.png"),
     "old",
   );
   const oldItem = {
@@ -174,16 +174,16 @@ test("clearing a gallery that mixes Studio media and older ComfyUI outputs trash
   assert.equal(result.batch.split(",").length, 2);
   assert.equal(trash.trashSummary().batches, 2);
   assert.equal(
-    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
+    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "studio", "old_00001_.png")),
     false,
   );
   const restored = trash.restoreTrash(result.batch);
   assert.equal(restored.restored.length, 2);
   assert.equal(
-    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "heiss-ui", "old_00001_.png")),
+    fs.existsSync(path.join(process.env.STUDIO_COMFY_OUTPUT_DIR, "studio", "old_00001_.png")),
     true,
   );
-  assert.ok(localOutputFile(paths.mediaParams(mediaItem.url).filename, "heiss-ui", "media"));
+  assert.ok(localOutputFile(paths.mediaParams(mediaItem.url).filename, "studio", "media"));
 });
 
 test("ingested runs are remembered across restarts so recovery never imports them twice", async () => {
@@ -203,7 +203,7 @@ test("output storage accepts studio or comfy and refuses anything else", () => {
   assert.equal(paths.outputStorageFromEnv({ STUDIO_MULTI_USER: "1" }), true);
   assert.equal(paths.outputStorageFromEnv({}), false);
   assert.throws(
-    () => paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "heiss" }),
+    () => paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "elsewhere" }),
     /STUDIO_OUTPUT_STORAGE must be "studio" or "comfy"/,
   );
 });

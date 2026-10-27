@@ -41,16 +41,16 @@ const tree = (dir) =>
           .update(fs.readFileSync(path.join(dir, name)))
           .digest("hex")}`,
     );
-const view = (filename, subfolder = "heiss-ui") =>
+const view = (filename, subfolder = "studio") =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder, type: "output" })}`;
 
 const source = path.join(root, "x", "data");
 const outputs = path.join(root, "x", "output");
 const target = path.join(root, "studio", "data");
 const media = path.join(target, "media");
-write(path.join(outputs, "heiss-ui", "image_00001_.png"), "png-1");
-write(path.join(outputs, "heiss-ui", "upscale_00001_.png"), "upscale-1");
-write(path.join(outputs, "heiss-ui", "video_00002_.mp4"), "mp4-2");
+write(path.join(outputs, "studio", "image_00001_.png"), "png-1");
+write(path.join(outputs, "studio", "upscale_00001_.png"), "upscale-1");
+write(path.join(outputs, "studio", "video_00002_.mp4"), "mp4-2");
 write(path.join(source, "gallery.json"), [
   {
     id: view("image_00001_.png"),
@@ -219,7 +219,7 @@ test("a migrated source imports into authoritative SQLite, backs up that documen
   const targetData = path.join(root, "migrated-target");
   const sourceMedia = path.join(sourceData, "media");
   const mediaRoot = path.join(targetData, "media");
-  const url = `/comfy/view?${new URLSearchParams({ filename: "owned.png", subfolder: "heiss-ui", type: "media" })}`;
+  const url = `/comfy/view?${new URLSearchParams({ filename: "owned.png", subfolder: "studio", type: "media" })}`;
   const record = {
     id: url,
     url,
@@ -229,7 +229,7 @@ test("a migrated source imports into authoritative SQLite, backs up that documen
     prompt: "Native saved image",
   };
   write(path.join(sourceData, "gallery.json"), []);
-  write(path.join(sourceMedia, "heiss-ui", "owned.png"), "native-media");
+  write(path.join(sourceMedia, "studio", "owned.png"), "native-media");
   migrateRuntime(sourceData, { apply: true });
   writeRuntimeDocument(sourceData, "gallery", [record]);
   closeRuntimeDatabase(sourceData);

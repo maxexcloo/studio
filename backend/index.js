@@ -1464,7 +1464,7 @@ async function profileDefinitions() {
     let block = {};
     try {
       const parsed = JSON.parse(text);
-      block = parsed.studio || parsed.heissUi || {};
+      block = parsed.studio || {};
     } catch {
       /* Unreadable definitions still count as naming the files they mention. */
     }
@@ -1643,7 +1643,7 @@ app.post("/api/workflows/import", async (req, res) => {
       (Array.isArray(raw?.nodes) && Array.isArray(raw?.links)) || raw?.prompt
         ? {
             graph: previewWorkflowImport(raw, req.body?.filename || "", info).graph,
-            heissUi: metadata,
+            studio: metadata,
           }
         : raw;
     const workflow = saveImportedWorkflow(normalized, metadata);

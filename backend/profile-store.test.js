@@ -24,7 +24,7 @@ const quiet = { info: () => {}, warn: () => {} };
 const profile = (name, extra = {}) =>
   JSON.stringify(
     {
-      heissUi: {
+      studio: {
         id: "image-test",
         name,
         kind: "image",

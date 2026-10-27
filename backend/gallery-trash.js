@@ -12,7 +12,7 @@ import { trashFolderName } from "./data-names.js";
 
 /**
  * "Delete all finished images" moves them to a trash instead of deleting
- * them: one folder per clear, `.heiss-trash/<batch>/` inside ComfyUI's output
+ * them: one folder per clear, `.studio-trash/<batch>/` inside ComfyUI's output
  * folder (same disk, so moving is instant and never runs out of space), with
  * a batch.json listing the gallery records and where each file came from.
  * A batch can be put back until it is purged, after STUDIO_TRASH_DAYS (30).

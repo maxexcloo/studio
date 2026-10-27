@@ -18,7 +18,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 
 const view = (filename) =>
-  `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`;
+  `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`;
 // A marker list as older versions wrote it: output names in the clear.
 fs.writeFileSync(
   path.join(dataDir, "gallery-hidden.json"),
@@ -65,7 +65,7 @@ test("the list of deleted outputs no longer says what they were", () => {
 
 test("forgetting an image deletes its cached thumbnails, and its upscale's", async () => {
   const cacheName = (filename) =>
-    crypto.createHash("sha1").update(`output:heiss-ui:${filename}:768:72`).digest("hex");
+    crypto.createHash("sha1").update(`output:studio:${filename}:768:72`).digest("hex");
   const dir = path.join(dataDir, ".thumbnails");
   for (const name of ["image_00010_.png", "upscale_00010_.png", "image_00011_.png"])
     fs.writeFileSync(path.join(dir, `${cacheName(name)}-${"a".repeat(64)}.webp`), "thumb");

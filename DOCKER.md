@@ -35,4 +35,4 @@ docker build -f worker/Dockerfile -t studio-worker:development .
 
 Pull the verified application and worker versions, stop Studio, back up runtime state and rehearse the [SQLite migration and restoration](CONFIGURATION.md#sqlite-migration--rollback) in a separate directory. Verify generation, saved results, ownership and old result links before updating the live deployment.
 
-Retain the previous image and protected backup until cutover is accepted. Reverting an application image alone does not restore metadata created in SQLite; restore the matching pre-migration metadata after stopping the rewritten application. Media paths and existing identifiers are preserved.
+Retain the previous image and protected backup until cutover is accepted. Reverting an application image alone does not restore metadata created in SQLite or the folder names the migration changed: after stopping the rewritten application, restore the snapshot, or run `--undo` on the [names backup](CONFIGURATION.md#studio-names) and restore the matching pre-migration metadata. Existing identifiers and result links are preserved.

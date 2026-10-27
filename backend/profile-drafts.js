@@ -21,7 +21,6 @@
  * Everything that talks to the outside is injected, so tests need no worker or gateway.
  */
 import { catalogueKinds } from "./library-catalogue.js";
-import { profileBlock, withWrittenBlock } from "./profile-block.js";
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const loaders = {
@@ -125,7 +124,7 @@ export function recommendedFromText(text) {
 
 /** The node that loads the profile's model: the `model` control's node, else the first model loader. */
 function modelLoader(raw) {
-  const meta = profileBlock(raw) || {};
+  const meta = raw?.studio || {};
   const graph = isObject(raw.graph) ? raw.graph : {};
   const controlled =
     meta.controls?.model?.node !== undefined ? graph[String(meta.controls.model.node)] : null;
@@ -232,8 +231,8 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     );
 
   // The template as drafts start from it: its model input named in defaults, its own guidance gone.
-  const base = withWrittenBlock(structuredClone(template.raw));
-  const meta = base.heissUi;
+  const base = structuredClone(template.raw);
+  const meta = base.studio;
   const loader = modelLoader(base);
   meta.defaults = {
     ...(meta.defaults || {}),
@@ -262,10 +261,10 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
     drafted = result.profile;
     read = result.source === "assistant" ? "assistant" : "page";
   } else drafted = deps.draftedProfile({ id, template: base, modelFile, recommended, nsfw });
-  const dmeta = drafted.heissUi;
+  const dmeta = drafted.studio;
   dmeta.id = id;
   dmeta.name = [record.title, record.version].filter(Boolean).join(" ").slice(0, 120) || id;
-  if (!dmeta.description || dmeta.description === profileBlock(template.raw)?.description)
+  if (!dmeta.description || dmeta.description === template.raw.studio?.description)
     dmeta.description =
       `Drafted from ${record.links?.civitaiCom || record.links?.hf || record.input?.url || "an import"}`.slice(
         0,

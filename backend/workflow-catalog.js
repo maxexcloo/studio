@@ -1,4 +1,3 @@
-import { profileBlock } from "./profile-block.js";
 import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
@@ -303,10 +302,10 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
     );
   const source = format === "comfyui-api-wrapper" ? raw.prompt : raw;
   const graph = graphFromJson(format === "comfyui-visual" ? { ...raw } : source, info);
-  // A wrapper ({ prompt: graph }) or a visual file can carry the heissUi block beside the graph.
-  const declared = profileBlock(raw);
+  // A wrapper ({ prompt: graph }) or a visual file can carry the studio block beside the graph.
+  const declared = raw?.studio || null;
   const detected = detectWorkflowMetadata(
-    { ...(declared ? { heissUi: declared } : {}), ...source, graph },
+    { ...(declared ? { studio: declared } : {}), ...source, graph },
     path.basename(filename || "", path.extname(filename || "")),
     info,
   );
@@ -338,7 +337,7 @@ export function previewWorkflowImport(raw, filename = "", info = {}) {
     declared,
     detected,
     format,
-    hasStudioBlock: Boolean(profileBlock(raw)),
+    hasStudioBlock: Boolean(declared),
     validation,
     // Nodes that run code, touch files elsewhere or go online: the review says so before saving.
     risks: workflowRisks(graph),

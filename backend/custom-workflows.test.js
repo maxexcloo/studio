@@ -47,9 +47,9 @@ test("visual workflow conversion prefers named widgets and ignores UI-only widge
   });
 });
 
-test("legacy start image metadata is normalized into a media input", () => {
+test("start image metadata is normalized into a media input", () => {
   const workflow = metadataFromJson({
-    jAiStudio: {
+    studio: {
       id: "legacy-edit",
       controls: {
         prompt: { node: "2", input: "prompt" },
@@ -68,7 +68,7 @@ test("legacy start image metadata is normalized into a media input", () => {
 
 test("custom filename mappings expose one-image capacity without rewriting the saved declaration", () => {
   const raw = {
-    heissUi: {
+    studio: {
       id: "single-filename",
       mediaInputs: [
         { id: "reference", label: "Style", max: 8, control: { node: "1", input: "image" } },
@@ -79,7 +79,7 @@ test("custom filename mappings expose one-image capacity without rewriting the s
   const workflow = metadataFromJson(raw);
   assert.equal(workflow.mediaInputs[0].max, 1);
   assert.match(workflow.metadataWarnings[0], /Style maps one image filename/);
-  assert.equal(raw.heissUi.mediaInputs[0].max, 8);
+  assert.equal(raw.studio.mediaInputs[0].max, 8);
   assert.equal(raw.graph[1].inputs.image, "original.png");
 });
 
@@ -91,7 +91,7 @@ test("prepared recipe metadata preserves conditioning and exact adapter identiti
     adapters: ["ref-adapter.safetensors"],
   };
   const workflow = metadataFromJson(
-    { heissUi: { id: "ref-pdd", recipe }, graph: {} },
+    { studio: { id: "ref-pdd", recipe }, graph: {} },
     "recipe.json",
   );
   assert.deepEqual(workflow.recipe, recipe);
@@ -110,7 +110,7 @@ test("profile-owned prompting metadata preserves structured guidance and only ex
   const reference = { ...prompting, summary: "Preserve the reference subject" };
   const raw = {
     graph: {},
-    heissUi: {
+    studio: {
       id: "prompting-metadata",
       prompting,
       imageModes: { generate: {}, reference: { prompting: reference } },
@@ -121,7 +121,7 @@ test("profile-owned prompting metadata preserves structured guidance and only ex
   assert.equal(workflow.imageModes.generate.prompting, undefined);
   assert.deepEqual(workflow.imageModes.reference.prompting, reference);
   workflow.prompting.rules[0] = "A local edit";
-  assert.equal(raw.heissUi.prompting.rules[0], "Keep the subject");
+  assert.equal(raw.studio.prompting.rules[0], "Keep the subject");
 });
 
 test("a synced profile's numbered reference slots chain into one stack", async () => {
@@ -150,7 +150,7 @@ test("start and end frames and differently named slots stay separate", () => {
     control: { node: "1", input: id },
   });
   const workflow = metadataFromJson({
-    heissUi: {
+    studio: {
       id: "frames",
       controls: { prompt: { node: "2", input: "prompt" } },
       mediaInputs: [
@@ -176,11 +176,11 @@ test("start and end frames and differently named slots stay separate", () => {
 
 test("the nsfw marker reaches the profile only when it is true", () => {
   assert.equal(
-    metadataFromJson({ heissUi: { id: "spicy", nsfw: true }, graph: {} }, "spicy.json").nsfw,
+    metadataFromJson({ studio: { id: "spicy", nsfw: true }, graph: {} }, "spicy.json").nsfw,
     true,
   );
   assert.equal(
-    "nsfw" in metadataFromJson({ heissUi: { id: "plain", nsfw: "yes" }, graph: {} }, "plain.json"),
+    "nsfw" in metadataFromJson({ studio: { id: "plain", nsfw: "yes" }, graph: {} }, "plain.json"),
     false,
   );
 });

@@ -38,7 +38,6 @@ interface DefinitionMeta {
 export interface LoadedDefinition {
   warnings?: string[];
   text?: string;
-  blockName?: string | null;
   pack?: Record<string, unknown>;
   hash: string;
   version?: DefinitionMeta;
@@ -87,17 +86,11 @@ function DefinitionForm({
   } catch (cause) {
     error = (cause as Error).message;
   }
-  const blockName = kind === "profile" ? loaded.blockName : undefined;
-  const metadata =
-    kind === "profile"
-      ? raw && blockName && object(raw[blockName])
-        ? (raw[blockName] as Record<string, unknown>)
-        : undefined
-      : raw;
+  const metadata = kind === "profile" ? (raw && object(raw.studio) ? raw.studio : undefined) : raw;
   function field(name: string, value: unknown) {
     if (!raw || !metadata) return;
     const next = { ...metadata, [name]: value };
-    form.setFieldValue("text", pretty(kind === "profile" ? { ...raw, [blockName!]: next } : next));
+    form.setFieldValue("text", pretty(kind === "profile" ? { ...raw, studio: next } : next));
     setCheck(null);
   }
   function nested(name: string, key: string, value: unknown) {

@@ -6,7 +6,7 @@ import { previewWorkflowImport } from "./workflow-catalog.js";
 const plain = {
   1: { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: "sdxl.safetensors" } },
   2: { class_type: "CLIPTextEncode", inputs: { text: "a cat", clip: ["1", 1] } },
-  3: { class_type: "SaveImage", inputs: { images: ["4", 0], filename_prefix: "heiss-ui/image" } },
+  3: { class_type: "SaveImage", inputs: { images: ["4", 0], filename_prefix: "studio/image" } },
   4: { class_type: "LoadImage", inputs: { image: "photo.png" } },
 };
 
@@ -53,7 +53,7 @@ test("the import review carries them", () => {
     customMetadata: { retained: true },
   };
   const preview = previewWorkflowImport(
-    { ...plain, heissUi: declared, 9: { class_type: "Shell", inputs: { command: "rm -rf ~" } } },
+    { ...plain, studio: declared, 9: { class_type: "Shell", inputs: { command: "rm -rf ~" } } },
     "risky.json",
     {},
   );

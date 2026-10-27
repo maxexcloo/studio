@@ -39,7 +39,7 @@ for (const file of ["seedvr2_ema_7b_fp16.safetensors", "ema_vae_fp16.safetensors
 const runGraph = () => ({
   1: { class_type: "EmptyLatentImage", inputs: { width: 1024, height: 768, batch_size: 2 } },
   8: { class_type: "VAEDecode", inputs: { samples: ["3", 0], vae: ["4", 0] } },
-  9: { class_type: "SaveImage", inputs: { images: ["8", 0], filename_prefix: "heiss-ui/image" } },
+  9: { class_type: "SaveImage", inputs: { images: ["8", 0], filename_prefix: "studio/image" } },
 });
 const body = {
   prompt: "a lighthouse",
@@ -81,7 +81,7 @@ test("a run whose upscale can't be set up goes ahead and says why", () => {
 });
 
 test("each saved picture carries its own upscale; upscales are not pictures of their own", () => {
-  const image = (filename) => ({ images: [{ filename, subfolder: "heiss-ui", type: "output" }] });
+  const image = (filename) => ({ images: [{ filename, subfolder: "studio", type: "output" }] });
   const pairs = [{ base: "9", upscale: "studio_up0_9" }];
   const done = pairRunOutputs(
     {
