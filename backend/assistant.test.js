@@ -36,20 +36,10 @@ const sse = (chunks) =>
 const event = (content) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`;
 const json = (content) => Response.json({ choices: [{ message: { content } }] });
 
-/** A fake gateway: `/model/info` and `/v1/models` answer from `info`, completions from `reply(body)`. */
-function fakeGateway(
-  reply,
-  { vision = {}, models = ["ai/text-quick", "ai/vision", "ai/uncensored"] } = {},
-) {
+/** A fake gateway: `/v1/models` answers from `models`, completions from `reply(body)`. */
+function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/uncensored"] } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
-    if (url.endsWith("/model/info"))
-      return Response.json({
-        data: Object.entries(vision).map(([model_name, supports_vision]) => ({
-          model_name,
-          model_info: { supports_vision },
-        })),
-      });
     if (url.endsWith("/v1/models")) return Response.json({ data: models.map((id) => ({ id })) });
     const body = JSON.parse(options.body);
     calls.push({ url, body, authorization: options.headers.Authorization, signal: options.signal });
@@ -257,12 +247,11 @@ test("references go to a vision model as image parts; a text-only model gets non
     { mime: "image/jpeg", data: "AAAA" },
     { mime: "image/png", data: "BBBB" },
   ];
-  const seen = fakeGateway(() => json("A cabin like the reference."), {
-    vision: { "ai/vision": true, "ai/text-quick": false },
-  });
-  const vision = createAssistant(gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision" }), {
+  const seen = fakeGateway(() => json("A cabin like the reference."));
+  const vision = createAssistant(gateway(), {
     fetchImpl: seen.fetchImpl,
     log: quiet,
+    supportsVision: async () => true,
   });
   const read = await vision.rewrite({ profile, prompt: "a cabin", references });
   assert.equal(read.referencesRead, true);
@@ -273,19 +262,13 @@ test("references go to a vision model as image parts; a text-only model gets non
   );
   assert.equal(content[1].image_url.url, "data:image/jpeg;base64,AAAA");
   assert.match(seen.calls[0].body.messages[0].content, /2 reference images are attached: describe/);
-  const text = fakeGateway(() => json("A cabin."), { vision: { "ai/text-quick": false } });
+  // Without a runtime to ask, the text model counts as text-only.
+  const text = fakeGateway(() => json("A cabin."));
   const blind = createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet });
   const unread = await blind.rewrite({ profile, prompt: "a cabin", references });
   assert.equal(unread.referencesRead, false);
   assert.equal(typeof text.calls[0].body.messages[1].content, "string");
   assert.match(text.calls[0].body.messages[0].content, /not shown to you/);
-  // Detection that fails counts as text-only.
-  const broken = createAssistant(gateway(), {
-    fetchImpl: async (url) =>
-      url.endsWith("/model/info") ? new Response("", { status: 404 }) : json("x"),
-    log: quiet,
-  });
-  assert.equal(await broken.supportsVision("ai/text-quick"), false);
   assert.deepEqual(
     await createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet }).listModels(),
     ["ai/text-quick", "ai/uncensored", "ai/vision"],
@@ -293,10 +276,12 @@ test("references go to a vision model as image parts; a text-only model gets non
 });
 
 test("FLUX.3 Enhance uses the maker’s upsampler prompt verbatim", async () => {
-  const seen = fakeGateway(() => json("Full-color outdoor photograph of a cabin."), {
-    vision: { "ai/text-quick": true },
+  const seen = fakeGateway(() => json("Full-color outdoor photograph of a cabin."));
+  const engine = createAssistant(gateway(), {
+    fetchImpl: seen.fetchImpl,
+    log: quiet,
+    supportsVision: async () => true,
   });
-  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   await engine.rewrite({
     profile: { ...profile, family: "flux3" },
     prompt: "a cabin",
@@ -471,8 +456,12 @@ test("describe reads an image with a vision model, writes from a hint without on
   const reply = json(
     '{"prompt": "A red barn at noon.", "negative": "blurry", "profile": "custom:fixture", "loras": ["cabin-style.safetensors", "made-up"]}',
   );
-  const seen = fakeGateway(() => reply.clone(), { vision: { "ai/text-quick": true } });
-  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  const seen = fakeGateway(() => reply.clone());
+  const engine = createAssistant(gateway(), {
+    fetchImpl: seen.fetchImpl,
+    log: quiet,
+    supportsVision: async () => true,
+  });
   const read = await engine.describe({
     images: [{ mime: "image/png", data: "AAAA" }],
     profiles: [profile],
@@ -491,7 +480,7 @@ test("describe reads an image with a vision model, writes from a hint without on
     available: false,
     vision: false,
     model: "ai/text-quick",
-    reason: "The assistant model can’t read images.",
+    reason: "The running text model can’t read images.",
   });
   const hinted = await blind.describe({
     images: [{ mime: "image/png", data: "AAAA" }],

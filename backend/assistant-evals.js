@@ -148,8 +148,7 @@ export async function runEvals({
   const live = typeof fetchImpl === "function";
   let current = { kind: "", id: "" };
   const transport = async (url, options) => {
-    if (!live)
-      return url.endsWith("/model/info") ? Response.json({ data: [] }) : reply(recorded.current);
+    if (!live) return reply(recorded.current);
     const response = await fetchImpl(url, options);
     if (/chat\/completions$/.test(url) && response.ok) {
       const answer = await response
