@@ -196,13 +196,26 @@ export function studioTheme({
         defaultProps: { transitionProps: popupTransition },
         styles: { dropdown },
       }),
+      // Dialogs sit centred on a raised plane: a dimmed, blurred backdrop, a clear border and a
+      // deep shadow. Full-screen dialogs (the viewer, phone panels) fill the viewport instead.
       Modal: Modal.extend({
         defaultProps: {
-          overlayProps: { blur: 6, backgroundOpacity: 0.4 },
+          centered: true,
+          overlayProps: { blur: 8, backgroundOpacity: 0.55 },
           transitionProps: popupTransition,
           radius: "lg",
+          size: "lg",
         },
-        styles: { header: overlayHeader, title: overlayTitle },
+        styles: (_theme, props) => ({
+          content: props.fullScreen
+            ? {}
+            : {
+                border: "1px solid var(--mantine-color-default-border)",
+                boxShadow: "var(--mantine-shadow-xl)",
+              },
+          header: overlayHeader,
+          title: overlayTitle,
+        }),
       }),
       NavLink: NavLink.extend({ styles: { root: { borderRadius: "var(--mantine-radius-md)" } } }),
       Notification: Notification.extend({ styles: { root: glass } }),

@@ -33,7 +33,7 @@ export function ConfirmDialog({
       opened={opened}
       onClose={close}
       title={title}
-      centered
+      size="md"
       zIndex={zIndex}
       closeOnClickOutside={!pending}
       closeOnEscape={!pending}
