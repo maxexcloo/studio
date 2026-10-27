@@ -24,7 +24,6 @@ import {
   listAccessProfiles,
   setDefaultAccessProfile,
   listAccounts,
-  migrateCloudModelAccess,
   revokeAccountMcpToken,
   revokeAccountSession,
   rotateAccountMcpToken,
@@ -516,8 +515,7 @@ export function registerMultiUserAuthRoutes(
 
   get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
-    migrateCloudModelAccess(cloud);
+    const profiles = await availableProfiles();
     ensureBuiltInAccessProfiles();
     res.setHeader("Cache-Control", "no-store");
     res.json({

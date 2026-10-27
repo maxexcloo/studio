@@ -136,11 +136,9 @@ import { registerMcpRoutes } from "./mcp.js";
 import { mcpOutputPath } from "./mcp-media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
-import { removeLocalEnvValue } from "./env.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { retireFeatureSwitches } from "./feature-options.js";
 import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./models.js";
 import { lorasEnabled, presetsEnabled } from "./features.js";
 import {
@@ -280,8 +278,6 @@ import {
   gatewayAccountAccess,
   gatewayAdminTools,
   listAccounts,
-  migrateCloudModelAccess,
-  migrateFeatureOptionAccess,
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
@@ -628,19 +624,6 @@ const discoveredProfiles = async () => {
     .catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
   return models.profiles || [];
 };
-// The retired global LoRAs and Cloud Models switches become per-profile starting values, once.
-try {
-  retireFeatureSwitches({
-    multiUser: multiUserEnabled,
-    source: settingSource,
-    migrate: migrateFeatureOptionAccess,
-    remove: removeLocalEnvValue,
-  });
-} catch (error) {
-  console.warn(
-    `[accounts] Couldn’t carry the old feature switches into access profiles: ${error.message}`,
-  );
-}
 registerMultiUserAuthRoutes(app, {
   availableProfiles: async () =>
     (await discoveredProfiles())
@@ -1014,15 +997,6 @@ app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     const { models } = await mediaModels(req.query.cached !== "1");
-    // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
-    if (req.studioAccount)
-      try {
-        migrateCloudModelAccess(
-          (models.profiles || []).filter(isCloudProfile).map((profile) => profile.id),
-        );
-      } catch {
-        /* Tried again on the next load. */
-      }
     res.json(withProfileAliases(withLibrary(modelsForAccount(models, req), req)));
   } catch {
     res.json(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)));

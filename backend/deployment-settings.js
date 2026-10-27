@@ -29,7 +29,7 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
  * deployment variables (features.js) but are no longer switched in Settings.
  * LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features;
  * STUDIO_ENABLE_LORAS, STUDIO_ENABLE_GROK and STUDIO_ENABLE_PRESETS stay
- * deployment variables that switch one off for everyone (feature-options.js).
+ * deployment variables that switch one off for everyone (features.js).
  */
 export const catalogueFlags = [
   flag("STUDIO_ENABLE_INPAINT", "Inpainting", "Painting over part of a reference image.", {
