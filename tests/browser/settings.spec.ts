@@ -207,7 +207,7 @@ test("Administrator accounts retain worker visibility and attribution", async ({
     "Image Worker",
   );
   await section(page, "Settings", "About");
-  await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(page.getByText("Development", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Licence", exact: true })).toHaveAttribute(
     "href",
     /\/LICENSE$/,
