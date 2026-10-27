@@ -250,8 +250,8 @@ export function GalleryPage() {
           />
         </div>
       ) : (
-        <EmptyState fill title={kind === "video" ? "No Videos" : "No Images"}>
-          {search || hasFilters ? "Try another search or clear your filters." : undefined}
+        <EmptyState fill>
+          {search || hasFilters ? "No Matches" : kind === "video" ? "No Videos" : "No Images"}
         </EmptyState>
       )}
       {gallery.hasNextPage && (
