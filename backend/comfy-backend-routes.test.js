@@ -45,12 +45,23 @@ async function start(useVideo = true, restrictModels = false, runtimeDir = dataD
       ...process.env,
       PORT: "0",
       HOST: "127.0.0.1",
-      COMFY_URL: primary.url,
-      COMFY_VIDEO_URL: useVideo ? video.url : "",
+      STUDIO_WORKERS: JSON.stringify([
+        {
+          id: "primary",
+          name: "Image Worker",
+          url: primary.url,
+          capabilities: useVideo
+            ? ["image", "upscale", "models"]
+            : ["image", "video", "upscale", "models"],
+        },
+        ...(useVideo
+          ? [{ id: "video", name: "Video Worker", url: video.url, capabilities: ["video"] }]
+          : []),
+      ]),
       STUDIO_ENABLE_KROMA: restrictModels ? "0" : "1",
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
-      COMFY_OUTPUT_DIR: "",
+      STUDIO_COMFY_OUTPUT_DIR: "",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -355,7 +366,6 @@ test(
     const accepted = await api("/api/generate", {
       ...generation(image),
       comfyBackend: "video",
-      COMFY_VIDEO_URL: video.url,
     });
     assert.equal(accepted.status, 200);
     const prompt = await queued;

@@ -30,9 +30,11 @@ test.before(async () => {
       ...process.env,
       PORT: "0",
       HOST: "127.0.0.1",
-      COMFY_URL: fake.url,
+      STUDIO_WORKERS: JSON.stringify([
+        { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
+      ]),
       STUDIO_DATA_DIR: dataDir,
-      COMFY_OUTPUT_DIR: "",
+      STUDIO_COMFY_OUTPUT_DIR: "",
       npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],

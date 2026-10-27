@@ -77,9 +77,6 @@ test("a same-origin request still needs the header or JSON, which only the studi
   assert.equal(result.body.reason, "header");
   // curl and scripts: no browser headers at all, the studio header is enough.
   assert.ok(run(guard, { headers: { "x-studio": "1" } }).passed);
-  // The header's name before the hard fork still counts, for pages and scripts made before it.
-  assert.ok(run(guard, { headers: { "x-heiss": "1" } }).passed);
-  assert.ok(run(guard, { headers: { "sec-fetch-site": "same-origin", "x-heiss": "1" } }).passed);
 });
 
 test("other sites cannot read or embed /api and /comfy either", () => {

@@ -40,14 +40,12 @@ async function start(environment) {
     PORT: "0",
     HOST: "127.0.0.1",
     STUDIO_DATA_DIR: dataDir,
-    COMFY_OUTPUT_DIR: "",
-    STUDIO_COMFY_SEARCH: "0",
+    STUDIO_COMFY_OUTPUT_DIR: "",
     STUDIO_ENABLE_GROK: "0",
     npm_lifecycle_event: "",
     ...environment,
   };
-  for (const key of ["COMFY_URL", "COMFY_VIDEO_URL", "STUDIO_WORKERS"])
-    if (!(key in environment)) delete env[key];
+  if (!("STUDIO_WORKERS" in environment)) delete env.STUDIO_WORKERS;
   server = fork(path.join(here, "index.js"), [], {
     cwd: path.join(here, ".."),
     env,

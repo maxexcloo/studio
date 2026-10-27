@@ -20,10 +20,12 @@ export async function importMcpOwnership({ database, dataDir, studio, environmen
     throw new Error("Choose exactly one studio: primary or secondary.");
   if (!database || !dataDir)
     throw new Error("Supply the legacy database and destination data directory.");
-  const signingKey = environment.MCP_SIGNING_KEY;
+  const signingKey = environment.STUDIO_MCP_SIGNING_KEY;
   const providerKey = environment.STUDIO_MCP_API_KEY;
   if (!signingKey || !providerKey)
-    throw new Error("Set MCP_SIGNING_KEY and this studio’s STUDIO_MCP_API_KEY in the environment.");
+    throw new Error(
+      "Set STUDIO_MCP_SIGNING_KEY and this studio’s STUDIO_MCP_API_KEY in the environment.",
+    );
   if (!mcpImportSupported())
     throw new Error("The offline ownership importer requires Node 22.13 or newer.");
   const file = path.join(dataDir, "mcp-ownership.json");
@@ -131,7 +133,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     });
     if (values.help)
       console.log(
-        "With both services stopped, run: node backend/mcp-import.js --data-dir <studio-data> --database <legacy-jobs.sqlite> --studio <primary|secondary>\nSet MCP_SIGNING_KEY and the destination STUDIO_MCP_API_KEY through the environment. No secret values are accepted as arguments.",
+        "With both services stopped, run: node backend/mcp-import.js --data-dir <studio-data> --database <legacy-jobs.sqlite> --studio <primary|secondary>\nSet STUDIO_MCP_SIGNING_KEY and the destination STUDIO_MCP_API_KEY through the environment. No secret values are accepted as arguments.",
       );
     else {
       const result = await importMcpOwnership({

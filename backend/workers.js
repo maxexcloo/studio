@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { envFileKeys, writeLocalEnvValue } from "./env.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { currentDataDir } from "./data-dir.js";
 
@@ -10,13 +9,10 @@ import { currentDataDir } from "./data-dir.js";
  * its one `comfyUrl`, which follows the default worker (comfy.js).
  *
  * Where workers come from, in order:
- * 1. The deployment: `STUDIO_WORKERS` (a JSON list), or else the older
- *    `COMFY_URL` / `COMFY_VIDEO_URL` pair set in the environment. These are
- *    locked: Settings shows them and changes them nowhere.
+ * 1. The deployment: `STUDIO_WORKERS` (a JSON list). These are locked:
+ *    Settings shows them and changes them nowhere.
  * 2. Studio's own list, `workers.json` in the data folder, which
- *    administrators edit in Settings › Workers. Until it is first saved it is
- *    seeded from `.env` (or the default local address), and nothing ever
- *    writes over a saved list except an administrator's save.
+ *    administrators edit in Settings › Workers. It is empty until first saved.
  */
 
 /** What a worker can be asked to do. `models` receives model downloads (STUDIO_MODEL_STORAGE=worker). */
@@ -32,8 +28,6 @@ const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
 const dataDir = () => currentDataDir();
 export const workersFile = () => path.join(dataDir(), "workers.json");
 
-const LEGACY_IMAGE_ID = "primary";
-const LEGACY_VIDEO_ID = "video";
 const maxWorkers = 32;
 
 export class WorkerConfigError extends Error {}
@@ -132,40 +126,7 @@ function defaultName(capabilities) {
   return "Worker";
 }
 
-/** Whether a variable was set by the deployment (the real environment), not saved to Studio's .env. */
-const fromDeployment = (environment, key) =>
-  Boolean(environment[key]) && !(environment === process.env && envFileKeys.has(key));
-
-/** The legacy pair as workers: COMFY_URL runs images, upscales and model downloads (and video unless a video worker exists). */
-function legacyWorkers({ imageUrl = "", videoUrl = "", videoElsewhere = false } = {}) {
-  const workers = [];
-  const image = normalizeWorkerUrl(imageUrl);
-  const video = normalizeWorkerUrl(videoUrl);
-  if (image)
-    workers.push({
-      id: LEGACY_IMAGE_ID,
-      name: "Image Worker",
-      url: image,
-      capabilities:
-        video || videoElsewhere
-          ? ["image", "upscale", "models"]
-          : ["image", "video", "upscale", "models"],
-    });
-  if (video)
-    workers.push({
-      id: LEGACY_VIDEO_ID,
-      name: "Video Worker",
-      url: video,
-      capabilities: ["video"],
-    });
-  return workers;
-}
-
-/**
- * The deployment's workers. `STUDIO_WORKERS` wins; without it, COMFY_URL and
- * COMFY_VIDEO_URL from the real environment keep working as before, with the
- * same ids ("primary", "video") so earlier jobs keep their worker.
- */
+/** The deployment's workers, from `STUDIO_WORKERS`. */
 export function deploymentWorkers(environment = process.env) {
   const text = String(environment.STUDIO_WORKERS || "").trim();
   if (text) {
@@ -189,43 +150,7 @@ export function deploymentWorkers(environment = process.env) {
       ),
     };
   }
-  const imageUrl = fromDeployment(environment, "COMFY_URL") ? environment.COMFY_URL : "";
-  const videoUrl = fromDeployment(environment, "COMFY_VIDEO_URL")
-    ? environment.COMFY_VIDEO_URL
-    : "";
-  // A video address from .env still takes video off a deployment's image worker, as it did before.
-  const workers = legacyWorkers({
-    imageUrl,
-    videoUrl,
-    videoElsewhere: Boolean(normalizeWorkerUrl(environment.COMFY_VIDEO_URL)),
-  });
-  return { variable: workers.length ? "COMFY_URL" : "", workers };
-}
-
-/**
- * What Studio's own list starts as before it is first saved: whatever the
- * deployment leaves out, from .env, or the usual local ComfyUI address when
- * nothing defines a worker at all (a fresh local install).
- */
-export function seedWorkers(
-  environment = process.env,
-  deployment = deploymentWorkers(environment),
-) {
-  if (deployment.variable === "STUDIO_WORKERS") return [];
-  const has = new Set(deployment.workers.map((worker) => worker.id));
-  const videoUrl = has.has(LEGACY_VIDEO_ID) ? "" : environment.COMFY_VIDEO_URL || "";
-  const fallback = deployment.workers.length
-    ? ""
-    : environment.STUDIO_DEFAULT_COMFY_URL || "http://127.0.0.1:8188";
-  const imageUrl = has.has(LEGACY_IMAGE_ID) ? "" : environment.COMFY_URL || fallback;
-  return legacyWorkers({ imageUrl, videoUrl, videoElsewhere: has.has(LEGACY_VIDEO_ID) }).map(
-    (worker) => ({
-      ...worker,
-      source: (worker.id === LEGACY_IMAGE_ID ? environment.COMFY_URL : environment.COMFY_VIDEO_URL)
-        ? "studio"
-        : "default",
-    }),
-  );
+  return { variable: "", workers: [] };
 }
 
 let cache = null;
@@ -255,14 +180,11 @@ function build(environment = process.env) {
   const deployment = deploymentWorkers(environment);
   const saved = readSaved();
   const locked = new Set(deployment.workers.map((worker) => worker.id));
-  const own = (
-    saved
-      ? saved.map((worker) => ({ ...worker, source: "studio" }))
-      : seedWorkers(environment, deployment)
-  ).filter((worker) => !locked.has(worker.id));
+  const own = (saved || [])
+    .filter((worker) => !locked.has(worker.id))
+    .map((worker) => ({ ...worker, source: "studio" }));
   return {
     variable: deployment.variable,
-    saved: saved !== null,
     workers: [
       ...deployment.workers.map((worker) => ({ ...worker, source: "deployment", locked: true })),
       ...own.map((worker) => ({ ...worker, locked: false })),
@@ -286,9 +208,9 @@ const workersWith = (capability) =>
 export const workersVariable = () => state().variable;
 
 /**
- * The worker upstream's single address follows: the first that runs images,
- * else the first of any kind. Local conveniences (the output folder, finding
- * ComfyUI on its own, Manager restarts with their progress) belong to it.
+ * The worker the single `comfyUrl` follows: the first that runs images,
+ * else the first of any kind. Local conveniences (the output folder, Manager
+ * restarts with their progress) belong to it.
  */
 export function defaultWorker() {
   const workers = state().workers;
@@ -319,7 +241,7 @@ function changed() {
   }
 }
 
-/** Reads the configuration again (tests, and after .env changes the seed). */
+/** Reads the configuration again (tests). */
 export function reloadWorkers() {
   changed();
   return listWorkers();
@@ -357,36 +279,6 @@ export function saveWorkers(list) {
   writeJsonFile(workersFile(), { version: 1, workers });
   changed();
   return listWorkers();
-}
-
-/**
- * The default worker's new address from upstream's flows (finding ComfyUI on
- * its own, the address field): into the saved list once there is one, else
- * into .env as COMFY_URL, which seeds it. Locked or missing workers refuse.
- */
-export function saveDefaultWorkerUrl(url) {
-  const next = normalizeWorkerUrl(url);
-  if (!next)
-    throw new WorkerConfigError(
-      "That doesn’t look like an address. Try something like 127.0.0.1:8188.",
-    );
-  const current = defaultWorker();
-  if (!current) throw new WorkerConfigError("No worker is set up. Add one in Settings › Workers.");
-  if (current.locked)
-    throw new WorkerConfigError(
-      "This address comes from the deployment configuration. Change it there.",
-    );
-  if (state().saved) {
-    saveWorkers(
-      listWorkers()
-        .filter((worker) => !worker.locked)
-        .map((worker) => (worker.id === current.id ? { ...worker, url: next } : worker)),
-    );
-  } else {
-    writeLocalEnvValue("COMFY_URL", next);
-    changed();
-  }
-  return next;
 }
 
 /** The capability a profile needs: video runs on a video worker, everything else on an image worker. */

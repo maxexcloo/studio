@@ -106,11 +106,7 @@ test("the record finds the data folder the way the server does, with the launche
     exitRecordDataDir({ STUDIO_DATA_DIR: "/srv/shell" }, { STUDIO_DATA_DIR: "/srv/from-file" }),
     path.resolve("/srv/shell"),
   );
-  // An old name in the shell still beats the file; an empty shell value does not hide it.
-  assert.equal(
-    exitRecordDataDir({ HEISS_DATA_DIR: "/srv/legacy" }, { STUDIO_DATA_DIR: "/srv/from-file" }),
-    path.resolve("/srv/legacy"),
-  );
+  // An empty shell value does not hide the file's.
   assert.equal(
     exitRecordDataDir({ STUDIO_DATA_DIR: "" }, { STUDIO_DATA_DIR: "/srv/from-file" }),
     path.resolve("/srv/from-file"),
