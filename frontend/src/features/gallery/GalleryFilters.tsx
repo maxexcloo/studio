@@ -92,6 +92,10 @@ export function GalleryFilterToolbar({
     filtersInitiallyOpen ? "filters" : "normal",
   );
   const searchOpen = mode === "search";
+  // A search set from elsewhere (a caption tag) opens the field so it shows what is filtered.
+  useEffect(() => {
+    if (query) setMode((current) => (current === "normal" ? "search" : current));
+  }, [query]);
   const selectedCount = galleryFilterCount(props.value, props.starred);
   const toolbar = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
