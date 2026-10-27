@@ -40,15 +40,19 @@ test("Administrators explicitly link, dismiss and unlink chat identities with sa
   await page.getByRole("combobox", { name: "Account for chat-member", exact: true }).click();
   await page.getByRole("option", { name: "Member (member@example.test)", exact: true }).click();
   await page.getByRole("button", { name: "Link chat-member", exact: true }).click();
-  const linked = page.getByRole("row", { name: "Linked chat-member", exact: true });
+  const linked = page.getByRole("row", { name: "chat-member", exact: true });
   await expect(linked).toContainText("Member (member@example.test)");
-  await expect(page.getByRole("row", { name: "Pending chat-member", exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Dismiss chat-dismiss", exact: true }).click();
-  await expect(page.getByRole("row", { name: "Pending chat-dismiss", exact: true })).toHaveCount(0);
+  await expect(linked).not.toContainText("Awaiting Link");
+  const rowAction = async (identity: string, action: string) => {
+    await page.getByRole("button", { name: `Actions for ${identity}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: action, exact: true }).click();
+  };
+  await rowAction("chat-dismiss", "Dismiss");
+  await expect(page.getByRole("row", { name: "chat-dismiss", exact: true })).toHaveCount(0);
   await section(page, "Settings", "Account");
   await section(page, "Settings", "Users");
   await expect(linked).toBeVisible();
-  await page.getByRole("button", { name: "Unlink chat-member", exact: true }).click();
+  await rowAction("chat-member", "Unlink");
   await expect(page.getByText("No Chat Users Yet", { exact: true })).toBeVisible();
   expect(actions).toEqual([
     { identity: "chat-member", accountId: "member" },
@@ -191,7 +195,7 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
     )
     .toBe(true);
   await section(page, "Settings", "Users");
-  const member = page.getByRole("row", { name: "Account Member", exact: true });
+  const member = page.getByRole("row", { name: "Member", exact: true });
   await member.getByRole("combobox", { name: "Access Group for Member", exact: true }).click();
   await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
   await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
