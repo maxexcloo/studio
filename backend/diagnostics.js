@@ -73,7 +73,7 @@ export function diagnostics({
 export function diagnosticsText(report) {
   const { studio, node, system, comfy } = report;
   const lines = [
-    `Studio ${studio.version || "(unknown version)"}${studio.install ? ` (${studio.install})` : ""}`,
+    `Studio ${studio.version || "development"}${studio.install ? ` (${studio.install})` : ""}`,
     `Node.js ${node}`,
     `System: ${system.name}, ${system.arch}${system.memoryBytes ? `, ${gigabytes(system.memoryBytes)} RAM` : ""}`,
   ];
