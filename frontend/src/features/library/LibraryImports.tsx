@@ -8,21 +8,23 @@ import {
   Group,
   Menu,
   Stack,
-  Table,
   Text,
   TextInput,
   Tooltip,
-  VisuallyHidden,
 } from "@mantine/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis, ImageUp } from "lucide-react";
+import { ImageUp } from "lucide-react";
 import { api, post } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
-import { LoadingState } from "../../ui/LoadingState";
+import { DataTable } from "../../ui/DataTable";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 import { LibraryImportReview, type ImportRecord, type ImportVision } from "./LibraryImportReview";
 
 const gradeColours: Record<string, string> = { Exact: "green", Close: "yellow", Partial: "orange" };
+/** Sorts the best grade first and unknown grades after the known ones. */
+function gradeRank(grade: string) {
+  const rank = Object.keys(gradeColours).indexOf(grade);
+  return rank < 0 ? Infinity : rank;
+}
 const stateLabels: Record<string, string> = {
   failed: "Failed",
   "needs-files": "Needs Files",
@@ -100,14 +102,8 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
   const records = imports.data?.imports || [];
   const nameOf = (record: ImportRecord) =>
     record.title || record.name || record.image?.name || record.input?.url || record.id;
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = records.filter((record) => {
-    if (view === "attention" && record.state !== "needs-files") return false;
-    const text = [nameOf(record), record.grade?.value, ...(record.grade?.reasons || [])]
-      .join(" ")
-      .toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
+  const rows =
+    view === "attention" ? records.filter((record) => record.state === "needs-files") : records;
   const failed = importing.error || uploading.error;
   return (
     <Stack gap="md">
@@ -162,31 +158,30 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
           onQueryChange={setQuery}
         />
       )}
-      {imports.isPending ? (
-        <LoadingState label="Loading Imports" />
-      ) : imports.error ? (
+      {imports.error ? (
         <Alert color="red">{imports.error.message}</Alert>
-      ) : !rows.length ? (
-        <EmptyState title={records.length ? "No Matching Imports" : "No Imports"}>
-          {records.length
-            ? "Try another search or view."
-            : "Your imports and compatibility grades will appear here."}
-        </EmptyState>
       ) : (
-        <Table aria-label="Library Imports" verticalSpacing="xs" highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Import</Table.Th>
-              <Table.Th>Grade</Table.Th>
-              <Table.Th w={44}>
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map((record) => (
-              <Table.Tr key={record.id}>
-                <Table.Td maw={0} w="100%">
+        <DataTable
+          label="Library Imports"
+          rows={rows}
+          rowKey={(record) => record.id}
+          rowName={nameOf}
+          loading={imports.isPending && "Loading Imports"}
+          query={query}
+          searchText={(record) => [
+            nameOf(record),
+            record.grade?.value,
+            ...(record.grade?.reasons || []),
+          ]}
+          empty={records.length ? "No Matches" : "No Imports"}
+          columns={[
+            {
+              key: "import",
+              header: "Import",
+              main: true,
+              sortValue: nameOf,
+              cell: (record) => (
+                <>
                   <Text size="sm" fw={500} truncate>
                     {nameOf(record)}
                   </Text>
@@ -195,52 +190,42 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
                       {reason}
                     </Text>
                   ))}
-                </Table.Td>
-                <Table.Td>
-                  <Stack gap={4} align="start">
-                    {record.grade && (
-                      <Badge
-                        miw="max-content"
-                        variant="light"
-                        size="sm"
-                        color={gradeColours[record.grade.value] || "gray"}
-                      >
-                        {record.grade.value}
-                      </Badge>
-                    )}
-                    <Text size="xs" c={record.state === "failed" ? "red" : "dimmed"}>
-                      {stateLabel(record.state)}
-                    </Text>
-                  </Stack>
-                </Table.Td>
-                <Table.Td>
-                  <Menu position="bottom-end">
-                    <Menu.Target>
-                      <ActionIcon
-                        variant="subtle"
-                        color="gray"
-                        aria-label={`Actions for ${nameOf(record)}`}
-                      >
-                        <Ellipsis size={18} />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item onClick={() => setReviewId(record.id)}>Review Import</Menu.Item>
-                      {record.state === "needs-files" && (
-                        <Menu.Item
-                          disabled={download.isPending}
-                          onClick={() => download.mutate(record.id)}
-                        >
-                          Download Missing
-                        </Menu.Item>
-                      )}
-                    </Menu.Dropdown>
-                  </Menu>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+                </>
+              ),
+            },
+            {
+              key: "grade",
+              header: "Grade",
+              sortValue: (record) => record.grade && gradeRank(record.grade.value),
+              cell: (record) => (
+                <Stack gap={4} align="start">
+                  {record.grade && (
+                    <Badge
+                      miw="max-content"
+                      variant="light"
+                      color={gradeColours[record.grade.value] || "gray"}
+                    >
+                      {record.grade.value}
+                    </Badge>
+                  )}
+                  <Text size="xs" c={record.state === "failed" ? "red" : "dimmed"}>
+                    {stateLabel(record.state)}
+                  </Text>
+                </Stack>
+              ),
+            },
+          ]}
+          rowActions={(record) => (
+            <>
+              <Menu.Item onClick={() => setReviewId(record.id)}>Review Import</Menu.Item>
+              {record.state === "needs-files" && (
+                <Menu.Item disabled={download.isPending} onClick={() => download.mutate(record.id)}>
+                  Download Missing
+                </Menu.Item>
+              )}
+            </>
+          )}
+        />
       )}
     </Stack>
   );

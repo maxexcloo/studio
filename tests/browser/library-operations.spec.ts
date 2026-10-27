@@ -122,7 +122,7 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
   );
   await expect.poll(() => modelReads).toBeGreaterThan(readsBeforeDownloads);
   const actions = async (file: string, action: string) => {
-    await table.getByRole("button", { name: `Download Actions for ${file}`, exact: true }).click();
+    await table.getByRole("button", { name: `Actions for ${file}`, exact: true }).click();
     await page.getByRole("menuitem", { name: action, exact: true }).click();
     await expect(page.getByRole("menu")).toBeHidden();
   };
@@ -370,9 +370,7 @@ for (const ordinary of [true, false])
     },
   );
 
-test("Catalogue views, search and filters narrow the list and reset without losing the query", async ({
-  page,
-}) => {
+test("Catalogue views, sorting, search and filters order and narrow the list", async ({ page }) => {
   await fixtures(page);
   const model = (key: string, title: string, families: string[], installed = true) => ({
     key: `diffusion_models/${key}.safetensors`,
@@ -387,8 +385,8 @@ test("Catalogue views, search and filters narrow the list and reset without losi
     route.fulfill({
       json: {
         items: [
-          model("flux", "Flux Base", ["flux2_dev"]),
           model("xl", "XL Base", ["sdxl"]),
+          model("flux", "Flux Base", ["flux2_dev"]),
           model("later", "Later Model", ["sdxl"], false),
         ],
       },
@@ -397,6 +395,13 @@ test("Catalogue views, search and filters narrow the list and reset without losi
   await page.goto("/library#models");
   const table = page.getByRole("table", { name: "Library Models", exact: true });
   await expect(table.getByRole("row")).toHaveCount(3);
+  const names = table.getByRole("row").locator("td:first-child p:first-child");
+  await expect(names).toHaveText(["Flux Base", "XL Base"]);
+  const name = table.getByRole("columnheader", { name: "Name", exact: true });
+  await expect(name).toHaveAttribute("aria-sort", "ascending");
+  await name.getByRole("button").click();
+  await expect(name).toHaveAttribute("aria-sort", "descending");
+  await expect(names).toHaveText(["XL Base", "Flux Base"]);
   await page.getByRole("button", { name: "Filter Models", exact: true }).click();
   await page.getByRole("combobox", { name: "Family", exact: true }).click();
   await page.getByRole("option", { name: "SDXL", exact: true }).click();
@@ -414,6 +419,8 @@ test("Catalogue views, search and filters narrow the list and reset without losi
   await expect(table).toContainText("Flux Base");
   await expect(table).not.toContainText("XL Base");
   await page.getByRole("button", { name: "Search Models", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search Models", exact: true }).fill("nothing");
+  await expect(page.getByText("No Matches", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Clear Search", exact: true }).click();
   await page.keyboard.press("Escape");
   await chooseView(page, "Models", "Available");

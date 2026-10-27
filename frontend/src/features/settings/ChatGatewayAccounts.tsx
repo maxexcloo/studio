@@ -1,18 +1,24 @@
 import { useState } from "react";
-import { Alert, Button, Group, Select, Stack, Switch, Table, Text } from "@mantine/core";
+import { Alert, Button, Group, Menu, Select, Stack, Switch, Text } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
+import { DataTable } from "../../ui/DataTable";
 
 export interface GatewayAccounts {
   adminTools: boolean;
   links: { identity: string; accountId: string; linkedAt?: string }[];
   pending: { identity: string; firstSeenAt?: string; lastSeenAt?: string }[];
 }
+type Identity =
+  | GatewayAccounts["links"][number]
+  | (GatewayAccounts["pending"][number] & { accountId?: undefined });
 type Action =
   | { kind: "link"; identity: string; accountId?: string }
   | { kind: "dismiss"; identity: string }
   | { kind: "admin"; on: boolean };
+
+const accountLabel = (account: { displayName: string; username: string }) =>
+  `${account.displayName} (${account.username})`;
 
 export function ChatGatewayAccounts({
   gateway,
@@ -38,14 +44,15 @@ export function ChatGatewayAccounts({
   });
   const options = [...accounts]
     .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username))
-    .map((account) => ({
-      value: account.id,
-      label: `${account.displayName} (${account.username})`,
-    }));
-  const links = [...(gateway?.links || [])].sort((a, b) => a.identity.localeCompare(b.identity));
-  const pending = [...(gateway?.pending || [])].sort((a, b) =>
-    a.identity.localeCompare(b.identity),
-  );
+    .map((account) => ({ value: account.id, label: accountLabel(account) }));
+  const accountName = (id: string) => {
+    const account = accounts.find((account) => account.id === id);
+    return account ? accountLabel(account) : "Removed Account";
+  };
+  const rows: Identity[] = [
+    ...(gateway?.links || []),
+    ...(gateway?.pending || []).map((identity) => ({ ...identity, accountId: undefined })),
+  ];
   return (
     <Stack>
       <Text size="sm" c="dimmed">
@@ -68,99 +75,89 @@ export function ChatGatewayAccounts({
           {change.error.message}
         </Alert>
       )}
-      {!links.length && !pending.length ? (
-        <EmptyState title="No Chat Users Yet" />
-      ) : (
-        <Table.ScrollContainer minWidth={560}>
-          <Table aria-label="Chat Gateway Identities" verticalSpacing="sm">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Identity</Table.Th>
-                <Table.Th>Account</Table.Th>
-                <Table.Th>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {links.map((link) => {
-                const account = accounts.find((account) => account.id === link.accountId);
-                return (
-                  <Table.Tr key={link.identity} aria-label={`Linked ${link.identity}`}>
-                    <Table.Td>{link.identity}</Table.Td>
-                    <Table.Td>
-                      {account ? `${account.displayName} (${account.username})` : "Removed Account"}
-                    </Table.Td>
-                    <Table.Td>
-                      <Button
-                        size="compact-sm"
-                        variant="light"
-                        disabled={change.isPending}
-                        aria-label={`Unlink ${link.identity}`}
-                        onClick={() => change.mutate({ kind: "link", identity: link.identity })}
-                      >
-                        Unlink
-                      </Button>
-                    </Table.Td>
-                  </Table.Tr>
-                );
-              })}
-              {pending.map((identity) => (
-                <Table.Tr key={identity.identity} aria-label={`Pending ${identity.identity}`}>
-                  <Table.Td>
-                    <Text size="sm">{identity.identity}</Text>
-                    <Text size="xs" c="dimmed">
-                      Awaiting Link
-                      {identity.firstSeenAt
-                        ? ` · ${new Date(identity.firstSeenAt).toLocaleString("en-AU")}`
-                        : ""}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Select
-                      aria-label={`Account for ${identity.identity}`}
-                      placeholder="Choose an Account"
-                      data={options}
-                      value={choices[identity.identity] || null}
-                      disabled={change.isPending}
-                      onChange={(value) =>
-                        setChoices((current) => ({ ...current, [identity.identity]: value || "" }))
-                      }
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Button
-                        size="compact-sm"
-                        disabled={change.isPending || !choices[identity.identity]}
-                        aria-label={`Link ${identity.identity}`}
-                        onClick={() =>
-                          change.mutate({
-                            kind: "link",
-                            identity: identity.identity,
-                            accountId: choices[identity.identity],
-                          })
-                        }
-                      >
-                        Link
-                      </Button>
-                      <Button
-                        size="compact-sm"
-                        variant="subtle"
-                        disabled={change.isPending}
-                        aria-label={`Dismiss ${identity.identity}`}
-                        onClick={() =>
-                          change.mutate({ kind: "dismiss", identity: identity.identity })
-                        }
-                      >
-                        Dismiss
-                      </Button>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
-      )}
+      <DataTable
+        label="Chat Gateway Identities"
+        rows={rows}
+        rowKey={(row) => row.identity}
+        rowName={(row) => row.identity}
+        initialSort={{ key: "identity", descending: false }}
+        empty="No Chat Users Yet"
+        columns={[
+          {
+            key: "identity",
+            header: "Identity",
+            sortValue: (row) => row.identity,
+            cell: (row) => (
+              <>
+                <Text size="sm">{row.identity}</Text>
+                {!row.accountId && (
+                  <Text size="xs" c="dimmed">
+                    Awaiting Link
+                    {"firstSeenAt" in row && row.firstSeenAt
+                      ? ` · ${new Date(row.firstSeenAt).toLocaleString("en-AU")}`
+                      : ""}
+                  </Text>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "account",
+            header: "Account",
+            main: true,
+            sortValue: (row) => (row.accountId ? accountName(row.accountId) : undefined),
+            cell: (row) =>
+              row.accountId ? (
+                <Text size="sm">{accountName(row.accountId)}</Text>
+              ) : (
+                <Group gap="xs" wrap="nowrap">
+                  <Select
+                    aria-label={`Account for ${row.identity}`}
+                    placeholder="Choose an Account"
+                    data={options}
+                    value={choices[row.identity] || null}
+                    disabled={change.isPending}
+                    onChange={(value) =>
+                      setChoices((current) => ({ ...current, [row.identity]: value || "" }))
+                    }
+                    flex={1}
+                    miw={0}
+                  />
+                  <Button
+                    disabled={change.isPending || !choices[row.identity]}
+                    aria-label={`Link ${row.identity}`}
+                    onClick={() =>
+                      change.mutate({
+                        kind: "link",
+                        identity: row.identity,
+                        accountId: choices[row.identity],
+                      })
+                    }
+                  >
+                    Link
+                  </Button>
+                </Group>
+              ),
+          },
+        ]}
+        rowActions={(row) =>
+          row.accountId ? (
+            <Menu.Item
+              disabled={change.isPending}
+              onClick={() => change.mutate({ kind: "link", identity: row.identity })}
+            >
+              Unlink
+            </Menu.Item>
+          ) : (
+            <Menu.Item
+              disabled={change.isPending}
+              onClick={() => change.mutate({ kind: "dismiss", identity: row.identity })}
+            >
+              Dismiss
+            </Menu.Item>
+          )
+        }
+      />
     </Stack>
   );
 }
