@@ -1,8 +1,7 @@
 import { Fragment } from "react";
 import { Group, Kbd, Stack, Switch, Text } from "@mantine/core";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, post } from "../../api";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { useShareWithoutSettings } from "../gallery/mediaShare";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
 import { FinishStarredImages } from "./FinishStarredImages";
@@ -23,20 +22,11 @@ const shortcuts: { keys: string[][]; action: string }[] = [
 
 /** Settings › Studio: preferences that change how Studio behaves for you. */
 export function StudioPreferences() {
-  const client = useQueryClient();
   const account = useAccount();
   const admin = useIsAdmin();
   const historyAllowed = admin || account.data?.account?.features?.promptHistory === true;
   const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
-  const history = useQuery({
-    queryKey: ["prompt-history", "positive"],
-    queryFn: () => api<{ enabled: boolean }>("/api/prompts?kind=positive"),
-    enabled: historyAllowed,
-  });
-  const keepPrompts = useMutation({
-    mutationFn: (enabled: boolean) => post("/api/prompts/enabled", { enabled }),
-    onSettled: () => void client.invalidateQueries({ queryKey: ["prompt-history"] }),
-  });
+  const keep = useKeepRecentPrompts(historyAllowed);
   const [shareWithoutSettings, setShareWithoutSettings] = useShareWithoutSettings();
   const [tileCaptions, setTileCaptions] = useTileCaptions();
   return (
@@ -49,11 +39,11 @@ export function StudioPreferences() {
           >
             <Switch
               // Remounts once loaded so the saved state appears without the thumb sliding.
-              key={history.data ? "loaded" : "loading"}
+              key={keep.history.data ? "loaded" : "loading"}
               aria-label="Keep Recent Prompts"
-              checked={keepPrompts.isPending ? keepPrompts.variables : !!history.data?.enabled}
-              disabled={!history.data || keepPrompts.isPending}
-              onChange={(event) => keepPrompts.mutate(event.currentTarget.checked)}
+              checked={!!keep.history.data?.enabled}
+              disabled={!keep.history.data}
+              onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
             />
           </SettingRow>
         )}

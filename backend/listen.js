@@ -1,5 +1,5 @@
 import https from "node:https";
-import { listenOnPort } from "./launch.js";
+import { keepProxyConnections, listenOnPort } from "./launch.js";
 import { listensBeyondThisComputer } from "./client-trust.js";
 import { httpsPort, startupTls, watchCertificate } from "./tls.js";
 
@@ -49,7 +49,9 @@ export async function startServers(app, { host, port, onListening, onFatal }) {
       `\n  HTTPS can’t start: ${plan.tlsProblem}\n  Other devices can’t connect until that’s fixed. This computer can still open http://localhost:${listening.port}\n`,
     );
   if (plan.httpsHost) {
-    const secure = https.createServer({ cert: startupTls.pem.cert, key: startupTls.pem.key }, app);
+    const secure = keepProxyConnections(
+      https.createServer({ cert: startupTls.pem.cert, key: startupTls.pem.key }, app),
+    );
     servers.push(secure);
     secure.once("error", (error) => {
       httpsProblem =

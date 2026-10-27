@@ -41,6 +41,16 @@ export function studioAnswersAt(port, { timeoutMs = 1500, host = "" } = {}) {
   });
 }
 
+// A reverse proxy pools idle upstream connections (Traefik for 90 seconds) and sends the next
+// request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
+// POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
+const idleSocketMs = 120_000;
+export function keepProxyConnections(server) {
+  server.keepAliveTimeout = idleSocketMs;
+  server.headersTimeout = idleSocketMs + 1000;
+  return server;
+}
+
 /**
  * Listens on `port` and resolves `{ server, port }` (port 0 reports the one the
  * system gave). Rejects with the listen error; when Studio itself holds the
@@ -49,7 +59,7 @@ export function studioAnswersAt(port, { timeoutMs = 1500, host = "" } = {}) {
 export async function listenOnPort(handler, { port, host, isStudio = studioAnswersAt } = {}) {
   try {
     const server = await new Promise((resolve, reject) => {
-      const server = http.createServer(handler);
+      const server = keepProxyConnections(http.createServer(handler));
       server.once("error", reject);
       server.listen(Number(port), host, () => {
         server.off("error", reject);
