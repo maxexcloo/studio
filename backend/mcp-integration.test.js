@@ -130,7 +130,6 @@ async function fixture(
     internalCredential,
     resolveSignedResult,
     gatewayAdminTools,
-    claimHandover,
     control = fixtureRuntime(),
     writerReply,
     taste,
@@ -341,7 +340,6 @@ async function fixture(
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(internalCredential ? { internalCredential } : {}),
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
-    ...(claimHandover ? { claimHandover } : {}),
     ...(taste ? { taste } : {}),
     // Like Studio's queue: failed direct cloud video jobs since a time.
     cloudVideoFailures: (since) =>
@@ -5144,57 +5142,6 @@ test("admin tools go through the Library and profile routes with the administrat
     (await fetch(`${f.base}${link.pathname.slice(0, -2)}xx`)).status,
     404,
     "a tampered link is refused",
-  );
-});
-
-test("a result handed over by Refine in Chat becomes the account’s for its chat, and no one else’s", async (t) => {
-  const account = {
-    userId: "stable-account-a",
-    role: "user",
-    authenticated: true,
-    generationProfiles: [imageProfile.id],
-    features: {},
-  };
-  const other = {
-    userId: "stable-account-b",
-    role: "user",
-    authenticated: true,
-    generationProfiles: [imageProfile.id],
-    features: {},
-  };
-  const tokens = {
-    "handover-account-token-long-enough-for-the-fixture-a": account,
-    "handover-account-token-long-enough-for-the-fixture-b": other,
-  };
-  const f = await fixture(t, {
-    accountMode: true,
-    enabled: false,
-    authenticateAccountToken: (value) => tokens[value] || null,
-    claimHandover: (owner, id, { accountMode }) =>
-      accountMode && owner === "stable-account-a" && id === "studio-made-job",
-  });
-  f.jobs.set("studio-made-job", {
-    id: "studio-made-job",
-    status: "done",
-    kind: "image",
-    outputs: [{ url: "/comfy/view?filename=studio.png" }],
-    settings: { prompt: "A heron", profileId: imageProfile.id },
-  });
-  const stranger = await f.client("", "handover-account-token-long-enough-for-the-fixture-b");
-  assert.equal((await call(stranger, "Status", { job_id: "studio-made-job" })).isError, true);
-  const owner = await f.client("", "handover-account-token-long-enough-for-the-fixture-a");
-  assert.equal(data(await call(owner, "Status", { job_id: "studio-made-job" })).status, "done");
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8")).jobs[
-      "studio-made-job"
-    ],
-    "stable-account-a",
-    "kept on disk",
-  );
-  assert.equal(
-    (await call(stranger, "Status", { job_id: "studio-made-job" })).isError,
-    true,
-    "still not the other account’s",
   );
 });
 

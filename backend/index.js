@@ -136,7 +136,6 @@ import {
 import { canAdmin, clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp.js";
-import { createHandoverStore, registerChatRoutes } from "./chat-handover.js";
 import { mcpOutputPath } from "./mcp-media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
@@ -385,15 +384,12 @@ for (const [name, migrate] of [
     );
   }
 }
-// Chat handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
-const chatHandovers = createHandoverStore({ dataDir });
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
 const runtime = loadRuntime(process.env, { dataDir });
 const mcp = registerMcpRoutes(app, {
   dataDir,
   runtime: runtime?.controller,
   gatewayAdminTools,
-  claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) =>
     hostAllowed(req.headers.host, { network: networkListening, extra: tlsHostNames() }),
@@ -1467,13 +1463,6 @@ registerGalleryReadRoutes(app, {
         .map((job) => [job.id, { id: job.sessionId, title: titles.get(job.sessionId) }]),
     );
   },
-});
-// Refine in Chat: the chat's address, and handing a result the account owns to its chat.
-registerChatRoutes(app, {
-  store: chatHandovers,
-  ownerId: ownerIdForRequest,
-  owned: (req, jobId) =>
-    recordsForRequest(gallery, req).some((item) => item.jobId === jobId && item.status === "done"),
 });
 
 app.delete("/api/loras", (req, res) => {

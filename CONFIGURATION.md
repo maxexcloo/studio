@@ -141,15 +141,13 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Administrators can edit and approve runtime-owned catalogue, profile and guide definitions through the retained mutation tools. Personal MCP tokens remain distinct from browser administrator credentials.
 
-The retained external-chat handover contracts use `STUDIO_CHAT_URL`, `chat-handovers.json` and account-owned job relationships. They remain available for existing LibreChat consumers.
-
 Studio's Chat tab uses its own OpenAI-compatible text gateway, configured with three server-side settings:
 
 - `STUDIO_CHAT_GATEWAY_URL`: gateway root, `/v1` base or full `/chat/completions` endpoint.
 - `STUDIO_CHAT_GATEWAY_KEY`: gateway credential, never sent to the browser.
 - `STUDIO_CHAT_GATEWAY_MODELS`: comma-separated permitted model IDs or prefixes ending in `*`, such as `ai/*,deepseek/specific`. Missing or empty configuration leaves Chat unavailable. Chat only offers models actually returned by this gateway's model catalogue; the first permitted model is the default. Selected models are checked again for every message.
 
-Chat uses the Prompt Assistant account permission; known Spicy models also require NSFW Models. Its gateway is independent of prompt assistance and `STUDIO_CHAT_URL`, which retains its external-chat handover meaning. Chat preserves the selected media model and backend. Explicit requests to create, refine or animate media use the normal generation admission path; discussion alone does not generate media. Editing and submitting a generation card records its changed settings in the conversation, then generates once after the assistant finishes its reply. Each iteration retains the assistant's text, generation inputs, actual text model and linked results; a model without a name of its own (a routing alias such as `ai/text`) is listed under the model that last answered for it. Interrupted text responses retain their partial content, and recorded media actions are not automatically resubmitted.
+Chat uses the Prompt Assistant account permission; known Spicy models also require NSFW Models. Its gateway is independent of prompt assistance. Chat preserves the selected media model and backend. Explicit requests to create, refine or animate media use the normal generation admission path; discussion alone does not generate media. Editing and submitting a generation card records its changed settings in the conversation, then generates once after the assistant finishes its reply. Each iteration retains the assistant's text, generation inputs, actual text model and linked results; a model without a name of its own (a routing alias such as `ai/text`) is listed under the model that last answered for it. Interrupted text responses retain their partial content, and recorded media actions are not automatically resubmitted.
 
 MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account. Existing gateway settings remain supported while the separate Bifrost migration is pending.
 
