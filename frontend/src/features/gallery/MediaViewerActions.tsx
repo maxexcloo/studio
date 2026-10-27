@@ -41,7 +41,13 @@ import { useSettingsText } from "./MediaDetails";
 import { useMediaTransfer, useShareWithoutSettings } from "./mediaShare";
 import { UpscaleControls } from "./UpscaleControls";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { animateThemes, useMediaAction, type AnimateTheme, type Iteration } from "./useMediaAction";
+import {
+  animateProfileQuery,
+  animateThemes,
+  useMediaAction,
+  type AnimateTheme,
+  type Iteration,
+} from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 import classes from "./MediaViewer.module.css";
 
@@ -85,6 +91,11 @@ export function MediaViewerActions({
   const favorite = useMediaFavorite(item);
   const action = useMediaAction(item, sessionId, onApplied);
   const assistant = useQuery(assistantQuery);
+  // Shown in the Animate menu before anything queues: the model that will run, or why none can.
+  const animation = useQuery({
+    ...animateProfileQuery(item),
+    enabled: ready && item.type === "image",
+  });
   const settingsText = useSettingsText(item);
   const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
   const [instructing, setInstructing] = useState(false);
@@ -181,6 +192,13 @@ export function MediaViewerActions({
               )}
               <Menu.Dropdown>
                 <Menu.Label>Animate</Menu.Label>
+                <Menu.Label fw={400}>
+                  {animation.error
+                    ? animation.error.message
+                    : animation.data
+                      ? animation.data.note || `Runs on ${animation.data.label}.`
+                      : "Choosing a video model…"}
+                </Menu.Label>
                 {assistant.data?.available ? (
                   themes.map((theme) => {
                     const Icon = themeIcons[theme];
@@ -188,6 +206,7 @@ export function MediaViewerActions({
                       <Menu.Item
                         key={theme}
                         h={36}
+                        disabled={!animation.data}
                         leftSection={<Icon size={16} />}
                         onClick={() =>
                           theme === "custom"
@@ -206,6 +225,7 @@ export function MediaViewerActions({
                 <Menu.Divider />
                 <Menu.Item
                   h={36}
+                  disabled={!animation.data}
                   leftSection={<SlidersHorizontal size={16} />}
                   onClick={() => action.mutate("animate")}
                 >

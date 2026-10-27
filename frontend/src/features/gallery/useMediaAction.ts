@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
@@ -11,6 +11,26 @@ import { generationInput, isProfile } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
+
+export interface AnimateChoice {
+  profileId: string;
+  label: string;
+  cloud: boolean;
+  /** Set when it runs somewhere the user may not expect (Grok while local video is stopped). */
+  note: string;
+  size?: { width: number; height: number };
+}
+/** The video profile that animates this image (backend/animate-profile.js), or why none can. */
+export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =>
+  queryOptions({
+    queryKey: ["animate-profile", item.width || 0, item.height || 0],
+    queryFn: () =>
+      api<AnimateChoice>(
+        `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}`,
+      ),
+    staleTime: 5000,
+    retry: false,
+  });
 
 /** The draft that reruns, refines or animates a saved result with its recorded settings. */
 export async function mediaDraft(
@@ -33,9 +53,15 @@ export async function mediaDraft(
   const original = compatible.find((profile) =>
     priorId ? isProfile(profile, priorId) : profile.model === item.model,
   );
-  const profile =
-    original ||
-    (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
+  // Animating an image takes Animate's own pick, so the composer shows the model that will run.
+  const choice =
+    operation === "animate" && item.type === "image"
+      ? await client.fetchQuery(animateProfileQuery(item))
+      : undefined;
+  const profile = choice
+    ? profiles.find((profile) => isProfile(profile, choice.profileId))
+    : original ||
+      (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
   if (!profile)
     throw new Error(
       operation === "image"
@@ -113,7 +139,8 @@ export async function mediaDraft(
         seed: "",
         prompt: item.prompt || "",
         negative: item.negative || "",
-        ...(item.width ? { width: item.width, height: item.height || item.width } : {}),
+        ...(choice?.size ??
+          (item.width ? { width: item.width, height: item.height || item.width } : {})),
         referenceAssets: operation === "image" ? restored : [],
         referenceDetails: preparedReferences,
       },
