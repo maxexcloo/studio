@@ -317,6 +317,7 @@ test("gateway identities map to accounts only through administrator links, and t
     },
   });
   assert.equal(accountForRequest(internal("POST", "/api/generate")).userId, artist.id);
+  assert.equal(accountForRequest(internal("POST", "/api/jobs/job-1/cancel")).userId, artist.id);
   assert.equal(accountForRequest(internal("GET", "/api/accounts/admin")), null);
   // Behind a proxy the request is not this computer, so the credential is refused.
   assert.equal(
@@ -512,6 +513,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
 
   assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
+  assert.equal(mcpAdminRouteAllowed("POST", "/api/profiles/backends/combine"), true);
   // Nothing that deletes or replaces files, and no account or GPU administration.
   for (const [method, routePath] of [
     ["DELETE", "/api/loras"],

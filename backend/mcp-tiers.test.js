@@ -53,11 +53,11 @@ test("a profile is found by id, then by a unique id or label match ignoring case
   assert.equal(findProfile(profiles, ""), null);
 });
 
-test("the chosen profile prefers the default, then its family, then unrestricted profiles", () => {
+test("the chosen profile prefers the default, then its family, then safe-for-work profiles", () => {
   const profiles = [
-    { id: "restricted", label: "R · Fast", family: "other", restricted: true },
+    { id: "nsfw", label: "N · Fast", family: "other", nsfw: true },
     { id: "plain", label: "P · Fast", family: "other" },
-    { id: "kin", label: "K · Fast", family: "qwen", restricted: true },
+    { id: "kin", label: "K · Fast", family: "qwen", nsfw: true },
     { id: "default", label: "D · Quality", family: "qwen" },
   ];
   // Without a tier, Fast leads; the default's family wins within it.
@@ -101,7 +101,7 @@ test("animating prefers a fast first-frame profile unless a tier is given", () =
       id: "tuned-quality",
       label: "H3 Tuned · Quality · 20 Steps",
       family: "h3",
-      restricted: true,
+      nsfw: true,
       mediaInputs: frame,
     },
     { id: "fl-fast", label: "H3 FL · Fast · 8 Steps", family: "h3", mediaInputs: frame },
