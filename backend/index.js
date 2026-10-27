@@ -19,6 +19,8 @@ import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
+import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
+import { fullBodyPerson } from "./mcp-prompt-checks.js";
 import { createSuggestions, registerSuggestionRoutes } from "./domain/suggestions.ts";
 import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
 import { ChatStore } from "./domain/chat-store.ts";
@@ -191,7 +193,7 @@ import {
 import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { scheduleTrashPurge } from "./gallery-trash.js";
-import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
+import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
 import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
 import {
@@ -224,10 +226,9 @@ import {
 import {
   bytesForReferenceAccount,
   publicGalleryBuffer,
-  referenceAssetFromGallery,
   referenceAssetForAccount,
   referenceExistsForAccount,
-  stageReferenceAssets,
+  stageReferenceAssetsForAccount,
 } from "./reference-assets.js";
 import { nodePack, nodePacks } from "./node-packs.js";
 import {
@@ -297,6 +298,7 @@ import { enforceMultiUserRequest } from "./multi-user-gate.js";
 import {
   ownerIdForRequest,
   outputFilenameBelongsToRequest,
+  recordBelongsToAccount,
   recordBelongsToRequest,
   recordsForRequest,
 } from "./account-ownership.js";
@@ -429,6 +431,11 @@ const mcp = registerMcpRoutes(app, {
   internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
   domainRequest: mcpGenerationRequest,
+  cloudVideoFailures: (since) =>
+    rewriteStore
+      .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
+      .filter((job) => job.input.kind === "video")
+      .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
   taste: (owner) => {
     const ownerId = multiUserEnabled ? owner : "";
     return taste.writable(ownerId) ? taste.read(ownerId).summary : "";
@@ -566,15 +573,6 @@ const recoverRunningJobs = createJobRecovery({
   cancel: cancelPrompt,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : []),
 });
-// Cloud runs accepted before a restart are live again before any status check or gallery cleanup.
-{
-  const waiting = new Set(
-    filterVisibleGallery(
-      gallery.filter((item) => !item.url && ["pending", "error"].includes(item.status)),
-    ).map((item) => item.jobId),
-  );
-  cloudJobs.restore(jobs, { live: (id) => waiting.has(id) });
-}
 
 /**
  * With Studio media storage, recovered ComfyUI outputs move into Studio media and
@@ -1940,6 +1938,7 @@ const taste = {
 const jobAdmitted = (job) => {
   if (job.parentJobId) taste.record(job.ownerId, [tasteSignal("iterate", job.id, job.input)]);
   dream.admitted(job);
+  finishing.admitted(job);
   captioner.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
@@ -1950,6 +1949,11 @@ registerGalleryHistoryRoutes(app, {
         ownerId,
         items.map((item) => item.id),
       );
+    finishing.starred(
+      ownerId,
+      items.map((item) => item.id),
+      favorite,
+    );
     taste.record(
       ownerId,
       items.map((item) =>
@@ -2271,7 +2275,7 @@ async function queueResourceFor(input) {
     typeof input.backendId === "string" && input.backendId
       ? input.backendId
       : worker?.id || defaultWorkerId() || "";
-  return `${profile && isCloudProfile(profile) ? "cloud" : "worker"}:${backend}`;
+  return `worker:${backend}`;
 }
 /** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
 function managedWorkloads(job) {
@@ -2300,7 +2304,7 @@ async function permitQueueFallback(job) {
   rewriteStore.save({
     ...latest,
     backend,
-    resource: `${job.resource.startsWith("cloud:") ? "cloud" : "worker"}:${backend}`,
+    resource: `worker:${backend}`,
   });
   return true;
 }
@@ -2643,10 +2647,7 @@ const dream = createDream({
     return {
       profiles: (models.profiles || []).filter(
         (profile) =>
-          profile.ready !== false &&
-          profile.availability !== "offline" &&
-          !isCloudProfile(profile) &&
-          !directCloud?.isProfile({ profileId: profile.id }),
+          profile.ready !== false && profile.availability !== "offline" && !isCloudProfile(profile),
       ),
       defaults: models.defaults,
     };
@@ -2675,19 +2676,54 @@ const dream = createDream({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerDreamRoutes(app, { dream });
+// Dream's idle rule (domain/dream.ts), with Dream's own jobs counting as work: no live job, no text work.
+const studioIdle = () =>
+  !textBusy() &&
+  !rewriteStore.db
+    .prepare(
+      "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
+    )
+    .get();
+// Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
+const finishing = createFinishing({
+  dataDir,
+  store: rewriteStore,
+  owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
+  allowed: (ownerId) => {
+    if (!ownerId) return !multiUserEnabled;
+    const account = accountAccessForId(ownerId);
+    return Boolean(account?.authenticated && mayUseFeature(account, "gallery"));
+  },
+  item: (ownerId, itemId) =>
+    gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
+  idle: studioIdle,
+  ready: async (quality) => {
+    const worker = routeJob("upscale");
+    if (!worker) return { reason: noWorkerMessage("upscale") };
+    return withComfyBackend(worker.id, async () => {
+      const { info, failure } = await upscaleInfo();
+      if (failure) return { reason: failure.payload.error };
+      const status = upscaleStatus(info, quality);
+      if (!status.ready) return { reason: upscaleUnready(status) };
+      return {
+        faceDetail: status.faceDetail.nodesInstalled && status.faceDetail.detectors.length > 0,
+      };
+    });
+  },
+  fullBody: fullBodyPerson,
+  upscale: (ownerId, request) =>
+    queueUpscale(ownerId ? accountAccessForId(ownerId) : undefined, request, {
+      priority: queuePriority.finishing,
+    }),
+  cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
+});
+registerFinishingRoutes(app, { finishing });
 // Gallery captions (domain/captions.ts) let search match what an image shows. Like Chat, accounts
 // without the prompt assistant never send their images to the text model.
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
-  // Dream's idle rule (domain/dream.ts), with Dream's own jobs counting as work: no live job, no text work.
-  idle: () =>
-    !textBusy() &&
-    !rewriteStore.db
-      .prepare(
-        "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
-      )
-      .get(),
+  idle: studioIdle,
   allowed: (ownerId) => {
     if (!multiUserEnabled) return true;
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
@@ -2950,6 +2986,7 @@ async function mcpGenerationRequest(method, route, input, owner) {
 }
 generationQueue.start();
 dream.start();
+finishing.start();
 captioner.start();
 
 /**
@@ -2960,37 +2997,54 @@ function onUpscaleWorker(handler) {
   return (req, res) => {
     const worker = routeJob("upscale");
     if (!worker) {
-      res.status(503).json({
-        ok: false,
-        offline: true,
-        noWorker: true,
-        error: noWorkerMessage("upscale"),
-        install: installState(),
-      });
+      const { status, payload } = noUpscaleWorker();
+      res.status(status).json(payload);
       return undefined;
     }
     return withComfyBackend(worker.id, () => handler(req, res));
   };
 }
+const noUpscaleWorker = () => ({
+  status: 503,
+  payload: {
+    ok: false,
+    offline: true,
+    noWorker: true,
+    error: noWorkerMessage("upscale"),
+    install: installState(),
+  },
+});
 
 /** Setup polls with fresh=1 so a node pack installed a moment ago is not hidden behind the 30s cache. */
-async function upscaleContext(res, { force = false } = {}) {
+async function upscaleInfo({ force = false } = {}) {
   try {
-    const { info } = await loadComfyContext({ force });
-    return info;
+    return { info: (await loadComfyContext({ force })).info };
   } catch {
     const restarting = isDefaultBackend() && comfyRestarting();
-    res.status(503).json({
-      ok: false,
-      offline: true,
-      restarting,
-      error: restarting
-        ? "ComfyUI is restarting. Smart upscale is back when it’s done."
-        : `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
-      install: installState(),
-    });
-    return null;
+    return {
+      failure: {
+        status: 503,
+        payload: {
+          ok: false,
+          offline: true,
+          restarting,
+          error: restarting
+            ? "ComfyUI is restarting. Smart upscale is back when it’s done."
+            : `${isDefaultBackend() ? "ComfyUI" : workerById(currentComfyBackend())?.name || "The upscale worker"} is offline, so smart upscale isn’t available.`,
+          install: installState(),
+        },
+      },
+    };
   }
+}
+const upscaleUnready = (status) =>
+  status.nodesInstalled
+    ? "The SeedVR2 models aren’t installed yet."
+    : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`;
+async function upscaleContext(res, options) {
+  const { info, failure } = await upscaleInfo(options);
+  if (failure) res.status(failure.status).json(failure.payload);
+  return info || null;
 }
 
 app.get(
@@ -3054,171 +3108,191 @@ app.post("/api/upscale/install/cancel", (req, res) => {
   res.json({ ok: true, install: cancelModelInstall() });
 });
 
-app.post(
-  "/api/upscale",
-  onUpscaleWorker(async (req, res) => {
-    const target = req.body?.target === undefined ? 0 : Number(req.body.target);
-    if (target !== 0 && !upscaleTargets.includes(target)) {
-      return res.status(400).json({
+/**
+ * Queues a smart upscale of one of the account's gallery items on a worker with Upscale, answering
+ * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Starred Images).
+ */
+async function queueUpscale(account, request, origin) {
+  const worker = routeJob("upscale");
+  if (!worker) return noUpscaleWorker();
+  return withComfyBackend(worker.id, () => queueUpscaleOnWorker(account, request, origin));
+}
+
+async function queueUpscaleOnWorker(account, request, origin) {
+  const target = request.target === undefined ? 0 : Number(request.target);
+  if (target !== 0 && !upscaleTargets.includes(target)) {
+    return {
+      status: 400,
+      payload: {
         ok: false,
         error: "Choose an upscale target of 2048 or 4096, or 0 for automatic sizing.",
-      });
-    }
-    const info = await upscaleContext(res);
-    if (!info) return;
-    const quality = normalizeQuality(req.body?.quality);
-    const itemId = String(req.body?.galleryItemId || "");
-    const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-    if (req.studioAccount && !ownedItem) {
-      res
-        .status(404)
-        .json({ ok: false, reason: "missing", error: "This image is no longer in the gallery." });
-      return;
-    }
-    const faceDetail =
-      Boolean(req.body?.faceDetail) && (ownedItem || findUpscaleTarget(itemId))?.type !== "video";
-    const status = upscaleStatus(info, quality);
-    if (!status.ready) {
-      res.status(400).json({
-        ok: false,
-        error: status.nodesInstalled
-          ? "The SeedVR2 models aren’t installed yet."
-          : `ComfyUI is missing the SeedVR2 nodes: ${status.missingNodes.join(", ")}.`,
-        status,
-      });
-      return;
-    }
-    if (faceDetail && !status.faceDetail.nodesInstalled) {
-      res.status(400).json({
+      },
+    };
+  }
+  const { info, failure } = await upscaleInfo();
+  if (failure) return failure;
+  const quality = normalizeQuality(request.quality);
+  const itemId = String(request.galleryItemId || "");
+  const ownedItem = gallery.find(
+    (item) => item.id === itemId && recordBelongsToAccount(item, account),
+  );
+  if (account && !ownedItem)
+    return {
+      status: 404,
+      payload: { ok: false, reason: "missing", error: "This image is no longer in the gallery." },
+    };
+  const faceDetail =
+    Boolean(request.faceDetail) && (ownedItem || findUpscaleTarget(itemId))?.type !== "video";
+  const status = upscaleStatus(info, quality);
+  if (!status.ready)
+    return {
+      status: 400,
+      payload: { ok: false, error: upscaleUnready(status), status },
+    };
+  if (faceDetail && !status.faceDetail.nodesInstalled)
+    return {
+      status: 400,
+      payload: {
         ok: false,
         error: `Face detail needs the Impact Pack nodes: ${status.faceDetail.missingNodes.join(", ")}.`,
-      });
-      return;
-    }
-    // Say exactly why an image cannot be upscaled; the tile shows this in a popover.
-    const item = findUpscaleTarget(itemId);
-    if (!item) {
-      res.status(404).json({
+      },
+    };
+  // Say exactly why an image cannot be upscaled; the tile shows this in a popover.
+  const item = findUpscaleTarget(itemId);
+  if (!item)
+    return {
+      status: 404,
+      payload: {
         ok: false,
         reason: "missing",
         error:
           "This image is no longer in the gallery. It may have been deleted on another device. Reload the page.",
-      });
-      return;
-    }
-    if (!["image", "video"].includes(item.type)) {
-      res
-        .status(400)
-        .json({ ok: false, reason: "video", error: "Upscale supports gallery images and videos." });
-      return;
-    }
-    if (item.library) {
-      res.status(400).json({
+      },
+    };
+  if (!["image", "video"].includes(item.type))
+    return {
+      status: 400,
+      payload: { ok: false, reason: "video", error: "Upscale supports gallery images and videos." },
+    };
+  if (item.library)
+    return {
+      status: 400,
+      payload: {
         ok: false,
         reason: "library",
         error: "Images from an added folder stay in that folder, so they can’t be upscaled.",
-      });
-      return;
-    }
-    if (item.status !== "done") {
-      res.status(409).json({
+      },
+    };
+  if (item.status !== "done")
+    return {
+      status: 409,
+      payload: {
         ok: false,
         reason: "unfinished",
         error: "This image is still rendering. Upscale it when it’s done.",
-      });
-      return;
-    }
-    if (["queued", "running"].includes(item.upscale?.status)) {
-      res.status(409).json({ ok: false, error: "This image is already being upscaled." });
-      return;
-    }
-    let imageName = "";
-    let upscaleItem = item;
-    try {
-      if (item.type === "video") {
-        imageName = await uploadUpscaleVideoSource(item);
-      } else {
-        const asset = referenceAssetFromGallery(req, item.id);
-        const [staged] = await stageReferenceAssets(req, [
-          { assetId: asset.id, slot: "upscale", source: asset.source },
-        ]);
-        imageName = staged?.comfyName || "";
-        if (staged) {
-          if (
-            !(
-              Number.isFinite(staged.width) &&
-              staged.width > 0 &&
-              Number.isFinite(staged.height) &&
-              staged.height > 0
-            )
+      },
+    };
+  if (["queued", "running"].includes(item.upscale?.status))
+    return { status: 409, payload: { ok: false, error: "This image is already being upscaled." } };
+  let imageName = "";
+  let upscaleItem = item;
+  try {
+    if (item.type === "video") {
+      imageName = await uploadUpscaleVideoSource(item);
+    } else {
+      const asset = referenceAssetForAccount(account, item.id);
+      const [staged] = await stageReferenceAssetsForAccount(account, [
+        { assetId: asset.id, slot: "upscale", source: asset.source },
+      ]);
+      imageName = staged?.comfyName || "";
+      if (staged) {
+        if (
+          !(
+            Number.isFinite(staged.width) &&
+            staged.width > 0 &&
+            Number.isFinite(staged.height) &&
+            staged.height > 0
           )
-            throw new Error("The source image dimensions could not be read.");
-          upscaleItem = { ...item, width: staged.width, height: staged.height };
-        }
+        )
+          throw new Error("The source image dimensions could not be read.");
+        upscaleItem = { ...item, width: staged.width, height: staged.height };
       }
-    } catch (error) {
-      res.status(400).json({
+    }
+  } catch (error) {
+    return {
+      status: 400,
+      payload: {
         ok: false,
         reason: "source",
         error: `Couldn’t read the original image: ${error.message}`,
-      });
-      return;
-    }
-    if (!imageName) {
-      res.status(502).json({
+      },
+    };
+  }
+  if (!imageName)
+    return {
+      status: 502,
+      payload: {
         ok: false,
         reason: "source",
         error:
           "ComfyUI didn’t accept the original image. Make sure ComfyUI is running and can write to its input folder.",
-      });
-      return;
-    }
-    const customWorkflow = String(item.model || "").startsWith("custom:")
-      ? getCustomWorkflow(item.model)
-      : null;
-    const { body, plan } = prepareUpscale({
-      item: upscaleItem,
-      imageName,
-      quality,
-      target,
-      faceDetail,
-      info,
-      customWorkflow,
-    });
-    const ownerId = ownerIdForRequest(req);
-    const parent = item.jobId && rewriteStore.job(ownerId, item.jobId);
-    const session = parent
-      ? rewriteStore.session(ownerId, parent.sessionId)
-      : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-    let queued;
-    try {
-      queued = rewriteStore.enqueue(
-        ownerId,
-        session.id,
-        {
-          prompt: item.prompt || "",
-          galleryItemId: item.id,
-          upscaleBody: body,
-          upscalePlan: plan,
-        },
-        "upscale",
-        parent?.id,
-        `worker:${currentComfyBackend()}`,
-        undefined,
-        req.studioAccount?.role === "user" ? accountJobLimit : undefined,
-      );
-    } catch (error) {
-      if (error.status === 429)
-        return res.status(429).json({ ok: false, reason: error.reason, error: error.message });
-      throw error;
-    }
-    updateGalleryJob(item.id, {
-      upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
-    });
-    void generationQueue.tick().catch(() => undefined);
-    res.json({ ok: true, jobId: queued.id, plan, revision: galleryRevisionValue() });
-  }),
-);
+      },
+    };
+  const customWorkflow = String(item.model || "").startsWith("custom:")
+    ? getCustomWorkflow(item.model)
+    : null;
+  const { body, plan } = prepareUpscale({
+    item: upscaleItem,
+    imageName,
+    quality,
+    target,
+    faceDetail,
+    info,
+    customWorkflow,
+  });
+  const ownerId = account?.userId || "";
+  const parent = item.jobId && rewriteStore.job(ownerId, item.jobId);
+  const session = parent
+    ? rewriteStore.session(ownerId, parent.sessionId)
+    : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
+  let queued;
+  try {
+    queued = rewriteStore.enqueue(
+      ownerId,
+      session.id,
+      {
+        prompt: item.prompt || "",
+        galleryItemId: item.id,
+        upscaleBody: body,
+        upscalePlan: plan,
+      },
+      "upscale",
+      parent?.id,
+      `worker:${currentComfyBackend()}`,
+      undefined,
+      account?.role === "user" && !origin ? accountJobLimit : undefined,
+      origin,
+    );
+  } catch (error) {
+    if (error.status === 429)
+      return { status: 429, payload: { ok: false, reason: error.reason, error: error.message } };
+    throw error;
+  }
+  updateGalleryJob(item.id, {
+    upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
+  });
+  finishing.admitted(queued);
+  void generationQueue.tick().catch(() => undefined);
+  return {
+    status: 200,
+    payload: { ok: true, jobId: queued.id, plan, revision: galleryRevisionValue() },
+  };
+}
+
+app.post("/api/upscale", async (req, res) => {
+  const { status, payload } = await queueUpscale(req.studioAccount, req.body || {});
+  res.status(status).json(payload);
+});
 
 // Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
 app.post("/api/upscale/cancel", async (req, res) => {
@@ -3300,6 +3374,9 @@ function generationJobResponse(account, id) {
       outputs: queued.outputs,
       error: queued.status === "failed" ? queued.reason : undefined,
       progress: queued.progress,
+      ...(queued.resource.startsWith("provider:cliproxyapi")
+        ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
+        : {}),
     };
   }
   const job = jobs.get(id);

@@ -19,7 +19,6 @@ import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
 import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
 import { canonicalProfileId } from "./profile-store.js";
-import { isLocalVideoProfile } from "./comfy-backends.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -73,7 +72,7 @@ export const cloudPauseMilliseconds = 10 * 60 * 1000;
 export const cloudQuotaMessage = "Cloud video unavailable (quota).";
 const cloudRefusal =
   /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
-const isCloudVideo = (profile) => profile?.kind === "video" && !isLocalVideoProfile(profile);
+const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(profile);
 // Request records behind each MCP job, for Reuse tweaks and the result page; the oldest go first.
 const maxPromptRecords = 5000;
 const aborted = (signal) => {
@@ -151,6 +150,7 @@ export class McpMedia {
     fetchImpl = fetch,
     resolveSignedResult,
     domainRequest,
+    cloudVideoFailures = () => [],
     profileTtl = 60000,
   }) {
     this.profileTtl = profileTtl;
@@ -159,6 +159,7 @@ export class McpMedia {
     this.fetch = fetchImpl;
     this.resolveSignedResult = resolveSignedResult;
     this.domainRequest = domainRequest;
+    this.cloudVideoFailures = cloudVideoFailures;
     this.credentials = new Map();
     this.stopping = new AbortController();
     this.profileRequests = new Map();
@@ -198,8 +199,6 @@ export class McpMedia {
       Array.isArray(this.state.prompts)
     )
       this.state.prompts = {};
-    // Recent cloud video jobs by id: their owner, submission time and whether they ended.
-    this.cloudJobs = new Map();
     this.cloudUnavailableUntil = 0;
     this.linkIds = new Map(
       Object.entries(this.state.links).map(([id, link]) => [
@@ -455,27 +454,19 @@ export class McpMedia {
     const left = this.cloudUnavailableUntil - Date.now();
     return left > 0 ? Math.ceil(left / 60000) : 0;
   }
-  /** A cloud refusal for authorisation or quota pauses cloud video; returns whether this was one. */
-  noteCloudRefusal(text) {
+  /**
+   * A cloud refusal for authorisation or quota pauses cloud video from when it happened, so noting
+   * the same failure again never extends the pause; returns whether this was one.
+   */
+  noteCloudRefusal(text, at = Date.now()) {
     if (!cloudRefusal.test(String(text || ""))) return false;
-    this.cloudUnavailableUntil = Date.now() + cloudPauseMilliseconds;
+    this.cloudUnavailableUntil = Math.max(this.cloudUnavailableUntil, at + cloudPauseMilliseconds);
     return true;
   }
-  /** Reads the few most recent unfinished cloud jobs, so a refusal is known before another cloud job queues. */
+  /** Studio's recent failed cloud video jobs, so a refusal is known before another cloud job queues. */
   async checkCloudJobs() {
-    if (this.cloudPause()) return;
-    const recent = [...this.cloudJobs]
-      .filter(([, entry]) => !entry.ended && Date.now() - entry.at < 30 * 60 * 1000)
-      .slice(-4);
-    await Promise.all(
-      recent.map(async ([jobId, entry]) => {
-        try {
-          if (terminal.has((await this.job(entry.owner, jobId)).status)) entry.ended = true;
-        } catch {
-          /* Unreadable now; the job itself is unaffected. */
-        }
-      }),
-    );
+    for (const { reason, at } of await this.cloudVideoFailures(Date.now() - cloudPauseMilliseconds))
+      this.noteCloudRefusal(reason, at);
   }
   /** The request behind an MCP job and the prompt it ran, when Studio recorded them. */
   promptRecord(jobId) {
@@ -626,11 +617,6 @@ export class McpMedia {
             )
               throw new Error("Studio returned a job owned by another account.");
             this.state.jobs[result.jobId] = owner;
-            if (cloud) {
-              if (this.cloudJobs.size >= 256)
-                this.cloudJobs.delete(this.cloudJobs.keys().next().value);
-              this.cloudJobs.set(result.jobId, { owner, at: Date.now(), ended: false });
-            }
             // The chat's part in the prompt (RewritePrompt's preset, chosen SuggestLoras picks) stays with the job on disk.
             this.recordPrompt(result.jobId, {
               prompt,
@@ -874,16 +860,17 @@ export class McpMedia {
                 profileId: visible.profileId,
               };
       }
-      // A cloud job refused for authorisation or quota reads as such, and pauses further cloud video.
-      // Each failed job counts once, so reading it again later never extends the pause.
-      const cloud = this.cloudJobs.get(jobId);
-      if (cloud && ["failed", "error"].includes(job.status)) {
-        cloud.ended = true;
-        cloud.refused ??= this.noteCloudRefusal(
+      // A cloud video job refused for authorisation or quota reads as such, and pauses further cloud video.
+      if (
+        job.provider === "cliproxyapi" &&
+        job.kind === "video" &&
+        ["failed", "error"].includes(job.status) &&
+        this.noteCloudRefusal(
           `${job.error || ""} ${JSON.stringify(job.failure || "")}`,
-        );
-        if (cloud.refused) job = { ...job, error: cloudQuotaMessage, cloudQuota: true };
-      }
+          Date.parse(job.updatedAt),
+        )
+      )
+        job = { ...job, error: cloudQuotaMessage, cloudQuota: true };
       if (terminal.has(job.status) || Date.now() >= deadline || this.stopping.signal.aborted)
         return job;
       // A client Stop or disconnect ends only this wait; the generation itself keeps running.

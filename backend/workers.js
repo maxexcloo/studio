@@ -281,9 +281,9 @@ export function saveWorkers(list) {
   return listWorkers();
 }
 
-/** The capability a profile needs: local video runs on a video worker; images and provider-backed runs on an image worker. */
+/** The capability a profile needs: video runs on a video worker, everything else on an image worker. */
 export function capabilityForProfile(profile) {
-  return profile?.kind === "video" && profile.family !== "grok" ? "video" : "image";
+  return profile?.kind === "video" ? "video" : "image";
 }
 
 /**
