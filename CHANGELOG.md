@@ -11,6 +11,17 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> The viewer opens without a flash, at a sensible size, and keeps its details tidy
+
+### Changed
+
+- The viewer opens an image fitted but never enlarged beyond its actual size, shows the gallery thumbnail instead of a blank stage while the full image loads, and plays videos when they open (muted when the browser refuses sound).
+- Viewer Details lists every recorded input in the order it shapes the run, with timings in the order they ran; Copy Prompt and Copy Settings sit beside its title, Copy Settings copies every input one per line, and long prompts scroll on a subtle surface.
+
+### Fixed
+
+- A click just beside the viewer's actions or controls no longer closes it.
+
 ## [1.0.5] - 2026-10-27
 
 > Grok Animate works again, with steadier LibreChat calls and Grok's refusals in plain words
