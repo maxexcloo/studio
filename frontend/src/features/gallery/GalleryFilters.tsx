@@ -197,7 +197,7 @@ export function GalleryFilterToolbar({
           >
             <SlidersHorizontal size={19} />
             {selectedCount > 0 && (
-              <Badge size="xs" circle pos="absolute" top={0} right={0} aria-hidden>
+              <Badge size="xs" circle variant="filled" pos="absolute" top={0} right={0} aria-hidden>
                 {selectedCount}
               </Badge>
             )}
