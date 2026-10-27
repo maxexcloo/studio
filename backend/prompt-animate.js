@@ -90,7 +90,8 @@ export function registerAnimatePromptRoute(app, { engine, profiles, guide }) {
           },
         ],
         temperature: 0.8,
-        maxTokens: 400,
+        // Reasoning models spend part of this on thinking before the prompt.
+        maxTokens: 1500,
       });
       const prompt = cleanPrompt(reply.text);
       if (!prompt) throw new AssistantError("unusable reply");
