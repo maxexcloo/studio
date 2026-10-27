@@ -11,11 +11,24 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Each LibreChat conversation is one Studio chat
+> Gallery titles, one Studio chat per LibreChat conversation and a steadier composer
+
+### Added
+
+- Gallery titles: the text model titles each image and video in a few words from its prompt, as it completes and, for the rest of the gallery, while Studio is idle. The title shows wherever an item's title does; the prompt's first words stand in until it is written.
+
+### Changed
+
+- Recent Prompts pins, forgets, clears and its Save switch change at once and undo themselves if Studio refuses; the switch loses its subtitle and sits at the right.
+- The size menu shows 2K and 4K disabled where the model isn't documented to draw them, instead of a warning.
+- Prompt Assistance runs a style as soon as you choose it, and its action spins with what it is doing (hover or tap to stop).
+- The composer no longer shows profile descriptions or the note that an assistant can't read references.
+- On Kubernetes, the image and video workers come from `STUDIO_KUBERNETES_WORKLOADS`, one per address, with `worker` and `capabilities` on the workload, so each address is given once; leave `STUDIO_WORKERS` unset there. When set, `STUDIO_WORKERS` still lists the workers, as for local and single-user setups.
 
 ### Fixed
 
 - An MCP conversation (LibreChat's `X-Studio-Conversation-Id`) is now one Chat: every Generate in it joins the same Chat, listed with an MCP marker and refreshing as new turns arrive. Previously each MCP job opened its own Chat; a conversation that already split continues in its first Chat.
+- Actions after a short pause, such as turning Recent Prompts back on, no longer fail with "Studio returned 502": Studio keeps idle connections open longer than the reverse proxy reuses them.
 
 ## [1.0.6] - 2026-10-27
 
@@ -24,7 +37,6 @@ version opens with a `> ` summary line.
 ### Added
 
 - The Generations queue offers Stop and Clear per item, and Stop All and Clear Failed with a confirmation. Clearing a failed generation only takes it out of the queue.
-- Gallery titles: the text model titles each image and video in a few words from its prompt, as it completes and, for the rest of the gallery, while Studio is idle. The title shows wherever an item's title does; the prompt's first words stand in until it is written.
 
 ### Changed
 
@@ -34,7 +46,6 @@ version opens with a `> ` summary line.
 - One motion system (short ease-out transform and opacity, no bounce, reduced motion respected) and one control size and emphasis scale come from the theme.
 - The viewer opens an image fitted but never enlarged beyond its actual size, shows the gallery thumbnail instead of a blank stage while the full image loads, and plays videos when they open (muted when the browser refuses sound).
 - Viewer Details lists every recorded input in the order it shapes the run, with timings in the order they ran; Copy Prompt and Copy Settings sit beside its title, Copy Settings copies every input one per line, and long prompts scroll on a subtle surface.
-- On Kubernetes, the image and video workers come from `STUDIO_KUBERNETES_WORKLOADS`, one per address, with `worker` and `capabilities` on the workload, so each address is given once; leave `STUDIO_WORKERS` unset there. When set, `STUDIO_WORKERS` still lists the workers, as for local and single-user setups.
 
 ### Fixed
 
