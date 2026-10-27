@@ -32,7 +32,7 @@ for (const development of [false, true]) {
               capabilities: ["image", "video", "upscale", "models"],
             },
           ]),
-          npm_lifecycle_event: development ? "dev" : "",
+          STUDIO_DEV_PROXY_TOKEN: development ? "startup-test-proxy" : "",
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],
       });

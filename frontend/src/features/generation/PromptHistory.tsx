@@ -46,7 +46,7 @@ type HistoryEdit =
   | { action: "clear" };
 
 /** One account's recent prompts of a kind, and whether new ones are kept. */
-export const promptHistoryQuery = (kind: PromptKind) =>
+const promptHistoryQuery = (kind: PromptKind) =>
   queryOptions({
     queryKey: ["prompt-history", kind],
     queryFn: () => api<HistoryData>(`/api/prompts?kind=${kind}`),

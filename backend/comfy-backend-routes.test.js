@@ -62,7 +62,6 @@ async function start(useVideo = true, restrictModels = false, runtimeDir = dataD
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
       STUDIO_COMFY_OUTPUT_DIR: "",
-      npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });

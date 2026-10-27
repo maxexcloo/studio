@@ -35,7 +35,6 @@ test.before(async () => {
       ]),
       STUDIO_DATA_DIR: dataDir,
       STUDIO_COMFY_OUTPUT_DIR: "",
-      npm_lifecycle_event: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });

@@ -19,7 +19,7 @@ function precompress(): Plugin {
   };
 }
 
-// `npm run dev` (dev.mjs) hands Vite and the server one token, so the
+// `mise run dev` (dev.mjs) hands Vite and the server one token, so the
 // server can tell a phone on the network from this computer even though every
 // proxied request reaches it from 127.0.0.1 (see backend/client-trust.js).
 const devProxyToken = process.env.STUDIO_DEV_PROXY_TOKEN || "";

@@ -42,7 +42,6 @@ async function start(environment) {
     STUDIO_DATA_DIR: dataDir,
     STUDIO_COMFY_OUTPUT_DIR: "",
     STUDIO_ENABLE_GROK: "0",
-    npm_lifecycle_event: "",
     ...environment,
   };
   if (!("STUDIO_WORKERS" in environment)) delete env.STUDIO_WORKERS;

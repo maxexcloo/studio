@@ -11,7 +11,7 @@ import crypto from "node:crypto";
  * socket says. Single-user Studio answers only this computer; account mode
  * answers anyone with an account.
  *
- * The one proxy trusted to say who is behind it is Vite in `npm run dev`:
+ * The one proxy trusted to say who is behind it is Vite in `mise run dev`:
  * dev.mjs hands it and the server a random token, and Vite passes the
  * real client address along with it (see vite.config.ts).
  */
@@ -71,7 +71,7 @@ export function listensBeyondThisComputer(host = "") {
 export function classifyClient(req, { devToken = "" } = {}) {
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
-  // Vite in `npm run dev`, vouched for by the token dev.mjs made.
+  // Vite in `mise run dev`, vouched for by the token dev.mjs made.
   const viaDevProxy =
     isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
   if (viaDevProxy) address = plainAddress(headers["x-studio-dev-client"] || "");

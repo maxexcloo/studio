@@ -34,7 +34,7 @@ import { GenerationQueue } from "./domain/queue.ts";
 import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
 import { createTitler } from "./domain/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
-import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
+import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
@@ -1831,7 +1831,7 @@ async function permitQueueFallback(job) {
   });
   return true;
 }
-const queueAdapter = createLegacyQueueAdapter({
+const queueAdapter = createGenerationQueueAdapter({
   generate: generationRoutes.generate,
   jobs,
   gallery: () => gallery,
@@ -3271,7 +3271,8 @@ setTimeout(
 // Studio media's thumbnails and posters are built ahead of their first view.
 if (mediaStorageEnabled) startMediaWarmup();
 
-const dev = /^dev/.test(process.env.npm_lifecycle_event || "");
+// dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
+const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);
 const serverStartup = startServers(app, {
   host,
   port,

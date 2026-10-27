@@ -182,7 +182,6 @@ test(
           STUDIO_SEEDVR2_MODEL_DIR: modelDir,
           STUDIO_COMFY_OUTPUT_DIR: "",
           STUDIO_COMFY_INPUT_DIR: "",
-          npm_lifecycle_event: "",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });

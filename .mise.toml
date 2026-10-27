@@ -20,10 +20,13 @@ depends = [
 ]
 
 [tasks.dev]
-run = "npm run dev"
+run = "node dev.mjs"
+
+[tasks."dev:demo"]
+run = "node dev.mjs --demo"
 
 [tasks.test]
-run = "npm test"
+run = "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
 
 [tasks."test:browser"]
 run = "playwright test"
