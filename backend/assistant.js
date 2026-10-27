@@ -18,6 +18,7 @@ import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import { cleanTriggers } from "./lora-catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora-prompts.js";
 import { replyTitle } from "../shared/titles.ts";
+import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
 import { userContent } from "./domain/model-content.ts";
 
 const gatewayKeys = [
@@ -30,10 +31,6 @@ export const assistantSpicyModelKey = "STUDIO_ASSISTANT_SPICY_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
-const captionCharacters = 600;
-const captionTags = 15;
-// Gallery captions are for search: what is visible, in the words people search with.
-const captionInstructions = `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under ${captionCharacters} characters", "tags": ["8 to ${captionTags} short lowercase search tags"]}`;
 const titleInstructions =
   "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
 const maxCandidates = 20;
