@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Each LibreChat conversation is one Studio chat
+
+### Fixed
+
+- An MCP conversation (LibreChat's `X-Studio-Conversation-Id`) is now one Chat: every Generate in it joins the same Chat, listed with an MCP marker and refreshing as new turns arrive. Previously each MCP job opened its own Chat; a conversation that already split continues in its first Chat.
+
 ## [1.0.6] - 2026-10-27
 
 > A calmer, faster shell: instant switching, steady popups and scrollbars, a tidier viewer and queue controls

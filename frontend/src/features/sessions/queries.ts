@@ -14,13 +14,17 @@ export const sessionsQuery = queryOptions({
   refetchInterval: (query) => (query.state.data?.sessions.some(awaitingTitle) ? 2000 : false),
 });
 
-/** One Chat with its generations; polls only while a generation is still in progress. */
+/** One Chat with its generations; polls while one is in progress, and an MCP Chat for its client's next turn. */
 export const sessionQuery = (id: string) =>
   queryOptions({
     queryKey: ["session", id],
     queryFn: () => api<{ session: Session; jobs: QueueJob[] }>(`/api/sessions/${id}`),
     refetchInterval: (query) =>
-      query.state.data?.jobs.some((job) => !terminal.has(job.status)) ? 1500 : false,
+      query.state.data?.jobs.some((job) => !terminal.has(job.status))
+        ? 1500
+        : query.state.data?.session.mcp
+          ? 5000
+          : false,
   });
 
 /** Saved and in-progress results of one generation, without repeats. */
