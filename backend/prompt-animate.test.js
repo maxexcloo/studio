@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
-import { once } from "node:events";
 import test from "node:test";
-import express from "express";
-import { registerAnimatePromptRoute } from "./prompt-animate.js";
+import { writeAnimatePrompt } from "./prompt-animate.js";
+import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 
 const video = { id: "video:test", label: "Motion", kind: "video" };
 const calls = [];
@@ -10,69 +9,79 @@ const engine = {
   settings: () => ({ model: "ai/text", spicyModel: "ai/spicy" }),
   chat: async (body) => {
     calls.push(body);
-    return { text: '"The camera slowly pushes in."' };
+    body.onThinking?.("A push-in suits a bird.");
+    body.onDelta?.('"The camera slowly pushes in."');
+    return { text: '"The camera slowly pushes in."', thinking: "A push-in suits a bird." };
   },
 };
-
-async function post(account, body) {
-  const app = express();
-  app.use(express.json());
-  app.use((req, _res, next) => {
-    req.studioAccount = account;
-    next();
-  });
-  registerAnimatePromptRoute(app, { engine, profiles: async () => [video], guide: () => null });
-  const server = app.listen(0, "127.0.0.1");
-  await once(server, "listening");
-  try {
-    const response = await fetch(
-      `http://127.0.0.1:${server.address().port}/api/assistant/animate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    );
-    return { status: response.status, body: await response.json() };
-  } finally {
-    server.close();
-  }
-}
-
 const user = (features) => ({ authenticated: true, role: "user", features });
+const issue = (features, writing) =>
+  writingIssue(writingRequest({ kind: "animate", ...writing }), { engine, account: user(features) })
+    ?.status;
 
-test("Animate themes write a motion prompt and keep Spicy behind NSFW Models", async () => {
-  const written = await post(user({ promptAssistant: true }), {
-    profileId: video.id,
-    prompt: "An amber bird",
-    theme: "cinematic",
+test("Animate is admitted only for known themes, with Spicy behind NSFW Models", () => {
+  assert.equal(issue({ promptAssistant: true }, { theme: "cinematic" }), undefined);
+  assert.equal(issue({}, { theme: "cinematic" }), 403);
+  assert.equal(issue({ promptAssistant: true }, { theme: "dance" }), 400);
+  assert.equal(issue({ promptAssistant: true }, { theme: "custom" }), 400);
+  assert.equal(issue({ promptAssistant: true }, { theme: "spicy" }), 403);
+  assert.equal(issue({ promptAssistant: true, nsfwModels: true }, { theme: "spicy" }), undefined);
+  // A client can't pass off its own text as the written prompt.
+  assert.equal(
+    writingRequest({ kind: "animate", theme: "living", prompt: "x", thinking: "y" }).prompt,
+    undefined,
+  );
+});
+
+test("the writing stage streams the motion prompt and its thinking with room to think", async () => {
+  const shown = [];
+  const stage = createPromptStage({
+    engine,
+    account: () => undefined,
+    profiles: async () => [video],
+    guide: () => null,
   });
+  const written = await stage(
+    {
+      ownerId: "",
+      input: {
+        profileId: video.id,
+        writing: { kind: "animate", theme: "cinematic", source: "An amber bird" },
+      },
+    },
+    {
+      signal: new AbortController().signal,
+      onThinking: (piece) => shown.push(["thinking", piece]),
+      onDelta: (piece) => shown.push(["prompt", piece]),
+    },
+  );
   assert.deepEqual(written, {
-    status: 200,
-    body: { ok: true, prompt: "The camera slowly pushes in.", model: "ai/text" },
+    prompt: "The camera slowly pushes in.",
+    thinking: "A push-in suits a bird.",
+    model: "ai/text",
   });
+  assert.deepEqual(shown, [
+    ["thinking", "A push-in suits a bird."],
+    ["prompt", '"The camera slowly pushes in."'],
+  ]);
   assert.match(calls[0].messages[0].content, /Cinematic Camera/);
   assert.match(calls[0].messages[1].content, /An amber bird/);
-
-  const refused = await post(user({ promptAssistant: true }), {
-    profileId: video.id,
-    theme: "spicy",
+  // Reasoning models spend part of the budget thinking (a 400-token budget left no prompt).
+  assert.ok(calls[0].maxTokens >= 1500);
+  const spicy = await writeAnimatePrompt({
+    engine,
+    profile: video,
+    guide: null,
+    writing: { theme: "spicy" },
   });
-  assert.equal(refused.status, 403);
-  const spicy = await post(user({ promptAssistant: true, nsfwModels: true }), {
-    profileId: video.id,
-    theme: "spicy",
-  });
-  assert.equal(spicy.body.model, "ai/spicy");
-
-  assert.equal(
-    (await post(user({ promptAssistant: true }), { profileId: video.id, theme: "custom" })).status,
-    400,
+  assert.equal(spicy.model, "ai/spicy");
+  await assert.rejects(
+    writeAnimatePrompt({
+      engine: { ...engine, chat: async () => ({ text: "", thinking: "Out of tokens." }) },
+      profile: video,
+      guide: null,
+      writing: { theme: "living" },
+    }),
+    /unusable reply/,
   );
-  assert.equal(
-    (await post(user({ promptAssistant: true }), { profileId: "image:test", theme: "action" }))
-      .status,
-    404,
-  );
-  assert.equal(calls.length, 2);
 });

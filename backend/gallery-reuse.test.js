@@ -108,6 +108,36 @@ test("a video that cannot be probed still completes with its requested dimension
   assert.equal(completed.settings.steps, 8);
 });
 
+test("a result keeps the prompt the queue wrote with its model and thinking, not the request", async () => {
+  const filename = "written-prompt.png";
+  fs.writeFileSync(path.join(outputDir, filename), "png");
+  // A queue job's input, as the cloud adapter passes it on.
+  const body = {
+    kind: "image",
+    prompt: "The bird takes flight",
+    writing: {
+      kind: "animate",
+      theme: "action",
+      source: "An amber bird",
+      prompt: "The bird takes flight",
+      model: "ai/text",
+      thinking: "A take-off reads best.",
+    },
+  };
+  const [completed] = await replaceGalleryJob(
+    "written-prompt",
+    [{ url: url(filename), filename, type: "image" }],
+    body,
+    new Map(),
+  );
+  assert.equal(completed.prompt, "The bird takes flight");
+  assert.deepEqual(completed.writing, {
+    kind: "animate",
+    model: "ai/text",
+    thinking: "A take-off reads best.",
+  });
+});
+
 test("separate variants keep their requested composer count without retrying the whole group", async () => {
   const body = {
     kind: "image",

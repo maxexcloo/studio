@@ -84,16 +84,22 @@ const tasteContext = (taste) =>
       ]
     : [];
 
-function instructions({ profile, guide, count, references, role, suggest, taste }) {
+function instructions({ profile, guide, count, index, of, references, role, suggest, taste }) {
   const label = profile.label || profile.id;
   const media = profile.kind === "video" ? "video" : "image";
   const lines = [
     `You write prompts for the ${media} model ${label}. Follow its prompting guide below.`,
-    `Reply with JSON only: {"prompts": [...]} with exactly ${count} complete, standalone prompt${count > 1 ? "s" : ""}, one per ${media}.`,
+    count === 1 && !suggest
+      ? "Reply with one complete, standalone prompt only, as plain text: no preamble, labels, quotes, Markdown or notes."
+      : `Reply with JSON only: {"prompts": [...]} with exactly ${count} complete, standalone prompt${count > 1 ? "s" : ""}, one per ${media}.`,
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for; add only what the guide recommends to realise it, never new subjects or content the user did not imply.",
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
     count > 1
       ? `If the request names ${count} different ${media}s, write one prompt for each; otherwise vary composition and details between the prompts while each matches the request.`
+      : "",
+    // One prompt of a set, written as its own queue item.
+    of > 1
+      ? `This is ${media} ${index + 1} of ${of} for the request. If it names ${of} different ${media}s, write number ${index + 1}; otherwise vary composition and details so it differs from the others while it matches the request.`
       : "",
     "When changes follow the request, apply all of them to the request in order and keep everything else.",
     references
@@ -116,11 +122,14 @@ function instructions({ profile, guide, count, references, role, suggest, taste 
 }
 
 /**
- * A prompt writer, or null when prompt writing is off. write() returns { prompts, source, ms }, with
- * `suggestions` for the concept when asked (`suggest`); `taste`, the person's taste profile, is context:
- * source "studio" for written prompts, "request" when it fell back to the given prompts.
+ * A prompt writer, or null when prompt writing is off. write() returns { prompts, thinking, model,
+ * source, ms }, with `suggestions` for the concept when asked (`suggest`); `taste`, the person's
+ * taste profile, is context: source "studio" for written prompts, "request" when it fell back to
+ * `fallback`. Without a fallback, a failure throws with the reason: the queue's writing stage
+ * (prompt-stage.js) writes each MCP job's prompt that way, one of `of` for a set (`index`),
+ * streaming through `onThinking` and `onDelta`.
  * Generate keeps the prompt writer's own model (STUDIO_PROMPT_WRITER_MODEL), a fast one.
- * A chat waits on it before anything queues, so a slow gateway falls back to the request itself after 15 s.
+ * A preview waits on it, so a slow gateway falls back to the request itself after 15 s.
  */
 export function createPromptWriter(
   environment = process.env,
@@ -137,12 +146,16 @@ export function createPromptWriter(
       request,
       changes = [],
       count = 1,
+      index = 0,
+      of = 1,
       references = 0,
       role = "",
       suggest = false,
       taste = "",
       fallback,
       signal,
+      onThinking,
+      onDelta,
     }) {
       const started = Date.now();
       const user = [
@@ -160,6 +173,8 @@ export function createPromptWriter(
                 profile,
                 guide: writerGuide(guide),
                 count,
+                index,
+                of,
                 references,
                 role,
                 suggest,
@@ -169,8 +184,11 @@ export function createPromptWriter(
             { role: "user", content: user },
           ],
           temperature: 0.7,
-          maxTokens: 400 * count + (suggest ? 350 : 200),
+          // Reasoning models spend part of this on thinking before the prompts.
+          maxTokens: 1200 + 400 * count + (suggest ? 350 : 200),
           signal,
+          onThinking,
+          onDelta,
         });
         const prompts = parseWrittenPrompts(reply.text, count);
         if (prompts) {
@@ -179,6 +197,8 @@ export function createPromptWriter(
           );
           return {
             prompts,
+            thinking: reply.thinking,
+            model: settings.model,
             source: "studio",
             ms: Date.now() - started,
             ...(suggest ? { suggestions: parseSuggestions(reply.text) } : {}),
@@ -189,6 +209,7 @@ export function createPromptWriter(
         if (signal?.aborted) throw error;
         reason = error instanceof AssistantError ? error.reason : "unreachable";
       }
+      if (fallback === undefined) throw new AssistantError(reason);
       log.warn?.(
         `MCP prompt writer fell back to the request for ${profile.id} after ${Date.now() - started} ms: ${reason}`,
       );

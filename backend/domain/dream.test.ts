@@ -16,7 +16,7 @@ import {
   type DreamLoraLibrary,
   type DreamProfile,
 } from "./dream.ts";
-import type { GenerationQueue } from "./queue.ts";
+import { writtenJob, type GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
 import { queuePriority, RewriteStore } from "./store.ts";
 import { createTaste } from "./taste.ts";
@@ -109,17 +109,29 @@ function fixture(t: TestContext) {
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
     reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
-    // Like the generation route: a Dream job's pending tile carries its mark from the queue record.
+    // Like the queue's writing stage, then the generation route: a Dream job's pending tile
+    // carries its written prompt and mark from the queue record.
     admit: async (input, account, scope, origin) => {
       const result = await admission(input, account, scope, origin);
-      const job = store.job(account?.userId || "", String(result.payload.jobId))!;
+      let job = store.job(account?.userId || "", String(result.payload.jobId))!;
+      if (job.status === "writing")
+        job = store.save(
+          writtenJob(
+            job,
+            await dream.write(job, {
+              signal: new AbortController().signal,
+              onThinking() {},
+              onDelta() {},
+            }),
+          ),
+        );
       state.items.unshift({
         id: `${job.id}-0`,
         jobId: job.id,
         ownerId: job.ownerId,
         type: input.kind === "video" ? "video" : "image",
         status: "pending",
-        prompt: String(input.prompt),
+        prompt: String(job.input.prompt),
         createdAt: new Date(state.clock).toISOString(),
         settings: { profileId: input.profileId },
         ...(job.dream ? { dream: { state: "unseen" as const, ...job.dream } } : {}),

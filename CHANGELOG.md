@@ -11,6 +11,14 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+
+- Prompts the assistant writes for a generation (the viewer's Animate themes, MCP Generate and Reuse, Dream) are now the queue item's Writing Prompt stage: one click queues the job, its thinking and prompt stream in the queue item, and the result keeps the prompt with its thinking, collapsed under the prompt in Details. A failed write fails the item with its reason instead of falling back, and cancelling stops it. `POST /api/assistant/animate` is gone; Animate queues with its theme.
+
+### Fixed
+
+- Prompt writing for MCP, Dream and MCP's model pick leaves room for a reasoning model's thinking, which Studio captures from `reasoning_content` as well as `<think>` blocks.
+
 ## [1.0.2] - 2026-10-27
 
 > Animate writes its prompt again

@@ -22,6 +22,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
+import { WritingStream } from "./PromptWriting";
 export const terminal = new Set(["completed", "failed", "cancelled"]);
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
@@ -110,6 +111,7 @@ export function QueueJobAction({ job, compact = false }: { job: QueueJob; compac
 }
 /** Title Case job states for the queue, tiles and the viewer. */
 export const statusLabels: Record<QueueJob["status"], string> = {
+  writing: "Writing Prompt",
   queued: "Queued",
   waiting: "Waiting for a Worker",
   starting: "Starting",
@@ -119,11 +121,13 @@ export const statusLabels: Record<QueueJob["status"], string> = {
   failed: "Failed",
   cancelled: "Cancelled",
 };
+/** A generation's progress as a percentage, or 0 while it has no steps to count. */
+export const progressPercent = (progress: QueueJob["progress"]) =>
+  progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
 function QueueRow({ job }: { job: QueueJob }) {
   const failed = job.status === "failed";
   const { progress } = job;
-  const percent =
-    progress && progress.max > 0 ? Math.min(100, (progress.value / progress.max) * 100) : 0;
+  const percent = progressPercent(progress);
   const Kind = failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
   return (
     <Group wrap="nowrap" gap="sm" py="xs" className={classes.row}>
@@ -140,6 +144,7 @@ function QueueRow({ job }: { job: QueueJob }) {
         <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
           {[statusLabels[job.status], progress?.phase, job.reason].filter(Boolean).join(" · ")}
         </Text>
+        {job.status === "writing" && <WritingStream progress={progress} />}
       </Stack>
       {!terminal.has(job.status) &&
         (percent ? (

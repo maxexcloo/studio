@@ -70,7 +70,8 @@ import {
   downscaleReferences,
   registerAssistantRoutes,
 } from "./assistant-routes.js";
-import { registerAnimatePromptRoute } from "./prompt-animate.js";
+import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
+import { createPromptWriter } from "./prompt-writer.js";
 import { animateProfile } from "./animate-profile.js";
 import {
   canonicalProfileId,
@@ -169,6 +170,7 @@ import {
   cleanupGalleryState,
   updateGalleryJob,
   galleryRevisionValue,
+  storedWritingRecord,
 } from "./gallery-store.js";
 import { buildStats, getThumbnail } from "./thumbnails.js";
 import {
@@ -1374,7 +1376,7 @@ const assistantGuides = (() => {
 })();
 const assistantProfiles = async (req) => {
   try {
-    return modelsForAccount((await mediaModels(false)).models, req).profiles || [];
+    return modelsForAccount(await catalogueModels(), req).profiles || [];
   } catch {
     return [];
   }
@@ -1426,11 +1428,6 @@ const assistantEngine = registerAssistantRoutes(app, {
       ],
     };
   },
-});
-registerAnimatePromptRoute(app, {
-  engine: assistantEngine,
-  profiles: assistantProfiles,
-  guide: assistantGuide,
 });
 
 app.delete("/api/workflows/:id", (req, res) => {
@@ -2093,14 +2090,50 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
     await queueAdapter.settled(job);
   },
 });
+// The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
+const promptStage = createPromptStage({
+  engine: assistantEngine,
+  writer: createPromptWriter(),
+  account: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    return ownerId && !account?.authenticated ? null : account;
+  },
+  profiles: (account) => assistantProfiles({ studioAccount: account }),
+  guide: assistantGuide,
+  loraInfos: (names) => (lorasEnabled ? loraInfos(names) : Promise.resolve({})),
+  dream: () => dream,
+  taste: (ownerId) => (taste.writable(ownerId) ? taste.read(ownerId).summary : ""),
+});
 const generationQueue = new GenerationQueue(
   rewriteStore,
   withUpscaleAdapter(
     directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
     upscaleQueueAdapter,
   ),
+  promptStage,
 );
 async function validateGenerationInput(input, account) {
+  if (input.writing === undefined) return validateGeneration(input, account);
+  if (typeof input.writing?.prompt === "string") {
+    // Already written (a Dream variation): the record goes with the prompt it explains.
+    const record = storedWritingRecord(input.writing);
+    if (record) input.writing = { ...record, prompt: input.writing.prompt };
+    else delete input.writing;
+    return validateGeneration(input, account);
+  }
+  // Written in the queue: only the request is admitted, and the rest is checked as it will run,
+  // with a stand-in for the prompt still to be written.
+  input.writing = writingRequest(input.writing);
+  const issue = writingIssue(input.writing, { engine: assistantEngine, account });
+  if (issue) return { status: issue.status, payload: { ok: false, error: issue.error } };
+  input.prompt = "(written by the prompt assistant)";
+  try {
+    return await validateGeneration(input, account);
+  } finally {
+    input.prompt = "";
+  }
+}
+async function validateGeneration(input, account) {
   // A per-backend id merged into a combined profile runs on the backend it named.
   const named = profileAliasBackend(input.profileId);
   // A merged profile's old id (a reused result, preset or MCP call) runs and is stored as the kept one.
@@ -2930,6 +2963,7 @@ function generationJobResponse(account, id) {
         completed: "done",
         failed: "error",
         cancelled: "canceled",
+        writing: "queued",
         waiting: "queued",
         starting: "queued",
         saving: "running",
@@ -2939,7 +2973,8 @@ function generationJobResponse(account, id) {
       items: queued.items,
       outputs: queued.outputs,
       error: queued.status === "failed" ? queued.reason : undefined,
-      progress: queued.progress,
+      // The prompt's thinking stays in Studio; a chat hears only the status.
+      progress: queued.status === "writing" ? undefined : queued.progress,
       ...(queued.resource.startsWith("provider:cliproxyapi")
         ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
         : {}),
@@ -2988,7 +3023,7 @@ app.post("/api/queue/cancel", async (req, res) => {
   const ownerId = ownerIdForRequest(req);
   for (const pending of rewriteStore
     .jobs(ownerId)
-    .filter((job) => ["queued", "waiting"].includes(job.status)))
+    .filter((job) => ["writing", "queued", "waiting"].includes(job.status)))
     await generationQueue.cancel(ownerId, pending.id);
   const promptIds = cancelOwnJobs(ownerId);
   setGallery(

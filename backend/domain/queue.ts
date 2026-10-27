@@ -1,4 +1,4 @@
-import type { QueueMedia, QueueStatus } from "../../shared/queue.ts";
+import type { PromptWriting, QueueMedia, QueueStatus } from "../../shared/queue.ts";
 import { queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
@@ -20,10 +20,67 @@ export interface QueueAdapter {
   settled?(job: OwnedJob): Promise<void>;
 }
 
+/** What the writing stage streams into the item's progress while the prompt is written. */
+export interface WritingProgress {
+  thinking: string;
+  prompt: string;
+}
+/** The writing stage's outcome: the prompt with its thinking and model; `why` is Dream's note on it. */
+export interface WrittenPrompt {
+  prompt: string;
+  thinking: string;
+  model: string;
+  why?: string;
+}
+/**
+ * Writes a job's prompt (`input.writing`), passing the text model's thinking and reply pieces on
+ * as they stream (`onThinking`, `onDelta`); throws with the reason.
+ */
+export type PromptWriter = (
+  job: OwnedJob,
+  context: {
+    signal: AbortSignal;
+    onThinking(piece: string): void;
+    onDelta(piece: string): void;
+  },
+) => Promise<WrittenPrompt>;
+
 export const terminalStatuses = new Set<QueueStatus>(["completed", "failed", "cancelled"]);
+/** Not yet handed to a provider: writing its prompt, or waiting for its resource. */
+const unsubmitted = new Set<QueueStatus>(["writing", "queued", "waiting"]);
 const accepted = (job: OwnedJob) =>
-  !terminalStatuses.has(job.status) && !["queued", "waiting"].includes(job.status);
-const started = (job: OwnedJob) => !["queued", "waiting", "cancelled"].includes(job.status);
+  !terminalStatuses.has(job.status) && !unsubmitted.has(job.status);
+const started = (job: OwnedJob) => !unsubmitted.has(job.status) && job.status !== "cancelled";
+const progressMs = 250;
+
+/** The job once its prompt is written: the prompt runs, its record keeps the thinking, and it queues. */
+export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
+  return {
+    ...job,
+    status: "queued",
+    reason: "",
+    progress: undefined,
+    input: {
+      ...job.input,
+      prompt: written.prompt,
+      writing: {
+        ...(job.input.writing as PromptWriting),
+        prompt: written.prompt,
+        model: written.model,
+        ...(written.thinking ? { thinking: written.thinking } : {}),
+      },
+    },
+    ...(job.dream
+      ? {
+          dream: {
+            ...job.dream,
+            prompt: written.prompt,
+            ...(written.why ? { why: written.why } : {}),
+          },
+        }
+      : {}),
+  };
+}
 /** What a job loads on its resource: the model and its enabled LoRAs at their strengths. */
 const loadKey = (job: OwnedJob) =>
   JSON.stringify([
@@ -45,13 +102,17 @@ export class GenerationQueue {
   private acceptedIds = new Set<string>();
   /** Load key of the last job started on each resource. */
   private loaded = new Map<string, string>();
+  /** Jobs whose prompt is being written, to abort on cancel or stop. */
+  private writing = new Map<string, AbortController>();
   private stopped = false;
   readonly store: RewriteStore;
   readonly adapter: QueueAdapter;
+  readonly writer?: PromptWriter;
 
-  constructor(store: RewriteStore, adapter: QueueAdapter) {
+  constructor(store: RewriteStore, adapter: QueueAdapter, writer?: PromptWriter) {
     this.store = store;
     this.adapter = adapter;
+    this.writer = writer;
     // One job runs per resource at a time, so after a restart the latest updated started job is what is loaded.
     const latest = new Map<string, OwnedJob>();
     for (const job of store.jobs()) {
@@ -75,7 +136,67 @@ export class GenerationQueue {
     this.stopped = true;
     clearInterval(this.timer);
     this.timer = undefined;
+    // An interrupted prompt stays in its writing stage and is written afresh after a restart.
+    for (const controller of this.writing.values()) controller.abort();
     await Promise.all(this.runs);
+  }
+
+  /**
+   * The writing stage: the prompt assistant writes the job's prompt, its streamed thinking and
+   * prompt gathered into `progress`; the written prompt then becomes the input and the job queues on its
+   * resource. A failure fails the job with the reason; a cancellation aborts the writing.
+   */
+  private write(initial: OwnedJob) {
+    const controller = new AbortController();
+    this.writing.set(initial.id, controller);
+    const current = () => {
+      const latest = this.store.job(initial.ownerId, initial.id);
+      return latest?.status === "writing" && !controller.signal.aborted ? latest : undefined;
+    };
+    const shown: WritingProgress = { thinking: "", prompt: "" };
+    let saved = 0;
+    let pending: ReturnType<typeof setTimeout> | undefined;
+    const flush = () => {
+      pending = undefined;
+      saved = Date.now();
+      const latest = current();
+      if (latest) this.store.save({ ...latest, progress: { ...shown } });
+    };
+    const stream = (key: keyof WritingProgress) => (piece: string) => {
+      shown[key] += piece;
+      pending ??= setTimeout(flush, Math.max(0, saved + progressMs - Date.now()));
+    };
+    const run = (async () => {
+      try {
+        if (!this.writer) throw new Error("The prompt assistant is not configured.");
+        const written = await this.writer(initial, {
+          signal: controller.signal,
+          onThinking: stream("thinking"),
+          onDelta: stream("prompt"),
+        });
+        clearTimeout(pending);
+        const latest = current();
+        if (!latest) return;
+        this.store.save(writtenJob(latest, written));
+        void this.tick().catch(() => undefined);
+      } catch (error) {
+        clearTimeout(pending);
+        const latest = current();
+        if (!latest) return;
+        const failed = this.store.save({
+          ...latest,
+          status: "failed",
+          progress: undefined,
+          reason: `Writing the prompt failed: ${(error as Error).message}`,
+        });
+        await this.adapter.settled?.(failed);
+      } finally {
+        this.writing.delete(initial.id);
+      }
+    })()
+      .catch(() => undefined)
+      .finally(() => this.runs.delete(run));
+    this.runs.add(run);
   }
 
   tick(): Promise<void> {
@@ -88,6 +209,8 @@ export class GenerationQueue {
   }
 
   private async run() {
+    for (const job of this.store.jobs())
+      if (job.status === "writing" && !this.writing.has(job.id)) this.write(job);
     await Promise.all(
       this.store
         .jobs()
@@ -262,10 +385,14 @@ export class GenerationQueue {
     const job = this.store.job(ownerId, id);
     if (!job || terminalStatuses.has(job.status)) return job;
     if (!this.acceptedIds.has(job.id)) {
+      this.writing.get(job.id)?.abort();
       const cancelled = this.store.save({
         ...job,
         status: "cancelled" as const,
-        reason: "Cancelled before submission.",
+        reason:
+          job.status === "writing"
+            ? "Cancelled while writing the prompt."
+            : "Cancelled before submission.",
       });
       if (!this.checkingEligibility.has(job.id)) await this.adapter.settled?.(cancelled);
       return cancelled;
