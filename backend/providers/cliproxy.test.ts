@@ -6,6 +6,7 @@ import test from "node:test";
 import sharp from "sharp";
 import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
 import { providerMediaWriter } from "./media.ts";
+import { studioCloudProfiles } from "./profiles.ts";
 import { createCloudQueueAdapter } from "../domain/cloud-adapter.ts";
 import { GenerationQueue } from "../domain/queue.ts";
 import { RewriteStore } from "../domain/store.ts";
@@ -30,6 +31,7 @@ function fixture() {
   let completed = false;
   let failImages = false;
   let rejectedImages = false;
+  let rejectedVideos = false;
   const fetchImpl: typeof fetch = async (request, init) => {
     const url = String(request);
     const headers = new Headers(init?.headers);
@@ -51,7 +53,9 @@ function fixture() {
       return Response.json({ data: [{ b64_json: image.toString("base64") }] });
     }
     if (route === "/v1/videos/generations")
-      return Response.json({ request_id: "provider-video-7" });
+      return rejectedVideos
+        ? Response.json({ error: "Quota exhausted" }, { status: 429 })
+        : Response.json({ request_id: "provider-video-7" });
     if (route === "/v1/videos/provider-video-7")
       return Response.json(
         completed
@@ -74,6 +78,9 @@ function fixture() {
     },
     rejectImages: (value: boolean) => {
       rejectedImages = value;
+    },
+    rejectVideos: (value: boolean) => {
+      rejectedVideos = value;
     },
   };
 }
@@ -249,6 +256,97 @@ test("lost synchronous response is recovered without resubmit and only its owner
     await restarted.cancel("alice", job.id);
     await restarted.tick();
     assert.equal(store.job("alice", job.id)?.status, "cancelled");
+  } finally {
+    store.close();
+  }
+});
+
+test("animating an image sends it as the first frame, shaped by the image, within provider limits", async () => {
+  const store = new RewriteStore(":memory:");
+  const remote = fixture();
+  const node = {
+    class_type: "GrokMedia",
+    inputs: { model: "grok-imagine-video-1.5", width: 1280, height: 720, resolution: "720p" },
+  };
+  const cloud = studioCloudProfiles({
+    provider: remote.provider,
+    workflows: () => [
+      {
+        profileId: "custom:grok-video",
+        name: "Grok Imagine Video 1.5",
+        kind: "video",
+        graph: { 1: node },
+        defaults: { duration: 8 },
+        imageModes: { generate: { graph: { 1: node } }, reference: { graph: { 1: node } } },
+      },
+    ],
+    buildProfile: (profile) => profile,
+    accountForOwner: () => null,
+    mayUseProfile: () => true,
+    mayUseFeature: () => true,
+    reference: async () => new Uint8Array(),
+    composePrompt: (_mode, prompt) => prompt,
+  });
+  // A portrait JPEG phone photo, stored landscape with an EXIF rotation.
+  const photo = await sharp({
+    create: { width: 1000, height: 600, channels: 3, background: "blue" },
+  })
+    .jpeg()
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
+  const animate = {
+    profileId: "custom:grok-video",
+    prompt: "The waves roll in",
+    startImage: `data:image/jpeg;base64,${photo.toString("base64")}`,
+  };
+  const run = async (input: Record<string, unknown>) => {
+    const session = store.createSession("");
+    const job = store.enqueue("", session.id, input, "animate", undefined, "provider:cliproxyapi");
+    const adapter = createCloudQueueAdapter({
+      store,
+      provider: remote.provider,
+      resolve: cloud.resolve,
+      saveMedia: async () => ({ url: "/fixture-video" }),
+      saveGallery: async () => {},
+    });
+    await new GenerationQueue(store, adapter).tick();
+    return store.job("", job.id)!;
+  };
+  try {
+    const accepted = await run(animate);
+    assert.equal(accepted.providerJobId, "provider-video-7");
+    const body = remote.calls.find((call) => call.path === "/v1/videos/generations")!.body!;
+    assert.equal(body.model, "grok-imagine-video-1.5");
+    assert.equal(body.aspect_ratio, "9:16");
+    assert.equal(body.duration, 8);
+    assert.equal(body.resolution, "720p");
+    const frame = String((body.image as { url: string }).url);
+    assert.match(frame, /^data:image\/png;base64,/);
+    const sent = await sharp(Buffer.from(frame.split(",")[1], "base64")).metadata();
+    assert.deepEqual([sent.format, sent.width, sent.height], ["png", 600, 1000]);
+
+    // Limits are refused before anything reaches the provider.
+    const submissions = () =>
+      remote.calls.filter((call) => call.path === "/v1/videos/generations").length;
+    assert.match((await run({ ...animate, duration: 20 })).reason, /between 1 and 15 seconds/);
+    assert.match(
+      (await run({ ...animate, resolution: "4k" })).reason,
+      /supports 480p, 720p, 1080p resolution, not 4k/,
+    );
+    assert.equal(submissions(), 1);
+
+    // A provider refusal fails the job with its status, which MCP reads to pause cloud video.
+    remote.rejectVideos(true);
+    const refused = await run(animate);
+    assert.equal(refused.status, "failed");
+    assert.match(refused.reason, /HTTP 429/);
+    const failed = store.failedJobs("provider:cliproxyapi:", new Date(0).toISOString());
+    assert.equal(failed.length, 3);
+    assert.ok(failed.some((job) => job.id === refused.id));
+    assert.deepEqual(
+      store.failedJobs("provider:cliproxyapi:", new Date(Date.now() + 1000).toISOString()),
+      [],
+    );
   } finally {
     store.close();
   }
