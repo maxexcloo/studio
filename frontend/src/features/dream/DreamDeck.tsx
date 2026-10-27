@@ -13,6 +13,7 @@ import { deckCards, type DeckCard } from "./deck";
 import { PairCard, type Choose } from "./PairCard";
 import { calibrationQuery, dreamItemPath, dreamQuery, type DreamItem } from "./queries";
 import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
+import { popupLayer } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
 type Verdict = "discard" | "keep" | "variations" | "star" | "animate";
@@ -23,8 +24,7 @@ const directions: Record<Verdict, Direction> = {
   star: "right",
   animate: "right",
 };
-const layers =
-  '[role="dialog"], [role="alertdialog"], .mantine-Popover-dropdown, .mantine-Combobox-dropdown, .mantine-Menu-dropdown';
+const layers = `[role="dialog"], [role="alertdialog"], ${popupLayer}`;
 // Calibration joins in once Dream has fewer unseen results than this.
 const few = 6;
 
