@@ -10,9 +10,9 @@
 // tags agree, and that CHANGELOG.md has notes under Unreleased opened by a `> `
 // summary line. Then it bumps package.json and the lockfile, dates the
 // changelog section, commits "Release vX.Y.Z" and makes an annotated tag with
-// the notes. It runs no test suites: pushing the tag runs
-// .github/workflows/container.yaml, which runs the full checks before it publishes
-// the container image and the GitHub release.
+// the notes. It runs no test suites: main's run of .github/workflows/container.yaml
+// verifies and publishes the release commit's image, and the tag's run gives it the
+// version tags and publishes the GitHub release.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
