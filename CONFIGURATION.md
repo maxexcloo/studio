@@ -228,7 +228,7 @@ Settings › Profiles › Combine Backends is an explicit administrator action, 
 
 ## SQLite Migration & Rollback
 
-Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. The same command then renames the [names Studio kept on disk](#studio-names) from HEISS UI.
+Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative.
 
 Stop Studio and run a dry run against a copy of the intended data directory:
 
@@ -237,7 +237,7 @@ node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data
 node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data --apply
 ```
 
-The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database, and the [renames](#studio-names) it would make. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
+The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
 
 Rehearse restoration into a separate empty directory:
 
@@ -245,7 +245,7 @@ Rehearse restoration into a separate empty directory:
 node backend/commands/migrate-runtime.mjs --restore /copy/of/studio-data/.backups/sqlite-STAMP --destination /empty/restore-rehearsal
 ```
 
-Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, put the old names back with `--undo` (see [Studio Names](#studio-names)), restore the verified pre-migration metadata beside the media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
+Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, restore the verified pre-migration metadata beside the media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
 
 Development uses `data/development` with SQLite migration applied only to that isolated directory. Recovery follows recorded job IDs and never scans or adopts a shared worker's full history.
 
@@ -273,43 +273,3 @@ STUDIO_KUBERNETES_WORKLOADS='{
 **Settings › Workers** shows each workload's state, GPU use and why a pod is not ready (such as a GPU claim that cannot be allocated). An administrator ticks the workloads that should run and reviews a preview before applying it; every workload left out stops. Restart scales a running workload to 0 and back. One change runs at a time: Studio stops accepting new work on the workloads that leave, waits for their accepted work to finish and save, scales them to 0, waits for their pods to go (their GPU claims are released only then), then starts the others and waits for them to be ready. Each change is recorded with its requester, timestamps, steps and the placement before and after, and the history survives restarts; a change cut short by a restart is marked interrupted. A deployment stopped outside Studio, such as by a Flux upgrade that resets replicas, shows as changed outside Studio.
 
 Automatic control (`STUDIO_RUNTIME_AUTOMATIC=1`, off by default) starts and stops only media (image and video) workloads. Queued work for a stopped media workload starts it, stopping the media workloads in its pool it needs room from (idle ones first), and waits with "Waiting for <workload> to start". It never stops or starts a text workload, because LibreChat and Bifrost call text models directly and Studio cannot see those requests: if a running text workload holds the GPUs the media workload needs, nothing changes and the work waits with "Waiting for a GPU: <text workload> is running; stop it in Settings › Workers". A stopped text workload is started in Settings › Workers or with the control MCP tools, which may stop text as an explicit choice. After an outside stop Studio restores its last applied placement, keeping any running text; while that text holds GPUs the placement needs, the restore waits. Without automatic control, work for a stopped workload waits with the reason that the worker is offline.
-
-## Renamed Settings
-
-Studio 1.0 reads only Studio names: every Studio setting starts with `STUDIO_`, and no old name is read as an alias. Third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`). Rename these before upgrading:
-
-- Each `HEISS_*` setting is now `STUDIO_*` with the same suffix, such as `HEISS_DATA_DIR` → `STUDIO_DATA_DIR`.
-- `MCP_SIGNING_KEY`, `MCP_PUBLIC_URL`, `MCP_PROMPTING_PATH`, `COMFY_OUTPUT_DIR`, `COMFY_INPUT_DIR`, `BIFROST_URL` and `CIVITAI_DNS_SERVERS` gain the prefix: `STUDIO_MCP_SIGNING_KEY`, `STUDIO_MCP_PUBLIC_URL`, `STUDIO_MCP_PROMPTING_PATH`, `STUDIO_COMFY_OUTPUT_DIR`, `STUDIO_COMFY_INPUT_DIR`, `STUDIO_BIFROST_URL` and `STUDIO_CIVITAI_DNS_SERVERS`.
-- `COMFY_URL` and `COMFY_VIDEO_URL` are gone: list the workers in `STUDIO_WORKERS` or `STUDIO_KUBERNETES_WORKLOADS` (keep the ids `primary` and `video` so earlier jobs keep their worker) or add them in Settings › Workers. `STUDIO_DEFAULT_COMFY_URL` and `STUDIO_COMFY_SEARCH` are gone too; Studio no longer looks for ComfyUI by itself.
-- Scripts send the `X-Studio` header; `X-HEISS` is refused.
-
-Browser storage and the account cookie (`studio_account`) already used Studio names.
-
-## Studio Names
-
-Studio 1.0 keeps no names on disk from HEISS UI. The [runtime migration](#sqlite-migration--rollback) renames them once, after its SQLite import, with Studio stopped. Studio 1.0 reads only the Studio names, so run it on existing data before 1.0 starts.
-
-| Old name                                                             | Studio name                         | Where                                                                                                                                                                                |
-| -------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`)                        | `studio/`                           | Studio media (`--media-dir`, by default `<data>/media`) and, with `--output-dir`, ComfyUI's output folder                                                                            |
-| `.heiss-trash/` (and each batch's `files/heiss-ui/`)                 | `.studio-trash/`                    | The same folders                                                                                                                                                                     |
-| `heiss-ui` in `subfolder`, `/comfy/view` and thumbnail URLs          | `studio`                            | Every database row (gallery, deletion markers, sessions, queue, jobs, Dream, taste), the JSON stores in the data folder (reference assets, Library, account files) and trash batches |
-| `heissUi` profile block (and `heiss_ui`, `jAiStudio`, `j_ai_studio`) | `studio`                            | `workflows/*.json` and their versions in `history/profiles/`, with output prefixes and the version hashes in `.studio-meta.json` and `.studio-edits.json`                            |
-| `heiss-*.log`                                                        | Deleted (a copy goes in the backup) | `logs/`                                                                                                                                                                              |
-
-Deletion markers of renamed gallery records move to their new keys. Backups (`backups/`, `.backups/`, `imports/`) and the JSON the SQLite import read stay as they are. The thumbnail and video preview caches are keyed by path, so they are made again as the gallery is viewed.
-
-1. **Back up.** Stop Studio (scale it to zero), then snapshot the data volume (`/data`, on kimbap's `truenas-nvme/studio` dataset). Keep the snapshot until the migrated studio has run for a while.
-2. **Dry run (default).** It changes nothing and reports, per mapping: the folders it renames, the files it rewrites by kind, the database rows by table or document (gallery records per account), the deletion markers it moves and the old logs. `missingFiles` lists finished gallery records whose file is not where the record says, and `outsideMedia` counts those in ComfyUI's output folder, which are only checked with `--output-dir`. Conflicts refuse the apply: a target folder that already exists, a profile with more than one block, or an unreadable file.
-3. **Apply (`--apply`).** It first writes `.backups/names-<time>/` and flushes it to disk: `manifest.json`, a copy of every file it rewrites or deletes, and `rows.json` with each changed row's previous value. Then it replaces each file whole, renames each folder (one rename on the same file system, so nothing is copied), updates the database rows and records `studio-names-v1` in one transaction, and deletes the old logs. A second run does nothing.
-4. **Recovery.** `--undo <data>/.backups/names-<time>` renames the folders back, restores the files and rows, returns the logs and removes the record, also after an interrupted apply. It does not keep work saved after the apply, so undo only before Studio 1.0 has run; after that, restore the snapshot from step 1 and redeploy the previous image.
-
-```sh
-node backend/commands/migrate-runtime.mjs --undo /data/.backups/names-STAMP
-```
-
-What Studio writes uses the Studio names too: `studio-reference-*` and `studio-upscale-*` in ComfyUI's input folder, `studio_generation` run records, `studio_*` sections and `.studio-backup` copies of ComfyUI's `extra_model_paths.yaml` in single-user mode (Studio finds the sections it added by their comment markers, so older ones keep their keys), and a `civitai` metadata chunk in imported PNGs. ComfyUI's own `<output>/heiss-ui` folder from older runs is not read.
-
-The profile block is shared with the seeds in ai's `profiles/`, which switch to `studio` in the same cutover window.
-
-The one name left is the key derivation label `heiss-mcp-result-link-v2` that seals MCP result links: every link already shared depends on it.
