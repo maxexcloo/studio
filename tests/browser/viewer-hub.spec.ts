@@ -58,21 +58,29 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
-test("The viewer prompt bar queues variations into a strip and choosing one makes it current", async ({
+test("The viewer's prompt bar is its own composer: it expands in place, prefilled, and queues into the strip", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  const prompt = viewer.getByRole("textbox", { name: "Variation Prompt", exact: true });
+  const compact = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(compact).toHaveValue("An amber bird");
+  await compact.click();
+  // The full composer opens over the viewer with its prompt focused and the item's settings.
+  const prompt = page.locator("textarea[data-expanded-prompt]");
+  await expect(prompt).toBeFocused();
   await expect(prompt).toHaveValue("An amber bird");
+  await expect(viewer).toBeVisible();
   await prompt.fill("An amber bird in snow");
-  await prompt.press("Enter");
+  await prompt.press("ControlOrMeta+Enter");
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     sessionId: "session-hub",
     parentJobId: "job-hub",
+    parentItemId: "hub",
     operation: "image",
-    input: { prompt: "An amber bird in snow", seed: "", count: 1, steps: 28 },
+    input: { prompt: "An amber bird in snow", seed: "", count: 2, steps: 28 },
   });
+  await expect(compact).toHaveValue("An amber bird in snow");
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
@@ -86,6 +94,9 @@ test("The viewer prompt bar queues variations into a strip and choosing one make
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2]).toMatchObject({ parentJobId: state.jobs[1].id, input: { count: 1 } });
   await expect(strip.getByRole("listitem")).toHaveCount(3);
+  // The page's own composer draft was never touched.
+  await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("");
 });
 
 test("A regenerated result joins its source's grid tile as a version until All Versions", async ({
@@ -391,10 +402,8 @@ test("Near-misses beside the viewer's controls keep it open; the empty stage clo
   page,
 }) => {
   const { viewer } = await seed(page);
-  const prompt = (await viewer
-    .getByRole("textbox", { name: "Variation Prompt", exact: true })
-    .boundingBox())!;
-  await page.mouse.click(prompt.x + prompt.width / 2, prompt.y - 10);
+  const composer = (await viewer.locator("[data-composer-dock]").boundingBox())!;
+  await page.mouse.click(composer.x + composer.width / 2, composer.y - 10);
   await expect(viewer).toBeVisible();
   const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
   const picture = (await viewer
@@ -651,6 +660,7 @@ test("Legacy Recreate retains reference slots, disabled LoRAs and exact profile 
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
   await viewerAction(page, "Recreate");
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");

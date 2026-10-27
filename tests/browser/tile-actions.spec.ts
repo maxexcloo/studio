@@ -216,9 +216,9 @@ for (const surface of ["tile", "viewer"]) {
         .click();
       await page.getByRole("menuitem", { name: "Reference", exact: true }).click();
     }
+    await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
     const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toHaveValue("Keep this separate visual direction");
-    await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
     await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toHaveText(
       "Image Fast",
     );

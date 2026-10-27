@@ -206,15 +206,14 @@ export const animateThemes = {
 } as const;
 export type AnimateTheme = keyof typeof animateThemes;
 export type Iteration =
-  | { kind: "variation"; prompt: string }
   | { kind: "regenerate" }
   | { kind: "repeat" }
   | { kind: "animate"; theme: AnimateTheme; instruction?: string };
 
 /**
- * Queues a new run from a saved result without leaving the viewer: a variation with a new prompt
- * (the composer's Count), a new seed, an exact repeat, or an animation whose motion prompt the
- * assistant writes from a theme as the queue item's first stage. Resolves to the new job's ID.
+ * Queues a new run from a saved result without leaving the viewer: a new seed (the composer's
+ * Count), an exact repeat, or an animation whose motion prompt the assistant writes from a theme
+ * as the queue item's first stage. Resolves to the new job's ID.
  */
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
@@ -230,8 +229,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
         sessionId,
       );
       if (note) notifications.show({ message: note });
-      const prompt =
-        iteration.kind === "variation" ? iteration.prompt : animate ? "" : draft.input.prompt;
+      const prompt = animate ? "" : draft.input.prompt;
       const repeat = iteration.kind === "repeat";
       const payload = {
         ...generationInput(

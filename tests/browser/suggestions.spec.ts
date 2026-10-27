@@ -133,7 +133,7 @@ test("Viewer next steps load in place, a step generates its change and More asks
     parentJobId: "job-hub",
     input: { prompt: "An amber bird, warm light" },
   });
-  await expect(viewer.getByRole("textbox", { name: "Variation Prompt", exact: true })).toHaveValue(
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird, warm light",
   );
   await more.click();
@@ -146,7 +146,7 @@ test("No ideas or next steps show when Studio has none", async ({ page }) => {
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  await expect(viewer.getByRole("textbox", { name: "Variation Prompt" })).toBeVisible();
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
   await expect(viewer.getByRole("group", { name: "Next Steps" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await create(page);

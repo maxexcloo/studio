@@ -237,14 +237,17 @@ primary component reference and verify APIs against the installed version.
 
 ## Media, Motion & Accessibility
 
-- The viewer is the iteration hub. Under the image, a prompt bar prefilled from
-  the item generates variations (the composer Count) into a strip of the item's
-  versions, grouped as the grid groups them (`gallery/versions.ts`); choosing one
-  makes it current. Its action bar is the shared item actions in their menu
-  groups, plus Star, Download (and Share on phones) first and Regenerate (new
-  seed, with Exact Repeat in its menu) after Recreate; Animate keeps its LLM
-  prompt menu (Cinematic Camera, Living Photo, Action, Spicy for NSFW-granted
-  accounts, Custom Instruction) and Upscale its settings. Details lists
+- The viewer is the iteration hub. Under the image, its prompt bar is the
+  composer collapsed (the same `ComposerDock`, in its own draft that never
+  touches the page's), prefilled with the item's settings; clicking it expands
+  in place over the open viewer with the prompt focused. Its runs queue as usual
+  into a strip of the item's versions, grouped as the grid groups them
+  (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
+  shared item actions in their menu groups, plus Star, Download (and Share on
+  phones) first and Regenerate (new seed, with Exact Repeat in its menu) after
+  Recreate; Animate keeps its LLM prompt menu (Cinematic Camera, Living Photo,
+  Action, Spicy for NSFW-granted accounts, Custom Instruction) and Upscale its
+  settings. Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height. The desktop details sidebar is open by

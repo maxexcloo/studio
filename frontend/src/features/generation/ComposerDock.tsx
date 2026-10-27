@@ -27,10 +27,24 @@ function GenerationScrollArea(props: ScrollAreaProps) {
   );
 }
 const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
-/** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
-export function ComposerDock({ chat }: { chat?: ReactNode }) {
+/**
+ * Gallery modes render the generation composer; Chat passes its own composer as `chat`. An
+ * `embedded` composer (the viewer's, in its own GenerationProvider) sits in its surface's flow and
+ * leaves the page's URL alone.
+ */
+export function ComposerDock({
+  chat,
+  embedded = false,
+  onSubmitted,
+}: {
+  chat?: ReactNode;
+  embedded?: boolean;
+  onSubmitted?: (jobId: string) => void;
+}) {
   const [params, setParams] = useSearchParams();
-  const [opened, { open, close }] = useDisclosure(!chat && params.get("compose") === "1");
+  // The page's composer answers `?compose=1` and shared images.
+  const main = !chat && !embedded;
+  const [opened, { open, close }] = useDisclosure(main && params.get("compose") === "1");
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
   const [expanded, setExpanded] = useState(opened);
@@ -100,10 +114,10 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     };
   }, []);
   useEffect(() => {
-    if (!chat && params.get("compose") === "1") open();
-  }, [params, open, chat]);
+    if (main && params.get("compose") === "1") open();
+  }, [params, open, main]);
   // An image shared to the installed app (POST /share) arrives as a reference to place.
-  const shared = chat ? "" : params.get("shared") || "";
+  const shared = main ? params.get("shared") || "" : "";
   useEffect(() => {
     if (!shared) return;
     void api<{ asset: ReferenceAsset }>(`/api/reference-assets/${encodeURIComponent(shared)}`)
@@ -117,12 +131,22 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     returningFocus.current = restoreFocus;
     close();
     setExpanded(false);
-    if (params.has("compose")) {
+    if (main && params.has("compose")) {
       const next = new URLSearchParams(params);
       next.delete("compose");
       setParams(next, { replace: true });
     }
   }
+  function submitted(jobId: string) {
+    collapse();
+    onSubmitted?.(jobId);
+  }
+  // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the
+  // surface the composer sits in, such as the viewer.
+  const inLayer = (element: Element) => {
+    const layer = element.closest(composerLayers);
+    return Boolean(layer && !layer.contains(dock.current));
+  };
   function focusCompact() {
     if (!returningFocus.current) return;
     dock.current
@@ -132,7 +156,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }
   const outside = useClickOutside<HTMLDivElement>(
     (event) => {
-      if (closingPopup() || (event.target as HTMLElement).closest(composerLayers)) return;
+      if (closingPopup() || inLayer(event.target as HTMLElement)) return;
       collapse(false);
     },
     ["mousedown", "touchstart"],
@@ -158,6 +182,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
         className={classes.dock}
         data-composer-dock
         data-chat={chat ? true : undefined}
+        data-embedded={embedded || undefined}
         hidden={!chat && phone && opened && expanded}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
@@ -172,8 +197,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           const keyboardDeparture = tabbing.current;
           tabbing.current = false;
           if (next instanceof Element) {
-            if (!event.currentTarget.contains(next) && !next.closest(composerLayers))
-              collapse(false);
+            if (!event.currentTarget.contains(next) && !inLayer(next)) collapse(false);
           } else if (keyboardDeparture) collapse(false);
         }}
         onKeyUp={(event) => {
@@ -207,10 +231,14 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
             collapse();
           }
         }}
-        style={{
-          bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
-          marginBottom: chat ? keyboardInset : undefined,
-        }}
+        style={
+          embedded
+            ? undefined
+            : {
+                bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+                marginBottom: chat ? keyboardInset : undefined,
+              }
+        }
       >
         {(chat || !opened || !expanded) && (
           <Paper
@@ -233,7 +261,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               open();
             }}
           >
-            {chat || <GenerationForm compact />}
+            {chat || <GenerationForm compact embedded={embedded} onSubmitted={onSubmitted} />}
           </Paper>
         )}
         {!chat && !phone && (
@@ -261,7 +289,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
                   inert={!opened}
                 >
                   <GenerationForm
-                    onSubmitted={collapse}
+                    onSubmitted={submitted}
+                    embedded={embedded}
                     focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
                   />
                 </div>
@@ -304,7 +333,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           >
             <GenerationForm
               fill
-              onSubmitted={collapse}
+              onSubmitted={submitted}
+              embedded={embedded}
               autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}
               focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
             />

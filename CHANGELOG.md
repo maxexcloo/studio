@@ -25,6 +25,7 @@ version opens with a `> ` summary line.
 - A next step generates its change at once, with progress on the chip, and a refresh action beside the steps asks for different ones.
 - Running work opens in the viewer from Chat as well as the gallery, showing its status and its prompt once written, and the viewer moves to the result when it is saved.
 - The viewer's strip holds the item's versions (each run made from it, and those made from them), grouped as the grid groups them, so switching moves between versions of one image rather than every result of the run.
+- The viewer's prompt bar is the composer: clicking it expands the full controls in place, prefilled with the item's settings and focused, without closing the viewer or touching the page's draft.
 
 ### Fixed
 
