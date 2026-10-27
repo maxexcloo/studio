@@ -193,7 +193,6 @@ import {
 } from "./video-previews.js";
 import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
-import { scheduleTrashPurge } from "./gallery-trash.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
 import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
@@ -3238,7 +3237,7 @@ app.get("/comfy/*path", async (req, res) => {
     }
     // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
     // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
-    // and neither are dot folders among the outputs (the gallery's trash, gallery-trash.js).
+    // and neither are dot folders among the outputs (such as an old `.studio-trash`).
     if (
       proxyPath !== "view" ||
       !["output", "input", "temp", mediaType].includes(String(req.query.type || "output")) ||
@@ -3350,7 +3349,6 @@ setTimeout(
       .catch(() => null),
   1200,
 );
-scheduleTrashPurge();
 // Studio media's thumbnails and posters are built ahead of their first view.
 if (mediaStorageEnabled) startMediaWarmup();
 

@@ -11,7 +11,7 @@ STUDIO_DATA_DIR=./data
 STUDIO_COMFY_OUTPUT_DIR=
 ```
 
-`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). A `.studio-trash` folder left there by an older version is emptied after 30 days (`STUDIO_TRASH_DAYS`).
+`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`).
 
 Single-user mode answers only the computer running Studio; other devices need [account mode](#multi-user-mode). `STUDIO_ALLOWED_HOSTS` lists extra names to answer to (comma-separated); TLS terminates at the proxy in front of Studio. See [Security](./SECURITY.md) and [Accounts & Devices](./TROUBLESHOOTING.md#accounts--devices).
 
