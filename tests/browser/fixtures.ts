@@ -115,7 +115,6 @@ export async function fixtures(page: Page) {
   }
   const ownAccount = {
     id: "admin",
-    displayName: "Administrator",
     username: "admin@example.test",
     provider: "local",
     canChangeEmail: true,
@@ -127,14 +126,12 @@ export async function fixtures(page: Page) {
       {
         id: "admin",
         username: "admin@example.test",
-        displayName: "Administrator",
         role: "administrator",
         disabled: false,
       },
       {
         id: "member",
         username: "member@example.test",
-        displayName: "Member",
         role: "user",
         accessProfileId: "users",
         disabled: false,
@@ -173,7 +170,6 @@ export async function fixtures(page: Page) {
     const respond = (value: unknown, status = 200) => route.fulfill({ status, json: value });
     if (path === "/api/accounts/me") {
       if (method === "PATCH") {
-        if (body.displayName) ownAccount.displayName = body.displayName;
         if (body.username) ownAccount.username = body.username;
       }
       return respond({ account: ownAccount });

@@ -17,15 +17,12 @@ type Action =
   | { kind: "dismiss"; identity: string }
   | { kind: "admin"; on: boolean };
 
-const accountLabel = (account: { displayName: string; username: string }) =>
-  `${account.displayName} (${account.username})`;
-
 export function ChatGatewayAccounts({
   gateway,
   accounts,
 }: {
   gateway?: GatewayAccounts;
-  accounts: { id: string; displayName: string; username: string }[];
+  accounts: { id: string; username: string }[];
 }) {
   const client = useQueryClient();
   const [choices, setChoices] = useState<Record<string, string>>({});
@@ -43,12 +40,10 @@ export function ChatGatewayAccounts({
     onSuccess: () => client.invalidateQueries({ queryKey: ["account-admin"] }),
   });
   const options = [...accounts]
-    .sort((a, b) => (a.displayName || a.username).localeCompare(b.displayName || b.username))
-    .map((account) => ({ value: account.id, label: accountLabel(account) }));
-  const accountName = (id: string) => {
-    const account = accounts.find((account) => account.id === id);
-    return account ? accountLabel(account) : "Removed Account";
-  };
+    .sort((a, b) => a.username.localeCompare(b.username))
+    .map((account) => ({ value: account.id, label: account.username }));
+  const accountName = (id: string) =>
+    accounts.find((account) => account.id === id)?.username || "Removed Account";
   const rows: Identity[] = [
     ...(gateway?.links || []),
     ...(gateway?.pending || []).map((identity) => ({ ...identity, accountId: undefined })),

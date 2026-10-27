@@ -157,7 +157,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
   const form = useForm({
     initialValues: {
       username: "",
-      displayName: "",
       password: "",
       accessProfileId: admin.defaultAccessProfileId,
     },
@@ -186,12 +185,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
             autoComplete="off"
             required
             {...form.getInputProps("username")}
-          />
-          <TextInput
-            label="Display Name"
-            autoComplete="off"
-            required
-            {...form.getInputProps("displayName")}
           />
           <PasswordInput
             label="Initial Password"
@@ -393,7 +386,6 @@ export function UsersAdmin() {
   if (admin.isPending) return <LoadingState label="Loading Users" />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
-  const nameOf = (account: Account) => account.displayName || account.username;
   const groupOf = (account: Account) =>
     data.accessProfiles.find((group) => group.id === account.accessProfileId);
   return (
@@ -403,9 +395,9 @@ export function UsersAdmin() {
         label="User Accounts"
         rows={data.accounts}
         rowKey={(account) => account.id}
-        rowName={nameOf}
+        rowName={(account) => account.username}
         query={query}
-        searchText={(account) => [account.displayName, account.username]}
+        searchText={(account) => [account.username]}
         initialSort={{ key: "account", descending: false }}
         empty="No Users"
         columns={[
@@ -413,13 +405,10 @@ export function UsersAdmin() {
             key: "account",
             header: "Account",
             main: true,
-            sortValue: nameOf,
+            sortValue: (account) => account.username,
             cell: (account) => (
               <>
                 <Text size="sm" fw={500} truncate>
-                  {nameOf(account)}
-                </Text>
-                <Text size="xs" c="dimmed" truncate>
                   {account.username}
                 </Text>
                 <Group gap={4} mt={4}>
@@ -459,7 +448,7 @@ export function UsersAdmin() {
             cell: (account) =>
               account.role === "user" ? (
                 <Select
-                  aria-label={`Access Group for ${nameOf(account)}`}
+                  aria-label={`Access Group for ${account.username}`}
                   value={account.accessProfileId || null}
                   placeholder="Choose Group"
                   data={data.accessProfiles.map((group) => ({
