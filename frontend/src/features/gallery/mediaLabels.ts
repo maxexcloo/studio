@@ -1,16 +1,13 @@
+import { promptWords } from "../../../../shared/titles";
 import type { MediaItem, Profile } from "../../types";
 import { isProfile } from "../generation/payload";
 
-/** A short title from the prompt's first clause, for captions and accessible names. */
-export function mediaTitle(item: Pick<MediaItem, "prompt">) {
-  const plain = (item.prompt || "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[()[\]{}]/g, "")
-    .replace(/:\s*-?\d+(\.\d+)?/g, "")
-    .trim();
-  const line = plain.split(/[,.;|\n]/)[0].trim() || plain;
-  const text = line.length > 64 ? `${line.slice(0, 61).replace(/\s+\S*$/, "")}…` : line;
-  return text ? text[0].toUpperCase() + text.slice(1) : "Untitled Generation";
+/**
+ * An item's title, for every place one shows (tiles, runs, the viewer, accessible names): the text
+ * model's title, else the prompt's first clause until it is written.
+ */
+export function mediaTitle(item: Pick<MediaItem, "prompt" | "title">) {
+  return item.title || promptWords(item.prompt) || "Untitled Generation";
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();

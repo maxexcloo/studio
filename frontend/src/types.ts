@@ -96,6 +96,8 @@ export interface MediaItem {
   negative?: string;
   /** How the prompt assistant wrote the prompt in the queue: its text model and thinking. */
   writing?: { kind: string; model?: string; thinking?: string };
+  /** A few words the text model summarised from the prompt; show it with mediaTitle. */
+  title?: string;
   /** What the image shows, from Gallery Captions; older captions have no tags. */
   caption?: { text: string; tags?: string[]; model?: string; at?: string };
   createdAt?: string;

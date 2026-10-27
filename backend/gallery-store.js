@@ -28,6 +28,7 @@ import {
 import { currentDataDir } from "./data-dir.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
 import { hasReferenceImage } from "./workflow-modes.js";
+import { replyTitle } from "../shared/titles.ts";
 
 export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
@@ -312,7 +313,7 @@ function pageStart(entry, cursor) {
 
 const searchTexts = new WeakMap();
 
-/** What a gallery search looks through: the prompts, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
+/** What a gallery search looks through: the title (domain/titles.ts), the prompts, the caption (domain/captions.ts), the model and LoRAs, and the file's name. */
 function gallerySearchText(item) {
   if (!item || typeof item !== "object") return "";
   let text = searchTexts.get(item);
@@ -322,6 +323,7 @@ function gallerySearchText(item) {
       ? settings.loras.map((lora) => lora?.name || "")
       : [];
     text = [
+      item.title,
       item.prompt,
       item.negative,
       item.caption?.text,
@@ -1317,6 +1319,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         ...(storedWritingRecord(body.writing)
           ? { writing: storedWritingRecord(body.writing) }
           : {}),
+        // A title the writing stage gave with the prompt; domain/titles.ts writes the rest.
+        ...(replyTitle(body.writing?.title) ? { title: replyTitle(body.writing.title) } : {}),
         ...(body.chat ? { chat: body.chat } : {}),
         ...(body.dream ? { dream: body.dream } : {}),
         outputName: item.filename,

@@ -29,6 +29,7 @@ import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
 import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
+import { createTitler } from "./domain/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
 import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
@@ -1563,6 +1564,7 @@ const jobAdmitted = (job) => {
   dream.admitted(job);
   finishing.admitted(job);
   captioner.interrupt();
+  titler.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
   starred: (req, items, favorite) => {
@@ -2106,12 +2108,22 @@ const promptStage = createPromptStage({
   dream: () => dream,
   taste: (ownerId) => (taste.writable(ownerId) ? taste.read(ownerId).summary : ""),
 });
+const generationAdapter = withUpscaleAdapter(
+  directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
+  upscaleQueueAdapter,
+);
 const generationQueue = new GenerationQueue(
   rewriteStore,
-  withUpscaleAdapter(
-    directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,
-    upscaleQueueAdapter,
-  ),
+  {
+    ...generationAdapter,
+    settled: async (job) => {
+      await generationAdapter.settled(job);
+      if (job.status === "completed")
+        void titler.completed(
+          gallery.filter((item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId),
+        );
+    },
+  },
   promptStage,
 );
 async function validateGenerationInput(input, account) {
@@ -2343,17 +2355,18 @@ const finishing = createFinishing({
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
 });
 registerFinishingRoutes(app, { finishing });
-// Gallery captions (domain/captions.ts) let search match what an image shows. Like Chat, accounts
-// without the prompt assistant never send their images to the text model.
+// Like Chat, accounts without the prompt assistant never send their gallery to the text model.
+function promptAssistantOwner(ownerId) {
+  if (!multiUserEnabled) return true;
+  const account = ownerId ? accountAccessForId(ownerId) : undefined;
+  return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
+}
+// Gallery captions (domain/captions.ts) let search match what an image shows.
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
   idle: studioIdle,
-  allowed: (ownerId) => {
-    if (!multiUserEnabled) return true;
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
-  },
+  allowed: promptAssistantOwner,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: async (item) => {
@@ -2378,6 +2391,15 @@ const captioner = createCaptioner({
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
 registerCaptionRoutes(app, { captioner, requireAdmin });
+// Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
+const titler = createTitler({
+  writer: assistantEngine,
+  idle: studioIdle,
+  allowed: promptAssistantOwner,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  save: (item, title) => updateGalleryJob(galleryKey(item), { title }),
+});
 generationRoutes.setAdmission(async (req, res) => {
   const result = await admitGeneration(req.body || {}, req.studioAccount);
   res.status(result.status).json(result.payload);
@@ -2642,6 +2664,7 @@ generationQueue.start();
 dream.start();
 finishing.start();
 captioner.start();
+titler.start();
 
 /**
  * Upscaling runs on a worker with Upscale (workers.js): the routes below run
