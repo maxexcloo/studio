@@ -28,7 +28,10 @@ export const captionTags = 15;
 // Gallery captions are for search: what is visible, in the words people search with.
 export const captionInstructions = `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. This is an adult gallery: name nudity, sexual acts, fetish wear and body details plainly, in the everyday words people search with, never softened or left out. Tags are the specific, distinctive things someone would search this image for (the outfit, the act, the body type, the hair colour, the setting, the style), not generic words such as image, photo, person, indoor or colourful. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under ${captionCharacters} characters", "tags": ["8 to ${captionTags} short lowercase search tags"]}`;
 // Changing the rules changes the version, so a Caption Gallery pass redoes older captions.
-export const captionVersion = createHash("sha256").update(captionInstructions).digest("hex").slice(0, 12);
+export const captionVersion = createHash("sha256")
+  .update(captionInstructions)
+  .digest("hex")
+  .slice(0, 12);
 
 /**
  * Captions finished gallery images while Studio is idle (domain/idle-work.ts): a trickle of new
