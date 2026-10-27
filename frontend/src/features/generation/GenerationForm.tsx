@@ -43,6 +43,7 @@ export function GenerationForm({
         ...generationInput(input, profile, draft.references),
         operation: draft.operation,
         parentJobId: draft.parentJobId,
+        parentItemId: draft.parentItemId,
       };
       let sessionId = draft.sessionId;
       if (!sessionId) {
@@ -177,6 +178,7 @@ export function GenerationForm({
               presetTitle: preset.title,
               sessionId: "",
               parentJobId: undefined,
+              parentItemId: undefined,
               operation: preset.input.kind === "video" ? "animate" : "image",
               input: { ...initialInput, ...preset.input },
               references: Array.isArray(preset.input.referenceDetails)

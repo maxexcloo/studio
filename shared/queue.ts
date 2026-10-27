@@ -50,6 +50,8 @@ export interface QueueJob {
   jobId: string;
   sessionId: string;
   parentJobId?: string;
+  /** The parent job's result this run is a version of (Edit, Recreate, Animate and the like). */
+  parentItemId?: string;
   operation: GenerationOperation;
   status: QueueStatus;
   reason: string;

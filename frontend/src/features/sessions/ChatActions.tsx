@@ -153,7 +153,7 @@ function DeleteChatDialog({ session, onClose }: { session: Session; onClose: () 
     onSuccess: ({ media }) => {
       const forget = (previous: { sessionId: string; parentJobId?: string }) =>
         previous.sessionId === session.id
-          ? { ...previous, sessionId: "", parentJobId: undefined }
+          ? { ...previous, sessionId: "", parentJobId: undefined, parentItemId: undefined }
           : previous;
       setDraft((previous) => ({ ...previous, ...forget(previous) }), "chat");
       setDraft((previous) => ({ ...previous, ...forget(previous) }), "gallery");
