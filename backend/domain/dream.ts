@@ -407,7 +407,7 @@ export function createDream(options: {
 
   function session(ownerId: string, record: DreamRecord) {
     if (record.session && store.session(ownerId, record.session)) return record.session;
-    record.session = store.createSession(ownerId, "Dream", {}, true).id;
+    record.session = store.createSession(ownerId, "Dream", {}, { hidden: true }).id;
     write(ownerId, record);
     return record.session;
   }

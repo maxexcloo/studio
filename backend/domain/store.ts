@@ -49,6 +49,9 @@ export class RewriteStore {
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, updated_at TEXT NOT NULL, record TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS studio_sessions_owner ON studio_sessions(owner_id, updated_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS studio_sessions_conversation
+        ON studio_sessions(owner_id, json_extract(record, '$.mcp.conversationId'))
+        WHERE json_extract(record, '$.mcp.conversationId') IS NOT NULL;
       CREATE TABLE IF NOT EXISTS studio_queue (
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, session_id TEXT NOT NULL REFERENCES studio_sessions(id),
         created_at TEXT NOT NULL, status TEXT NOT NULL, record TEXT NOT NULL
@@ -69,7 +72,7 @@ export class RewriteStore {
     ownerId: string,
     title = "New Chat",
     inputs: GenerationInput = {},
-    hidden = false,
+    marks: Pick<StudioSession, "hidden" | "mcp"> = {},
   ): StudioSession {
     const stamp = now();
     const session: StudioSession = {
@@ -78,11 +81,40 @@ export class RewriteStore {
       inputs,
       createdAt: stamp,
       updatedAt: stamp,
-      ...(hidden ? { hidden: true as const } : {}),
+      ...marks,
     };
     this.db
       .prepare("INSERT INTO studio_sessions VALUES (?, ?, ?, ?)")
       .run(session.id, ownerId, stamp, JSON.stringify(session));
+    return session;
+  }
+
+  /** The MCP Chat of a client's conversation, made on its first generation; without one, a new Chat. */
+  mcpSession(
+    ownerId: string,
+    title: string,
+    inputs: GenerationInput,
+    conversationId = "",
+  ): StudioSession {
+    if (!conversationId) return this.createSession(ownerId, title, inputs, { mcp: {} });
+    const row = this.db
+      .prepare(
+        "SELECT record FROM studio_sessions WHERE owner_id = ? AND json_extract(record, '$.mcp.conversationId') = ?",
+      )
+      .get(ownerId, conversationId);
+    if (row) return JSON.parse(row.record as string);
+    // Before a conversation kept one Chat, each MCP job had its own; the conversation goes on in its first.
+    const first = this.db
+      .prepare(
+        "SELECT session_id FROM studio_queue WHERE owner_id = ? AND json_extract(record, '$.input.chat.conversationId') = ? ORDER BY created_at, rowid LIMIT 1",
+      )
+      .get(ownerId, conversationId);
+    const earlier = first && this.session(ownerId, first.session_id as string);
+    if (!earlier) return this.createSession(ownerId, title, inputs, { mcp: { conversationId } });
+    const session = { ...earlier, mcp: { conversationId } };
+    this.db
+      .prepare("UPDATE studio_sessions SET record = ? WHERE id = ? AND owner_id = ?")
+      .run(JSON.stringify(session), session.id, ownerId);
     return session;
   }
 

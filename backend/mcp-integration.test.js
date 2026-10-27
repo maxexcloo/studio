@@ -1984,6 +1984,43 @@ test(
     const status = data(await call(client, "Status", { job_id: id }));
     assert.ok(["queued", "running", "done"].includes(status.status));
     assert.notEqual((await call(client, "Cancel", { job_id: id })).isError, true);
+
+    // LibreChat connects afresh for each turn and names its conversation: the turns are one MCP Chat.
+    const turn = async (prompt) => {
+      const librechat = new Client({ name: "librechat-fixture", version: "1.0.0" });
+      t.after(() => librechat.close().catch(() => {}));
+      await librechat.connect(
+        new StreamableHTTPClientTransport(new URL("/mcp", base), {
+          requestInit: {
+            headers: {
+              authorization: `Bearer ${mediaKey}`,
+              "x-ai-user-id": "real-server-fixture",
+              "x-studio-conversation-id": "librechat-conversation",
+            },
+          },
+        }),
+      );
+      const queued = data(
+        await call(librechat, "Generate", {
+          profile_id: profileId,
+          prompts: [prompt],
+          wait_seconds: 0,
+        }),
+      );
+      return jobId(queued);
+    };
+    const turns = [await turn("A first turn"), await turn("A second turn")];
+    const api = async (route) => (await fetch(new URL(route, base))).json();
+    const chats = [];
+    for (const chat of (await api("/api/sessions")).sessions) {
+      const { jobs } = await api(`/api/sessions/${chat.id}`);
+      if (jobs.some((job) => turns.includes(job.id)))
+        chats.push({ ...chat, jobs: jobs.map((job) => job.id) });
+    }
+    assert.equal(chats.length, 1, "one conversation is one Chat");
+    assert.deepEqual(chats[0].jobs, turns);
+    assert.deepEqual(chats[0].mcp, { conversationId: "librechat-conversation" });
+    assert.equal(chats[0].title, "A first turn");
   },
 );
 
