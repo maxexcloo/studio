@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-27
+
 > Studio 1.0: the rebuilt app (chip composer, viewer hub, Chat, Dream and a learned taste profile), Studio-managed GPU workloads, Grok animation and Studio names throughout
 
 ### Added
@@ -2077,7 +2079,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v0.51.0...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/maxexcloo/studio/compare/v0.51.0...v1.0.0
 [0.51.0]: https://github.com/maxexcloo/studio/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/maxexcloo/studio/compare/v0.49.0...v0.50.0
 [0.49.0]: https://github.com/maxexcloo/studio/compare/v0.48.2...v0.49.0
