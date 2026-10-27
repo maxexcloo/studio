@@ -18,7 +18,7 @@
 }
 
 .cell,
-.tile {
+.upload {
   position: relative;
   display: grid;
   place-items: center;
@@ -27,9 +27,9 @@
   border-radius: var(--mantine-radius-md);
   background: var(--mantine-color-default);
   transition:
-    border-color var(--studio-motion-duration) ease,
-    box-shadow var(--studio-motion-duration) ease,
-    opacity var(--studio-motion-duration) ease;
+    border-color var(--studio-motion-duration) ease-out,
+    box-shadow var(--studio-motion-duration) ease-out,
+    opacity var(--studio-motion-duration) ease-out;
 }
 
 .cell {
@@ -48,14 +48,13 @@
 }
 
 .cell[data-target],
-.cell[data-over],
-.tile[data-over] {
+.cell[data-over] {
   border-color: var(--mantine-primary-color-filled);
   box-shadow: 0 0 0 1px var(--mantine-primary-color-filled);
 }
 
 .cell:focus-visible,
-.tile:focus-visible {
+.upload:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 2px;
 }
@@ -74,38 +73,17 @@
   white-space: nowrap;
 }
 
-.tile {
+/* Upload sits first among the choices, in the normal text colour. */
+.upload {
   width: 100%;
   aspect-ratio: 1;
-}
-
-.tile:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.tile[data-upload] {
   border-style: dashed;
   background: transparent;
-  color: var(--mantine-color-dimmed);
 }
 
-.tileAction {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-}
-
-@media (hover: hover) {
-  .tileWrap .tileAction {
-    opacity: 0;
-    transition: opacity var(--studio-motion-duration) ease;
-  }
-
-  .tileWrap:hover .tileAction,
-  .tileWrap:focus-within .tileAction {
-    opacity: 1;
-  }
+.upload:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 @media (max-width: 48em) {

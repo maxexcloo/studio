@@ -115,7 +115,7 @@ test("Escape closes only the innermost reference layer; phones confirm at the sa
   await page.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   await expect(picker).toBeVisible();
-  await picker.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
   await picker.getByRole("button", { name: "Filter By Size", exact: true }).click();
   const size = picker.getByRole("dialog");
   await expect(size).toBeVisible();
@@ -216,7 +216,11 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   ]);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  // A tap fills the next empty slot.
+  // A second tap removes a selected image; choosing a slot first places it there too.
+  await expect(
+    page.getByRole("button", { name: "Remove reference: Slot Source", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Slot 1 · Start", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Slot Source", exact: true }).click();
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();

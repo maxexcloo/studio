@@ -71,6 +71,10 @@ function cleanSnapshot(value) {
         .trim()
         .slice(0, 120) || "Untitled stack",
     loras: cleanStack(value?.loras),
+    // When it was saved, for sorting by date; stacks saved before this have none.
+    ...(Number.isFinite(Date.parse(value?.savedAt))
+      ? { savedAt: new Date(value.savedAt).toISOString() }
+      : {}),
   };
 }
 

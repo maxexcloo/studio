@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, stamp, viewerAction } from "./fixtures";
+import { fixtures, image, loadSaved, stamp, viewerAction } from "./fixtures";
 async function galleryFixture(page: Page) {
   const state = await fixtures(page);
   const input = {
@@ -191,7 +191,7 @@ for (const surface of ["tile", "viewer"]) {
     });
     await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
     await page.getByRole("button", { name: "Presets", exact: true }).click();
-    await page.getByRole("button", { name: "Current Direction", exact: true }).click();
+    await loadSaved(page, "Preset", "Current Direction");
     await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
     await page.keyboard.press("Escape");
     if (surface === "viewer") {

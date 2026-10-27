@@ -34,6 +34,8 @@ interface UserPreset {
   id: string;
   title: string;
   input: GenerationInput;
+  /** Presets saved before dates were kept have none. */
+  savedAt?: string;
 }
 const now = () => new Date().toISOString();
 
@@ -354,7 +356,7 @@ export class RewriteStore {
   }
 
   createPreset(ownerId: string, title: string, input: GenerationInput): UserPreset {
-    const preset = { id: randomUUID(), title, input };
+    const preset = { id: randomUUID(), title, input, savedAt: now() };
     this.db
       .prepare("INSERT INTO studio_user_presets VALUES (?, ?, ?)")
       .run(preset.id, ownerId, JSON.stringify(preset));
