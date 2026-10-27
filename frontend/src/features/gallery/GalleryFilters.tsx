@@ -57,6 +57,10 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
 
+/** How many filters are on, Starred included, for a filter action's badge. */
+export const galleryFilterCount = (filters: GalleryFilterValues, starred: boolean) =>
+  Number(starred) + Object.values(filters).reduce((count, values) => count + values.length, 0);
+
 /** The gallery and reference picker share facets, labels and selection behaviour. */
 interface GalleryFiltersProps {
   kind?: MediaKind;
@@ -88,9 +92,7 @@ export function GalleryFilterToolbar({
     filtersInitiallyOpen ? "filters" : "normal",
   );
   const searchOpen = mode === "search";
-  const selectedCount =
-    Number(props.starred) +
-    Object.values(props.value).reduce((count, values) => count + values.length, 0);
+  const selectedCount = galleryFilterCount(props.value, props.starred);
   const toolbar = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
@@ -209,7 +211,8 @@ export function GalleryFilterToolbar({
   );
 }
 
-function GalleryFilters({
+/** The facets as a row, for the gallery toolbar's filter mode and the reference picker. */
+export function GalleryFilters({
   kind,
   value,
   onChange,

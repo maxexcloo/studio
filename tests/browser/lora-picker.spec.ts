@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { closeLoras, create, fixtures, profiles, serveProfiles } from "./fixtures";
+import { closeLoras, create, fixtures, pickerTab, profiles, serveProfiles } from "./fixtures";
 
 test("LoRA favourites persist, filters and search narrow the choices, and Trigger Words reach the generation", async ({
   page,
@@ -33,6 +33,7 @@ test("LoRA favourites persist, filters and search narrow the choices, and Trigge
   await star.click();
   await expect(star).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => state.loraLibrary.favorites).toEqual(["soft-style.safetensors"]);
+  await controls.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   const filters = controls.getByRole("radiogroup", { name: "LoRA Filter", exact: true });
   await filters.getByText("Favourites", { exact: true }).click();
   const choices = controls.getByRole("list", { name: "Compatible LoRAs", exact: true });
@@ -83,13 +84,14 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await page.keyboard.press("Space");
   await page.keyboard.press("Escape");
   await expect(controls).toBeVisible();
-  // An open saved-stack list closes first.
-  await controls.getByRole("button", { name: "Saved LoRA Stacks", exact: true }).click();
-  const saved = controls.getByRole("combobox", { name: "Saved LoRA Stack", exact: true });
-  await saved.click();
-  await expect(saved).toHaveAttribute("aria-expanded", "true");
+  // An open sort menu closes first.
+  await pickerTab(page, "LoRAs", "Stacks");
+  const sort = controls.getByRole("button", { name: "Sort", exact: true });
+  await sort.click();
+  await expect(sort).toHaveAttribute("aria-expanded", "true");
+  await expect(controls.getByRole("menuitem", { name: "Name A–Z" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(saved).toHaveAttribute("aria-expanded", "false");
+  await expect(sort).toHaveAttribute("aria-expanded", "false");
   await expect(controls).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(controls).toBeHidden();
@@ -126,6 +128,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   );
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await page
     .getByRole("radiogroup", { name: "LoRA Filter", exact: true })
     .getByText("Style", { exact: true })
@@ -139,6 +142,7 @@ test("LoRAs use catalogue family and type metadata", async ({ page }) => {
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: "Other Quality", exact: true }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
+  await page.getByRole("button", { name: "Filter LoRAs", exact: true }).click();
   await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Other Detail", exact: true }).click();
   await expect(

@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useRef, useState, type DragEvent, type ReactNode } from "react";
 import {
   ActionIcon,
   Badge,
@@ -52,6 +52,7 @@ export function PanelHeader({ title, onBack }: { title: string; onBack: () => vo
 /** Tabs, an inline search and a filter toggle on one row; the filters open inline below it. */
 export function PickerHeader<Tab extends string>({
   label,
+  searched = label,
   tabs,
   tab,
   onTabChange,
@@ -62,8 +63,10 @@ export function PickerHeader<Tab extends string>({
   filterCount = 0,
   actions,
 }: {
-  /** Names the search and filters, such as "References" or "LoRAs". */
+  /** Names the picker, such as "References" or "LoRAs". */
   label: string;
+  /** What the search and filters cover, such as the current tab's "Gallery". */
+  searched?: string;
   tabs?: { value: Tab; label: string }[];
   tab?: Tab;
   onTabChange?: (tab: Tab) => void;
@@ -91,7 +94,7 @@ export function PickerHeader<Tab extends string>({
         <SearchInput
           className={classes.search}
           data-autofocus
-          aria-label={`Search ${label}`}
+          aria-label={`Search ${searched}`}
           placeholder={placeholder}
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
@@ -99,9 +102,9 @@ export function PickerHeader<Tab extends string>({
         />
         {actions}
         {filters && (
-          <Tooltip label={`Filter ${label}`}>
+          <Tooltip label={`Filter ${searched}`}>
             <ActionIcon
-              aria-label={`Filter ${label}`}
+              aria-label={`Filter ${searched}`}
               aria-expanded={open}
               variant={open || filterCount ? "light" : "subtle"}
               color={open || filterCount ? undefined : "gray"}
@@ -119,7 +122,7 @@ export function PickerHeader<Tab extends string>({
         )}
       </div>
       {open && (
-        <div className={classes.filters} role="group" aria-label={`${label} Filters`}>
+        <div className={classes.filters} role="group" aria-label={`${searched} Filters`}>
           {filters}
         </div>
       )}
@@ -301,6 +304,8 @@ export interface SavedItem {
   name: string;
   /** When it was saved; older records without one sort by their place in the list. */
   savedAt?: string;
+  /** A note under the name, such as where an older record came from. */
+  detail?: string;
 }
 
 /** Saved items filtered by the query and sorted; `items` arrive oldest first. */
@@ -332,13 +337,13 @@ export function SortMenu({
 }) {
   return (
     <Menu position="bottom-end" withinPortal={false}>
-      <Menu.Target>
-        <Tooltip label={`Sort: ${sortLabels[value]}`}>
+      <Tooltip label={`Sort: ${sortLabels[value]}`}>
+        <Menu.Target>
           <ActionIcon aria-label="Sort" variant="subtle" color="gray">
             <ArrowDownUp size={18} />
           </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
+        </Menu.Target>
+      </Tooltip>
       <Menu.Dropdown>
         {(Object.keys(sortLabels) as SavedSort[]).map((sort) => (
           <Menu.Item
@@ -421,14 +426,21 @@ export function SavedList<T extends SavedItem>({
               <UnstyledButton
                 className={classes.savedName}
                 aria-label={`Load ${noun}: ${item.name}`}
+                aria-current={item.id === current || undefined}
                 onClick={() => (replaces ? setConfirming(item.id) : onLoad(item))}
               >
                 <Text size="sm" truncate>
                   {item.name}
                 </Text>
+                {item.detail && (
+                  <Text size="xs" c="dimmed" truncate>
+                    {item.detail}
+                  </Text>
+                )}
               </UnstyledButton>
             )}
-            <Menu position="bottom-end" withinPortal={false}>
+            {/* Rename focuses its field, so the closing menu must not take focus back. */}
+            <Menu position="bottom-end" withinPortal={false} returnFocus={false}>
               <Menu.Target>
                 <ActionIcon
                   variant="subtle"
@@ -480,28 +492,32 @@ export function SavedList<T extends SavedItem>({
 export function SaveCurrent({
   noun,
   disabled,
-  pending,
   onSave,
 }: {
   noun: string;
   disabled: boolean;
-  pending: boolean;
   onSave: (name: string) => void;
 }) {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
+  // Focus returns to Save after naming, so the composer keeps focus and stays open.
+  const named = useRef(false);
+  const finish = () => {
+    named.current = true;
+    setNaming(false);
+  };
   const save = () => {
     if (!name.trim()) return;
     onSave(name.trim());
     setName("");
-    setNaming(false);
+    finish();
   };
   if (!naming)
     return (
       <Button
         variant="default"
+        autoFocus={named.current}
         disabled={disabled}
-        loading={pending}
         onClick={() => setNaming(true)}
       >
         Save {noun}
@@ -524,7 +540,7 @@ export function SaveCurrent({
           } else if (event.key === "Escape") {
             event.preventDefault();
             event.stopPropagation();
-            setNaming(false);
+            finish();
           }
         }}
       />

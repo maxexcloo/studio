@@ -3,26 +3,21 @@ import { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Alert,
-  Box,
   Button,
   Drawer,
   FileButton,
   FocusTrap,
   getDefaultZIndex,
-  Group,
   Image,
-  Indicator,
   Loader,
   Popover,
   ScrollArea,
-  SegmentedControl,
-  SimpleGrid,
   Stack,
   Text,
   UnstyledButton,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { ImagePlus, ArrowLeft, Trash2, Upload } from "lucide-react";
+import { ImagePlus, Trash2, Upload } from "lucide-react";
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -33,8 +28,11 @@ import { api } from "../../api";
 import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
-import { SearchInput } from "../../ui/SearchInput";
-import { GalleryFilterToolbar, appendGalleryFilters } from "../gallery/GalleryFilters";
+import {
+  GalleryFilters,
+  appendGalleryFilters,
+  galleryFilterCount,
+} from "../gallery/GalleryFilters";
 import { referenceDetails, referenceGroup } from "./payload";
 import { useGeneration } from "./GenerationProvider";
 import {
@@ -55,7 +53,14 @@ import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowse
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { chipProps, escapePanel } from "./chip";
-import editorClasses from "./GenerationEditor.module.css";
+import {
+  ChipThumbnails,
+  PanelHeader,
+  PickerFooter,
+  PickerGrid,
+  PickerHeader,
+  PickerTile,
+} from "./Picker";
 import classes from "./ReferencePicker.module.css";
 
 export function ReferencePicker({
@@ -203,15 +208,16 @@ export function ReferencePicker({
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
   const listing = source === "uploads" ? uploads : gallery;
-  const choices =
+  const listed =
     source === "uploads"
       ? (uploads.data?.pages.flatMap((page) => page.items) || []).map((asset, index) => ({
           id: asset.id,
           name: `Reference ${index + 1}`,
           deleteId: asset.id,
           thumbnailUrl: asset.thumbnailUrl || asset.url,
-          drag: [uploadReferenceType, JSON.stringify(asset)],
+          drag: [uploadReferenceType, JSON.stringify(asset)] as [string, string],
           choose: () => placement.place(asset, chosen),
+          matches: (reference: ReferenceAsset) => reference.id === asset.id,
         }))
       : (gallery.data?.pages.flatMap((page) => page.items) || [])
           .filter((item) => item.type === "image" && item.status === "done")
@@ -220,9 +226,19 @@ export function ReferencePicker({
             name: item.prompt || "Result",
             deleteId: undefined,
             thumbnailUrl: item.thumbnailUrl || item.url,
-            drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })],
+            drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })] as [
+              string,
+              string,
+            ],
             choose: () => placement.addGalleryItem(item, chosen),
+            matches: (reference: ReferenceAsset) => reference.galleryItemId === item.id,
           }));
+  // A selected image removes on a second click, except into a chosen slot, so one image can
+  // still play several roles.
+  const choices = listed.map((item) => {
+    const selected = references.some((reference) => item.matches(reference));
+    return { ...item, selected, removes: selected && !chosen };
+  });
   const [viewport, setViewport] = useState<HTMLDivElement | null>(null);
   const restoreScroll = useRef(true);
   useLayoutEffect(() => {
@@ -233,30 +249,31 @@ export function ReferencePicker({
     }
   }, [viewport, choices.length, browser.scroll]);
   const uploadTile = (
-    <FileButton
-      accept="image/png,image/jpeg,image/webp"
-      multiple
-      onChange={(files) => uploadFiles(files)}
-    >
-      {(props) => (
-        <UnstyledButton
-          {...props}
-          className={classes.tile}
-          data-upload
-          aria-label="Upload Reference"
-          disabled={!target}
-        >
-          {placement.uploading ? (
-            <Loader size="sm" />
-          ) : (
-            <Stack gap={4} align="center">
-              <Upload size={20} aria-hidden />
-              <Text size="xs">Upload</Text>
-            </Stack>
-          )}
-        </UnstyledButton>
-      )}
-    </FileButton>
+    <div role="listitem">
+      <FileButton
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        onChange={(files) => uploadFiles(files)}
+      >
+        {(props) => (
+          <UnstyledButton
+            {...props}
+            className={classes.upload}
+            aria-label="Upload Reference"
+            disabled={!target}
+          >
+            {placement.uploading ? (
+              <Loader size="sm" />
+            ) : (
+              <Stack gap={4} align="center">
+                <Upload size={20} aria-hidden />
+                <Text size="xs">Upload</Text>
+              </Stack>
+            )}
+          </UnstyledButton>
+        )}
+      </FileButton>
+    </div>
   );
   const content = (
     <Stack
@@ -285,23 +302,7 @@ export function ReferencePicker({
         height: sheet ? "calc(100dvh - 3.75rem)" : "min(70dvh, 620px)",
       }}
     >
-      {inline && (
-        <Group justify="space-between">
-          <Button
-            autoFocus
-            size="compact-sm"
-            variant="subtle"
-            color="gray"
-            leftSection={<ArrowLeft size={16} />}
-            onClick={close}
-          >
-            Back
-          </Button>
-          <Text size="sm" fw={500}>
-            References
-          </Text>
-        </Group>
-      )}
+      {inline && <PanelHeader title="References" onBack={close} />}
       <ReferenceSlots
         references={references}
         profile={profile}
@@ -316,39 +317,35 @@ export function ReferencePicker({
       />
       {!target && (
         <Text size="xs" c="dimmed">
-          All slots are filled. Choose a reference to replace it.
+          All slots are filled. Choose a reference to replace it, or a selected image to remove it.
         </Text>
       )}
-      <SegmentedControl
-        aria-label="Reference Source"
-        value={source}
-        onChange={(value) => browse({ source: value as "gallery" | "uploads" })}
-        fullWidth
-        data={[
+      <PickerHeader
+        label="References"
+        searched={source === "uploads" ? "Uploads" : "Gallery"}
+        tabs={[
           { value: "gallery", label: "Gallery" },
           { value: "uploads", label: "Uploads" },
         ]}
+        tab={source}
+        onTabChange={(source) => browse({ source })}
+        query={query}
+        onQueryChange={(query) => browse({ query })}
+        placeholder={source === "uploads" ? "Search uploads…" : "Search your generations…"}
+        filterCount={source === "gallery" ? galleryFilterCount(filters, starred) : 0}
+        filters={
+          source === "gallery" && (
+            <GalleryFilters
+              withinPortal={false}
+              kind="image"
+              value={filters}
+              onChange={(filters) => browse({ filters })}
+              starred={starred}
+              onStarredChange={(starred) => browse({ starred })}
+            />
+          )
+        }
       />
-      {source === "gallery" ? (
-        <GalleryFilterToolbar
-          withinPortal={false}
-          query={query}
-          onQueryChange={(query) => browse({ query })}
-          kind="image"
-          value={filters}
-          onChange={(filters) => browse({ filters })}
-          starred={starred}
-          onStarredChange={(starred) => browse({ starred })}
-        />
-      ) : (
-        <SearchInput
-          aria-label="Search Uploads"
-          placeholder="Search uploads…"
-          value={query}
-          onChange={(event) => browse({ query: event.currentTarget.value })}
-          onClear={() => browse({ query: "" })}
-        />
-      )}
       <ScrollArea.Autosize
         style={{ flex: 1, minHeight: 0 }}
         offsetScrollbars="present"
@@ -362,52 +359,39 @@ export function ReferencePicker({
         ) : listing.error ? (
           <Alert color="red">{listing.error.message}</Alert>
         ) : choices.length || source === "uploads" ? (
-          <SimpleGrid cols={{ base: 3, sm: 4 }} spacing="xs">
+          <PickerGrid label="Reference Choices">
             {source === "uploads" && uploadTile}
             {choices.map((item, index) => (
-              <div key={item.id} className={classes.tileWrap} style={{ position: "relative" }}>
-                <UnstyledButton
-                  className={classes.tile}
-                  aria-label={`Use reference: ${item.name}`}
-                  onClick={() => {
-                    item.choose();
-                    settle();
-                  }}
-                  disabled={!target}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "copy";
-                    event.dataTransfer.setData(item.drag[0], item.drag[1]);
-                  }}
-                >
-                  <Image
-                    src={item.thumbnailUrl}
-                    alt=""
-                    h="100%"
-                    w="100%"
-                    fit="cover"
-                    fallbackSrc=""
-                    draggable={false}
-                  />
-                </UnstyledButton>
-                {item.deleteId && (
-                  <ActionIcon
-                    className={classes.tileAction}
-                    size="sm"
-                    variant="default"
-                    color="red"
-                    aria-label={`Delete Upload ${index + 1}`}
-                    onClick={() => {
-                      deletion.reset();
-                      setDeleteId(item.deleteId);
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </ActionIcon>
-                )}
-              </div>
+              <PickerTile
+                key={item.id}
+                label={`${item.removes ? "Remove" : "Use"} reference: ${item.name}`}
+                selected={item.selected}
+                disabled={!target}
+                image={item.thumbnailUrl}
+                drag={item.drag}
+                onToggle={() => {
+                  if (item.removes) list.set(list.get().filter((asset) => !item.matches(asset)));
+                  else item.choose();
+                  settle();
+                }}
+                action={
+                  item.deleteId && (
+                    <ActionIcon
+                      variant="default"
+                      color="red"
+                      aria-label={`Delete Upload ${index + 1}`}
+                      onClick={() => {
+                        deletion.reset();
+                        setDeleteId(item.deleteId);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </ActionIcon>
+                  )
+                }
+              />
             ))}
-          </SimpleGrid>
+          </PickerGrid>
         ) : (
           <EmptyState fill>{search ? "No Matching Images" : "No Images"}</EmptyState>
         )}
@@ -426,13 +410,21 @@ export function ReferencePicker({
           </Button>
         )}
       </ScrollArea.Autosize>
-      {sheet && (
-        <Box className={editorClasses.footer} data-sticky>
-          <Button fullWidth onClick={close}>
-            Use References
+      <PickerFooter
+        end={
+          <Button
+            variant="default"
+            disabled={!references.length}
+            onClick={() => {
+              list.set([]);
+              settle();
+            }}
+          >
+            Clear References
           </Button>
-        </Box>
-      )}
+        }
+        done={sheet ? { label: "Use References", onClick: close } : undefined}
+      />
     </Stack>
   );
   const missing = profile?.mediaInputs?.some(
@@ -466,33 +458,18 @@ export function ReferencePicker({
       aria-expanded={opened}
       color={missing ? "yellow" : undefined}
       variant={missing ? "outline" : chipProps.variant}
-      leftSection={<ImagePlus size={16} />}
+      leftSection={references.length ? undefined : <ImagePlus size={16} />}
       onClick={() => setOpened(!opened)}
     >
       {references.length ? (
-        <Group gap={6} wrap="nowrap" component="span">
-          {references.map((asset, index) => (
-            <Indicator
-              key={referenceKey(asset)}
-              component="span"
-              label={index + 1}
-              size={14}
-              offset={7}
-              position="bottom-end"
-              color="dark"
-              fz={9}
-            >
-              <Image
-                src={asset.thumbnailUrl || asset.url}
-                alt={referenceLabel(asset, index, profile)}
-                h={24}
-                w={24}
-                radius="sm"
-                fallbackSrc=""
-              />
-            </Indicator>
-          ))}
-        </Group>
+        <ChipThumbnails
+          placeholder={ImagePlus}
+          items={references.map((asset, index) => ({
+            key: referenceKey(asset),
+            label: referenceLabel(asset, index, profile),
+            src: asset.thumbnailUrl || asset.url,
+          }))}
+        />
       ) : (
         "References"
       )}

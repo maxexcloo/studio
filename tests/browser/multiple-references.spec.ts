@@ -42,6 +42,7 @@ test("Multiple owned references preserve order, role identity and capacity throu
       json: {
         asset: {
           id: `asset-${body.galleryItemId}`,
+          galleryItemId: body.galleryItemId,
           name: "private-upload-name.png",
           url: image,
           thumbnailUrl: image,
@@ -62,9 +63,10 @@ test("Multiple owned references preserve order, role identity and capacity throu
   for (const name of ["first", "second", "third"])
     await picker.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
+  // With every slot filled, a selected image can still be removed.
   await expect(
-    picker.getByRole("button", { name: "Use reference: first study", exact: true }),
-  ).toBeDisabled();
+    picker.getByRole("button", { name: "Remove reference: first study", exact: true }),
+  ).toBeEnabled();
   await slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }).click();
   await page
     .getByRole("menu", { name: "Reference 1 · Inputs", exact: true })
@@ -99,8 +101,11 @@ test("Multiple owned references preserve order, role identity and capacity throu
   ).toEqual(expected);
   await openNav(page, "Chat");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  for (const name of ["second", "first", "first"])
+  for (const name of ["second", "first"])
     await page.getByRole("button", { name: `Use reference: ${name} study`, exact: true }).click();
+  // The same image fills End too once that slot is chosen.
+  await page.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: first study", exact: true }).click();
   await closeReferences(page);
   await page
     .getByRole("textbox", { name: "Message", exact: true })
@@ -176,6 +181,8 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
   const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
   await slots.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  // One upload can fill several slots: choose the slot, then the selected image.
+  await slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
   await slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true }).click();

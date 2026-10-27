@@ -2,11 +2,9 @@ import {
   ActionIcon,
   Alert,
   Anchor,
-  Box,
   Button,
   Chip,
   Group,
-  Image,
   NumberInput,
   Popover,
   ScrollArea,
@@ -14,26 +12,35 @@ import {
   Stack,
   Switch,
   Text,
-  UnstyledButton,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, Layers, Star, X } from "lucide-react";
+import { Layers, Star, X } from "lucide-react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LoraStacks, loraLibraryQuery, type LoraLibrary } from "./LoraStacks";
+import { loraLibraryQuery, useLoraStacks, type LoraLibrary } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { SearchInput } from "../../ui/SearchInput";
 import { api, post } from "../../api";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 import { isProfile } from "./payload";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps, escapePanel } from "./chip";
+import {
+  ChipThumbnails,
+  PanelHeader,
+  PickerFooter,
+  PickerGrid,
+  PickerHeader,
+  PickerTile,
+  SaveCurrent,
+  SavedList,
+  SortMenu,
+  savedItems,
+  type SavedSort,
+} from "./Picker";
 import classes from "./LoraPicker.module.css";
-import railClasses from "./GenerationInputControls.module.css";
-import editorClasses from "./GenerationEditor.module.css";
 interface LoraInfo {
   title?: string;
   sourceUrl?: string;
@@ -68,6 +75,8 @@ export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<"loras" | "stacks">("loras");
+  const [sort, setSort] = useState<SavedSort>("name-asc");
   const controlsId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLDivElement>(null);
@@ -83,7 +92,21 @@ export function useLoraPicker() {
     }
     wasOpened.current = opened;
   }, [opened]);
-  return { opened, setOpened, filter, setFilter, query, setQuery, controlsId, trigger, controls };
+  return {
+    opened,
+    setOpened,
+    filter,
+    setFilter,
+    query,
+    setQuery,
+    tab,
+    setTab,
+    sort,
+    setSort,
+    controlsId,
+    trigger,
+    controls,
+  };
 }
 export type LoraPickerState = ReturnType<typeof useLoraPicker>;
 interface LoraPickerProps {
@@ -112,40 +135,16 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
       flex={inline ? 1 : undefined}
       mih={0}
     >
-      {inline ? (
-        <>
-          <Group justify="space-between">
-            <Button
-              autoFocus
-              size="compact-sm"
-              variant="subtle"
-              color="gray"
-              leftSection={<ArrowLeft size={16} />}
-              onClick={close}
-            >
-              Back
-            </Button>
-            <Text size="sm" fw={500}>
-              LoRAs
-            </Text>
-          </Group>
-          <LoraControls value={value} onChange={onChange} picker={picker} phone />
-          <Box className={editorClasses.footer} data-sticky>
-            <Button fullWidth onClick={close}>
-              Use LoRAs
-            </Button>
-          </Box>
-        </>
-      ) : (
-        <LoraControls value={value} onChange={onChange} picker={picker} />
-      )}
+      {inline && <PanelHeader title="LoRAs" onBack={close} />}
+      <LoraControls
+        value={value}
+        onChange={onChange}
+        picker={picker}
+        phone={inline}
+        onDone={inline ? close : undefined}
+      />
     </Stack>
   );
-  const enabled = input.loras.filter((lora) => lora.enabled !== false);
-  const first = enabled[0] || input.loras[0];
-  const summary = first
-    ? `${loraTitle(info.data?.loras[first.name], first.name)}${input.loras.length > 1 ? ` +${input.loras.length - 1}` : ""}`
-    : "LoRAs";
   // Warms the preview images on intent, so the grid paints them on open.
   const warm = () => {
     for (const url of Object.values(previews.data?.previews || {}).slice(0, 40))
@@ -158,12 +157,24 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
       aria-label="Choose LoRAs"
       aria-expanded={picker.opened}
       aria-controls={picker.controlsId}
-      leftSection={<Layers size={15} />}
+      leftSection={input.loras.length ? undefined : <Layers size={15} />}
       onPointerEnter={warm}
       onFocus={warm}
       onClick={() => picker.setOpened(!picker.opened)}
     >
-      <span className={railClasses.label}>{summary}</span>
+      {input.loras.length ? (
+        <ChipThumbnails
+          placeholder={Layers}
+          items={input.loras.map((lora) => ({
+            key: lora.name,
+            label: loraTitle(info.data?.loras[lora.name], lora.name),
+            src: previews.data?.previews[lora.name],
+            off: lora.enabled === false,
+          }))}
+        />
+      ) : (
+        "LoRAs"
+      )}
     </Button>
   );
   if (inline) return content;
@@ -220,11 +231,13 @@ function LoraControls({
   onChange,
   picker,
   phone = false,
+  onDone,
 }: {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
   phone?: boolean;
+  onDone?: () => void;
 }) {
   const context = useGeneration();
   const input = value || context.input;
@@ -239,6 +252,7 @@ function LoraControls({
   const favourite = useFavourite();
   const metadata = info.data?.loras || {};
   const family = profile?.family || "";
+  const stacks = useLoraStacks(family, profile?.id || "");
   const title = (file: string) => loraTitle(metadata[file], file);
   const typeOf = (file: string) => metadata[file]?.type || "unclassified";
   const compatible = (profile?.options?.loras || []).filter(
@@ -285,54 +299,96 @@ function LoraControls({
     : filter === "favourites" && !favourites.size
       ? "No Favourites"
       : "No Matching LoRAs";
-  const choices = info.isPending ? (
-    <LoadingState label="Loading LoRAs" />
-  ) : info.error ? (
-    <Alert color="red">{info.error.message}</Alert>
-  ) : shown.length ? (
-    <div className={phone ? undefined : classes.grid} role="list" aria-label="Compatible LoRAs">
-      {shown.map((file) => (
-        <LoraChoice
-          key={file}
-          title={title(file)}
-          type={typeNames[typeOf(file)] || typeOf(file)}
-          preview={previews.data?.previews[file]}
-          selected={selected.has(file)}
-          favourite={favourites.has(file)}
-          row={phone}
-          onToggle={() => toggle(file)}
-          onFavourite={() => favourite.mutate({ name: file, on: !favourites.has(file) })}
-        />
-      ))}
-    </div>
-  ) : (
-    <EmptyState fill>{empty}</EmptyState>
-  );
-  const browser = (
-    <>
-      <SearchInput
-        data-autofocus
-        size={phone ? "md" : "sm"}
-        aria-label="Search LoRAs"
-        placeholder="Search LoRAs"
-        value={picker.query}
-        onChange={(event) => picker.setQuery(event.currentTarget.value)}
-        onClear={() => picker.setQuery("")}
+  const choices =
+    picker.tab === "stacks" ? (
+      <SavedList
+        label="Saved LoRA Stacks"
+        noun="Stack"
+        items={savedItems(stacks.records, picker.query, picker.sort)}
+        empty={stacks.records.length ? "No Matching Stacks" : "No Saved Stacks"}
+        replaces={input.loras.length > 0}
+        replaceMessage="Replace the current LoRAs with this stack?"
+        onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
+        onRename={stacks.rename}
+        onUpdate={(record) => stacks.update(record, input.loras)}
+        onDelete={stacks.remove}
       />
-      <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
-        <Group gap={6} className={classes.filters} role="radiogroup" aria-label="LoRA Filter">
-          {[
-            ["all", "All"],
-            ["favourites", "Favourites"],
-            ...types.map((type) => [type, typeNames[type] || type]),
-          ].map(([value, label]) => (
-            <Chip key={value} value={value} size={phone ? "md" : "xs"} variant="light">
-              {label}
-            </Chip>
-          ))}
-        </Group>
-      </Chip.Group>
-    </>
+    ) : info.isPending ? (
+      <LoadingState label="Loading LoRAs" />
+    ) : info.error ? (
+      <Alert color="red">{info.error.message}</Alert>
+    ) : shown.length ? (
+      <PickerGrid label="Compatible LoRAs" rows={phone}>
+        {shown.map((file) => (
+          <PickerTile
+            key={file}
+            label={title(file)}
+            title={title(file)}
+            detail={typeNames[typeOf(file)] || typeOf(file)}
+            image={previews.data?.previews[file]}
+            placeholder={Layers}
+            aspect={phone ? "1" : "4 / 3"}
+            selected={selected.has(file)}
+            row={phone}
+            onToggle={() => toggle(file)}
+            action={
+              <ActionIcon
+                variant={phone ? "subtle" : "default"}
+                color="gray"
+                aria-label={`Favourite ${title(file)}`}
+                aria-pressed={favourites.has(file)}
+                onClick={() => favourite.mutate({ name: file, on: !favourites.has(file) })}
+              >
+                <Star
+                  size={16}
+                  color={
+                    favourites.has(file) ? "var(--mantine-color-yellow-filled)" : "currentColor"
+                  }
+                  fill={favourites.has(file) ? "var(--mantine-color-yellow-filled)" : "none"}
+                />
+              </ActionIcon>
+            }
+          />
+        ))}
+      </PickerGrid>
+    ) : (
+      <EmptyState fill>{empty}</EmptyState>
+    );
+  const header = (
+    <PickerHeader
+      label="LoRAs"
+      searched={picker.tab === "stacks" ? "Stacks" : "LoRAs"}
+      tabs={[
+        { value: "loras", label: "LoRAs" },
+        { value: "stacks", label: "Stacks" },
+      ]}
+      tab={picker.tab}
+      onTabChange={picker.setTab}
+      query={picker.query}
+      onQueryChange={picker.setQuery}
+      placeholder={picker.tab === "stacks" ? "Search stacks…" : "Search LoRAs…"}
+      actions={
+        picker.tab === "stacks" && <SortMenu value={picker.sort} onChange={picker.setSort} />
+      }
+      filterCount={filter === "all" ? 0 : 1}
+      filters={
+        picker.tab === "loras" && (
+          <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
+            <Group gap={6} role="radiogroup" aria-label="LoRA Filter">
+              {[
+                ["all", "All"],
+                ["favourites", "Favourites"],
+                ...types.map((type) => [type, typeNames[type] || type]),
+              ].map(([value, label]) => (
+                <Chip key={value} value={value} variant="light">
+                  {label}
+                </Chip>
+              ))}
+            </Group>
+          </Chip.Group>
+        )
+      }
+    />
   );
   const stack = (
     <>
@@ -379,119 +435,55 @@ function LoraControls({
         </OrderedItems>
       ) : (
         <Text size="sm" c="dimmed">
-          Choose LoRAs to add them here.
+          Choose LoRAs or a saved stack to add them here.
         </Text>
       )}
-      <LoraStacks
-        key={family}
-        family={family}
-        profileId={profile?.id || ""}
-        loras={input.loras}
-        onLoad={update}
-      />
     </>
+  );
+  const footer = (
+    <PickerFooter
+      start={
+        <SaveCurrent
+          noun="Stack"
+          disabled={!input.loras.length || !stacks.ready}
+          onSave={(name) => stacks.save(name, input.loras)}
+        />
+      }
+      end={
+        <Button variant="default" disabled={!input.loras.length} onClick={() => update([])}>
+          Clear LoRAs
+        </Button>
+      }
+      done={onDone && { label: "Use LoRAs", onClick: onDone }}
+    />
   );
   if (phone)
     return (
-      <Stack gap="sm">
+      <>
         <Stack gap="xs">{stack}</Stack>
-        {browser}
+        {header}
         {choices}
-      </Stack>
+        {footer}
+      </>
     );
   return (
-    <div className={classes.panel}>
-      <div className={classes.column}>
-        {browser}
-        <ScrollArea flex={1} offsetScrollbars="present">
-          {choices}
+    <Stack gap="sm">
+      <div className={classes.panel}>
+        <div className={classes.column}>
+          {header}
+          <ScrollArea flex={1} offsetScrollbars="present">
+            {choices}
+          </ScrollArea>
+        </div>
+        <ScrollArea
+          className={`${classes.column} ${classes.stackColumn}`}
+          offsetScrollbars="present"
+        >
+          <Stack gap="xs">{stack}</Stack>
         </ScrollArea>
       </div>
-      <ScrollArea className={`${classes.column} ${classes.stackColumn}`} offsetScrollbars="present">
-        <Stack gap="xs">{stack}</Stack>
-      </ScrollArea>
-    </div>
-  );
-}
-
-function LoraChoice({
-  title,
-  type,
-  preview,
-  selected,
-  favourite,
-  row,
-  onToggle,
-  onFavourite,
-}: {
-  title: string;
-  type: string;
-  preview?: string;
-  selected: boolean;
-  favourite: boolean;
-  row: boolean;
-  onToggle: () => void;
-  onFavourite: () => void;
-}) {
-  const [state, setState] = useState<"loaded" | "failed">();
-  return (
-    <div
-      className={classes.choice}
-      role="listitem"
-      data-row={row || undefined}
-      data-selected={selected || undefined}
-    >
-      <UnstyledButton
-        className={classes.toggle}
-        aria-label={title}
-        aria-pressed={selected}
-        onClick={onToggle}
-      >
-        <div className={classes.preview}>
-          <Layers size={row ? 18 : 22} aria-hidden />
-          {preview && (
-            <Image
-              className={classes.image}
-              src={preview}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              data-loaded={state === "loaded" || undefined}
-              data-failed={state === "failed" || undefined}
-              onLoad={() => setState("loaded")}
-              onError={() => setState("failed")}
-            />
-          )}
-          {selected && (
-            <span className={classes.check}>
-              <Check size={14} strokeWidth={3} aria-hidden />
-            </span>
-          )}
-        </div>
-        <div className={classes.text}>
-          <Text size="sm" fw={500} truncate>
-            {title}
-          </Text>
-          <Text size="xs" c="dimmed" truncate>
-            {type}
-          </Text>
-        </div>
-      </UnstyledButton>
-      <ActionIcon
-        className={classes.star}
-        variant={row ? "subtle" : "default"}
-        color="gray"
-        aria-label={`Favourite ${title}`}
-        aria-pressed={favourite}
-        onClick={onFavourite}
-      >
-        <Star
-          size={16}
-          color={favourite ? "var(--mantine-color-yellow-filled)" : "currentColor"}
-          fill={favourite ? "var(--mantine-color-yellow-filled)" : "none"}
-        />
-      </ActionIcon>
-    </div>
+      {footer}
+    </Stack>
   );
 }
 

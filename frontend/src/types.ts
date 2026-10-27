@@ -53,6 +53,8 @@ export interface ReferenceAsset {
   id: string;
   slot?: string;
   source?: "upload" | "generation";
+  /** The gallery item a generated reference came from. */
+  galleryItemId?: string;
   name: string;
   thumbnailUrl: string;
   url?: string;
