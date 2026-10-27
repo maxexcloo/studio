@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-10-27
+
 > Captions lead the viewer's Details, and their tags search the gallery
 
 ### Changed
@@ -2194,7 +2196,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.9...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/maxexcloo/studio/compare/v1.0.9...v1.0.10
 [1.0.9]: https://github.com/maxexcloo/studio/compare/v1.0.8...v1.0.9
 [1.0.8]: https://github.com/maxexcloo/studio/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/maxexcloo/studio/compare/v1.0.6...v1.0.7
