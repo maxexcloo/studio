@@ -62,6 +62,7 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/loras\/info$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],
+  ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
@@ -79,9 +80,10 @@ function mcpBearerRouteAllowed(method, routePath) {
 
 /**
  * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
- * guides and the export. Only an administrator's own MCP token reaches them, or MCP's loopback
- * credential for a gateway-linked administrator while Chat Gateway Admin Tools is on. Nothing here
- * deletes a file, replaces a download or touches a GPU.
+ * guides, Combine Backends and the export. Only an administrator's own MCP token reaches them, or
+ * MCP's loopback credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
+ * Nothing here deletes a model file, replaces a download or touches a GPU; Combine Backends backs up
+ * the profiles it replaces.
  */
 const routeId = "[\\w.-]+";
 const mcpAdminRoutes = [
@@ -108,6 +110,8 @@ const mcpAdminRoutes = [
   ["GET", new RegExp(`^/api/profiles/guides/${routeId}(?:/versions|/versions/\\d+)?$`)],
   ["PUT", new RegExp(`^/api/profiles/guides/${routeId}$`)],
   ["POST", new RegExp(`^/api/profiles/guides/${routeId}/(?:approve|revert)$`)],
+  ["GET", /^\/api\/profiles\/backends$/],
+  ["POST", /^\/api\/profiles\/backends\/combine$/],
   ["GET", /^\/api\/profiles\/export$/],
 ];
 

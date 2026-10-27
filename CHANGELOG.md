@@ -11,6 +11,15 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+
+- The CombineBackends admin MCP tool previews and applies Combine Backends from chat, for an administrator's own token or a gateway-linked administrator with Chat Gateway Admin Tools on.
+
+### Fixed
+
+- MCP Cancel no longer fails with HTTP 401 for gateway-linked and personal-token accounts.
+- MCP's usual profile pick prefers safe-for-work profiles by Studio's NSFW mark.
+
 ## [1.0.12] - 2026-10-27
 
 > Gallery versions and a new item menu, a full composer in the viewer, and Chat results with their details

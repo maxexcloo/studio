@@ -231,14 +231,14 @@ export function choicePool(profiles, { kind, tier, references = 0, firstFrame = 
   return tier ? pool : fastestTier(pool);
 }
 
-/** The pool's usual pick: the deployment default, then its family, then unrestricted, then catalogue order. */
+/** The pool’s usual pick: the deployment default, then its family, then safe for work, then catalogue order. */
 export function chooseProfile(profiles, { defaultId, ...options }) {
   const fallback = profiles.find((profile) => profile.id === defaultId);
   const score = (profile) =>
     [
       profile.id === defaultId,
       Boolean(fallback?.family) && profile.family === fallback.family,
-      !profile.restricted,
+      !profile.nsfw,
     ].reduce((total, value) => total * 2 + Number(value), 0);
   return choicePool(profiles, options).reduce((best, profile) =>
     score(profile) > score(best) ? profile : best,

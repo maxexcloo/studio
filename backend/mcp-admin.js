@@ -8,8 +8,8 @@
  * gateway-linked administrator while Chat Gateway Admin Tools is on.
  *
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
- * partial file stays for Resume), an update keeps the old file until the new one verifies, and no
- * tool deletes a file or touches a GPU.
+ * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
+ * Backends backs up the profiles it replaces, and no tool deletes a model file or touches a GPU.
  */
 import { z } from "zod";
 import { mcpJson } from "./mcp-media.js";
@@ -25,11 +25,12 @@ export const adminToolNames = Object.freeze([
   "CatalogueEdit",
   "Profiles",
   "ProfileEdit",
+  "CombineBackends",
   "Export",
   "Placement",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles and guides only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, and no tool deletes files or touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles and guides only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
@@ -790,6 +791,37 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         next = `${JSON.stringify(mergePatch(JSON.parse(now.text), patch), null, 2)}\n`;
       }
       return reply(await api("PUT", base, { text: next, baseHash: base_hash, draft }, signal));
+    },
+  );
+
+  tool(
+    server,
+    "CombineBackends",
+    "Combine Backends",
+    "Combine a model’s Radiance and ComfyUI profiles into one, as Settings › Profiles › Combine Backends does, only when asked. preview lists the pairs it could combine with what differs, and a hash; apply combines selections (radiance and comfyui ids from one preview pair, optionally name and backend, the default backend, comfyui unless given) with that hash, backing up both profiles first. A stale hash is refused: preview again.",
+    {
+      action: z.enum(["preview", "apply"]).default("preview"),
+      hash: z.string().trim().min(1).max(200).optional(),
+      selections: z
+        .array(
+          z.object({
+            radiance: id,
+            comfyui: id,
+            name: z.string().trim().min(1).max(200).optional(),
+            backend: z.enum(["radiance", "comfyui"]).optional(),
+          }),
+        )
+        .min(1)
+        .optional(),
+    },
+    async ({ action, hash, selections }, signal) => {
+      if (action === "preview")
+        return mcpJson(await api("GET", "/api/profiles/backends", undefined, signal));
+      if (!hash || !selections)
+        throw new Error("Pass hash and selections from CombineBackends preview.");
+      return mcpJson(
+        await api("POST", "/api/profiles/backends/combine", { hash, selections }, signal),
+      );
     },
   );
 
