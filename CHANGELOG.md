@@ -11,12 +11,13 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Steadier LibreChat calls and Grok's refusals in plain words
+> Grok Animate works again, with steadier LibreChat calls and Grok's refusals in plain words
 
 ### Fixed
 
 - Studio's MCP tools accept the argument shapes chat models send: Generate takes one prompt or a list, LoRA entries may carry extra fields, and Models trims LoRA lists to five instead of refusing them.
 - Grok refusals sent as plain text now show their reason too.
+- Animate on Grok works again: the first frame is sent as a JPEG instead of a PNG, which had pushed requests over the provider's length limit (HTTP 400, "length limit exceeded").
 
 ## [1.0.4] - 2026-10-27
 
