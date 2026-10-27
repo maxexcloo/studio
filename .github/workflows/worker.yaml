@@ -19,8 +19,8 @@ on:
 permissions:
   contents: read
 
-# Only pull requests cancel superseded runs: every main commit must publish its sha image, which a
-# release tag of that commit promotes.
+# Only pull requests cancel superseded runs: every main commit must publish its sha image, which
+# Studio's release job tags.
 concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: worker-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
