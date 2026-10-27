@@ -702,7 +702,7 @@ export function createAssistant(
           { role: "user", content: userContent(user, images, vision) },
         ],
         temperature: upsampler ? 0.3 : 0.7,
-        maxTokens: upsampler ? 1400 : 900,
+        maxTokens: upsampler ? 2400 : 2000,
         signal,
         onDelta,
       });
@@ -760,7 +760,7 @@ export function createAssistant(
           { role: "user", content: `Positive prompt: ${one(prompt, maxPromptCharacters)}` },
         ],
         temperature: 0.3,
-        maxTokens: 200,
+        maxTokens: 1200,
         signal,
       });
       const written = cleanPrompt(reply.text, 600).replace(/^negative(?: prompt)?\s*:\s*/i, "");
@@ -821,7 +821,7 @@ export function createAssistant(
           { role: "user", content: `Prompt: ${one(prompt, maxPromptCharacters)}` },
         ],
         temperature: 0.2,
-        maxTokens: 500,
+        maxTokens: 1500,
         signal,
       });
       const parsed = replyJson(reply.text);
@@ -906,7 +906,7 @@ export function createAssistant(
           { role: "user", content: userContent(text, pictures, vision) },
         ],
         temperature: 0.4,
-        maxTokens: 900,
+        maxTokens: 2000,
         signal,
       });
       const parsed = replyJson(reply.text);
@@ -950,7 +950,7 @@ export function createAssistant(
         { role: "user", content: userContent("Caption this image.", [image], true) },
       ],
       temperature: 0.2,
-      maxTokens: 500,
+      maxTokens: 1500,
       signal,
     });
     const parsed = replyJson(reply.text);
@@ -1067,7 +1067,7 @@ export function createAssistant(
             { role: "user", content: one(sourceText, 12000) },
           ],
           temperature: 0.1,
-          maxTokens: 400,
+          maxTokens: 1500,
           signal,
         });
         read = replyJson(reply.text) || {};
