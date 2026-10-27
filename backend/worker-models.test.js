@@ -21,7 +21,9 @@ for (const key of [
   "all_proxy",
 ])
   delete process.env[key];
-const { setComfyUrl } = await import("./comfy.js");
+const { saveWorkers } = await import("./workers.js");
+const useWorker = (url) =>
+  saveWorkers([{ id: "primary", url, capabilities: ["image", "video", "upscale", "models"] }]);
 const worker = await import("./worker-models.js");
 const downloads = await import("./model-downloads.js");
 
@@ -80,7 +82,7 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
     server.close();
   });
   const url = `http://127.0.0.1:${server.address().port}`;
-  setComfyUrl(url);
+  useWorker(url);
   assert.equal(
     worker.remoteModelsEnabled(),
     true,
@@ -168,7 +170,7 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
   holdInventory = true;
   const pending = worker.refreshWorkerModels({ force: true });
   while (!releaseInventory) await new Promise((resolve) => setTimeout(resolve, 1));
-  setComfyUrl("http://127.0.0.1:1");
+  useWorker("http://127.0.0.1:1");
   releaseInventory();
   await pending;
   assert.equal(

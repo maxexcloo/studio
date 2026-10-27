@@ -11,7 +11,7 @@ export async function civitaiRequest(
   url,
   init = {},
   {
-    servers = process.env.CIVITAI_DNS_SERVERS,
+    servers = process.env.STUDIO_CIVITAI_DNS_SERVERS,
     request = https.request,
     resolver = new Resolver(),
   } = {},

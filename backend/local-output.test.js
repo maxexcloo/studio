@@ -9,7 +9,7 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 fs.mkdirSync(path.join(outputDir, "run"), { recursive: true });
 fs.writeFileSync(path.join(outputDir, "run", "a.png"), "png");
 fs.writeFileSync(path.join(path.dirname(outputDir), "outside.png"), "secret");
-process.env.COMFY_OUTPUT_DIR = outputDir;
+process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 const { localOutputFile } = await import("./comfy.js");
 
 test("outputs open from the output folder while ComfyUI is down", () => {

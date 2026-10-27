@@ -1,5 +1,5 @@
 import https from "node:https";
-import { listenWithFallback } from "./launch.js";
+import { listenOnPort } from "./launch.js";
 import { listensBeyondThisComputer } from "./client-trust.js";
 import { httpsPort, startupTls, watchCertificate } from "./tls.js";
 
@@ -28,27 +28,21 @@ let httpsListening = false;
 let httpsProblem = "";
 
 /**
- * Starts the servers. Plain HTTP moves to the next free port when another
- * program has the one asked for (launch.js; never onto the HTTPS port), and
- * `onListening` runs once it is up with the port it got. A failure to bind it
- * is fatal (`onFatal`); a failure to bind HTTPS only costs HTTPS.
+ * Starts the servers. `onListening` runs once plain HTTP is up with the port
+ * it got (launch.js). A failure to bind it is fatal (`onFatal`); a failure to
+ * bind HTTPS only costs HTTPS.
  */
-export async function startServers(app, { host, port, fallback = true, onListening, onFatal }) {
+export async function startServers(app, { host, port, onListening, onFatal }) {
   const plan = listenPlan({ host });
   let listening;
   try {
-    listening = await listenWithFallback(app, {
-      port,
-      host: plan.httpHost,
-      fallback,
-      skip: plan.httpsHost ? [httpsPort] : [],
-    });
+    listening = await listenOnPort(app, { port, host: plan.httpHost });
   } catch (error) {
     onFatal(error);
     return null;
   }
   const servers = [listening.server];
-  onListening({ plan, port: listening.port, moved: listening.moved });
+  onListening({ plan, port: listening.port });
   httpsProblem = plan.tlsProblem;
   if (plan.tlsProblem)
     console.warn(

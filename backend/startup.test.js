@@ -25,7 +25,13 @@ for (const development of [false, true]) {
           STUDIO_DEMO: "1",
           HOST: "127.0.0.1",
           PORT: "0",
-          COMFY_URL: "http://127.0.0.1:9",
+          STUDIO_WORKERS: JSON.stringify([
+            {
+              id: "primary",
+              url: "http://127.0.0.1:9",
+              capabilities: ["image", "video", "upscale", "models"],
+            },
+          ]),
           npm_lifecycle_event: development ? "dev" : "",
         },
         stdio: ["ignore", "pipe", "pipe", "ipc"],

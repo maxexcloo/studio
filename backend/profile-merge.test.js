@@ -6,7 +6,13 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-profile-merge-"));
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.COMFY_URL = "http://127.0.0.1:9";
+process.env.STUDIO_WORKERS = JSON.stringify([
+  {
+    id: "primary",
+    url: "http://127.0.0.1:9",
+    capabilities: ["image", "video", "upscale", "models"],
+  },
+]);
 const { duplicateProfiles, mergeDuplicateProfiles } = await import("./profile-merge.js");
 const { canonicalProfileId, createProfileStore, guideStore, profileStore } =
   await import("./profile-store.js");

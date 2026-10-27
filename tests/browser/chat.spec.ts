@@ -102,7 +102,10 @@ async function savedChat(page: Page) {
 async function chats(page: Page, isMobile: boolean) {
   if (!isMobile) return page.getByRole("complementary", { name: "Chats", exact: true });
   await page.getByRole("button", { name: "Open Status", exact: true }).click();
-  return page.getByRole("dialog", { name: "Chats", exact: true });
+  const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+  // A press during the slide-in can release over another row, which focuses without clicking.
+  await expect(drawer).toBeInViewport({ ratio: 1 });
+  return drawer;
 }
 
 test("Chat cards show their request, settings and every output beneath the reply", async ({
@@ -129,7 +132,8 @@ test("Chat cards show their request, settings and every output beneath the reply
   await edited.getByRole("button", { name: "Close Editor", exact: true }).click();
   await expect(prompt).toBeHidden();
   await expect(edited.getByText("A watercolour bird", { exact: true })).toBeVisible();
-  expect(warnings.filter((text) => /key/i.test(text))).toEqual([]);
+  // React's list-key warning; WebKit also warns about the viewport's unsupported argument "key".
+  expect(warnings.filter((text) => /unique "key" prop/.test(text))).toEqual([]);
 });
 
 test("Chats can be renamed and deleted with an opt-in results checklist", async ({

@@ -2,7 +2,7 @@
 
 Studio is a media workspace for generating images and video, refining results and continuing an idea through saved visual sessions. It connects to ComfyUI and cloud providers, with account isolation, model imports and native MCP tools.
 
-The rewrite uses React, Mantine and a persistent generation queue. Images and Videos share a bottom composer; Chat combines streamed conversation with generation inputs, results and saved iterations. See [the working backlog](todo.md) for verification still required before replacing the live application.
+The rewrite uses React, Mantine and a persistent generation queue. Images and Videos share a bottom composer; Chat combines streamed conversation with generation inputs, results and saved iterations.
 
 ## Development
 

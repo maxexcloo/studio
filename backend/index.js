@@ -1,4 +1,4 @@
-// First: the settings (.env and old HEISS_* names, env-names.js), so every module below reads them.
+// First: the settings (.env), so every module below reads them.
 import "./env.js";
 // Then: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
@@ -124,7 +124,6 @@ import {
   port,
   root,
   setComfyFolderPaths,
-  setComfyUrl,
   setListeningPort,
 } from "./comfy.js";
 import { canAdmin, clientOf } from "./access.js";
@@ -135,11 +134,10 @@ import { mcpOutputPath } from "./mcp-media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
 import { httpsPort, startupTls, tlsHostNames } from "./tls.js";
-import { legacyEnvInUse, removeLocalEnvValue } from "./env.js";
+import { removeLocalEnvValue } from "./env.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { currentEnvName, legacyEnvNotice, shadowedLegacyEnvNames } from "./env-names.js";
 import { retireFeatureSwitches } from "./feature-options.js";
 import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./models.js";
 import { lorasEnabled, presetsEnabled } from "./features.js";
@@ -207,7 +205,6 @@ import { galleryStats, profileStats } from "./stats.js";
 import { describeHardware } from "./hardware.js";
 import { familySetupPlan, guidedSetups } from "./family-setup.js";
 import { setDismissed } from "./dismissals.js";
-import { comfySearchEnabled, findComfy, findComfyNow, nearbyAddresses } from "./comfy-finder.js";
 import {
   loadWorkflowPreferences,
   previewWorkflowImport,
@@ -822,9 +819,6 @@ const serverStartedAt = Date.now();
 // Read once listening: a second copy that finds this one running must not take over its record.
 let previousExit = null;
 function beginSession() {
-  // One line for old HEISS_* names still in use; they keep working until the deployment renames them.
-  const legacyNotice = legacyEnvNotice(legacyEnvInUse, shadowedLegacyEnvNames(process.env));
-  if (legacyNotice) console.warn(logWarning(legacyNotice));
   previousExit = startSession({ now: serverStartedAt });
   if (previousExit)
     logWarning("The last run stopped unexpectedly", {
@@ -842,7 +836,6 @@ app.get("/api/health", async (req, res) => {
     res.status(503).json({
       ok: false,
       noWorkers: true,
-      comfySearch: false,
       thisComputer: canAdmin(req),
       atComputer: clientOf(req).thisComputer,
       error: noWorkerMessage("image"),
@@ -857,7 +850,6 @@ app.get("/api/health", async (req, res) => {
     res.json({
       ok: true,
       ...(req.studioAccount && !canAdmin(req) ? {} : { comfyUrl }),
-      comfySearch: comfySearchEnabled(),
       startedAt: serverStartedAt,
       thisComputer: canAdmin(req),
       atComputer: clientOf(req).thisComputer,
@@ -866,7 +858,6 @@ app.get("/api/health", async (req, res) => {
   } catch (error) {
     res.status(503).json({
       ok: false,
-      comfySearch: comfySearchEnabled(),
       thisComputer: canAdmin(req),
       atComputer: clientOf(req).thisComputer,
       restarting: comfyRestarting(),
@@ -876,18 +867,6 @@ app.get("/api/health", async (req, res) => {
     });
   }
 });
-
-/** Switch to an address where ComfyUI turned up by itself, and remember it like a saved one. */
-function adoptFoundComfy(found) {
-  try {
-    setComfyUrl(found);
-  } catch {
-    return false; // .env could not be written; the saved address stays.
-  }
-  contextCaches.delete(defaultWorkerId());
-  console.log(`    Found ComfyUI at ${found}. Using it from now on.\n`);
-  return true;
-}
 
 // What the last answer said, for the status while ComfyUI is busy.
 let lastComfyAnswer = { url: "", version: "", device: "" };
@@ -906,14 +885,7 @@ function withoutBackendAddresses(status) {
     /:\/\/|\d+\.\d+\.\d+\.\d+|localhost/i.test(value.error)
       ? { ...value, error: "Not connected" }
       : value;
-  const {
-    url: _url,
-    nearby: _nearby,
-    found: _found,
-    backends,
-    workers,
-    ...rest
-  } = plain(status) || {};
+  const { url: _url, backends, workers, ...rest } = plain(status) || {};
   return {
     ...rest,
     ...(backends
@@ -1069,7 +1041,6 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
       latencyMs,
       version,
       device,
-      ...(res.locals.foundComfy ? { found: res.locals.foundComfy } : {}),
     });
   } catch (error) {
     // Demo mode makes placeholder images without ComfyUI, so to the app it is connected.
@@ -1099,17 +1070,6 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
     }
     // A timeout that outlasted the grace counts too: this poll is the app asking whether ComfyUI is there.
     noteComfyFetchError(isComfyTimeout(error) ? new Error("timed out") : error);
-    // Refused: on this computer it may well be on the other usual port (Desktop uses 8000).
-    // Looking for and adopting another ComfyUI changes the studio: administrators only.
-    const mayDiscover = !res.locals.ordinaryStatus;
-    const found =
-      !mayDiscover || comfyRestarting() || res.locals.foundComfy || isComfyTimeout(error)
-        ? ""
-        : await findComfyNow(comfyUrl);
-    if (found && adoptFoundComfy(found)) {
-      res.locals.foundComfy = found;
-      return comfyStatus(req, res);
-    }
     const latencyMs = Math.round(performance.now() - startedAt);
     const message = isComfyTimeout(error)
       ? "Not answering for over a minute"
@@ -1120,7 +1080,6 @@ app.get("/api/comfy/status", async function comfyStatus(req, res) {
       url: comfyUrl,
       latencyMs,
       ...restartFields(),
-      nearby: comfySearchEnabled() ? nearbyAddresses(comfyUrl) : [],
       error: `${message}${demoMode ? " (Demo Mode Active)" : ""}`,
     });
   } finally {
@@ -2238,8 +2197,7 @@ app.get("/api/settings/deployment", async (req, res) => {
 
 app.post("/api/settings/deployment", (req, res) => {
   if (!requireAdmin(req, res)) return;
-  // An old HEISS_* key from a page loaded before the rename names the same setting.
-  const key = currentEnvName(String(req.body?.key || ""));
+  const key = String(req.body?.key || "");
   const value = req.body?.value;
   try {
     if (isCatalogueFlag(key)) {
@@ -3945,13 +3903,10 @@ scheduleTrashPurge();
 // Studio media's thumbnails and posters are built ahead of their first view.
 if (mediaStorageEnabled) startMediaWarmup();
 
-// One port, always: under `npm run dev*` Vite forwards to this exact port, and in a
-// container a quietly moved port is one nothing publishes or health-checks.
 const dev = /^dev/.test(process.env.npm_lifecycle_event || "");
 const serverStartup = startServers(app, {
   host,
   port,
-  fallback: false,
   onFatal(error) {
     let message = `\n  Studio couldn’t start: ${error.message}\n`;
     // Where the running copy answered: this computer, or the one address HOST names.
@@ -3999,7 +3954,7 @@ const serverStartup = startServers(app, {
               .map((entry) => `http://${entry.address}:${pagePort}`);
         for (const address of addresses) console.log(`    ➜  Network   ${address}`);
       }
-      // No workers is a setup of its own: say so, and look for nothing.
+      // No workers is a setup of its own: say so.
       if (!listWorkers().length) {
         if (!demoMode)
           console.log("    No workers are set up yet. Add one in Settings › Workers.\n");
@@ -4012,8 +3967,7 @@ const serverStartup = startServers(app, {
         (response) => response.ok,
         () => false,
       );
-      const found = answering || demoMode ? "" : await findComfy({ current: comfyUrl });
-      if (!(found && adoptFoundComfy(found)) && !answering && !demoMode)
+      if (!answering && !demoMode)
         console.log(
           `    ComfyUI isn’t answering at ${comfyUrl} yet. The studio connects once it starts.\n`,
         );

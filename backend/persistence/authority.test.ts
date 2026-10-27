@@ -24,7 +24,13 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_CONFIG_DIR: "",
         STUDIO_MULTI_USER: "",
-        COMFY_URL: "http://127.0.0.1:9",
+        STUDIO_WORKERS: JSON.stringify([
+          {
+            id: "primary",
+            url: "http://127.0.0.1:9",
+            capabilities: ["image", "video", "upscale", "models"],
+          },
+        ]),
       },
     });
   run(`
