@@ -22,8 +22,14 @@ export interface QueueOrigin {
   queueSet?: string;
   dream?: DreamOrigin;
 }
+/** `cleared` takes a failed job out of the queue panel; its chat card and record stay. */
 export type OwnedJob = QueueJob &
-  QueueOrigin & { ownerId: string; resource: string; cancelRequested?: boolean };
+  QueueOrigin & {
+    ownerId: string;
+    resource: string;
+    cancelRequested?: boolean;
+    cleared?: boolean;
+  };
 interface UserPreset {
   id: string;
   title: string;
@@ -352,6 +358,7 @@ export function publicJob({
   ownerId: _ownerId,
   resource: _resource,
   cancelRequested: _cancelRequested,
+  cleared: _cleared,
   priority: _priority,
   queueSet: _queueSet,
   dream: _dream,

@@ -28,24 +28,21 @@ export function SessionsPage() {
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <ChatWorkspace>
-      {phone ? (
-        // Phones have no Chats sidebar, so the empty state says where the list is.
-        <EmptyState
-          fill
-          title="No Chat Selected"
-          action={
+      <EmptyState
+        fill
+        action={
+          // Phones have no Chats sidebar, so the empty state offers New Chat.
+          phone && (
             <NewChatButton
               onClick={() =>
                 document.querySelector<HTMLElement>('textarea[aria-label="Message"]')?.focus()
               }
             />
-          }
-        >
-          Your Chats are behind the status button at the top left.
-        </EmptyState>
-      ) : (
-        <EmptyState fill>No Chat Selected</EmptyState>
-      )}
+          )
+        }
+      >
+        No Chat Selected
+      </EmptyState>
       <ChatDock />
     </ChatWorkspace>
   );
