@@ -3,10 +3,12 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test, { type TestContext } from "node:test";
 import express from "express";
-import { createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
+import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
+import type { userContent } from "./model-content.ts";
 import type { TasteRecord, TasteWriter } from "./taste.ts";
 
-type Message = { role: string; content: string };
+/** A message as the model got it: its text, and how many images came with it. */
+type Message = { role: string; content: string; images: number };
 function fixture(
   options: {
     reply?: (system: string) => string;
@@ -16,11 +18,20 @@ function fixture(
 ) {
   const calls: Message[][] = [];
   let clock = 0;
-  const model: TasteWriter = {
+  const model: TasteWriter<ReturnType<typeof userContent>> = {
     settings: () => ({ model: "text" }),
     chat: async ({ messages }) => {
-      calls.push(messages);
-      return { text: (options.reply || replies)(messages[0].content) };
+      const seen = messages.map(({ role, content }) =>
+        typeof content === "string"
+          ? { role, content, images: 0 }
+          : {
+              role,
+              content: content.map((part) => (part.type === "text" ? part.text : "")).join(""),
+              images: content.filter((part) => part.type === "image_url").length,
+            },
+      );
+      calls.push(seen);
+      return { text: (options.reply || replies)(seen[0].content) };
     },
   };
   const records: Record<string, Partial<TasteRecord>> = {
@@ -56,6 +67,7 @@ function fixture(
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
     item: (owner, jobId) => items[`${owner}:${jobId}`],
+    save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     now: () => clock,
   });
   return {
@@ -154,6 +166,56 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
     reason: "Next steps are offered for finished images.",
   });
   assert.equal(calls.length, 1);
+});
+
+test("an image's next steps are kept with it, and More asks for different ones", async () => {
+  const { calls, suggestions, advance } = fixture();
+  const ask = (fresh?: boolean) =>
+    suggestions.suggest("alice", { surface: "viewer", jobId: "job-a", fresh });
+  const first = await ask();
+  advance(11 * 60_000);
+  assert.deepEqual(await ask(), first);
+  assert.equal(calls.length, 1);
+  await ask(true);
+  assert.equal(calls.length, 2);
+  assert.match(
+    calls[1][1].content,
+    /Already suggested \(offer different ones\): Warmer Light Please Now, Closer Crop/,
+  );
+});
+
+test("idle work writes next steps ahead of time, from the image where the model reads it", async () => {
+  const { calls, suggestions } = fixture();
+  let vision = true;
+  const items = [
+    { id: "a", jobId: "job-a", ownerId: "alice", type: "image", status: "done", prompt: "A" },
+    { id: "b", jobId: "job-b", ownerId: "alice", type: "image", status: "done", prompt: "B" },
+    { id: "v", jobId: "job-v", ownerId: "alice", type: "video", status: "done", prompt: "V" },
+  ];
+  let clock = 0;
+  const work = createNextStepWork({
+    suggestions,
+    writer: { supportsVision: async () => vision },
+    idle: () => true,
+    allowed: () => true,
+    items: () => items,
+    visible: () => true,
+    image: async () => ({ mime: "image/jpeg", data: "AAAA" }),
+    now: () => clock,
+    log: { info: () => {} },
+  });
+  assert.equal(await work.tick(), "done");
+  assert.equal(calls[0][1].images, 1);
+  assert.match(calls[0][0].content, /what the attached image shows/);
+  assert.equal((items[0] as { nextSteps?: { steps: unknown[] } }).nextSteps?.steps.length, 2);
+  vision = false;
+  clock += 10_000;
+  assert.equal(await work.tick(), "done");
+  assert.equal(calls[1][1].images, 0);
+  assert.match(calls[1][1].content, /Prompt: B/);
+  clock += 10_000;
+  assert.equal(await work.tick(), "none");
+  assert.equal(calls.length, 2);
 });
 
 test("chat context is one paragraph from the taste profile", async () => {

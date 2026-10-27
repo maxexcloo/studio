@@ -14,10 +14,14 @@ export const promptIdeasQuery = (kind: MediaKind) =>
     ...cached,
   });
 
+/** A finished image's next steps; `fresh` asks for different ones than those saved with it. */
+export const askNextSteps = (jobId: string, fresh = false) =>
+  post<Suggestions<NextStep>>("/api/suggestions", { surface: "viewer", jobId, fresh });
+
 /** Next-step chips for a finished image in the viewer. */
 export const nextStepsQuery = (jobId: string) =>
   queryOptions({
     queryKey: ["suggestions", "viewer", jobId],
-    queryFn: () => post<Suggestions<NextStep>>("/api/suggestions", { surface: "viewer", jobId }),
+    queryFn: () => askNextSteps(jobId),
     ...cached,
   });
