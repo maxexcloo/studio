@@ -47,8 +47,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const status = useAccount();
   const [username, setUsername] = useState(""),
     [password, setPassword] = useState(""),
-    [setupToken, setSetupToken] = useState(""),
-    [displayName, setDisplayName] = useState("");
+    [setupToken, setSetupToken] = useState("");
   const [outcome] = useState(
     () =>
       ({
@@ -74,7 +73,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
       post(bootstrap ? "/api/accounts/bootstrap" : "/api/accounts/sign-in", {
         username,
         password,
-        ...(bootstrap ? { setupToken, displayName } : {}),
+        ...(bootstrap ? { setupToken } : {}),
       }),
     onSuccess: async () => {
       setPassword("");
@@ -144,15 +143,6 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     value={username}
                     onChange={(e) => setUsername(e.currentTarget.value)}
                   />
-                  {bootstrap && (
-                    <TextInput
-                      label="Display Name"
-                      autoComplete="name"
-                      required
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.currentTarget.value)}
-                    />
-                  )}
                   <PasswordInput
                     label="Password"
                     autoComplete={bootstrap ? "new-password" : "current-password"}

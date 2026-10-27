@@ -61,7 +61,10 @@ function readStore() {
     cache = {
       ...emptyStore(),
       ...saved,
-      accounts: Array.isArray(saved?.accounts) ? saved.accounts : [],
+      // An account is named by its email; a display name older stores kept is dropped on the next save.
+      accounts: Array.isArray(saved?.accounts)
+        ? saved.accounts.map(({ displayName: _displayName, ...account }) => account)
+        : [],
       profiles:
         saved?.profiles && typeof saved.profiles === "object" && !Array.isArray(saved.profiles)
           ? saved.profiles
@@ -105,21 +108,9 @@ export function accountStoreSnapshot() {
   return {
     version: store.version,
     accounts: store.accounts.map(
-      ({
+      ({ id, username, role, accessProfileId, disabled, createdAt, identity, pending, oidc }) => ({
         id,
         username,
-        displayName,
-        role,
-        accessProfileId,
-        disabled,
-        createdAt,
-        identity,
-        pending,
-        oidc,
-      }) => ({
-        id,
-        username,
-        displayName,
         role,
         accessProfileId,
         disabled,
@@ -288,7 +279,6 @@ export function assignAccessProfile(accountId, profileId) {
 
 export async function createLocalAccount({
   username,
-  displayName = "",
   password,
   role = accountRoles.user,
   accessProfileId = "",
@@ -317,9 +307,6 @@ export async function createLocalAccount({
   const account = {
     id: crypto.randomBytes(18).toString("base64url"),
     username: String(username).trim().normalize("NFKC"),
-    displayName: String(displayName || username)
-      .trim()
-      .slice(0, 80),
     role,
     ...(role === accountRoles.user ? { accessProfileId } : {}),
     ...(identity ? { identity } : {}),
@@ -438,7 +425,6 @@ export function ownAccount(accountId) {
   return {
     id: account.id,
     username: account.username,
-    displayName: account.displayName || account.username,
     role: account.role,
     signInLinked: Boolean(account.oidc),
     provider: provider ? "pocket-id" : "local",
@@ -467,16 +453,14 @@ async function passwordMatches(account, password) {
 export const wrongCurrentPassword = "Your current password is incorrect.";
 
 /** Everything about a change to one's own account that can be checked without the current password. */
-export function validateOwnAccountChange(accountId, { displayName, username, newPassword } = {}) {
+export function validateOwnAccountChange(accountId, { username, newPassword } = {}) {
   const found = readStore().accounts.find(
     (item) => item.id === accountId && item.disabled !== true,
   );
   if (!found) throw new Error("That account was not found.");
   const provider = found.identity?.provider === "pocket-id";
-  const nextName = typeof displayName === "string" ? displayName.trim().slice(0, 80) : undefined;
   const nextUsername = typeof username === "string" ? username.trim().normalize("NFKC") : undefined;
   const nextPassword = typeof newPassword === "string" && newPassword ? newPassword : undefined;
-  if (nextName !== undefined && !nextName) throw new Error("Enter a display name.");
   const emailChanges =
     nextUsername !== undefined && usernameKey(nextUsername) !== usernameKey(found.username);
   const needsPassword = emailChanges || nextPassword !== undefined;
@@ -498,16 +482,16 @@ export function validateOwnAccountChange(accountId, { displayName, username, new
     throw new Error("An account with that email already exists.");
   if (nextPassword !== undefined && nextPassword.length < 8)
     throw new Error("Use a new password of at least 8 characters.");
-  return { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword };
+  return { found, nextUsername, nextPassword, emailChanges, needsPassword };
 }
 
 /**
- * Changes an account's own display name, email (its sign-in name) or password.
+ * Changes an account's own email (its name and sign-in) or password.
  * The email and password need the current password; a new password ends every
  * other browser session but keeps the one making the change.
  */
 export async function updateOwnAccount(accountId, changes = {}, { keepSessionToken = "" } = {}) {
-  const { found, nextName, nextUsername, nextPassword, emailChanges, needsPassword } =
+  const { found, nextUsername, nextPassword, emailChanges, needsPassword } =
     validateOwnAccountChange(accountId, changes);
   if (needsPassword && !(await passwordMatches(found, changes.currentPassword)))
     throw new Error(wrongCurrentPassword);
@@ -531,7 +515,6 @@ export async function updateOwnAccount(accountId, changes = {}, { keepSessionTok
     )
   )
     throw new Error("An account with that email already exists.");
-  if (nextName !== undefined) account.displayName = nextName;
   if (emailChanges) account.username = nextUsername;
   if (hashed) {
     account.password = hashed;
@@ -597,7 +580,6 @@ function linkGatewayEmail(store, identity, email) {
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username: String(email).trim().normalize("NFKC"),
-      displayName: String(email).trim().slice(0, 80),
       role: accountRoles.user,
       ...(startingProfileId() ? { accessProfileId: startingProfileId() } : { pending: true }),
       identity: { provider: "gateway" },
@@ -700,7 +682,6 @@ export function signInWithOidcIdentity({
   subject,
   email = "",
   emailVerified = false,
-  name = "",
 } = {}) {
   if (!issuer || !subject) throw new Error("The sign-in identity is incomplete.");
   const store = readStore();
@@ -732,7 +713,6 @@ export function signInWithOidcIdentity({
     account = {
       id: crypto.randomBytes(18).toString("base64url"),
       username,
-      displayName: (name || username).slice(0, 80),
       role: accountRoles.user,
       identity: { provider: "pocket-id" },
       oidc: { issuer, subject, linkedAt: new Date().toISOString() },

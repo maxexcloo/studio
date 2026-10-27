@@ -15,18 +15,16 @@ import {
   Select,
   SimpleGrid,
   Stack,
-  Table,
   Text,
   TextInput,
   Tooltip,
-  VisuallyHidden,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ellipsis, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { api, post } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
+import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
@@ -159,7 +157,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
   const form = useForm({
     initialValues: {
       username: "",
-      displayName: "",
       password: "",
       accessProfileId: admin.defaultAccessProfileId,
     },
@@ -188,12 +185,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
             autoComplete="off"
             required
             {...form.getInputProps("username")}
-          />
-          <TextInput
-            label="Display Name"
-            autoComplete="off"
-            required
-            {...form.getInputProps("displayName")}
           />
           <PasswordInput
             label="Initial Password"
@@ -274,7 +265,7 @@ function useAdministration() {
   return { admin, refresh };
 }
 const groupFeature = (on: boolean | undefined, label: string) => (
-  <Badge miw="max-content" variant="light" size="sm" color={on ? "green" : "gray"}>
+  <Badge miw="max-content" variant="light" color={on ? "green" : "gray"}>
     {label} {on ? "On" : "Off"}
   </Badge>
 );
@@ -306,62 +297,46 @@ export function GroupsAdmin() {
           </Tooltip>
         }
       />
-      {data.accessProfiles.length ? (
-        <Table aria-label="Access Groups" verticalSpacing="xs" highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Group</Table.Th>
-              <Table.Th visibleFrom="sm">Permissions</Table.Th>
-              <Table.Th w={44}>
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {data.accessProfiles.map((group) => (
-              <Table.Tr key={group.id}>
-                <Table.Td>
-                  <Text size="sm" fw={500}>
-                    {group.name}
-                  </Text>
-                  <Text size="xs" c="dimmed">
-                    {group.allModels
-                      ? "All local models"
-                      : `${group.generationProfiles.length} local ${group.generationProfiles.length === 1 ? "model" : "models"}`}{" "}
-                    · {users(group)} {users(group) === 1 ? "user" : "users"}
-                  </Text>
-                </Table.Td>
-                <Table.Td visibleFrom="sm">
-                  <Group gap={4}>
-                    {groupFeature(group.features.cloudModels, "Cloud Models")}
-                    {groupFeature(group.features.nsfwModels, "NSFW Models")}
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Menu position="bottom-end">
-                    <Menu.Target>
-                      <ActionIcon
-                        variant="subtle"
-                        color="gray"
-                        aria-label={`Actions for ${group.name}`}
-                      >
-                        <Ellipsis size={18} />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item onClick={() => setEditing(group)}>Edit Group</Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      ) : (
-        <EmptyState title="No Groups">
-          Create a group to choose which models and features its users may use.
-        </EmptyState>
-      )}
+      <DataTable
+        label="Access Groups"
+        rows={data.accessProfiles}
+        rowKey={(group) => group.id}
+        rowName={(group) => group.name}
+        initialSort={{ key: "group", descending: false }}
+        empty="No Groups"
+        columns={[
+          {
+            key: "group",
+            header: "Group",
+            sortValue: (group) => group.name,
+            cell: (group) => (
+              <>
+                <Text size="sm" fw={500}>
+                  {group.name}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {group.allModels
+                    ? "All local models"
+                    : `${group.generationProfiles.length} local ${group.generationProfiles.length === 1 ? "model" : "models"}`}{" "}
+                  · {users(group)} {users(group) === 1 ? "user" : "users"}
+                </Text>
+              </>
+            ),
+          },
+          {
+            key: "permissions",
+            header: "Permissions",
+            visibleFrom: "sm",
+            cell: (group) => (
+              <Group gap={4}>
+                {groupFeature(group.features.cloudModels, "Cloud Models")}
+                {groupFeature(group.features.nsfwModels, "NSFW Models")}
+              </Group>
+            ),
+          },
+        ]}
+        rowActions={(group) => <Menu.Item onClick={() => setEditing(group)}>Edit Group</Menu.Item>}
+      />
       <Modal
         opened={!!editing}
         onClose={() => setEditing(null)}
@@ -411,129 +386,100 @@ export function UsersAdmin() {
   if (admin.isPending) return <LoadingState label="Loading Users" />;
   if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
   const data = admin.data;
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const accounts = data.accounts.filter((account) =>
-    terms.every((term) =>
-      `${account.displayName} ${account.username}`.toLowerCase().includes(term),
-    ),
-  );
+  const groupOf = (account: Account) =>
+    data.accessProfiles.find((group) => group.id === account.accessProfileId);
   return (
     <Stack gap="lg">
       <SectionToolbar label="Users" query={query} onQueryChange={setQuery} />
-      {accounts.length ? (
-        <Table aria-label="User Accounts" verticalSpacing="xs" highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Account</Table.Th>
-              <Table.Th>Access Group</Table.Th>
-              <Table.Th w={44}>
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {accounts.map((account) => {
-              const name = account.displayName || account.username;
-              const group = data.accessProfiles.find(
-                (group) => group.id === account.accessProfileId,
-              );
-              return (
-                <Table.Tr key={account.id} aria-label={`Account ${name}`}>
-                  <Table.Td maw={0} w="100%">
-                    <Text size="sm" fw={500} truncate>
-                      {name}
-                    </Text>
-                    <Text size="xs" c="dimmed" truncate>
-                      {account.username}
-                    </Text>
-                    <Group gap={4} mt={4}>
-                      {(account.disabled ||
-                        account.pending ||
-                        account.role === "administrator") && (
-                        <Badge
-                          miw="max-content"
-                          size="sm"
-                          variant="light"
-                          color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}
-                        >
-                          {account.disabled
-                            ? "Disabled"
-                            : account.pending
-                              ? "Awaiting Approval"
-                              : "Administrator"}
-                        </Badge>
-                      )}
-                      {account.signInLinked && (
-                        <Badge miw="max-content" size="sm" variant="light" color="gray">
-                          Single Sign-On
-                        </Badge>
-                      )}
-                      {account.role === "user" && group && (
-                        <>
-                          {groupFeature(group.features.cloudModels, "Cloud Models")}
-                          {groupFeature(group.features.nsfwModels, "NSFW Models")}
-                        </>
-                      )}
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    {account.role === "user" ? (
-                      <Select
-                        aria-label={`Access Group for ${name}`}
-                        value={account.accessProfileId || null}
-                        placeholder="Choose Group"
-                        data={data.accessProfiles.map((group) => ({
-                          value: group.id,
-                          label: group.name,
-                        }))}
-                        allowDeselect={false}
-                        size="sm"
-                        w={{ base: 140, sm: 200 }}
-                        onChange={(accessProfileId) =>
-                          change.mutate({ id: account.id, patch: { accessProfileId } })
-                        }
-                      />
-                    ) : (
-                      <Text size="sm" c="dimmed">
-                        All Groups
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Menu position="bottom-end">
-                      <Menu.Target>
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          aria-label={`Actions for ${name}`}
-                        >
-                          <Ellipsis size={18} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item
-                          color={account.disabled ? undefined : "red"}
-                          disabled={change.isPending}
-                          onClick={() =>
-                            change.mutate({
-                              id: account.id,
-                              patch: { disabled: !account.disabled },
-                            })
-                          }
-                        >
-                          {account.disabled ? "Enable Account" : "Disable Account"}
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Table.Td>
-                </Table.Tr>
-              );
-            })}
-          </Table.Tbody>
-        </Table>
-      ) : (
-        <EmptyState title="No Matching Users">Try another name or email.</EmptyState>
-      )}
+      <DataTable
+        label="User Accounts"
+        rows={data.accounts}
+        rowKey={(account) => account.id}
+        rowName={(account) => account.username}
+        query={query}
+        searchText={(account) => [account.username]}
+        initialSort={{ key: "account", descending: false }}
+        empty="No Users"
+        columns={[
+          {
+            key: "account",
+            header: "Account",
+            main: true,
+            sortValue: (account) => account.username,
+            cell: (account) => (
+              <>
+                <Text size="sm" fw={500} truncate>
+                  {account.username}
+                </Text>
+                <Group gap={4} mt={4}>
+                  {(account.disabled || account.pending || account.role === "administrator") && (
+                    <Badge
+                      miw="max-content"
+                      variant="light"
+                      color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}
+                    >
+                      {account.disabled
+                        ? "Disabled"
+                        : account.pending
+                          ? "Awaiting Approval"
+                          : "Administrator"}
+                    </Badge>
+                  )}
+                  {account.signInLinked && (
+                    <Badge miw="max-content" variant="light" color="gray">
+                      Single Sign-On
+                    </Badge>
+                  )}
+                  {account.role === "user" && groupOf(account) && (
+                    <>
+                      {groupFeature(groupOf(account)!.features.cloudModels, "Cloud Models")}
+                      {groupFeature(groupOf(account)!.features.nsfwModels, "NSFW Models")}
+                    </>
+                  )}
+                </Group>
+              </>
+            ),
+          },
+          {
+            key: "group",
+            header: "Access Group",
+            sortValue: (account) =>
+              account.role === "user" ? groupOf(account)?.name : "All Groups",
+            cell: (account) =>
+              account.role === "user" ? (
+                <Select
+                  aria-label={`Access Group for ${account.username}`}
+                  value={account.accessProfileId || null}
+                  placeholder="Choose Group"
+                  data={data.accessProfiles.map((group) => ({
+                    value: group.id,
+                    label: group.name,
+                  }))}
+                  allowDeselect={false}
+                  w={{ base: 140, sm: 200 }}
+                  onChange={(accessProfileId) =>
+                    change.mutate({ id: account.id, patch: { accessProfileId } })
+                  }
+                />
+              ) : (
+                <Text size="sm" c="dimmed">
+                  All Groups
+                </Text>
+              ),
+          },
+        ]}
+        rowActions={(account) => (
+          <Menu.Item
+            color={account.disabled ? undefined : "red"}
+            disabled={change.isPending}
+            onClick={() =>
+              change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
+            }
+          >
+            {account.disabled ? "Enable Account" : "Disable Account"}
+          </Menu.Item>
+        )}
+      />
       {/* Opening without a height animation keeps nested Select dropdowns anchored to their inputs. */}
       <Accordion variant="separated" transitionDuration={0}>
         <Accordion.Item value="new-user">

@@ -115,7 +115,6 @@ export async function fixtures(page: Page) {
   }
   const ownAccount = {
     id: "admin",
-    displayName: "Administrator",
     username: "admin@example.test",
     provider: "local",
     canChangeEmail: true,
@@ -127,14 +126,12 @@ export async function fixtures(page: Page) {
       {
         id: "admin",
         username: "admin@example.test",
-        displayName: "Administrator",
         role: "administrator",
         disabled: false,
       },
       {
         id: "member",
         username: "member@example.test",
-        displayName: "Member",
         role: "user",
         accessProfileId: "users",
         disabled: false,
@@ -173,7 +170,6 @@ export async function fixtures(page: Page) {
     const respond = (value: unknown, status = 200) => route.fulfill({ status, json: value });
     if (path === "/api/accounts/me") {
       if (method === "PATCH") {
-        if (body.displayName) ownAccount.displayName = body.displayName;
         if (body.username) ownAccount.username = body.username;
       }
       return respond({ account: ownAccount });
@@ -726,14 +722,15 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
 /** Opens a Settings › Profiles view and the editor of its first listed definition. */
 export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
   const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
-  if (!(await page.getByRole("table", { name: `Editable ${kind}s`, exact: true }).isVisible())) {
+  const table = page.getByRole("table", { name: `Editable ${kind}s`, exact: true });
+  if (!(await table.isVisible())) {
     await page.goto("/images");
     await openNav(page, "Settings");
     await section(page, "Settings", "Profiles");
     if (kind === "Guide") await chooseView(page, "Profiles", "Guides");
   }
-  await page
-    .getByRole("button", { name: new RegExp(`^${kind} Actions for `) })
+  await table
+    .getByRole("button", { name: /^Actions for / })
     .first()
     .click();
   await page.getByRole("menuitem", { name: `Edit ${kind}`, exact: true }).click();
