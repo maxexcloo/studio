@@ -434,6 +434,7 @@ export class GenerationQueue {
       job.resource,
       undefined,
       jobLimit,
+      { parentItemId: job.parentItemId },
     );
   }
 }

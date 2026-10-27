@@ -3,7 +3,7 @@ import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { Download, Ellipsis, Star } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaActionItems, type PrimaryAction } from "./MediaActions";
+import { MediaActionMenu } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
@@ -17,14 +17,12 @@ export function MediaTileActions({
   onOpenedChange,
   sessionId,
   omit,
-  onSelect,
 }: {
   item: MediaItem;
   opened: boolean;
   onOpenedChange: (value: boolean) => void;
   sessionId?: string;
-  omit?: PrimaryAction[];
-  onSelect?: () => void;
+  omit?: string[];
 }) {
   const [deleting, setDeleting] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
@@ -50,7 +48,6 @@ export function MediaTileActions({
               aria-label={`${item.favorite ? "Unstar" : "Star"} ${name}`}
               aria-pressed={Boolean(item.favorite)}
               variant="default"
-              loading={favorite.isPending}
               onClick={() => favorite.mutate()}
             >
               <Star size={16} fill={item.favorite ? "currentColor" : "none"} />
@@ -82,14 +79,13 @@ export function MediaTileActions({
           </Menu.Target>
           <Menu.Dropdown>
             {opened && (
-              <MediaActionItems
+              <MediaActionMenu
                 item={item}
                 transfer={transfer}
                 sessionId={sessionId}
                 omit={omit}
                 onApplied={() => onOpenedChange(false)}
                 onDelete={() => setDeleting(true)}
-                onSelect={onSelect}
                 onUpscale={() => setUpscaling(true)}
               />
             )}

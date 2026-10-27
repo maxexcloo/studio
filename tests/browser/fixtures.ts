@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const stamp = "2026-10-23T00:00:00.000Z";
 export const image =
@@ -103,6 +103,7 @@ export async function fixtures(page: Page) {
       input: body,
       operation: body.operation,
       parentJobId: body.parentJobId,
+      parentItemId: body.parentItemId,
       status: "completed",
       items: [item],
       outputs: [item],
@@ -495,6 +496,7 @@ export async function fixtures(page: Page) {
         items: gallery.filter(
           (i) =>
             (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
+            (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
             (!url.searchParams.has("chat") ||
               url.searchParams.getAll("chat").includes(i.sessionId)),
         ),
@@ -706,8 +708,18 @@ export async function openTheme(page: Page) {
   }
 }
 
+/** The gallery search box: in the toolbar on desktop, opened from its icon on phones. */
+export async function gallerySearch(scope: Page | Locator) {
+  const open = scope.getByRole("button", { name: "Search Gallery", exact: true });
+  if (await open.isVisible()) await open.click();
+  return scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+}
+
+/** Runs a viewer action from its bar, or from More Viewer Actions where phones move it. */
 export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const action = viewer.getByRole("button", { name: label, exact: true });
+  if (await action.isVisible()) return action.click();
   await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
   await page.getByRole("menuitem", { name: label, exact: true }).click();
 }

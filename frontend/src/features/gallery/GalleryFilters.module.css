@@ -9,6 +9,27 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .mode {
+    animation: none;
+  }
+}
+
+/* The leading controls (search, view or facets) take the row's free width. */
+.lead {
+  flex: 1;
+  min-width: 0;
+}
+
+.search {
+  flex: 0 1 18rem;
+  min-width: 10rem;
+}
+
+.searchOpen {
+  flex: 1;
+}
+
 .facets {
   flex: 1;
   min-width: 0;

@@ -114,6 +114,39 @@
   justify-content: center;
 }
 
+/* Versions: a quiet count, which turns into dots while flipping through them. */
+.versions {
+  position: absolute;
+  top: calc(var(--mantine-spacing-xs) + 6px);
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding-inline: 8px;
+  border-radius: var(--mantine-radius-xl);
+  background: rgb(0 0 0 / 0.45);
+  color: white;
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  transition: opacity var(--studio-motion-duration) ease;
+}
+
+.dot[data-current] {
+  opacity: 1;
+}
+
 .check {
   position: absolute;
   top: var(--mantine-spacing-xs);

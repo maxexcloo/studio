@@ -90,6 +90,7 @@ test(
       await start();
       const { session } = await api("/api/sessions", "POST", { title: "Image → Refine → Animate" });
       let parentJobId: string | undefined;
+      let parentItemId: string | undefined;
       const ids: string[] = [];
       for (const operation of ["image", "refine", "animate"]) {
         const ack = await api(`/api/sessions/${session.id}/generations`, "POST", {
@@ -99,12 +100,16 @@ test(
           steps: 2,
           width: 256,
           height: 256,
-          ...(parentJobId ? { parentJobId } : {}),
+          ...(parentJobId ? { parentJobId, parentItemId } : {}),
         });
         const job = await completed(session.id, ack.jobId);
         assert.equal(job.outputs.length, 1);
         assert.equal(job.parentJobId, parentJobId);
+        // The version link names the parent's result; the gallery groups versions by it.
+        assert.equal(job.parentItemId, parentItemId);
+        assert.equal(job.input.parentItemId, undefined);
         parentJobId = job.id;
+        parentItemId = String(job.outputs[0].id);
         ids.push(job.id);
       }
       const legacy = await api("/api/generate", "POST", {

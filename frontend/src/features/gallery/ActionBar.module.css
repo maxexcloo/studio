@@ -1,0 +1,22 @@
+/* One bar layout for the viewer and the gallery selection: compact icons in divided groups. */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--studio-composer-gap, 0px));
+  margin-inline: auto;
+  padding: 4px;
+}
+
+.divider {
+  align-self: stretch;
+  margin: 6px 4px;
+}
+
+.action {
+  flex-shrink: 0;
+  transition:
+    background-color var(--studio-motion-duration) ease,
+    color var(--studio-motion-duration) ease;
+}

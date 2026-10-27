@@ -68,6 +68,8 @@ export interface Draft {
   sessionId: string;
   operation: "image" | "refine" | "animate";
   parentJobId?: string;
+  /** The result in `parentJobId` this draft makes a version of. */
+  parentItemId?: string;
   presetId?: string;
   presetTitle?: string;
 }
@@ -77,6 +79,7 @@ const empty: Draft = {
   sessionId: "",
   operation: "image",
   parentJobId: undefined,
+  parentItemId: undefined,
   presetId: undefined,
   presetTitle: undefined,
 };

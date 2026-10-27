@@ -15,14 +15,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
   ChevronDown,
-  Clapperboard,
-  ClipboardCopy,
-  Copy,
   Download,
-  Ellipsis,
   Flame,
-  ListChecks,
   PenLine,
+  Play,
   RefreshCw,
   Repeat,
   Share,
@@ -34,10 +30,9 @@ import {
 } from "lucide-react";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
-import { copyText } from "../../ui/clipboard";
 import { usePhone } from "../../ui/usePhone";
-import { MediaActionItems } from "./MediaActions";
-import { useSettingsText } from "./MediaDetails";
+import { ActionBarGroups, ActionBarSurface, useActionIconProps, type Action } from "./ActionBar";
+import { useMediaActions } from "./MediaActions";
 import { useMediaTransfer, useShareWithoutSettings } from "./mediaShare";
 import { UpscaleControls } from "./UpscaleControls";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -59,7 +54,10 @@ const themeIcons: Record<AnimateTheme, typeof Camera> = {
   custom: PenLine,
 };
 
-/** The viewer's one icon row: Star, Download/Share, Upscale, Animate, Regenerate, Copy, More, Options. */
+/**
+ * The viewer's action bar: the shared item actions in their menu groups, plus Star, Download (Share
+ * on phones) and Regenerate, then Viewer Options. Phones move the rest to More Viewer Actions.
+ */
 export function MediaViewerActions({
   item,
   sessionId,
@@ -84,8 +82,7 @@ export function MediaViewerActions({
   onVersionChange: (id: string, active: boolean) => void;
 }) {
   const phone = usePhone();
-  // Phones keep 40px touch targets so the actions and Regenerate's menu fit one 375px row.
-  const size = phone ? 40 : undefined;
+  const iconProps = useActionIconProps();
   const ready = item.status === "done" && Boolean(item.url);
   const transfer = useMediaTransfer(item, true);
   const favorite = useMediaFavorite(item);
@@ -96,7 +93,6 @@ export function MediaViewerActions({
     ...animateProfileQuery(item),
     enabled: ready && item.type === "image",
   });
-  const settingsText = useSettingsText(item);
   const [withoutSettings, setWithoutSettings] = useShareWithoutSettings();
   const [instructing, setInstructing] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -124,263 +120,209 @@ export function MediaViewerActions({
   const themes = (Object.keys(animateThemes) as AnimateTheme[]).filter(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
-  return (
-    <Group
-      gap={phone ? 0 : 6}
-      justify={phone ? "space-between" : "center"}
-      wrap="nowrap"
-      role="group"
-      aria-label="Generation Actions"
-      onClick={(event) => event.stopPropagation()}
-    >
-      {ready && (
-        <>
-          {tip(
-            item.favorite ? "Unstar (F)" : "Star (F)",
-            <ActionIcon
-              variant="default"
-              size={size}
-              aria-label={item.favorite ? "Unstar" : "Star"}
-              aria-pressed={Boolean(item.favorite)}
-              c={item.favorite ? "var(--mantine-primary-color-filled)" : undefined}
-              disabled={favorite.isPending}
-              onClick={() => favorite.mutate()}
-            >
-              <Star size={18} fill={item.favorite ? "currentColor" : "none"} />
-            </ActionIcon>,
-          )}
-          {transfer.canShare
-            ? tip(
-                "Share",
-                <ActionIcon
-                  variant="default"
-                  size={size}
-                  aria-label={transfer.shareReady ? "Share" : "Prepare Share"}
-                  loading={transfer.sharing}
-                  onClick={() => void transfer.share()}
-                >
-                  <Share size={18} />
-                </ActionIcon>,
-              )
-            : tip(
-                "Download",
-                <ActionIcon
-                  component="a"
-                  {...transfer.download}
-                  variant="default"
-                  size={size}
-                  aria-label="Download"
-                >
-                  <Download size={18} />
-                </ActionIcon>,
-              )}
-          <UpscaleControls key={item.id} item={item} size={size} />
-          {item.type === "image" && (
-            <Menu position="top" width={240} {...layerEvents("animate")}>
-              {tip(
-                "Animate",
-                <Menu.Target>
-                  <ActionIcon
-                    variant="default"
-                    size={size}
-                    aria-label="Animate"
-                    loading={iterating === "animate" || action.isPending}
-                  >
-                    <Clapperboard size={18} />
-                  </ActionIcon>
-                </Menu.Target>,
-              )}
-              <Menu.Dropdown>
-                <Menu.Label>Animate</Menu.Label>
-                <Menu.Label fw={400}>
-                  {animation.error
-                    ? animation.error.message
-                    : animation.data
-                      ? animation.data.note || `Runs on ${animation.data.label}.`
-                      : "Choosing a video model…"}
-                </Menu.Label>
-                {assistant.data?.available ? (
-                  themes.map((theme) => {
-                    const Icon = themeIcons[theme];
-                    return (
-                      <Menu.Item
-                        key={theme}
-                        h={36}
-                        disabled={!animation.data}
-                        leftSection={<Icon size={16} />}
-                        onClick={() =>
-                          theme === "custom"
-                            ? setInstructing(true)
-                            : iterate({ kind: "animate", theme })
-                        }
-                      >
-                        {animateThemes[theme]}
-                        {theme === "custom" ? "…" : ""}
-                      </Menu.Item>
-                    );
-                  })
-                ) : (
-                  <Menu.Label fw={400}>Motion themes need the prompt assistant.</Menu.Label>
-                )}
-                <Menu.Divider />
-                <Menu.Item
-                  h={36}
-                  disabled={!animation.data}
-                  leftSection={<SlidersHorizontal size={16} />}
-                  onClick={() => action.mutate("animate")}
-                >
-                  Animate in Composer
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          )}
-          <ActionIcon.Group>
-            {tip(
-              "Regenerate",
-              <ActionIcon
-                variant="default"
-                size={size}
-                aria-label="Regenerate"
-                loading={iterating === "regenerate" || iterating === "repeat"}
-                onClick={() => iterate({ kind: "regenerate" })}
-              >
-                <RefreshCw size={18} />
-              </ActionIcon>,
-            )}
-            <Menu position="top" width={220} {...layerEvents("regenerate")}>
-              {tip(
-                "Regenerate Options",
-                <Menu.Target>
-                  <ActionIcon
-                    className={classes.splitMenu}
-                    variant="default"
-                    size={size}
-                    aria-label="Regenerate Options"
-                  >
-                    <ChevronDown size={14} />
-                  </ActionIcon>
-                </Menu.Target>,
-              )}
-              <Menu.Dropdown>
-                <Menu.Label>Regenerate</Menu.Label>
-                <Menu.Item
-                  h={36}
-                  leftSection={<Shuffle size={16} />}
-                  onClick={() => iterate({ kind: "regenerate" })}
-                >
-                  New Seed
-                </Menu.Item>
-                <Menu.Item
-                  h={36}
-                  leftSection={<Repeat size={16} />}
-                  onClick={() => iterate({ kind: "repeat" })}
-                >
-                  Exact Repeat
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </ActionIcon.Group>
-          <Menu position="top" width={220} {...layerEvents("copy")}>
-            {tip(
-              "Copy",
-              <Menu.Target>
-                <ActionIcon variant="default" size={size} aria-label="Copy">
-                  <Copy size={18} />
-                </ActionIcon>
-              </Menu.Target>,
-            )}
-            <Menu.Dropdown>
-              <Menu.Item
-                h={36}
-                leftSection={<Copy size={16} />}
-                onClick={() => void copyText(item.prompt || "", "Prompt")}
-              >
-                Copy Prompt
-              </Menu.Item>
-              <Menu.Item
-                h={36}
-                leftSection={<ListChecks size={16} />}
-                onClick={() => void copyText(settingsText(), "Settings")}
-              >
-                Copy Settings
-              </Menu.Item>
-              {transfer.canCopy && (
-                <Menu.Item
-                  h={36}
-                  leftSection={<ClipboardCopy size={16} />}
-                  disabled={transfer.copying}
-                  onClick={() => void transfer.copyImage()}
-                >
-                  Copy Image
-                </Menu.Item>
-              )}
-            </Menu.Dropdown>
-          </Menu>
-        </>
+  const shared = useMediaActions(item, {
+    transfer,
+    sessionId,
+    omit: ["share"],
+    compare,
+    onApplied,
+    onCompare,
+    onDelete,
+    onRetried,
+  });
+  const animateControl = (
+    <Menu key="animate" position="top" width={240} {...layerEvents("animate")}>
+      {tip(
+        "Animate",
+        <Menu.Target>
+          <ActionIcon
+            {...iconProps}
+            aria-label="Animate"
+            loading={iterating === "animate" || action.isPending}
+          >
+            <Play size={18} />
+          </ActionIcon>
+        </Menu.Target>,
       )}
-      <Menu position="top-end" width={220} {...layerEvents("more")}>
+      <Menu.Dropdown>
+        <Menu.Label>Animate</Menu.Label>
+        <Menu.Label fw={400}>
+          {animation.error
+            ? animation.error.message
+            : animation.data
+              ? animation.data.note || `Runs on ${animation.data.label}.`
+              : "Choosing a video model…"}
+        </Menu.Label>
+        {assistant.data?.available ? (
+          themes.map((theme) => {
+            const Icon = themeIcons[theme];
+            return (
+              <Menu.Item
+                key={theme}
+                h={36}
+                disabled={!animation.data}
+                leftSection={<Icon size={16} />}
+                onClick={() =>
+                  theme === "custom" ? setInstructing(true) : iterate({ kind: "animate", theme })
+                }
+              >
+                {animateThemes[theme]}
+                {theme === "custom" ? "…" : ""}
+              </Menu.Item>
+            );
+          })
+        ) : (
+          <Menu.Label fw={400}>Motion themes need the prompt assistant.</Menu.Label>
+        )}
+        <Menu.Divider />
+        <Menu.Item
+          h={36}
+          disabled={!animation.data}
+          leftSection={<SlidersHorizontal size={16} />}
+          onClick={() => action.mutate("animate")}
+        >
+          Animate in Composer
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+  const regenerateControl = (
+    <ActionIcon.Group key="regenerate">
+      {tip(
+        "Regenerate",
+        <ActionIcon
+          {...iconProps}
+          aria-label="Regenerate"
+          loading={iterating === "regenerate" || iterating === "repeat"}
+          onClick={() => iterate({ kind: "regenerate" })}
+        >
+          <RefreshCw size={18} />
+        </ActionIcon>,
+      )}
+      <Menu position="top" width={220} {...layerEvents("regenerate")}>
         {tip(
-          "More",
+          "Regenerate Options",
           <Menu.Target>
-            <ActionIcon aria-label="More Viewer Actions" variant="default" size={size}>
-              <Ellipsis size={18} />
+            <ActionIcon
+              {...iconProps}
+              className={`${iconProps.className} ${classes.splitMenu}`}
+              aria-label="Regenerate Options"
+            >
+              <ChevronDown size={14} />
             </ActionIcon>
           </Menu.Target>,
         )}
         <Menu.Dropdown>
-          <MediaActionItems
-            item={item}
-            transfer={transfer}
-            sessionId={sessionId}
-            // Phones that share natively keep Download here.
-            omit={[
-              "animate",
-              "upscale",
-              "share",
-              "copy",
-              "star",
-              ...(transfer.canShare ? [] : (["download"] as const)),
-            ]}
-            compare={compare}
-            onApplied={onApplied}
-            onCompare={onCompare}
-            onDelete={onDelete}
-            onRetried={onRetried}
-          />
+          <Menu.Label>Regenerate</Menu.Label>
+          <Menu.Item
+            h={36}
+            leftSection={<Shuffle size={16} />}
+            onClick={() => iterate({ kind: "regenerate" })}
+          >
+            New Seed
+          </Menu.Item>
+          <Menu.Item
+            h={36}
+            leftSection={<Repeat size={16} />}
+            onClick={() => iterate({ kind: "repeat" })}
+          >
+            Exact Repeat
+          </Menu.Item>
         </Menu.Dropdown>
       </Menu>
-      {ready && (
-        <Popover position="top-end" width={280} trapFocus {...layerEvents("options")}>
-          {tip(
-            "Viewer Options",
-            <Popover.Target>
-              <ActionIcon aria-label="Viewer Options" variant="default" size={size}>
-                <SlidersHorizontal size={18} />
-              </ActionIcon>
-            </Popover.Target>,
-          )}
-          <Popover.Dropdown>
-            <Stack gap="md">
-              {item.upscale?.url && !item.upscale.withRun && (
-                <Switch
-                  label="Show Upscale"
-                  checked={Boolean(item.upscaleActive)}
-                  disabled={version.isPending}
-                  onChange={(event) =>
-                    version.mutate({ galleryItemId: item.id, active: event.currentTarget.checked })
-                  }
-                />
-              )}
-              <Switch
-                label="Share Without Settings"
-                description="Leave the prompt, seed and workflow out of downloaded or shared files."
-                checked={withoutSettings}
-                onChange={(event) => setWithoutSettings(event.currentTarget.checked)}
-              />
-            </Stack>
-          </Popover.Dropdown>
-        </Popover>
+    </ActionIcon.Group>
+  );
+  // Regenerate joins the first group after Recreate; in More it queues a new seed.
+  const regenerate: Action = {
+    id: "regenerate",
+    label: "Regenerate",
+    icon: RefreshCw,
+    control: regenerateControl,
+    onClick: () => iterate({ kind: "regenerate" }),
+  };
+  const extras: Action[] = !ready
+    ? []
+    : [
+        {
+          id: "star",
+          label: item.favorite ? "Unstar" : "Star",
+          icon: Star,
+          pressed: Boolean(item.favorite),
+          disabled: favorite.isPending,
+          onClick: favorite.mutate,
+        },
+        ...(transfer.canShare
+          ? [
+              {
+                id: "share",
+                label: transfer.shareReady ? "Share" : "Prepare Share",
+                icon: Share,
+                loading: transfer.sharing,
+                onClick: () => void transfer.share(),
+              },
+            ]
+          : []),
+        { id: "download", label: "Download", icon: Download, link: transfer.download },
+      ];
+  const groups = [
+    extras,
+    ...shared.map((group) =>
+      group.flatMap((entry): Action[] => {
+        if (entry.id === "animate") return [{ ...entry, control: animateControl }];
+        if (entry.id === "upscale")
+          return [{ ...entry, control: <UpscaleControls key={item.id} item={item} /> }];
+        if (entry.id === "recreate" && ready) return [entry, regenerate];
+        return [entry];
+      }),
+    ),
+  ];
+  const viewerOptions = (
+    <Popover position="top-end" width={280} trapFocus {...layerEvents("options")}>
+      {tip(
+        "Viewer Options",
+        <Popover.Target>
+          <ActionIcon aria-label="Viewer Options" {...iconProps}>
+            <SlidersHorizontal size={18} />
+          </ActionIcon>
+        </Popover.Target>,
       )}
+      <Popover.Dropdown>
+        <Stack gap="md">
+          {item.upscale?.url && !item.upscale.withRun && (
+            <Switch
+              label="Show Upscale"
+              checked={Boolean(item.upscaleActive)}
+              disabled={version.isPending}
+              onChange={(event) =>
+                version.mutate({ galleryItemId: item.id, active: event.currentTarget.checked })
+              }
+            />
+          )}
+          <Switch
+            label="Share Without Settings"
+            description="Leave the prompt, seed and workflow out of downloaded or shared files."
+            checked={withoutSettings}
+            onChange={(event) => setWithoutSettings(event.currentTarget.checked)}
+          />
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
+  );
+  return (
+    <ActionBarSurface aria-label="Generation Actions" onClick={(event) => event.stopPropagation()}>
+      <ActionBarGroups
+        groups={groups}
+        // Phones that share natively keep Download under More.
+        phoneActions={[
+          "star",
+          transfer.canShare ? "share" : "download",
+          "animate",
+          "regenerate",
+          "upscale",
+        ]}
+        moreLabel="More Viewer Actions"
+        trailing={ready && viewerOptions}
+      />
       <Modal
         opened={instructing}
         onClose={() => setInstructing(false)}
@@ -414,6 +356,6 @@ export function MediaViewerActions({
           </Stack>
         </form>
       </Modal>
-    </Group>
+    </ActionBarSurface>
   );
 }

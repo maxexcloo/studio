@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, image, stamp, viewerOptions } from "./fixtures";
+import { fixtures, image, stamp, viewerAction, viewerOptions } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -140,8 +140,7 @@ test("Media transfer actions honour the shared metadata preference", async ({ pa
       : viewer.getByRole("link", { name: "Download", exact: true }),
   ).toHaveAttribute("href", "/api/fixture-media.png?clean=1");
   if (phone) await page.keyboard.press("Escape");
-  await viewer.getByRole("button", { name: "Copy", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Copy Image", exact: true }).click();
+  await viewerAction(page, "Copy Image");
   await expect.poll(() => page.evaluate(() => (window as any).copiedMedia?.type)).toBe("image/png");
   if (phone) {
     await viewer.getByRole("button", { name: "Share", exact: true }).click();

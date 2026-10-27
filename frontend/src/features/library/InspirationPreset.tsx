@@ -203,6 +203,7 @@ export function InspirationPreset({ preset }: { preset: LibraryPreset }) {
                   references: [],
                   operation: kind === "video" ? "animate" : "image",
                   parentJobId: undefined,
+                  parentItemId: undefined,
                   presetId: undefined,
                   presetTitle: undefined,
                 }),
