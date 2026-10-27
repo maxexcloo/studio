@@ -104,6 +104,45 @@ test("Cancel All isolates the owner and retains accepted work until cancellation
   }
 });
 
+test("Clearing takes only the owner's failed jobs out of the queue and keeps their records", async () => {
+  const store = new RewriteStore(":memory:");
+  const alice = store.createSession("alice"),
+    bob = store.createSession("bob");
+  const [first, second, active] = [0, 1, 2].map(() =>
+    store.enqueue("alice", alice.id, {}, "image"),
+  );
+  const foreign = store.enqueue("bob", bob.id, {}, "image");
+  for (const job of [first, second, foreign]) store.save({ ...job, status: "failed" });
+  const app = express();
+  app.use((req, _res, next) => {
+    Object.assign(req, { studioAccount: { userId: "alice" } });
+    next();
+  });
+  registerRewriteRoutes(app as unknown as Parameters<typeof registerRewriteRoutes>[0], {
+    store,
+    queue: new GenerationQueue(store, {} as never),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/queue`;
+  const listed = async () =>
+    ((await (await fetch(base)).json()) as { jobs: { id: string }[] }).jobs.map((job) => job.id);
+  try {
+    assert.equal((await fetch(`${base}/${active.id}/clear`, { method: "POST" })).status, 409);
+    assert.equal((await fetch(`${base}/${first.id}/clear`, { method: "POST" })).status, 200);
+    assert.deepEqual(await listed(), [second.id, active.id]);
+    const response = await fetch(`${base}/clear-failed`, { method: "POST" });
+    assert.deepEqual(await response.json(), { cleared: 1 });
+    assert.deepEqual(await listed(), [active.id]);
+    assert.equal(store.job("alice", first.id)?.status, "failed");
+    assert.equal(store.job("bob", foreign.id)?.cleared, undefined);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
 test("Deleting a chat is owner scoped, waits for active work and deletes only chosen results", async () => {
   const store = new RewriteStore(":memory:");
   const chat = store.createSession("alice"),

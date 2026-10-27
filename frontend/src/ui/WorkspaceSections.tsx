@@ -119,7 +119,6 @@ export function WorkspaceSections({
             component="section"
             aria-label={`${label}: ${section.label}`}
             hidden={section.value !== active}
-            className={classes.section}
           >
             <Stack>
               <div>
