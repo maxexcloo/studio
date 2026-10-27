@@ -649,8 +649,12 @@ export async function uploadBufferToComfy({ buffer, mime, name }, { unique = fal
   return { comfyName: uploaded.name || filename, name: safeName(name), mime };
 }
 
-export async function stageReferenceAssets(
-  req,
+export function stageReferenceAssets(req, references = [], options = {}) {
+  return stageReferenceAssetsForAccount(req?.studioAccount, references, options);
+}
+
+export async function stageReferenceAssetsForAccount(
+  account,
   references = [],
   { unique = false, generation = null } = {},
 ) {
@@ -669,7 +673,7 @@ export async function stageReferenceAssets(
           ? Number(generation.width) * Number(generation.height)
           : 0;
       const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
-      const original = await bytesForReference(req, assetId);
+      const original = await bytesForReferenceAccount(account, assetId);
       const inspected = await inspectImage(original.buffer, original.mime);
       const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
       // Remote ComfyUI has no native input-delete endpoint. Reuse content names there

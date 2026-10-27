@@ -59,7 +59,8 @@ const ordinaryRoutes = [
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/taste$/],
-  ["GET", /^\/api\/upscale\/status$/],
+  ["GET", /^\/api\/(finishing|upscale\/status)$/],
+  ["PUT", /^\/api\/finishing\/settings$/],
   ["POST", /^\/api\/upscale(\/cancel|\/toggle)?$/],
   ["GET", /^\/comfy\/(view|thumb|video-preview)$/],
 ];

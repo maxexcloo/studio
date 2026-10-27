@@ -10,8 +10,8 @@ import type {
 } from "../../shared/queue.ts";
 import type { DreamOrigin } from "./dream.ts";
 
-/** Queue tiers on one resource, lower first; Dream's background work runs below MCP. */
-export const queuePriority = { manual: 0, mcp: 1, dream: 2 } as const;
+/** Queue tiers on one resource, lower first; Dream's and finishing's background work run below MCP. */
+export const queuePriority = { manual: 0, mcp: 1, dream: 2, finishing: 3 } as const;
 /**
  * Where a job was admitted from: its tier, for an MCP call the set it was enqueued with, and for a
  * Dream job its prompt and note, which its gallery items carry until the person keeps them.
@@ -177,7 +177,7 @@ export class RewriteStore {
     if (jobLimit !== undefined) {
       const row = this.db
         .prepare(
-          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled') AND COALESCE(json_extract(record, '$.priority'), 0) <> ?",
+          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled') AND COALESCE(json_extract(record, '$.priority'), 0) < ?",
         )
         .get(ownerId, queuePriority.dream)!;
       if (Number(row.count) >= jobLimit)
