@@ -137,15 +137,15 @@ export class CliProxyMedia {
       if (input.reference)
         fields.image = {
           type: "image_url",
-          url: `data:image/png;base64,${Buffer.from(input.reference).toString("base64")}`,
+          url: `data:image/jpeg;base64,${Buffer.from(input.reference).toString("base64")}`,
         };
     } else if (input.reference) {
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) form.set(key, String(value));
       form.set(
         "image",
-        new Blob([new Uint8Array(input.reference)], { type: "image/png" }),
-        "reference.png",
+        new Blob([new Uint8Array(input.reference)], { type: "image/jpeg" }),
+        "reference.jpg",
       );
       body = form;
     }
@@ -169,7 +169,7 @@ export class CliProxyMedia {
         ...(input.reference
           ? {
               image: {
-                url: `data:image/png;base64,${Buffer.from(input.reference).toString("base64")}`,
+                url: `data:image/jpeg;base64,${Buffer.from(input.reference).toString("base64")}`,
               },
             }
           : {}),

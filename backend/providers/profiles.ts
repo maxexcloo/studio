@@ -150,7 +150,8 @@ export function studioCloudProfiles(options: ProfileOptions) {
       const { data, info } = await sharp(reference)
         .rotate()
         .resize(referenceEdge, referenceEdge, { fit: "inside", withoutEnlargement: true })
-        .png()
+        // JPEG keeps the inline request under Grok's body limit, which a 2048 px PNG exceeds.
+        .jpeg({ quality: 90 })
         .toBuffer({ resolveWithObject: true });
       reference = data;
       // A first frame gives the video its shape.
