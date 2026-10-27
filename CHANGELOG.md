@@ -11,6 +11,8 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+## [1.0.7] - 2026-10-27
+
 > Gallery titles, one Studio chat per LibreChat conversation and a steadier composer
 
 ### Added
@@ -2168,7 +2170,8 @@ notes cover everything that changed since the fork.
 The baseline HEISS UI grew from, forked from
 [J-AI Studio](https://github.com/jasperdevs/J-AI-Studio). Never tagged.
 
-[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/maxexcloo/studio/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/maxexcloo/studio/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/maxexcloo/studio/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/maxexcloo/studio/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/maxexcloo/studio/compare/v1.0.3...v1.0.4
