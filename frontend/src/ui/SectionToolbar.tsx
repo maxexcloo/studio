@@ -105,8 +105,9 @@ export function SectionToolbar({
         )}
         {filters && (
           <Popover position="bottom-end" width={300} trapFocus>
-            <Popover.Target>
-              <Tooltip label={`Filter ${label}`}>
+            {/* The Tooltip wraps the target, so the button itself carries aria-expanded. */}
+            <Tooltip label={`Filter ${label}`}>
+              <Popover.Target>
                 <ActionIcon
                   aria-label={`Filter ${label}`}
                   variant={filterCount ? "light" : "subtle"}
@@ -115,13 +116,21 @@ export function SectionToolbar({
                 >
                   <SlidersHorizontal size={18} />
                   {filterCount > 0 && (
-                    <Badge size="xs" circle pos="absolute" top={0} right={0} aria-hidden>
+                    <Badge
+                      size="xs"
+                      circle
+                      variant="filled"
+                      pos="absolute"
+                      top={0}
+                      right={0}
+                      aria-hidden
+                    >
                       {filterCount}
                     </Badge>
                   )}
                 </ActionIcon>
-              </Tooltip>
-            </Popover.Target>
+              </Popover.Target>
+            </Tooltip>
             <Popover.Dropdown aria-label={`${label} Filters`} role="dialog" p="sm">
               <ScrollArea.Autosize mah="min(60dvh, 420px)">
                 <Stack gap="sm">

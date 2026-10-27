@@ -11,10 +11,18 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> The viewer opens without a flash, at a sensible size, and keeps its details tidy
+> A calmer, faster shell: instant switching, steady popups and scrollbars, a tidier viewer and queue controls
+
+### Added
+
+- The Generations queue offers Stop and Clear per item, and Stop All and Clear Failed with a confirmation. Clearing a failed generation only takes it out of the queue.
 
 ### Changed
 
+- The modes read Chat, Dream, Images, Videos with a sliding indicator, and the status action sits right of the Studio logo.
+- Pages, tabs and sections switch instantly; scrollbars no longer shift content; popups stay put while the page scrolls, and a click outside one only closes it.
+- Dialogs are larger and raised on a bordered, shadowed plane; empty views show one short centred line.
+- One motion system (short ease-out transform and opacity, no bounce, reduced motion respected) and one control size and emphasis scale come from the theme.
 - The viewer opens an image fitted but never enlarged beyond its actual size, shows the gallery thumbnail instead of a blank stage while the full image loads, and plays videos when they open (muted when the browser refuses sound).
 - Viewer Details lists every recorded input in the order it shapes the run, with timings in the order they ran; Copy Prompt and Copy Settings sit beside its title, Copy Settings copies every input one per line, and long prompts scroll on a subtle surface.
 

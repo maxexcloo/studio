@@ -1,8 +1,21 @@
 .modes {
+  position: relative;
   border: 1px solid var(--mantine-color-default-border);
   padding: 0.25rem;
   border-radius: var(--mantine-radius-xl);
   background: var(--mantine-color-default);
+}
+/* The selected mode's pill slides between items; the buttons stay transparent above it. */
+.indicator {
+  border-radius: var(--mantine-radius-xl);
+  background: var(--mantine-primary-color-light);
+}
+.mode {
+  position: relative;
+  z-index: 1;
+}
+.mode[aria-current="page"] {
+  --button-hover: transparent;
 }
 @media (min-width: 48em) {
   .modes {

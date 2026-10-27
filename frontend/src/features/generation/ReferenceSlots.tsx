@@ -117,7 +117,13 @@ export function ReferenceSlots({
                         fallbackSrc=""
                         draggable={false}
                       />
-                      <Badge className={classes.number} size="xs" circle color="dark">
+                      <Badge
+                        className={classes.number}
+                        size="xs"
+                        circle
+                        variant="filled"
+                        color="dark"
+                      >
                         {number}
                       </Badge>
                     </UnstyledButton>

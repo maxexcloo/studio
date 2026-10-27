@@ -4,6 +4,14 @@
 a {
   color: inherit;
 }
+/* Scrollbars stay hidden, so content never shifts when it becomes scrollable or a dialog locks
+   the page (Mantine's scroll lock then measures no gap to pad). */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
 button,
 a,
 input,
@@ -16,6 +24,19 @@ select {
 }
 .studio-content {
   min-width: 0;
+}
+/* Popups grow from the side that faces their trigger (the theme's raise transition). */
+[data-popup][data-position^="top"] {
+  transform-origin: bottom;
+}
+[data-popup][data-position^="bottom"] {
+  transform-origin: top;
+}
+[data-popup][data-position^="left"] {
+  transform-origin: right;
+}
+[data-popup][data-position^="right"] {
+  transform-origin: left;
 }
 @media (max-width: 48em) {
   :root {

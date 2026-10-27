@@ -40,19 +40,26 @@ primary component reference and verify APIs against the installed version.
   defaults, with readable contrast over media. Follow the system colour scheme by
   default. The header Theme popover owns persisted Animations, Background, Colour,
   Colour Scheme, Corners and Layout controls in that order; Settings does not duplicate appearance controls.
+- Controls follow one size and emphasis scale from the `theme.ts` defaults.
+  Standard: Button and inputs `md`, ActionIcon 36 px, SegmentedControl `sm`.
+  Compact surfaces (list rows, toolbars, chip rails, popover forms) step down
+  one tier: Button `compact-sm`, inputs and SegmentedControl `xs`/`sm`, Badge
+  `xs`/`sm`. Emphasis: one filled primary action per view, `default` for
+  secondary actions, `subtle` for row and toolbar actions, `light` status
+  Badges and filled count dots. Set a per-call size only to step down a tier, never to restate a default.
 - Use Mantine spacing, typography, colours and breakpoints, including custom
   media CSS. Give Paper padding and borders explicitly where needed; do not
   apply global Paper defaults that leak into dialogs and navigation.
-- Primary modes are Chat, Images, Videos and Dream in that order; Images is the
+- Primary modes are Chat, Dream, Images and Videos in that order; Images is the
   landing page at `/images`; videos use `/video`, conversation uses
   `/chat` and `/chat/:id`, and Dream uses `/dream`. Call conversations Chat everywhere
-  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Image, Video and Sparkles icons with
-  accessible names and tooltips. On every breakpoint one status action sits
-  left of the Studio logo: a spinner while work is generating, otherwise an
+  (New Chat, No Chats), never Session. `/` redirects to Images. Phone tabs use MessageCircle, Sparkles, Image and Video icons with
+  accessible names and tooltips. The selected mode's pill slides between items (`FloatingIndicator`). On every breakpoint one status action sits
+  right of the Studio logo: a spinner while work is generating, otherwise an
   icon coloured by actual gateway/worker health (partial readiness is yellow;
   cloud configuration alone is not proof of availability). It opens the same
-  slideout everywhere: Chats in Chat, active and failed generations with Cancel
-  and Retry in gallery modes, and the compact service summary at the bottom.
+  slideout everywhere: Chats in Chat, active and failed generations with Stop,
+  Retry and Clear in gallery modes, and the compact service summary at the bottom.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Account, Library,
@@ -65,6 +72,10 @@ primary component reference and verify APIs against the installed version.
   neutral surface and divider. Phones use a session Drawer. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
+- Dialogs are centred on a raised plane from the theme defaults: a dimmed,
+  blurred backdrop, a clear border and a deep shadow, `lg` by default and `md`
+  for `ConfirmDialog`. Full-screen dialogs (the viewer, phone panels) fill the
+  viewport instead.
 - Library and Settings are route-backed Mantine modals with blurred overlays.
   Keep the same bounded dimensions and title typography across both workspaces,
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
@@ -77,11 +88,18 @@ primary component reference and verify APIs against the installed version.
   phones drop secondary columns into the main cell); preview cards are for visual
   content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
+- A click outside an open popover, menu or dropdown only closes it; nothing
+  beneath reacts until no popup is open. `ui/popupClicks.ts` owns this for every
+  Mantine dropdown (marked `data-popup` by the theme); outside-click handlers
+  check `closingPopup()` and match popup layers with `popupLayer`. A trigger's
+  Tooltip wraps `Popover.Target`/`Menu.Target`, so the trigger itself carries
+  `aria-expanded` and pressing it still toggles the popup.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
   parent controls and keyboard focus.
-- Use shared `EmptyState` for centred, subdued welcome/empty copy without a
-  decorative card or redundant creation button. Use the exact empty copy
+- Use shared `EmptyState` for empty views: one short, centred, subdued Title
+  Case line with no title, explanation or decorative card, and at most the one
+  action that fills the view (Turn On, Resume, New Chat on phones). Use the exact empty copy
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
   the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.
@@ -189,10 +207,12 @@ primary component reference and verify APIs against the installed version.
   A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
   in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
   the thinking collapsed under the prompt.
-- The status panel shows compact active rows with a muted spinner and Cancel;
-  completed/cancelled work leaves the list, failed work retains Retry. Cancel
-  All requests cancellation of owned active jobs; accepted work may remain
-  active until the provider confirms cancellation or outputs are safely saved.
+- The status panel shows compact active rows with a muted spinner and Stop;
+  completed/cancelled work leaves the list, failed work retains Retry and Clear.
+  Stop All and Clear Failed use `ConfirmDialog`. Stop All requests cancellation
+  of owned active jobs; accepted work may remain active until the provider
+  confirms cancellation or outputs are safely saved. Clearing only takes failed
+  jobs out of the queue; their records and chat cards stay.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
 - Gallery search expands into a full-width focused input; Escape closes it
@@ -261,18 +281,26 @@ primary component reference and verify APIs against the installed version.
   movement cancellation; its release must not also open the viewer.
 - Every interaction should feel fluid and intuitive: state changes (opening,
   expanding, fanning out run stacks, swiping cards, variations arriving, chips
-  updating) use short, tasteful shared-token transitions rather than jumps, and
+  updating) use short, subtle shared-token transitions rather than jumps, and
   never shift layout unexpectedly or block input. Treat visible jank, flashes
   of empty content and layout jumps as defects.
-- Prefer transform/opacity for interaction motion, no decorative hover movement
-  or layout animation in hot paths. Respect reduced motion in CSS and Mantine
-  transitions. Persist Off/Fast/Standard/Relaxed through one motion token; reduced
-  motion takes precedence. Desktop composer expansion uses a bottom-anchored
-  transform/opacity transition. Background previews use labelled, contrasting
-  swatches and preserve readable elevated surfaces in both schemes.
-  Disable native pressed translation centrally with Mantine’s
-  `activeClassName`; retain colour and focus feedback. Aim for smooth 120Hz interaction; report measured environment
-  and frame intervals rather than claiming hardware-independent frame rates.
+- `theme.ts` owns one motion system: the duration token (`--studio-motion-duration`,
+  Off/Fast/Standard/Relaxed, 160ms by default, 0 under reduced motion), quicker
+  exits (`--studio-motion-exit`) and ease-out entrances without bounce or overshoot
+  (`--studio-ease-enter`, `--studio-ease-exit`; `easing` in code). Mantine popups,
+  menus and modals grow from scale 0.98 on their trigger side; drawers slide;
+  selection indicators slide between items. Items appearing move a few pixels or
+  scale from 0.98 at most. Motion makes a change continuous and never adds a wait
+  before content: switching pages, tabs and sections is instant, without fades.
+- Animate only transform and opacity (Mantine's sliding indicators also size
+  themselves); no decorative hover movement or layout animation in hot paths.
+  Respect reduced motion in CSS and Mantine transitions. Desktop composer
+  expansion uses a bottom-anchored transform/opacity transition. Background
+  previews use labelled, contrasting swatches and preserve readable elevated
+  surfaces in both schemes. Disable native pressed translation centrally with
+  Mantine’s `activeClassName`; retain colour and focus feedback. Aim for smooth
+  120Hz interaction; report measured environment and frame intervals rather than
+  claiming hardware-independent frame rates.
 - Browser tests cover meaningful desktop, Chromium phone and WebKit phone
   flows using accessible roles and event-driven fixtures. Avoid exact animation
   timing and cosmetic-only tests. Fixtures are never production fallbacks.
