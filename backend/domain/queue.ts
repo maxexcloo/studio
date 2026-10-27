@@ -25,12 +25,16 @@ export interface WritingProgress {
   thinking: string;
   prompt: string;
 }
-/** The writing stage's outcome: the prompt with its thinking and model; `why` is Dream's note on it. */
+/**
+ * The writing stage's outcome: the prompt with its thinking and model; `why` is Dream's note on it
+ * and `title` the result's title, when the writer gave one (domain/titles.ts titles the rest).
+ */
 export interface WrittenPrompt {
   prompt: string;
   thinking: string;
   model: string;
   why?: string;
+  title?: string;
 }
 /**
  * Writes a job's prompt (`input.writing`), passing the text model's thinking and reply pieces on
@@ -70,6 +74,7 @@ export function writtenJob(job: OwnedJob, written: WrittenPrompt): OwnedJob {
         prompt: written.prompt,
         model: written.model,
         ...(written.thinking ? { thinking: written.thinking } : {}),
+        ...(written.title ? { title: written.title } : {}),
       },
     },
     ...(job.dream

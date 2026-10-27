@@ -3,13 +3,11 @@ import test from "node:test";
 import {
   captionVersion,
   createCaptioner,
-  dailyCaptions,
-  passConcurrency,
   type Caption,
-  type CaptionDocument,
   type CaptionItem,
   type CaptionWriter,
 } from "./captions.ts";
+import { dailyItems, passConcurrency, type IdleDocument } from "./idle-work.ts";
 
 const image = (id: string, ownerId = "alice", extra: Partial<CaptionItem> = {}): CaptionItem => ({
   id,
@@ -22,7 +20,7 @@ const image = (id: string, ownerId = "alice", extra: Partial<CaptionItem> = {}):
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
 /** A captioner over fakes: no model is called and no image is read. */
-function fixture(items: CaptionItem[], saved: CaptionDocument | null = null) {
+function fixture(items: CaptionItem[], saved: IdleDocument | null = null) {
   const state = {
     clock: Date.parse("2026-10-26T09:00:00Z"),
     items,
@@ -91,7 +89,7 @@ test("captions the newest uncaptioned image, one at a time and at most one every
     image("captioned", "alice", { caption: old }),
     image("old"),
   ]);
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   assert.deepEqual(state.items[0].caption, {
     text: "a picture of new",
     tags: ["picture"],
@@ -106,7 +104,7 @@ test("captions the newest uncaptioned image, one at a time and at most one every
   );
   assert.equal(await captioner.tick(), "spaced");
   later();
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   later();
   assert.equal(await captioner.tick(), "none", "outside a pass, older captions stay");
   assert.deepEqual(state.sent, ["new", "old"]);
@@ -130,7 +128,7 @@ test("waits while work runs and yields the moment work appears", async () => {
 
   state.hold = false;
   later();
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   assert.equal(captionOf(0)?.text, "a picture of a");
 });
 
@@ -149,9 +147,9 @@ test("text work that starts mid-caption makes it step aside within a second", as
 test("skips text-only models (saying so once), the switch off and accounts without the assistant", async () => {
   const { state, captioner, later } = fixture([image("bob-1", "bob"), image("alice-1")]);
   state.vision = false;
-  assert.equal(await captioner.tick(), "text-only");
+  assert.equal(await captioner.tick(), "unavailable");
   later();
-  assert.equal(await captioner.tick(), "text-only");
+  assert.equal(await captioner.tick(), "unavailable");
   assert.equal(state.logs.length, 1);
   assert.match(state.logs[0], /running text model can't read images/);
   assert.deepEqual(
@@ -167,7 +165,7 @@ test("skips text-only models (saying so once), the switch off and accounts witho
   state.enabled = true;
   state.allowed.delete("bob");
   later();
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   later();
   assert.equal(await captioner.tick(), "none");
   assert.deepEqual(state.sent, ["alice-1"], "bob's image never reaches the model");
@@ -176,12 +174,12 @@ test("skips text-only models (saying so once), the switch off and accounts witho
 
 test("stops at the daily cap, which a restart keeps, and starts again the next day", async () => {
   const { state, captioner, later } = fixture([image("waiting")], {
-    trickle: { day: new Date("2026-10-26T09:00:00Z").toDateString(), count: dailyCaptions },
+    trickle: { day: new Date("2026-10-26T09:00:00Z").toDateString(), count: dailyItems },
   });
   assert.equal(await captioner.tick(), "capped");
   state.clock += 24 * 60 * 60_000;
   later();
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   assert.equal(state.saved?.trickle?.count, 1);
 });
 
@@ -190,7 +188,7 @@ test("an image that fails is skipped; failures in a row pause instead of skippin
   state.fail.add("broken");
   assert.equal(await captioner.tick(), "failed");
   later();
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   assert.equal(state.items[1].caption?.text, "a picture of fine");
   later();
   assert.equal(await captioner.tick(), "none");
@@ -207,7 +205,7 @@ test("an image that fails is skipped; failures in a row pause instead of skippin
   assert.match((await down.captioner.status()).reason, /failing \(HTTP 500\)/);
   down.state.fail.clear();
   down.state.clock += 60_000;
-  assert.equal(await down.captioner.tick(), "captioned");
+  assert.equal(await down.captioner.tick(), "done");
   assert.equal(down.state.items[0].caption?.text, "a picture of a", "the paused images come back");
 });
 
@@ -266,7 +264,7 @@ test("a pass yields to work, reports waiting and resumes once idle", async () =>
 
   state.idle = true;
   state.hold = false;
-  assert.equal(await captioner.tick(), "captioned");
+  assert.equal(await captioner.tick(), "done");
   await captioner.settled();
   assert.equal((await captioner.status()).state, "finished");
   assert.equal(state.items.filter((item) => item.caption).length, 3);
@@ -286,7 +284,7 @@ test("a stopped pass stays stopped across a restart; a running one resumes", asy
     ["stopped", 3],
   );
   state.hold = false;
-  assert.equal(await restarted.tick(), "captioned", "the trickle carries on");
+  assert.equal(await restarted.tick(), "done", "the trickle carries on");
   assert.equal(await restarted.tick(), "spaced");
 
   restarted.startPass();
@@ -298,7 +296,7 @@ test("a stopped pass stays stopped across a restart; a running one resumes", asy
   restarted.stop();
   restarted.interrupt();
   await restarted.settled();
-  assert.equal(await resumed.tick(), "captioned", "no spacing after a restart mid-pass");
+  assert.equal(await resumed.tick(), "done", "no spacing after a restart mid-pass");
   await resumed.settled();
   assert.equal((await resumed.status()).state, "finished");
 });
