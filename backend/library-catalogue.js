@@ -163,7 +163,7 @@ const provenanceFields = new Set(["sha256", "bytes", "source"]);
  * An edit patch reduced to the fields Studio may change, each in its stored form. Throws on
  * anything else. `provenance` (imports only) also accepts the file's hash, size and source.
  */
-export function cleanCataloguePatch(patch, { provenance = false } = {}) {
+function cleanCataloguePatch(patch, { provenance = false } = {}) {
   if (!isObject(patch)) throw new Error("A catalogue change is an object of fields.");
   const clean = {};
   for (const [key, value] of Object.entries(patch)) {

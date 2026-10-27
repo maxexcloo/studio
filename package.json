@@ -16,9 +16,7 @@
     "build": "vite build --config frontend/vite.config.ts",
     "dev": "node dev.mjs",
     "dev:demo": "node dev.mjs --demo",
-    "preview": "vite preview --config frontend/vite.config.ts --host 127.0.0.1 --port 5173",
     "release": "node .github/release.mjs",
-    "start": "node backend/index.js",
     "test": "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts .github/*.test.js"
   },
   "dependencies": {

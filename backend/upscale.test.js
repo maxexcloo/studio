@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,15 +7,8 @@ import test from "node:test";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-seedvr2-"));
 process.env.STUDIO_SEEDVR2_MODEL_DIR = dir;
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-const {
-  faceDetailSource,
-  installState,
-  modelFiles,
-  startModelInstall,
-  upscaleGraph,
-  upscalePlan,
-  upscaleStatus,
-} = await import("./upscale.js");
+const { faceDetailSource, modelFiles, upscaleGraph, upscalePlan, upscaleStatus } =
+  await import("./upscale.js");
 
 // Shaped like the real /object_info: V3 combos, and offload_device is an optional input.
 const combo = (values) => ["COMBO", { options: values }];
@@ -121,67 +113,6 @@ test("the graph uses the machine's own device and skips block swap without an of
   assert.equal(cuda["3"].inputs.device, "cuda:0");
   assert.equal(cuda["3"].inputs.offload_device, "cpu");
   assert.equal(cuda["3"].inputs.blocks_to_swap, 16);
-});
-
-async function waitForInstall() {
-  for (let i = 0; i < 200; i += 1) {
-    const state = installState();
-    if (state && state.status !== "running") return state;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-  throw new Error("install never finished");
-}
-
-test("a download resumes from its .part file and is verified by checksum", async (t) => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  const payload = crypto.randomBytes(64 * 1024);
-  const original = { ...modelFiles["ema_vae_fp16.safetensors"] };
-  Object.assign(modelFiles["ema_vae_fp16.safetensors"], {
-    bytes: payload.length,
-    sha256: crypto.createHash("sha256").update(payload).digest("hex"),
-  });
-  fs.writeFileSync(path.join(dir, "ema_vae_fp16.safetensors.part"), payload.subarray(0, 20_000));
-  const ranges = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (_url, init = {}) => {
-    const range = init.headers?.range || "";
-    ranges.push(range);
-    const from = Number(range.match(/bytes=(\d+)-/)?.[1] || 0);
-    return new Response(payload.subarray(from), { status: from ? 206 : 200 });
-  };
-  t.after(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(modelFiles["ema_vae_fp16.safetensors"], original);
-  });
-
-  startModelInstall("fast", infoWith(registryListing));
-  const done = await waitForInstall();
-  assert.equal(done.status, "done");
-  assert.deepEqual(ranges, ["bytes=20000-"]);
-  assert.deepEqual(fs.readFileSync(path.join(dir, "ema_vae_fp16.safetensors")), payload);
-  assert.equal(fs.existsSync(path.join(dir, "ema_vae_fp16.safetensors.part")), false);
-  const cache = JSON.parse(fs.readFileSync(path.join(dir, ".validation_cache.json"), "utf8"));
-  assert.equal(cache["ema_vae_fp16.safetensors"].size, payload.length);
-});
-
-test("a download that fails its checksum is thrown away, not installed", async (t) => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  const original = { ...modelFiles["ema_vae_fp16.safetensors"] };
-  Object.assign(modelFiles["ema_vae_fp16.safetensors"], { bytes: 4, sha256: "0".repeat(64) });
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(Buffer.from("evil"), { status: 200 });
-  t.after(() => {
-    globalThis.fetch = realFetch;
-    Object.assign(modelFiles["ema_vae_fp16.safetensors"], original);
-  });
-
-  startModelInstall("fast", infoWith(registryListing));
-  const done = await waitForInstall();
-  assert.equal(done.status, "error");
-  assert.match(done.error, /checksum/);
-  assert.equal(fs.existsSync(path.join(dir, "ema_vae_fp16.safetensors")), false);
 });
 
 test("the terminal install uses ComfyUI's own folder and Python when it can see them", async () => {

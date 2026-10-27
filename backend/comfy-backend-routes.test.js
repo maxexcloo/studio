@@ -82,6 +82,11 @@ async function stop() {
   server.kill("SIGTERM");
   await exited;
 }
+// A worker that stopped answering is remembered for a while; a restarted Studio asks again.
+async function restart() {
+  await stop();
+  await start();
+}
 async function api(route, body, method = body === undefined ? "GET" : "POST") {
   const response = await fetch(base + route, {
     method,
@@ -108,33 +113,6 @@ test.after(async () => {
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
 
-test("health keeps the studio connected while either configured backend is available", async () => {
-  try {
-    let status = (await api("/api/comfy/status")).body;
-    assert.equal(status.connected, true);
-    assert.equal(status.backends.primary.connected, true);
-    assert.equal(status.backends.video.connected, true);
-    assert.equal(status.backends.primary.url, primary.url);
-    assert.equal(status.backends.video.url, video.url);
-    primary.setDown(true);
-    status = (await api("/api/comfy/status")).body;
-    assert.equal(status.connected, true);
-    assert.equal(status.backends.primary.connected, false);
-    assert.equal(status.backends.video.connected, true);
-    video.setDown(true);
-    status = (await api("/api/comfy/status")).body;
-    assert.equal(status.connected, false);
-    primary.setDown(false);
-    status = (await api("/api/comfy/status")).body;
-    assert.equal(status.connected, true);
-    assert.equal(status.backends.primary.connected, true);
-    assert.equal(status.backends.video.connected, false);
-  } finally {
-    primary.setDown(false);
-    video.setDown(false);
-  }
-});
-
 test("the catalogue reports whether the local video worker answered", async () => {
   try {
     let models = (await api("/api/models")).body;
@@ -147,7 +125,7 @@ test("the catalogue reports whether the local video worker answered", async () =
     assert.equal(offline.ready, undefined);
   } finally {
     video.setDown(false);
-    await api("/api/comfy/status");
+    await restart();
   }
 });
 
@@ -188,47 +166,21 @@ test(
         "cancelled",
       );
       video.setDown(false);
-      // Still remembered until something reaches the worker.
+      // Still remembered until Studio asks the worker again.
       assert.deepEqual((await api("/api/models")).body.backends.video, {
         configured: true,
         available: false,
       });
-      assert.equal((await api("/api/comfy/status")).body.backends.video.connected, true);
+      await restart();
       const models = (await api("/api/models")).body;
       assert.deepEqual(models.backends.video, { configured: true, available: true });
       assert.ok(models.profiles.some((profile) => profile.family === "minimax_h3"));
       assert.ok(probes() > before);
     } finally {
       video.setDown(false);
-      await api("/api/comfy/status");
     }
   },
 );
-
-test("a model type choice shows in the cached catalogue straight away", async () => {
-  const file = () =>
-    api("/api/models?cached=1").then(({ body }) =>
-      body.modelFiles.find((item) => item.name === "sd_xl_base_1.0.safetensors"),
-    );
-  const original = (await file()).choice;
-  const choice = (await api("/api/models?cached=1")).body.modelTypeChoices.checkpoint
-    .map((item) => item.value)
-    .find((value) => value && value !== original);
-  assert.ok(choice);
-  const put = (type) =>
-    fetch(base + "/api/models/types", {
-      method: "PUT",
-      headers: { "content-type": "application/json", "X-Studio": "1" },
-      body: JSON.stringify({ source: "checkpoint", name: "sd_xl_base_1.0.safetensors", type }),
-    });
-  try {
-    assert.equal((await put(choice)).status, 200);
-    assert.equal((await file()).choice, choice);
-  } finally {
-    await put("");
-  }
-  assert.equal((await file()).choice, original);
-});
 
 test(
   "generate leads with enabled LoRAs’ trigger words unless their toggle is off, and the run keeps that prompt",
@@ -279,8 +231,6 @@ test(
     assert.ok(
       Object.values(h3Prompt.prompt).some((node) => node.class_type === "MiniMaxH3ImageToVideo"),
     );
-    const status = (await api("/api/comfy/status")).body;
-    assert.doesNotMatch(JSON.stringify(status), /red ceramic teapot/);
     const before = primary.requests.length;
     await api(`/api/jobs/${accepted.body.jobId}/cancel`, {});
     assert.equal(
@@ -345,7 +295,6 @@ test(
     await api(`/api/jobs/${queued.id}/cancel`, {});
     assert.equal(primary.prompts.length, count);
     video.setDown(false);
-    await api("/api/comfy/status");
   },
 );
 

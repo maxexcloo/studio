@@ -248,7 +248,7 @@ export function cleanPrompt(text, limit = maxPromptCharacters) {
 }
 
 /** The first JSON object or array in a reply, or null. */
-export function replyJson(text) {
+function replyJson(text) {
   const body = stripThinking(text)
     .replace(/^```(?:json)?\s*([\s\S]*?)\s*```$/i, "$1")
     .trim();
@@ -302,7 +302,7 @@ const one = (value, limit = 600) =>
 const isRole = (info) => ["acceleration", "supporting"].includes(info?.role);
 
 /** A LoRA's suggested strength: the publisher's default, a "Strength 0.7" note, else 1. */
-export function suggestedStrength(info) {
+function suggestedStrength(info) {
   const range = strengthRange(info);
   if (range?.default !== undefined) return range.default;
   const noted = Number(

@@ -1,5 +1,5 @@
 export type UpscaleQuality = "fast" | "balanced" | "high";
-export type UpscaleTarget = 2048 | 4096;
+type UpscaleTarget = 2048 | 4096;
 
 export interface UpscaleRequest {
   galleryItemId: string;

@@ -24,7 +24,6 @@ import { forgetComfyRun } from "./comfy-traces.js";
 import { families } from "./family-catalog.js";
 import { mimeExtension, referenceInputName } from "./reference-names.js";
 import {
-  ownerIdForRequest,
   recordBelongsToRequest,
   recordBelongsToAccount,
   recordsForRequest,
@@ -417,10 +416,6 @@ function decodeGalleryReference(id = "") {
   } catch {
     return "";
   }
-}
-
-function findGalleryItem(id = "", req = null) {
-  return findGalleryItemForAccount(id, req?.studioAccount);
 }
 
 function findGalleryItemForAccount(id, account) {

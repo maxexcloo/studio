@@ -19,7 +19,7 @@ export interface CaptionStatus {
   perMinute: number;
   etaSeconds: number | null;
 }
-export const galleryCaptionsQuery = queryOptions({
+const galleryCaptionsQuery = queryOptions({
   queryKey: ["gallery-captions"],
   queryFn: () => api<CaptionStatus>("/api/gallery/captions"),
   // Progress moves while a pass runs; otherwise only a new image changes it.

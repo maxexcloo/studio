@@ -8,13 +8,6 @@ const basename = (value) =>
     .split(/[\\/]/)
     .pop();
 
-/** Only a known shared family carries the current stack into another model. */
-export function sameLoraFamily(previous, next) {
-  if (previous?.id && previous.id === next?.id) return true;
-  const family = familyId(previous?.family);
-  return Boolean(family && family !== "custom" && family === familyId(next?.family));
-}
-
 /**
  * A LoRA's friendly name: the catalogue's title, else its file name cleaned
  * up (no folder or extension, spaces for underscores and hyphens, Title
@@ -104,14 +97,4 @@ export function strengthRange(info) {
       ? { default: range.default }
       : {}),
   };
-}
-
-export function compatibilityNote(info, profile) {
-  if (!info?.compatibility) return "";
-  const fit = loraCompatibility(info, profile);
-  return fit === "unknown"
-    ? "Compatibility has not been verified for this model variant."
-    : fit === "other"
-      ? "This LoRA does not support the selected model variant."
-      : "";
 }

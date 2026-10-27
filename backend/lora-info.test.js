@@ -12,7 +12,6 @@ fs.mkdirSync(path.join(loraDir, "sdxl"), { recursive: true });
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const {
-  cachedLoraAbout,
   catalogueLoraInfo,
   familiesFromKeys,
   familiesFromMetadata,
@@ -142,7 +141,6 @@ test("a LoRA file is read once, with the keys winning and metadata narrowing", (
   assert.equal(info.base, "SDXL");
   assert.equal(info.title, "detail slider");
   assert.deepEqual(info.triggers, ["detailed"]);
-  assert.equal(cachedLoraAbout(name), "detail slider");
   assert.equal(loraInfo("../escape.safetensors"), null);
   assert.equal(loraInfo("missing.safetensors"), null);
 });

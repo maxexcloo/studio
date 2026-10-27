@@ -163,7 +163,7 @@ test("only an authenticated administrator can create profiles and approve ordina
   // A personal MCP token is not a general API or administrator credential.
   assert.equal(accountForRequest(bearer("GET", "/api/accounts/admin")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
-  assert.equal(accountForRequest(bearer("POST", "/api/comfy/restart")), null);
+  assert.equal(accountForRequest(bearer("POST", "/api/runtime/restart")), null);
   const { canAdmin } = await import("./access.js");
   assert.equal(canAdmin(bearer("GET", "/comfy/view")), false);
   const revoked = await call(routes["POST /api/accounts/mcp-token/revoke"], admin);
@@ -514,7 +514,6 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
   // Nothing that deletes or replaces files, and no account or GPU administration.
   for (const [method, routePath] of [
-    ["POST", "/api/models/downloads/replace"],
     ["DELETE", "/api/loras"],
     ["DELETE", "/api/models/downloads"],
     ["GET", "/api/accounts/admin"],

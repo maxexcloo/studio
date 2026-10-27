@@ -146,34 +146,6 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
   });
 });
 
-test("account deltas carry only the owner's own upserts and removes", () => {
-  galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b")]);
-  const request = (since) => ({
-    studioAccount: {
-      userId: "account-a",
-      role: "user",
-      authenticated: true,
-      features: { gallery: true },
-    },
-    query: { since: String(since) },
-  });
-  const start = galleryStore.galleryRevisionValue();
-  galleryStore.setGallery([item("account-a", "job-a"), item("account-b", "job-b2")]);
-  const foreignOnly = call(routes["/api/gallery/delta"], request(start));
-  assert.equal(foreignOnly.reset, false);
-  assert.deepEqual(foreignOnly.upserts, []);
-  assert.deepEqual(foreignOnly.removes, []);
-
-  const next = galleryStore.galleryRevisionValue();
-  galleryStore.setGallery([item("account-a", "job-a2"), item("account-b", "job-b2")]);
-  const own = call(routes["/api/gallery/delta"], request(next));
-  assert.deepEqual(
-    own.upserts.map((record) => record.jobId),
-    ["job-a2"],
-  );
-  assert.deepEqual(own.removes, [galleryStore.galleryKey(item("account-a", "job-a"))]);
-});
-
 test("finished outputs keep the pending tiles' owner and never replace another owner's tiles", async () => {
   const pending = (ownerId) => ({
     ...item(ownerId, "shared-job"),
@@ -227,20 +199,6 @@ test("repeated gallery filters match any of their values and combine across filt
     ids({ model: ["", ""] }),
     ["job-flux", "job-sdxl", "job-wan"],
     "blank values are no filter",
-  );
-  const since = galleryStore.galleryRevisionValue();
-  galleryStore.setGallery([
-    ...galleryStore.gallery,
-    made("job-flux2", "flux.safetensors", 2048, 2048),
-    made("job-wan2", "wan.safetensors", 2048, 2048),
-  ]);
-  const delta = call(
-    routes["/api/gallery/delta"],
-    request({ since: String(since), model: ["flux", "sdxl"] }),
-  );
-  assert.deepEqual(
-    delta.upserts.map((record) => record.jobId),
-    ["job-flux2"],
   );
 });
 

@@ -5,7 +5,7 @@ into ComfyUI, recognised, set up with the settings its makers ship, and, when
 something is missing, explained with a way to get it right in the app.
 
 Everything below is data plus one graph. The sidebar, the workflow library,
-the "Use as …" picker, downloads and node-pack installs all read the same
+downloads and missing-part hints all read the same
 catalog, so a family that is described correctly needs no UI work.
 
 ## The pieces
@@ -43,17 +43,11 @@ catalog, so a family that is described correctly needs no UI work.
    for the panel). Then point the family at it with `pack: "<id>"`. When a model runs
    on more than one pack (for example one CUDA-only, one that also runs on
    Apple Silicon), describe each as a runner the way `sanaRunners` does, one
-   model source per runner. Studio then shows an **Install** button wherever
-   the model appears (`backend/pack-installer.js`): packs with a `manager` id
-   are queued in ComfyUI-Manager when it answers; otherwise, with ComfyUI on
-   this computer, Studio clones the pack and installs its requirements with
-   ComfyUI's own Python. Manager 4 cannot install by Git URL (only in its
-   legacy UI, behind a config flag), so unlisted packs always take the local
-   route. Manual steps (Manager or terminal) stay one tap away and are all a
-   remote ComfyUI gets. A pack that ships inside its makers' model repository
-   gets `subdir` (its folder there): the one-click route checks the repository
-   out outside custom_nodes and copies only that folder in, and the terminal
-   steps do the same. `requirements: false` leaves pip out for a pack with no
+   model source per runner. A missing pack is reported with its terminal
+   install steps; workers get packs from their image recipe. A pack that ships
+   inside its makers' model repository gets `subdir` (its folder there): the
+   steps check the repository out outside custom_nodes and copy only that
+   folder in. `requirements: false` leaves pip out for a pack with no
    requirements.txt.
 
    When a model runs both on ComfyUI's own nodes and on a pack, give the
@@ -93,8 +87,7 @@ catalog, so a family that is described correctly needs no UI work.
    download `fp8: true` when its header carries per-layer
    fp8 quantization (`_quantization_metadata`, `comfy_quant` or `scale_weight`
    keys): ComfyUI keeps those in fp8, which a Mac cannot load, so on a Mac any
-   other build of the part is offered first and an fp8 starter never counts as
-   fitting. A plain fp8 file (no scales) loads at full precision and stays
+   other build of the part is offered first. A plain fp8 file (no scales) loads at full precision and stays
    unmarked. Parts that cannot be downloaded as single files (diffusers
    folders, gated repos) get a `command` on their missing entry: a
    copyable shell command, see `diffusersDownloadPlan` in
@@ -144,13 +137,6 @@ catalog, so a family that is described correctly needs no UI work.
    one with its own sampling style (Ideogram 4, MageFlow, Sana, H3, Wan's
    pair) or `ownLoaders` cannot. `canInpaint` in `backend/family-profiles.js`
    decides, and the model menu shows the result.
-
-   **Guided setup.** A family that runs more than one way can have a setup
-   dialog of its own: add it to `guidedSetups` (`backend/family-setup.js`)
-   and point the family at it with `setup`. Its setup panel then gets a
-   **Guided setup** button. The dialog works out the way from the file you
-   have and walks through what that needs; like everything else here, it
-   never downloads the model itself.
 
 9. **Tests** in `backend/model-families.test.js`. Cover detection from a
    header, each variant's defaults, what a missing part or pack reports, and
@@ -228,9 +214,7 @@ Architecture support depends on the pinned worker node revision, not the file ex
 
 ### Worker Memory
 
-`backend/hardware.js` uses the selected worker's `/system_stats` response for its memory estimate; the application container's own RAM is not the GPU budget. CUDA-style device reports also include ROCm workers. CPU and placeholder device values do not establish a usable GPU budget. Memory estimates help present requirements; they do not replace a verified model run on the actual placement.
-
-For local MPS development the retained estimator uses a configured wired-memory limit where available, otherwise 70% of unified memory. It favours full-precision alternatives to scaled or mixed FP8 formats that MPS cannot execute. Worker deployments use the exact image, GPU placement and model paths owned in ai.
+Studio does not estimate a worker's memory budget; a model fits when a verified run on the actual placement succeeds. Scaled or mixed FP8 formats cannot execute on MPS, so local Mac development needs full-precision alternatives. Worker deployments use the exact image, GPU placement and model paths owned in ai.
 
 ## Downloads
 

@@ -58,7 +58,7 @@ const pause = (milliseconds, signal) =>
   });
 
 /** RFC 7386 JSON merge patch: objects merge, null removes, anything else replaces. */
-export function mergePatch(target, patch) {
+function mergePatch(target, patch) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return structuredClone(patch);
   const result =
     target && typeof target === "object" && !Array.isArray(target) ? structuredClone(target) : {};
@@ -70,7 +70,7 @@ export function mergePatch(target, patch) {
 }
 
 /** A diff as text a chat can read: "- old", "+ new", "  same" and "… n unchanged lines". */
-export function diffText(before, after) {
+function diffText(before, after) {
   const { lines, added, removed } = lineDiff(before, after);
   const shown = lines
     .slice(0, maxDiffLines)
@@ -84,7 +84,7 @@ export function diffText(before, after) {
 }
 
 /** An import as chat sees it: its grade, reasons and every file with its status. */
-export function importView(record) {
+function importView(record) {
   if (!record) return null;
   const files = (record.resources || []).map((resource) => ({
     name: resource.want?.file || resource.name,

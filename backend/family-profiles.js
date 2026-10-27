@@ -21,7 +21,6 @@ import {
   visionKinds,
 } from "./family-catalog.js";
 import { diffusersFolderPath, diffusersFolders } from "./diffusers-folders.js";
-import { isDismissed } from "./dismissals.js";
 import { nodePack } from "./node-packs.js";
 import { existingCopy } from "./model-downloads.js";
 import { inpaintingEnabled } from "./features.js";
@@ -176,17 +175,6 @@ export function catalogDownload(id = "") {
     ...spec(entry, at),
     alternatives: list.slice(at + 1).map((item, offset) => spec(item, at + 1 + offset)),
   };
-}
-
-/** A part's first download on this device (see forDevice), as catalogDownload gives it. */
-export function preferredDownload(kind, key, device = {}) {
-  const [source] = downloadSources[kind] || [];
-  const list = source && Object.hasOwn(source, key) ? source[key] : [];
-  const [first] = forDevice(
-    list.map((item, index) => ({ fp8: item.fp8, index })),
-    device,
-  );
-  return first ? catalogDownload(`${kind}:${key}:${first.index}`) : null;
 }
 
 /**
@@ -518,16 +506,13 @@ export function familyProfiles(info, helpers) {
     if (family.upsampler && !ownLoaders) {
       const slot = family.upsampler.slot;
       upsampler = rankEncoders(encoderFiles, slot)[0] || "";
-      // `dismissKey`: "Don't show again" hides a recommendation for the whole family, for good.
-      const dismissKey = `${info2.family}:${slot.slot}`;
-      if (!upsampler && !(family.upsampler.optional && isDismissed(dismissKey))) {
+      if (!upsampler) {
         (family.upsampler.optional ? recommended : missing).push({
           part: "encoder",
           slot: slot.slot,
           label: slot.label,
           kind: slot.kinds[0],
           detail: slot.detail,
-          ...(family.upsampler.optional ? { dismissKey } : {}),
           downloads: downloadsFor(
             encoderDownloads[slot.download],
             "text_encoders",
@@ -803,7 +788,6 @@ export function familyProfiles(info, helpers) {
     Object.assign(profile, {
       source,
       familyName: family.label,
-      ...(family.setup ? { setupGuide: family.setup } : {}),
       variant: variant.id,
       variantLabel: variant.label,
       encoderSlots,

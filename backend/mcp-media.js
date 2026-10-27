@@ -68,8 +68,8 @@ export function assertJobCount(prompts = 1, count = 1) {
   }
 }
 // A cloud provider that refused for authorisation or quota is skipped this long, so cloud video the user asks for doesn't queue doomed jobs.
-export const cloudPauseMilliseconds = 10 * 60 * 1000;
-export const cloudQuotaMessage = "Cloud video unavailable (quota).";
+const cloudPauseMilliseconds = 10 * 60 * 1000;
+const cloudQuotaMessage = "Cloud video unavailable (quota).";
 const cloudRefusal =
   /\b(?:401|402|403|429)\b|quota|unauthori[sz]ed|forbidden|insufficient|credit|billing|rate.?limit|exhausted/i;
 const isCloudVideo = (profile) => profile?.kind === "video" && isCloudProfile(profile);
@@ -83,7 +83,7 @@ const aborted = (signal) => {
   return error;
 };
 // A job read answers in milliseconds; one that takes longer than this is stalled, and Status says so instead of waiting on.
-export const statusReadTimeoutMs = 15000;
+const statusReadTimeoutMs = 15000;
 const statusStalledMessage =
   "Studio did not answer this status check in time. The generation keeps running: share its link and check again later, without resubmitting.";
 const pause = (milliseconds, signal) =>

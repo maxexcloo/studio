@@ -9,7 +9,7 @@ import { withPngText } from "./png-text.js";
 import { probeVideo } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
 
-export function importedGalleryItem(preset, previous = {}) {
+function importedGalleryItem(preset, previous = {}) {
   const checkpoint = preset.resources.find((item) =>
     ["checkpoints", "diffusion_models"].includes(item.folder),
   );
