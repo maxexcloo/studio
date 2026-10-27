@@ -220,10 +220,12 @@ primary component reference and verify APIs against the installed version.
   jobs out of the queue; their records and chat cards stay.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
-- Gallery search expands into a full-width focused input; Escape closes it
-  while preserving the query. Supported filters use icon-triggered Mantine
-  popovers with scrollable controls. Normal, search, filters and selection
-  modes use the same toolbar region. Search/filter actions preserve queries.
+- The gallery toolbar keeps its search box in the row on desktop; phones expand
+  it from an icon into a full-width focused input, and Escape closes it while
+  preserving the query. Filter and Select are compact chips at the row's end
+  (icons on phones); Filter swaps the leading controls for a row of facet chips,
+  each opening a scrollable Mantine popover. Normal, search, filters and
+  selection modes use the same toolbar region. Search/filter actions preserve queries.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
@@ -235,10 +237,11 @@ primary component reference and verify APIs against the installed version.
 
 - The viewer is the iteration hub. Under the image, a prompt bar prefilled from
   the item generates variations (the composer Count) into a strip; choosing one
-  makes it current. Always-visible actions: Star, Download (Share on phones),
-  Upscale, Animate with an LLM prompt menu (Cinematic Camera, Living Photo,
-  Action, Spicy for NSFW-granted accounts, Custom Instruction), Regenerate (new
-  seed, with Exact Repeat in its menu) and Copy Prompt/Settings. Details lists
+  makes it current. Its action bar is the shared item actions in their menu
+  groups, plus Star, Download (and Share on phones) first and Regenerate (new
+  seed, with Exact Repeat in its menu) after Recreate; Animate keeps its LLM
+  prompt menu (Cinematic Camera, Living Photo, Action, Spicy for NSFW-granted
+  accounts, Custom Instruction) and Upscale its settings. Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height. The desktop details sidebar is open by
@@ -246,7 +249,12 @@ primary component reference and verify APIs against the installed version.
   an icon row and prompt bar; swipe left/right navigates, down closes and up
   reveals details and further options.
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
-  card that fans out in place; its images open the viewer hub.
+  card that fans out in place; its images open the viewer hub. Grid shows a
+  result and its versions (runs made from it: Edit, Recreate, Regenerate and the
+  like, linked by `parentJobId` and `parentItemId`) as one tile showing the latest,
+  with a version count; crossing it with the pointer, or a sideways swipe on
+  phones, flips through them. The All Versions filter chip lists them
+  separately. `versions.ts` owns the grouping for every consumer.
 - Viewers always fill the viewport independently of workspace width. Transparent
   stage/content reveal the blurred gallery behind. Empty-stage clicks close,
   including just outside the image; a near-miss within an invisible margin
@@ -258,8 +266,12 @@ primary component reference and verify APIs against the installed version.
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Viewer actions share one icon row with consistent controls; secondary
-  actions use More Viewer Actions and display/sharing switches use Viewer Options.
+- Item actions have one definition (`useMediaActions`): Animate, Edit, Recreate,
+  Reference | Create Comparison, Upscale | Copy Details, Copy Prompt | Delete,
+  divided into those groups in every menu and action bar. The viewer and gallery
+  selection share one `ActionBarGroups` bar: icon groups with dividers, phone
+  overflow in a More menu of the same groups, and a trailing control after a
+  divider (Viewer Options for display/sharing switches; Cancel, which ends selection).
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
   Image viewing and original/upscale comparison share `MediaZoom` for named
@@ -273,7 +285,8 @@ primary component reference and verify APIs against the installed version.
   hiding the tab pauses playback. Heavy tools load only when opened. Near-bottom
   paging preserves loaded results and exposes a retry after failure. Closing
   after viewer navigation reveals and focuses the current gallery item.
-- Tiles share one Mantine actions menu for More and context clicks. Desktop
+- Tiles share one Mantine actions menu for More and context clicks; Star,
+  Download and Select live on the tile, toolbar and selection instead. Desktop
   reveals quick controls on hover/focus; phones keep More visible and show a
   persistent star for favourites. Selection replaces these controls.
 - Use semantic buttons/links and accessible names for icons. Preserve drafts

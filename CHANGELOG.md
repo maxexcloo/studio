@@ -22,6 +22,15 @@ version opens with a `> ` summary line.
 ### Fixed
 
 - Refine, Negative, LoRA suggestions, profile drafts and suggestions leave room for the text model's thinking, so they no longer fail with "unusable reply".
+### Added
+
+- Grid groups each image's versions (Edit, Recreate, Regenerate and the like) under one tile showing the latest, with a version count; hover across it, or swipe sideways on a phone, to flip through them. The All Versions filter lists them separately. New runs record the result they came from as `parentItemId`.
+
+### Changed
+
+- The item menu has one order everywhere: Animate, Edit (was Refine), Recreate, Reference | Create Comparison (was Compare Variants), Upscale | Copy Details, Copy Prompt | Delete. Download, Star and Select stay on the tile, toolbar and selection bar.
+- The viewer's action bar and the gallery selection bar share one divided icon bar with the menu's groups; the selection bar ends with Cancel.
+- The gallery toolbar keeps search in the row on desktop, with compact Filter and Select chips; starring is instant and rolls back if it fails.
 
 ## [1.0.10] - 2026-10-27
 
