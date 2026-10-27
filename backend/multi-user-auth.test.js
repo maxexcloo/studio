@@ -317,6 +317,7 @@ test("gateway identities map to accounts only through administrator links, and t
     },
   });
   assert.equal(accountForRequest(internal("POST", "/api/generate")).userId, artist.id);
+  assert.equal(accountForRequest(internal("POST", "/api/jobs/job-1/cancel")).userId, artist.id);
   assert.equal(accountForRequest(internal("GET", "/api/accounts/admin")), null);
   // Behind a proxy the request is not this computer, so the credential is refused.
   assert.equal(

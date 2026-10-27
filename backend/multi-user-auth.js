@@ -62,6 +62,7 @@ const mcpBearerRoutes = [
   ["GET", /^\/api\/loras\/info$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],
+  ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
