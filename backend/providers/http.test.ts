@@ -140,7 +140,7 @@ test(
         if (job?.status === "completed" || job?.status === "failed") break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      assert.equal(job?.status, "completed", job?.reason);
+      assert.equal(job?.status, "completed", String(job?.reason));
       assert.equal(submissions, 1);
       const gallery = await api("/api/gallery");
       const output = gallery.items.find(
@@ -263,7 +263,7 @@ test(
         if (ownJob?.status === "completed" || ownJob?.status === "failed") break;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      assert.equal(ownJob?.status, "completed", ownJob?.reason);
+      assert.equal(ownJob?.status, "completed", String(ownJob?.reason));
       assert.equal(submissions, 2);
       assert.equal(
         (await api("/api/gallery")).items.every(
