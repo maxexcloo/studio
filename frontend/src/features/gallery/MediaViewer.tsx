@@ -19,7 +19,7 @@ import type { MediaItem } from "../../types";
 import { LoadingState } from "../../ui/LoadingState";
 import { usePhone } from "../../ui/usePhone";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaDetails } from "./MediaDetails";
+import { DetailsCopyActions, MediaDetails } from "./MediaDetails";
 import { mediaTitle } from "./mediaLabels";
 import { MediaJobStatus } from "./MediaJobStatus";
 import classes from "./MediaViewer.module.css";
@@ -433,14 +433,17 @@ export function MediaViewer({
               >
                 <ScrollArea h="100%" type="hover" offsetScrollbars>
                   <Stack gap="lg" p="md" pt="lg">
-                    <Stack gap={2}>
-                      <Text fw={600} lineClamp={2}>
-                        {mediaTitle(item)}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {subtitle}
-                      </Text>
-                    </Stack>
+                    <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
+                      <Stack gap={2} miw={0}>
+                        <Text fw={600} lineClamp={2}>
+                          {mediaTitle(item)}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {subtitle}
+                        </Text>
+                      </Stack>
+                      <DetailsCopyActions item={displayed} />
+                    </Group>
                     <MediaDetails item={displayed} />
                   </Stack>
                 </ScrollArea>
@@ -460,9 +463,12 @@ export function MediaViewer({
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">
-              <Text size="xs" c="dimmed" mt={-8}>
-                {subtitle}
-              </Text>
+              <Group justify="space-between" wrap="nowrap" gap="xs" mt={-8}>
+                <Text size="xs" c="dimmed">
+                  {subtitle}
+                </Text>
+                <DetailsCopyActions item={displayed} />
+              </Group>
               <MediaDetails item={displayed} />
             </Stack>
           </Drawer>
