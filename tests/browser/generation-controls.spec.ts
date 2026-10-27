@@ -513,11 +513,10 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await prompt.fill("A wide copper horizon");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
-  await page
-    .getByRole("radiogroup", { name: "Resolution", exact: true })
-    .locator("label")
-    .filter({ hasText: "2K" })
-    .click();
+  const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
+  // A size the model isn't documented to draw is shown but can't be chosen.
+  await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toBeDisabled();
+  await resolution.locator("label").filter({ hasText: "2K" }).click();
   await page.getByRole("button", { name: "16:9 2048 × 1152", exact: true }).click();
   await aspect.click();
   await expect(aspect).toHaveText("16:9 · 2K");
