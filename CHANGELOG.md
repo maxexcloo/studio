@@ -11,6 +11,17 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+
+- The Generations queue offers Stop and Clear per item, and Stop All and Clear Failed with a confirmation. Clearing a failed generation only takes it out of the queue.
+
+### Changed
+
+- The modes read Chat, Dream, Images, Videos with a sliding indicator, and the status action sits right of the Studio logo.
+- Pages, tabs and sections switch instantly; scrollbars no longer shift content; popups stay put while the page scrolls, and a click outside one only closes it.
+- Dialogs are larger and raised on a bordered, shadowed plane; empty views show one short centred line.
+- One motion system (short ease-out transform and opacity, no bounce, reduced motion respected) and one control size and emphasis scale come from the theme.
+
 ## [1.0.4] - 2026-10-27
 
 > Cloud failures say why

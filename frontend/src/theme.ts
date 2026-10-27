@@ -3,6 +3,7 @@ import {
   ActionIcon,
   alpha,
   AppShell,
+  Badge,
   Button,
   createTheme,
   Drawer,
@@ -154,6 +155,8 @@ export function studioTheme({
     cursorType: "pointer",
     activeClassName: "",
     other: { background, motionDuration, transparency },
+    // One size and emphasis scale (UI-PATTERNS › Theme & Layout). Standard controls take these
+    // defaults; compact surfaces (rows, toolbars, chip rails, popover forms) step down one tier.
     components: {
       ActionBar: ActionBar.extend({ defaultProps: { transitionProps } }),
       // One size for header and toolbar icons; the radius follows the Corners setting. Default
@@ -181,6 +184,8 @@ export function studioTheme({
           navbar: chrome,
         },
       }),
+      // Status pills are light; filled colour is for the one primary action in a view.
+      Badge: Badge.extend({ defaultProps: { variant: "light" } }),
       Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
       Drawer: Drawer.extend({
         defaultProps: { overlayProps: { blur: 6, backgroundOpacity: 0.4 }, transitionProps },
@@ -251,6 +256,7 @@ export function studioTheme({
       }),
       SegmentedControl: SegmentedControl.extend({
         defaultProps: {
+          size: "sm",
           transitionDuration: motionDuration,
           transitionTimingFunction: easing.enter,
         },
