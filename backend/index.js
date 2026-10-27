@@ -3,7 +3,6 @@ import "./env.js";
 // Then: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
-import "./hidden-migration.js";
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
 import { addProbe, logWarning } from "./crash-log.js";

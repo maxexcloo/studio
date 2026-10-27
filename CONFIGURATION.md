@@ -293,16 +293,6 @@ STUDIO_KUBERNETES_WORKLOADS='{
 
 Automatic control (`STUDIO_RUNTIME_AUTOMATIC=1`, off by default) starts and stops only media (image and video) workloads. Queued work for a stopped media workload starts it, stopping the media workloads in its pool it needs room from (idle ones first), and waits with "Waiting for <workload> to start". It never stops or starts a text workload, because LibreChat and Bifrost call text models directly and Studio cannot see those requests: if a running text workload holds the GPUs the media workload needs, nothing changes and the work waits with "Waiting for a GPU: <text workload> is running; stop it in Settings › Workers". A stopped text workload is started in Settings › Workers or with the control MCP tools, which may stop text as an explicit choice. After an outside stop Studio restores its last applied placement, keeping any running text; while that text holds GPUs the placement needs, the restore waits. Without automatic control, work for a stopped workload waits with the reason that the worker is offline.
 
-## Hidden Removal
-
-Studio no longer has Hidden. The first start of a version without it backs up and converts what an older Hidden left in the data folder, once, and deletes nothing:
-
-- **The backup** goes to `<STUDIO_DATA_DIR>/backups/hidden-removal-<time>/` (readable by the server's user only). It holds copies of `gallery.json`, `gallery-hidden.json`, `privacy.json` and `hidden-runs.json` where they existed, the encrypted `.private-vault` folder moved in whole, and a `summary.json` and `README.txt` saying what changed. The backup is written even on a studio that never used Hidden, so a deployment can confirm the step ran.
-- **Into the gallery:** gallery records still flagged as Hidden become ordinary gallery items, and records that a delete marker in `gallery-hidden.json` kept out of view come back. Markers for deleted and cleared outputs stay, so those don't return from ComfyUI's history.
-- **Still encrypted:** images inside the vault can't be opened without the owner's Hidden password, so they stay as ciphertext in the backup. `summary.json` counts them, and the server log warns once. Prompts sealed by the older scheme are cleared from the gallery records; the backup's copy of `gallery.json` keeps them.
-
-`<STUDIO_DATA_DIR>/.hidden-removed-v1` records that the step finished. Remove it only to run the step again.
-
 ## Renamed Settings
 
 Studio 1.0 reads only Studio names: every Studio setting starts with `STUDIO_`, and no old name is read as an alias. Third-party credentials keep their standard names (`HF_TOKEN`, `CIVITAI_API_TOKEN`). Rename these before upgrading:
