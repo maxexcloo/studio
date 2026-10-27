@@ -8,6 +8,7 @@ import type {
   ChatStatus,
 } from "../../shared/chat.ts";
 import type { GenerationInput, QueueJob } from "../../shared/queue.ts";
+import { promptWords, replyTitle } from "../../shared/titles.ts";
 import { ChatStore } from "./chat-store.ts";
 
 interface ChatSettings {
@@ -139,32 +140,6 @@ const tool = {
   },
 };
 
-/** A chat's title from its first prompt: the first clause, without weights or tags. */
-function fallbackTitle(text: string) {
-  const prompt = text
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[()[\]{}]/g, "")
-    .replace(/:\s*-?\d+(\.\d+)?/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const clause = prompt.split(/[,.;|!?]/)[0].trim() || prompt;
-  const title = clause.length > 64 ? `${clause.slice(0, 61).replace(/\s+\S*$/, "")}…` : clause;
-  return title ? title[0].toUpperCase() + title.slice(1) : "New Chat";
-}
-function modelTitle(text: unknown) {
-  const title = String(text || "")
-    .trim()
-    .split("\n")[0]
-    .replace(/^title:\s*/i, "")
-    .replace(/["'“”‘’*_`#]/g, "")
-    .replace(/[\s.,;:!?-]+$/, "")
-    .split(/\s+/)
-    .slice(0, 6)
-    .join(" ")
-    .slice(0, 64);
-  return title ? title[0].toUpperCase() + title.slice(1) : "";
-}
-
 /** Session-scoped discussion and media requests share admission with the normal composer. */
 export class ChatService {
   readonly active = new Set<string>();
@@ -252,12 +227,12 @@ export class ChatService {
             }),
           }).catch(() => undefined);
           if (response?.ok)
-            title = modelTitle(
+            title = replyTitle(
               (await response.json().catch(() => undefined))?.choices?.[0]?.message?.content,
             );
         }
       }
-      if (modelId === null) title = fallbackTitle(text);
+      if (modelId === null) title = promptWords(text) || "New Chat";
       if (title) this.options.store.generatedTitle(ownerId, sessionId, title);
     } catch {
       // Titling is cosmetic; the chat keeps its current title.

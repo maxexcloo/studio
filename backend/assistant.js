@@ -17,6 +17,7 @@ import { assistantPreset, defaultPreset, familyUpsampler } from "./assistant-pre
 import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import { cleanTriggers } from "./lora-catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora-prompts.js";
+import { replyTitle } from "../shared/titles.ts";
 
 const gatewayKeys = [
   "STUDIO_PROMPT_WRITER_URL",
@@ -32,6 +33,8 @@ const captionCharacters = 600;
 const captionTags = 15;
 // Gallery captions are for search: what is visible, in the words people search with.
 const captionInstructions = `You caption images in a private gallery so its search can find them. Describe only what is visible, as plain facts: the subjects and objects; for each person their apparent age range, body type, hair, skin tone and apparent ethnicity, clothing or outfit (and how nude, when they are), pose and expression; the setting and background; any action; the style and look (medium such as photo, painting, illustration or 3D render, lighting, main colours, mood, composition and framing); and any legible text, quoted exactly. No opinions or judgement, no guessed names or identities, no preamble. Reply with only this JSON: {"text": "the description, under ${captionCharacters} characters", "tags": ["8 to ${captionTags} short lowercase search tags"]}`;
+const titleInstructions =
+  "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
 const maxCandidates = 20;
 const maxExamples = 6;
 const lookupTtlMs = 10 * 60_000;
@@ -967,6 +970,25 @@ export function createAssistant(
     return { text, tags, model };
   }
 
+  /** A gallery item's title of a few words, summarised from its prompt; throws on an unusable reply. */
+  async function title({ prompt, signal } = {}) {
+    const model = settings().model;
+    const reply = await chat({
+      model,
+      messages: [
+        { role: "system", content: titleInstructions },
+        { role: "user", content: one(prompt, maxPromptCharacters) },
+      ],
+      temperature: 0.2,
+      // Reasoning models spend most of this on thinking before the few words.
+      maxTokens: 1500,
+      signal,
+    });
+    const text = replyTitle(reply.text);
+    if (!text) throw new AssistantError("unusable reply");
+    return { title: text, model };
+  }
+
   /**
    * A drafted prompting guide in the prompting.json pack schema, from a source page's text and the
    * nearest existing pack. Throws when the reply isn't a usable pack; callers mark it AI-drafted.
@@ -1074,6 +1096,7 @@ export function createAssistant(
     matchLoras,
     describe,
     caption,
+    title,
     draftGuide,
     draftProfile,
   };

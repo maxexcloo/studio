@@ -20,6 +20,8 @@ export interface PromptWriting {
   prompt?: string;
   thinking?: string;
   model?: string;
+  /** The result's title, when the writer gave one with the prompt. */
+  title?: string;
   [request: string]: unknown;
 }
 /** Whether an input still waits for its prompt to be written. */
