@@ -38,12 +38,14 @@ export function useMediaZoom({
   }
   function layout(next: Mode, animationTime = duration) {
     const api = transform.current;
-    if (!api || !picture.current) return;
-    // zoomToElement cancels queued native animations even for an immediate resize refit.
+    // A failed picture is hidden and has nothing to lay out.
+    if (!api || !picture.current?.offsetWidth) return;
+    // zoomToElement cancels queued native animations even for an immediate resize refit. Fit never
+    // enlarges a picture smaller than the viewport beyond its actual size.
     if (next === "Fit" || next === "Actual Size")
       void api.zoomToElement(
         picture.current,
-        next === "Actual Size" ? { scale: 1 } : undefined,
+        next === "Actual Size" ? { scale: 1 } : { maxScale: 1 },
         animationTime,
       );
     else if (next === "Fill") {
@@ -79,8 +81,8 @@ export function useMediaZoom({
     if (direction < 0) void transform.current?.zoomOut(0.2, duration);
     else void transform.current?.zoomIn(0.2, duration);
   }
+  // Lays out while the image loads too, so its placeholder already sits where the image will.
   useLayoutEffect(() => {
-    if (disabled) return;
     const observer = new ResizeObserver(() => layout(modeRef.current, 0));
     observer.observe(viewport.current!);
     layout(modeRef.current, 0);

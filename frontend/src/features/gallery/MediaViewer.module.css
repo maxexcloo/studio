@@ -200,6 +200,15 @@
   min-width: 22px;
 }
 
+/* The surface extends outward so prompt text stays aligned with the rest of Details. */
+.promptText {
+  margin-inline: calc(-1px - var(--mantine-spacing-xs));
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  padding: calc(var(--mantine-spacing-xs) / 2) var(--mantine-spacing-xs);
+  background: var(--mantine-color-default-hover);
+}
+
 .asideTrack {
   display: flex;
   justify-content: flex-end;

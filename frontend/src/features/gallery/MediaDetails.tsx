@@ -1,6 +1,17 @@
-import { ActionIcon, Badge, Group, Image, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import {
+  ActionIcon,
+  Badge,
+  Group,
+  Image,
+  ScrollArea,
+  Stack,
+  Table,
+  Text,
+  Title,
+  Tooltip,
+} from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Copy } from "lucide-react";
+import { Copy, ListChecks } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -8,6 +19,7 @@ import { backendLabel, isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { WritingThinking } from "../generation/PromptWriting";
 import { referenceLabel } from "../generation/references";
+import classes from "./MediaViewer.module.css";
 import { mediaSource } from "./mediaSource";
 
 const fileStem = (name: unknown) =>
@@ -67,6 +79,7 @@ function generationDetails(
     ? (settings.referenceDetails as ReferenceAsset[])
     : [];
   const shown = mediaSource(item);
+  const inpaint = settings.inpaint as { strength?: number } | undefined;
   const video = item.type === "video";
   return {
     profile: String(
@@ -82,15 +95,23 @@ function generationDetails(
         strength: Number(lora.strength ?? 1).toFixed(2),
       })),
     references,
+    // Every recorded input, in the order they shape the run; Copy Settings copies the same rows.
     settings: rows([
       // The backend a combined profile ran on.
       ["Backend", settings.profileBackend ? backendLabel(String(settings.profileBackend)) : ""],
-      ["Seed", settings.seed],
+      ["Text Encoder", fileStem(settings.textEncoder)],
+      ["VAE", fileStem(settings.vae)],
+      ["CLIP Type", settings.clipType],
+      ["Weight Type", settings.weightDtype],
+      ["Resolution", settings.resolution],
       ["Steps", settings.steps],
       ["CFG", settings.cfg],
       ["Sampler", settings.sampler],
       ["Scheduler", settings.scheduler],
       ["Denoise", !video && references.length ? settings.denoise : ""],
+      ["Inpaint", inpaint?.strength ?? ""],
+      ["Seed", settings.seed],
+      ["Count", !video && Number(settings.count) > 1 ? settings.count : ""],
     ]),
     output: rows([
       ["Dimensions", shown.width ? `${shown.width} × ${shown.height}` : ""],
@@ -102,13 +123,14 @@ function generationDetails(
       ["Size", size === null ? pendingValue : bytes(size)],
       ["Time", time(item.createdAt)],
     ]),
+    // The stages in the order they ran, then their totals.
     timing: rows([
-      ["Active", elapsed(item.timing?.runMs)],
-      ["Total", elapsed(item.durationMs || undefined)],
       ["Queue", elapsed(item.timing?.queueMs)],
       ["Setup", elapsed(item.timing?.setupMs)],
       ["Sampling", elapsed(item.timing?.samplingMs)],
       ["Finishing", elapsed(item.timing?.finishMs)],
+      ["Active", elapsed(item.timing?.runMs)],
+      ["Total", elapsed(item.durationMs || undefined)],
     ]),
   };
 }
@@ -123,9 +145,11 @@ function useGenerationDetails(item: MediaItem, size?: number | null) {
   });
 }
 
-/** Copy Settings: the prompt and only the inputs that were set, as plain text. */
+/** Copy Settings: the prompts and every input that was set, one per line. */
 export function useSettingsText(item: MediaItem) {
   const details = useGenerationDetails(item);
+  const { profiles } = useGenerationActions();
+  const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return () =>
     [
       item.prompt?.trim(),
@@ -133,17 +157,59 @@ export function useSettingsText(item: MediaItem) {
       details.profile && `Profile: ${details.profile}`,
       details.loras.length &&
         `LoRAs: ${details.loras.map((lora) => `${lora.name} ${lora.strength}`).join(", ")}`,
-      [
+      details.references.length &&
+        `References: ${details.references.map((asset, index) => referenceLabel(asset, index, profile)).join(", ")}`,
+      ...[
         ...details.settings,
         ...details.output.filter(([label]) =>
-          ["Dimensions", "Frames", "FPS", "Duration"].includes(label),
+          ["Dimensions", "Duration", "Frames", "FPS"].includes(label),
         ),
-      ]
-        .map(([label, value]) => `${label}: ${value}`)
-        .join(" · "),
+      ].map(([label, value]) => `${label}: ${value}`),
     ]
       .filter(Boolean)
       .join("\n");
+}
+
+/** A prompt on a subtle surface; long prompts scroll within a bounded height. */
+function PromptText({ dimmed, children }: { dimmed?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={classes.promptText}>
+      <ScrollArea.Autosize mah="12rem">
+        <Text size="sm" c={dimmed ? "dimmed" : undefined} style={{ whiteSpace: "pre-wrap" }}>
+          {children}
+        </Text>
+      </ScrollArea.Autosize>
+    </div>
+  );
+}
+
+/** Copy Prompt and Copy Settings beside the details title. */
+export function DetailsCopyActions({ item }: { item: MediaItem }) {
+  const settingsText = useSettingsText(item);
+  return (
+    <Group gap={6} wrap="nowrap">
+      {item.prompt && (
+        <Tooltip label="Copy Prompt">
+          <ActionIcon
+            variant="default"
+            aria-label="Copy Prompt"
+            onClick={() => void copyText(item.prompt!, "Prompt")}
+          >
+            <Copy size={18} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      <Tooltip label="Copy Settings">
+        <ActionIcon
+          variant="default"
+          aria-label="Copy Settings"
+          onClick={() => void copyText(settingsText(), "Settings")}
+        >
+          <ListChecks size={18} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
+  );
 }
 
 /** The shown file's size from a one-byte range request; gallery records do not store it. */
@@ -204,31 +270,10 @@ export function MediaDetails({ item }: { item: MediaItem }) {
   return (
     <Stack gap="lg" fz="sm">
       <Stack gap={6}>
-        <Group justify="space-between" wrap="nowrap" gap="xs">
-          <Title order={6}>Prompt</Title>
-          {item.prompt && (
-            <Tooltip label="Copy Prompt">
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size="sm"
-                aria-label="Copy Prompt"
-                onClick={() => void copyText(item.prompt || "", "Prompt")}
-              >
-                <Copy size={14} />
-              </ActionIcon>
-            </Tooltip>
-          )}
-        </Group>
-        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-          {item.prompt || "No prompt recorded."}
-        </Text>
+        <Title order={6}>Prompt</Title>
+        <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
         <WritingThinking writing={item.writing} />
-        {item.negative && (
-          <Text size="sm" c="dimmed">
-            Negative: {item.negative}
-          </Text>
-        )}
+        {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
         {item.caption?.text && (
           <Text size="sm" c="dimmed">
             Caption: {item.caption.text}
