@@ -17,7 +17,6 @@ version opens with a `> ` summary line.
 
 ### Changed
 
-- Captions name adult content plainly and tag the specific things you would search for, not generic words like "photo". Captions record a hash of the rules they were written under, so changing the rules lets Caption Gallery redo older ones.
 - The item menu has one order everywhere: Animate, Edit (was Refine), Recreate, Reference | Create Comparison (was Compare Variants), Upscale | Copy Details, Copy Prompt | Delete. Download, Star and Select stay on the tile, toolbar and selection bar.
 - The viewer's action bar and the gallery selection bar share one divided icon bar with the menu's groups; the selection bar ends with Cancel.
 - The gallery toolbar keeps search in the row on desktop, with compact Filter and Select chips; starring is instant and rolls back if it fails.
@@ -27,6 +26,7 @@ version opens with a `> ` summary line.
 - Running work opens in the viewer from Chat as well as the gallery, showing its status and its prompt once written, and the viewer moves to the result when it is saved.
 - The viewer's strip holds the item's versions (each run made from it, and those made from them), grouped as the grid groups them, so switching moves between versions of one image rather than every result of the run.
 - The viewer's prompt bar is the composer: clicking it expands the full controls in place, prefilled with the item's settings and focused, without closing the viewer or touching the page's draft.
+- Captions name adult content plainly and tag the specific things you would search for, not generic words like "photo". Captions record a hash of the rules they were written under, so changing the rules lets Caption Gallery redo older ones.
 
 ### Fixed
 
