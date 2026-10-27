@@ -7,7 +7,7 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-provider-controls-"));
 process.env.STUDIO_DATA_DIR = scratch;
 const { saveImportedWorkflow } = await import("./custom-workflows.js");
-const { inferModels } = await import("./models.js");
+const { buildProfile, inferModels } = await import("./models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 const { customWorkflowGraph } = await import("./graphs.js");
 const { generationSettings } = await import("./gallery-store.js");
@@ -117,4 +117,31 @@ test("seconds and model-specific resolution travel from profile through validati
       video ? 15 : 0,
     );
   }
+});
+
+test("a profile's image modes override only its capabilities, defaults and prompting", () => {
+  // Grok profiles arrive with whole mode workflows, and MCP spreads a mode over its profile.
+  const reference = { id: "reference", kind: "image", min: 0, max: 1, required: false };
+  const mode = (mediaInputs, startImage) => ({
+    id: "video-grok",
+    graph: {},
+    mediaInputs,
+    capabilities: { startImage },
+    defaults: { duration: 8 },
+  });
+  const profile = buildProfile({
+    id: "custom:video-grok",
+    kind: "video",
+    label: "Grok Video",
+    model: "video-grok",
+    mediaInputs: [reference],
+    imageModes: { generate: mode([], false), reference: mode([reference], true) },
+  });
+  assert.deepEqual(profile.imageModes.reference, {
+    capabilities: { startImage: true },
+    defaults: { duration: 8 },
+  });
+  const generate = { ...profile, ...profile.imageModes.generate };
+  assert.equal(generate.id, "custom:video-grok");
+  assert.deepEqual(generate.mediaInputs, [reference]);
 });
