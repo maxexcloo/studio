@@ -21,6 +21,8 @@ version opens with a `> ` summary line.
 - The viewer's action bar and the gallery selection bar share one divided icon bar with the menu's groups; the selection bar ends with Cancel.
 - The gallery toolbar keeps search in the row on desktop, with compact Filter and Select chips; starring is instant and rolls back if it fails.
 - Every prompt assistant call shares one 4,000-token budget, so long thinking no longer cuts a reply short.
+- Viewer next steps are written ahead of time while Studio is idle (from the image too when the text model reads images), so they show as soon as the viewer opens; placeholder chips hold their row while they load.
+- A next step generates its change at once, with progress on the chip, and a refresh action beside the steps asks for different ones.
 
 ## [1.0.11] - 2026-10-27
 

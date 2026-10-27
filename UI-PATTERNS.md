@@ -192,8 +192,10 @@ primary component reference and verify APIs against the installed version.
   viewer next-step suggestions and Chat.
 - Suggestions never move the layout or act on their own: prompt ideas float
   over an empty, focused prompt and fill it (in Chat as "Create an image: …");
-  viewer next steps hold their row while loading and stage a prompt that Enter
-  or Generate runs. With none to offer, nothing shows.
+  viewer next steps hold their row with placeholder chips while loading, written
+  ahead of time while Studio is idle; a step puts its prompt in the prompt bar
+  and generates it, showing progress on the chip, and a small refresh action
+  asks for different ones. With none to offer, nothing shows.
 
 ## Data & Feedback
 

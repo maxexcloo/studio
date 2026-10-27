@@ -403,6 +403,10 @@ export function MediaViewer({
               prompt={prompt}
               onPromptChange={(next) => setDraft({ id: item.id, prompt: next })}
               onSubmit={() => iterate({ kind: "variation", prompt })}
+              onApply={(next) => {
+                setDraft({ id: item.id, prompt: next });
+                iterate({ kind: "variation", prompt: next });
+              }}
               pending={iteration.isPending && iteration.variables?.kind === "variation"}
               actions={
                 <MediaViewerActions

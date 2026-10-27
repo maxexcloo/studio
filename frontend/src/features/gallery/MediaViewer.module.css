@@ -170,18 +170,19 @@
   justify-content: safe center;
   min-height: 26px;
   padding-inline: 2px;
-  opacity: 0;
-  transition-property: opacity;
-  transition-timing-function: ease;
-}
-
-.stepRow[data-shown] {
-  opacity: 1;
 }
 
 .step {
   flex-shrink: 0;
   font-weight: 500;
+  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+/* Placeholder chips where the steps will appear, at a step's height. */
+.stepSkeleton {
+  flex-shrink: 0;
+  width: 96px;
+  height: 26px;
 }
 
 /* Padding sits outside the scrolling textarea, so a capped prompt never shows a cut-off line. */
