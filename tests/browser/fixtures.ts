@@ -194,6 +194,9 @@ export async function fixtures(page: Page) {
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
     if (path === "/api/models")
       return respond({ profiles, features: { library: true, presets: true } });
+    // Local video is running: Animate takes the local video profile.
+    if (path === "/api/animate/profile")
+      return respond({ profileId: "video:test", label: "Motion Quality", cloud: false, note: "" });
     if (path === "/api/chat/status")
       return respond({
         available: true,
