@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Animate writes its prompt again
+
+### Fixed
+
+- Animate's prompt assistant leaves room for the local model's thinking, so it no longer fails with "unusable reply".
+
 ## [1.0.1] - 2026-10-27
 
 > Steadier release checks for 1.0
