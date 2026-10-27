@@ -145,7 +145,6 @@ test(
           STUDIO_COMFY_OUTPUT_DIR: "",
           STUDIO_COMFY_INPUT_DIR: "",
           STUDIO_RUNTIME_AUTOMATIC: "1",
-          STUDIO_TEXT_ADMISSION_ACKNOWLEDGED: "1",
           STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
           STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
           STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
