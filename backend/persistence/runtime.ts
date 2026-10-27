@@ -6,14 +6,13 @@ import { DatabaseSync } from "node:sqlite";
 const databases = new Map<string, DatabaseSync>();
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
 
-/** Offline inspection of stopped studios; SQLite may create sidecars only on the private copy. */
-export function readOfflineRuntime(dataDir: string, names: readonly string[] = []) {
-  const result: { migrated: boolean; documents: Record<string, unknown> } = {
-    migrated: false,
-    documents: {},
-  };
+/**
+ * Runs `read` on a read-only copy of a stopped studio's database (undefined without one), so
+ * SQLite may create sidecars only on the private copy.
+ */
+export function withOfflineDatabase<T>(dataDir: string, read: (db: DatabaseSync) => T) {
   const file = databaseFile(dataDir);
-  if (!fs.existsSync(file)) return result;
+  if (!fs.existsSync(file)) return undefined;
   const temporary = fs.mkdtempSync(path.join(tmpdir(), "studio-runtime-read-"));
   try {
     const copy = databaseFile(temporary);
@@ -21,31 +20,40 @@ export function readOfflineRuntime(dataDir: string, names: readonly string[] = [
     if (fs.existsSync(`${file}-wal`)) fs.copyFileSync(`${file}-wal`, `${copy}-wal`);
     const db = new DatabaseSync(copy, { readOnly: true });
     try {
-      if (
-        !db
-          .prepare(
-            "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'studio_migrations'",
-          )
-          .get()
-      )
-        return result;
-      result.migrated = Boolean(
-        db.prepare("SELECT name FROM studio_migrations WHERE name = ?").get("runtime-json-v1"),
-      );
-      if (result.migrated && names.length) {
-        const read = db.prepare("SELECT value FROM studio_documents WHERE name = ?");
-        for (const name of names) {
-          const row = read.get(name) as { value: string } | undefined;
-          if (row) result.documents[name] = JSON.parse(row.value);
-        }
-      }
-      return result;
+      return read(db);
     } finally {
       db.close();
     }
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
+}
+
+/** Whether a migration (such as `runtime-json-v1`) has committed in this database. */
+export function hasMigration(db: DatabaseSync, name: string) {
+  return Boolean(
+    db
+      .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'studio_migrations'")
+      .get() && db.prepare("SELECT name FROM studio_migrations WHERE name = ?").get(name),
+  );
+}
+
+/** Offline inspection of stopped studios. */
+export function readOfflineRuntime(dataDir: string, names: readonly string[] = []) {
+  const result: { migrated: boolean; documents: Record<string, unknown> } = {
+    migrated: false,
+    documents: {},
+  };
+  withOfflineDatabase(dataDir, (db) => {
+    result.migrated = hasMigration(db, "runtime-json-v1");
+    if (!result.migrated) return;
+    const read = db.prepare("SELECT value FROM studio_documents WHERE name = ?");
+    for (const name of names) {
+      const row = read.get(name) as { value: string } | undefined;
+      if (row) result.documents[name] = JSON.parse(row.value);
+    }
+  });
+  return result;
 }
 
 export function runtimeDatabase(dataDir: string): DatabaseSync {
@@ -69,17 +77,7 @@ export function usesRuntimeDatabase(dataDir: string): boolean {
   const cached = databases.get(databaseFile(dataDir));
   const db = cached || new DatabaseSync(databaseFile(dataDir), { readOnly: true });
   try {
-    if (
-      !db
-        .prepare(
-          "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'studio_migrations'",
-        )
-        .get()
-    )
-      return false;
-    return Boolean(
-      db.prepare("SELECT name FROM studio_migrations WHERE name = ?").get("runtime-json-v1"),
-    );
+    return hasMigration(db, "runtime-json-v1");
   } finally {
     if (!cached) db.close();
   }
