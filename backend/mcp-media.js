@@ -894,6 +894,7 @@ export class McpMedia {
       "sha256",
       Buffer.from(String(this.key)),
       Buffer.alloc(0),
+      // Part of every result link already shared: changing it would break them all.
       Buffer.from("heiss-mcp-result-link-v2"),
       32,
     );

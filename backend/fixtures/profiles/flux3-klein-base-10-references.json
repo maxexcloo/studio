@@ -159,7 +159,7 @@
       }
     }
   },
-  "heissUi": {
+  "studio": {
     "aspectPolicy": "manual",
     "description": "Generate from a full scene caption, or attach up to ten reference images to edit or combine them; expand short requests with an LLM first. Undistilled FLUX.3 [klein] Base (INT8 ConvRot) with the Qwen3-VL 4B INT8 ConvRot encoder and the FLUX.2 VAE. Euler/simple, 50 steps and CFG 3.5. Timing has not been benchmarked.",
     "family": "flux3_klein",

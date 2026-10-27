@@ -24,7 +24,7 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 
 ## What Studio protects
 
-- **Deleting.** Deleting a card deletes its file. Studio only deletes inside its own media folder or ComfyUI's output folder, never a file shown from somewhere else, and only ever serves images, videos and sound from those folders (never through a link out of them). A `.heiss-trash` folder left by an older version's **Delete all finished images** is emptied after 30 days (`STUDIO_TRASH_DAYS`).
+- **Deleting.** Deleting a card deletes its file. Studio only deletes inside its own media folder or ComfyUI's output folder, never a file shown from somewhere else, and only ever serves images, videos and sound from those folders (never through a link out of them). A `.studio-trash` folder left by an older version's **Delete all finished images** is emptied after 30 days (`STUDIO_TRASH_DAYS`).
 - **Updates.** Studio doesn't update itself. New versions arrive as container images that CI builds and tests before publishing.
 - **Node packs** installed with one click come from a reviewed commit of each pack, and their Python requirements can't replace the PyTorch or NumPy ComfyUI runs on. When ComfyUI-Manager refuses an install because of its security level, Studio stops and asks.
 - **Model downloads** only come from Studio's own catalogue and reviewed Civitai and Hugging Face imports, resume only while the remote file is unchanged, and are checked against their published SHA-256. Provider tokens (`HF_TOKEN`, `CIVITAI_API_TOKEN`) come from the deployment's environment; Studio never shows, saves or changes them.

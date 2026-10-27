@@ -402,7 +402,7 @@ async function fixture(
     },
     client: async (user = "alice", key = mediaKey) => {
       const client = new Client(
-        { name: "heiss-integration-fixture", version: "1.0.0" },
+        { name: "studio-integration-fixture", version: "1.0.0" },
         { capabilities: {} },
       );
       clients.push(client);
@@ -1899,7 +1899,7 @@ test(
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
     const client = new Client(
-      { name: "heiss-real-server-fixture", version: "1.0.0" },
+      { name: "studio-real-server-fixture", version: "1.0.0" },
       { capabilities: {} },
     );
     t.after(async () => {
@@ -2037,7 +2037,7 @@ test(
           1: { class_type: "FixtureImage", inputs: { prompt: "" } },
           2: { class_type: "SaveImage", inputs: { images: ["1", 0], filename_prefix: "fixture" } },
         },
-        heissUi: {
+        studio: {
           id: "owned-api-guide",
           name: "Owned API Guide",
           kind: "image",
@@ -2193,7 +2193,7 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
   const f = await fixture(t);
   const conversation = async (user, id) => {
     const client = new Client(
-      { name: "heiss-ref-fixture", version: "1.0.0" },
+      { name: "studio-ref-fixture", version: "1.0.0" },
       { capabilities: {} },
     );
     t.after(() => client.close());
@@ -3529,7 +3529,10 @@ test("video stays local while the worker is up, and a plain request never reache
 
 /** A client in one LibreChat conversation, named by the header the gateway forwards. */
 async function chat(t, f, user, conversation) {
-  const client = new Client({ name: "heiss-chat-fixture", version: "1.0.0" }, { capabilities: {} });
+  const client = new Client(
+    { name: "studio-chat-fixture", version: "1.0.0" },
+    { capabilities: {} },
+  );
   t.after(() => client.close());
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${f.base}/mcp`), {
@@ -4740,7 +4743,7 @@ test("admin tools go through the Library and profile routes with the administrat
     ],
     results: { catalogueKeys: ["loras/glow.safetensors"] },
   };
-  const profileText = `${JSON.stringify({ heissUi: { name: "Fast", controls: { prompt: { node: 1 } } }, steps: 4 }, null, 2)}\n`;
+  const profileText = `${JSON.stringify({ studio: { name: "Fast", controls: { prompt: { node: 1 } } }, steps: 4 }, null, 2)}\n`;
   const profileHash = "a".repeat(64);
   f.app.use("/api", (req, _res, next) => {
     seen.push({

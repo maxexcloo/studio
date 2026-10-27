@@ -13,5 +13,5 @@ export function mimeExtension(mime = "") {
 
 export function referenceInputName(buffer, mime = "") {
   const hash = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32);
-  return `heiss-ui-reference-${hash}.${mimeExtension(mime)}`;
+  return `studio-reference-${hash}.${mimeExtension(mime)}`;
 }

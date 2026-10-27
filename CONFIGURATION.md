@@ -11,7 +11,7 @@ STUDIO_DATA_DIR=./data
 STUDIO_COMFY_OUTPUT_DIR=
 ```
 
-`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). The gallery's clear operation moves finished files to `.heiss-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
+`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`). The gallery's clear operation moves finished files to `.studio-trash` in that folder, where they wait 30 days (`STUDIO_TRASH_DAYS`) in case you want them back.
 
 Single-user mode answers only the computer running Studio; other devices need [account mode](#multi-user-mode). `STUDIO_ALLOWED_HOSTS` lists extra names to answer to (comma-separated), and `STUDIO_TLS_CERT`, `STUDIO_TLS_KEY` and `STUDIO_HTTPS_PORT` give Studio its own HTTPS when it listens beyond this computer. See [Security](./SECURITY.md) and [Accounts & Devices](./TROUBLESHOOTING.md#accounts--devices).
 
@@ -98,7 +98,7 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 - **Every request needs an account,** including requests from this computer. The first visit on the computer running Studio creates the recovery administrator; after that, administrators add accounts in **Settings › Users**. Accounts sign in with their email address, which is the account's username; accounts created before this with other usernames keep signing in with them. Where nobody can open Studio on its own computer (a container platform), set `STUDIO_SETUP_TOKEN` to a random value of at least 32 characters (a shorter one stops Studio at startup): the first-administrator screen then accepts it from any address, until an account exists.
 - **Single sign-on (Pocket ID or another OpenID Connect provider):** set `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_CLIENT_ID` and `STUDIO_OIDC_REDIRECT_URI` (`https://<studio>/api/accounts/oidc/callback`). Public PKCE clients need no secret; `STUDIO_OIDC_CLIENT_SECRET` supports confidential clients, and `STUDIO_OIDC_LABEL` names the button (Single Sign-On by default). Setting only some of these stops Studio at startup and names the missing ones. The provider only proves identity. A verified email that matches an account's username links that account. Any other identity becomes a pending account, which an administrator approves (onto the default group, or by assigning one), or, with a default and Require Approval off, an account on the default at once. Roles never come from the provider.
 - **Probes stay open:** `/api/ping` (liveness) and `/api/ready` (readiness: the data folder is writable) answer without an account. ComfyUI workers being down does not make Studio unready.
-- **Administrators** have full access. **Ordinary accounts** are in one group (an access profile on the server), which lists the local generation profiles they may use (or All, which includes ones added later) and switches for cloud models, galleries, LoRAs, NSFW models, prompt history, references and image/video generation. Cloud (Grok) profiles follow the Cloud Models feature, and a profile marked `"nsfw": true` in its `heissUi` block also needs NSFW Models. Other new generation profiles stay administrator-only until a group grants them. Presets & Civitai Imports stay administrator-only for now.
+- **Administrators** have full access. **Ordinary accounts** are in one group (an access profile on the server), which lists the local generation profiles they may use (or All, which includes ones added later) and switches for cloud models, galleries, LoRAs, NSFW models, prompt history, references and image/video generation. Cloud (Grok) profiles follow the Cloud Models feature, and a profile marked `"nsfw": true` in its `studio` block also needs NSFW Models. Other new generation profiles stay administrator-only until a group grants them. Presets & Civitai Imports stay administrator-only for now.
 - **Default group:** Studio adds an Administrator (everything) and a User (no NSFW models, cloud models, LoRAs or presets) group when no group has those IDs. Administrators edit groups in **Settings › Groups** and pick one default group under **Settings › Users › New Account Policy**; it applies to accounts added in **Settings › Users**, to first single sign-on and to chat gateway accounts. **Require Approval** beside it (on until an administrator turns it off) keeps new single sign-on and chat gateway accounts waiting in Users; assigning an access group approves a waiting account. Turned off, they start on the default at once. Without a default, single sign-on accounts wait for approval and the gateway creates none.
 - **Each account's outputs, prompt history, LoRA stacks, references and jobs are private** and saved under its own output subfolder. Ordinary accounts only reach reviewed, owner-checked routes; studio administration (models, library folders, connection, updates, presets, trash) stays with administrators. Run grouping is unavailable to accounts.
 - **Personal MCP tokens** are issued once in Settings, stored only as hashes, and work only for MCP. They are never an administrator credential. Rotating or revoking a token leaves existing result links working; a result link ends when its output is hidden or deleted.
@@ -111,8 +111,8 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 `backend/commands/import-studio.mjs` moves a whole single-user studio into one existing account of this studio. It runs against this studio's `STUDIO_DATA_DIR` and `STUDIO_MEDIA_DIR`; stop Studio first.
 
 ```bash
-node backend/commands/import-studio.mjs --source-data /old/heiss/data --source-outputs /old/comfy/output --account studio --label normal         # dry run
-node backend/commands/import-studio.mjs --source-data /old/heiss/data --source-outputs /old/comfy/output --account studio --label normal --apply
+node backend/commands/import-studio.mjs --source-data /old/studio/data --source-outputs /old/comfy/output --account studio --label normal         # dry run
+node backend/commands/import-studio.mjs --source-data /old/studio/data --source-outputs /old/comfy/output --account studio --label normal --apply
 node backend/commands/import-studio.mjs --undo <batch>
 ```
 
@@ -193,7 +193,7 @@ Dream results load up to two of the account's starred LoRAs that the chosen prof
 
 ## Profiles, Guides & Catalogue
 
-Studio owns editable live definitions in its data directory: profiles in `workflows/`, prompting guides in `guides/`, and catalogue changes in `library/`. Administrators edit and approve these in Library; user presets remain account-owned runtime data. Existing identifiers and the `studio`/`heissUi` mapping format are preserved.
+Studio owns editable live definitions in its data directory: profiles in `workflows/`, prompting guides in `guides/`, and catalogue changes in `library/`. Administrators edit and approve these in Library; user presets remain account-owned runtime data. Existing identifiers are preserved; each profile maps its controls in its `studio` block.
 
 `STUDIO_CONFIG_DIR` is a read-only ai mount for initial seed definitions. Its seed layout is:
 
@@ -211,7 +211,7 @@ Settings › Profiles › Merge Duplicate Profiles is an explicit administrator 
 
 ## SQLite Migration & Rollback
 
-Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. Media files and runtime directory names do not move.
+Native Node SQLite stores the persistent queue, sessions, Chat messages and user presets in `studio.sqlite`. Accounts, account sessions, gallery metadata and deletion markers move into its document tables through an explicit offline migration. Until that migration commits, the retained JSON stores remain authoritative. The same command then renames the [names Studio kept on disk](#studio-names) from HEISS UI.
 
 Stop Studio and run a dry run against a copy of the intended data directory:
 
@@ -220,7 +220,7 @@ node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data
 node backend/commands/migrate-runtime.mjs --data-dir /copy/of/studio-data --apply
 ```
 
-The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
+The dry run reports source-to-table mappings, record counts, hashes and conflicts without creating a database, and the [renames](#studio-names) it would make. Apply verifies copies of affected metadata and a restore manifest under `.backups/sqlite-*` before committing all documents and its migration marker atomically. The source JSON remains untouched. Re-running never reimports stale JSON over SQLite. Protect the complete original data directory and media separately before production migration; the metadata backup covers only files this migration changes authority for.
 
 Rehearse restoration into a separate empty directory:
 
@@ -228,7 +228,7 @@ Rehearse restoration into a separate empty directory:
 node backend/commands/migrate-runtime.mjs --restore /copy/of/studio-data/.backups/sqlite-STAMP --destination /empty/restore-rehearsal
 ```
 
-Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, restore the verified pre-migration metadata beside the unchanged media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
+Verify account ownership, profile identifiers and existing result links on the copy. For rollback, stop the rewrite, retain its complete SQLite/media state, put the old names back with `--undo` (see [Studio Names](#studio-names)), restore the verified pre-migration metadata beside the media, then start the previous application image. Do not run old and new writers against the same data directory. Post-migration work must be retained or explicitly mapped before reverting to the older JSON-only application.
 
 Development uses `data/development` with SQLite migration applied only to that isolated directory. Recovery follows recorded job IDs and never scans or adopts a shared worker's full history.
 
@@ -278,33 +278,31 @@ Studio 1.0 reads only Studio names: every Studio setting starts with `STUDIO_`, 
 
 Browser storage and the account cookie (`studio_account`) already used Studio names.
 
-## On-Disk Names
+## Studio Names
 
-Some names on disk still come from HEISS UI. Gallery records, account media and ComfyUI's output folder hold these paths, so Studio keeps writing them and never moves or renames files by itself. It already recognises the Studio name beside each one (`backend/data-names.js`), so files a migration has moved keep working.
+Studio 1.0 keeps no names on disk from HEISS UI. The [runtime migration](#sqlite-migration--rollback) renames them once, after its SQLite import, with Studio stopped. Studio 1.0 reads only the Studio names, so run it on existing data before 1.0 starts.
 
-| Kept name                                     | Where                                                                                                 | Studio name it also reads                      |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`) | ComfyUI's output folder and `STUDIO_MEDIA_DIR` (for example `/data/media/heiss-ui`)                   | `studio/`                                      |
-| `.heiss-trash/`                               | Beside trashed files in the output and media folders                                                  | `.studio-trash/` (skipped by snapshots)        |
-| `heiss_generation`                            | Run records in ComfyUI's queue and history                                                            | `studio_generation` (written now)              |
-| `heissUi`                                     | The mapping block in workflow and profile files (`/data/workflows`, the `ai/profiles/` configuration) | `studio` (read; Studio still writes `heissUi`) |
-| `heiss_*` sections, `.heiss-backup`           | ComfyUI's `extra_model_paths.yaml` (single-user mode)                                                 | Not renamed                                    |
-| `heiss` text chunk                            | Metadata in PNGs Studio wrote                                                                         | Not renamed                                    |
-| `heiss-ui-reference-*`, `heiss-ui-upscale-*`  | File names in ComfyUI's input folder                                                                  | Not renamed                                    |
+| Old name                                                             | Studio name                         | Where                                                                                                                                                                                |
+| -------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `heiss-ui/` (and `heiss-ui/accounts/<hash>/`)                        | `studio/`                           | Studio media (`--media-dir`, by default `<data>/media`) and, with `--output-dir`, ComfyUI's output folder                                                                            |
+| `.heiss-trash/` (and each batch's `files/heiss-ui/`)                 | `.studio-trash/`                    | The same folders                                                                                                                                                                     |
+| `heiss-ui` in `subfolder`, `/comfy/view` and thumbnail URLs          | `studio`                            | Every database row (gallery, deletion markers, sessions, queue, jobs, Dream, taste), the JSON stores in the data folder (reference assets, Library, account files) and trash batches |
+| `heissUi` profile block (and `heiss_ui`, `jAiStudio`, `j_ai_studio`) | `studio`                            | `workflows/*.json` and their versions in `history/profiles/`, with output prefixes and the version hashes in `.studio-meta.json` and `.studio-edits.json`                            |
+| `heiss-*.log`                                                        | Deleted (a copy goes in the backup) | `logs/`                                                                                                                                                                              |
 
-Logs are now `studio-YYYY-MM-DD.log`; older `heiss-*.log` files are still pruned after a week.
+Deletion markers of renamed gallery records move to their new keys. Backups (`backups/`, `.backups/`, `imports/`) and the JSON the SQLite import read stay as they are. The thumbnail and video preview caches are keyed by path, so they are made again as the gallery is viewed.
 
-### Moving to Studio Names Later
+1. **Back up.** Stop Studio (scale it to zero), then snapshot the data volume (`/data`, on kimbap's `truenas-nvme/studio` dataset). Keep the snapshot until the migrated studio has run for a while.
+2. **Dry run (default).** It changes nothing and reports, per mapping: the folders it renames, the files it rewrites by kind, the database rows by table or document (gallery records per account), the deletion markers it moves and the old logs. `missingFiles` lists finished gallery records whose file is not where the record says, and `outsideMedia` counts those in ComfyUI's output folder, which are only checked with `--output-dir`. Conflicts refuse the apply: a target folder that already exists, a profile with more than one block, or an unreadable file.
+3. **Apply (`--apply`).** It first writes `.backups/names-<time>/` and flushes it to disk: `manifest.json`, a copy of every file it rewrites or deletes, and `rows.json` with each changed row's previous value. Then it replaces each file whole, renames each folder (one rename on the same file system, so nothing is copied), updates the database rows and records `studio-names-v1` in one transaction, and deletes the old logs. A second run does nothing.
+4. **Recovery.** `--undo <data>/.backups/names-<time>` renames the folders back, restores the files and rows, returns the logs and removes the record, also after an interrupted apply. It does not keep work saved after the apply, so undo only before Studio 1.0 has run; after that, restore the snapshot from step 1 and redeploy the previous image.
 
-A later release adds an explicit migration command. It is never run automatically. Until then, nothing needs to change.
+```sh
+node backend/commands/migrate-runtime.mjs --undo /data/.backups/names-STAMP
+```
 
-1. **Back up.** Stop Studio (scale it to zero), then snapshot the data volume (`/data`, on kimbap's `truenas-nvme/studio` dataset) and, with ComfyUI's output folder, that folder too. Keep the snapshots until the migrated studio has run for a while.
-2. **Dry run (default).** The command lists every mapping it would apply and changes nothing:
-   - folders: `<media>/heiss-ui` → `<media>/studio`, `<output>/heiss-ui` → `<output>/studio`, and each `.heiss-trash` → `.studio-trash`
-   - records: each gallery, history, trash and comparison record whose `subfolder` or `/media`, `/comfy/view` and thumbnail URL starts with `heiss-ui/` (counted per account)
-   - refusals: a target folder that already exists and differs, a record that points at a missing file, or a running Studio.
-3. **Apply (`--apply`).** It writes a mapping manifest first (every old → new path and record ID), renames the folders (a rename on the same file system, so no copy), rewrites the records, verifies the record and file counts against the dry run, and writes a marker so a second run does nothing.
-4. **Switch.** The release that ships the command changes `outputFolderName` and `trashFolderName` in `backend/data-names.js` to the Studio names; the old names stay readable for one more release.
-5. **Recovery.** `--undo <manifest>` renames the folders back and restores the records from the backups the apply step made. If anything else is wrong, restore the snapshots from step 1 and redeploy the previous image.
+What Studio writes uses the Studio names too: `studio-reference-*` and `studio-upscale-*` in ComfyUI's input folder, `studio_generation` run records, `studio_*` sections and `.studio-backup` copies of ComfyUI's `extra_model_paths.yaml` in single-user mode (Studio finds the sections it added by their comment markers, so older ones keep their keys), and a `civitai` metadata chunk in imported PNGs. ComfyUI's own `<output>/heiss-ui` folder from older runs is not read.
 
-The profile block is a file format shared with the `ai/profiles/` configuration. Studio reads both `studio` and `heissUi` (a file with both is refused by the profile check), and retains `heissUi` output for external format compatibility; changing that format requires an explicit migration.
+The profile block is shared with the seeds in ai's `profiles/`, which switch to `studio` in the same cutover window.
+
+The one name left is the key derivation label `heiss-mcp-result-link-v2` that seals MCP result links: every link already shared depends on it.

@@ -27,7 +27,6 @@ import {
   readEditableProfile,
   revertEditableProfile,
 } from "./profile-editor.js";
-import { profileBlock } from "./profile-block.js";
 import { writeExport } from "./profile-export.js";
 import { duplicateProfiles, mergeDuplicateProfiles } from "./profile-merge.js";
 
@@ -103,7 +102,7 @@ export function registerProfileRoutes(
       const current = readEditableProfile(req.params.id);
       let kind = "image";
       try {
-        kind = profileBlock(JSON.parse(current.text))?.kind || "image";
+        kind = JSON.parse(current.text)?.studio?.kind || "image";
       } catch {
         /* The check reports it. */
       }
@@ -132,7 +131,7 @@ export function registerProfileRoutes(
       const current = readEditableProfile(req.params.id);
       let meta = {};
       try {
-        meta = profileBlock(JSON.parse(current.text)) || {};
+        meta = JSON.parse(current.text)?.studio || {};
       } catch {
         /* Unreadable: no guide. */
       }

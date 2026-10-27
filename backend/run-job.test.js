@@ -98,7 +98,7 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
   fake.finish(prompt.id, {
     outputs: {
-      [save]: { images: [{ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" }] },
+      [save]: { images: [{ filename: "image_00001_.png", subfolder: "studio", type: "output" }] },
     },
   });
   if (socketsBuiltIn)
@@ -110,10 +110,10 @@ test("a run goes from queued through progress to a finished gallery image", asyn
   assert.equal(job.outputs.length, 1);
   const item = store.gallery.find((entry) => entry.jobId === id);
   assert.equal(item.status, "done");
-  assert.equal(item.url, "/comfy/view?filename=image_00001_.png&subfolder=heiss-ui&type=output");
+  assert.equal(item.url, "/comfy/view?filename=image_00001_.png&subfolder=studio&type=output");
   assert.equal(
     item.thumbnailUrl,
-    "/comfy/thumb?filename=image_00001_.png&subfolder=heiss-ui&type=output",
+    "/comfy/thumb?filename=image_00001_.png&subfolder=studio&type=output",
   );
   assert.equal(item.settings.steps, 4);
 });

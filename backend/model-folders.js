@@ -414,7 +414,7 @@ export function sectionFor(dir, kinds, existingText = "") {
   const byKind = new Map();
   for (const { kind, name } of kinds) byKind.set(kind, [...(byKind.get(kind) || []), name]);
   const slug = path.basename(path.dirname(dir)) + "_" + path.basename(dir);
-  let key = `heiss_${
+  let key = `studio_${
     slug
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
@@ -561,8 +561,8 @@ export async function linkModelFolders(paths = [], { picked = "", scan = {} } = 
   // Preserve the imported file's line endings.
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const already = new Set(studioModelSections(text).map((section) => pathKey(section.path)));
-  const backup = text ? `${file}.heiss-backup` : "";
-  // Sections an older HEISS wrote under a derived kind never took; fix them in place.
+  const backup = text ? `${file}.studio-backup` : "";
+  // Sections written under a derived kind never took; fix them in place.
   const migrated = migrateDerivedKinds(text);
   let next =
     migrated.text && !migrated.text.endsWith("\n") ? `${migrated.text}${eol}` : migrated.text;

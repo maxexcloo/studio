@@ -441,7 +441,7 @@ test("cached catalogue reads reflect profile creation, editing, approval and del
   await api("/api/models");
   const before = primary.requests.filter((item) => item.pathname === "/object_info").length;
   const workflow = {
-    heissUi: {
+    studio: {
       id: "cache-readback",
       name: "Cached First",
       kind: "image",
@@ -465,7 +465,7 @@ test("cached catalogue reads reflect profile creation, editing, approval and del
   assert.equal((await selected()).label, "Cached First");
   const current = (await api("/api/profiles/editable/cache-readback")).body;
   const raw = JSON.parse(current.text);
-  raw.heissUi.name = "Cached Edited";
+  raw.studio.name = "Cached Edited";
   assert.equal(
     (
       await api(

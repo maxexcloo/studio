@@ -907,7 +907,7 @@ test("custom Klein generation and reference schedules follow their mapped latent
     const id = `klein-dimensions-${references.length ? "reference" : "generation"}`;
     saveCustomWorkflow({
       graph,
-      heissUi: {
+      studio: {
         id,
         controls: {
           width: { node: latentId, input: "width" },

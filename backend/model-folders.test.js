@@ -112,7 +112,7 @@ test("adding writes a marked, backed-up section ComfyUI can read, and removing t
   await modelFolderReport({ scan });
   const result = await linkModelFolders([shared], { scan });
   assert.deepEqual(result.added, [shared]);
-  assert.equal(fs.readFileSync(`${config}.heiss-backup`, "utf8").startsWith("# mine"), true);
+  assert.equal(fs.readFileSync(`${config}.studio-backup`, "utf8").startsWith("# mine"), true);
   const text = fs.readFileSync(config, "utf8");
   assert.match(
     text,
