@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, openTheme, profiles, stamp } from "./fixtures";
+import { fixtures, image, loadSaved, openTheme, profiles, stamp } from "./fixtures";
 
 const at = (seconds: number) => new Date(Date.parse(stamp) + seconds * 1000).toISOString();
 
@@ -224,7 +224,7 @@ test("Chat keeps discussion, requested generation inputs and variation results t
     input: { kind: "image", profileId: "image:test", prompt: "A blue bird at dusk" },
   });
   await first.getByRole("button", { name: "Presets", exact: true }).click();
-  await page.getByRole("button", { name: "Dusk", exact: true }).click();
+  await loadSaved(page, "Preset", "Dusk");
   await expect(first.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "A blue bird at dusk",
   );

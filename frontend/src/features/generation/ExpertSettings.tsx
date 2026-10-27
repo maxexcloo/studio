@@ -1,9 +1,7 @@
 import {
   ActionIcon,
-  Box,
   Button,
   Checkbox,
-  Group,
   NumberInput,
   Popover,
   Select,
@@ -14,15 +12,14 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { ArrowLeft, Dices, SlidersHorizontal } from "lucide-react";
+import { Dices, SlidersHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
 import { iconChipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
 import { controlRange, stepsRange } from "./payload";
 import { PromptHistory } from "./PromptHistory";
-import { ReferenceRoleControl } from "./ReferenceRoleControl";
+import { PanelHeader, PickerFooter } from "./Picker";
 import { usePhone } from "../../ui/usePhone";
-import editorClasses from "./GenerationEditor.module.css";
 
 const selections = [
   { options: "samplers", field: "sampler", label: "Sampler" },
@@ -38,7 +35,6 @@ export function ExpertSettings({
   input,
   profile,
   onChange,
-  hasReferences,
   opened,
   onOpenedChange,
   inline = false,
@@ -46,7 +42,6 @@ export function ExpertSettings({
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
-  hasReferences: boolean;
   opened: boolean;
   onOpenedChange: (opened: boolean) => void;
   /** Phones show the settings in place of the form instead of a popover. */
@@ -199,13 +194,6 @@ export function ExpertSettings({
           }}
         />
       )}
-      {hasReferences && (
-        <ReferenceRoleControl
-          locked={Boolean(input.inpaint)}
-          value={input.referenceRole}
-          onChange={(referenceRole) => onChange({ referenceRole })}
-        />
-      )}
       {inpaint && (
         <SimpleGrid cols={2} spacing="xs">
           <NumberInput
@@ -278,27 +266,9 @@ export function ExpertSettings({
   if (inline)
     return (
       <Stack gap="md" flex={1} role="region" aria-label="Expert Settings" data-composer-layer>
-        <Group gap="xs">
-          <Button
-            autoFocus
-            size="compact-sm"
-            variant="subtle"
-            color="gray"
-            leftSection={<ArrowLeft size={16} />}
-            onClick={() => onOpenedChange(false)}
-          >
-            Back
-          </Button>
-          <Text size="sm" fw={500}>
-            Expert Settings
-          </Text>
-        </Group>
+        <PanelHeader title="Expert Settings" onBack={() => onOpenedChange(false)} />
         {content}
-        <Box className={editorClasses.footer} data-sticky>
-          <Button fullWidth onClick={() => onOpenedChange(false)}>
-            Done
-          </Button>
-        </Box>
+        <PickerFooter done={{ label: "Done", onClick: () => onOpenedChange(false) }} />
       </Stack>
     );
   const trigger = (

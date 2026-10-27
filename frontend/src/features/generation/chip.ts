@@ -18,7 +18,7 @@ export const iconChipProps = {
 
 /** Nested pickers, menus, open comboboxes and keyboard drags inside a panel handle their own Escape. */
 const nestedLayers =
-  '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [role="combobox"][aria-expanded="true"]';
+  '.mantine-Popover-dropdown, [role="menu"], [role="dialog"], [aria-haspopup][aria-expanded="true"]';
 
 /** A chip panel's Escape: closes the panel only when no nested layer took the key. */
 export function escapePanel(event: KeyboardEvent<HTMLElement>, close: () => void) {

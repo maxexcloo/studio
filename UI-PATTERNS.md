@@ -109,9 +109,14 @@ primary component reference and verify APIs against the installed version.
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
   generation-input action and icon-only Generate. Expanded controls are one prompt
-  box with a history action inside it and a row of compact chips: Profile, Aspect,
-  Count, References, LoRAs, Presets and an Expert settings popover, then
-  Image/Video and Generate. No section labels or accordions. Clicking inside expands; clicking outside collapses.
+  box with a history action inside it and a row of compact chips: Profile,
+  Reference Role (once references are placed), References, LoRAs, Aspect, Count,
+  a set Seed (clearable), Expert settings, Compare and Presets, then
+  Image/Video and Generate. References, LoRAs and Presets share one picker
+  (`Picker.tsx`): tabs, inline search and a filter toggle on one row; a
+  selected tile fades with a check and a second click removes it; saved stacks
+  and presets sort, rename, update and delete, and ask before replacing the
+  draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer upward with a short
   transition and the standard accessible close action.

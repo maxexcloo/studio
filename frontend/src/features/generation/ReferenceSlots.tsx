@@ -10,6 +10,7 @@ import {
   uploadReferenceType,
   type ReferenceTarget,
 } from "./references";
+import { dragPicture } from "./Picker";
 import classes from "./ReferencePicker.module.css";
 
 /** A placed reference dragged onto another slot moves there. */
@@ -105,6 +106,8 @@ export function ReferenceSlots({
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = "copyMove";
                         event.dataTransfer.setData(referenceCellType, key);
+                        const picture = event.currentTarget.querySelector("img");
+                        if (picture?.naturalWidth) dragPicture(event.dataTransfer, picture);
                       }}
                       {...dropProps(key, cellTarget)}
                     >

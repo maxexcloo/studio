@@ -7,7 +7,7 @@ import { post } from "../../api";
 import type { ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
-import { PresetEditor } from "./PresetEditor";
+import { PresetPicker } from "./PresetPicker";
 import { queueQuery } from "./Queue";
 import { generationInput, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
@@ -162,12 +162,13 @@ export function GenerationForm({
         draft.presetId,
         draft.operation,
       ])}
-      presets={(close) => (
-        <PresetEditor
+      presets={(close, inline) => (
+        <PresetPicker
           input={input}
           references={draft.references}
           profile={profile}
           selection={draft}
+          onDone={inline ? close : undefined}
           onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
           onLoad={(preset) => {
             setDraft((value) => ({

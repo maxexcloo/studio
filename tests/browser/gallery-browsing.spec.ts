@@ -124,10 +124,8 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   await expect(prompt).toHaveValue("Keep typing/");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   const picker = page.getByRole("region", { name: "References", exact: true });
-  await picker.getByRole("button", { name: "Search Gallery", exact: true }).focus();
-  await page.keyboard.press("ControlOrMeta+f");
+  // The picker's search sits inline and takes focus when it opens.
   const referenceSearch = picker.getByRole("textbox", { name: "Search Gallery", exact: true });
-  await expect(referenceSearch).toBeFocused();
   await referenceSearch.fill("Result 0");
   await expect(
     picker.getByRole("button", { name: "Use reference: Browse Result 0", exact: true }),

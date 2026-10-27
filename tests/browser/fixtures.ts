@@ -520,6 +520,8 @@ export async function fixtures(page: Page) {
       return respond({
         asset: {
           id: `asset-${body.galleryItemId}`,
+          source: "generation",
+          galleryItemId: body.galleryItemId,
           name: "Generated Reference",
           thumbnailUrl: image,
           url: image,
@@ -772,10 +774,58 @@ export async function closeReferences(page: Page) {
   if (await done.isVisible()) await done.click();
   else
     await references
-      .getByRole("radiogroup", { name: "Reference Source", exact: true })
+      .getByRole("radiogroup", { name: "References View", exact: true })
       .getByRole("radio", { checked: true })
       .press("Escape");
   await expect(references).toBeHidden();
+}
+
+/** Saves the draft as a named stack or preset from its picker's footer. */
+export async function saveCurrent(page: Page, noun: "Preset" | "Stack", name: string) {
+  await page.getByRole("button", { name: `Save ${noun}`, exact: true }).click();
+  const field = page.getByRole("textbox", { name: `${noun} Name`, exact: true });
+  await field.fill(name);
+  await field.press("Enter");
+}
+
+/** Opens the Presets picker unless it is already open. */
+export async function openPresets(page: Page) {
+  if (!(await page.getByRole("button", { name: "Save Preset", exact: true }).isVisible()))
+    await page.getByRole("button", { name: "Presets", exact: true }).click();
+}
+
+/** Closes the Presets picker: Done in the phone panel, its own chip on desktop (an outside click only dismisses). */
+export async function closePresets(page: Page) {
+  const done = page.getByRole("button", { name: "Done", exact: true });
+  if (await done.isVisible()) await done.click();
+  else await page.getByRole("button", { name: "Presets", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
+}
+
+/** Loads a saved stack or preset, confirming when it replaces what the draft has. */
+export async function loadSaved(page: Page, noun: "Preset" | "Stack", name: string) {
+  await page.getByRole("button", { name: `Load ${noun}: ${name}`, exact: true }).click();
+  const replace = page.getByRole("button", { name: "Replace", exact: true });
+  if (await replace.isVisible()) await replace.click();
+}
+
+/** Runs one action from a saved stack's or preset's row menu. */
+export async function savedAction(
+  page: Page,
+  noun: "Preset" | "Stack",
+  name: string,
+  action: string,
+) {
+  await page.getByRole("button", { name: `${noun} Actions for ${name}`, exact: true }).click();
+  await page.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
+/** Chooses a picker tab, such as LoRAs › Stacks. */
+export async function pickerTab(page: Page, picker: string, tab: string) {
+  await page
+    .getByRole("radiogroup", { name: `${picker} View`, exact: true })
+    .getByText(tab, { exact: true })
+    .click();
 }
 
 /** Closes the LoRA picker: Use LoRAs on phones, Escape in the desktop popover. */

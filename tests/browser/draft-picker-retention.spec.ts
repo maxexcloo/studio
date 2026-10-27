@@ -24,8 +24,6 @@ async function finishReferences(page: Page) {
 async function referenceSearch(page: Page) {
   const references = page.getByRole("region", { name: "References", exact: true });
   await expect(references).toBeVisible();
-  const search = references.getByRole("button", { name: "Search Gallery", exact: true });
-  if (await search.isVisible()) await search.click();
   return references.getByRole("textbox", { name: "Search Gallery", exact: true });
 }
 
@@ -106,17 +104,15 @@ test("Reference browsing keeps its scroll, query, filters and source in gallery 
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await expect.poll(() => listing.evaluate((element) => element.scrollTop)).toBe(120);
   await (await referenceSearch(page)).fill("Copper");
-  await references.getByRole("button", { name: "Close Search", exact: true }).click();
-  await references.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
   await references.getByRole("button", { name: "Starred", exact: true }).click();
   await finishReferences(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await references.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await references.getByRole("button", { name: "Filter Gallery", exact: true }).click();
   await expect(references.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await references.getByRole("button", { name: "Close Filters", exact: true }).click();
   await expect(await referenceSearch(page)).toHaveValue("Copper");
   await page
     .getByRole("button", { name: "Use reference: Copper bird reference", exact: true })

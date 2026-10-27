@@ -8,7 +8,7 @@ import {
   useGenerationActions,
 } from "../generation/GenerationProvider";
 import { GenerationEditor } from "../generation/GenerationEditor";
-import { PresetEditor, type PresetSelection } from "../generation/PresetEditor";
+import { PresetPicker, type PresetSelection } from "../generation/PresetPicker";
 import { generationInput, isProfile, referencePatch } from "../generation/payload";
 import type { ChatDraft } from "../../../../shared/chat";
 import { useChatController } from "./ChatProvider";
@@ -106,12 +106,13 @@ export function GenerationCard({
         }
         onClear={() => form.reset()}
         onSubmit={() => void submit()}
-        presets={(close) => (
-          <PresetEditor
+        presets={(close, inline) => (
+          <PresetPicker
             input={form.values}
             references={references}
             profile={profile}
             selection={preset}
+            onDone={inline ? close : undefined}
             onSelectionChange={setPreset}
             onLoad={(loaded) => {
               setPreset({ presetId: loaded.id, presetTitle: loaded.title });

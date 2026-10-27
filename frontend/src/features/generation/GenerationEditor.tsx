@@ -20,6 +20,7 @@ import { GenerationInputControls } from "./GenerationInputControls";
 import { ExpertSettings } from "./ExpertSettings";
 import { chipProps } from "./chip";
 import { LoraPicker, useLoraPicker } from "./LoraPicker";
+import { PanelHeader } from "./Picker";
 import { primaryReference, referenceDetails } from "./payload";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptIdeas } from "./PromptIdeas";
@@ -137,8 +138,8 @@ export function GenerationEditor({
   blockedReason?: string;
   error?: unknown;
   assistantScope: string;
-  /** The Presets popover's content; `close` dismisses it after a preset loads. */
-  presets?: (close: () => void) => ReactNode;
+  /** The Presets picker; `close` dismisses it after a preset loads, `inline` on phones. */
+  presets?: (close: () => void, inline: boolean) => ReactNode;
   onCompare?: () => void;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
@@ -153,6 +154,7 @@ export function GenerationEditor({
   const [maskOpen, setMaskOpen] = useState(false);
   const [referenceOpen, setReferenceOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const referenceBrowser = useReferenceBrowser();
   const loraPicker = useLoraPicker();
   const prompt = useRef<HTMLTextAreaElement>(null);
@@ -178,7 +180,7 @@ export function GenerationEditor({
     className: classes.promptIdeas,
     stacked: fill,
   });
-  const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen);
+  const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen || presetsOpen);
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
@@ -213,17 +215,18 @@ export function GenerationEditor({
       onChange={onReferencesChange}
     />
   );
-  const expert = {
-    opened: expertOpen,
-    onOpenedChange: setExpertOpen,
-    hasReferences: !!details.length,
-  };
+  const expert = { opened: expertOpen, onOpenedChange: setExpertOpen };
   const inlinePanel = !phone ? null : loraPicker.opened ? (
     <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
   ) : referenceOpen ? (
     referencePicker(true)
   ) : expertOpen ? (
     <ExpertSettings inline input={input} profile={profile} onChange={onChange} {...expert} />
+  ) : presetsOpen && presets ? (
+    <Stack gap="sm" flex={1} role="region" aria-label="Presets" data-composer-layer>
+      <PanelHeader title="Presets" onBack={() => setPresetsOpen(false)} />
+      {presets(() => setPresetsOpen(false), true)}
+    </Stack>
   ) : null;
   const mask = primary && profile?.capabilities?.inpaint && (
     <Button.Group>
@@ -311,8 +314,15 @@ export function GenerationEditor({
             profile={profile}
             onChange={onChange}
             references={supportsReferences ? referencePicker(false) : undefined}
+            hasReferences={!!details.length}
             mask={mask}
-            presets={presets}
+            presets={
+              presets && {
+                opened: presetsOpen,
+                onOpenedChange: setPresetsOpen,
+                content: !phone && presets(() => setPresetsOpen(false), false),
+              }
+            }
             expert={expert}
             onCompare={onCompare}
           />
