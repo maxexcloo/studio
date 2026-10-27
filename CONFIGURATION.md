@@ -113,22 +113,6 @@ Existing ComfyUI outputs stay where they are; only new runs, upscales and recove
 
 `STUDIO_ACCOUNT_MAX_OUTSTANDING_JOBS` limits each ordinary account's queued and running generations (2 by default; anything but a positive whole number stops Studio at startup). Session cookies are marked `Secure` over HTTPS, including behind a proxy that sends `X-Forwarded-Proto: https`.
 
-### Importing an Existing Studio
-
-`backend/commands/import-studio.mjs` moves a whole single-user studio into one existing account of this studio. It runs against this studio's `STUDIO_DATA_DIR` and `STUDIO_MEDIA_DIR`; stop Studio first.
-
-```bash
-node backend/commands/import-studio.mjs --source-data /old/studio/data --source-outputs /old/comfy/output --account studio --label normal         # dry run
-node backend/commands/import-studio.mjs --source-data /old/studio/data --source-outputs /old/comfy/output --account studio --label normal --apply
-node backend/commands/import-studio.mjs --undo <batch>
-```
-
-- **What moves:** finished gallery outputs and their upscales (copied into the account's media folder), prompt and negative-prompt history, LoRA stacks and library, uploaded references, and MCP job and reference ownership.
-- **What doesn't:** Hidden items from an older studio (they are encrypted), presets and workflow preferences (studio-wide), pending or failed records, and library-folder items. Each of these is counted in the dry run.
-- **Without `--apply`,** nothing is written; the dry run lists every count and conflict.
-- **The source is never changed.** Every target file that changes is backed up under `<STUDIO_DATA_DIR>/imports/<batch>/`, and `--undo` removes exactly what that import added.
-- **Refused:** an import whose jobs are already in the gallery, an account that already has its own history files, or a result above `STUDIO_GALLERY_LIMIT`.
-
 MCP clients connect in one of three ways in multi-user mode:
 
 - **Personal token:** a client sends the account's own token as `Authorization: Bearer <token>` to `/mcp`. A client that can send no headers, such as a Grok custom connector, uses `/mcp/<token>` as its complete URL. Only a personal token works in the path; the shared gateway and control keys are header-only. URLs can reach proxy logs and browser history, so mint a token for that one client and revoke it if it leaks. Studio has no OAuth (discovery gets a plain 404), and the MCP endpoints answer a browser's CORS preflight so a connector can validate its URL from a page.
