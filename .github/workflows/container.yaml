@@ -4,14 +4,12 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: [v*]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Only pull requests cancel superseded runs: every main commit must publish its sha image, which a
-# release tag of that commit promotes.
+# Only pull requests cancel superseded runs: every main commit must publish and release its image.
 concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: studio-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
@@ -23,7 +21,6 @@ env:
 jobs:
   check:
     name: Check
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     outputs:
       browser-image: ${{ steps.browser-image.outputs.image }}
@@ -53,7 +50,7 @@ jobs:
           retention-days: 1
 
   # Pull requests run Check only; the browser suite and image build run on main, where they gate
-  # publishing. A version tag promotes the images main already verified for its commit.
+  # publishing and the release.
   browser:
     name: Browser
     needs: check
@@ -123,7 +120,9 @@ jobs:
       - name: Build Image For Verification
         uses: docker/build-push-action@v7
         with:
-          build-args: STUDIO_PREBUILT=1
+          build-args: |
+            STUDIO_COMMIT=${{ github.sha }}
+            STUDIO_PREBUILT=1
           cache-from: type=gha,scope=studio
           cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,scope=studio,mode=max,ignore-error=true' || '' }}
           context: .
@@ -153,7 +152,9 @@ jobs:
         if: env.PUBLISH == 'true'
         uses: docker/build-push-action@v7
         with:
-          build-args: STUDIO_PREBUILT=1
+          build-args: |
+            STUDIO_COMMIT=${{ github.sha }}
+            STUDIO_PREBUILT=1
           context: .
           labels: ${{ steps.metadata.outputs.labels }}
           platforms: linux/amd64
@@ -162,63 +163,62 @@ jobs:
           sbom: true
           tags: ${{ steps.metadata.outputs.tags }}
 
-  promote:
-    name: Promote
-    if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    name: Release
+    needs: image
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Serialises version numbering. A newer pending release replaces an older one, which it includes.
+    concurrency:
+      cancel-in-progress: false
+      group: studio-release
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check Release Tag
-        run: test "$GITHUB_REF_NAME" = "v$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json")).version')"
+      - name: Assign Version
+        id: version
+        run: |
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          # Runs can finish out of order; never release a commit the latest release already includes.
+          if [ -n "$latest" ] && git merge-base --is-ancestor "$GITHUB_SHA" "$latest"; then
+            echo "::notice::$latest already includes $GITHUB_SHA."
+            exit 0
+          fi
+          day="$(date -u +%Y.%-m.%-d)"
+          echo "version=$day.$(($(git tag --list "v$day.*" | wc -l) + 1))" >> "$GITHUB_OUTPUT"
       - name: Log In to GHCR
+        if: steps.version.outputs.version
         uses: docker/login-action@v4
         with:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
           username: ${{ github.actor }}
       - name: Tag Verified Images
+        if: steps.version.outputs.version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          app="$IMAGE_NAME:sha-$GITHUB_SHA"
           # The worker image is published only by main commits that change it.
           worker_commit="$(git log -1 --first-parent --format=%H -- .dockerignore .github/workflows/worker.yaml LICENSE worker)"
           worker="$IMAGE_NAME-worker:sha-$worker_commit"
-          # main's runs publish both images and start alongside this one; the worker takes longest.
+          # The Worker workflow starts alongside this run and can take longer.
           for _ in $(seq 1 100); do
-            if docker buildx imagetools inspect "$app" >/dev/null 2>&1 && docker buildx imagetools inspect "$worker" >/dev/null 2>&1; then break; fi
+            if docker buildx imagetools inspect "$worker" >/dev/null 2>&1; then break; fi
             sleep 30
           done
-          docker buildx imagetools inspect "$app" >/dev/null || { echo "::error::main's run for $GITHUB_SHA did not publish $app; rerun it, then this one."; exit 1; }
-          docker buildx imagetools inspect "$worker" >/dev/null || { echo "::error::$worker is missing; run the Worker workflow on main."; exit 1; }
-          for image in "$app" "$worker"; do
-            docker buildx imagetools create --tag "${image%%:*}:$version" --tag "${image%%:*}:${version%.*}" "$image"
+          docker buildx imagetools inspect "$worker" >/dev/null || { echo "::error::$worker is missing; run the Worker workflow on main, then rerun this job."; exit 1; }
+          for image in "$IMAGE_NAME:sha-$GITHUB_SHA" "$worker"; do
+            docker buildx imagetools create --tag "${image%%:*}:$VERSION" "$image"
           done
-
-  release:
-    name: Release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: promote
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Set Up Shared Tools & Tasks
-        uses: maxexcloo/dotfiles/.github/actions/mise@main
-        with:
-          tools: gh node
       - name: Publish Release
+        if: steps.version.outputs.version
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          node .github/changelog.mjs notes "$GITHUB_REF_NAME" > /tmp/release-notes.md
-          gh release create "$GITHUB_REF_NAME" --notes-file /tmp/release-notes.md --repo "$GITHUB_REPOSITORY" --title "Studio $GITHUB_REF_NAME" --verify-tag
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "v$VERSION" --generate-notes --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Studio v$VERSION"
