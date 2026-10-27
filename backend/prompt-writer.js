@@ -185,7 +185,7 @@ export function createPromptWriter(
           ],
           temperature: 0.7,
           // Reasoning models spend part of this on thinking before the prompts.
-          maxTokens: 1200 + 400 * count + (suggest ? 350 : 200),
+          maxTokens: 4000 + 400 * count,
           signal,
           onThinking,
           onDelta,
@@ -240,8 +240,6 @@ export function createPromptWriter(
             { role: "user", content: `Request: ${clean(request)}` },
           ],
           temperature: 0,
-          // Reasoning models spend part of this on thinking before the choice.
-          maxTokens: 1500,
           timeout: 8000,
           signal,
         });

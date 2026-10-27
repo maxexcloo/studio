@@ -535,7 +535,8 @@ export function createAssistant(
     model,
     messages,
     temperature = 0.7,
-    maxTokens = 800,
+    // Reasoning models spend part of this on thinking before the reply.
+    maxTokens = 4000,
     signal,
     onDelta,
     onThinking,
@@ -702,7 +703,6 @@ export function createAssistant(
           { role: "user", content: userContent(user, images, vision) },
         ],
         temperature: upsampler ? 0.3 : 0.7,
-        maxTokens: upsampler ? 2400 : 2000,
         signal,
         onDelta,
       });
@@ -760,7 +760,6 @@ export function createAssistant(
           { role: "user", content: `Positive prompt: ${one(prompt, maxPromptCharacters)}` },
         ],
         temperature: 0.3,
-        maxTokens: 1200,
         signal,
       });
       const written = cleanPrompt(reply.text, 600).replace(/^negative(?: prompt)?\s*:\s*/i, "");
@@ -821,7 +820,6 @@ export function createAssistant(
           { role: "user", content: `Prompt: ${one(prompt, maxPromptCharacters)}` },
         ],
         temperature: 0.2,
-        maxTokens: 1500,
         signal,
       });
       const parsed = replyJson(reply.text);
@@ -906,7 +904,6 @@ export function createAssistant(
           { role: "user", content: userContent(text, pictures, vision) },
         ],
         temperature: 0.4,
-        maxTokens: 2000,
         signal,
       });
       const parsed = replyJson(reply.text);
@@ -950,7 +947,6 @@ export function createAssistant(
         { role: "user", content: userContent("Caption this image.", [image], true) },
       ],
       temperature: 0.2,
-      maxTokens: 1500,
       signal,
     });
     const parsed = replyJson(reply.text);
@@ -980,8 +976,6 @@ export function createAssistant(
         { role: "user", content: one(prompt, maxPromptCharacters) },
       ],
       temperature: 0.2,
-      // Reasoning models spend most of this on thinking before the few words.
-      maxTokens: 1500,
       signal,
     });
     const text = replyTitle(reply.text);
@@ -1019,7 +1013,6 @@ export function createAssistant(
           { role: "user", content: "Draft the guide." },
         ],
         temperature: 0.3,
-        maxTokens: 2000,
         signal,
         timeout: 60_000,
       });
@@ -1067,7 +1060,6 @@ export function createAssistant(
             { role: "user", content: one(sourceText, 12000) },
           ],
           temperature: 0.1,
-          maxTokens: 1500,
           signal,
         });
         read = replyJson(reply.text) || {};
