@@ -377,7 +377,17 @@ export async function fixtures(page: Page) {
             "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },
       });
-    if (path === "/api/queue") return respond({ jobs });
+    if (path === "/api/queue") return respond({ jobs: jobs.filter((job) => !job.cleared) });
+    if (path === "/api/queue/clear-failed") {
+      const failed = jobs.filter((job) => job.status === "failed" && !job.cleared);
+      failed.forEach((job) => (job.cleared = true));
+      return respond({ cleared: failed.length });
+    }
+    if (path.match(/^\/api\/queue\/[^/]+\/clear$/)) {
+      const job = jobs.find((j) => j.id === path.split("/")[3]);
+      job.cleared = true;
+      return respond({ job });
+    }
     if (path === "/api/queue/cancel-all") {
       const active = jobs.filter(
         (job) => !["completed", "cancelled", "failed"].includes(job.status),

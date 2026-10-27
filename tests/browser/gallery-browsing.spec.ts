@@ -443,7 +443,7 @@ test("Offline views report the API error and support retry", async ({ page }) =>
   await expect(page.getByText("No Images", { exact: true })).toBeVisible();
 });
 
-test("Gallery search preserves the query and status panel cancels only active work", async ({
+test("Gallery search preserves the query and status panel stops active and clears failed work", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -451,6 +451,7 @@ test("Gallery search preserves the query and status panel cancels only active wo
     ["waiting-job", "waiting"],
     ["queued-job", "queued"],
     ["finished-job", "completed"],
+    ["failed-job", "failed"],
   ])
     state.jobs.push({
       id,
@@ -484,10 +485,21 @@ test("Gallery search preserves the query and status panel cancels only active wo
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   await expect(queue.getByText("waiting-job", { exact: true })).toBeVisible();
   await expect(queue.getByText("queued-job", { exact: true })).toBeVisible();
-  await queue.getByRole("button", { name: "Cancel All", exact: true }).click();
+  for (const action of ["Stop All", "Clear Failed"]) {
+    await queue.getByRole("button", { name: action, exact: true }).click();
+    await page
+      .getByRole("dialog", { name: `${action} Generations?` })
+      .getByRole("button", { name: action, exact: true })
+      .click();
+  }
   await expect
-    .poll(() => state.jobs.map((job) => job.status))
-    .toEqual(["cancelled", "cancelled", "completed"]);
+    .poll(() => state.jobs.map((job) => [job.status, Boolean(job.cleared)]))
+    .toEqual([
+      ["cancelled", false],
+      ["cancelled", false],
+      ["completed", false],
+      ["failed", true],
+    ]);
   await expect(queue.getByText("Empty Queue", { exact: true })).toBeVisible();
 });
 

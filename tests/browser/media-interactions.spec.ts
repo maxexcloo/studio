@@ -197,6 +197,6 @@ test("Retrying a failed entry in the viewer replaces it with the new run", async
   await status.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(status).toContainText("Generation resumed");
   expect(retries).toBe(1);
-  await expect(status.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
+  await expect(status.getByRole("button", { name: "Stop", exact: true })).toBeVisible();
   expect(state.gallery.map((item) => item.id)).toEqual(["retried-item"]);
 });

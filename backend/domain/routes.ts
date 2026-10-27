@@ -23,9 +23,13 @@ interface Router {
   delete(path: string, handler: Handler): unknown;
 }
 const owner = (req: Request) => req.studioAccount?.userId || "";
-/** The person's queue: Dream's background jobs stay out of it; Dream's own pause stops them. */
+/**
+ * The person's queue: Dream's background jobs stay out of it (Dream's own pause stops them), and
+ * so do failed jobs the person cleared.
+ */
 const listed = (store: RewriteStore, ownerId: string) =>
-  store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream);
+  store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream && !job.cleared);
+const clear = (store: RewriteStore, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -238,6 +242,18 @@ export function registerRewriteRoutes(
         }),
     );
     return res.json({ outcomes } satisfies QueueCancelAllResponse);
+  });
+  app.post("/api/queue/clear-failed", (req, res) => {
+    const failed = listed(store, owner(req)).filter((job) => job.status === "failed");
+    failed.forEach((job) => clear(store, job));
+    return res.json({ cleared: failed.length });
+  });
+  app.post("/api/queue/:id/clear", (req, res) => {
+    const job = store.job(owner(req), req.params.id);
+    if (!job) return missing(res);
+    if (job.status !== "failed")
+      return res.status(409).json({ error: "Only failed generations can be cleared." });
+    return res.json({ job: publicJob(clear(store, job)) });
   });
   app.post("/api/queue/:id/cancel", async (req, res) => {
     const job = await queue.cancel(owner(req), req.params.id);
