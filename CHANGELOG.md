@@ -21,6 +21,7 @@ version opens with a `> ` summary line.
 
 ### Fixed
 
+- Gallery Captions, Describe and reference reading know again when the text model reads images: Studio asks the running text workload's own `/props` instead of LiteLLM's `/model/info`, which Bifrost doesn't serve.
 - Prompt writing for MCP, Dream and MCP's model pick leaves room for a reasoning model's thinking, which Studio captures from `reasoning_content` as well as `<think>` blocks.
 
 ## [1.0.2] - 2026-10-27

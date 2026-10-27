@@ -168,6 +168,13 @@ export class RuntimeController {
     }));
   }
 
+  /** The workloads of a kind the cluster has scaled up (replicas > 0), ready or not. */
+  async running(kind: ServiceKind) {
+    const workloads = this.workloads.filter((workload) => workload.kind === kind);
+    const states = await Promise.all(workloads.map((workload) => this.engine.state(workload)));
+    return workloads.filter((_, index) => states[index].replicas > 0);
+  }
+
   private async states() {
     const states = new Map<string, DeploymentState>();
     await Promise.all(

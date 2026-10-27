@@ -48,7 +48,6 @@ const accounts = {
 const encoder = new TextEncoder();
 const calls = [];
 const fetchImpl = async (url, options = {}) => {
-  if (url.endsWith("/model/info")) return Response.json({ data: [] });
   if (url.endsWith("/v1/models"))
     return Response.json({ data: [{ id: "ai/text-quick" }, { id: "ai/uncensored" }] });
   const body = JSON.parse(options.body);
