@@ -349,6 +349,32 @@ test("Near-misses beside the viewer's controls keep it open; the empty stage clo
   await expect(viewer).toBeHidden();
 });
 
+test("An opened video plays, muted when the browser refuses sound", async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      (window as any).played = { muted: this.muted };
+      return this.muted
+        ? Promise.resolve()
+        : Promise.reject(new DOMException("Sound needs a gesture", "NotAllowedError"));
+    };
+  });
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    prompt: "A rolling wave",
+    width: 1280,
+    height: 720,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).played)).toEqual({ muted: true });
+});
+
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
   const { viewer } = await seed(page, {
     caption: {

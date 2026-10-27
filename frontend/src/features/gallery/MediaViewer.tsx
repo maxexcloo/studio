@@ -63,6 +63,29 @@ function nearControl(event: React.MouseEvent<HTMLElement>) {
   });
 }
 
+/**
+ * Plays each opened video, muted if the browser refuses sound, pauses it while the tab is hidden
+ * and releases the player when it leaves. The keyed element gets a fresh call per source.
+ */
+function playVideo(media: HTMLVideoElement | null) {
+  if (!media) return;
+  const pause = () => {
+    if (document.hidden) media.pause();
+  };
+  document.addEventListener("visibilitychange", pause);
+  media.play().catch((error: DOMException) => {
+    if (error.name !== "NotAllowedError" || media.muted) return;
+    media.muted = true;
+    void media.play().catch(() => {});
+  });
+  return () => {
+    document.removeEventListener("visibilitychange", pause);
+    media.pause();
+    media.removeAttribute("src");
+    media.load();
+  };
+}
+
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
   const held = useRef(new Map<string, HTMLImageElement>());
@@ -165,22 +188,6 @@ export function MediaViewer({
     },
     [],
   );
-  const video = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const media = video.current;
-    const pause = () => {
-      if (document.hidden) media?.pause();
-    };
-    document.addEventListener("visibilitychange", pause);
-    return () => {
-      document.removeEventListener("visibilitychange", pause);
-      if (media) {
-        media.pause();
-        media.removeAttribute("src");
-        media.load();
-      }
-    };
-  }, [item.id, item.type, source.url]);
   const subtitle = [
     item.type === "video" ? "Video" : "Image",
     String(item.settings?.profileName || ""),
@@ -341,13 +348,12 @@ export function MediaViewer({
                 <MediaJobStatus item={item} onRetried={setReplacement} />
               ) : item.type === "video" ? (
                 <video
-                  ref={video}
+                  ref={playVideo}
                   key={`${item.id}:${source.url}`}
                   src={source.url}
                   width={source.width}
                   height={source.height}
                   controls
-                  autoPlay={false}
                   playsInline
                   className={classes.video}
                   onClick={(event) => event.stopPropagation()}
