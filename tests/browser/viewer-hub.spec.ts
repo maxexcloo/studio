@@ -1,7 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeLoras, fixtures, image, stamp, viewerAction } from "./fixtures";
+import type { Profile } from "../../frontend/src/types";
+import {
+  closeLoras,
+  fixtures,
+  image,
+  profiles,
+  serveProfiles,
+  stamp,
+  viewerAction,
+} from "./fixtures";
 
-async function seed(page: Page, extra: Record<string, unknown> = {}) {
+async function seed(
+  page: Page,
+  extra: Record<string, unknown> = {},
+  routes?: (page: Page) => Promise<unknown>,
+) {
   const state = await fixtures(page);
   const settings = { profileId: "image:test", seed: 1234567, steps: 28, count: 2 };
   const item = {
@@ -38,6 +51,8 @@ async function seed(page: Page, extra: Record<string, unknown> = {}) {
     updatedAt: stamp,
   });
   state.gallery.push(item);
+  // Registered after the shared fixtures, these take precedence over them.
+  await routes?.(page);
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
@@ -119,6 +134,89 @@ test("Animate themes write the motion prompt and queue a video from the image", 
       referenceAssets: [{ assetId: "asset-hub", slot: "start" }],
     },
   });
+});
+
+// Local video is stopped and the account is granted Grok: Animate goes there and says so first.
+const grok: Profile = {
+  id: "grok:video",
+  label: "Grok Imagine Video",
+  kind: "video",
+  model: "grok:video",
+  workflow: "grok:video",
+  family: "grok",
+  provider: "cliproxyapi",
+  ready: true,
+  defaults: { width: 1280, height: 720, duration: 6 },
+  capabilities: { imageInput: true },
+  mediaInputs: [{ id: "reference", label: "Reference Image" }],
+};
+const note = "Local video isn't running, so this runs on Grok Imagine Video.";
+async function offline(page: Page) {
+  await serveProfiles(page, [...profiles, grok]);
+  await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        profileId: grok.id,
+        label: grok.label,
+        cloud: true,
+        note,
+        size: { width: 960, height: 960 },
+      },
+    }),
+  );
+}
+
+test("With local video stopped, an Animate theme says it runs on Grok and queues there", async ({
+  page,
+}) => {
+  const { state, viewer } = await seed(page, {}, offline);
+  await page.route("**/api/assistant/animate", (route) =>
+    route.fulfill({ json: { ok: true, prompt: "The bird takes flight" } }),
+  );
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(page.getByText(note, { exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    operation: "animate",
+    input: {
+      kind: "video",
+      profileId: grok.id,
+      prompt: "The bird takes flight",
+      width: 960,
+      height: 960,
+      duration: 6,
+      referenceAssets: [{ assetId: "asset-hub", slot: "reference" }],
+    },
+  });
+});
+
+test("With local video stopped, Animate in Composer pre-selects Grok", async ({ page }) => {
+  const { state, viewer } = await seed(page, {}, offline);
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
+  await expect(page).toHaveURL(/\/video\?compose=1/);
+  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
+    grok.label,
+  );
+  expect(state.jobs).toHaveLength(1);
+});
+
+test("With neither local video nor Grok, Animate says why and queues nothing", async ({ page }) => {
+  const reason =
+    "Local video isn't running and this account has no Grok access (Cloud Models), so nothing can animate this image right now.";
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) =>
+      route.fulfill({ status: 409, json: { ok: false, error: reason } }),
+    ),
+  );
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(page.getByText(reason, { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Living Photo", exact: true })).toBeDisabled();
+  await expect(
+    page.getByRole("menuitem", { name: "Animate in Composer", exact: true }),
+  ).toBeDisabled();
+  expect(state.jobs).toHaveLength(1);
 });
 
 test("Copy Prompt beside the details heading copies in one click", async ({ page }, testInfo) => {

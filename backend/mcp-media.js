@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
 import { flagEnabled } from "./deployment-settings.js";
-import { referenceImageSize } from "./generation-defaults.js";
+import { animateProfile, frameSize } from "./animate-profile.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import {
   assertAdjustable,
@@ -355,17 +355,14 @@ export class McpMedia {
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
    * Cloud (Grok) profiles join only when the user asked for the cloud (`cloud`). While the local video worker is
    * unavailable, video is refused with what to tell the user, or with Video Cloud Fallback on goes to a granted
-   * cloud profile with a `note` to pass on.
+   * cloud profile with a `note` to pass on. Animating an image follows animate-profile.js instead.
    */
   async choose(owner, options = {}) {
     const { profile, note } = await this.choices(owner, options);
     return { profile, note };
   }
   /** The profiles choose() picks from (`pool`), its usual pick (`profile`) and any `note`, so Generate can pick by the request. */
-  async choices(
-    owner,
-    { kind = "image", tier, references = 0, firstFrame = false, loras = [], cloud = false } = {},
-  ) {
+  async choices(owner, { kind = "image", tier, references = 0, loras = [], cloud = false } = {}) {
     const models = await this.catalogue(owner);
     const ready = await this.profiles(kind, owner);
     let profiles = ready;
@@ -400,7 +397,7 @@ export class McpMedia {
         );
     }
     const defaultId = models.defaults?.[kind === "video" ? "videoModel" : "imageModel"];
-    const options = { kind, tier, references, firstFrame };
+    const options = { kind, tier, references };
     return {
       pool: choicePool(profiles, options),
       profile: chooseProfile(profiles, { ...options, defaultId }),
@@ -1187,10 +1184,23 @@ export class McpMedia {
     const output = await this.download(owner, jobId, index);
     if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
       throw new Error("Only image results can be animated.");
-    // A named profile (the chat asking for Grok by name) picks the video model outright; otherwise the tier does.
-    const { profile: base, note } = named
-      ? { profile: named, note: namedNote }
-      : await this.choose(owner, { kind: "video", tier, references: 1, firstFrame: true, cloud });
+    const { width, height } = await sharp(output.content, {
+      limitInputPixels: 80000000,
+    }).metadata();
+    // A named profile picks the video model outright; otherwise Animate's own rule does, as in the app.
+    let base = named;
+    let note = namedNote;
+    if (!named) {
+      const models = await this.catalogue(owner);
+      const choice = animateProfile(await this.profiles("video", owner), {
+        defaultId: models.defaults?.videoModel,
+        localRunning: models.backends?.video?.available !== false,
+        tier,
+        cloud,
+      });
+      base = choice.profile;
+      note = choice.note ? `${choice.note} Tell the user. ` : "";
+    }
     if (!(base.mediaInputs || []).some((slot) => slot.kind === "image"))
       throw new Error(
         `${base.label || base.id} takes no starting image, so it cannot animate this result. Pass tier instead, or a profile_id that takes one.`,
@@ -1207,18 +1217,8 @@ export class McpMedia {
       count,
       reference_asset_ids: [asset.id],
     };
-    // The video takes the image's proportions at the profile's default pixel count, snapped to its limits.
     const controls = mcpControls(profile);
-    const { width, height } = await sharp(output.content, {
-      limitInputPixels: 80000000,
-    }).metadata();
-    const scale = Math.sqrt(
-      (profile.defaults?.width * profile.defaults?.height) / (width * height),
-    );
-    const size =
-      controls.width && controls.height && scale > 0
-        ? referenceImageSize(profile, { width: width * scale, height: height * scale })
-        : null;
+    const size = controls.width && controls.height ? frameSize(base, width, height) : null;
     if (
       size &&
       (size.width !== profile.defaults?.width || size.height !== profile.defaults?.height)

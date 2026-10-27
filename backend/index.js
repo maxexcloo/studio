@@ -71,6 +71,7 @@ import {
   registerAssistantRoutes,
 } from "./assistant-routes.js";
 import { registerAnimatePromptRoute } from "./prompt-animate.js";
+import { animateProfile } from "./animate-profile.js";
 import {
   canonicalProfileId,
   guideStore,
@@ -1388,6 +1389,37 @@ app.get("/api/models", async (req, res) => {
     res.json(withProfileAliases(withLibrary(modelsForAccount(models, req), req)));
   } catch {
     res.json(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)));
+  }
+});
+
+/** The media catalogue; demo mode without workers serves its sample one. */
+const catalogueModels = () =>
+  mediaModels(false)
+    .then((result) => result.models)
+    .catch((error) => {
+      if (demoMode) return mockModelResult();
+      throw error;
+    });
+/** Animate's profile for an account (animate-profile.js), from its catalogue and whether a local video worker answered. */
+async function animateChoice(account, { width, height } = {}) {
+  const models = modelsForAccount(await catalogueModels(), { studioAccount: account });
+  return animateProfile(models.profiles || [], {
+    defaultId: models.defaults?.videoModel,
+    localRunning: models.backends?.video?.available !== false,
+    width,
+    height,
+  });
+}
+// Every Animate surface asks this before queuing or staging, so it shows the model that will run.
+app.get("/api/animate/profile", async (req, res) => {
+  try {
+    const { profile, cloud, note, size } = await animateChoice(req.studioAccount, {
+      width: Number(req.query.width),
+      height: Number(req.query.height),
+    });
+    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, note, size });
+  } catch (error) {
+    res.status(409).json({ ok: false, error: error.message });
   }
 });
 
@@ -2758,14 +2790,13 @@ generationRoutes.setAdmission(async (req, res) => {
   res.status(result.status).json(result.payload);
 });
 
+/** The catalogue profile a Chat draft names, if any. */
+async function chatProfile(input) {
+  const models = await catalogueModels();
+  return models.profiles?.find((item) => item.id === canonicalProfileId(input?.profileId));
+}
 async function selectedChatMediaProfile(input, operation) {
-  const models = await mediaModels(false)
-    .then((result) => result.models)
-    .catch((error) => {
-      if (demoMode) return mockModelResult();
-      throw error;
-    });
-  const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input?.profileId));
+  const profile = await chatProfile(input);
   const reject = (message) => {
     throw Object.assign(new Error(message), { status: 400 });
   };
@@ -2878,9 +2909,15 @@ const sessionChat = new ChatService({
       throw Object.assign(new Error("The prompt assistant is off for this account."), {
         status: 403,
       });
-    const profile = await selectedChatMediaProfile(draft.input, draft.operation);
+    // Without a video model chosen in Chat's composer, Animate's own rule picks one (animate-profile.js).
+    const choosing =
+      draft.operation === "animate" &&
+      !revision &&
+      (await chatProfile(draft.input))?.kind !== "video";
+    let profile = choosing ? null : await selectedChatMediaProfile(draft.input, draft.operation);
+    let note = "";
     const kind = draft.operation === "animate" ? "video" : "image";
-    const input = {
+    let input = {
       ...draft.input,
       kind,
       clientJobId: turnId,
@@ -2903,12 +2940,14 @@ const sessionChat = new ChatService({
       const replaceInherited = Boolean(
         inheritedPrimary && references[0]?.assetId === inheritedPrimary,
       );
-      if (!revision && (!references.length || replaceInherited)) {
+      const inherit = !revision && (!references.length || replaceInherited);
+      let source;
+      if (inherit) {
         if (parent && parent.status !== "completed")
           throw new Error(
             "The selected result is still rendering. Wait for it to finish before refining it.",
           );
-        const source =
+        source =
           parent &&
           gallery.find(
             (item) =>
@@ -2920,6 +2959,28 @@ const sessionChat = new ChatService({
           throw new Error(
             "Choose an image result or attach a reference before asking Chat to refine or animate it.",
           );
+      }
+      if (choosing) {
+        const choice = await animateChoice(account, {
+          width: source?.width,
+          height: source?.height,
+        });
+        profile = choice.profile;
+        note = choice.note;
+        // The composer's image settings belong to its image model, not the chosen video profile.
+        input = {
+          kind,
+          clientJobId: turnId,
+          allowFallback: input.allowFallback,
+          prompt: input.prompt,
+          profileId: profile.id,
+          model: profile.model,
+          workflow: profile.workflow,
+          referenceAssets: references,
+          ...choice.size,
+        };
+      }
+      if (inherit) {
         const asset = referenceAssetForAccount(account, source.id, {
           frame: source.type === "video" ? "last" : "",
         });
@@ -2945,7 +3006,7 @@ const sessionChat = new ChatService({
       throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
         status: result.status,
       });
-    return publicJob(rewriteStore.job(ownerId, result.payload.jobId));
+    return { job: publicJob(rewriteStore.job(ownerId, result.payload.jobId)), note };
   },
 });
 app.use(

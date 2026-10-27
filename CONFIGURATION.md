@@ -52,7 +52,7 @@ adds them in **Settings › Workers**, which saves Studio's own list to
 `workers.json` in the data folder. Deployment workers come first and are never
 written there.
 
-**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
+**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for [Animate](#cloud-models), which never waits on a stopped video worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
 ## Cloud Models
 
@@ -62,7 +62,9 @@ Direct cloud work is independent of GPU admission. Studio records asynchronous v
 
 Cloud Models and NSFW access remain per-user permissions. Credentials never reach the browser or media-download URLs.
 
-While the local video worker is off, MCP video is refused with a note that Grok can be asked for. **Settings › Models › Video Cloud Fallback** (`STUDIO_VIDEO_CLOUD_FALLBACK=1`, off by default) sends it to a cloud profile the account is granted instead, and the reply says it went to the cloud. It applies at once and never affects Studio's own composer or held video work.
+**Animate** (the viewer's motion themes and Animate in Composer, tile and context menus, Chat's staged and requested animations, the Dream deck and MCP Reuse) picks its video profile with one rule: while the local video worker answers, the account's default local first-frame profile (otherwise the usual local first-frame pick); while it is stopped, a Grok video profile the account is granted; the Animate menu shows this before anything queues, and Chat and MCP replies say so. With neither, it says so and queues nothing. The video takes the image's proportions at the profile's default size, snapped for Grok to the nearest aspect it accepts. A profile the user chooses in the composer, a video model selected in Chat or an MCP `profile_id` always wins.
+
+While the local video worker is off, other MCP video is refused with a note that Grok can be asked for. **Settings › Models › Video Cloud Fallback** (`STUDIO_VIDEO_CLOUD_FALLBACK=1`, off by default) sends it to a cloud profile the account is granted instead, and the reply says it went to the cloud. It applies at once and never affects Animate, Studio's own composer or held video work.
 
 ## Model Manifest
 
