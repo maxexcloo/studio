@@ -238,7 +238,8 @@ primary component reference and verify APIs against the installed version.
 ## Media, Motion & Accessibility
 
 - The viewer is the iteration hub. Under the image, a prompt bar prefilled from
-  the item generates variations (the composer Count) into a strip; choosing one
+  the item generates variations (the composer Count) into a strip of the item's
+  versions, grouped as the grid groups them (`gallery/versions.ts`); choosing one
   makes it current. Its action bar is the shared item actions in their menu
   groups, plus Star, Download (and Share on phones) first and Regenerate (new
   seed, with Exact Repeat in its menu) after Recreate; Animate keeps its LLM
