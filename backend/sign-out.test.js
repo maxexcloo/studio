@@ -97,7 +97,6 @@ test(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         username: "admin@example.com",
-        displayName: "Admin",
         password: crypto.randomBytes(12).toString("base64url"),
         setupToken,
       }),

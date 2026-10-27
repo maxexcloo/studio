@@ -25,9 +25,7 @@ export function AccountMenuContent({
       window.location.assign("/");
     },
   });
-  const name = multi
-    ? own.data?.account.displayName || own.data?.account.username || "Your Account"
-    : "Single-User Development";
+  const name = multi ? own.data?.account.username || "Your Account" : "Single-User Development";
   const label = <Menu.Label>{name}</Menu.Label>;
   return (
     <>

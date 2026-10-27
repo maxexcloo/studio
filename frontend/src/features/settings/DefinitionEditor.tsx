@@ -6,13 +6,13 @@ import {
   Button,
   FocusTrap,
   Group,
+  Menu,
   Modal,
   NumberInput,
   Select,
   SimpleGrid,
   Stack,
   Switch,
-  Table,
   Tabs,
   Text,
   Textarea,
@@ -21,6 +21,7 @@ import {
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
+import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -432,55 +433,61 @@ function DefinitionForm({
           </Tabs.Panel>
           <Tabs.Panel value="versions" pt="md">
             <Stack gap="sm">
-              {versions.isPending ? (
-                <LoadingState label="Loading Versions" />
-              ) : versions.error ? (
+              {versions.error ? (
                 <Alert color="red">{versions.error.message}</Alert>
               ) : (
-                <Table.ScrollContainer minWidth={420}>
-                  <Table aria-label="Definition Versions">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Version</Table.Th>
-                        <Table.Th>Saved By</Table.Th>
-                        <Table.Th>Actions</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {versions.data?.versions.map((entry) => (
-                        <Table.Tr key={entry.version}>
-                          <Table.Td>
-                            {entry.version}
-                            {entry.aiDrafted ? " · AI-Drafted" : ""}
-                          </Table.Td>
-                          <Table.Td>{entry.by || entry.origin}</Table.Td>
-                          <Table.Td>
-                            <Group gap="xs">
-                              <Button
-                                size="compact-xs"
-                                variant="subtle"
-                                loading={version.isPending}
-                                onClick={() => version.mutate(entry.version)}
-                              >
-                                View
-                              </Button>
-                              <Button
-                                size="compact-xs"
-                                variant="default"
-                                disabled={busy || form.isDirty()}
-                                onClick={() =>
-                                  action.mutate({ action: "revert", version: entry.version })
-                                }
-                              >
-                                Restore Version {entry.version}
-                              </Button>
-                            </Group>
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </Table.ScrollContainer>
+                <DataTable
+                  label="Definition Versions"
+                  rows={versions.data?.versions || []}
+                  rowKey={(entry) => `${entry.version}`}
+                  rowName={(entry) => `Version ${entry.version}`}
+                  loading={versions.isPending && "Loading Versions"}
+                  empty="No Versions"
+                  columns={[
+                    {
+                      key: "version",
+                      header: "Version",
+                      sortValue: (entry) => entry.version,
+                      cell: (entry) => (
+                        <Group gap="xs" wrap="nowrap">
+                          <Text size="sm">{entry.version}</Text>
+                          {entry.aiDrafted && (
+                            <Badge color="orange" variant="light">
+                              AI-Drafted
+                            </Badge>
+                          )}
+                        </Group>
+                      ),
+                    },
+                    {
+                      key: "by",
+                      header: "Saved By",
+                      main: true,
+                      sortValue: (entry) => entry.by || entry.origin,
+                      cell: (entry) => (
+                        <Text size="sm" truncate>
+                          {entry.by || entry.origin}
+                        </Text>
+                      ),
+                    },
+                  ]}
+                  rowActions={(entry) => (
+                    <>
+                      <Menu.Item
+                        disabled={version.isPending}
+                        onClick={() => version.mutate(entry.version)}
+                      >
+                        View Version
+                      </Menu.Item>
+                      <Menu.Item
+                        disabled={busy || form.isDirty()}
+                        onClick={() => action.mutate({ action: "revert", version: entry.version })}
+                      >
+                        Restore Version
+                      </Menu.Item>
+                    </>
+                  )}
+                />
               )}
               {version.error && <Alert color="red">{version.error.message}</Alert>}
               {versionText && (

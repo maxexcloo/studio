@@ -297,7 +297,6 @@ export function registerMultiUserAuthRoutes(
     try {
       bootstrapping = createLocalAccount({
         username: req.body?.username,
-        displayName: req.body?.displayName,
         password: req.body?.password,
         role: "administrator",
         onlyIfEmpty: true,
@@ -488,17 +487,11 @@ export function registerMultiUserAuthRoutes(
       return res.status(401).json({ ok: false, error: "Sign in to change your account." });
     const body = req.body || {};
     const changes = {
-      displayName: body.displayName,
       username: body.username,
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
     };
     try {
-      if (typeof body.username !== "string" && !body.newPassword)
-        return res.json({
-          ok: true,
-          account: await updateOwnAccount(access.userId, { displayName: body.displayName }),
-        });
       validateOwnAccountChange(access.userId, changes);
       // Checking the current password is a guess like a sign-in, so it shares the limiter.
       const lane = `${clientOf(req).address}|me:${access.userId}`;

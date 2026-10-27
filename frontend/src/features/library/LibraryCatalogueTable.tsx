@@ -1,18 +1,8 @@
 import { useState } from "react";
-import {
-  ActionIcon,
-  Badge,
-  Menu,
-  Select,
-  Stack,
-  Table,
-  Text,
-  Tooltip,
-  VisuallyHidden,
-} from "@mantine/core";
-import { Ellipsis, RefreshCw } from "lucide-react";
+import { ActionIcon, Badge, Menu, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { RefreshCw } from "lucide-react";
 import { copyText } from "../../ui/clipboard";
-import { EmptyState } from "../../ui/EmptyState";
+import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 
@@ -143,27 +133,13 @@ export function LibraryCatalogueTable({
   const inView = items.filter((item) =>
     view === "updates" ? updating(item) : item.installed === (view === "installed"),
   );
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = inView.filter((item) => {
-    if (family && !familiesOf(item).includes(family)) return false;
-    if (type && resourceType(item) !== type) return false;
-    if (modelType && (item.modelType || "unclassified") !== modelType) return false;
-    const text = [
-      resourceName(item),
-      item.file,
-      item.description,
-      item.note,
-      ...(item.families || []),
-      ...familiesOf(item),
-      typeLabel(item),
-      statusOf(item).label,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
+  const rows = inView.filter(
+    (item) =>
+      (!family || familiesOf(item).includes(family)) &&
+      (!type || resourceType(item) === type) &&
+      (!modelType || (item.modelType || "unclassified") === modelType),
+  );
   const filterCount = Number(!!family) + Number(!!type) + Number(!!modelType);
-  const noun = label === "LoRAs" ? "LoRAs" : "Models";
   const unclassified = items.filter((item) => libraryItemCategory(item) === "unclassified").length;
   return (
     <Stack gap="md">
@@ -245,166 +221,151 @@ export function LibraryCatalogueTable({
           conflicting model or LoRA metadata.
         </Text>
       )}
-      {rows.length ? (
-        <Table aria-label={`Library ${label}`} verticalSpacing="xs" highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th visibleFrom="sm" w={170}>
-                Family
-              </Table.Th>
-              <Table.Th visibleFrom="sm" w={150}>
-                Type
-              </Table.Th>
-              <Table.Th w={130}>Status</Table.Th>
-              <Table.Th w={44}>
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map((item) => {
-              const name = resourceName(item);
-              const status = statusOf(item);
-              const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
-              const latest = item.update?.latest;
-              const free = item.update?.freeAlternative;
-              return (
-                <Table.Tr key={item.key}>
-                  <Table.Td maw={0} w="100%">
-                    <Text size="sm" fw={500} truncate>
-                      {name}
-                    </Text>
-                    <Text size="xs" c="dimmed" truncate hiddenFrom="sm">
-                      {[familySummary(item), typeLabel(item)]
-                        .filter((part) => part !== "Unclassified")
-                        .join(" · ")}
-                    </Text>
-                    {(item.description || item.note) && (
-                      <Text size="xs" c="dimmed" lineClamp={1}>
-                        {item.description || item.note}
-                      </Text>
-                    )}
-                    {canUpdate(item) && (
-                      <Text size="xs">
-                        Update Available: {latest?.name}
-                        {item.update?.note ? ` · ${item.update.note}` : ""}
-                      </Text>
-                    )}
-                    {item.update?.state === "error" && item.update.note && (
-                      <Text size="xs" c="red">
-                        {item.update.note}
-                      </Text>
-                    )}
-                    {item.applied?.note && (
-                      <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
-                        {item.applied.note}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td visibleFrom="sm">
-                    <Text
-                      size="sm"
-                      lineClamp={2}
-                      title={familiesOf(item).join(", ")}
-                      c={item.families?.length ? undefined : "dimmed"}
-                    >
-                      {familySummary(item)}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td visibleFrom="sm">
-                    <Text
-                      size="sm"
-                      c={typeLabel(item) === "Unclassified" ? "dimmed" : undefined}
-                      style={{ whiteSpace: "nowrap" }}
-                    >
-                      {typeLabel(item)}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge color={status.color} variant="light" size="sm" miw="max-content">
-                      {status.label}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
-                    <Menu position="bottom-end">
-                      <Menu.Target>
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          aria-label={`Actions for ${name}`}
-                        >
-                          <Ellipsis size={18} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        {onUpdate &&
-                          canUpdate(item) &&
-                          (latest?.downloadable && !latest.unavailable ? (
-                            <Menu.Item disabled={updatePending} onClick={() => onUpdate(item)}>
-                              Update to {latest.name}
-                            </Menu.Item>
-                          ) : free?.downloadable && !free.unavailable ? (
-                            <Menu.Item
-                              disabled={updatePending}
-                              onClick={() => onUpdate(item, true)}
-                            >
-                              Update to {free.name}
-                            </Menu.Item>
-                          ) : (
-                            <Menu.Item disabled>
-                              {latest?.unavailable?.note || "This update cannot be downloaded."}
-                            </Menu.Item>
-                          ))}
-                        <Menu.Item
-                          onClick={() => void copyText(item.file || item.key, "File name")}
-                        >
-                          Copy File Name
-                        </Menu.Item>
-                        {source && (
-                          <Menu.Item
-                            component="a"
-                            href={source}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Open Source Page
-                          </Menu.Item>
-                        )}
-                        {onEdit && (
-                          <Menu.Item onClick={() => onEdit(item)}>Edit Catalogue Entry</Menu.Item>
-                        )}
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Table.Td>
-                </Table.Tr>
-              );
-            })}
-          </Table.Tbody>
-        </Table>
-      ) : (
-        <EmptyState
-          title={
-            inView.length
-              ? `No Matching ${noun}`
-              : view === "updates"
-                ? "Everything Is Up to Date"
-                : view === "installed"
-                  ? `No ${noun} Installed`
-                  : `No Other ${noun} Catalogued`
-          }
-        >
-          {inView.length
-            ? "Try another search or reset the filters."
+      <DataTable
+        label={`Library ${label}`}
+        rows={rows}
+        rowKey={(item) => item.key}
+        rowName={resourceName}
+        query={query}
+        searchText={(item) => [
+          resourceName(item),
+          item.file,
+          item.description,
+          item.note,
+          ...(item.families || []),
+          ...familiesOf(item),
+          typeLabel(item),
+          statusOf(item).label,
+        ]}
+        initialSort={{ key: "name", descending: false }}
+        empty={
+          inView.length
+            ? "No Matches"
             : view === "updates"
-              ? onCheckUpdates
-                ? "Check for updates to see newer versions of installed files."
-                : "Installed files have no newer versions."
+              ? "Everything Is Up to Date"
               : view === "installed"
-                ? `${noun} on the workers show here.`
-                : `Catalogued ${noun} that are not installed show here.`}
-        </EmptyState>
-      )}
+                ? `No ${label} Installed`
+                : `No Other ${label} Catalogued`
+        }
+        columns={[
+          {
+            key: "name",
+            header: "Name",
+            main: true,
+            sortValue: resourceName,
+            cell: (item) => (
+              <>
+                <Text size="sm" fw={500} truncate>
+                  {resourceName(item)}
+                </Text>
+                <Text size="xs" c="dimmed" truncate hiddenFrom="sm">
+                  {[familySummary(item), typeLabel(item)]
+                    .filter((part) => part !== "Unclassified")
+                    .join(" · ")}
+                </Text>
+                {(item.description || item.note) && (
+                  <Text size="xs" c="dimmed" lineClamp={1}>
+                    {item.description || item.note}
+                  </Text>
+                )}
+                {canUpdate(item) && (
+                  <Text size="xs">
+                    Update Available: {item.update?.latest?.name}
+                    {item.update?.note ? ` · ${item.update.note}` : ""}
+                  </Text>
+                )}
+                {item.update?.state === "error" && item.update.note && (
+                  <Text size="xs" c="red">
+                    {item.update.note}
+                  </Text>
+                )}
+                {item.applied?.note && (
+                  <Text size="xs" c={item.applied.state === "failed" ? "red" : "dimmed"}>
+                    {item.applied.note}
+                  </Text>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "family",
+            header: "Family",
+            visibleFrom: "sm",
+            width: 170,
+            sortValue: (item) => (item.families?.length ? familySummary(item) : undefined),
+            cell: (item) => (
+              <Text
+                size="sm"
+                lineClamp={2}
+                title={familiesOf(item).join(", ")}
+                c={item.families?.length ? undefined : "dimmed"}
+              >
+                {familySummary(item)}
+              </Text>
+            ),
+          },
+          {
+            key: "type",
+            header: "Type",
+            visibleFrom: "sm",
+            width: 150,
+            sortValue: (item) => (typeLabel(item) === "Unclassified" ? undefined : typeLabel(item)),
+            cell: (item) => (
+              <Text
+                size="sm"
+                c={typeLabel(item) === "Unclassified" ? "dimmed" : undefined}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {typeLabel(item)}
+              </Text>
+            ),
+          },
+          {
+            key: "status",
+            header: "Status",
+            width: 130,
+            sortValue: (item) => statusOf(item).label,
+            cell: (item) => (
+              <Badge color={statusOf(item).color} variant="light" miw="max-content">
+                {statusOf(item).label}
+              </Badge>
+            ),
+          },
+        ]}
+        rowActions={(item) => {
+          const source = item.links?.civitaiCom || item.links?.hf || item.links?.civitaiRed;
+          const latest = item.update?.latest;
+          const free = item.update?.freeAlternative;
+          return (
+            <>
+              {onUpdate &&
+                canUpdate(item) &&
+                (latest?.downloadable && !latest.unavailable ? (
+                  <Menu.Item disabled={updatePending} onClick={() => onUpdate(item)}>
+                    Update to {latest.name}
+                  </Menu.Item>
+                ) : free?.downloadable && !free.unavailable ? (
+                  <Menu.Item disabled={updatePending} onClick={() => onUpdate(item, true)}>
+                    Update to {free.name}
+                  </Menu.Item>
+                ) : (
+                  <Menu.Item disabled>
+                    {latest?.unavailable?.note || "This update cannot be downloaded."}
+                  </Menu.Item>
+                ))}
+              <Menu.Item onClick={() => void copyText(item.file || item.key, "File name")}>
+                Copy File Name
+              </Menu.Item>
+              {source && (
+                <Menu.Item component="a" href={source} target="_blank" rel="noopener noreferrer">
+                  Open Source Page
+                </Menu.Item>
+              )}
+              {onEdit && <Menu.Item onClick={() => onEdit(item)}>Edit Catalogue Entry</Menu.Item>}
+            </>
+          );
+        }}
+      />
     </Stack>
   );
 }
