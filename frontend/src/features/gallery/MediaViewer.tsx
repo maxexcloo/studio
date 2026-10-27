@@ -343,6 +343,7 @@ export function MediaViewer({
                     key={item.id}
                     src={source.url}
                     alt={item.prompt || "Generated Image"}
+                    placeholder={source.thumbnailUrl}
                     width={source.width}
                     height={source.height}
                     swipe={(direction) => {

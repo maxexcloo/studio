@@ -12,7 +12,7 @@
   max-height: none;
   padding: 0;
   border: 0;
-  background: none;
+  background: none center / 100% 100% no-repeat;
   cursor: zoom-in;
 }
 .picture img {
