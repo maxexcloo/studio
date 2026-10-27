@@ -184,9 +184,11 @@ test("A saved End-only preset restores its explicit slot without creating a Star
   expect(state.presets[0].input.referenceAssets).toEqual([
     { assetId: "asset-ending", slot: "end" },
   ]);
+  // The first tap outside the open preset popup only closes it; the second clears.
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("");
-  await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await page.getByRole("button", { name: "End Frame Only", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
