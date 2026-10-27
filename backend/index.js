@@ -47,7 +47,6 @@ import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createServicesObserver, createTextVision } from "./runtime/services.ts";
-import { legacyRecoverySwitchGuard } from "./runtime/legacy-recovery.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library-routes.js";
@@ -517,17 +516,10 @@ function refreshComfyContextSoon() {
   setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
-const legacyRecoveryIds = new Set(
-  filterVisibleGallery(gallery)
-    .filter((item) => item.jobId && !item.url && ["pending", "error"].includes(item.status))
-    .map((item) => item.jobId),
-);
-const legacyRecoveryTerminals = new Map();
 const recoverRunningJobs = createJobRecovery({
   backends: configuredBackends,
   finishJob: (id, patch) => {
-    const terminal = setTerminalJob(id, patch);
-    if (legacyRecoveryIds.has(id)) legacyRecoveryTerminals.set(id, terminal);
+    setTerminalJob(id, patch);
   },
   getGallery: () => gallery,
   jobs,
@@ -1975,53 +1967,6 @@ for (const job of rewriteStore
   )) {
   const workloads = managedWorkloads(job);
   if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
-}
-if (runtime) {
-  const queuedIds = new Set(rewriteStore.jobs().map((job) => job.id));
-  for (const id of queuedIds) {
-    legacyRecoveryIds.delete(id);
-    legacyRecoveryTerminals.delete(id);
-  }
-  runtime.controller.beforeStop = legacyRecoverySwitchGuard({
-    ids: legacyRecoveryIds,
-    recover: recoverRunningJobs,
-    inspect: (id) => {
-      const job = jobs.get(id) || legacyRecoveryTerminals.get(id);
-      return { backendUrl: workerById(job?.comfyBackend)?.url, settled: Boolean(job?.terminalAt) };
-    },
-    save: async (ids, workload) => {
-      const worker = configuredBackends()
-        .map((id) => workerById(id))
-        .find((item) => item?.url.replace(/\/$/, "") === workload.url.replace(/\/$/, ""));
-      for (const id of ids) {
-        const records = gallery.filter((item) => item.jobId === id && item.status === "done");
-        if (!records.length) continue;
-        const ownerId = records[0].ownerId || "";
-        const moved = await withComfyBackend(
-          (jobs.get(id) || legacyRecoveryTerminals.get(id))?.comfyBackend || worker?.id,
-          () =>
-            ingestRunResults(
-              records.map((output) => ({
-                output,
-                ...(output.upscale?.url ? { upscale: output.upscale } : {}),
-              })),
-              ownerId,
-              { strict: true },
-            ),
-        );
-        for (const result of moved.results)
-          updateGalleryJob(result.output.id, {
-            ...result.output,
-            ...(result.upscale ? { upscale: result.upscale } : {}),
-          });
-      }
-      await flushGalleryStrict();
-      for (const id of ids) {
-        legacyRecoveryIds.delete(id);
-        legacyRecoveryTerminals.delete(id);
-      }
-    },
-  });
 }
 const directCloudAdapter =
   directCloud &&
