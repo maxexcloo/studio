@@ -11,7 +11,8 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   retries: process.env.CI ? 1 : 0,
   testDir: "./tests/browser",
-  workers: process.env.CI ? 4 : undefined,
+  // CI runners have two CPUs; more browser workers starve Linux WebKit and time out.
+  workers: process.env.CI ? 2 : undefined,
   projects: [
     {
       name: "desktop",
