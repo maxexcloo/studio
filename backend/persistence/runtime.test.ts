@@ -29,7 +29,7 @@ test("migration dry run, verified backup, SQLite authority and restoration prese
         jobId: "kept-job",
         index: 0,
         ownerId: "kept-owner",
-        url: "/comfy/view?filename=old.png&subfolder=heiss-ui&type=media",
+        url: "/comfy/view?filename=old.png&subfolder=studio&type=media",
         settings: { profileId: "custom:original" },
       },
     ],
