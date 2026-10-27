@@ -587,7 +587,6 @@ export function DefinitionEditor({
       opened
       onClose={close}
       title={`${creating ? "Create" : "Edit"} ${kind === "profile" ? "Profile" : "Guide"}`}
-      size="lg"
       fullScreen={phone}
       closeButtonProps={{ "aria-label": "Close Definition Editor" }}
     >

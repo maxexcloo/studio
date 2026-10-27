@@ -1,4 +1,5 @@
-import { ActionIcon, Box, Button, Group, Tooltip } from "@mantine/core";
+import { useState } from "react";
+import { ActionIcon, Box, Button, FloatingIndicator, Group, Tooltip } from "@mantine/core";
 import { Image, Library, MessageCircle, Settings, Sparkles, Video } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { AppearanceMenu, useAppearance } from "../../ui/Appearance";
@@ -12,9 +13,9 @@ import classes from "./AppHeader.module.css";
 
 const modes = [
   { to: "/chat", label: "Chat", icon: MessageCircle },
+  { to: "/dream", label: "Dream", icon: Sparkles },
   { to: "/images", label: "Images", icon: Image },
   { to: "/video", label: "Videos", icon: Video },
-  { to: "/dream", label: "Dream", icon: Sparkles },
 ];
 const navigation = [
   { to: "/library", label: "Library", icon: Library },
@@ -22,26 +23,32 @@ const navigation = [
 ];
 function ModeSwitcher({ mode }: { mode: string }) {
   const phone = usePhone();
+  const [root, setRoot] = useState<HTMLElement | null>(null);
+  const [selected, setSelected] = useState<HTMLElement | null>(null);
   return (
     <Group
+      ref={setRoot}
       gap={2}
       component="nav"
       aria-label="Creative Modes"
       className={classes.modes}
       wrap="nowrap"
     >
+      <FloatingIndicator target={selected} parent={root} className={classes.indicator} />
       {modes.map((item) => {
         const active = mode.startsWith(item.to);
         return (
           <Tooltip key={item.to} label={item.label} disabled={!phone}>
             <Box component="span" style={{ display: "inline-flex" }}>
               <Button
+                ref={active ? setSelected : undefined}
                 component={Link}
                 to={item.to}
                 aria-label={item.label}
                 aria-current={active ? "page" : undefined}
-                variant={active ? "light" : "subtle"}
+                variant="subtle"
                 color={active ? undefined : "gray"}
+                className={classes.mode}
                 px={{ base: 8, sm: 12 }}
                 size="sm"
                 radius="xl"
@@ -73,10 +80,10 @@ export function AppHeader({ chat, mode }: { chat: boolean; mode: string }) {
       maw={appearance.layout === "fixed" ? "var(--studio-workspace-width)" : undefined}
     >
       <Group gap="xs" wrap="nowrap">
-        <StatusAction chat={chat} />
         <Link to="/images" replace={mode === "/images"} className={classes.home}>
           <StudioLogo order={phone ? 3 : 2} />
         </Link>
+        <StatusAction chat={chat} />
       </Group>
       <ModeSwitcher mode={mode} />
       <Group gap="xs" visibleFrom="sm">

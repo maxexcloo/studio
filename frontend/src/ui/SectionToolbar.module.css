@@ -1,6 +1,6 @@
 /* Switching between the toolbar and its search field fades in place without moving the rows below. */
 .enter {
-  animation: enter var(--studio-motion-duration) ease-out;
+  animation: enter var(--studio-motion-duration) var(--studio-ease-enter);
 }
 .views {
   min-width: 0;
