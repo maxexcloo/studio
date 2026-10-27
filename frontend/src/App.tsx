@@ -133,10 +133,10 @@ function Workspace() {
               closeButtonProps={{
                 "aria-label": `Close ${panel === "library" ? "Library" : "Settings"}`,
               }}
-              size={1200}
+              size={1320}
               styles={{
                 content: {
-                  height: phone ? "100dvh" : "min(90dvh, 960px)",
+                  height: phone ? "100dvh" : "min(92dvh, 1040px)",
                   display: "flex",
                   flexDirection: "column",
                 },

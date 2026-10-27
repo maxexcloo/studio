@@ -65,6 +65,10 @@ primary component reference and verify APIs against the installed version.
   neutral surface and divider. Phones use a session Drawer. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
+- Dialogs are centred on a raised plane from the theme defaults: a dimmed,
+  blurred backdrop, a clear border and a deep shadow, `lg` by default and `md`
+  for `ConfirmDialog`. Full-screen dialogs (the viewer, phone panels) fill the
+  viewport instead.
 - Library and Settings are route-backed Mantine modals with blurred overlays.
   Keep the same bounded dimensions and title typography across both workspaces,
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
