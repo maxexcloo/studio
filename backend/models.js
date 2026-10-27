@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "./gallery-store.js";
 import { missingNodes, nodeRange, optionsFor, textRange } from "./comfy.js";
-import { loadCustomWorkflows, workflowOptionIssues } from "./custom-workflows.js";
+import { loadCustomWorkflows, usesGrokMedia, workflowOptionIssues } from "./custom-workflows.js";
 import { classifyModel, modelTypeChoices } from "./model-families.js";
 import { familyProfiles } from "./family-profiles.js";
 import { families } from "./family-catalog.js";
@@ -328,6 +328,7 @@ export function inferModels(info, stats = {}, { configuredOnly = false } = {}) {
   const modelFiles = detectedFiles.filter((file) => modelFamilyEnabled(file.family, file.name));
 
   for (const workflow of loadCustomWorkflows()) {
+    if (usesGrokMedia(workflow)) continue;
     const missing = missingNodes(info, workflow.requiredNodes);
     if (!configuredOnly && (missing.length || workflowOptionIssues(workflow, info).length))
       continue;

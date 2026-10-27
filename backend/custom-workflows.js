@@ -425,8 +425,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
       Object.values(workflow.graph || {}).every((node) =>
         modelFamilyEnabled("", node.inputs?.unet_name),
       ) &&
-      (grokEnabled ||
-        !Object.values(workflow.graph || {}).some((node) => node.class_type === "GrokMedia")),
+      (grokEnabled || !usesGrokMedia(workflow)),
   );
   if (!dedupe) return allowed;
   // The bundled folder is scanned first, so a hand-authored template wins over
@@ -446,6 +445,10 @@ function withinWorkflowRoot(file) {
     return resolved === base || resolved.startsWith(`${base}${path.sep}`);
   });
 }
+
+/** Grok runs at its provider (providers/profiles.ts), never on a ComfyUI worker. */
+export const usesGrokMedia = (workflow) =>
+  Object.values(workflow.graph || {}).some((node) => node.class_type === "GrokMedia");
 
 export function loadCustomWorkflows() {
   return allCustomWorkflowRecords().filter((workflow) => {

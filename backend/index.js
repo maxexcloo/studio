@@ -191,7 +191,7 @@ import {
 import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { scheduleTrashPurge } from "./gallery-trash.js";
-import { cloudJobs, jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
+import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
 import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
 import {
@@ -429,6 +429,11 @@ const mcp = registerMcpRoutes(app, {
   internalCredential: internalMcpHeaders,
   resolveSignedResult: resolveSignedMcpResult,
   domainRequest: mcpGenerationRequest,
+  cloudVideoFailures: (since) =>
+    rewriteStore
+      .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
+      .filter((job) => job.input.kind === "video")
+      .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
   taste: (owner) => {
     const ownerId = multiUserEnabled ? owner : "";
     return taste.writable(ownerId) ? taste.read(ownerId).summary : "";
@@ -566,15 +571,6 @@ const recoverRunningJobs = createJobRecovery({
   cancel: cancelPrompt,
   ingest: (records, promptId) => ingestRecoveredRecords(records, promptId ? [promptId] : []),
 });
-// Cloud runs accepted before a restart are live again before any status check or gallery cleanup.
-{
-  const waiting = new Set(
-    filterVisibleGallery(
-      gallery.filter((item) => !item.url && ["pending", "error"].includes(item.status)),
-    ).map((item) => item.jobId),
-  );
-  cloudJobs.restore(jobs, { live: (id) => waiting.has(id) });
-}
 
 /**
  * With Studio media storage, recovered ComfyUI outputs move into Studio media and
@@ -2271,7 +2267,7 @@ async function queueResourceFor(input) {
     typeof input.backendId === "string" && input.backendId
       ? input.backendId
       : worker?.id || defaultWorkerId() || "";
-  return `${profile && isCloudProfile(profile) ? "cloud" : "worker"}:${backend}`;
+  return `worker:${backend}`;
 }
 /** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
 function managedWorkloads(job) {
@@ -2300,7 +2296,7 @@ async function permitQueueFallback(job) {
   rewriteStore.save({
     ...latest,
     backend,
-    resource: `${job.resource.startsWith("cloud:") ? "cloud" : "worker"}:${backend}`,
+    resource: `worker:${backend}`,
   });
   return true;
 }
@@ -2643,10 +2639,7 @@ const dream = createDream({
     return {
       profiles: (models.profiles || []).filter(
         (profile) =>
-          profile.ready !== false &&
-          profile.availability !== "offline" &&
-          !isCloudProfile(profile) &&
-          !directCloud?.isProfile({ profileId: profile.id }),
+          profile.ready !== false && profile.availability !== "offline" && !isCloudProfile(profile),
       ),
       defaults: models.defaults,
     };
@@ -3300,6 +3293,9 @@ function generationJobResponse(account, id) {
       outputs: queued.outputs,
       error: queued.status === "failed" ? queued.reason : undefined,
       progress: queued.progress,
+      ...(queued.resource.startsWith("provider:cliproxyapi")
+        ? { provider: "cliproxyapi", kind: queued.input.kind, updatedAt: queued.updatedAt }
+        : {}),
     };
   }
   const job = jobs.get(id);

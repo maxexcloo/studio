@@ -80,7 +80,6 @@ test(
           STUDIO_RUNTIME_AUTOMATIC: "",
           STUDIO_TEXT_ADMISSION_TOKEN: "",
           STUDIO_CLIPROXYAPI_URL: "",
-          CLIPROXYAPI_URL: "",
           STUDIO_CHAT_GATEWAY_URL: gatewayUrl,
           STUDIO_CHAT_GATEWAY_KEY: "fixture",
           STUDIO_CHAT_GATEWAY_MODELS: allowedModels,
