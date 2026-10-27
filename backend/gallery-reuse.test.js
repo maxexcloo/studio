@@ -140,11 +140,11 @@ test("separate variants keep their requested composer count without retrying the
 });
 
 test("a run that reuses a deleted image's file name still shows when it finishes", async () => {
-  // The newest image, HEISS_00042_.png, exists; a run starts; then that image is deleted.
-  fs.writeFileSync(path.join(outputDir, "HEISS_00042_.png"), "old");
+  // The newest image, studio_00042_.png, exists; a run starts; then that image is deleted.
+  fs.writeFileSync(path.join(outputDir, "studio_00042_.png"), "old");
   const old = {
-    id: url("HEISS_00042_.png"),
-    url: url("HEISS_00042_.png"),
+    id: url("studio_00042_.png"),
+    url: url("studio_00042_.png"),
     status: "done",
     type: "image",
     createdAt: new Date(Date.now() - 60_000).toISOString(),
@@ -157,16 +157,16 @@ test("a run that reuses a deleted image's file name still shows when it finishes
   };
   const pending = makePendingItems("job-1", body);
   setGallery([...pending, old]);
-  fs.unlinkSync(path.join(outputDir, "HEISS_00042_.png"));
+  fs.unlinkSync(path.join(outputDir, "studio_00042_.png"));
   hideGalleryItems([old]);
   setGallery(pending);
   const since = galleryRevisionValue();
 
   // ComfyUI saves the run under the freed name.
-  fs.writeFileSync(path.join(outputDir, "HEISS_00042_.png"), "new");
+  fs.writeFileSync(path.join(outputDir, "studio_00042_.png"), "new");
   await replaceGalleryJob(
     "job-1",
-    [{ url: url("HEISS_00042_.png"), filename: "HEISS_00042_.png", type: "image" }],
+    [{ url: url("studio_00042_.png"), filename: "studio_00042_.png", type: "image" }],
     body,
     new Map(),
   );
@@ -174,11 +174,11 @@ test("a run that reuses a deleted image's file name still shows when it finishes
   const delta = galleryDelta({ since });
   assert.deepEqual(
     delta.upserts.map((item) => item.url),
-    [url("HEISS_00042_.png")],
+    [url("studio_00042_.png")],
   );
   assert.deepEqual(
     pageGallery({}).items.map((item) => item.url),
-    [url("HEISS_00042_.png")],
+    [url("studio_00042_.png")],
   );
 });
 

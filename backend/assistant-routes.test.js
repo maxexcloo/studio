@@ -117,7 +117,7 @@ registerAssistantRoutes(app, {
   template: async (id) =>
     id === "base"
       ? {
-          heissUi: {
+          studio: {
             id: "base",
             name: "Base",
             kind: "image",
@@ -304,8 +304,8 @@ test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; draf
   assert.deepEqual(
     [
       drafted.aiDrafted,
-      JSON.parse(drafted.text).heissUi.defaults.model,
-      JSON.parse(drafted.text).heissUi.nsfw,
+      JSON.parse(drafted.text).studio.defaults.model,
+      JSON.parse(drafted.text).studio.nsfw,
       drafted.check.ok,
     ],
     [true, "new.safetensors", true, true],

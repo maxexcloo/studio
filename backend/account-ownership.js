@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { accountFolders } from "./data-names.js";
+import { accountFolder } from "./data-names.js";
 
 /** The authenticated server identity is the only source of a content owner ID. */
 export function ownerIdForRequest(req) {
@@ -27,20 +27,14 @@ const ownerHash = (ownerId) => crypto.createHash("sha256").update(ownerId).diges
 /** The account's folder new outputs go to. */
 export function accountOutputSubfolder(ownerId) {
   if (typeof ownerId !== "string" || !ownerId) return "";
-  return accountFolders(ownerHash(ownerId))[0];
-}
-
-/** The account's folder under every name it may have (data-names.js): the written one, then the migration's. */
-function accountOutputSubfolders(ownerId) {
-  return typeof ownerId === "string" && ownerId ? accountFolders(ownerHash(ownerId)) : [];
+  return accountFolder(ownerHash(ownerId));
 }
 
 export function outputSubfolderBelongsToRequest(subfolder, req) {
   const ownerId = ownerIdForRequest(req);
   if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   return (
-    typeof subfolder === "string" &&
-    accountOutputSubfolders(ownerId).some((folder) => subfolder.startsWith(`${folder}/`))
+    typeof subfolder === "string" && subfolder.startsWith(`${accountOutputSubfolder(ownerId)}/`)
   );
 }
 
@@ -55,7 +49,6 @@ export function outputFilenameBelongsToRequest(filename, subfolder, req) {
   const ownerId = ownerIdForRequest(req);
   if (!ownerId) return process.env.STUDIO_MULTI_USER !== "1";
   return (
-    accountOutputSubfolders(ownerId).includes(subfolder) ||
-    outputSubfolderBelongsToRequest(subfolder, req)
+    subfolder === accountOutputSubfolder(ownerId) || outputSubfolderBelongsToRequest(subfolder, req)
   );
 }

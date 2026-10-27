@@ -22,7 +22,7 @@ test(
     const config = path.join(temporary, "ai");
     mkdirSync(path.join(config, "profiles"), { recursive: true });
     const raw = {
-      heissUi: {
+      studio: {
         id: "cold",
         name: "Cold Model",
         family: "sdxl",
@@ -75,7 +75,7 @@ test(
     Object.assign(
       raw,
       Object.fromEntries(
-        raw.heissUi.mediaInputs.map((slot) => [
+        raw.studio.mediaInputs.map((slot) => [
           slot.control.node,
           {
             class_type: "LoadImage",
@@ -91,7 +91,7 @@ test(
       removedFile,
       JSON.stringify({
         ...raw,
-        heissUi: { ...raw.heissUi, id: "removed", name: "Removed Profile" },
+        studio: { ...raw.studio, id: "removed", name: "Removed Profile" },
       }),
     );
     writeFileSync(path.join(config, "models.json"), "[]");
@@ -324,7 +324,7 @@ test(
       const submitted = await nextPrompt;
       assert.equal(submitted.client_id, accepted.jobId);
       assert.equal(chosen.uploads.length, 10);
-      for (const [index, slot] of raw.heissUi.mediaInputs.entries())
+      for (const [index, slot] of raw.studio.mediaInputs.entries())
         assert.equal(
           submitted.prompt[slot.control.node].inputs.image,
           `fixture-input-${index + 1}.png`,
@@ -355,8 +355,8 @@ test(
         profileFile,
         JSON.stringify({
           ...raw,
-          heissUi: {
-            ...raw.heissUi,
+          studio: {
+            ...raw.studio,
             name: "Changed Seed Title",
             nsfw: true,
             defaults: { steps: 9 },
@@ -367,8 +367,8 @@ test(
         path.join(dataDir, "workflows", "cold.json"),
         JSON.stringify({
           ...raw,
-          heissUi: {
-            ...raw.heissUi,
+          studio: {
+            ...raw.studio,
             name: "Current Studio Title",
             nsfw: true,
             defaults: { steps: 7 },

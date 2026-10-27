@@ -30,7 +30,7 @@ generate[7] = { class_type: "BasicGuider", inputs: {} };
 const controls = { prompt: { node: "1", input: "text" }, seed: { node: "2", input: "seed" } };
 const raw = {
   graph,
-  heissUi: {
+  studio: {
     id: "mode-test",
     capabilities: { lora: true },
     loraStack: { adapter: "rgthree-power-v1", node: "6" },
@@ -89,7 +89,7 @@ test("custom profile discovery advertises installed LoRAs and compact mode capab
   assert.ok(!("graph" in profile.imageModes.generate));
   saveCustomWorkflow({
     ...raw,
-    heissUi: { ...raw.heissUi, id: "no-loras", capabilities: { lora: false } },
+    studio: { ...raw.studio, id: "no-loras", capabilities: { lora: false } },
   });
   assert.deepEqual(
     inferModels(info).profiles.find((item) => item.id === "custom:no-loras").options.loras,
@@ -125,13 +125,13 @@ test("mode selection reaches final graphs, preserves fixed generation denoise an
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
   const { optionalLoraIssue } = await import("./lora-catalogue.js");
   const prepared = structuredClone(raw);
-  prepared.heissUi.id = "fixed-accelerator";
+  prepared.studio.id = "fixed-accelerator";
   const fixed = {
     class_type: "LoraLoader",
     inputs: { lora_name: "recipe-accelerator.safetensors", strength_model: 1 },
   };
   prepared.graph["90"] = fixed;
-  prepared.heissUi.imageModes.generate.graph["90"] = fixed;
+  prepared.studio.imageModes.generate.graph["90"] = fixed;
   saveCustomWorkflow(prepared);
   const body = sanitizeGenerateBody(
     {
@@ -151,9 +151,9 @@ test("recipe-owned graph adapters are not inspected as optional stack entries", 
 
 test("trusted optional adapter policy validates conditioning and full publisher strength before generation", () => {
   const prepared = structuredClone(raw);
-  prepared.heissUi.id = "effect-policy";
-  prepared.heissUi.family = "minimax_h3";
-  prepared.heissUi.recipe = { modelLabel: "H3", label: "Standard", conditioning: "FL2VA" };
+  prepared.studio.id = "effect-policy";
+  prepared.studio.family = "minimax_h3";
+  prepared.studio.recipe = { modelLabel: "H3", label: "Standard", conditioning: "FL2VA" };
   saveCustomWorkflow(prepared);
   const catalogue = {
     "style.safetensors": {
@@ -187,7 +187,7 @@ test("trusted optional adapter policy validates conditioning and full publisher 
       ),
     /published range/,
   );
-  prepared.heissUi.recipe.conditioning = "Ref2VA";
+  prepared.studio.recipe.conditioning = "Ref2VA";
   saveCustomWorkflow(prepared);
   assert.throws(() => sanitizeGenerateBody(request, info), /conditioning variant/);
   assert.deepEqual(
@@ -222,13 +222,13 @@ test("runtime profiles expose owned prompting and select explicit image-mode gui
   };
   saveCustomWorkflow({
     ...raw,
-    heissUi: {
-      ...raw.heissUi,
+    studio: {
+      ...raw.studio,
       id: "owned-prompting",
       prompting,
       imageModes: {
-        generate: { ...raw.heissUi.imageModes.generate, prompting: generation },
-        reference: { ...raw.heissUi.imageModes.reference, prompting: reference },
+        generate: { ...raw.studio.imageModes.generate, prompting: generation },
+        reference: { ...raw.studio.imageModes.reference, prompting: reference },
       },
     },
   });
@@ -237,7 +237,7 @@ test("runtime profiles expose owned prompting and select explicit image-mode gui
   assert.deepEqual(profile.imageModes.generate.prompting, generation);
   assert.deepEqual(profile.imageModes.reference.prompting, reference);
   assert.equal(profile.imageModes.reference.graph, undefined);
-  saveCustomWorkflow({ ...raw, heissUi: { ...raw.heissUi, id: "inherited-prompting", prompting } });
+  saveCustomWorkflow({ ...raw, studio: { ...raw.studio, id: "inherited-prompting", prompting } });
   const inherited = inferModels(info).profiles.find(
     (item) => item.id === "custom:inherited-prompting",
   );

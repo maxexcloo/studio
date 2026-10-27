@@ -48,8 +48,8 @@ test("the text reads the way AUTOMATIC1111 writes it", () => {
 });
 
 test("a finished PNG in the output folder always carries it", async () => {
-  fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
-  const file = path.join(outputDir, "heiss-ui", "image_00001_.png");
+  fs.mkdirSync(path.join(outputDir, "studio"), { recursive: true });
+  const file = path.join(outputDir, "studio", "image_00001_.png");
   fs.writeFileSync(
     file,
     await sharp({ create: { width: 8, height: 6, channels: 3, background: "#123" } })
@@ -58,7 +58,7 @@ test("a finished PNG in the output folder always carries it", async () => {
   );
   const outputs = [
     {
-      url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "heiss-ui", type: "output" })}`,
+      url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "studio", type: "output" })}`,
       filename: "image_00001_.png",
       type: "image",
     },

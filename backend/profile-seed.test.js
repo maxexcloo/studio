@@ -13,7 +13,7 @@ const scratch = (t) => {
   return dir;
 };
 const profile = (id, name) =>
-  `${JSON.stringify({ heissUi: { id, name, kind: "image", controls: { prompt: { node: "1", input: "text" } } }, graph: { 1: { class_type: "CLIPTextEncode", inputs: { text: "" } } } }, null, 2)}\n`;
+  `${JSON.stringify({ studio: { id, name, kind: "image", controls: { prompt: { node: "1", input: "text" } } }, graph: { 1: { class_type: "CLIPTextEncode", inputs: { text: "" } } } }, null, 2)}\n`;
 
 function seedTree(root) {
   const workflows = path.join(root, "config", "studio", "workflows");
