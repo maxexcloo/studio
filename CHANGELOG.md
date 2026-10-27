@@ -11,6 +11,10 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Changed
+
+- Every prompt assistant call shares one 4,000-token budget, so long thinking no longer cuts a reply short.
+
 ## [1.0.11] - 2026-10-27
 
 > The prompt assistant stops failing with "unusable reply"
