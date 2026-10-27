@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router";
 import { Copy, ListChecks } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
 import { copyText } from "../../ui/clipboard";
@@ -260,7 +261,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   );
 }
 
-/** Details › Prompt, Model, References, Settings, Output and Timing for one result. */
+/** Details › Caption, Prompt, Model, References, Settings, Output and Timing for one result. */
 export function MediaDetails({ item }: { item: MediaItem }) {
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
@@ -269,25 +270,39 @@ export function MediaDetails({ item }: { item: MediaItem }) {
   const profile = profiles.find((candidate) => isProfile(candidate, item.settings?.profileId));
   return (
     <Stack gap="lg" fz="sm">
+      {(item.caption?.text || !!item.caption?.tags?.length) && (
+        <Stack gap={6}>
+          <Title order={6}>Caption</Title>
+          {item.caption?.text && <Text size="sm">{item.caption.text}</Text>}
+          {!!item.caption?.tags?.length && (
+            <Group gap={4} aria-label="Caption Tags">
+              {[...item.caption.tags]
+                .sort((a, b) => a.localeCompare(b))
+                .map((tag) => (
+                  <Badge
+                    key={tag}
+                    component={Link}
+                    to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
+                    aria-label={`Search ${tag}`}
+                    variant="default"
+                    radius="sm"
+                    size="sm"
+                    tt="none"
+                    fw={400}
+                    style={{ cursor: "pointer" }}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+            </Group>
+          )}
+        </Stack>
+      )}
       <Stack gap={6}>
         <Title order={6}>Prompt</Title>
         <PromptText>{item.prompt || "No prompt recorded."}</PromptText>
         <WritingThinking writing={item.writing} />
         {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
-        {item.caption?.text && (
-          <Text size="sm" c="dimmed">
-            Caption: {item.caption.text}
-          </Text>
-        )}
-        {!!item.caption?.tags?.length && (
-          <Group gap={4} aria-label="Caption Tags">
-            {item.caption.tags.map((tag) => (
-              <Badge key={tag} variant="default" radius="sm" size="sm" tt="none" fw={400}>
-                {tag}
-              </Badge>
-            ))}
-          </Group>
-        )}
       </Stack>
       {(details.profile || !!details.loras.length) && (
         <Stack gap={6}>

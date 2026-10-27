@@ -407,7 +407,7 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
   const { viewer } = await seed(page, {
     caption: {
       text: "A small amber bird perched on a mossy branch, soft morning light.",
-      tags: ["bird", "branch"],
+      tags: ["branch", "bird"],
       model: "vision-model",
       at: stamp,
       version: 2,
@@ -419,16 +419,19 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
     details = page.getByRole("dialog", { name: "An amber bird", exact: true });
   }
   await expect(
-    details.getByText(
-      "Caption: A small amber bird perched on a mossy branch, soft morning light.",
-      {
-        exact: true,
-      },
-    ),
+    details.getByText("A small amber bird perched on a mossy branch, soft morning light.", {
+      exact: true,
+    }),
   ).toBeVisible();
-  await expect(
-    details.getByLabel("Caption Tags", { exact: true }).getByText("branch"),
-  ).toBeVisible();
+  const tags = details.getByLabel("Caption Tags", { exact: true });
+  await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
+  // A tag searches the gallery for it and closes the viewer.
+  await tags.getByRole("link", { name: "Search branch", exact: true }).click();
+  await expect(viewer).toBeHidden();
+  if (!testInfo.project.use.isMobile)
+    await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
+      "branch",
+    );
 });
 
 test("Desktop details stay where the viewer left them", async ({ page }, testInfo) => {
