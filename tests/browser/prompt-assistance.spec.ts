@@ -60,7 +60,10 @@ test("Stopping held assistance retains the draft and unblocks generation", async
     await assist(page, "Improve Prompt");
     await expect.poll(() => started).toBe(true);
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Stop Assistance", exact: true }).click();
+    // The action spins and says what it is doing until it finishes or is stopped.
+    const stop = page.getByRole("button", { name: "Stop Assistance", exact: true });
+    await expect(stop).toHaveAccessibleDescription("Improving the prompt…");
+    await stop.click();
     await expect(page.getByRole("button", { name: "Generate Image", exact: true })).toBeEnabled();
     await expect(prompt).toHaveValue("Keep my original bird");
     release();
