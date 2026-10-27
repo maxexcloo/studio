@@ -155,10 +155,6 @@
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
 }
 
-.prompt {
-  width: 100%;
-}
-
 /* Next steps hold their row's height while they load, so the prompt bar never moves. */
 .steps {
   width: auto;
@@ -183,16 +179,6 @@
   flex-shrink: 0;
   width: 96px;
   height: 26px;
-}
-
-/* Padding sits outside the scrolling textarea, so a capped prompt never shows a cut-off line. */
-.promptWrapper {
-  padding-block: 8px;
-}
-
-.promptInput {
-  min-height: 0;
-  padding-block: 0;
 }
 
 /* Regenerate's menu half stays narrow so the split control reads as one action. */

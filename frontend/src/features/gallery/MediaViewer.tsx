@@ -162,10 +162,9 @@ export function MediaViewer({
     setReplacement("");
     navigate?.(next);
   }, [replacement, items, navigate]);
-  const [draft, setDraft] = useState({ id: item.id, prompt: item.prompt || "" });
-  const prompt = draft.id === item.id ? draft.prompt : item.prompt || "";
+  const joinStrip = (jobId: string) => setQueued((ids) => [...ids, jobId]);
   function iterate(next: Parameters<typeof iteration.mutate>[0]) {
-    iteration.mutate(next, { onSuccess: (jobId) => setQueued((ids) => [...ids, jobId]) });
+    iteration.mutate(next, { onSuccess: joinStrip });
   }
   function move(direction: -1 | 1) {
     if (!canNavigate) return;
@@ -217,7 +216,8 @@ export function MediaViewer({
             !event.nativeEvent.isComposing &&
             !deleting &&
             event.currentTarget.contains(target) &&
-            !target.closest("input,textarea,select,[aria-haspopup]")
+            // The viewer's composer folds back first.
+            !target.closest("input,textarea,select,[aria-haspopup],[data-composer-dock]")
           ) {
             event.preventDefault();
             close();
@@ -400,14 +400,8 @@ export function MediaViewer({
                 setCompare(false);
                 navigate?.(next);
               }}
-              prompt={prompt}
-              onPromptChange={(next) => setDraft({ id: item.id, prompt: next })}
-              onSubmit={() => iterate({ kind: "variation", prompt })}
-              onApply={(next) => {
-                setDraft({ id: item.id, prompt: next });
-                iterate({ kind: "variation", prompt: next });
-              }}
-              pending={iteration.isPending && iteration.variables?.kind === "variation"}
+              sessionId={sessionId}
+              onQueued={joinStrip}
               actions={
                 <MediaViewerActions
                   item={displayed}
