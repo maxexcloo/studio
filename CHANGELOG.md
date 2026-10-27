@@ -11,7 +11,7 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
-> Prompt writing moves onto the queue, with live thinking
+> Prompt writing on the queue with live thinking, one table for every list, email-named accounts and captions working again
 
 ### Changed
 
