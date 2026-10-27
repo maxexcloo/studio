@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Captions lead the viewer's Details, and their tags search the gallery
+
+### Changed
+
+- Details shows the caption and its tags above the prompt; tags sort alphabetically, and tapping one searches that gallery for it.
+
 ## [1.0.9] - 2026-10-27
 
 > One picker for references, LoRAs and presets, with saved stacks and a clearer chip rail; ships everything listed under 1.0.6–1.0.8, whose images never published

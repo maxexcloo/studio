@@ -14,7 +14,7 @@ import {
 import { LayoutGrid, Layers, SquareCheck } from "lucide-react";
 import { useDebouncedValue, useLocalStorage } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { queueQuery, terminal } from "../generation/Queue";
 import { api } from "../../api";
@@ -69,6 +69,21 @@ export function GalleryPage() {
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
+  // A caption tag in Details links here as ?q=<tag>: it becomes the search and closes the viewer.
+  const [params, setParams] = useSearchParams();
+  const linkedQuery = params.get("q");
+  useEffect(() => {
+    if (linkedQuery === null) return;
+    setQuery(linkedQuery);
+    setSelected(null);
+    setParams(
+      (next) => {
+        next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [linkedQuery, setParams]);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const client = useQueryClient();
   // Queue changes (new, finished or failed work) refresh the gallery at once; only active work
