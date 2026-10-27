@@ -93,10 +93,6 @@ export function loadRuntime(
   const { pools, workloads, keys } = kubernetesWorkloads(environment);
   if (!workloads.length) return undefined;
   const automatic = environment.STUDIO_RUNTIME_AUTOMATIC === "1";
-  if (automatic && environment.STUDIO_TEXT_ADMISSION_ACKNOWLEDGED !== "1")
-    throw new Error(
-      "Automatic runtime control requires STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1: managed local text must reach Studio's admission before Studio stops text workloads on its own.",
-    );
   const engine = new KubernetesEngine(
     request ??
       (environment.STUDIO_KUBERNETES_URL
