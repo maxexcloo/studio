@@ -36,6 +36,8 @@ export interface StudioSession {
   titleSource?: "generated" | "user";
   /** Dream's own session: it holds Dream jobs and is never listed as a Chat. */
   hidden?: true;
+  /** An MCP client's Chat; the conversation the client names (X-Studio-Conversation-Id) has one. */
+  mcp?: { conversationId?: string };
   inputs: GenerationInput;
   createdAt: string;
   updatedAt: string;
