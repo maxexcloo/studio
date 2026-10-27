@@ -210,7 +210,7 @@ export function registerRewriteRoutes(
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
     for (const job of listed(store, owner(req)).filter((item) =>
-      ["queued", "waiting"].includes(item.status),
+      ["writing", "queued", "waiting"].includes(item.status),
     )) {
       if ((await queue.cancel(owner(req), job.id))?.status === "cancelled") cancelled++;
     }
