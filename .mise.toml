@@ -32,10 +32,6 @@ run = "playwright test"
 [tasks.setup]
 run = "npm ci --no-audit --no-fund"
 
-# Native MCP
-[tasks."test:mcp"]
-run = "node --test backend/mcp*.test.js"
-
 # Prompt Assistant Evals (live LiteLLM replay on demand, never in CI; --record refreshes the fixtures)
 [tasks."eval:assistant"]
 run = "node backend/commands/assistant-eval.mjs"
