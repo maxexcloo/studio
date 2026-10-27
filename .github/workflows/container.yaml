@@ -186,9 +186,9 @@ jobs:
           # The worker image is published only by main commits that change it.
           worker_commit="$(git log -1 --first-parent --format=%H -- .dockerignore .github/workflows/worker.yaml LICENSE worker)"
           worker="$IMAGE_NAME-worker:sha-$worker_commit"
-          # main's run for this commit publishes the app image; it starts alongside this one.
+          # main's runs publish both images and start alongside this one; the worker takes longest.
           for _ in $(seq 1 100); do
-            if docker buildx imagetools inspect "$app" >/dev/null 2>&1; then break; fi
+            if docker buildx imagetools inspect "$app" >/dev/null 2>&1 && docker buildx imagetools inspect "$worker" >/dev/null 2>&1; then break; fi
             sleep 30
           done
           docker buildx imagetools inspect "$app" >/dev/null || { echo "::error::main's run for $GITHUB_SHA did not publish $app; rerun it, then this one."; exit 1; }
