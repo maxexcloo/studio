@@ -11,7 +11,6 @@ import { dataDir } from "./gallery-store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { fromChat, requireAdmin } from "./route-access.js";
 import { profileStore } from "./profile-store.js";
-import { profileBlock, profileBlockName, profileBlocksIn } from "./profile-block.js";
 
 /**
  * Studio owns editable runtime profiles and their version history; ai is a read-only seed.
@@ -22,7 +21,7 @@ const validId = (id) =>
   /^[a-z0-9][a-z0-9._-]{0,79}$/.test(String(id || "")) && !String(id).includes("..");
 const hashOf = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const fileFor = (id) => path.join(userWorkflowsDir, `${id}.json`);
-const metaOf = (raw) => profileBlock(raw);
+const metaOf = (raw) => raw?.studio;
 
 function readEdits() {
   try {
@@ -73,16 +72,9 @@ export function readEditableProfile(id) {
   if (!validId(id) || !fs.existsSync(fileFor(id)))
     throw Object.assign(new Error("That profile was not found."), { status: 404 });
   const text = fs.readFileSync(fileFor(id), "utf8");
-  let blockName = null;
-  try {
-    blockName = profileBlockName(JSON.parse(text));
-  } catch {
-    // The raw editor can repair a malformed workflow.
-  }
   return {
     id,
     text,
-    blockName,
     hash: hashOf(text),
     edited: readEdits()[id] || null,
     version: profileStore({ workflowsDir: userWorkflowsDir }).meta(id),
@@ -165,24 +157,19 @@ export function validateProfileText(id, text, { info = null } = {}) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     return { ok: false, errors: ["The profile must be a JSON object."], warnings };
   const meta = metaOf(raw);
-  // Studio reads the new "studio" name and "heissUi"; both at once leaves it unclear which applies.
-  const block = profileBlockName(raw) || "heissUi";
-  const blocks = profileBlocksIn(raw);
-  if (blocks.length > 1)
-    errors.push(`Keep one profile block: this file has ${blocks.join(" and ")}.`);
   if (!meta || typeof meta !== "object")
-    errors.push("Missing the heissUi (or studio) block that describes the profile.");
+    errors.push("Missing the studio block that describes the profile.");
   else {
-    if (!String(meta.name || "").trim()) errors.push(`${block}.name is required.`);
+    if (!String(meta.name || "").trim()) errors.push(`studio.name is required.`);
     if (meta.id && meta.id !== id)
-      errors.push(`${block}.id must stay "${id}"; save a copy under a new file to rename it.`);
+      errors.push(`studio.id must stay "${id}"; save a copy under a new file to rename it.`);
     if (meta.kind && !["image", "video"].includes(meta.kind))
-      errors.push(`${block}.kind must be image or video.`);
+      errors.push(`studio.kind must be image or video.`);
     if ("nsfw" in meta && typeof meta.nsfw !== "boolean")
-      errors.push(`${block}.nsfw must be true or false.`);
+      errors.push(`studio.nsfw must be true or false.`);
     if (!meta.controls || typeof meta.controls !== "object")
-      errors.push(`${block}.controls is required.`);
-    else if (!meta.controls.prompt) errors.push(`${block}.controls.prompt is required.`);
+      errors.push(`studio.controls is required.`);
+    else if (!meta.controls.prompt) errors.push(`studio.controls.prompt is required.`);
   }
   let workflow = null;
   try {

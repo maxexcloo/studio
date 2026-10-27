@@ -36,7 +36,7 @@ const promptEntry = (jobId) => [
   0,
   `${jobId}-prompt`,
   grokGraph,
-  { heiss_generation: generation(jobId) },
+  { studio_generation: generation(jobId) },
 ];
 
 /** One Studio process: its own job map and cloud store over the shared file, against a stub ComfyUI that runs the Grok node. */

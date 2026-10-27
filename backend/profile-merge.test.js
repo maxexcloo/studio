@@ -34,7 +34,7 @@ const graph = (model) => ({
 const profile = (id, name, { model = "h3.safetensors", description = "" } = {}) =>
   `${JSON.stringify(
     {
-      heissUi: {
+      studio: {
         id,
         name,
         description,

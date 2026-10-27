@@ -52,7 +52,7 @@ test(
     writeFileSync(
       path.join(dataDir, "workflows", "cloud-image.json"),
       JSON.stringify({
-        heissUi: {
+        studio: {
           id: "cloud-image",
           name: "Cloud Image",
           family: "grok",

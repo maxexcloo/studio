@@ -26,7 +26,7 @@ test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const profile = (name, extra = {}) =>
   `${JSON.stringify(
     {
-      heissUi: {
+      studio: {
         id: "krea-test",
         name,
         kind: "image",

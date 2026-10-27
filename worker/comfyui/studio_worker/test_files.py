@@ -12,7 +12,7 @@ class WorkerFileTests(unittest.TestCase):
             name: os.path.join(self.root, name) for name in ("output", "input", "temp")
         }
         for base in self.bases.values():
-            os.makedirs(os.path.join(base, "heiss-ui", "accounts", "abc"))
+            os.makedirs(os.path.join(base, "studio", "accounts", "abc"))
         self.outside = os.path.join(self.root, "secret.png")
         open(self.outside, "w").close()
 
@@ -23,7 +23,7 @@ class WorkerFileTests(unittest.TestCase):
 
     def test_deletes_named_media_files_once(self):
         target = self.touch(
-            self.bases["output"], "heiss-ui", "accounts", "abc", "image_00001_.png"
+            self.bases["output"], "studio", "accounts", "abc", "image_00001_.png"
         )
         staged = self.touch(self.bases["input"], "ref.webp")
         result = delete_files(
@@ -31,13 +31,13 @@ class WorkerFileTests(unittest.TestCase):
             [
                 {
                     "type": "output",
-                    "subfolder": "heiss-ui/accounts/abc",
+                    "subfolder": "studio/accounts/abc",
                     "filename": "image_00001_.png",
                 },
                 {"type": "input", "filename": "ref.webp"},
                 {
                     "type": "output",
-                    "subfolder": "heiss-ui/accounts/abc",
+                    "subfolder": "studio/accounts/abc",
                     "filename": "image_00001_.png",
                 },
             ],
@@ -47,14 +47,14 @@ class WorkerFileTests(unittest.TestCase):
 
     def test_refuses_traversal_dot_folders_symlinks_and_non_media(self):
         self.touch(self.bases["output"], "notes.txt")
-        os.makedirs(os.path.join(self.bases["output"], ".heiss-trash"))
-        self.touch(self.bases["output"], ".heiss-trash", "kept.png")
+        os.makedirs(os.path.join(self.bases["output"], ".studio-trash"))
+        self.touch(self.bases["output"], ".studio-trash", "kept.png")
         os.symlink(self.outside, os.path.join(self.bases["output"], "link.png"))
         for entry in [
             {"filename": "../secret.png"},
             {"subfolder": "..", "filename": "secret.png"},
             {"subfolder": "/etc", "filename": "passwd.png"},
-            {"subfolder": ".heiss-trash", "filename": "kept.png"},
+            {"subfolder": ".studio-trash", "filename": "kept.png"},
             {"filename": "notes.txt"},
             {"type": "models", "filename": "x.png"},
             {"filename": ""},

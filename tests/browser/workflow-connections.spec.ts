@@ -3,7 +3,7 @@ import { editDefinition, fixtures } from "./fixtures";
 
 function profile() {
   return {
-    heissUi: {
+    studio: {
       id: "connections",
       name: "Connected Profile",
       kind: "image",
@@ -71,7 +71,7 @@ async function setup(page: Page, { failPreview = false, conflict = false } = {})
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/profiles/editable")
       return route.fulfill({
-        json: { profiles: [{ id: "connections", name: state.document.heissUi.name, version: 1 }] },
+        json: { profiles: [{ id: "connections", name: state.document.studio.name, version: 1 }] },
       });
     if (path !== "/api/profiles/editable/connections") return route.fallback();
     if (route.request().method() === "PUT") {
@@ -89,7 +89,7 @@ async function setup(page: Page, { failPreview = false, conflict = false } = {})
         id: "connections",
         text: JSON.stringify(state.document),
         hash: "opened-hash",
-        blockName: "heissUi",
+        blockName: "studio",
         version: { version: 1 },
       },
     });
@@ -156,11 +156,11 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   await editor.getByRole("button", { name: "Save Profile", exact: true }).click();
   await expect(editor).toBeHidden();
   const expected = structuredClone(original);
-  expected.heissUi.controls.prompt.node = "text.two";
-  expected.heissUi.controls.prompt.input = "text.target";
-  expected.heissUi.controls.cfg.node = "sampler.real";
-  expected.heissUi.mediaInputs[0].control.node = "image.two";
-  expected.heissUi.mediaInputs[0].control.input = "image.target";
+  expected.studio.controls.prompt.node = "text.two";
+  expected.studio.controls.prompt.input = "text.target";
+  expected.studio.controls.cfg.node = "sampler.real";
+  expected.studio.mediaInputs[0].control.node = "image.two";
+  expected.studio.mediaInputs[0].control.input = "image.target";
   expect(state.document).toEqual(expected);
   expect(state.writes[0].baseHash).toBe("opened-hash");
   expect(state.previews).toBe(1);
@@ -193,11 +193,11 @@ test("Workflow connections preserve dotted IDs, unknown metadata and reference s
   await expect(editor).toBeHidden();
   expect(state.document).toEqual({
     ...changed,
-    heissUi: {
-      ...changed.heissUi,
+    studio: {
+      ...changed.studio,
       controls: {
-        ...changed.heissUi.controls,
-        prompt: { ...changed.heissUi.controls.prompt, input: "new.input.with.dots" },
+        ...changed.studio.controls,
+        prompt: { ...changed.studio.controls.prompt, input: "new.input.with.dots" },
       },
     },
   });
@@ -227,9 +227,9 @@ test("Workflow inspection retry and save conflicts retain the edited connection 
   ).toHaveValue("text.target");
   const attempted = JSON.parse(state.writes[0].text);
   expect(attempted.graph).toEqual(profile().graph);
-  expect(attempted.heissUi.mediaInputs).toEqual(profile().heissUi.mediaInputs);
-  expect(attempted.heissUi.controls.prompt).toEqual({
-    ...profile().heissUi.controls.prompt,
+  expect(attempted.studio.mediaInputs).toEqual(profile().studio.mediaInputs);
+  expect(attempted.studio.controls.prompt).toEqual({
+    ...profile().studio.controls.prompt,
     node: "text.two",
     input: "text.target",
   });

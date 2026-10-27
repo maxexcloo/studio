@@ -22,7 +22,7 @@ test(
     );
     fs.mkdirSync(path.join(directory, "workflows"));
     fs.writeFileSync(
-      path.join(directory, "workflows", `${raw.heissUi.id}.json`),
+      path.join(directory, "workflows", `${raw.studio.id}.json`),
       JSON.stringify(raw),
     );
     const info = JSON.parse(
@@ -33,7 +33,7 @@ test(
     );
     for (const graph of [
       raw.graph,
-      ...Object.values(raw.heissUi.imageModes || {})
+      ...Object.values(raw.studio.imageModes || {})
         .map((mode) => mode.graph)
         .filter(Boolean),
     ]) {
@@ -85,7 +85,7 @@ test(
       return { status: response.status, body: await response.json() };
     }
     const profile = (await api("/api/models")).body.profiles.find(
-      (profile) => profile.id === `custom:${raw.heissUi.id}`,
+      (profile) => profile.id === `custom:${raw.studio.id}`,
     );
     assert.ok(profile, "the real ten-slot profile is offered by the worker catalogue");
     assert.equal(profile.mediaInputs.length, 10);

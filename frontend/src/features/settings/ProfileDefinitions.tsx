@@ -125,8 +125,7 @@ export function ProfileDefinitions() {
       const { nodes: _nodes, guessed: _guessed, ...detectedMetadata } = detected;
       const metadata = { ...declared, ...detectedMetadata };
       return {
-        text: JSON.stringify({ heissUi: metadata, graph }, null, 2),
-        blockName: "heissUi",
+        text: JSON.stringify({ studio: metadata, graph }, null, 2),
         hash: "",
         warnings: [
           ...(validation?.issues || []),

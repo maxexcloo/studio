@@ -9,7 +9,7 @@ import { compressJson, serveApp } from "./http-assets.js";
 import { precompressDir } from "../frontend/precompress.mjs";
 
 const dist = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dist-"));
-const script = `console.log(${JSON.stringify("heiss ".repeat(2000))});`;
+const script = `console.log(${JSON.stringify("studio ".repeat(2000))});`;
 fs.mkdirSync(path.join(dist, "assets"));
 fs.writeFileSync(
   path.join(dist, "index.html"),

@@ -21,7 +21,6 @@ import path from "node:path";
 import { graphFromJson, userWorkflowsDir } from "./custom-workflows.js";
 import { dataDir } from "./gallery-store.js";
 import { writeJsonFile } from "./json-store.js";
-import { profileBlock } from "./profile-block.js";
 import { listEditableProfiles, readEditableProfile } from "./profile-editor.js";
 import { guideStore, hashOf, profileStore } from "./profile-store.js";
 import { loadWorkflowPreferences, saveWorkflowPreferences } from "./workflow-catalog.js";
@@ -43,7 +42,7 @@ function sorted(value) {
 
 /** The parts of a profile that decide what it runs, each as comparable JSON. */
 function parts(raw, guides, meta) {
-  const block = profileBlock(raw) || {};
+  const block = raw?.studio || {};
   const graph = Object.fromEntries(
     Object.entries(graphFromJson(raw) || {}).map(([id, node]) => {
       const { _meta: _title, ...rest } = node || {};
@@ -82,7 +81,7 @@ export function duplicateProfiles() {
     if (!item.readable) continue;
     const { text, hash } = readEditableProfile(item.id);
     const raw = JSON.parse(text);
-    if ((profileBlock(raw)?.id || item.id) !== item.id) continue;
+    if ((raw?.studio?.id || item.id) !== item.id) continue;
     const key = `${item.kind}\u0000${item.name}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({ ...item, hash, parts: parts(raw, guides, metas[item.id]) });

@@ -535,7 +535,7 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
   const drafted = await engine.draftGuide({ profile, sourceText: "Model card text" });
   assert.deepEqual([drafted.guide.summary, drafted.aiDrafted], ["Write prose.", true]);
   const template = {
-    heissUi: {
+    studio: {
       id: "krea2-template",
       name: "Template",
       kind: "image",
@@ -555,12 +555,12 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
   });
   assert.deepEqual(
     [
-      pure.heissUi.id,
-      pure.heissUi.defaults.model,
-      pure.heissUi.defaults.steps,
-      pure.heissUi.defaults.cfg,
-      pure.heissUi.defaults.sampler,
-      pure.heissUi.nsfw,
+      pure.studio.id,
+      pure.studio.defaults.model,
+      pure.studio.defaults.steps,
+      pure.studio.defaults.cfg,
+      pure.studio.defaults.sampler,
+      pure.studio.nsfw,
       pure.graph[1].inputs.unet_name,
     ],
     ["new-model", "new.safetensors", 28, 3.5, undefined, true, "new.safetensors"],
@@ -580,10 +580,10 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
   });
   assert.deepEqual(
     [
-      read.profile.heissUi.name,
-      read.profile.heissUi.nsfw,
-      read.profile.heissUi.defaults.steps,
-      read.profile.heissUi.defaults.sampler,
+      read.profile.studio.name,
+      read.profile.studio.nsfw,
+      read.profile.studio.defaults.steps,
+      read.profile.studio.defaults.sampler,
       read.aiDrafted,
       read.source,
     ],

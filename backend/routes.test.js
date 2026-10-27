@@ -182,9 +182,9 @@ test("a generate request with no prompt is refused plainly", async () => {
 test("the gallery's trash and other dot folders are never served, not even through ComfyUI", async () => {
   for (const route of ["view", "thumb"]) {
     for (const query of [
-      "subfolder=.heiss-trash%2Fbatch%2Ffiles%2Fheiss-ui",
-      "subfolder=heiss-ui%2F.hidden",
-      "subfolder=heiss-ui&subfolder=.heiss-trash",
+      "subfolder=.studio-trash%2Fbatch%2Ffiles%2Fstudio",
+      "subfolder=studio%2F.hidden",
+      "subfolder=studio&subfolder=.studio-trash",
     ]) {
       const response = await fetch(
         `${base}/comfy/${route}?filename=image_00001_.png&type=output&${query}`,

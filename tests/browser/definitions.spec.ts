@@ -14,7 +14,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
 }) => {
   await fixtures(page);
   const original = {
-    heissUi: {
+    studio: {
       id: "owned",
       name: "Owned Profile",
       kind: "image",
@@ -37,7 +37,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
           profiles: [
             {
               id: "owned",
-              name: document.heissUi.name,
+              name: document.studio.name,
               family: "flux2",
               version: attempts > 1 ? 2 : 1,
             },
@@ -49,7 +49,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
       const body = route.request().postDataJSON();
       requests.push(body);
       if (++attempts === 1) {
-        document.heissUi.name = "Changed by Another Editor";
+        document.studio.name = "Changed by Another Editor";
         return route.fulfill({
           status: 409,
           json: { error: "This profile changed while you were editing." },
@@ -62,7 +62,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
         id: "owned",
         text: JSON.stringify(document),
         hash: attempts ? "latest-hash" : "opened-hash",
-        blockName: "heissUi",
+        blockName: "studio",
         version: { version: attempts > 1 ? 2 : 1 },
       },
     });
@@ -76,7 +76,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   );
   expect(JSON.parse(requests[0].text)).toEqual({
     ...original,
-    heissUi: { ...original.heissUi, name: "My Edited Profile" },
+    studio: { ...original.studio, name: "My Edited Profile" },
   });
   expect(requests[0].baseHash).toBe("opened-hash");
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -95,7 +95,7 @@ test("Profile edits preserve workflow metadata and retain unsaved text after a c
   );
   expect(document.graph).toEqual(original.graph);
   expect(document.extra).toEqual(original.extra);
-  expect(document.heissUi.customMetadata).toEqual(original.heissUi.customMetadata);
+  expect(document.studio.customMetadata).toEqual(original.studio.customMetadata);
 });
 
 test("Guide editing and restoring an earlier version create distinct saved revisions", async ({

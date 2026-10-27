@@ -9,7 +9,7 @@ import sharp from "sharp";
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-warmup-"));
 process.env.STUDIO_DATA_DIR = dataDir;
-const media = path.join(dataDir, "media", "heiss-ui");
+const media = path.join(dataDir, "media", "studio");
 fs.mkdirSync(media, { recursive: true });
 let encoder;
 try {
@@ -48,7 +48,7 @@ if (canEncode)
     path.join(media, "clip.mp4"),
   ]);
 const urls = (filename) => {
-  const query = new URLSearchParams({ filename, subfolder: "heiss-ui", type: "media" });
+  const query = new URLSearchParams({ filename, subfolder: "studio", type: "media" });
   return { url: `/comfy/view?${query}`, thumbnailUrl: `/comfy/thumb?${query}` };
 };
 const record = (filename, type, minutesAgo, extra = {}) => ({

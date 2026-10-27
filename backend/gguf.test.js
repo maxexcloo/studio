@@ -329,7 +329,7 @@ test("with ComfyUI-GGUF, GGUF models and encoders run through its loaders", () =
         {
           slot: "reference",
           assetId: "asset-1",
-          comfyName: "heiss-ui/image_00042_.png [output]",
+          comfyName: "studio/image_00042_.png [output]",
           temporary: true,
         },
         { comfyName: "other.png" },

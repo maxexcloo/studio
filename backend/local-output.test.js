@@ -33,9 +33,9 @@ test("only media, never through a symlink out of the folder or from the trash", 
   fs.writeFileSync(path.join(outputDir, "id_rsa"), "key");
   assert.equal(localOutputFile("notes.txt", "run", "output"), null);
   assert.equal(localOutputFile("id_rsa", "", "output"), null);
-  fs.mkdirSync(path.join(outputDir, ".heiss-trash", "b1"), { recursive: true });
-  fs.writeFileSync(path.join(outputDir, ".heiss-trash", "b1", "gone.png"), "png");
-  assert.equal(localOutputFile("gone.png", ".heiss-trash/b1", "output"), null);
+  fs.mkdirSync(path.join(outputDir, ".studio-trash", "b1"), { recursive: true });
+  fs.writeFileSync(path.join(outputDir, ".studio-trash", "b1", "gone.png"), "png");
+  assert.equal(localOutputFile("gone.png", ".studio-trash/b1", "output"), null);
   const secretDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-secret-"));
   fs.writeFileSync(path.join(secretDir, "private.png"), "not yours");
   try {

@@ -13,7 +13,6 @@
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
  * or the LoRA pre-filter.
  */
-import { profileBlock, withWrittenBlock } from "./profile-block.js";
 import { assistantPreset, defaultPreset, familyUpsampler } from "./assistant-presets.js";
 import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import { cleanTriggers } from "./lora-catalogue.js";
@@ -989,7 +988,7 @@ export function createAssistant(
   }
 
   /**
-   * A drafted runtime profile (heissUi workflow JSON) from a family template: the graph is the
+   * A drafted runtime profile (workflow JSON with a studio block) from a family template: the graph is the
    * template's, the model file replaces the template's, and only the name, description, NSFW marker
    * and recommended steps, CFG, sampler and scheduler come from the source page (read by the model,
    * else `recommended`). The caller checks it with validateProfileText before saving.
@@ -1003,11 +1002,10 @@ export function createAssistant(
     nsfw,
     signal,
   } = {}) {
-    if (!template || typeof template !== "object" || !profileBlock(template) || !template.graph)
-      throw new AssistantError(
-        "Choose a family template with a heissUi (or studio) block and a graph.",
-        { status: 400 },
-      );
+    if (!template || typeof template !== "object" || !template.studio || !template.graph)
+      throw new AssistantError("Choose a family template with a studio block and a graph.", {
+        status: 400,
+      });
     let read = {};
     let source = "template";
     const started = now();
@@ -1107,12 +1105,11 @@ export function validDraftGuide(value) {
 }
 
 /**
- * The template with the model file, recommended settings and page details in place. Pure. The
- * template's block may be `studio` or `heissUi`; the draft is written as `heissUi` (profile-block.js).
+ * The template with the model file, recommended settings and page details in place. Pure.
  */
 export function draftedProfile({ id, template, modelFile, recommended = {}, read = {}, nsfw }) {
-  const profile = withWrittenBlock(structuredClone(template));
-  const meta = profile.heissUi;
+  const profile = structuredClone(template);
+  const meta = profile.studio;
   const previousModel = meta.defaults?.model;
   if (id) meta.id = id;
   if (typeof read.name === "string" && read.name.trim()) meta.name = read.name.trim().slice(0, 120);

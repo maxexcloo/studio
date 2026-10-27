@@ -157,7 +157,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   const current = store.gallery.find((item) => item.id === "civitai:42");
   assert.ok(Date.parse(current.createdAt) > Date.parse("2025-01-01T00:00:00Z"));
   assert.equal(
-    JSON.parse(readPngInfo(store.importedImageFile(current)).text.heiss).prompt,
+    JSON.parse(readPngInfo(store.importedImageFile(current)).text.civitai).prompt,
     sourcePrompt,
   );
   assert.equal(current.civitai.sourceMetadata.prompt, sourcePrompt);

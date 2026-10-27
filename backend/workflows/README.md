@@ -2,11 +2,11 @@
 
 Studio owns ComfyUI workflow profiles in its runtime data directory. The mounted ai configuration supplies missing-definition seeds and backups. This folder retains standalone compatibility examples.
 
-Use ComfyUI's API workflow JSON format, then add a `heissUi` block that tells the simple UI which node inputs map to common controls.
+Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the simple UI which node inputs map to common controls.
 
 ```json
 {
-  "heissUi": {
+  "studio": {
     "id": "my-workflow",
     "name": "My Workflow",
     "kind": "image",
@@ -29,7 +29,7 @@ Use ComfyUI's API workflow JSON format, then add a `heissUi` block that tells th
 }
 ```
 
-Mark a workflow that makes adult content with `"nsfw": true` in its `heissUi` block. Access profiles without the NSFW Models feature (such as the built-in User profile) never offer it; administrators always can.
+Mark a workflow that makes adult content with `"nsfw": true` in its `studio` block. Access profiles without the NSFW Models feature (such as the built-in User profile) never offer it; administrators always can.
 
 Only mapped controls are changed by Studio. Everything else stays exactly as it was in the exported ComfyUI API workflow.
 
@@ -46,7 +46,7 @@ node:
 
 ```json
 {
-  "heissUi": {
+  "studio": {
     "capabilities": { "imageToImage": true },
     "mediaInputs": [
       {
@@ -88,7 +88,7 @@ An API workflow can opt in to Studio's LoRA picker with an existing rgthree Powe
 
 ```json
 {
-  "heissUi": {
+  "studio": {
     "capabilities": { "lora": true },
     "loraStack": {
       "adapter": "rgthree-power-v1",
@@ -106,7 +106,7 @@ supported:
 
 ```json
 {
-  "heissUi": {
+  "studio": {
     "capabilities": { "lora": true },
     "loraStack": {
       "adapter": "rgthree-stack-v1",
@@ -122,7 +122,7 @@ string instead of loader slots:
 
 ```json
 {
-  "heissUi": {
+  "studio": {
     "capabilities": { "lora": true },
     "loraStack": {
       "adapter": "radiance-tags-v1",

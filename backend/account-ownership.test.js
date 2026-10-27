@@ -46,7 +46,7 @@ test("multi-user sessions do not inherit unowned legacy records", () => {
 test("account output paths are stable, server-derived and cannot overlap", () => {
   const first = accountOutputSubfolder("account-a");
   const second = accountOutputSubfolder("account-b");
-  assert.match(first, /^heiss-ui\/accounts\/[a-f0-9]{64}$/);
+  assert.match(first, /^studio\/accounts\/[a-f0-9]{64}$/);
   assert.notEqual(first, second);
   assert.equal(
     outputSubfolderBelongsToRequest(`${first}/image_00001.png`, {
@@ -84,23 +84,14 @@ test("account output paths are stable, server-derived and cannot overlap", () =>
   );
 });
 
-test("an account's outputs stay its own under the folder's current name and the name the on-disk migration moves it to", () => {
+test("an account's outputs go to and stay in its own folder", () => {
   const request = { studioAccount: { userId: "account-a", role: "user" } };
   const written = accountOutputSubfolder("account-a");
-  assert.match(
-    written,
-    /^heiss-ui\/accounts\/[0-9a-f]{64}$/,
-    "new outputs keep the folder name on disk",
-  );
-  const moved = written.replace(/^heiss-ui\//, "studio/");
-  assert.equal(outputSubfolderBelongsToRequest(`${moved}/image.png`, request), true);
-  assert.equal(outputFilenameBelongsToRequest("image.png", moved, request), true);
+  assert.match(written, /^studio\/accounts\/[0-9a-f]{64}$/);
+  assert.equal(outputSubfolderBelongsToRequest(`${written}/image.png`, request), true);
+  assert.equal(outputFilenameBelongsToRequest("image.png", written, request), true);
   assert.equal(
-    outputFilenameBelongsToRequest(
-      "image.png",
-      accountOutputSubfolder("account-b").replace(/^heiss-ui\//, "studio/"),
-      request,
-    ),
+    outputFilenameBelongsToRequest("image.png", accountOutputSubfolder("account-b"), request),
     false,
   );
 });
