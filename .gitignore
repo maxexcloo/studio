@@ -17,6 +17,3 @@ release/
 !.env.example
 # PP Neue Bit is a commercial font; the app doesn't use it, keep any local copy out of the repo.
 /frontend/public/fonts/PPNeueBit*
-
-# Local working backlog, kept out of Git
-/todo.md
