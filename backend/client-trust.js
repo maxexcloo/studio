@@ -46,26 +46,6 @@ function isLoopbackAddress(value = "") {
   return loopback.has(address) || /^127\.\d+\.\d+\.\d+$/.test(address);
 }
 
-/**
- * A home or office network address: RFC 1918, carrier-grade NAT (which is
- * also where Tailscale puts its devices), and IPv6 unique-local and
- * link-local. Never a public address.
- */
-export function isPrivateAddress(value = "") {
-  const address = plainAddress(value);
-  const v4 = address.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    return (
-      a === 10 ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127)
-    );
-  }
-  return /^f[cd][0-9a-f]{2}:/.test(address) || /^fe[89ab][0-9a-f]:/.test(address);
-}
-
 function hasProxyHeaders(headers = {}) {
   return proxyHeaders.some((name) => headers[name] !== undefined && headers[name] !== "");
 }
@@ -88,7 +68,7 @@ export function listensBeyondThisComputer(host = "") {
  *   proxied       something between the client and this server added headers
  *   thisComputer  the browser runs on the machine Studio runs on
  */
-export function classifyClient(req, { devToken = "", hostOnly = false } = {}) {
+export function classifyClient(req, { devToken = "" } = {}) {
   const headers = req?.headers || {};
   let address = plainAddress(req?.socket?.remoteAddress || "");
   // Vite in `npm run dev`, vouched for by the token dev.mjs made.
@@ -96,10 +76,6 @@ export function classifyClient(req, { devToken = "", hostOnly = false } = {}) {
     isLoopbackAddress(address) && tokenMatches(headers["x-studio-dev-token"], devToken);
   if (viaDevProxy) address = plainAddress(headers["x-studio-dev-client"] || "");
   const proxied = hasProxyHeaders(headers);
-  // hostOnly: a container whose port is published on the host's 127.0.0.1 only
-  // (STUDIO_DOCKER_HOST_ONLY=1). The host's browser then arrives from a Docker
-  // address (the bridge gateway, 192.168.65.1 on Docker Desktop), never loopback.
-  const thisComputer =
-    !proxied && (isLoopbackAddress(address) || (hostOnly && isPrivateAddress(address)));
+  const thisComputer = !proxied && isLoopbackAddress(address);
   return { address: proxied ? `proxied:${address}` : address, proxied, thisComputer };
 }

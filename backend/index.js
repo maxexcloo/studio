@@ -137,7 +137,6 @@ import { registerMcpRoutes } from "./mcp.js";
 import { mcpOutputPath } from "./mcp-media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
-import { httpsPort, startupTls, tlsHostNames } from "./tls.js";
 import { removeLocalEnvValue } from "./env.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -300,7 +299,7 @@ const app = express();
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
-app.use(requestGuard({ network: networkListening, extraHosts: tlsHostNames }));
+app.use(requestGuard({ network: networkListening }));
 async function resolveSignedMcpResult(owner, jobId, index) {
   if (!mayUseFeature(accountAccessForId(owner), "gallery")) return null;
   const item = gallery.find(
@@ -390,7 +389,7 @@ const mcp = registerMcpRoutes(app, {
   gatewayAdminTools,
   baseUrl: () => `http://127.0.0.1:${port}`,
   allowedHost: (req) =>
-    hostAllowed(req.headers.host, { network: networkListening, extra: tlsHostNames() }),
+    hostAllowed(req.headers.host, { network: networkListening }),
   accountMode: multiUserEnabled,
   authenticateAccountToken: verifyAccountMcpToken,
   authenticateGatewayIdentity: gatewayAccountAccess,
@@ -3376,7 +3375,7 @@ const serverStartup = startServers(app, {
     // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
     process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
   },
-  onListening({ plan, port: listening }) {
+  onListening({ port: listening }) {
     beginSession();
     // Phone links in Settings use the bound address.
     setListeningPort(listening);
@@ -3390,20 +3389,11 @@ const serverStartup = startServers(app, {
     );
     void (async () => {
       // Listening beyond this computer: say where a phone can open it.
-      if (
-        multiUserEnabled &&
-        networkListening &&
-        (host === "0.0.0.0" || host === "::") &&
-        !plan.tlsProblem
-      ) {
-        const addresses = plan.httpsHost
-          ? startupTls.names
-              .filter((name) => !name.startsWith("*."))
-              .map((name) => `https://${name.includes(":") ? `[${name}]` : name}:${httpsPort}`)
-          : Object.values(os.networkInterfaces())
-              .flatMap((entries) => entries || [])
-              .filter((entry) => entry.family === "IPv4" && !entry.internal)
-              .map((entry) => `http://${entry.address}:${pagePort}`);
+      if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
+        const addresses = Object.values(os.networkInterfaces())
+          .flatMap((entries) => entries || [])
+          .filter((entry) => entry.family === "IPv4" && !entry.internal)
+          .map((entry) => `http://${entry.address}:${pagePort}`);
         for (const address of addresses) console.log(`    ➜  Network   ${address}`);
       }
       // No workers is a setup of its own: say so.

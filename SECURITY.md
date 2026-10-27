@@ -36,4 +36,4 @@ Please report security issues privately through a [GitHub security advisory](htt
 
 ## Single-user mode
 
-Only without accounts (`STUDIO_MULTI_USER` unset), for development on your own computer. It answers only the computer running Studio, which also looks after it; there is no sign-in. A request from any other address, or one that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar proxy header, is refused, even when the proxy runs on the same computer. In Docker, publish the port on the host's `127.0.0.1` only and set `STUDIO_DOCKER_HOST_ONLY=1` ([Docker](DOCKER.md)). Use account mode for any other device.
+Only without accounts (`STUDIO_MULTI_USER` unset), for development on your own computer. It answers only the computer running Studio, which also looks after it; there is no sign-in. A request from any other address, or one that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar proxy header, is refused, even when the proxy runs on the same computer. Use account mode for any other device.
