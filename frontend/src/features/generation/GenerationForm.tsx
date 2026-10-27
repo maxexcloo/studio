@@ -4,7 +4,7 @@ import { ArrowUp } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 import { post } from "../../api";
-import type { ReferenceAsset, Session } from "../../types";
+import type { QueueJob, ReferenceAsset, Session } from "../../types";
 import { initialInput, inputForProfile, useGeneration } from "./GenerationProvider";
 import { blockedProps, GenerationEditor, submitShortcut, useSubmitState } from "./GenerationEditor";
 import { PresetPicker } from "./PresetPicker";
@@ -14,33 +14,30 @@ import { ReferencePicker } from "./ReferencePicker";
 import { useCompare } from "../compare/CompareDialog";
 import classes from "./ComposerDock.module.css";
 
-export function GenerationForm({
+/**
+ * Queues the composer's draft. `prompt` runs a prompt the draft hasn't caught up with yet (a
+ * viewer next step); an `embedded` composer stays on its surface rather than opening the Chat.
+ * Forms show the error inline; elsewhere (`inlineError` false) it is the default notification.
+ */
+export function useDraftSubmit({
   onSubmitted,
-  compact = false,
-  autoFocusPrompt = false,
-  focusPrompt = false,
-  fill = false,
+  embedded = false,
+  inlineError = true,
 }: {
-  onSubmitted?: () => void;
-  compact?: boolean;
-  autoFocusPrompt?: boolean;
-  focusPrompt?: boolean;
-  fill?: boolean;
+  onSubmitted?: (jobId: string) => void;
+  embedded?: boolean;
+  inlineError?: boolean;
 }) {
-  const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
+  const { draft, setDraft, input, profile } = useGeneration();
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const compare = useCompare();
-  useEffect(() => {
-    if (!input.profileId && profile) selectProfile(profile);
-  }, [input.profileId, profile]);
-  const submit = useMutation({
-    meta: { inlineError: true },
-    mutationFn: async () => {
+  return useMutation({
+    meta: { inlineError },
+    mutationFn: async (staged?: { prompt: string }) => {
       if (!profile) throw new Error("Choose an available model first.");
       const payload = {
-        ...generationInput(input, profile, draft.references),
+        ...generationInput({ ...input, ...staged }, profile, draft.references),
         operation: draft.operation,
         parentJobId: draft.parentJobId,
         parentItemId: draft.parentItemId,
@@ -51,19 +48,55 @@ export function GenerationForm({
         sessionId = result.session.id;
         setDraft((value) => ({ ...value, sessionId }));
       }
-      await post(`/api/sessions/${sessionId}/generations`, payload);
-      return sessionId;
+      const { jobId, job } = await post<{ jobId: string; job?: QueueJob }>(
+        `/api/sessions/${sessionId}/generations`,
+        payload,
+      );
+      // The viewer's strip shows the new run at once; polling then follows its progress.
+      if (job)
+        client.setQueryData(queueQuery.queryKey, (queue) =>
+          queue ? { jobs: [...queue.jobs, job] } : queue,
+        );
+      return { sessionId, jobId };
     },
     // The pending tile is the confirmation: refresh the gallery now instead of waiting for its poll.
-    onSuccess: (sessionId) => {
+    onSuccess: ({ sessionId, jobId }) => {
       void client.invalidateQueries({ queryKey: ["gallery"] });
       void client.invalidateQueries({ queryKey: queueQuery.queryKey });
       void client.invalidateQueries({ queryKey: ["sessions"] });
       void client.invalidateQueries({ queryKey: ["session", sessionId] });
-      onSubmitted?.();
-      if (!["/images", "/video"].includes(location.pathname)) navigate(`/chat/${sessionId}`);
+      onSubmitted?.(jobId);
+      if (!embedded && !["/images", "/video"].includes(location.pathname))
+        navigate(`/chat/${sessionId}`);
     },
   });
+}
+
+export function GenerationForm({
+  onSubmitted,
+  compact = false,
+  autoFocusPrompt = false,
+  focusPrompt = false,
+  fill = false,
+  embedded = false,
+}: {
+  onSubmitted?: (jobId: string) => void;
+  compact?: boolean;
+  autoFocusPrompt?: boolean;
+  focusPrompt?: boolean;
+  fill?: boolean;
+  /** A composer inside another surface (the viewer) stays there instead of changing route. */
+  embedded?: boolean;
+}) {
+  const { draft, setDraft, changeKind, input, update, profile, selectProfile, models } =
+    useGeneration();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const compare = useCompare();
+  useEffect(() => {
+    if (!input.profileId && profile) selectProfile(profile);
+  }, [input.profileId, profile]);
+  const submit = useDraftSubmit({ onSubmitted, embedded });
   const { label, blockedReason } = useSubmitState({
     input,
     profile,
@@ -137,7 +170,9 @@ export function GenerationForm({
       onReferencesChange={setReferences}
       // The output toggle switches the gallery; the route restores that output's draft.
       onKindChange={(kind) =>
-        navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
+        embedded
+          ? changeKind(kind)
+          : navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
       }
       onClear={() =>
         setDraft((previous) => ({
