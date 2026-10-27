@@ -15,7 +15,7 @@ import os from "node:os";
  *   its own name, so it gets nothing.
  * - Anything that changes state (not GET, HEAD or OPTIONS) must come from the
  *   studio's own page: the browser's Sec-Fetch-Site or Origin has to say same
- *   origin, and the request must be JSON or carry the X-Studio header (or the older X-HEISS). Another
+ *   origin, and the request must be JSON or carry the X-Studio header. Another
  *   origin cannot send either without a CORS preflight, which this server
  *   never grants. Cross-site reads and embeds of /api and /comfy are refused
  *   too, so a page cannot show or probe what the studio holds.
@@ -25,8 +25,6 @@ import os from "node:os";
  */
 
 const studioHeader = "x-studio";
-/** The header's name before Studio's hard fork, still accepted from pages and scripts made before it. */
-const legacyStudioHeader = "x-heiss";
 /** On a 401 that a sign-in would fix; the page then shows its sign-in. */
 export const signInHeader = "X-Studio-Sign-In";
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -154,12 +152,7 @@ export function requestGuard({ network = false, extraHosts = () => [] } = {}) {
     // Signing out only ever ends the sender's own session, so a plain same-origin POST (a console
     // fetch, a form) may do it; another site was already refused above.
     const signOut = req.method === "POST" && req.path === signOutPath;
-    if (
-      !signOut &&
-      !req.headers[studioHeader] &&
-      !req.headers[legacyStudioHeader] &&
-      !req.is("application/json")
-    ) {
+    if (!signOut && !req.headers[studioHeader] && !req.is("application/json")) {
       refuse(
         res,
         "header",

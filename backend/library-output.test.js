@@ -8,7 +8,7 @@ import test from "node:test";
 const parent = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-parent-")));
 const outputDir = path.join(parent, "output");
 fs.mkdirSync(outputDir);
-process.env.COMFY_OUTPUT_DIR = outputDir;
+process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 fs.writeFileSync(
   path.join(process.env.STUDIO_DATA_DIR, "library-folders.json"),
