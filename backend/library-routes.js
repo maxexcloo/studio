@@ -437,12 +437,12 @@ export function registerLibraryRoutes(
           "Set up the prompt assistant in Settings › Models › Integrations to describe images.",
       };
     try {
-      return (await engine.supportsVision(engine.settings().model))
+      return (await engine.supportsVision())
         ? { available: true, reason: "" }
         : {
             available: false,
             reason:
-              "The assistant model can’t read images. Choose a vision model in Settings › Models › Integrations.",
+              "The running text model can’t read images. Start one that does in Settings › Workers.",
           };
     } catch {
       return { available: false, reason: "The prompt assistant is unavailable." };
@@ -461,7 +461,7 @@ export function registerLibraryRoutes(
       loras,
     });
     if (!result.available)
-      throw new Error(result.reason || "The assistant model can’t read images.");
+      throw new Error(result.reason || "The running text model can’t read images.");
     return {
       ...result,
       profileLabel: offered.find((item) => item.id === result.profileId)?.label || "",
