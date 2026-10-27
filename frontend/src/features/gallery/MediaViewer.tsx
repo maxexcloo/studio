@@ -39,6 +39,30 @@ const loadZoomImage = () =>
 const LazyZoomImage = lazy(loadZoomImage);
 (window.requestIdleCallback || setTimeout)(() => void loadZoomImage());
 
+// Clicks this close to a visible control are near-misses, not a request to close. The zoomable
+// picture is not a control: a click just outside the image still closes.
+const deadZone = 24;
+function nearControl(event: React.MouseEvent<HTMLElement>) {
+  return [
+    ...event.currentTarget.querySelectorAll(
+      "button, a[href], input, textarea, video, [role=slider]",
+    ),
+  ].some((control) => {
+    if (
+      control.closest(".react-transform-wrapper") ||
+      !control.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+    )
+      return false;
+    const box = control.getBoundingClientRect();
+    return (
+      event.clientX > box.left - deadZone &&
+      event.clientX < box.right + deadZone &&
+      event.clientY > box.top - deadZone &&
+      event.clientY < box.bottom + deadZone
+    );
+  });
+}
+
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
   const held = useRef(new Map<string, HTMLImageElement>());
@@ -236,7 +260,9 @@ export function MediaViewer({
             event.stopPropagation();
             gestureClick.current = false;
           }}
-          onClick={close}
+          onClick={(event) => {
+            if (!nearControl(event)) close();
+          }}
         >
           <div className={classes.main}>
             <Group

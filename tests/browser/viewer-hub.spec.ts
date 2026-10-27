@@ -327,6 +327,28 @@ test("Copy Prompt beside the details heading copies in one click", async ({ page
   await expect.poll(() => page.evaluate(() => (window as any).copiedPrompt)).toBe("An amber bird");
 });
 
+test("Near-misses beside the viewer's controls keep it open; the empty stage closes it", async ({
+  page,
+}) => {
+  const { viewer } = await seed(page);
+  const prompt = (await viewer
+    .getByRole("textbox", { name: "Variation Prompt", exact: true })
+    .boundingBox())!;
+  await page.mouse.click(prompt.x + prompt.width / 2, prompt.y - 10);
+  await expect(viewer).toBeVisible();
+  const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
+  const picture = (await viewer
+    .getByRole("button", { name: "Change Image Zoom", exact: true })
+    .boundingBox())!;
+  // The square image leaves empty stage above or beside it.
+  const blank =
+    picture.x - stage.x > 80
+      ? { x: stage.x + 20, y: stage.y + stage.height / 3 }
+      : { x: stage.x + stage.width / 2, y: stage.y + 20 };
+  await page.mouse.click(blank.x, blank.y);
+  await expect(viewer).toBeHidden();
+});
+
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
   const { viewer } = await seed(page, {
     caption: {
