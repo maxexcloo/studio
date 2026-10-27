@@ -1,9 +1,9 @@
 import type { NextStep, Suggestions } from "../../shared/suggestions.ts";
 import type { Taste, TasteWriter } from "./taste.ts";
 
-export type SuggestionSurface = "composer" | "viewer" | "chat";
+type SuggestionSurface = "composer" | "viewer" | "chat";
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
-export interface SuggestionItem {
+interface SuggestionItem {
   type?: string;
   status?: string;
   prompt?: string;
@@ -240,7 +240,7 @@ export function createSuggestions({
     },
   };
 }
-export type SuggestionService = ReturnType<typeof createSuggestions>;
+type SuggestionService = ReturnType<typeof createSuggestions>;
 
 /** `POST /api/suggestions`: the caller's own suggestions for one surface. */
 export function registerSuggestionRoutes(

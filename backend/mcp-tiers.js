@@ -15,8 +15,7 @@ const cloudWords =
 export const asksForCloud = (request) =>
   cloudWords.test(String(request || "").replace(/[-_]/g, " "));
 /** Whether a model name or profile_id names the cloud: "grok", "cloud" or a grok-* id. */
-export const namesCloud = (name) =>
-  /\b(?:grok|cloud)\b/i.test(String(name || "").replace(/[-_]/g, " "));
+const namesCloud = (name) => /\b(?:grok|cloud)\b/i.test(String(name || "").replace(/[-_]/g, " "));
 /** The profiles MCP may pick from a request or name: cloud ones only when it asks for the cloud. */
 export const localUnlessAsked = (profiles, { request, name } = {}) =>
   asksForCloud(request) || namesCloud(name)
@@ -29,7 +28,7 @@ export const localUnlessAsked = (profiles, { request, name } = {}) =>
 export const localVideoUnavailable = (cloudOffered = false) =>
   `Local video is unavailable right now: the video worker is offline. ${cloudOffered ? "Tell the user; they can ask for Grok to make it in the cloud instead." : "Tell the user to try again later."}`;
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
-export const preferredTiers = ["fast", "turbo", "standard", "quality"];
+const preferredTiers = ["fast", "turbo", "standard", "quality"];
 const labels = { "super fast": "turbo", fast: "fast", quality: "quality", standard: "standard" };
 
 /** A profile's tier; a label without a tier segment counts as standard. */

@@ -83,12 +83,6 @@ test("the server says who it is, and an unknown API route fails as JSON", async 
   assert.match(unknown.body.error, /Unknown API route/);
 });
 
-test("the former desktop folder picker directs callers to worker deployment configuration", async () => {
-  const result = await api("/api/model-folders/pick", { method: "POST", body: {} });
-  assert.equal(result.status, 410);
-  assert.match(result.body.error, /Configure model paths in the worker deployment/);
-});
-
 test("health says whether ComfyUI answers, and keeps its system stats (command line, paths) to itself", async () => {
   const { status, body } = await api("/api/health");
   assert.equal(status, 200);

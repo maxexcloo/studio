@@ -28,7 +28,7 @@ function json(environment: Environment, name: string) {
 }
 
 /** Parse STUDIO_KUBERNETES_GPUS and STUDIO_KUBERNETES_WORKLOADS; anything malformed stops Studio with its name. */
-export function kubernetesWorkloads(environment: Environment) {
+function kubernetesWorkloads(environment: Environment) {
   const pools = json(environment, "STUDIO_KUBERNETES_GPUS") as Record<string, number>;
   for (const [pool, count] of Object.entries(pools))
     if (!Number.isInteger(count) || count < 1)

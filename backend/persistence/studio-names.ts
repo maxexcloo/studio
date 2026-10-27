@@ -13,7 +13,7 @@ import { hasMigration, runtimeDatabase, withOfflineDatabase } from "./runtime.ts
  * transaction with its marker. A manifest and copies of everything changed are written first, so
  * `undoStudioNames` can put it all back.
  */
-export const namesMigration = "studio-names-v1";
+const namesMigration = "studio-names-v1";
 const folders: Record<string, string> = { "heiss-ui": "studio", ".heiss-trash": ".studio-trash" };
 const oldBlocks = ["heissUi", "heiss_ui", "jAiStudio", "j_ai_studio"];
 // Imported into SQLite by the runtime step, whose source JSON stays as it was.
