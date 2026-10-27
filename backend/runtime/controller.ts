@@ -98,8 +98,6 @@ export class RuntimeController {
   readonly workloads: Workload[];
   readonly pools: Record<string, number>;
   readonly automaticLifecycle: boolean;
-  /** Recovery can hold a recorded legacy operation through durable output saving. */
-  beforeStop?: (workload: Workload) => Promise<void>;
   /** Settles when the running operation finishes; for tests and shutdown. */
   settled: Promise<void> = Promise.resolve();
   private active = new Map<string, number>();
@@ -396,7 +394,6 @@ export class RuntimeController {
         },
         "; nothing was stopped",
       );
-      for (const id of plan.stop) await this.beforeStop?.(this.workload(id));
       for (const id of plan.stop) {
         this.step(operation, `Stopping ${label(id)}.`);
         await this.engine.scale(this.workload(id), 0);
@@ -533,8 +530,6 @@ export class RuntimeController {
       while (this.usage(target, workload.pool) > this.pools[workload.pool] && candidates.length)
         target.splice(target.indexOf(candidates.shift()!), 1);
       const plan = this.plan(this.validate(target), states);
-      // A guard that refuses (such as unsaved legacy outputs) becomes the waiting reason; nothing is recorded.
-      for (const id of plan.stop) await this.beforeStop?.(this.workload(id));
       this.begin("apply", plan, "automatic");
     } finally {
       this.claimed = false;

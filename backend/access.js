@@ -1,4 +1,3 @@
-import { dockerHostOnly } from "./comfy.js";
 import { classifyClient } from "./client-trust.js";
 import { accountSession } from "./account-store.js";
 
@@ -8,7 +7,6 @@ export function clientOf(req) {
   if (!req.studioClient)
     req.studioClient = classifyClient(req, {
       devToken: process.env.STUDIO_DEV_PROXY_TOKEN || "",
-      hostOnly: dockerHostOnly,
     });
   return req.studioClient;
 }

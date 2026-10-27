@@ -28,13 +28,11 @@ const markerName = ".version";
 const backupsName = ".backups";
 const keepDays = 14;
 const keepCount = 3;
-// Large, or never rewritten by an update, or not ours to keep. An encrypted
-// vault from before Hidden was removed moves into backups/ on its first start.
+// Large, or never rewritten by an update, or not ours to keep.
 const skipped = new Set([
   ".thumbnails",
   backupsName,
   "backups",
-  ".private-vault",
   "reference-assets",
   "setup-demo",
   trashFolderName,

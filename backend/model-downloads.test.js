@@ -89,7 +89,7 @@ test("a file gone from its address says to update, and where to look by hand", a
 });
 
 test("a file fetched before a restart reads as on disk, not as a new download", async () => {
-  const { catalogDownloadsForFile } = await import("./family-profiles.js");
+  const { catalogDownloadsForFile } = await import("./catalog-downloads.js");
   const file = "sdxl_vae.safetensors";
   assert.equal(catalogDownloadsForFile(file, "vae")[0].onDisk, undefined);
   fs.writeFileSync(path.join(scratch, "ComfyUI", "models", "vae", file), "x");

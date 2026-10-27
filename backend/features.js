@@ -10,12 +10,6 @@ export function presetsEnabled() {
   return process.env.STUDIO_ENABLE_PRESETS === "1";
 }
 
-export function builtInProfilesEnabled() {
-  if (process.env.STUDIO_ENABLE_BUILTIN_PROFILES !== undefined)
-    return process.env.STUDIO_ENABLE_BUILTIN_PROFILES !== "0";
-  return !process.env.STUDIO_CONFIG_DIR;
-}
-
 export function modelFamilyEnabled(family, model = "") {
   const tessera = family === "tessera" || /(?:^|[\\/])tessera(?:[-_.]|$)/i.test(model);
   return (family !== "grok" || grokEnabled) && (!tessera || process.env.STUDIO_ENABLE_TESSERA !== "0");

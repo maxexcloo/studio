@@ -3,9 +3,7 @@ import { catalogueLoraInfo } from "./lora-info.js";
 import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy.js";
 import { inferModels } from "./models.js";
-import { workflowFor, workflowIds } from "./workflow-registry.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
-import { inpaintingEnabled } from "./features.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {
@@ -93,29 +91,6 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
   return sanitized;
 }
 
-/**
- * A painted mask on the first reference: only for a model that can inpaint,
- * with a reference to paint on. The mask itself is checked when it is read
- * (inpaint.js); here only its shape and the two settings.
- */
-function sanitizeInpaint(input, profile, referenceAssets) {
-  const mask = String(input.inpaint?.mask || "");
-  if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length)
-    return null;
-  if (!mask.startsWith("data:image/png;base64,"))
-    throw new Error("The painted mask didn’t come through. Paint it again.");
-  const fallback = profile.defaults.inpaintStrength ?? 1;
-  const strength = Number(input.inpaint.strength);
-  const feather = Number(input.inpaint.feather);
-  return {
-    mask,
-    strength: Number.isFinite(strength)
-      ? Math.round(Math.min(1, Math.max(0.05, strength)) * 100) / 100
-      : fallback,
-    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4,
-  };
-}
-
 export function validateReferenceSlots(references, profile, input = {}) {
   const slots = profile.mediaInputs || [];
   // Plain img2img advertises one start image through its capability rather than named slots.
@@ -140,158 +115,18 @@ export function validateReferenceSlots(references, profile, input = {}) {
       );
   }
 }
-
-/**
- * A built-in family request, checked against the profile Studio built for that
- * model file: encoders must be files that fit their slot, the VAE must fit (or
- * be the checkpoint's own), and nothing the model needs may be missing.
- */
-function sanitizeFamilyBody(input, info, stats) {
-  const kind = input.kind === "video" ? "video" : "image";
-  const prompt = String(input.prompt || "").trim();
-  if (!prompt) throw new Error("Enter a prompt.");
-  const profiles = inferModels(info, stats).profiles || [];
-  const profile =
-    profiles.find((item) => item.id === input.profileId) ||
-    profiles.find((item) => item.workflow === input.workflow && item.model === input.model);
-  if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
-  if (profile.kind !== kind) throw new Error(`The selected model isn’t a ${kind} model.`);
-  if (!profile.ready) {
-    throw new Error(
-      `${profile.displayName} still needs: ${profile.missing.map((item) => item.label).join(", ")}.`,
-    );
-  }
-  const requested = Array.isArray(input.textEncoders) ? input.textEncoders : [input.textEncoder];
-  const encoders = profile.encoderSlots.map((slot, index) => {
-    const wanted = String(requested[index] || "");
-    if (wanted && !slot.options.includes(wanted))
-      throw new Error(`${wanted} doesn’t fit this model’s ${slot.label} slot.`);
-    return wanted || slot.default;
-  });
-  const vae = String(input.vae || "");
-  if (vae && !profile.options.vaes.includes(vae))
-    throw new Error(`${vae} isn’t a VAE this model can use.`);
-  const resolvedVae = vae || (profile.vaeBuiltIn ? "" : profile.defaults.vae);
-  if (input.sampler) ensureOption(info, "KSampler", "sampler_name", input.sampler, "Sampler");
-  if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
-  const c = profile.constraints || {};
-  // Only asset IDs come from the client; ComfyUI input names are always staged by the server.
-  const supplied = Array.isArray(input.referenceAssets)
-    ? input.referenceAssets
-        .map((item) => ({
-          slot:
-            String(item?.slot || "reference")
-              .replace(/[^a-z0-9._-]/gi, "")
-              .slice(0, 80) || "reference",
-          assetId: String(item?.assetId || "").slice(0, 2048),
-          source: String(item?.source || "").slice(0, 40),
-        }))
-        .filter((item) => item.assetId)
-    : [];
-  const slots = (profile.mediaInputs || []).map((item) => item.id);
-  // A model with reference slots takes an image per slot, in slot order; others keep the first as a start image.
-  const referenceAssets = slots.length
-    ? slots.flatMap((slot) => supplied.filter((item) => item?.slot === slot))
-    : supplied;
-  if (
-    profile.capabilities.startImageRequired &&
-    !referenceAssets.length &&
-    !input.startImage &&
-    !input.startImageId
-  ) {
-    throw new Error(
-      `${profile.displayName} makes a video from a picture. Add a start image first.`,
-    );
-  }
-  validateReferenceSlots(supplied, profile, input);
-  return {
-    kind,
-    workflow: profile.workflow,
-    profileId: profile.id,
-    family: profile.family,
-    variant: profile.variant,
-    source: profile.source,
-    model: profile.model,
-    bundled:
-      profile.source === "checkpoint"
-        ? { encoder: profile.encoderBuiltIn, vae: profile.vaeBuiltIn }
-        : null,
-    // A quantized checkpoint (NF4) loads through its format's node, with the same inputs.
-    checkpointLoader: profile.checkpointLoader || "",
-    encoders,
-    encoderProjection: profile.encoderProjections?.[encoders[0]] || "",
-    textEncoder: encoders[0] || "",
-    clipType: profile.defaults.clipType || "",
-    vae: resolvedVae,
-    audioVae: profile.audioVae,
-    pairModel: profile.pairModel,
-    // A runner that loads a whole model folder takes it by its full path (resolved when the profile was built).
-    modelPath: profile.modelPath || "",
-    clipVision: profile.clipVision || "",
-    upsampler: profile.upsampler || "",
-    vpredPatch: profile.vpredPatch,
-    krea2Enhancer: profile.family === "krea2" && Boolean(info["ComfyUI-Krea2T-Enhancer"]),
-    sana: profile.sana || null,
-    weightDtype: String(input.weightDtype || "default"),
-    prompt,
-    negative: String(input.negative || ""),
-    width: snapInteger(input.width, c.width?.default, c.width),
-    height: snapInteger(input.height, c.height?.default, c.height),
-    steps: snapInteger(input.steps, profile.defaults.steps, c.steps),
-    cfg: snapNumber(input.cfg, profile.defaults.cfg, c.cfg),
-    denoise: snapNumber(input.denoise, profile.defaults.denoise ?? 1, c.denoise),
-    sampler: String(input.sampler || profile.defaults.sampler || ""),
-    scheduler: String(input.scheduler || profile.defaults.scheduler || ""),
-    seed: String(input.seed || ""),
-    count:
-      profile.capabilities.variations === false
-        ? 1
-        : snapInteger(input.count, defaultGenerationCount, c.count),
-    ...(input.variationCount !== undefined
-      ? {
-          variationCount:
-            kind === "image" && profile.capabilities.variations !== false
-              ? clampInteger(input.variationCount, 1, 1, 8)
-              : 1,
-        }
-      : {}),
-    frames: kind === "video" ? videoFrames(input.frames, c.frames) : 0,
-    fps: kind === "video" ? snapInteger(input.fps, c.fps?.default, c.fps) : 0,
-    startImage: profile.capabilities.startImage ? String(input.startImage || "") : "",
-    startImageId: profile.capabilities.startImage ? String(input.startImageId || "") : "",
-    startImageName: String(input.startImageName || ""),
-    referenceAssets,
-    autoResizeInputs: input.autoResizeInputs !== false,
-    inpaint: sanitizeInpaint(input, profile, referenceAssets),
-    // "reference": the first reference guides the picture but doesn't frame it; the picked size does.
-    // A painted mask is an edit of that image, so it keeps the image's framing.
-    referenceRole: input.referenceRole === "reference" && !input.inpaint ? "reference" : "edit",
-    promptPolicy: null,
-    loras: sanitizeLoras(input, info, profile, kind, 8),
-    // A retry after the GPU ran out of memory while decoding; only where this ComfyUI has the node.
-    tiledDecode:
-      Boolean(input.tiledDecode) && Boolean(info.VAEDecodeTiled) && profile.family !== "sana",
-    profileLabel: profile.displayName,
-  };
-}
-
 export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
-  if (String(input.workflow || "").startsWith("family:"))
-    return sanitizeFamilyBody(input, info, stats);
   const kind = input.kind === "video" ? "video" : "image";
   const workflow = String(input.workflow || "");
   const installed = workflow.startsWith("custom:")
     ? getCustomWorkflow(workflow, input.profileBackend)
     : null;
   const customWorkflow = installed && resolveImageMode(installed, input);
-  const workflowInfo = workflowFor(workflow) || customWorkflow;
   const prompt = String(input.prompt || "").trim();
   if (!prompt) throw new Error("Enter a prompt.");
   if (!String(input.model || "").trim()) throw new Error("Choose a supported model first.");
-  if (!workflowInfo) throw new Error("There’s no workflow for this model.");
-  if (!customWorkflow && !workflowIds().includes(workflow))
-    throw new Error("There’s no workflow for this model.");
-  if (kind !== workflowInfo.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
+  if (!customWorkflow) throw new Error("There’s no workflow for this model.");
+  if (kind !== customWorkflow.kind) throw new Error(`The selected model isn’t a ${kind} workflow.`);
   const referenceAssets = Array.isArray(input.referenceAssets)
     ? input.referenceAssets
         .map((item) => ({
@@ -304,8 +139,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
         }))
         .filter((item) => item.assetId)
     : [];
-  validateReferenceSlots(referenceAssets, workflowInfo, input);
-  const missing = missingNodes(info, workflowInfo.requiredNodes);
+  validateReferenceSlots(referenceAssets, customWorkflow, input);
+  const missing = missingNodes(info, customWorkflow.requiredNodes);
   if (missing.length)
     throw new Error(`ComfyUI is missing nodes this model needs: ${missing.join(", ")}`);
   const profiles =
@@ -318,16 +153,6 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
   const selected = available?.imageModes?.[hasReferenceImage(input) ? "reference" : "generate"];
   const profile = available && { ...available, ...selected };
   if (!profile) throw new Error("ComfyUI doesn’t list this model. Rescan models and try again.");
-  if (
-    (workflowInfo.needsTextEncoder && !input.textEncoder) ||
-    (workflowInfo.needsVae && !input.vae)
-  ) {
-    throw new Error("This workflow needs a text encoder and VAE.");
-  }
-
-  if (workflowInfo.modelNode && workflowInfo.modelKey) {
-    ensureOption(info, workflowInfo.modelNode, workflowInfo.modelKey, input.model, "Model");
-  }
   if (
     customWorkflow?.controls?.model?.node &&
     customWorkflow?.controls?.model?.input &&
@@ -342,16 +167,16 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
       "Model",
     );
   }
-  if (workflowInfo.needsTextEncoder || workflowInfo.capabilities?.textEncoder) {
+  if (customWorkflow.capabilities?.textEncoder) {
     ensureOption(info, "CLIPLoader", "clip_name", input.textEncoder, "Text encoder");
   }
-  if (workflowInfo.needsVae || workflowInfo.capabilities?.vae) {
+  if (customWorkflow.capabilities?.vae) {
     ensureOption(info, "VAELoader", "vae_name", input.vae, "VAE");
   }
   if (input.sampler) ensureOption(info, "KSampler", "sampler_name", input.sampler, "Sampler");
   if (input.scheduler) ensureOption(info, "KSampler", "scheduler", input.scheduler, "Scheduler");
 
-  const latentNode = workflowInfo.latentNode || "EmptyLatentImage";
+  const latentNode = "EmptyLatentImage";
   const widthRange = nodeRange(info, latentNode, "width", {
     default: kind === "video" ? 512 : 1024,
     min: 16,
@@ -414,13 +239,13 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     scheduler: String(input.scheduler || ""),
     seed: String(input.seed || ""),
     count:
-      workflowInfo.capabilities?.variations === false
+      customWorkflow.capabilities?.variations === false
         ? 1
         : snapInteger(input.count, countRange.default, countRange),
     ...(input.variationCount !== undefined
       ? {
           variationCount:
-            kind === "image" && workflowInfo.capabilities?.variations !== false
+            kind === "image" && customWorkflow.capabilities?.variations !== false
               ? clampInteger(input.variationCount, 1, 1, 8)
               : 1,
         }
@@ -436,10 +261,10 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     startImageName: String(input.startImageName || ""),
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
-    promptPolicy: workflowInfo.promptComposition
+    promptPolicy: customWorkflow.promptComposition
       ? {
-          policy: workflowInfo.promptComposition.policy,
-          version: workflowInfo.promptComposition.version,
+          policy: customWorkflow.promptComposition.policy,
+          version: customWorkflow.promptComposition.version,
         }
       : null,
     loras,

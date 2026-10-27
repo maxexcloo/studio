@@ -422,7 +422,7 @@ export class GenerationQueue {
     return this.store.job(ownerId, id);
   }
 
-  retry(ownerId: string, id: string, jobLimit?: number): OwnedJob | undefined {
+  retry(ownerId: string, id: string): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;
     return this.store.enqueue(
@@ -433,7 +433,6 @@ export class GenerationQueue {
       job.parentJobId,
       job.resource,
       undefined,
-      jobLimit,
       { parentItemId: job.parentItemId },
     );
   }

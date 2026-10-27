@@ -3,7 +3,6 @@ import "./env.js";
 // Then: keeps a copy of data/ before a new version's stores load and migrate it.
 import "./data-snapshot.js";
 // Then, once: Hidden's data backed up and its readable records back in the gallery.
-import "./hidden-migration.js";
 import { createJobRecovery } from "./job-recovery.js";
 import { installShutdown } from "./shutdown.js";
 import { addProbe, logWarning } from "./crash-log.js";
@@ -35,7 +34,7 @@ import { GenerationQueue } from "./domain/queue.ts";
 import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
 import { createTitler } from "./domain/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
-import { createLegacyQueueAdapter } from "./domain/legacy-adapter.ts";
+import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
@@ -43,12 +42,10 @@ import { providerMediaWriter } from "./providers/media.ts";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
-import { configuredAccountJobLimit } from "./account-jobs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { registerRewriteRoutes } from "./domain/routes.ts";
-import { loadRuntime, registerTextAdmission, registerRuntimeStatus } from "./runtime/bootstrap.ts";
+import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createServicesObserver, createTextVision } from "./runtime/services.ts";
-import { legacyRecoverySwitchGuard } from "./runtime/legacy-recovery.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library-routes.js";
@@ -63,10 +60,10 @@ import {
 } from "./profile-editor.js";
 import { registerProfileRoutes } from "./profile-routes.js";
 import { draftProfileFromImport } from "./profile-drafts.js";
-import { seedDirectory, seedMissing } from "./profile-seed.js";
+import { seedSamples } from "./profile-seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings } from "./chat-settings.js";
-import { catalogDownloadsForFile } from "./family-profiles.js";
+import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { familyFromName } from "./family-catalog.js";
 import {
   assistantIntegration,
@@ -136,16 +133,12 @@ import {
 import { canAdmin, clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp.js";
-import { createHandoverStore, registerChatRoutes } from "./chat-handover.js";
 import { mcpOutputPath } from "./mcp-media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
-import { httpsPort, startupTls, tlsHostNames } from "./tls.js";
-import { removeLocalEnvValue } from "./env.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { retireFeatureSwitches } from "./feature-options.js";
 import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./models.js";
 import { lorasEnabled, presetsEnabled } from "./features.js";
 import {
@@ -197,7 +190,6 @@ import {
 } from "./video-previews.js";
 import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
-import { scheduleTrashPurge } from "./gallery-trash.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
 import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
@@ -286,8 +278,6 @@ import {
   gatewayAccountAccess,
   gatewayAdminTools,
   listAccounts,
-  migrateCloudModelAccess,
-  migrateFeatureOptionAccess,
   noteGatewayIdentity,
   verifyAccountMcpToken,
 } from "./account-store.js";
@@ -303,7 +293,7 @@ const app = express();
 // checks the lowercase prefix, so a capitalised path would reach handlers ungated.
 app.set("case sensitive routing", true);
 // Before anything reads a body: other websites and rebound hostnames stop here (request-guard.js).
-app.use(requestGuard({ network: networkListening, extraHosts: tlsHostNames }));
+app.use(requestGuard({ network: networkListening }));
 async function resolveSignedMcpResult(owner, jobId, index) {
   if (!mayUseFeature(accountAccessForId(owner), "gallery")) return null;
   const item = gallery.find(
@@ -359,20 +349,11 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     return null;
   }
 }
-// Once per start and safe to repeat: the seed (STUDIO_SEED_DIR) fills only what is missing, then the
-// catalogue, guide and profile stores take in what the older files hold, which stay where they are
+// Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue,
+// guide and profile stores take in what the older files hold, which stay where they are
 // (profile-seed.js, library-catalogue.js, profile-store.js). Before MCP reads guides.
 for (const [name, migrate] of [
-  [
-    "seed",
-    () =>
-      seedMissing({
-        seedDir: seedDirectory(),
-        dataDir,
-        workflowsDir: userWorkflowsDir,
-        store: profileStore(),
-      }),
-  ],
+  ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
   ["guides", () => guideStore().migrate()],
   ["profiles", () => profileStore().migrate()],
@@ -385,18 +366,14 @@ for (const [name, migrate] of [
     );
   }
 }
-// Chat handovers (chat-handover.js): a result an account hands to its chat becomes MCP's for that chat.
-const chatHandovers = createHandoverStore({ dataDir });
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
 const runtime = loadRuntime(process.env, { dataDir });
 const mcp = registerMcpRoutes(app, {
   dataDir,
   runtime: runtime?.controller,
   gatewayAdminTools,
-  claimHandover: (owner, jobId, options) => chatHandovers.claim(owner, jobId, options),
   baseUrl: () => `http://127.0.0.1:${port}`,
-  allowedHost: (req) =>
-    hostAllowed(req.headers.host, { network: networkListening, extra: tlsHostNames() }),
+  allowedHost: (req) => hostAllowed(req.headers.host, { network: networkListening }),
   accountMode: multiUserEnabled,
   authenticateAccountToken: verifyAccountMcpToken,
   authenticateGatewayIdentity: gatewayAccountAccess,
@@ -429,7 +406,6 @@ const directCloud =
     reference: async (account, id) =>
       (await bytesForReferenceAccount(account || undefined, id)).buffer,
   });
-registerTextAdmission(app, runtime);
 // A body that is not valid JSON, or too big, gets a plain JSON answer, not Express's HTML page with a stack trace and file paths.
 app.use((error, _req, res, next) => {
   if (!error || (error.type !== "entity.parse.failed" && error.type !== "entity.too.large"))
@@ -523,17 +499,10 @@ function refreshComfyContextSoon() {
   setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
-const legacyRecoveryIds = new Set(
-  filterVisibleGallery(gallery)
-    .filter((item) => item.jobId && !item.url && ["pending", "error"].includes(item.status))
-    .map((item) => item.jobId),
-);
-const legacyRecoveryTerminals = new Map();
 const recoverRunningJobs = createJobRecovery({
   backends: configuredBackends,
   finishJob: (id, patch) => {
-    const terminal = setTerminalJob(id, patch);
-    if (legacyRecoveryIds.has(id)) legacyRecoveryTerminals.set(id, terminal);
+    setTerminalJob(id, patch);
   },
   getGallery: () => gallery,
   jobs,
@@ -645,19 +614,6 @@ const discoveredProfiles = async () => {
     .catch(() => (demoMode ? mockModelResult() : offlineModelResult(comfyUrl)));
   return models.profiles || [];
 };
-// The retired global LoRAs and Cloud Models switches become per-profile starting values, once.
-try {
-  retireFeatureSwitches({
-    multiUser: multiUserEnabled,
-    source: settingSource,
-    migrate: migrateFeatureOptionAccess,
-    remove: removeLocalEnvValue,
-  });
-} catch (error) {
-  console.warn(
-    `[accounts] Couldn’t carry the old feature switches into access profiles: ${error.message}`,
-  );
-}
 registerMultiUserAuthRoutes(app, {
   availableProfiles: async () =>
     (await discoveredProfiles())
@@ -783,13 +739,11 @@ app.get("/api/diagnostics", async (_req, res) => {
   res.json({ ok: true, ...report, text: diagnosticsText(report) });
 });
 
-// When this server process started, so the app can tell a restart (e.g. after an update) happened.
 const serverStartedAt = Date.now();
-// How the last run ended, when it went wrong (exit-record.js): told once in the studio, via /api/health.
+// How the last run ended, when it went wrong (exit-record.js), logged at start.
 // Read once listening: a second copy that finds this one running must not take over its record.
-let previousExit = null;
 function beginSession() {
-  previousExit = startSession({ now: serverStartedAt });
+  const previousExit = startSession({ now: serverStartedAt });
   if (previousExit)
     logWarning("The last run stopped unexpectedly", {
       who: previousExit.who,
@@ -799,43 +753,6 @@ function beginSession() {
     });
   setInterval(() => noteAlive(), 60_000).unref();
 }
-
-app.get("/api/health", async (req, res) => {
-  // No workers at all is a setup Studio runs in: it says so plainly instead of naming an address.
-  if (!listWorkers().length && !demoMode) {
-    res.status(503).json({
-      ok: false,
-      noWorkers: true,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      error: noWorkerMessage("image"),
-      startedAt: serverStartedAt,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-    return;
-  }
-  try {
-    // Only whether ComfyUI answers: its system_stats (command line, paths) stay here.
-    await comfy("/system_stats");
-    res.json({
-      ok: true,
-      ...(req.studioAccount && !canAdmin(req) ? {} : { comfyUrl }),
-      startedAt: serverStartedAt,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-  } catch (error) {
-    res.status(503).json({
-      ok: false,
-      thisComputer: canAdmin(req),
-      atComputer: clientOf(req).thisComputer,
-      error: error.message,
-      startedAt: serverStartedAt,
-      ...(previousExit && canAdmin(req) ? { previousExit } : {}),
-    });
-  }
-});
 
 // Accounts read their own outputs: ComfyUI's output folder, or Studio-owned media.
 const ownerMediaTypes = new Set(["output", mediaType]);
@@ -1070,15 +987,6 @@ app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     const { models } = await mediaModels(req.query.cached !== "1");
-    // A discovered catalogue settles Cloud Models on access profiles stored before it existed.
-    if (req.studioAccount)
-      try {
-        migrateCloudModelAccess(
-          (models.profiles || []).filter(isCloudProfile).map((profile) => profile.id),
-        );
-      } catch {
-        /* Tried again on the next load. */
-      }
     res.json(withProfileAliases(withLibrary(modelsForAccount(models, req), req)));
   } catch {
     res.json(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)));
@@ -1468,13 +1376,6 @@ registerGalleryReadRoutes(app, {
     );
   },
 });
-// Refine in Chat: the chat's address, and handing a result the account owns to its chat.
-registerChatRoutes(app, {
-  store: chatHandovers,
-  ownerId: ownerIdForRequest,
-  owned: (req, jobId) =>
-    recordsForRequest(gallery, req).some((item) => item.jobId === jobId && item.status === "done"),
-});
 
 app.delete("/api/loras", (req, res) => {
   if (!requireLocal(req, res)) return;
@@ -1844,7 +1745,6 @@ const generationRoutes = registerGenerationRoutes(app, {
 });
 
 // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
-const accountJobLimit = configuredAccountJobLimit();
 const mediaLeases = new Map();
 async function queueResourceFor(input) {
   if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
@@ -1893,7 +1793,7 @@ async function permitQueueFallback(job) {
   });
   return true;
 }
-const queueAdapter = createLegacyQueueAdapter({
+const queueAdapter = createGenerationQueueAdapter({
   generate: generationRoutes.generate,
   jobs,
   gallery: () => gallery,
@@ -1978,7 +1878,7 @@ const queueAdapter = createLegacyQueueAdapter({
     mediaLeases.delete(job.id);
   },
 });
-// Reconstruct leases synchronously before the HTTP listener can accept text admission.
+// Reconstruct leases synchronously before the HTTP listener accepts work.
 for (const job of rewriteStore
   .jobs()
   .filter(
@@ -1988,53 +1888,6 @@ for (const job of rewriteStore
   )) {
   const workloads = managedWorkloads(job);
   if (workloads.length) mediaLeases.set(job.id, runtime.controller.retain(workloads));
-}
-if (runtime) {
-  const queuedIds = new Set(rewriteStore.jobs().map((job) => job.id));
-  for (const id of queuedIds) {
-    legacyRecoveryIds.delete(id);
-    legacyRecoveryTerminals.delete(id);
-  }
-  runtime.controller.beforeStop = legacyRecoverySwitchGuard({
-    ids: legacyRecoveryIds,
-    recover: recoverRunningJobs,
-    inspect: (id) => {
-      const job = jobs.get(id) || legacyRecoveryTerminals.get(id);
-      return { backendUrl: workerById(job?.comfyBackend)?.url, settled: Boolean(job?.terminalAt) };
-    },
-    save: async (ids, workload) => {
-      const worker = configuredBackends()
-        .map((id) => workerById(id))
-        .find((item) => item?.url.replace(/\/$/, "") === workload.url.replace(/\/$/, ""));
-      for (const id of ids) {
-        const records = gallery.filter((item) => item.jobId === id && item.status === "done");
-        if (!records.length) continue;
-        const ownerId = records[0].ownerId || "";
-        const moved = await withComfyBackend(
-          (jobs.get(id) || legacyRecoveryTerminals.get(id))?.comfyBackend || worker?.id,
-          () =>
-            ingestRunResults(
-              records.map((output) => ({
-                output,
-                ...(output.upscale?.url ? { upscale: output.upscale } : {}),
-              })),
-              ownerId,
-              { strict: true },
-            ),
-        );
-        for (const result of moved.results)
-          updateGalleryJob(result.output.id, {
-            ...result.output,
-            ...(result.upscale ? { upscale: result.upscale } : {}),
-          });
-      }
-      await flushGalleryStrict();
-      for (const id of ids) {
-        legacyRecoveryIds.delete(id);
-        legacyRecoveryTerminals.delete(id);
-      }
-    },
-  });
 }
 const directCloudAdapter =
   directCloud &&
@@ -2193,7 +2046,6 @@ registerRewriteRoutes(app, {
   queue: generationQueue,
   resourceFor: queueResourceFor,
   validate: validateGenerationInput,
-  jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
   media: (ownerId) => {
     const byJob = new Map();
@@ -2212,7 +2064,6 @@ const admitGeneration = createGenerationAdmission({
   resourceFor: queueResourceFor,
   pendingItems: makePendingItems,
   revision: galleryRevisionValue,
-  jobLimit: accountJobLimit,
   validate: validateGenerationInput,
   admitted: jobAdmitted,
 });
@@ -2907,29 +2758,21 @@ async function queueUpscaleOnWorker(account, request, origin) {
   const session = parent
     ? rewriteStore.session(ownerId, parent.sessionId)
     : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-  let queued;
-  try {
-    queued = rewriteStore.enqueue(
-      ownerId,
-      session.id,
-      {
-        prompt: item.prompt || "",
-        galleryItemId: item.id,
-        upscaleBody: body,
-        upscalePlan: plan,
-      },
-      "upscale",
-      parent?.id,
-      `worker:${currentComfyBackend()}`,
-      undefined,
-      account?.role === "user" && !origin ? accountJobLimit : undefined,
-      origin,
-    );
-  } catch (error) {
-    if (error.status === 429)
-      return { status: 429, payload: { ok: false, reason: error.reason, error: error.message } };
-    throw error;
-  }
+  const queued = rewriteStore.enqueue(
+    ownerId,
+    session.id,
+    {
+      prompt: item.prompt || "",
+      galleryItemId: item.id,
+      upscaleBody: body,
+      upscalePlan: plan,
+    },
+    "upscale",
+    parent?.id,
+    `worker:${currentComfyBackend()}`,
+    undefined,
+    origin,
+  );
   updateGalleryJob(item.id, {
     upscale: { ...item.upscale, status: "queued", jobId: queued.id, progress: null, error: "" },
   });
@@ -2944,48 +2787,6 @@ async function queueUpscaleOnWorker(account, request, origin) {
 app.post("/api/upscale", async (req, res) => {
   const { status, payload } = await queueUpscale(req.studioAccount, req.body || {});
   res.status(status).json(payload);
-});
-
-// Stops an image's running upscale. runUpscaleJob sees the canceled job and resets the tile.
-app.post("/api/upscale/cancel", async (req, res) => {
-  const itemId = String(req.body?.galleryItemId || "");
-  const ownedItem = recordsForRequest(gallery, req).find((item) => item.id === itemId);
-  if (req.studioAccount && !ownedItem)
-    return res.status(404).json({ ok: false, error: "This image is no longer in the gallery." });
-  const queued = rewriteStore
-    .jobs(ownerIdForRequest(req))
-    .find(
-      (job) =>
-        job.operation === "upscale" &&
-        job.input.galleryItemId === itemId &&
-        !["completed", "failed", "cancelled"].includes(job.status),
-    );
-  if (queued) {
-    await generationQueue.cancel(queued.ownerId, queued.id);
-    return res.json({ ok: true });
-  }
-  const entry = [...jobs].find(
-    ([, job]) =>
-      job.kind === "upscale" &&
-      job.galleryItemId === itemId &&
-      !job.terminalAt &&
-      (!req.studioAccount || job.ownerId === req.studioAccount.userId),
-  );
-  if (!entry) {
-    // Nothing is running it (the server restarted mid-upscale): just clear the spinner.
-    const item = findUpscaleTarget(itemId);
-    if (item?.upscale?.status === "running")
-      updateGalleryJob(item.id, {
-        upscale: { ...item.upscale, status: "canceled", progress: null },
-      });
-    res.json({ ok: true, stale: true });
-    return;
-  }
-  const [jobId, job] = entry;
-  setTerminalJob(jobId, { status: "canceled" });
-  if (job.promptId)
-    await withComfyBackend(job.comfyBackend, () => cancelPrompt(job.promptId)).catch(() => null);
-  res.json({ ok: true });
 });
 
 app.post("/api/upscale/toggle", (req, res) => {
@@ -3307,7 +3108,7 @@ app.get("/comfy/*path", async (req, res) => {
     }
     // Only ComfyUI's image route, for images, videos and sound among its outputs, inputs
     // and previews. Its other GET routes (settings, logs, Manager's) are not for the studio's visitors,
-    // and neither are dot folders among the outputs (the gallery's trash, gallery-trash.js).
+    // and neither are dot folders among the outputs (such as an old `.studio-trash`).
     if (
       proxyPath !== "view" ||
       !["output", "input", "temp", mediaType].includes(String(req.query.type || "output")) ||
@@ -3419,11 +3220,11 @@ setTimeout(
       .catch(() => null),
   1200,
 );
-scheduleTrashPurge();
 // Studio media's thumbnails and posters are built ahead of their first view.
 if (mediaStorageEnabled) startMediaWarmup();
 
-const dev = /^dev/.test(process.env.npm_lifecycle_event || "");
+// dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
+const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);
 const serverStartup = startServers(app, {
   host,
   port,
@@ -3444,7 +3245,7 @@ const serverStartup = startServers(app, {
     // A distinct code, so the exit record keeps the running copy's own last run (crash-log.js).
     process.exit(error.code === "EADDRINUSE" ? PORT_IN_USE_CODE : 1);
   },
-  onListening({ plan, port: listening }) {
+  onListening({ port: listening }) {
     beginSession();
     // Phone links in Settings use the bound address.
     setListeningPort(listening);
@@ -3458,20 +3259,11 @@ const serverStartup = startServers(app, {
     );
     void (async () => {
       // Listening beyond this computer: say where a phone can open it.
-      if (
-        multiUserEnabled &&
-        networkListening &&
-        (host === "0.0.0.0" || host === "::") &&
-        !plan.tlsProblem
-      ) {
-        const addresses = plan.httpsHost
-          ? startupTls.names
-              .filter((name) => !name.startsWith("*."))
-              .map((name) => `https://${name.includes(":") ? `[${name}]` : name}:${httpsPort}`)
-          : Object.values(os.networkInterfaces())
-              .flatMap((entries) => entries || [])
-              .filter((entry) => entry.family === "IPv4" && !entry.internal)
-              .map((entry) => `http://${entry.address}:${pagePort}`);
+      if (multiUserEnabled && networkListening && (host === "0.0.0.0" || host === "::")) {
+        const addresses = Object.values(os.networkInterfaces())
+          .flatMap((entries) => entries || [])
+          .filter((entry) => entry.family === "IPv4" && !entry.internal)
+          .map((entry) => `http://${entry.address}:${pagePort}`);
         for (const address of addresses) console.log(`    ➜  Network   ${address}`);
       }
       // No workers is a setup of its own: say so.

@@ -209,24 +209,11 @@ export class RewriteStore {
     parentJobId?: string,
     resource = "local-media",
     requestedId?: string,
-    jobLimit?: number,
     origin: QueueOrigin & { parentItemId?: string } = {},
   ): OwnedJob {
     if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
     if (parentJobId && !this.job(ownerId, parentJobId))
       throw new Error("Parent generation not found.");
-    if (jobLimit !== undefined) {
-      const row = this.db
-        .prepare(
-          "SELECT COUNT(*) AS count FROM studio_queue WHERE owner_id = ? AND status NOT IN ('completed', 'failed', 'cancelled') AND COALESCE(json_extract(record, '$.priority'), 0) < ?",
-        )
-        .get(ownerId, queuePriority.dream)!;
-      if (Number(row.count) >= jobLimit)
-        throw Object.assign(new Error(`You can have up to ${jobLimit} outstanding jobs.`), {
-          status: 429,
-          reason: "job-limit",
-        });
-    }
     const stamp = now();
     const id = requestedId || randomUUID();
     const jobResource = resource.startsWith("provider:cliproxyapi")

@@ -21,8 +21,6 @@ const { ggufModelNames, readGgufHeader, withGgufLoaders } = await import("./gguf
 const { classifyModel } = await import("./model-families.js");
 const { familyFromHeader } = await import("./family-catalog.js");
 const { classifyEncoder, encoderKindFromHeader } = await import("./model-components.js");
-const { inferModels } = await import("./models.js");
-const { familyGraph } = await import("./family-graph.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 /* ------------------------------------------------------------ A tiny GGUF writer */
@@ -265,91 +263,6 @@ test("anything that is not a GGUF file is refused, and a model then falls back t
 
 /* ------------------------------------------------------------ Profiles and graphs */
 
-test("with ComfyUI-GGUF, GGUF models and encoders run through its loaders", () => {
-  const model = put("diffusion_models", "my-finetune-Q4_K_S.gguf", fluxModel);
-  const clipL = put(
-    "text_encoders",
-    "clip_l.safetensors",
-    safetensors({
-      "text_model.encoder.layers.0.mlp.fc1.weight": {
-        dtype: "F16",
-        shape: [3072, 768],
-        data_offsets: [0, 0],
-      },
-    }),
-  );
-  const t5 = "t5-v1_1-xxl-encoder-Q4_K_M.gguf";
-  const vae = put(
-    "vae",
-    "ae.safetensors",
-    safetensors({
-      "decoder.conv_in.weight": { dtype: "F16", shape: [512, 16, 3, 3], data_offsets: [0, 0] },
-    }),
-  );
-  const info = objectInfo({
-    unets: [],
-    ggufUnets: [model],
-    clips: [clipL],
-    ggufClips: [t5],
-    vaeFiles: [vae],
-  });
-  const flux = inferModels(info).profiles.find((profile) => profile.model === model);
-  assert.equal(flux.family, "flux1");
-  assert.equal(flux.detectedBy, "file");
-  assert.equal(flux.ready, true);
-  assert.deepEqual(
-    flux.encoderSlots.map((slot) => slot.default),
-    [clipL, t5],
-  );
-  assert.equal(flux.capabilities.weightDtype, false, "UnetLoaderGGUF has no weight dtype");
-
-  const body = sanitizeGenerateBody(
-    {
-      kind: "image",
-      workflow: flux.workflow,
-      profileId: flux.id,
-      model,
-      prompt: "a fox",
-      textEncoders: [clipL, t5],
-      vae,
-    },
-    info,
-  );
-  // Clients name reference assets only; ComfyUI input names come from server-side staging.
-  const forged = sanitizeGenerateBody(
-    {
-      kind: "image",
-      workflow: flux.workflow,
-      profileId: flux.id,
-      model,
-      prompt: "a fox",
-      textEncoders: [clipL, t5],
-      vae,
-      referenceAssets: [
-        {
-          slot: "reference",
-          assetId: "asset-1",
-          comfyName: "studio/image_00042_.png [output]",
-          temporary: true,
-        },
-        { comfyName: "other.png" },
-      ],
-    },
-    info,
-  );
-  assert.deepEqual(forged.referenceAssets, [{ slot: "reference", assetId: "asset-1", source: "" }]);
-  const graph = withGgufLoaders(familyGraph(body));
-  const nodes = Object.values(graph);
-  const unet = nodes.find((item) => item.class_type === "UnetLoaderGGUF");
-  assert.deepEqual(unet.inputs, { unet_name: model });
-  const clip = nodes.find((item) => item.class_type === "DualCLIPLoaderGGUF");
-  assert.deepEqual(clip.inputs, { clip_name1: clipL, clip_name2: t5, type: "flux" });
-  assert.equal(
-    nodes.some((item) => ["UNETLoader", "DualCLIPLoader"].includes(item.class_type)),
-    false,
-  );
-});
-
 test("safetensors-only graphs keep the core loaders", () => {
   const graph = withGgufLoaders({
     1: {
@@ -371,26 +284,4 @@ test("safetensors-only graphs keep the core loaders", () => {
     class_type: "CLIPLoaderGGUF",
     inputs: { clip_name: "qwen3-4b-Q8_0.gguf", type: "lumina2" },
   });
-});
-
-test("without ComfyUI-GGUF, GGUF files on disk show up needing it, with an install", () => {
-  put(
-    "diffusion_models",
-    path.join("HighNoise", "Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf"),
-    gguf([["general.architecture", value.string("wan")]], [["head.modulation", [1, 2, 5120], 0]]),
-  );
-  const names = ggufModelNames(objectInfo());
-  assert.ok(names.includes("my-finetune-Q4_K_S.gguf"));
-  assert.ok(
-    names.includes(path.join("HighNoise", "Wan2.2-T2V-A14B-HighNoise-Q4_K_M.gguf")),
-    "subfolders are listed the way ComfyUI names them",
-  );
-  const flux = inferModels(objectInfo()).profiles.find(
-    (profile) => profile.model === "my-finetune-Q4_K_S.gguf",
-  );
-  assert.equal(flux.ready, false);
-  const [first] = flux.missing;
-  assert.equal(first.label, "ComfyUI-GGUF nodes");
-  assert.equal(first.nodePack.repository, "https://github.com/city96/ComfyUI-GGUF.git");
-  assert.ok(first.missingNodes.includes("UnetLoaderGGUF"));
 });

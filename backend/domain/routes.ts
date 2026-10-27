@@ -34,11 +34,6 @@ const clear = (store: RewriteStore, job: OwnedJob) => store.save({ ...job, clear
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
-function admissionError(res: Response, error: unknown) {
-  const failure = error as { status?: number; reason?: string; message: string };
-  if (failure.status !== 429) throw error;
-  return res.status(429).json({ ok: false, reason: failure.reason, error: failure.message });
-}
 
 export function registerRewriteRoutes(
   app: Router,
@@ -47,7 +42,6 @@ export function registerRewriteRoutes(
     queue,
     resourceFor = () => "local-media",
     validate,
-    jobLimit,
     deleteMedia,
     media,
     title,
@@ -60,7 +54,6 @@ export function registerRewriteRoutes(
       input: GenerationInput,
       account?: Request["studioAccount"],
     ) => Promise<{ status: number; payload: unknown }>;
-    jobLimit?: number;
     /** Viewer deletion of the owner's gallery items; returns the IDs it removed. */
     deleteMedia?: (
       ownerId: string,
@@ -196,24 +189,18 @@ export function registerRewriteRoutes(
       return res.status(400).json({ error: "Parent generation must belong to this chat." });
     if (parentItemId !== undefined && typeof parentItemId !== "string")
       return res.status(400).json({ error: "Parent result must be an item ID." });
-    let job;
     const checked = await validate?.(input, req.studioAccount);
     if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);
-    try {
-      job = store.enqueue(
-        owner(req),
-        req.params.id,
-        input,
-        operation as GenerationOperation,
-        parentJobId as string | undefined,
-        await resourceFor(input),
-        undefined,
-        req.studioAccount?.role === "user" ? jobLimit : undefined,
-        { parentItemId: parentItemId as string | undefined },
-      );
-    } catch (error) {
-      return admissionError(res, error);
-    }
+    const job = store.enqueue(
+      owner(req),
+      req.params.id,
+      input,
+      operation as GenerationOperation,
+      parentJobId as string | undefined,
+      await resourceFor(input),
+      undefined,
+      { parentItemId: parentItemId as string | undefined },
+    );
     admitted?.(job);
     // The scheduler is also driven by its timer; responses acknowledge durable acceptance.
     void queue.tick().catch(() => undefined);
@@ -281,16 +268,7 @@ export function registerRewriteRoutes(
   });
   app.post("/api/queue/:id/retry", (req, res) => {
     if (!store.job(owner(req), req.params.id)) return missing(res);
-    let job;
-    try {
-      job = queue.retry(
-        owner(req),
-        req.params.id,
-        req.studioAccount?.role === "user" ? jobLimit : undefined,
-      );
-    } catch (error) {
-      return admissionError(res, error);
-    }
+    const job = queue.retry(owner(req), req.params.id);
     if (!job) return res.status(409).json({ error: "Only failed generations can be retried." });
     void queue.tick().catch(() => undefined);
     return res.status(202).json({ job: publicJob(job) });

@@ -138,22 +138,6 @@ export function mergeWorkerModels(entries, empty = {}) {
   }
   const images = profiles.filter((profile) => profile.kind === "image");
   const videos = profiles.filter((profile) => profile.kind === "video");
-  const videoFamily = (file) => families[file.family]?.kind === "video";
-  const fileNames = new Set();
-  const modelFiles = [];
-  for (const { worker, models } of entries) {
-    for (const file of models.modelFiles || []) {
-      if (
-        !(videoFamily(file)
-          ? worker.capabilities.includes("video")
-          : worker.capabilities.includes("image")) ||
-        fileNames.has(file.name)
-      )
-        continue;
-      fileNames.add(file.name);
-      modelFiles.push(file);
-    }
-  }
   const first = (capability) =>
     entries.find(({ worker }) => worker.capabilities.includes(capability))?.models;
   const selected = (list, preferred) =>
@@ -165,9 +149,7 @@ export function mergeWorkerModels(entries, empty = {}) {
     entries.find(({ models }) => models.profiles?.length)?.models || entries[0]?.models || empty;
   const result = {
     ...base,
-    modelFiles,
     profiles,
-    unsupportedModels: modelFiles.filter((file) => !file.supported).map((file) => file.name),
     imageModels: images.map((profile) => ({ label: profile.label, value: profile.id })),
     videoModels: videos.map((profile) => ({ label: profile.label, value: profile.id })),
     defaults: {

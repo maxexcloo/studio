@@ -1,4 +1,3 @@
-import { configurationFile } from "./config-directory.js";
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * Versioned generation profiles and prompting guides, owned by Studio.
@@ -21,7 +20,7 @@ import { configurationFile } from "./config-directory.js";
  * replaces one Studio holds. Studio is the only writer of live profiles and guides; the profiles
  * repository (`ai/profiles/`) is their seed and backup, fed by Settings › Profiles › Export.
  *
- * Origins: "seed" (the profiles repository), "studio" (an administrator in Studio), "ai"
+ * Origins: "seed" (a sample profile or an older seed), "studio" (an administrator in Studio), "ai"
  * (assistant drafts) and "chat" (MCP admin tools). An AI-drafted save sets aiDrafted; an
  * administrator's edit or Approve clears it. Each store has one writer (this module) and writes
  * atomically (json-store.js).
@@ -376,22 +375,13 @@ function cleanPack(pack) {
   return structuredClone(pack);
 }
 
-/**
- * The guides' seed: STUDIO_CONFIG_DIR/prompting.json, then STUDIO_MCP_PROMPTING_PATH, else with STUDIO_SEED_DIR the data folder's
- * `config/prompting.json` (which profile-seed.js fills from the seed on a new install).
- */
-export function guideSeedFile(environment = process.env, dataDir = currentDataDir()) {
-  if (configurationFile("prompting.json", environment))
-    return configurationFile("prompting.json", environment);
-  if (environment.STUDIO_MCP_PROMPTING_PATH) return environment.STUDIO_MCP_PROMPTING_PATH;
-  return String(environment.STUDIO_SEED_DIR || "").trim()
-    ? path.join(dataDir, "config", "prompting.json")
-    : "";
-}
+/** The guides' seed, STUDIO_MCP_PROMPTING_PATH, or "". */
+export const guideSeedFile = (environment = process.env) =>
+  environment.STUDIO_MCP_PROMPTING_PATH || "";
 
 export function createGuideStore({
   dataDir = currentDataDir(),
-  seedFile = guideSeedFile(process.env, dataDir),
+  seedFile = guideSeedFile(),
   log = console,
 } = {}) {
   const file = path.join(dataDir, "guides", "prompting.json");
@@ -673,7 +663,7 @@ export function createGuideStore({
  */
 export function livePrompting({
   dataDir = currentDataDir(),
-  seedFile = guideSeedFile(process.env, dataDir),
+  seedFile = guideSeedFile(),
   log = console,
   negatives: fillNegatives = false,
 } = {}) {

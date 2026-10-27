@@ -12,10 +12,7 @@ import {
   accountRoles,
   builtInAccessProfiles,
   effectiveAccountAccess,
-  migrateCloudModels,
-  migrateFeatureOptions,
   normaliseAccessProfile,
-  predatesCloudModels,
   validAccountKey,
 } from "./account-policy.js";
 import { currentDataDir } from "./data-dir.js";
@@ -141,24 +138,6 @@ export function listAccessProfiles() {
 }
 
 /**
- * Settles Cloud Models on every stored access profile that predates it, from the cloud
- * profiles discovery found (see account-policy.js). Does nothing until a cloud profile is known.
- */
-export function migrateCloudModelAccess(cloudProfiles = []) {
-  const store = readStore();
-  let changed = false;
-  for (const [id, profile] of Object.entries(store.profiles)) {
-    const next = migrateCloudModels(profile, cloudProfiles);
-    if (next !== profile) {
-      store.profiles[id] = next;
-      changed = true;
-    }
-  }
-  if (changed) saveStore();
-  return changed;
-}
-
-/**
  * Adds the built-in Administrator and User access profiles where no profile has their ID.
  * An existing profile with that ID is never changed.
  */
@@ -168,20 +147,6 @@ export function ensureBuiltInAccessProfiles() {
   for (const profile of missing) store.profiles[profile.id] = structuredClone(profile);
   if (missing.length) saveStore();
   return missing.map((profile) => profile.id);
-}
-
-/**
- * Carries the retired global LoRAs and Cloud Models switches into every stored access
- * profile, once (see account-policy.js). Returns whether this run did it.
- */
-export function migrateFeatureOptionAccess(globals = {}) {
-  const store = readStore();
-  if (store.featureOptionsMigrated) return false;
-  for (const [id, profile] of Object.entries(store.profiles))
-    store.profiles[id] = migrateFeatureOptions(profile, globals);
-  store.featureOptionsMigrated = true;
-  saveStore();
-  return true;
 }
 
 /** The access profile new ordinary accounts start with, or "" when each one waits for an administrator. */
@@ -236,7 +201,6 @@ export function setDefaultAccessProfile(profileId) {
 }
 
 export function saveAccessProfile(input, availableProfiles = [], cloudProfiles = []) {
-  migrateCloudModelAccess(cloudProfiles);
   // New grants must be currently available; keep existing grants if discovery is degraded.
   const stored = validAccountKey(input?.id) ? readStore().profiles[input.id] : null;
   const existing = stored?.generationProfiles || [];
@@ -248,15 +212,11 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
       generationProfiles: Array.isArray(input?.generationProfiles)
         ? input.generationProfiles.filter((id) => !cloud.has(id))
         : [],
-      retiredCloudGrants: stored?.retiredCloudGrants,
     },
     [...availableProfiles, ...existing].filter((id) => !cloud.has(id)),
   );
   if (!profile.id) throw new Error("Choose a valid profile ID.");
   if (!profile.name) throw new Error("Enter a name for this group");
-  // A profile that could not be settled yet keeps its old cloud grants unless this save turns Cloud Models on.
-  if (stored && predatesCloudModels(stored) && !profile.features.cloudModels)
-    delete profile.features.cloudModels;
   readStore().profiles[profile.id] = profile;
   saveStore();
   return structuredClone(profile);

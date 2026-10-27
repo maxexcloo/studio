@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 
 const fake = await startFakeComfy();
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-terminal-progress-"));
@@ -12,6 +13,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
 ]);
 process.env.STUDIO_DATA_DIR = temporary;
+writeTestWorkflows(temporary);
 process.env.STUDIO_OUTPUT_STORAGE = "studio";
 process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const nativeFetch = globalThis.fetch;
@@ -73,14 +75,9 @@ test(
     const body = {
       kind: "image",
       family: "sdxl",
-      variant: "standard",
-      source: "checkpoint",
-      workflow: "family:sdxl",
-      profileId: "image:checkpoint:sd_xl_base_1.0.safetensors",
-      model: "sd_xl_base_1.0.safetensors",
-      bundled: { encoder: true, vae: true },
-      encoders: [],
-      vae: "",
+      workflow: "custom:test-image",
+      profileId: "custom:test-image",
+      model: "custom:test-image",
       prompt: "a lighthouse",
       negative: "",
       width: 1024,

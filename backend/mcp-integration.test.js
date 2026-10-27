@@ -130,7 +130,6 @@ async function fixture(
     internalCredential,
     resolveSignedResult,
     gatewayAdminTools,
-    claimHandover,
     control = fixtureRuntime(),
     writerReply,
     taste,
@@ -341,7 +340,6 @@ async function fixture(
     ...(noteGatewayIdentity ? { noteGatewayIdentity } : {}),
     ...(internalCredential ? { internalCredential } : {}),
     ...(gatewayAdminTools ? { gatewayAdminTools } : {}),
-    ...(claimHandover ? { claimHandover } : {}),
     ...(taste ? { taste } : {}),
     // Like Studio's queue: failed direct cloud video jobs since a time.
     cloudVideoFailures: (since) =>
@@ -2153,7 +2151,6 @@ test(
         HOST: "127.0.0.1",
         STUDIO_DATA_DIR: dir,
         STUDIO_ENV_FILE: path.join(dir, ".env"),
-        STUDIO_ENABLE_BUILTIN_PROFILES: "0",
         STUDIO_MCP_API_KEY: mediaKey,
         STUDIO_WORKERS: JSON.stringify([
           {
@@ -2214,51 +2211,19 @@ test(
   },
 );
 
-test("MCP advertises native sizing and submits tiled 2K with an explicit reference role", async (t) => {
+test("MCP advertises native sizing and submits tiled 2K", async (t) => {
   const f = await fixture(t);
   const client = await f.client("native-sizing");
-  const profile = {
-    ...imageProfile,
-    aspectPolicy: "reference",
-    family: "flux3",
-    native: { "2k": "yes" },
-    workflow: "family:flux3",
-  };
+  const profile = { ...imageProfile, family: "flux3", native: { "2k": "yes" } };
   await f.profiles([profile]);
   const detail = data(await call(client, "Models", { profile_id: profile.id }));
   assert.deepEqual(detail.native, { "2k": "yes" });
-  const uploaded = data(
-    await call(client, "Upload", {
-      content_base64: png.toString("base64"),
-      filename: "reference.png",
-    }),
-  );
-  const assetId = uploaded.asset?.id || uploaded.id;
-  await generate(client, {
-    height: 1152,
-    reference_asset_ids: [assetId],
-    reference_role: "reference",
-    width: 2048,
-  });
-  assert.equal(f.submitted[0].referenceRole, "reference");
+  await generate(client, { height: 1152, width: 2048 });
   assert.equal(f.submitted[0].tiledDecode, true);
   assert.equal(f.submitted[0].autoUpscale, null);
   assert.deepEqual([f.submitted[0].width, f.submitted[0].height], [2048, 1152]);
-  await generate(client, { reference_asset_ids: [assetId], reference_role: "edit" });
-  assert.equal(f.submitted[1].referenceRole, "edit");
+  await generate(client, {});
   assert.equal(f.submitted[1].tiledDecode, undefined);
-  await failure(client, "Generate", {
-    profile_id: profile.id,
-    prompts: ["A scene"],
-    reference_role: "reference",
-  });
-  await f.profiles([imageProfile]);
-  await failure(client, "Generate", {
-    profile_id: profile.id,
-    prompts: ["A scene"],
-    reference_asset_ids: [assetId],
-    reference_role: "reference",
-  });
   assert.equal(f.submitted.length, 2);
 });
 
@@ -3856,7 +3821,7 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(f.submitted.length, 4);
 });
 
-test("ten images in one Generate call queue ten separate jobs, and the account job limit still stops the rest", async (t) => {
+test("ten images in one Generate call queue ten separate jobs, and a refusal stops the rest", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const ten = await generate(client, { count: 10, seed: 1 });
@@ -3875,16 +3840,12 @@ test("ten images in one Generate call queue ten separate jobs, and the account j
     f.submitted.slice(10).map((body) => body.prompt),
     prompts,
   );
-  // The studio's outstanding-job limit refuses further jobs; those queued so far are kept and the reason is passed on.
-  f.failAfter(22, 429, {
-    ok: false,
-    reason: "job-limit",
-    error: "You can have up to 2 outstanding jobs.",
-  });
+  // When the studio refuses further jobs, those queued so far are kept and the reason is passed on.
+  f.failAfter(22, 422, { ok: false, error: "This profile can't run right now." });
   const limited = await generate(client, { count: 10 });
   assert.equal(limited.status, "partially_queued");
   assert.equal(limited.jobs.length, 2);
-  assert.match(limited.error, /up to 2 outstanding jobs/);
+  assert.match(limited.error, /can't run right now/);
   assert.equal(f.submitted.length, 22);
 });
 
@@ -5144,57 +5105,6 @@ test("admin tools go through the Library and profile routes with the administrat
     (await fetch(`${f.base}${link.pathname.slice(0, -2)}xx`)).status,
     404,
     "a tampered link is refused",
-  );
-});
-
-test("a result handed over by Refine in Chat becomes the account’s for its chat, and no one else’s", async (t) => {
-  const account = {
-    userId: "stable-account-a",
-    role: "user",
-    authenticated: true,
-    generationProfiles: [imageProfile.id],
-    features: {},
-  };
-  const other = {
-    userId: "stable-account-b",
-    role: "user",
-    authenticated: true,
-    generationProfiles: [imageProfile.id],
-    features: {},
-  };
-  const tokens = {
-    "handover-account-token-long-enough-for-the-fixture-a": account,
-    "handover-account-token-long-enough-for-the-fixture-b": other,
-  };
-  const f = await fixture(t, {
-    accountMode: true,
-    enabled: false,
-    authenticateAccountToken: (value) => tokens[value] || null,
-    claimHandover: (owner, id, { accountMode }) =>
-      accountMode && owner === "stable-account-a" && id === "studio-made-job",
-  });
-  f.jobs.set("studio-made-job", {
-    id: "studio-made-job",
-    status: "done",
-    kind: "image",
-    outputs: [{ url: "/comfy/view?filename=studio.png" }],
-    settings: { prompt: "A heron", profileId: imageProfile.id },
-  });
-  const stranger = await f.client("", "handover-account-token-long-enough-for-the-fixture-b");
-  assert.equal((await call(stranger, "Status", { job_id: "studio-made-job" })).isError, true);
-  const owner = await f.client("", "handover-account-token-long-enough-for-the-fixture-a");
-  assert.equal(data(await call(owner, "Status", { job_id: "studio-made-job" })).status, "done");
-  assert.equal(
-    JSON.parse(fs.readFileSync(path.join(f.dataDir, "mcp-ownership.json"), "utf8")).jobs[
-      "studio-made-job"
-    ],
-    "stable-account-a",
-    "kept on disk",
-  );
-  assert.equal(
-    (await call(stranger, "Status", { job_id: "studio-made-job" })).isError,
-    true,
-    "still not the other account’s",
   );
 });
 

@@ -1,6 +1,6 @@
-# Custom Workflows
+# Sample Profiles
 
-Studio owns ComfyUI workflow profiles in its runtime data directory. The mounted ai configuration supplies missing-definition seeds and backups. This folder retains standalone compatibility examples.
+These sample profiles seed a data folder that has never held a profile (profile-seed.js); Studio owns them in its data directory from then on. They also show the profile format.
 
 Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the simple UI which node inputs map to common controls.
 
@@ -101,7 +101,7 @@ An API workflow can opt in to Studio's LoRA picker with an existing rgthree Powe
 
 The referenced node must be `Power Lora Loader (rgthree)` and already have its model and CLIP wiring connected. Studio replaces only its `lora_` inputs using the selected LoRAs, in sidebar order.
 
-The simpler rgthree stack used by the bundled Flux 2 edit workflow is also
+The simpler rgthree stack used by the sample Flux 2 edit profile is also
 supported:
 
 ```json

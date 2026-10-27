@@ -119,76 +119,6 @@ test("ordinary accounts cannot be created without one existing profile", async (
   );
 });
 
-test("stored access profiles from before Cloud Models are settled once and their cloud grants kept on record", () => {
-  const file = path.join(temporary, "data", "accounts.json");
-  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
-  saved.profiles.legacy = {
-    id: "legacy",
-    name: "Legacy",
-    generationProfiles: ["image-fast", "grok-video"],
-    features: { videoGeneration: true },
-  };
-  saved.profiles.local = {
-    id: "local",
-    name: "Local",
-    generationProfiles: ["image-fast"],
-    features: { imageGeneration: true },
-  };
-  fs.writeFileSync(file, JSON.stringify(saved));
-  store.resetAccountStoreForTests();
-
-  assert.equal(
-    store.migrateCloudModelAccess([]),
-    false,
-    "nothing settles without a known cloud profile",
-  );
-  // Saving while the catalogue lacks cloud profiles keeps the old grant and leaves the profile unsettled.
-  store.saveAccessProfile(
-    {
-      id: "legacy",
-      name: "Legacy",
-      generationProfiles: ["image-fast", "grok-video"],
-      features: { videoGeneration: true },
-    },
-    ["image-fast"],
-  );
-  assert.equal(
-    "cloudModels" in store.listAccessProfiles().find((item) => item.id === "legacy").features,
-    true,
-  );
-  assert.equal(
-    JSON.parse(fs.readFileSync(file, "utf8")).profiles.legacy.features.cloudModels,
-    undefined,
-  );
-
-  assert.equal(store.migrateCloudModelAccess(["grok-video", "grok-image"]), true);
-  const after = JSON.parse(fs.readFileSync(file, "utf8")).profiles;
-  assert.equal(after.legacy.features.cloudModels, true);
-  assert.deepEqual(after.legacy.generationProfiles, ["image-fast"]);
-  assert.deepEqual(after.legacy.retiredCloudGrants, ["grok-video"]);
-  assert.equal(after.local.features.cloudModels, false);
-  assert.equal(
-    store.migrateCloudModelAccess(["grok-video"]),
-    false,
-    "settled profiles stay as they are",
-  );
-
-  // An administrator can then turn it off; a cloud id sent as a model grant is ignored.
-  const off = store.saveAccessProfile(
-    {
-      id: "legacy",
-      name: "Legacy",
-      generationProfiles: ["image-fast", "grok-image"],
-      features: { videoGeneration: true, cloudModels: false },
-    },
-    ["image-fast"],
-    ["grok-video", "grok-image"],
-  );
-  assert.equal(off.features.cloudModels, false);
-  assert.deepEqual(off.generationProfiles, ["image-fast"]);
-  assert.deepEqual(off.retiredCloudGrants, ["grok-video"]);
-});
-
 test("the built-in access profiles are added only where their IDs are free", () => {
   const file = path.join(temporary, "data", "accounts.json");
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -211,42 +141,6 @@ test("the built-in access profiles are added only where their IDs are free", () 
   assert.equal(administrator.allModels, true);
   assert.equal(Object.values(administrator.features).every(Boolean), true);
   assert.deepEqual(store.ensureBuiltInAccessProfiles(), []);
-});
-
-test("the old global switches become per-profile values once, never widening access", () => {
-  const file = path.join(temporary, "data", "accounts.json");
-  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
-  delete saved.featureOptionsMigrated;
-  saved.profiles.mixed = {
-    id: "mixed",
-    name: "Mixed",
-    generationProfiles: ["image-fast"],
-    features: { imageGeneration: true, loras: true, cloudModels: true },
-  };
-  saved.profiles.plain = {
-    id: "plain",
-    name: "Plain",
-    generationProfiles: ["image-fast"],
-    features: { imageGeneration: true, loras: false },
-  };
-  fs.writeFileSync(file, JSON.stringify(saved));
-  store.resetAccountStoreForTests();
-  assert.equal(store.migrateFeatureOptionAccess({ loras: false, cloudModels: true }), true);
-  const after = JSON.parse(fs.readFileSync(file, "utf8")).profiles;
-  assert.equal(after.mixed.features.loras, false, "LoRAs were off for everyone, so they stay off");
-  assert.equal(
-    after.mixed.features.cloudModels,
-    true,
-    "Cloud Models was on, so the profile keeps its own value",
-  );
-  assert.equal(after.plain.features.loras, false);
-  assert.equal(after.plain.features.cloudModels, undefined, "nothing is turned on");
-  assert.equal(
-    store.migrateFeatureOptionAccess({ loras: false, cloudModels: false }),
-    false,
-    "it runs once",
-  );
-  assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).profiles.mixed.features.cloudModels, true);
 });
 
 test("new accounts start on the default access profile: local at once, single sign-on and chat gateway after approval unless it is off", async () => {

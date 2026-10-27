@@ -25,10 +25,7 @@ onWorkersChanged(() => {
 });
 
 export const host = process.env.HOST || "127.0.0.1";
-/** In Docker with the port on the host's 127.0.0.1 only: every connection is this computer's (client-trust.js). */
-export const dockerHostOnly = process.env.STUDIO_DOCKER_HOST_ONLY === "1";
-// Listening on 0.0.0.0 inside such a container is how the host reaches it, not other devices.
-export const networkListening = listensBeyondThisComputer(host) && !dockerHostOnly;
+export const networkListening = listensBeyondThisComputer(host);
 
 /** The port asked for (PORT, else 8787). */
 const requestedPort = Number(process.env.PORT || 8787);

@@ -6,7 +6,7 @@
  *
  * It replaces the scattered catalogue files, which stay where they are as backups and are never
  * deleted or written here:
- *   - seed:     `<data>/config/lora-catalogue.json` (the synced profiles repository copy)
+ *   - seed:     `<data>/config/lora-catalogue.json` (an older LoRA catalogue copy)
  *   - definitions: `<data>/config/catalogue.json` (model metadata from a Studio export)
  *   - admin:    `<data>/lora-catalogue.json` (installed by hand)
  *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
@@ -15,9 +15,8 @@
  *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent. Since the ownership cutover nothing deploys
- * over the seed file (profile-seed.js copies it only into a data folder without one), and Studio's
- * own edits are a layer above all of them either way. On a conflict the more
+ * when the file goes, so the migration is idempotent. Studio's own edits are a layer above all of
+ * them. On a conflict the more
  * specific source wins: edits over the admin file over the seed over provider details over the
  * manifest, except that provider metadata wins for links and hashes.
  *

@@ -13,8 +13,7 @@ import { cancelPrompt, promptTracker } from "./comfy-queue.js";
 import { describeFailure } from "./failures.js";
 import { withFixes } from "./failure-fixes.js";
 import { nextProgress } from "./progress-phase.js";
-import { rememberMissingParts } from "./model-families.js";
-import { imageGraph, videoGraph } from "./graphs.js";
+import { customWorkflowGraph } from "./graphs.js";
 import {
   generationSettings,
   outputsFrom,
@@ -447,7 +446,6 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
         run.wake?.();
       }
       if (message.type === "execution_error") {
-        const learned = learnFromFailure(jobBodies.get(id), data.exception_message);
         const failure = withFixes(
           describeFailure({
             message: data.exception_message,
@@ -455,7 +453,6 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
             nodeId: data.node_id,
             exceptionType: data.exception_type,
             traceback: data.traceback,
-            learned,
           }),
           jobBodies.get(id),
         );
@@ -477,23 +474,6 @@ function forgetTemporaryInputs(body) {
 
 // What each running job asked for, so a failure can be read against it.
 const jobBodies = new Map();
-
-/**
- * A checkpoint assumed to be all-in-one (its header was out of reach) that
- * turns out to lack its text encoder or VAE: remember that for the file, so the
- * next scan asks for the missing part, and say so plainly.
- */
-function learnFromFailure(body, message = "") {
-  if (body?.source !== "checkpoint" || !body.bundled) return "";
-  const text = String(message || "");
-  const noEncoder =
-    /clip input is invalid: None|does not contain a valid clip|no CLIP\/text encoder/i.test(text);
-  const noVae = /VAE is invalid: None|vae.*is None|does not contain a valid vae/i.test(text);
-  if (!noEncoder && !noVae) return "";
-  rememberMissingParts(body.model, { encoder: noEncoder, vae: noVae });
-  const part = noEncoder ? "text encoder" : "VAE";
-  return `This checkpoint has no ${part} built in, so it now uses a separate one. Rescan models, pick one in Advanced (or download it), and generate again.`;
-}
 
 /**
  * Waits before the next look at ComfyUI; a finished-run message on the socket ends the wait early.
@@ -554,7 +534,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
   let socket = null;
   let submissionStarted = false;
   try {
-    let prompt = body.kind === "video" ? await videoGraph(body) : await imageGraph(body);
+    let prompt = await customWorkflowGraph(body);
     const upscale = prepare ? await prepare(prompt) : null;
     const embed = upscale?.graph ? upscale : null;
     if (embed) prompt = embed.graph;
@@ -833,8 +813,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     const known = jobs.get(id)?.failure;
     // ComfyUI's own words stay in the detail (a missing module's name, say); the plain version leads.
     const raw = error.raw || error.message;
-    const learned = learnFromFailure(body, raw);
-    const friendly = learned ? "" : normalizeComfyError(raw);
+    const friendly = normalizeComfyError(raw);
     const from = error.comfyFailure || {};
     const failure =
       known ||
@@ -847,7 +826,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           nodeId: from.node_id,
           exceptionType: from.exception_type,
           traceback: from.traceback,
-          learned,
         }),
         body,
       );

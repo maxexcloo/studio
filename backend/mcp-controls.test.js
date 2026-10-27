@@ -8,7 +8,6 @@ import {
   prepareLoras,
   resolveLoraName,
 } from "./mcp-controls.js";
-import { familyGraph } from "./family-graph.js";
 
 const profile = {
   id: "image:sdxl",
@@ -99,27 +98,6 @@ test("negative prompts are refused with an explanation where CFG 1 ignores them"
     /Choose sampler from: euler, dpmpp_2m/,
   );
   assert.throws(() => assertAdjustable(profile, { steps: 200 }), /Choose steps from 1 to 150/);
-});
-
-test("an accepted MCP negative prompt reaches the built-in graph’s negative encoder", () => {
-  // MCP submits the field as `negative`, the name the studio API and every graph builder read.
-  const graph = familyGraph({
-    ...profile.defaults,
-    family: "sdxl",
-    variant: "base",
-    source: "checkpoint",
-    bundled: { encoder: true, vae: true },
-    model: "sdxl.safetensors",
-    prompt: "a lighthouse",
-    negative: "blurry, low detail",
-    seed: 5,
-  });
-  const texts = Object.values(graph)
-    .filter((node) => node.class_type === "CLIPTextEncode")
-    .map((node) => node.inputs.text);
-  assert.ok(texts.includes("blurry, low detail"), JSON.stringify(texts));
-  const sampler = Object.values(graph).find((node) => node.class_type === "KSampler");
-  assert.ok(sampler.inputs.cfg > 1, "the negative takes effect only above cfg 1");
 });
 
 test("LoRA discovery indexes compatible optional effects compactly and bounds looked-up details", () => {

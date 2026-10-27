@@ -3,7 +3,7 @@ import type { JobObservation, QueueAdapter } from "./queue.ts";
 import type { OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
-interface LegacyAdapterOptions {
+interface GenerationAdapterOptions {
   generate(req: RecordValue, res: RecordValue): Promise<unknown>;
   jobs: Map<string, RecordValue>;
   gallery(): RecordValue[];
@@ -17,7 +17,7 @@ interface LegacyAdapterOptions {
 }
 
 /** The old HTTP contract and the queue call the same generation domain entry point. */
-export function createLegacyQueueAdapter(options: LegacyAdapterOptions): QueueAdapter {
+export function createGenerationQueueAdapter(options: GenerationAdapterOptions): QueueAdapter {
   const ownedItems = (job: OwnedJob) =>
     options
       .gallery()

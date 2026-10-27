@@ -1,5 +1,4 @@
-import { families } from "./family-catalog.js";
-import { catalogDownloadsForFile } from "./family-profiles.js";
+import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { packInstallPlan } from "./node-install.js";
 import { nodePack, nodePacks } from "./node-packs.js";
 
@@ -39,16 +38,8 @@ function redownloadFor(file = "", nodeType = "") {
   return null;
 }
 
-/** Whether a built-in family's graph can swap its decode for a tiled one (the Sana packs decode themselves). */
-export function canDecodeTiled(body = {}) {
-  const family = families[body.family];
-  return Boolean(
-    family && family.sampling !== "sana" && String(body.workflow || "").startsWith("family:"),
-  );
-}
-
 /** The failure with the fixes Studio can offer for it. */
-export function withFixes(failure, body = {}) {
+export function withFixes(failure) {
   if (!failure) return failure;
   const next = { ...failure };
   if (failure.fix === "node" && failure.missingNode) {
@@ -70,12 +61,7 @@ export function withFixes(failure, body = {}) {
     if (download) next.redownload = download;
   }
   if (failure.fix === "memory") {
-    next.retry = {
-      smaller: true,
-      ...(canDecodeTiled(body) && /VAEDecode/i.test(failure.nodeType || "")
-        ? { tiledDecode: true }
-        : {}),
-    };
+    next.retry = { smaller: true };
   }
   return next;
 }

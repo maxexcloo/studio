@@ -1,3 +1,4 @@
+import "./fixtures/sample-profiles.js";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";

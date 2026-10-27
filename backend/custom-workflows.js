@@ -3,16 +3,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { dataDir } from "./gallery-store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
-import { root } from "./comfy.js";
-import { workflowIds } from "./workflow-registry.js";
 import { writeJsonFile } from "./json-store.js";
-import { builtInProfilesEnabled, grokEnabled, modelFamilyEnabled } from "./features.js";
+import { grokEnabled, modelFamilyEnabled } from "./features.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
 import { profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
 
 export { profileBackendLabels, sharedProfileFields };
 
-const bundledWorkflowsDir = path.join(root, "backend", "workflows");
 export const userWorkflowsDir = path.join(dataDir, "workflows");
 
 // Windows keeps these names for devices, with any extension: `con.json` can never be a file.
@@ -393,67 +390,62 @@ export function workflowOptionIssues(workflow, info = {}) {
 }
 
 export function allCustomWorkflowRecords({ dedupe = true } = {}) {
-  const dirs = [
-    { dir: bundledWorkflowsDir, source: "bundled" },
-    { dir: userWorkflowsDir, source: "custom" },
-  ];
+  const dir = userWorkflowsDir;
+  const source = "custom";
   const items = [];
-  for (const { dir, source } of dirs) {
-    if (source === "bundled" && !builtInProfilesEnabled()) continue;
-    if (!fs.existsSync(dir)) continue;
-    // profile-store.js keeps each Studio profile's version and AI-Drafted marker beside them.
-    const versions = source === "custom" ? readJson(path.join(dir, ".studio-meta.json")) || {} : {};
-    // Dotfiles beside the profiles (.studio-edits.json, .studio-meta.json) are Studio's records, not workflows.
-    for (const file of fs
-      .readdirSync(dir)
-      .filter((name) => name.endsWith(".json") && !name.startsWith("."))) {
-      const fullPath = path.join(dir, file);
-      const raw = readJson(fullPath);
-      if (!raw) {
-        items.push({
-          id: safeId(path.basename(file, ".json")),
-          profileId: `custom:${safeId(path.basename(file, ".json"))}`,
-          name: path.basename(file, ".json"),
-          description: "This file isn’t valid JSON.",
-          kind: "image",
-          family: "custom",
-          graph: {},
-          controls: {},
-          requiredNodes: [],
-          defaults: {},
-          capabilities: {},
-          path: fullPath,
-          source,
-          parseError: "Invalid JSON",
-        });
-        continue;
-      }
-      try {
-        const drafted = versions[path.basename(file, ".json")]?.aiDrafted === true;
-        items.push({
-          ...metadataFromJson(raw, fullPath),
-          source,
-          raw,
-          ...(drafted ? { aiDrafted: true } : {}),
-        });
-      } catch (error) {
-        items.push({
-          id: safeId(path.basename(file, ".json")),
-          profileId: `custom:${safeId(path.basename(file, ".json"))}`,
-          name: path.basename(file, ".json"),
-          description: error.message || "Couldn’t read this workflow.",
-          kind: "image",
-          family: "custom",
-          graph: {},
-          controls: {},
-          requiredNodes: [],
-          defaults: {},
-          capabilities: {},
-          path: fullPath,
-          source,
-          parseError: error.message,
-        });
-      }
+  // profile-store.js keeps each Studio profile's version and AI-Drafted marker beside them.
+  const versions = readJson(path.join(dir, ".studio-meta.json")) || {};
+  // Dotfiles beside the profiles (.studio-edits.json, .studio-meta.json) are Studio's records, not workflows.
+  const files = fs.existsSync(dir)
+    ? fs.readdirSync(dir).filter((name) => name.endsWith(".json") && !name.startsWith("."))
+    : [];
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
+    const raw = readJson(fullPath);
+    if (!raw) {
+      items.push({
+        id: safeId(path.basename(file, ".json")),
+        profileId: `custom:${safeId(path.basename(file, ".json"))}`,
+        name: path.basename(file, ".json"),
+        description: "This file isn’t valid JSON.",
+        kind: "image",
+        family: "custom",
+        graph: {},
+        controls: {},
+        requiredNodes: [],
+        defaults: {},
+        capabilities: {},
+        path: fullPath,
+        source,
+        parseError: "Invalid JSON",
+      });
+      continue;
+    }
+    try {
+      const drafted = versions[path.basename(file, ".json")]?.aiDrafted === true;
+      items.push({
+        ...metadataFromJson(raw, fullPath),
+        source,
+        raw,
+        ...(drafted ? { aiDrafted: true } : {}),
+      });
+    } catch (error) {
+      items.push({
+        id: safeId(path.basename(file, ".json")),
+        profileId: `custom:${safeId(path.basename(file, ".json"))}`,
+        name: path.basename(file, ".json"),
+        description: error.message || "Couldn’t read this workflow.",
+        kind: "image",
+        family: "custom",
+        graph: {},
+        controls: {},
+        requiredNodes: [],
+        defaults: {},
+        capabilities: {},
+        path: fullPath,
+        source,
+        parseError: error.message,
+      });
     }
   }
   const allowed = items.filter(
@@ -465,8 +457,6 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
       (grokEnabled || !usesGrokMedia(workflow)),
   );
   if (!dedupe) return allowed;
-  // The bundled folder is scanned first, so a hand-authored template wins over
-  // an imported copy of the same id.
   const seen = new Set();
   return allowed.filter((item) => {
     if (seen.has(item.id)) return false;
@@ -477,10 +467,8 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
 
 function withinWorkflowRoot(file) {
   const resolved = path.resolve(file);
-  return [bundledWorkflowsDir, userWorkflowsDir].some((dir) => {
-    const base = path.resolve(dir);
-    return resolved === base || resolved.startsWith(`${base}${path.sep}`);
-  });
+  const base = path.resolve(userWorkflowsDir);
+  return resolved === base || resolved.startsWith(`${base}${path.sep}`);
 }
 
 /** Grok runs at its provider (providers/profiles.ts), never on a ComfyUI worker. */
@@ -513,29 +501,6 @@ export function getCustomWorkflow(requested, backend = profileAliasBackend(reque
   return workflow ? workflowOnBackend(workflow, backend) : null;
 }
 
-/**
- * An import that collides with a bundled template would be written but never
- * shown, because the bundled copy wins the scan. Give it its own id instead.
- * Re-importing over an existing user copy still overwrites, so updates work.
- */
-function unshadowedId(id) {
-  const records = allCustomWorkflowRecords({ dedupe: false });
-  // Built-in registry workflows do not have a JSON file, so checking only the
-  // bundled directory is not enough to keep imported workflows out of the
-  // built-in namespace.
-  const reserved = new Set(workflowIds());
-  const shadowed = (candidate) =>
-    reserved.has(candidate) ||
-    records.some((record) => record.id === candidate && record.source === "bundled");
-  if (!shadowed(id)) return id;
-  for (let suffix = 2; suffix < 100; suffix += 1) {
-    const candidate = safeId(`${id}-${suffix}`);
-    if (!shadowed(candidate) && !records.some((record) => record.id === candidate))
-      return candidate;
-  }
-  return safeId(`${id}-${crypto.randomUUID().slice(0, 8)}`);
-}
-
 export function saveImportedWorkflow(raw, meta = {}) {
   const mergedMeta = {
     ...workflowMeta(raw),
@@ -544,7 +509,6 @@ export function saveImportedWorkflow(raw, meta = {}) {
   const { studio: _block, ...rest } = raw;
   const profile = { studio: mergedMeta, ...rest };
   const workflow = metadataFromJson(profile);
-  workflow.id = unshadowedId(workflow.id);
   mergedMeta.id = workflow.id;
   workflow.profileId = `custom:${workflow.id}`;
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
@@ -554,24 +518,14 @@ export function saveImportedWorkflow(raw, meta = {}) {
 }
 
 /**
- * Removes every file backing an id, across both workflow folders. Deleting only
- * the user copy left a same-id template in the bundled folder to re-supply the
- * workflow on the next scan, which read as "delete did nothing".
- * A record's filename can differ from its id, so resolve real paths rather than
- * guessing `<id>.json`.
+ * Removes every file backing an id. A record's filename can differ from its id,
+ * so resolve real paths rather than guessing `<id>.json`.
  */
 export function deleteImportedWorkflow(id) {
   const safe = safeId(id);
-  const records = allCustomWorkflowRecords({ dedupe: false }).filter(
+  const targets = allCustomWorkflowRecords({ dedupe: false }).filter(
     (record) => record.id === safe && record.path && withinWorkflowRoot(record.path),
   );
-  // Bundled templates live in the repo: never delete them. Removing a user copy
-  // that shadows a template simply brings the built-in version back.
-  const targets = records.filter((record) => record.source !== "bundled");
-  if (!targets.length)
-    throw new Error(
-      records.length ? "Built-in workflows can't be deleted." : "Workflow file was not found.",
-    );
   const removed = [];
   for (const record of targets) {
     if (!fs.existsSync(record.path)) continue;

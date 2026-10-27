@@ -45,7 +45,7 @@ export function studioAnswersAt(port, { timeoutMs = 1500, host = "" } = {}) {
 // request on one without checking it. Node closes idle sockets after 5 seconds by default, so a
 // POST after a short pause raced that close and the proxy answered 502 (Go retries only GETs).
 const idleSocketMs = 120_000;
-export function keepProxyConnections(server) {
+function keepProxyConnections(server) {
   server.keepAliveTimeout = idleSocketMs;
   server.headersTimeout = idleSocketMs + 1000;
   return server;

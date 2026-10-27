@@ -24,10 +24,8 @@ test("a new version copies the state files, not thumbnails, references or backup
   fs.rmSync(path.join(dataDir, ".version"), { force: true });
   fs.writeFileSync(path.join(dataDir, "gallery.json"), "[1]");
   fs.writeFileSync(path.join(dataDir, "access.json"), "{}", { mode: 0o600 });
-  fs.mkdirSync(path.join(dataDir, ".private-vault", "assets"), { recursive: true });
-  fs.writeFileSync(path.join(dataDir, ".private-vault", "assets", "a.bin"), "sealed");
-  fs.mkdirSync(path.join(dataDir, "backups", "hidden-removal-x"), { recursive: true });
-  fs.writeFileSync(path.join(dataDir, "backups", "hidden-removal-x", "gallery.json"), "[]");
+  fs.mkdirSync(path.join(dataDir, "backups", "earlier"), { recursive: true });
+  fs.writeFileSync(path.join(dataDir, "backups", "earlier", "gallery.json"), "[]");
   fs.mkdirSync(path.join(dataDir, ".thumbnails"), { recursive: true });
   fs.writeFileSync(path.join(dataDir, ".thumbnails", "t.webp"), "thumb");
   fs.mkdirSync(path.join(dataDir, "reference-assets"), { recursive: true });
@@ -37,7 +35,6 @@ test("a new version copies the state files, not thumbnails, references or backup
   assert.match(path.basename(target), /^earlier-to-0\.12\.0-/);
   assert.equal(fs.readFileSync(path.join(target, "gallery.json"), "utf8"), "[1]");
   assert.equal(fs.existsSync(path.join(target, "access.json")), true);
-  assert.equal(fs.existsSync(path.join(target, ".private-vault")), false);
   assert.equal(fs.existsSync(path.join(target, "backups")), false);
   assert.equal(fs.existsSync(path.join(target, ".thumbnails")), false);
   assert.equal(fs.existsSync(path.join(target, "reference-assets")), false);

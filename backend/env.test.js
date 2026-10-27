@@ -13,7 +13,10 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
   const file = path.join(dir, "settings.env");
   try {
-    fs.writeFileSync(file, "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\nSTUDIO_TRASH_DAYS=9\n");
+    fs.writeFileSync(
+      file,
+      "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\nSTUDIO_VIDEO_PREVIEW_CACHE_MB=9\n",
+    );
     const output = execFileSync(
       process.execPath,
       [
@@ -23,8 +26,8 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
         const env = await import("./backend/env.js");
         const before = { hosts: process.env.STUDIO_ALLOWED_HOSTS, hostsFromFile: env.envFileKeys.has("STUDIO_ALLOWED_HOSTS"), demoFromFile: env.envFileKeys.has("STUDIO_DEMO") };
         env.writeLocalEnvValue("STUDIO_DEMO", "0");
-        env.removeLocalEnvValue("STUDIO_TRASH_DAYS");
-        console.log(JSON.stringify({ before, demo: process.env.STUDIO_DEMO, trash: process.env.STUDIO_TRASH_DAYS ?? null, file: (await import("node:fs")).readFileSync(${JSON.stringify(file)}, "utf8") }));
+        env.removeLocalEnvValue("STUDIO_VIDEO_PREVIEW_CACHE_MB");
+        console.log(JSON.stringify({ before, demo: process.env.STUDIO_DEMO, removed: process.env.STUDIO_VIDEO_PREVIEW_CACHE_MB ?? null, file: (await import("node:fs")).readFileSync(${JSON.stringify(file)}, "utf8") }));
       `,
       ],
       {
@@ -45,7 +48,7 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
       demoFromFile: true,
     });
     assert.equal(result.demo, "0");
-    assert.equal(result.trash, null);
+    assert.equal(result.removed, null);
     assert.equal(result.file, "STUDIO_DEMO=0\nSTUDIO_ALLOWED_HOSTS=from-file\n");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

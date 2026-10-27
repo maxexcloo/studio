@@ -829,7 +829,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Export",
     "Export Profiles",
-    "Build the export bundle for the profiles repository (profiles, guides, catalogue and EXPORT.json listing origins and unreviewed AI drafts), as Settings › Profiles › Export does, only when asked. Returns a signed download link valid for an hour.",
+    "Build the export bundle as a backup (profiles, guides, catalogue and EXPORT.json listing origins and unreviewed AI drafts), as Settings › Profiles › Export does, only when asked. Returns a signed download link valid for an hour.",
     {},
     async (_args, signal) => {
       const response = await media.response("GET", "/api/profiles/export", undefined, owner, {

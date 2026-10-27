@@ -8,7 +8,7 @@ Check the interface status and Queue for the affected job's state and reason. Wh
 
 Check the configured addresses in **Settings › Workers**, then inspect that worker's container logs and network access. Worker addresses must be reachable from the Studio server. A waiting job keeps its selected backend; it does not silently switch providers.
 
-Deployment configuration owns worker placements and model paths; Studio owns editable runtime profiles. See [Configuration](CONFIGURATION.md) and [Worker Operations](worker/README.md). Lifecycle switching remains disabled until the required ownership and text-admission cutover is complete.
+Deployment configuration owns worker placements and model paths; Studio owns editable runtime profiles. See [Configuration](CONFIGURATION.md) and [Worker Operations](worker/README.md).
 
 ### Studio Does Not Start
 
@@ -16,7 +16,7 @@ Read the startup error for the missing setting, occupied port or invalid mounted
 
 ### Profiles or Models Are Missing
 
-Check the live profile and catalogue definitions in Library, and confirm that `STUDIO_CONFIG_DIR` mounts the intended ai seed. Existing runtime edits take precedence over seeds. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
+Check the live profile and catalogue definitions in Library. Check worker model mounts separately; model files and required custom nodes must exist on the selected worker.
 
 ### Chat Is Unavailable
 
@@ -98,4 +98,4 @@ Single-user mode answers only the computer running Studio; other devices need ac
 
 ## Updating & Rollback
 
-Follow [Container Operations](DOCKER.md#updating--rollback).
+Follow [Running Studio](README.md#running-studio).

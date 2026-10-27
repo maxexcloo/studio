@@ -35,13 +35,10 @@ import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
 import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
-import { configuredAccountJobLimit, reserveAccountJob } from "./account-jobs.js";
 import { assistantRecord } from "./assistant-routes.js";
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
   const submissions = new Map();
-  const accountReservations = new Map();
-  const accountJobLimit = configuredAccountJobLimit();
   const generate = async (req, res) => {
     const id = String(req.body?.clientJobId || "").replace(/[^\w-]/g, "");
     // Serialise retries before any asynchronous image staging or backend work.
@@ -56,27 +53,9 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         }),
       );
     }
-    let releaseReservation = () => {};
     try {
-      if (req.studioAccount?.role === "user" && !(id && jobs.has(id))) {
-        const reservation = reserveAccountJob(
-          req.studioAccount.userId,
-          jobs,
-          accountReservations,
-          accountJobLimit,
-        );
-        if (!reservation.accepted) {
-          return res.status(429).json({
-            ok: false,
-            reason: "job-limit",
-            error: `You can have up to ${accountJobLimit} outstanding jobs.`,
-          });
-        }
-        releaseReservation = reservation.release;
-      }
       await dispatchGenerate(req, res);
     } finally {
-      releaseReservation();
       if (id) {
         submissions.delete(id);
         release();

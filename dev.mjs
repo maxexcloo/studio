@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -23,9 +22,6 @@ const environment = {
   STUDIO_OUTPUT_STORAGE: "studio",
 };
 if (values.demo) environment.STUDIO_DEMO = "1";
-const siblingConfig = path.resolve(root, "../ai");
-if (!environment.STUDIO_CONFIG_DIR && fs.existsSync(path.join(siblingConfig, "profiles")))
-  environment.STUDIO_CONFIG_DIR = siblingConfig;
 const migration = migrateRuntime(dataDir, { apply: true });
 if (migration.conflicts.length) throw new Error(migration.conflicts.join("\n"));
 

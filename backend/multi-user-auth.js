@@ -24,7 +24,6 @@ import {
   listAccessProfiles,
   setDefaultAccessProfile,
   listAccounts,
-  migrateCloudModelAccess,
   revokeAccountMcpToken,
   revokeAccountSession,
   rotateAccountMcpToken,
@@ -212,9 +211,6 @@ function publicStatus(req) {
         }
       : null,
     needsRecoveryAdmin: accountStoreSnapshot().accounts.length === 0,
-    ...(accountStoreSnapshot().accounts.length === 0 && setupTokenUsable()
-      ? { setupTokenAccepted: true }
-      : {}),
     ...(oidc ? { oidc: { label: oidc.label } } : {}),
   };
 }
@@ -231,13 +227,6 @@ function requireAccountAdmin(req, res) {
 }
 
 let oidc = null;
-/** A setup token shorter than 32 characters stops Studio instead of being ignored. */
-export function checkSetupToken(value = process.env.STUDIO_SETUP_TOKEN) {
-  if (value && String(value).length < 32)
-    throw new Error("STUDIO_SETUP_TOKEN must be at least 32 characters.");
-}
-const setupTokenUsable = () => String(process.env.STUDIO_SETUP_TOKEN || "").length >= 32;
-if (multiUserEnabled) checkSetupToken();
 
 /**
  * `availableProfiles` lists the grantable local profile ids; `cloudProfiles` the cloud ones,
@@ -275,20 +264,11 @@ export function registerMultiUserAuthRoutes(
         .json({ ok: false, error: "Recovery administrator setup is already complete." });
       return;
     }
-    // Where nobody can sit at the computer (a container platform), a one-time setup token from the environment stands in.
-    const setupToken = process.env.STUDIO_SETUP_TOKEN || "";
-    const given = String(req.body?.setupToken || "");
-    const tokenMatches =
-      setupToken.length >= 32 &&
-      Buffer.byteLength(given) === Buffer.byteLength(setupToken) &&
-      crypto.timingSafeEqual(Buffer.from(given), Buffer.from(setupToken));
-    if (!clientOf(req).thisComputer && !tokenMatches) {
+    if (!clientOf(req).thisComputer) {
       res.status(403).json({
         ok: false,
         reason: "this-computer",
-        error: setupToken
-          ? "Enter the setup token, or create the recovery administrator on the computer running Studio."
-          : "Create the recovery administrator on the computer running Studio.",
+        error: "Create the recovery administrator on the computer running Studio.",
       });
       return;
     }
@@ -535,8 +515,7 @@ export function registerMultiUserAuthRoutes(
 
   get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
-    const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
-    migrateCloudModelAccess(cloud);
+    const profiles = await availableProfiles();
     ensureBuiltInAccessProfiles();
     res.setHeader("Cache-Control", "no-store");
     res.json({

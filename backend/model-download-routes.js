@@ -1,5 +1,5 @@
 import { refreshWorkerModels } from "./worker-models.js";
-import { catalogDownload } from "./family-profiles.js";
+import { catalogDownload } from "./catalog-downloads.js";
 import {
   cancelDownload,
   discardDownload,

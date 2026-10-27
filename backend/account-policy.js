@@ -4,12 +4,10 @@
  * user ID or storage path.
  *
  * Cloud (provider-backed) profiles are not granted one by one: the Cloud Models
- * feature grants them all. An access profile stored before that feature existed
- * has no `cloudModels` value; until `migrateCloudModels` settles it from the
- * discovered catalogue, it keeps exactly its old cloud grants.
+ * feature grants them all.
  *
  * A generation profile marked `nsfw` needs the NSFW Models feature on top of its
- * grant. The prompt assistant's Spicy preset needs NSFW Models too, whatever profile is selected. Profiles stored before that feature keep it on, as nothing was marked then.
+ * grant. The prompt assistant's Spicy preset needs NSFW Models too, whatever profile is selected.
  * `allModels` grants every local profile, including ones added later.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
@@ -33,12 +31,6 @@ const accessFeatures = Object.freeze([
   "promptAssistant",
 ]);
 
-/**
- * Features that default on when a stored access profile has no value for them. Prompt Assistant
- * arrived on for every existing profile; an administrator may turn it off per profile.
- */
-const onUnlessStored = new Set(["nsfwModels", "promptAssistant"]);
-
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
 
 export function validAccountKey(value) {
@@ -56,22 +48,8 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
     ? [...new Set(profile.generationProfiles.filter(usable))]
     : [];
   const features = Object.fromEntries(
-    accessFeatures.map((feature) => [
-      feature,
-      onUnlessStored.has(feature)
-        ? profile?.features?.[feature] !== false
-        : profile?.features?.[feature] === true,
-    ]),
+    accessFeatures.map((feature) => [feature, profile?.features?.[feature] === true]),
   );
-  const retired = Array.isArray(profile?.retiredCloudGrants)
-    ? [
-        ...new Set(
-          profile.retiredCloudGrants.filter(
-            (name) => typeof name === "string" && name.trim() && name.length <= 256,
-          ),
-        ),
-      ]
-    : [];
   return {
     id: validAccountKey(profile?.id) ? profile.id : "",
     name: String(profile?.name || "")
@@ -80,31 +58,6 @@ export function normaliseAccessProfile(profile, availableProfiles = null) {
     generationProfiles: selected,
     allModels: profile?.allModels === true,
     features,
-    ...(retired.length ? { retiredCloudGrants: retired } : {}),
-  };
-}
-
-/** Whether a stored access profile predates the Cloud Models feature. */
-export const predatesCloudModels = (profile) => typeof profile?.features?.cloudModels !== "boolean";
-
-/**
- * Settles Cloud Models on an access profile that predates it: on when it granted any cloud
- * profile. Those grants move from `generationProfiles` to `retiredCloudGrants`, kept as a
- * record that no longer grants anything. Returns the profile unchanged when there is nothing
- * to settle, or when no cloud profile is known to settle it against.
- */
-export function migrateCloudModels(profile, cloudProfiles = []) {
-  const cloud = new Set(cloudProfiles);
-  if (!predatesCloudModels(profile) || !cloud.size) return profile;
-  const grants = Array.isArray(profile?.generationProfiles) ? profile.generationProfiles : [];
-  const retired = grants.filter((id) => cloud.has(id));
-  return {
-    ...profile,
-    generationProfiles: grants.filter((id) => !cloud.has(id)),
-    features: { ...(profile?.features || {}), cloudModels: retired.length > 0 },
-    ...(retired.length
-      ? { retiredCloudGrants: [...new Set([...(profile.retiredCloudGrants || []), ...retired])] }
-      : {}),
   };
 }
 
@@ -140,8 +93,6 @@ export function effectiveAccountAccess(account, profiles, availableProfiles = nu
     generationProfiles: safe.generationProfiles,
     allModels: safe.allModels,
     features: safe.features,
-    // Not yet settled: a cloud profile still needs its own grant, as before.
-    ...(predatesCloudModels(profile) ? { legacyCloudGrants: true } : {}),
   };
 }
 
@@ -157,11 +108,8 @@ export function mayUseGenerationProfile(access, profile) {
     return false;
   // An AI-drafted profile is live for administrators only until one approves it.
   if (typeof profile === "object" && profile?.aiDrafted === true) return false;
-  if (isCloudProfile(typeof profile === "string" ? { id: profile } : profile)) {
-    return access.legacyCloudGrants
-      ? access.generationProfiles.includes(id)
-      : access.features.cloudModels === true;
-  }
+  if (isCloudProfile(typeof profile === "string" ? { id: profile } : profile))
+    return access.features.cloudModels === true;
   return access.allModels === true || access.generationProfiles.includes(id);
 }
 
@@ -204,23 +152,3 @@ export const builtInAccessProfiles = Object.freeze([
     ),
   },
 ]);
-
-/**
- * Carries the old global LoRAs and Cloud Models switches into each access profile once:
- * a profile keeps a feature only where the switch had it on too, so nobody gains or loses
- * access when the switch goes. `globals` holds the switches' values at the time.
- */
-export function migrateFeatureOptions(profile, globals = {}) {
-  const features = { ...(profile?.features || {}) };
-  let changed = false;
-  if (globals.loras === false && features.loras !== false) {
-    features.loras = false;
-    changed = true;
-  }
-  // With cloud models switched off nobody had a cloud grant to keep, so this also settles the profile.
-  if (globals.cloudModels === false && features.cloudModels !== false) {
-    features.cloudModels = false;
-    changed = true;
-  }
-  return changed ? { ...profile, features } : profile;
-}

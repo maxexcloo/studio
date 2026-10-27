@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -152,9 +152,6 @@ test(
   { timeout: 15_000 },
   async (context) => {
     const directory = mkdtempSync(join(tmpdir(), "studio-service-http-"));
-    writeFileSync(join(directory, "lora-catalogue.json"), "{}");
-    writeFileSync(join(directory, "prompting.json"), "{}");
-    writeFileSync(join(directory, "models.json"), "[]");
     let healthCalls = 0;
     const worker = createServer((request, response) => {
       assert.equal(request.method, "GET");
@@ -172,7 +169,6 @@ test(
         HOST: "127.0.0.1",
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: join(directory, "data"),
-        STUDIO_CONFIG_DIR: directory,
         STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
         // Health observation never calls the API, so it needs no fake.
         STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",

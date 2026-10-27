@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import type { Express, RequestHandler } from "express";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { RuntimeController, type RuntimeRecord } from "./controller.ts";
@@ -8,8 +7,8 @@ import {
   urlRequest,
   type KubernetesRequest,
 } from "./kubernetes.ts";
-import { createRuntimeRouter, createTextAdmissionRouter } from "./routes.ts";
-import { kubernetesWorkloads, required } from "./workloads.ts";
+import { createRuntimeRouter } from "./routes.ts";
+import { kubernetesWorkloads } from "./workloads.ts";
 
 type Environment = Record<string, string | undefined>;
 
@@ -27,7 +26,7 @@ export function loadRuntime(
   } = {},
 ) {
   if (!environment.STUDIO_KUBERNETES_WORKLOADS) return undefined;
-  const { pools, workloads, keys } = kubernetesWorkloads(environment);
+  const { pools, workloads } = kubernetesWorkloads(environment);
   if (!workloads.length) return undefined;
   const automatic = environment.STUDIO_RUNTIME_AUTOMATIC === "1";
   const engine = new KubernetesEngine(
@@ -59,44 +58,7 @@ export function loadRuntime(
       : {}),
   });
   if (automatic) setInterval(() => void controller.reconcile().catch(() => {}), 30_000).unref();
-  return { controller, keys };
-}
-
-/** Mount before browser sign-in middleware, after JSON parsing and request guards. */
-export function registerTextAdmission(
-  app: Express,
-  runtime: ReturnType<typeof loadRuntime>,
-  environment: Environment = process.env,
-) {
-  if (!environment.STUDIO_TEXT_ADMISSION_TOKEN) return;
-  if (!runtime) throw new Error("Text admission requires configured Studio workloads.");
-  const expected = Buffer.from(`Bearer ${environment.STUDIO_TEXT_ADMISSION_TOKEN}`);
-  const authenticate: RequestHandler = (request, response, next) => {
-    const actual = Buffer.from(request.get("Authorization") ?? "");
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      response.status(401).json({ error: "Unauthorised." });
-      return;
-    }
-    next();
-  };
-  const workloadId = required(environment, "STUDIO_TEXT_WORKLOAD");
-  if (
-    !runtime.controller.workloads.some(
-      (workload) => workload.id === workloadId && workload.kind === "text",
-    )
-  )
-    throw new Error("STUDIO_TEXT_WORKLOAD must select a configured text workload.");
-  const apiKey = runtime.keys.get(workloadId);
-  if (!apiKey) throw new Error("Text admission requires the workload's apiKeyEnv credential.");
-  app.use(
-    "/api/local-text",
-    authenticate,
-    createTextAdmissionRouter({
-      controller: runtime.controller,
-      workloadId,
-      apiKey,
-    }),
-  );
+  return { controller };
 }
 
 /** Mount after account middleware with the existing administrator requirement. */

@@ -27,7 +27,6 @@ export function kubernetesWorkloads(environment: Environment) {
     string,
     Partial<Workload>
   >;
-  const keys = new Map<string, string>();
   const workloads = Object.entries(records).map(([id, record]): Workload => {
     const problem = (detail: string) => new Error(`STUDIO_KUBERNETES_WORKLOADS: ${id} ${detail}.`);
     if (!kinds.includes(record.kind!)) throw problem("needs a kind of image, video or text");
@@ -50,7 +49,7 @@ export function kubernetesWorkloads(environment: Environment) {
       target.origin === new URL(environment.STUDIO_BIFROST_URL).origin
     )
       throw problem("must point directly to its worker, not Bifrost");
-    if (record.apiKeyEnv) keys.set(id, required(environment, record.apiKeyEnv));
+    if (record.apiKeyEnv) required(environment, record.apiKeyEnv);
     return {
       id,
       label: record.label || id,
@@ -65,5 +64,5 @@ export function kubernetesWorkloads(environment: Environment) {
       ...(record.capabilities ? { capabilities: record.capabilities } : {}),
     };
   });
-  return { pools, workloads, keys };
+  return { pools, workloads };
 }

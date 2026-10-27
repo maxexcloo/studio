@@ -50,7 +50,6 @@ async function fixture(t, beforeAcknowledgement) {
     revision() {
       return 0;
     },
-    jobLimit: 100,
   });
   const requests = [];
   const prepared = new Set();

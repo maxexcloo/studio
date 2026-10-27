@@ -10,12 +10,12 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
-  const config = path.join(directory, "config");
-  fs.mkdirSync(config);
+  writeTestWorkflows(path.join(directory, "runtime"));
   const info = JSON.parse(
     fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
   );
@@ -82,8 +82,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         HOST: "127.0.0.1",
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: path.join(directory, "runtime"),
-        STUDIO_CONFIG_DIR: config,
-        STUDIO_ENABLE_BUILTIN_PROFILES: "1",
         STUDIO_WORKERS: JSON.stringify([
           { id: "chosen", name: "Chosen", url: worker.url, capabilities: ["image"] },
         ]),
@@ -91,8 +89,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
         STUDIO_KUBERNETES_WORKLOADS: workloads,
         STUDIO_RUNTIME_AUTOMATIC: "1",
-        STUDIO_TEXT_WORKLOAD: "text",
-        STUDIO_TEXT_ADMISSION_TOKEN: "fixture-admission",
         STUDIO_FIXTURE_TEXT_KEY: "fixture-text",
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
@@ -148,7 +144,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     throw new Error("Cancellation fixture did not reach the observed provider state");
   };
   const profile = (await api("/api/models")).body.profiles.find(
-    (profile) => profile.model === "sd_xl_base_1.0.safetensors",
+    (profile) => profile.id === "custom:test-image",
   );
   assert.ok(profile);
   const submitted = worker.nextPrompt();
@@ -185,13 +181,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   worker.setDown(true);
   if (!lostAcknowledgement)
     assert.equal((await api(`/api/queue/${accepted.body.jobId}/cancel`, {})).status, 503);
-  const textRequest = () =>
-    api(
-      "/api/local-text/v1/chat/completions",
-      { model: "local", messages: [{ role: "user", content: "Fixture" }] },
-      { Authorization: "Bearer fixture-admission" },
-    );
-  assert.equal((await textRequest()).status, 503);
   worker.setDown(false);
   // The worker accepts an interrupt request but deliberately leaves this prompt running.
   await waitFor(
@@ -209,7 +198,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     signature: preview.body.signature,
   });
   assert.equal(apply.status, 202);
-  assert.equal((await textRequest()).status, 503);
   assert.deepEqual(operations, []);
   const save = Object.entries(prompt.prompt).find(([, node]) => node.class_type === "SaveImage")[0];
   worker.finish(prompt.id, {
@@ -227,7 +215,10 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   assert.equal(saved.status, 200);
   assert.ok((await saved.arrayBuffer()).byteLength > 0);
   // The switch waited for the saved output; now it stops media, waits for its pod and starts text.
-  await waitFor(textRequest, (response) => response.status === 200);
+  await waitFor(
+    async () => operations,
+    (list) => list.includes("scale gpu/text 1"),
+  );
   assert.deepEqual(operations, ["scale gpu/media 0", "gone gpu/media", "scale gpu/text 1"]);
   assert.equal(worker.prompts.length, 1);
 }

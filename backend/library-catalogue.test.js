@@ -254,3 +254,31 @@ test("the LoRA view keeps the older shapes, with Studio’s edits applied", (t) 
   });
   assert.equal(catalogue["seed-only.safetensors"].title, "Seed Only");
 });
+
+test("explicit Original/Finetune classification persists and projects through Library", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-catalogue-type-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const { libraryItems } = await import("./library-routes.js");
+  createCatalogueStore({ dataDir: dir, log: quiet }).edit("checkpoints/base.safetensors", {
+    title: "Base",
+    description: "Studio model notes.",
+    families: ["flux2"],
+    modelType: "original",
+  });
+  const store = createCatalogueStore({ dataDir: dir, log: quiet });
+  assert.equal(store.entry("checkpoints/base.safetensors").modelType, "original");
+  assert.equal(
+    libraryItems({ entries: store.entries() }).find(
+      (item) => item.key === "checkpoints/base.safetensors",
+    ).modelType,
+    "original",
+  );
+  store.edit("checkpoints/base.safetensors", { modelType: "finetune" });
+  assert.equal(store.entry("checkpoints/base.safetensors").modelType, "finetune");
+  store.undo("checkpoints/base.safetensors");
+  assert.equal(store.entry("checkpoints/base.safetensors").modelType, "original");
+  assert.throws(
+    () => store.edit("checkpoints/base.safetensors", { modelType: "guessed" }),
+    /modelType must/,
+  );
+});

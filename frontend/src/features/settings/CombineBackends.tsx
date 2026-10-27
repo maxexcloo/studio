@@ -27,7 +27,7 @@ interface Choice {
   name: string;
   backend: string;
 }
-export const backendCandidatesQuery = queryOptions({
+const backendCandidatesQuery = queryOptions({
   queryKey: ["profile-backends"],
   queryFn: () => api<BackendPreview>("/api/profiles/backends"),
 });

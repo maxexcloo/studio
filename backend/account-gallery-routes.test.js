@@ -79,10 +79,6 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     [first.id],
   );
   assert.deepEqual(
-    page.outputs.map((record) => record.id),
-    [first.id],
-  );
-  assert.deepEqual(
     call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } }).items,
     [],
   );
