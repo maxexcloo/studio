@@ -1,6 +1,5 @@
 {
   "name": "studio",
-  "version": "1.0.12",
   "private": false,
   "homepage": "https://github.com/maxexcloo/studio",
   "bugs": {
@@ -16,8 +15,7 @@
     "build": "vite build --config frontend/vite.config.ts",
     "dev": "node dev.mjs",
     "dev:demo": "node dev.mjs --demo",
-    "release": "node .github/release.mjs",
-    "test": "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts .github/*.test.js"
+    "test": "node --test backend/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

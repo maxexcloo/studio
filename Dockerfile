@@ -35,6 +35,10 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && mkdir /data && chown node:node /data
 
+# Last, so a new commit rebuilds only this layer.
+ARG STUDIO_COMMIT
+ENV STUDIO_COMMIT=$STUDIO_COMMIT
+
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 \

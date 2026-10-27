@@ -42,13 +42,14 @@ const link = (href: string, label: string) => (
   </Anchor>
 );
 
-/** Settings › About: the running release, its notes, licences and credits. */
+/** Settings › About: the running commit, releases, licences and credits. */
 export function AboutStudio() {
   const stats = useQuery({
     queryKey: ["stats"],
-    queryFn: () => api<{ stats?: { outputs?: number } }>("/api/stats"),
+    queryFn: () => api<{ stats?: { outputs?: number }; version: string }>("/api/stats"),
   });
   const outputs = stats.data?.stats?.outputs;
+  const commit = stats.data?.version;
   return (
     <Stack gap="lg">
       <Stack align="center" gap={6} py="md">
@@ -59,13 +60,17 @@ export function AboutStudio() {
         </Text>
       </Stack>
       <SettingGroup title="Release">
-        <SettingRow label="Version" description="The release running here.">
-          <Text size="sm" fw={500}>
-            v{__STUDIO_VERSION__}
-          </Text>
+        <SettingRow label="Commit" description="The commit running here.">
+          {commit ? (
+            link(`${repository}/commit/${commit}`, commit)
+          ) : (
+            <Text size="sm" fw={500}>
+              Development
+            </Text>
+          )}
         </SettingRow>
-        <SettingRow label="Changelog" description="What’s new in each release.">
-          {link(`${repository}/blob/main/CHANGELOG.md`, "Changelog")}
+        <SettingRow label="Releases" description="What changed in each release.">
+          {link(`${repository}/releases`, "Releases")}
         </SettingRow>
         <SettingRow
           label="Licence"

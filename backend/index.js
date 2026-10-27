@@ -3454,7 +3454,7 @@ const serverStartup = startServers(app, {
       host === "0.0.0.0" || host === "::" || host === "127.0.0.1" ? "localhost" : host;
     const pagePort = dev ? 5173 : listening;
     console.log(
-      `Studio v${appVersion}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
+      `Studio ${appVersion || "development"}\nOpen http://${shownHost.includes(":") ? `[${shownHost}]` : shownHost}:${pagePort}`,
     );
     void (async () => {
       // Listening beyond this computer: say where a phone can open it.
