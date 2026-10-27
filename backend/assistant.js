@@ -18,6 +18,7 @@ import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import { cleanTriggers } from "./lora-catalogue.js";
 import { negativeUnused, recommendedNegative } from "./lora-prompts.js";
 import { replyTitle } from "../shared/titles.ts";
+import { userContent } from "./domain/model-content.ts";
 
 const gatewayKeys = [
   "STUDIO_PROMPT_WRITER_URL",
@@ -430,14 +431,6 @@ function rewriteInstructions({
     .filter(Boolean)
     .join("\n");
 }
-
-const imageParts = (images) =>
-  images.map((image) => ({
-    type: "image_url",
-    image_url: { url: `data:${image.mime || "image/jpeg"};base64,${image.data}` },
-  }));
-const userContent = (text, images, vision) =>
-  vision && images.length ? [{ type: "text", text }, ...imageParts(images)] : text;
 
 /**
  * The engine, or null while the gateway is unset. Pass `environment` as a live object (process.env)

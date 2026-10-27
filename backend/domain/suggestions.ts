@@ -1,15 +1,21 @@
 import type { NextStep, Suggestions } from "../../shared/suggestions.ts";
+import { createIdleWork, type IdleItem } from "./idle-work.ts";
+import { type ModelImage, userContent } from "./model-content.ts";
 import type { Taste, TasteWriter } from "./taste.ts";
 
 type SuggestionSurface = "composer" | "viewer" | "chat";
+// The viewer's next steps may send the image along.
+type Writer = TasteWriter<ReturnType<typeof userContent>>;
+type SavedSteps = { steps: NextStep[]; at: string };
 /** A finished gallery item the viewer asks about, already checked to belong to the owner. */
-interface SuggestionItem {
-  type?: string;
-  status?: string;
+export interface SuggestionItem extends IdleItem {
+  jobId?: string;
   prompt?: string;
   width?: number;
   height?: number;
   settings?: Record<string, unknown>;
+  /** The last next steps written for it, shown at once when the viewer opens. */
+  nextSteps?: SavedSteps;
 }
 interface Request {
   studioAccount?: { userId: string };
@@ -71,22 +77,27 @@ function describeItem(item: SuggestionItem) {
 /**
  * Short, taste-led suggestions from the text model: prompt ideas for an empty composer, next-step
  * chips for a finished image in the viewer and a paragraph of taste context for Chat. Answers are
- * cached per owner and input for ten minutes; an account without the prompt assistant, or while
- * text is offline, gets none (never fallback text or cloud).
+ * cached per owner and input for ten minutes, and an image's next steps are saved with it (most
+ * written ahead of time by `createNextStepWork`), so the viewer shows them at once; `fresh` asks
+ * for different ones. An account without the prompt assistant, or while text is offline, gets
+ * none (never fallback text or cloud).
  */
 export function createSuggestions({
   taste,
   writer,
   online,
   item,
+  save,
   now = Date.now,
 }: {
   taste: Pick<Taste, "read">;
   /** Null where the account may not send prompts to the text model. */
-  writer: (ownerId: string) => TasteWriter | null;
+  writer: (ownerId: string) => Writer | null;
   online: () => Promise<boolean>;
   /** The owner's finished gallery item for a job, if it is theirs and visible. */
   item: (ownerId: string, jobId: string) => SuggestionItem | undefined;
+  /** Keeps an image's latest next steps with it. */
+  save: (item: SuggestionItem, nextSteps: SavedSteps) => void;
   now?: () => number;
 }) {
   const cache = new Map<string, { until: number; value: Promise<Suggestions> }>();
@@ -103,10 +114,11 @@ export function createSuggestions({
   }
 
   async function write(
-    model: TasteWriter,
+    model: Writer,
     surface: SuggestionSurface,
     kind: "image" | "video",
     context: string,
+    { signal, image }: { signal?: AbortSignal; image?: ModelImage | null } = {},
   ): Promise<Suggestions> {
     const system = {
       composer: [
@@ -116,7 +128,7 @@ export function createSuggestions({
         'Reply with JSON only: {"ideas": ["<prompt>", "<prompt>", "<prompt>"]}.',
       ],
       viewer: [
-        "You suggest next steps for an image a person just made in a media studio, drawn from the image's prompt and settings and their taste profile.",
+        `You suggest next steps for an image a person just made in a media studio, drawn from the image's prompt and settings${image ? ", what the attached image shows" : ""} and their taste profile.`,
         "Suggest three or four distinct changes, such as lighting, framing, time of day, mood or style.",
         'Each has a label of at most four words in Title Case (such as "Warmer Light", "Closer Crop" or "Night Version"), the change in a few plain words, and the full prompt rewritten with only that change applied, in the same style and language.',
         data,
@@ -135,10 +147,11 @@ export function createSuggestions({
         model: model.settings().model,
         messages: [
           { role: "system", content: system },
-          { role: "user", content: context },
+          { role: "user", content: userContent(context, image ? [image] : [], true) },
         ],
         temperature: surface === "chat" ? 0.3 : 0.9,
         timeout: 45_000,
+        signal,
       }));
     } catch (error) {
       return empty(
@@ -178,11 +191,70 @@ export function createSuggestions({
     return steps.length ? { suggestions: steps } : empty("The text model’s reply was unusable.");
   }
 
+  /** The taste profile and the prompts the owner liked, as the model's context. */
+  function tasteContext(ownerId: string) {
+    const record = taste.read(ownerId);
+    const liked = [
+      ...new Set(
+        record.signals
+          .filter((signal) => ["star", "compare", "keep"].includes(signal.kind) && signal.prompt)
+          .map((signal) => signal.prompt!),
+      ),
+    ].slice(0, 5);
+    return {
+      known: Boolean(record.summary || liked.length),
+      lines: [
+        `Taste profile: ${record.summary || "(none yet)"}`,
+        "Prompts they liked:",
+        ...(liked.length ? liked.map((text) => `- ${text}`) : ["(none yet)"]),
+      ],
+    };
+  }
+
+  /** Writes an image's next steps, different from those it has, and keeps them with it. */
+  async function stepsFor(
+    model: Writer,
+    ownerId: string,
+    source: SuggestionItem,
+    options: { signal?: AbortSignal; image?: ModelImage | null } = {},
+  ): Promise<Suggestions> {
+    const shown = source.nextSteps?.steps.map((step) => step.label) ?? [];
+    const context = [
+      ...tasteContext(ownerId).lines,
+      "",
+      "The image:",
+      describeItem(source),
+      ...(shown.length
+        ? ["", `Already suggested (offer different ones): ${shown.join(", ")}`]
+        : []),
+    ];
+    const answer = await write(model, "viewer", "image", context.join("\n"), options);
+    if (!answer.reason && !options.signal?.aborted)
+      save(source, { steps: answer.suggestions as NextStep[], at: new Date(now()).toISOString() });
+    return answer;
+  }
+
   return {
+    /**
+     * Writes a finished image's next steps ahead of its viewer, from the image too where `image`
+     * is given; throws when none could be written, so idle work backs off a failing model.
+     */
+    async prepare(source: SuggestionItem, signal: AbortSignal, image: ModelImage | null) {
+      const model = writer(source.ownerId || "");
+      if (!model) throw new Error("the prompt assistant is off for this account");
+      const answer = await stepsFor(model, source.ownerId || "", source, { signal, image });
+      if (answer.reason && !signal.aborted) throw new Error(answer.reason);
+    },
     /** Throws a 400 or 404 for an unusable request; anything else answers, perhaps with none. */
     async suggest(
       ownerId: string,
-      body: { surface?: unknown; kind?: unknown; prompt?: unknown; jobId?: unknown },
+      body: {
+        surface?: unknown;
+        kind?: unknown;
+        prompt?: unknown;
+        jobId?: unknown;
+        fresh?: unknown;
+      },
     ): Promise<Suggestions> {
       const surface = body.surface as SuggestionSurface;
       if (!surfaces.has(surface)) throw failure("Choose composer, viewer or chat.", 400);
@@ -203,21 +275,16 @@ export function createSuggestions({
       }
       const model = writer(ownerId);
       if (!model) return empty("The prompt assistant is off for this account.");
-      const record = taste.read(ownerId);
-      const liked = [
-        ...new Set(
-          record.signals
-            .filter((signal) => ["star", "compare", "keep"].includes(signal.kind) && signal.prompt)
-            .map((signal) => signal.prompt!),
-        ),
-      ].slice(0, 5);
-      if (surface !== "viewer" && !record.summary && !liked.length)
+      const fresh = body.fresh === true;
+      if (source?.nextSteps?.steps.length && !fresh) return { suggestions: source.nextSteps.steps };
+      const { known, lines } = tasteContext(ownerId);
+      if (surface !== "viewer" && !known)
         return empty("Star a few results so Studio learns your taste.");
       const kind = surface === "composer" ? (body.kind as "image" | "video") : "image";
       const prompt = surface === "composer" ? clean(body.prompt, maxPrompt) : "";
       const key = JSON.stringify([ownerId, surface, kind, prompt, body.jobId ?? ""]);
       const cached = cache.get(key);
-      if (cached && cached.until > now()) return cached.value;
+      if (cached && cached.until > now() && !fresh) return cached.value;
       const answer = (async () => {
         try {
           model.settings();
@@ -225,12 +292,10 @@ export function createSuggestions({
           return empty("The prompt assistant is not configured.");
         }
         if (!(await online())) return empty("The text model is offline.");
+        if (source) return stepsFor(model, ownerId, source);
         const context = [
-          `Taste profile: ${record.summary || "(none yet)"}`,
-          "Prompts they liked:",
-          ...(liked.length ? liked.map((text) => `- ${text}`) : ["(none yet)"]),
+          ...lines,
           ...(prompt ? ["", `They have started this prompt: ${prompt}`] : []),
-          ...(source ? ["", "The image:", describeItem(source)] : []),
         ].join("\n");
         return write(model, surface, kind, context);
       })();
@@ -240,6 +305,39 @@ export function createSuggestions({
   };
 }
 type SuggestionService = ReturnType<typeof createSuggestions>;
+
+/**
+ * Writes finished images' viewer next steps ahead of time as idle work (domain/idle-work.ts), a
+ * trickle of the newest first: from the image too where the running text model reads images, from
+ * its prompt and settings where it can't. Only for owners `allowed` to use the prompt assistant,
+ * and never with cloud.
+ */
+export function createNextStepWork(options: {
+  suggestions: Pick<SuggestionService, "prepare">;
+  writer: { supportsVision(): Promise<boolean> } | null;
+  idle(): boolean;
+  allowed(ownerId: string): boolean;
+  items(): Iterable<SuggestionItem>;
+  visible(item: SuggestionItem): boolean;
+  /** A small (≤512 px) copy of the image, or null when there is none. */
+  image(item: SuggestionItem): Promise<ModelImage | null>;
+  now?: () => number;
+  log?: { info(message: string): void };
+}) {
+  const { writer } = options;
+  return createIdleWork<SuggestionItem>({
+    ...options,
+    name: "Viewer next steps",
+    enabled: () => Boolean(writer),
+    unavailable: async () => "",
+    wanted: (item) =>
+      item.type === "image" && Boolean(item.jobId && item.prompt) && !item.nextSteps,
+    async run(item, signal) {
+      const image = (await writer!.supportsVision()) ? await options.image(item) : null;
+      if (!signal.aborted) await options.suggestions.prepare(item, signal, image);
+    },
+  });
+}
 
 /** `POST /api/suggestions`: the caller's own suggestions for one surface. */
 export function registerSuggestionRoutes(

@@ -7,20 +7,20 @@ import {
   Loader,
   Paper,
   ScrollArea,
+  Skeleton,
   Textarea,
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUp, Play } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowUp, Play, RefreshCw } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
 import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { PromptHistory } from "../generation/PromptHistory";
 import { queueQuery, terminal } from "../generation/Queue";
-import { useMotionDuration } from "../../ui/Appearance";
 import { usePhone } from "../../ui/usePhone";
-import { nextStepsQuery } from "../taste/suggestions";
+import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import classes from "./MediaViewer.module.css";
 
 interface Entry {
@@ -67,56 +67,78 @@ const steppable = (item: MediaItem | undefined, assistant: boolean): item is Med
   Boolean(assistant && item?.type === "image" && item.status === "done" && item.url && item.jobId);
 
 /**
- * Taste-led next steps for a finished image. A chip stages its rewritten prompt in the prompt bar;
- * Enter or Generate runs it. The row's height is held while the steps load, and the neighbour's
- * steps are fetched once these have arrived.
+ * Taste-led next steps for a finished image. Placeholder chips hold the row while they load; a
+ * chip puts its rewritten prompt in the prompt bar and generates it at once, and More Next Steps
+ * asks for different ones. The neighbour's steps are fetched once these have arrived.
  */
 function NextSteps({
   item,
   neighbour,
   prompt,
-  stage,
+  pending,
+  apply,
 }: {
   item: MediaItem;
   neighbour?: MediaItem;
   prompt: string;
-  stage: (prompt: string) => void;
+  pending: boolean;
+  apply: (prompt: string) => void;
 }) {
   const client = useQueryClient();
-  const motionDuration = useMotionDuration();
-  const steps = useQuery(nextStepsQuery(item.jobId!));
+  const query = nextStepsQuery(item.jobId!);
+  const steps = useQuery(query);
+  const more = useMutation({
+    mutationFn: () => askNextSteps(item.jobId!, true),
+    onSuccess: (fresh) => client.setQueryData(query.queryKey, fresh),
+  });
   const ready = steps.isSuccess;
   const next = steppable(neighbour, true) ? neighbour.jobId! : "";
   useEffect(() => {
     if (ready && next) void client.prefetchQuery(nextStepsQuery(next));
   }, [ready, next]);
+  const loading = steps.isPending || more.isPending;
   const list = steps.data?.suggestions ?? [];
-  if (steps.isError || (ready && !list.length)) return null;
+  if (steps.isError || (!loading && !list.length)) return null;
   return (
     <ScrollArea type="never" className={classes.steps} onClick={(event) => event.stopPropagation()}>
       <Group
         role="group"
         aria-label="Next Steps"
+        aria-busy={loading || undefined}
         gap={6}
         wrap="nowrap"
         className={classes.stepRow}
-        data-shown={ready || undefined}
-        style={{ transitionDuration: `${motionDuration}ms` }}
       >
-        {list.map((step) => (
-          <Button
-            key={step.label}
-            size="compact-sm"
-            radius="xl"
-            variant={prompt === step.prompt ? "light" : "default"}
-            aria-pressed={prompt === step.prompt}
-            title={step.request}
-            className={classes.step}
-            onClick={() => stage(step.prompt)}
+        {loading
+          ? [0, 1, 2].map((index) => (
+              <Skeleton key={index} radius="xl" className={classes.stepSkeleton} />
+            ))
+          : list.map((step) => (
+              <Button
+                key={step.label}
+                size="compact-sm"
+                radius="xl"
+                variant={prompt === step.prompt ? "light" : "default"}
+                title={step.request}
+                className={classes.step}
+                loading={pending && prompt === step.prompt}
+                disabled={pending}
+                onClick={() => apply(step.prompt)}
+              >
+                {step.label}
+              </Button>
+            ))}
+        <Tooltip label="More Next Steps">
+          <ActionIcon
+            variant="subtle"
+            size="sm"
+            aria-label="More Next Steps"
+            disabled={loading}
+            onClick={() => more.mutate()}
           >
-            {step.label}
-          </Button>
-        ))}
+            <RefreshCw size={14} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
     </ScrollArea>
   );
@@ -131,6 +153,7 @@ export function MediaViewerDock({
   prompt,
   onPromptChange,
   onSubmit,
+  onApply,
   pending,
   actions,
 }: {
@@ -142,6 +165,8 @@ export function MediaViewerDock({
   prompt: string;
   onPromptChange: (prompt: string) => void;
   onSubmit: () => void;
+  /** Generates variations with this prompt, which the prompt bar shows. */
+  onApply: (prompt: string) => void;
   pending: boolean;
   actions: React.ReactNode;
 }) {
@@ -213,10 +238,8 @@ export function MediaViewerDock({
           item={item}
           neighbour={neighbour}
           prompt={prompt}
-          stage={(next) => {
-            onPromptChange(next);
-            promptField.current?.focus({ preventScroll: true });
-          }}
+          pending={pending}
+          apply={onApply}
         />
       )}
       {ready && (
