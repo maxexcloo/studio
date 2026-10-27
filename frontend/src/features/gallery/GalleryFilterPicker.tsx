@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { ChevronDown, type LucideIcon } from "lucide-react";
+import { chipProps } from "../generation/chip";
 
 export interface GalleryFilterOption {
   value: string;
@@ -64,11 +65,10 @@ export function GalleryFilterPicker({
           maw={280}
         >
           <Button
+            {...chipProps}
             aria-label={`Filter By ${label}`}
             aria-expanded={opened}
             variant={value.length ? "light" : "default"}
-            size="compact-md"
-            radius="xl"
             leftSection={<Icon size={15} />}
             rightSection={
               value.length > 0 ? (

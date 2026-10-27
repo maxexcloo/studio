@@ -133,7 +133,11 @@ function useChatState() {
           });
         } else if (event.event === "generation") {
           generated = true;
-          setDraft((previous) => ({ ...previous, parentJobId: event.data.job.id }));
+          setDraft((previous) => ({
+            ...previous,
+            parentJobId: event.data.job.id,
+            parentItemId: undefined,
+          }));
           void client.invalidateQueries({ queryKey: ["session", sessionId] });
           void client.invalidateQueries({ queryKey: queueQuery.queryKey });
           void client.invalidateQueries({ queryKey: ["gallery"] });

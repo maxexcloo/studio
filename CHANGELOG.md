@@ -11,8 +11,15 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+### Added
+
+- Grid groups each image's versions (Edit, Recreate, Regenerate and the like) under one tile showing the latest, with a version count; hover across it, or swipe sideways on a phone, to flip through them. The All Versions filter lists them separately. New runs record the result they came from as `parentItemId`.
+
 ### Changed
 
+- The item menu has one order everywhere: Animate, Edit (was Refine), Recreate, Reference | Create Comparison (was Compare Variants), Upscale | Copy Details, Copy Prompt | Delete. Download, Star and Select stay on the tile, toolbar and selection bar.
+- The viewer's action bar and the gallery selection bar share one divided icon bar with the menu's groups; the selection bar ends with Cancel.
+- The gallery toolbar keeps search in the row on desktop, with compact Filter and Select chips; starring is instant and rolls back if it fails.
 - Every prompt assistant call shares one 4,000-token budget, so long thinking no longer cuts a reply short.
 
 ## [1.0.11] - 2026-10-27

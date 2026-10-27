@@ -134,6 +134,7 @@ export async function mediaDraft(
       sessionId: sourceSession,
       operation: (operation === "extend" ? "animate" : operation) as "image" | "refine" | "animate",
       parentJobId: sourceSession ? item.jobId : undefined,
+      parentItemId: sourceSession ? item.id : undefined,
       references: preparedReferences,
       input: {
         ...initialInput,
@@ -256,6 +257,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
           : {}),
         operation: draft.input.kind === "video" ? "animate" : "image",
         parentJobId: draft.parentJobId,
+        parentItemId: draft.parentItemId,
       };
       const session =
         draft.sessionId ||

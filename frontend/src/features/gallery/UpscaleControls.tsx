@@ -23,6 +23,7 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
+import { useActionIconProps } from "./ActionBar";
 
 function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void }) {
   const [quality, setQuality] = useState<UpscaleQuality>("balanced");
@@ -140,17 +141,17 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
 }
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
-/** The viewer's Upscale action and its settings popover; `size` keeps phone touch targets. */
-export function UpscaleControls({ item, size }: { item: MediaItem; size?: number }) {
+/** The viewer's Upscale action and its settings popover, styled as an action bar icon. */
+export function UpscaleControls({ item }: { item: MediaItem }) {
   const [opened, setOpened] = useState(false);
+  const iconProps = useActionIconProps();
   const busy = upscaling(item);
   return (
     <Popover opened={opened} onChange={setOpened} position="top" width={300} trapFocus>
       <Tooltip label={busy ? "Upscaling…" : "Upscale"} disabled={opened}>
         <Popover.Target>
           <ActionIcon
-            variant="default"
-            size={size}
+            {...iconProps}
             aria-label="Upscale"
             loading={busy}
             onClick={() => setOpened((value) => !value)}

@@ -303,7 +303,7 @@ function RunPanel({
         }
       }}
     >
-      <Group justify="space-between" wrap="nowrap" gap="sm" mb="sm" align="start">
+      <Group justify="space-between" wrap="nowrap" gap="sm" mb="sm">
         <Stack gap={2} miw={0}>
           <Text fw={600} truncate>
             {title}

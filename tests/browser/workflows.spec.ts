@@ -41,8 +41,9 @@ test("Image → Refine → Animate retains one session and can reopen saved work
     page.getByRole("button", { name: "Open video: The bird spreads its wings" }),
   ).toBeVisible();
   await openNav(page, "Images");
+  // The refined image is a version of the first, so Grid shows them as one tile.
   await expect(
-    page.getByRole("button", { name: "Open image: An amber bird", exact: true }),
+    page.getByRole("button", { name: /^Open image: .*, Version 2 of 2$/ }),
   ).toBeVisible();
 });
 

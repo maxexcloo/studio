@@ -210,7 +210,7 @@ export class RewriteStore {
     resource = "local-media",
     requestedId?: string,
     jobLimit?: number,
-    origin: QueueOrigin = {},
+    origin: QueueOrigin & { parentItemId?: string } = {},
   ): OwnedJob {
     if (!this.session(ownerId, sessionId)) throw new Error("Session not found.");
     if (parentJobId && !this.job(ownerId, parentJobId))
@@ -243,6 +243,7 @@ export class RewriteStore {
       backend,
       sessionId,
       parentJobId,
+      ...(parentJobId && origin.parentItemId ? { parentItemId: origin.parentItemId } : {}),
       operation,
       priority: origin.priority ?? queuePriority.manual,
       queueSet: origin.queueSet,

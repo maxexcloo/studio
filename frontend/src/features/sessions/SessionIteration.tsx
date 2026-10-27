@@ -106,7 +106,7 @@ function ResultTile({
             opened={menu}
             onOpenedChange={setMenu}
             sessionId={sessionId}
-            omit={single ? ["refine", "animate"] : []}
+            omit={single ? ["edit", "animate"] : []}
           />
         )
       }

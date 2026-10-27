@@ -170,7 +170,7 @@ export function registerRewriteRoutes(
   });
   app.post("/api/sessions/:id/generations", async (req, res) => {
     if (!store.session(owner(req), req.params.id)) return missing(res);
-    const { operation = "image", parentJobId, ...input } = req.body || {};
+    const { operation = "image", parentJobId, parentItemId, ...input } = req.body || {};
     if (!["image", "refine", "animate"].includes(String(operation)))
       return res.status(400).json({ error: "Unknown generation operation." });
     if (
@@ -179,6 +179,8 @@ export function registerRewriteRoutes(
         !store.jobs(owner(req), req.params.id).some((job) => job.id === parentJobId))
     )
       return res.status(400).json({ error: "Parent generation must belong to this chat." });
+    if (parentItemId !== undefined && typeof parentItemId !== "string")
+      return res.status(400).json({ error: "Parent result must be an item ID." });
     let job;
     const checked = await validate?.(input, req.studioAccount);
     if (checked && checked.status >= 400) return res.status(checked.status).json(checked.payload);
@@ -192,6 +194,7 @@ export function registerRewriteRoutes(
         await resourceFor(input),
         undefined,
         req.studioAccount?.role === "user" ? jobLimit : undefined,
+        { parentItemId: parentItemId as string | undefined },
       );
     } catch (error) {
       return admissionError(res, error);

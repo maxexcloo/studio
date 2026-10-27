@@ -506,7 +506,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Refine", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(page.getByRole("button", { name: "Refine Image", exact: true })).toBeVisible();
   await prompt.click();

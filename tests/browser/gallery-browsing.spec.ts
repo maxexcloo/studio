@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { closeReferences, fixtures, image, stamp } from "./fixtures";
+import { closeReferences, fixtures, gallerySearch, image, stamp } from "./fixtures";
 const results = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
     id: `browse-${index}`,
@@ -101,7 +101,7 @@ test("Single-item viewer keyboard actions star and request deletion through the 
 
 test("Search shortcuts follow the active gallery or reference picker and leave prompt typing alone", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push(...results(1));
   await page.goto("/images");
@@ -112,7 +112,10 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   await expect(search).toBeFocused();
   await search.fill("Browse");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Search Gallery", exact: true })).toBeFocused();
+  // Phones close the search row back to its icon; desktop keeps the box and leaves it.
+  if (testInfo.project.use.isMobile)
+    await expect(page.getByRole("button", { name: "Search Gallery", exact: true })).toBeFocused();
+  else await expect(search).not.toBeFocused();
   await page.keyboard.press("ControlOrMeta+f");
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("Browse");
@@ -176,7 +179,10 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await page.getByRole("button", { name: "Star Selected", exact: true }).click();
   await expect.poll(() => state.gallery[1].favorite).toBe(true);
   expect(state.gallery[0].favorite).not.toBe(true);
-  await selection.getByRole("button", { name: "Done Selecting", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Selected Item Actions", exact: true })
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
@@ -394,9 +400,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
   await first.focus();
   await page.keyboard.press("Shift+F10");
-  await expect(
-    page.getByRole("menuitem", { name: "Recreate in Composer", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Recreate", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
@@ -463,13 +467,10 @@ test("Gallery search preserves the query and status panel stops active and clear
       updatedAt: stamp,
     });
   await page.goto("/");
-  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
-  const search = page.getByRole("textbox", { name: "Search Gallery", exact: true });
-  await expect(search).toBeFocused();
+  const search = await gallerySearch(page);
   await search.fill("birds");
   await search.press("Escape");
-  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
-  await expect(search).toHaveValue("birds");
+  await expect(await gallerySearch(page)).toHaveValue("birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Starred", exact: true }).click();
@@ -535,7 +536,10 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect.poll(() => state.gallery.map((item) => item.id)).toEqual(["selection-2"]);
-  await page.getByRole("button", { name: "Done Selecting", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Selected Item Actions", exact: true })
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 
@@ -544,9 +548,9 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
 }) => {
   const state = await fixtures(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
-  await page.getByRole("textbox", { name: "Search Gallery", exact: true }).fill("bird");
-  await page.getByRole("textbox", { name: "Search Gallery", exact: true }).press("Escape");
+  const search = await gallerySearch(page);
+  await search.fill("bird");
+  await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Filter By Models", exact: true }).click();
   await page.getByRole("checkbox", { name: "Studio Image", exact: true }).check();
@@ -590,9 +594,6 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
       }),
     )
     .toBe(true);
-  await page.getByRole("button", { name: "Close Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Search Gallery", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Search Gallery", exact: true })).toHaveValue(
-    "bird",
-  );
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await expect(await gallerySearch(page)).toHaveValue("bird");
 });
