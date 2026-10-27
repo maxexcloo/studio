@@ -726,14 +726,15 @@ export async function section(page: Page, workspace: "Library" | "Settings", lab
 /** Opens a Settings › Profiles view and the editor of its first listed definition. */
 export async function editDefinition(page: Page, kind: "Profile" | "Guide") {
   const editor = page.getByRole("dialog", { name: `Edit ${kind}`, exact: true });
-  if (!(await page.getByRole("table", { name: `Editable ${kind}s`, exact: true }).isVisible())) {
+  const table = page.getByRole("table", { name: `Editable ${kind}s`, exact: true });
+  if (!(await table.isVisible())) {
     await page.goto("/images");
     await openNav(page, "Settings");
     await section(page, "Settings", "Profiles");
     if (kind === "Guide") await chooseView(page, "Profiles", "Guides");
   }
-  await page
-    .getByRole("button", { name: new RegExp(`^${kind} Actions for `) })
+  await table
+    .getByRole("button", { name: /^Actions for / })
     .first()
     .click();
   await page.getByRole("menuitem", { name: `Edit ${kind}`, exact: true }).click();

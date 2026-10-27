@@ -8,17 +8,14 @@ import {
   Menu,
   Select,
   Stack,
-  Table,
   Text,
   Tooltip,
-  VisuallyHidden,
 } from "@mantine/core";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Combine, Ellipsis, FileDown, Merge, Plus, Upload } from "lucide-react";
+import { Combine, FileDown, Merge, Plus, Upload } from "lucide-react";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
-import { EmptyState } from "../../ui/EmptyState";
-import { LoadingState } from "../../ui/LoadingState";
+import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
 import { SectionToolbar } from "../../ui/SectionToolbar";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
@@ -105,14 +102,9 @@ export function ProfileDefinitions() {
   const families = [
     ...new Set(records.flatMap((entry) => (entry.family ? [entry.family] : []))),
   ].sort((a, b) => modelFamilyLabel(a).localeCompare(modelFamilyLabel(b)));
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const rows = records.filter((entry) => {
-    if (family && entry.family !== family) return false;
-    const text = [entry.name, idOf(entry), entry.family && modelFamilyLabel(entry.family)]
-      .join(" ")
-      .toLowerCase();
-    return terms.every((term) => text.includes(term));
-  });
+  const rows = family ? records.filter((entry) => entry.family === family) : records;
+  // Runs record the runtime id, `custom:` plus the definition's id.
+  const statsOf = (id: string) => stats?.[`custom:${id}`] || stats?.[id];
   const importing = useMutation({
     meta: { inlineError: true },
     mutationFn: async (file: File) => {
@@ -257,95 +249,91 @@ export function ProfileDefinitions() {
         }
       />
       {importing.error && <Alert color="red">{importing.error.message}</Alert>}
-      {list.isPending ? (
-        <LoadingState label={`Loading ${noun}s`} />
-      ) : list.error ? (
+      {list.error ? (
         <Alert color="red">{list.error.message}</Alert>
-      ) : !rows.length ? (
-        <EmptyState title={records.length ? `No Matching ${noun}s` : `No ${noun}s`}>
-          {records.length
-            ? "Try another search or reset the filters."
-            : kind === "profile"
-              ? "Import a workflow, or draft one from a checkpoint in Library › Imports."
-              : "Create a guide to steer the prompt assistant for a family."}
-        </EmptyState>
       ) : (
-        <Table aria-label={`Editable ${noun}s`} verticalSpacing="xs" highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th visibleFrom="sm">Family</Table.Th>
-              <Table.Th>Version</Table.Th>
-              {kind === "profile" && <Table.Th visibleFrom="md">Last 30 Days</Table.Th>}
-              <Table.Th w={44}>
-                <VisuallyHidden>Actions</VisuallyHidden>
-              </Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {rows.map((entry) => {
-              const id = idOf(entry);
-              const name = entry.name || id;
-              return (
-                <Table.Tr key={id}>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Text size="sm" fw={500} lineClamp={1}>
-                        {name}
-                      </Text>
-                      {entry.backend && (
-                        <Badge size="xs" variant="default">
-                          {backendLabel(entry.backend)}
-                        </Badge>
-                      )}
-                    </Group>
-                    <Text size="xs" c="dimmed" lineClamp={1} style={{ overflowWrap: "anywhere" }}>
-                      {id}
+        <DataTable
+          key={kind}
+          label={`Editable ${noun}s`}
+          rows={rows}
+          rowKey={idOf}
+          rowName={(entry) => entry.name || idOf(entry)}
+          loading={list.isPending && `Loading ${noun}s`}
+          query={query}
+          searchText={(entry) => [
+            entry.name,
+            idOf(entry),
+            entry.family && modelFamilyLabel(entry.family),
+          ]}
+          initialSort={{ key: "name", descending: false }}
+          empty={records.length ? "No Matches" : `No ${noun}s`}
+          columns={[
+            {
+              key: "name",
+              header: "Name",
+              main: true,
+              sortValue: (entry) => entry.name || idOf(entry),
+              cell: (entry) => (
+                <>
+                  <Group gap="xs" wrap="nowrap">
+                    <Text size="sm" fw={500} truncate>
+                      {entry.name || idOf(entry)}
                     </Text>
-                  </Table.Td>
-                  <Table.Td visibleFrom="sm">
-                    <Text size="sm">{entry.family ? modelFamilyLabel(entry.family) : "—"}</Text>
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Text size="sm">{entry.version}</Text>
-                      {entry.aiDrafted && (
-                        <Badge color="orange" variant="light" size="sm">
-                          AI-Drafted
-                        </Badge>
-                      )}
-                    </Group>
-                  </Table.Td>
-                  {kind === "profile" && (
-                    <Table.Td visibleFrom="md">
-                      {/* Runs record the runtime id, `custom:` plus the definition's id. */}
-                      <ProfileUse stats={stats?.[`custom:${id}`] || stats?.[id]} />
-                    </Table.Td>
+                    {entry.backend && (
+                      <Badge variant="default">{backendLabel(entry.backend)}</Badge>
+                    )}
+                  </Group>
+                  <Text size="xs" c="dimmed" truncate>
+                    {idOf(entry)}
+                  </Text>
+                </>
+              ),
+            },
+            {
+              key: "family",
+              header: "Family",
+              visibleFrom: "sm",
+              sortValue: (entry) => entry.family && modelFamilyLabel(entry.family),
+              cell: (entry) => (
+                <Text size="sm">{entry.family ? modelFamilyLabel(entry.family) : "—"}</Text>
+              ),
+            },
+            {
+              key: "version",
+              header: "Version",
+              sortValue: (entry) => entry.version,
+              cell: (entry) => (
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="sm">{entry.version}</Text>
+                  {entry.aiDrafted && (
+                    <Badge color="orange" variant="light">
+                      AI-Drafted
+                    </Badge>
                   )}
-                  <Table.Td>
-                    <Menu position="bottom-end">
-                      <Menu.Target>
-                        <ActionIcon
-                          variant="subtle"
-                          color="gray"
-                          aria-label={`${noun} Actions for ${name}`}
-                        >
-                          <Ellipsis size={18} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item onClick={() => setSelected(id)}>Edit {noun}</Menu.Item>
-                        <Menu.Item onClick={() => void copyText(id, `${noun} ID`)}>
-                          Copy {noun} ID
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Table.Td>
-                </Table.Tr>
-              );
-            })}
-          </Table.Tbody>
-        </Table>
+                </Group>
+              ),
+            },
+            ...(kind === "profile"
+              ? [
+                  {
+                    key: "use",
+                    header: "Last 30 Days",
+                    visibleFrom: "md" as const,
+                    sortValue: (entry: DefinitionRow) => statsOf(idOf(entry))?.runs,
+                    cell: (entry: DefinitionRow) => <ProfileUse stats={statsOf(idOf(entry))} />,
+                  },
+                ]
+              : []),
+          ]}
+          rowActions={(entry) => (
+            <>
+              <Menu.Item onClick={() => setSelected(idOf(entry))}>Edit {noun}</Menu.Item>
+              <Menu.Item onClick={() => void copyText(idOf(entry), `${noun} ID`)}>
+                Copy {noun} ID
+              </Menu.Item>
+            </>
+          )}
+        />
       )}
       <MergeDuplicateProfiles opened={merging} onClose={() => setMerging(false)} />
       <CombineBackends opened={combining} onClose={() => setCombining(false)} />

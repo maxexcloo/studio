@@ -23,7 +23,7 @@ primary component reference and verify APIs against the installed version.
   `MutationCache` default notification. Do not add per-call duplicate surfaces.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
-  `EmptyState`, `LoadingState`, `StudioLogo` and `copyText`.
+  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo` and `copyText`.
 - Style with Mantine props and theme `extend` defaults first; component-specific
   CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
   global class rules and per-call sizes that the theme should own.
@@ -72,8 +72,10 @@ primary component reference and verify APIs against the installed version.
   keep visited forms mounted to preserve edits. Navigation items carry an icon;
   each section shows its heading and one-line description, segmented views,
   an expanding search and filters in one popover above compact rows with status
-  badges and row menus. Use Mantine Table for dense records; preview cards are for
-  visual content. Account authentication follows the standard Mantine form
+  badges and row menus. Dense records use the shared `DataTable` on Mantine Table
+  (sortable headers, the toolbar query, one empty line, loading and the row menu;
+  phones drop secondary columns into the main cell); preview cards are for visual
+  content. Account authentication follows the standard Mantine form
   layout, retaining local and OIDC sign-in.
 - Nested Select/MultiSelect dropdowns stay inside their owning Mantine Popover
   with `comboboxProps.withinPortal: false`; choosing an option must preserve the
