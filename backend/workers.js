@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { currentDataDir } from "./data-dir.js";
+import { kubernetesWorkloads } from "./runtime/workloads.ts";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
@@ -9,8 +10,9 @@ import { currentDataDir } from "./data-dir.js";
  * its one `comfyUrl`, which follows the default worker (comfy.js).
  *
  * Where workers come from, in order:
- * 1. The deployment: `STUDIO_WORKERS` (a JSON list). These are locked:
- *    Settings shows them and changes them nowhere.
+ * 1. The deployment: `STUDIO_WORKERS` (a JSON list), else the media workloads
+ *    in `STUDIO_KUBERNETES_WORKLOADS`. These are locked: Settings shows them
+ *    and changes them nowhere.
  * 2. Studio's own list, `workers.json` in the data folder, which
  *    administrators edit in Settings › Workers. It is empty until first saved.
  */
@@ -126,7 +128,7 @@ function defaultName(capabilities) {
   return "Worker";
 }
 
-/** The deployment's workers, from `STUDIO_WORKERS`. */
+/** The deployment's workers, from `STUDIO_WORKERS`, else from the Kubernetes workloads. */
 export function deploymentWorkers(environment = process.env) {
   const text = String(environment.STUDIO_WORKERS || "").trim();
   if (text) {
@@ -150,7 +152,37 @@ export function deploymentWorkers(environment = process.env) {
       ),
     };
   }
+  if (environment.STUDIO_KUBERNETES_WORKLOADS)
+    return { variable: "STUDIO_KUBERNETES_WORKLOADS", workers: workloadWorkers(environment) };
   return { variable: "", workers: [] };
+}
+
+/**
+ * One worker per address of the image and video workloads (runtime/workloads.ts), which the
+ * deployments at that address share: its id is the `worker` they give, else the first one's id, and
+ * it runs their `capabilities`, else their kinds.
+ */
+function workloadWorkers(environment) {
+  const groups = new Map();
+  for (const workload of kubernetesWorkloads(environment).workloads) {
+    if (workload.kind === "text") continue;
+    const url = normalizeWorkerUrl(workload.url);
+    const group = groups.get(url) || { first: workload.id, id: "", capabilities: [] };
+    if (workload.worker && group.id && workload.worker !== group.id)
+      throw new WorkerConfigError(
+        `STUDIO_KUBERNETES_WORKLOADS: ${workload.id} names worker ${workload.worker}, but its address's worker is ${group.id}.`,
+      );
+    group.id ||= workload.worker || "";
+    group.capabilities.push(...(workload.capabilities || [workload.kind]));
+    groups.set(url, group);
+  }
+  const taken = new Set();
+  return [...groups].map(([url, group]) =>
+    normalizeWorker(
+      { id: group.id || group.first, url, capabilities: group.capabilities },
+      { taken, where: `STUDIO_KUBERNETES_WORKLOADS: ${group.first}` },
+    ),
+  );
 }
 
 let cache = null;
