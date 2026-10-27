@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> The prompt assistant stops failing with "unusable reply"
+
+### Fixed
+
+- Refine, Negative, LoRA suggestions, profile drafts and suggestions leave room for the text model's thinking, so they no longer fail with "unusable reply".
+
 ## [1.0.10] - 2026-10-27
 
 > Captions lead the viewer's Details, and their tags search the gallery
