@@ -11,6 +11,12 @@ version opens with a `> ` summary line.
 
 ## [Unreleased]
 
+> Steadier release checks for 1.0
+
+### Fixed
+
+- The release pipeline's browser checks run two workers on CI's two-CPU runners, and the Library downloads check matches the server's refreshed catalogue, so slow runners no longer fail the release; 1.0.0's image was never published because of this.
+
 ## [1.0.0] - 2026-10-27
 
 > Studio 1.0: the rebuilt app (chip composer, viewer hub, Chat, Dream and a learned taste profile), Studio-managed GPU workloads, Grok animation and Studio names throughout
