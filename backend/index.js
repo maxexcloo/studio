@@ -163,6 +163,7 @@ import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
   flushGalleryStrict,
+  isGalleryHidden,
   galleryKey,
   flushPendingGallery,
   replaceGalleryJob,
@@ -2194,6 +2195,14 @@ registerRewriteRoutes(app, {
   validate: validateGenerationInput,
   jobLimit: accountJobLimit,
   deleteMedia: deleteOwnedGalleryItems,
+  media: (ownerId) => {
+    const byJob = new Map();
+    for (const item of gallery)
+      if (item.jobId && (item.ownerId || "") === ownerId && !isGalleryHidden(item))
+        byJob.set(item.jobId, [...(byJob.get(item.jobId) || []), item]);
+    for (const items of byJob.values()) items.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    return byJob;
+  },
   title: chatTitle,
   admitted: jobAdmitted,
 });

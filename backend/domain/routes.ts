@@ -2,6 +2,7 @@ import type {
   GenerationInput,
   GenerationOperation,
   QueueCancelAllResponse,
+  QueueMedia,
 } from "../../shared/queue.ts";
 import { GenerationQueue, terminalStatuses } from "./queue.ts";
 import { publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
@@ -48,6 +49,7 @@ export function registerRewriteRoutes(
     validate,
     jobLimit,
     deleteMedia,
+    media,
     title,
     admitted,
   }: {
@@ -64,12 +66,25 @@ export function registerRewriteRoutes(
       ownerId: string,
       ids: string[],
     ) => { removed: string[]; files: { deleted: number; skipped: number } };
+    /**
+     * The owner's gallery records by job. A job's own results are what its adapter reported (a
+     * cloud provider's bare files, or a snapshot taken on completion), so the queue and Chat show the
+     * gallery's records instead: each with its prompt, settings, title and star.
+     */
+    media?: (ownerId: string) => Map<string, QueueMedia[]>;
     /** Titles a chat started by its first generation; must not reject. */
     title?: (account: Request["studioAccount"], sessionId: string, prompt: string) => Promise<void>;
     /** Hears each newly queued job, for the taste profile; must not throw. */
     admitted?: (job: OwnedJob) => void;
   },
 ) {
+  const shown = (ownerId: string, jobs: OwnedJob[]) => {
+    const saved = media?.(ownerId);
+    return jobs.map((job) => {
+      const items = saved?.get(job.id);
+      return publicJob(items?.length ? { ...job, items } : job);
+    });
+  };
   app.get("/api/user-presets", (req, res) => res.json({ presets: store.presets(owner(req)) }));
   app.post("/api/user-presets", (req, res) => {
     if (typeof req.body?.title !== "string" || !req.body.title.trim() || !object(req.body.input))
@@ -110,7 +125,7 @@ export function registerRewriteRoutes(
   app.get("/api/sessions/:id", (req, res) => {
     const session = store.session(owner(req), req.params.id);
     return session
-      ? res.json({ session, jobs: store.jobs(owner(req), session.id).map(publicJob) })
+      ? res.json({ session, jobs: shown(owner(req), store.jobs(owner(req), session.id)) })
       : missing(res);
   });
   app.patch("/api/sessions/:id", (req, res) => {
@@ -142,9 +157,9 @@ export function registerRewriteRoutes(
     const refused = busy(store.sessionActivity(ownerId, req.params.id));
     if (refused) return refused;
     const results = new Set(
-      store
-        .jobs(ownerId, req.params.id)
-        .flatMap((job) => [...job.items, ...job.outputs].map((item) => item.id)),
+      shown(ownerId, store.jobs(ownerId, req.params.id)).flatMap((job) =>
+        [...job.items, ...job.outputs].map((item) => item.id),
+      ),
     );
     const ids = [...new Set(requested as string[])];
     const media = { removed: [] as string[], failed: [] as { id: string; error: string }[] };
@@ -213,7 +228,9 @@ export function registerRewriteRoutes(
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
   });
-  app.get("/api/queue", (req, res) => res.json({ jobs: listed(store, owner(req)).map(publicJob) }));
+  app.get("/api/queue", (req, res) =>
+    res.json({ jobs: shown(owner(req), listed(store, owner(req))) }),
+  );
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
     for (const job of listed(store, owner(req)).filter((item) =>
