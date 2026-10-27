@@ -34,12 +34,10 @@ Pointing that target at Bifrost would create a routing loop. Set
 The browser never receives either credential. Configure `STUDIO_BIFROST_URL` when used;
 Studio refuses to target that gateway origin as a worker.
 
-Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) also needs
-`STUDIO_TEXT_ADMISSION_ACKNOWLEDGED=1`, confirming that all managed local text
-traffic reaches that endpoint before Studio stops text workers on its own. These
-are deployment acknowledgements, not settings exposed to app users. Runtime
-status and control are administrator-only at `/api/runtime`; text admission uses
-its own bearer authentication.
+Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) never stops or starts
+text workers; only an administrator's change in Settings › Workers or the control
+MCP tools does. Runtime status and control are administrator-only at
+`/api/runtime`; text admission uses its own bearer authentication.
 
 CPU checks: `node --test backend/runtime/*.test.ts` and
 `python3 -m unittest discover -s worker -p 'test_*.py'`. Lease tests require Linux

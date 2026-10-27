@@ -212,26 +212,72 @@ test("restart scales to zero, waits for the pod to go and scales back; a stopped
   assert.deepEqual(recorded.after, ["text"]);
 });
 
-test("generation waits on a stopped workload: off says so, automatic starts it in place of an idle holder", async () => {
+test("generation waits on a stopped workload: off says so, automatic starts media in place of media", async () => {
   const manual = fixture(["image"]);
   await assert.rejects(
-    manual.controller.acquire("text"),
+    manual.controller.acquire("video"),
     /offline; automatic lifecycle control is disabled/,
   );
   assert.deepEqual(manual.kube.log, []);
-  const { kube, controller } = fixture(["image", "video"], { automaticLifecycle: true });
-  const busy = await controller.acquire("video");
-  await assert.rejects(controller.acquire("text"), { message: "Waiting for Text to start." });
+  const { kube, controller } = fixture(["image", "text"], { automaticLifecycle: true });
+  await assert.rejects(controller.acquire("video"), { message: "Waiting for Video to start." });
   await assert.rejects(
-    controller.acquire("text"),
-    /Text to start after the current runtime change/,
+    controller.acquire("video"),
+    /Video to start after the current runtime change/,
   );
   await controller.settled;
-  assert.deepEqual(kube.log, ["scale comfyui/image 0", "gone comfyui/image", "scale text/text 1"]);
-  (await controller.acquire("text")).release();
-  busy.release();
+  assert.deepEqual(kube.log, [
+    "scale comfyui/image 0",
+    "gone comfyui/image",
+    "scale comfyui-video/video 1",
+  ]);
   // Two-GPU video and one-GPU video share an address; whichever runs serves it.
   (await controller.acquire(["video", "video-tp2"])).release();
+  (await controller.acquire("text")).release();
+});
+
+test("automatic control never stops or starts text; an administrator's apply can stop it", async () => {
+  const { kube, controller } = fixture(["text"], { automaticLifecycle: true });
+  await assert.rejects(controller.acquire("video-tp2"), {
+    status: 503,
+    message: "Waiting for a GPU: Text is running; stop it in Settings › Workers.",
+  });
+  await assert.rejects(controller.acquire("gaming"), /automatic control never starts text/);
+  assert.deepEqual(kube.log, []);
+  assert.deepEqual((await controller.observe()).history, []);
+  const preview = await controller.preview(["video-tp2"]);
+  assert.deepEqual(preview.stop, ["text"]);
+  await controller.apply(["video-tp2"], preview.signature, "account:admin");
+  await controller.settled;
+  assert.deepEqual(kube.log, [
+    "scale text/text 0",
+    "gone text/text",
+    "scale comfyui-video/video-tp2 1",
+  ]);
+  (await controller.acquire("video-tp2")).release();
+});
+
+test("restoring the last placement leaves text started outside Studio running", async () => {
+  const { kube, controller } = fixture(["image", "video"], { automaticLifecycle: true });
+  const preview = await controller.preview(["image", "video"]);
+  await controller.apply(["image", "video"], preview.signature, "local");
+  await controller.settled;
+  // Something outside Studio stops image and starts text in its place.
+  kube.deployments.get("comfyui/image")!.replicas = 0;
+  for (const pod of kube.deployments.get("comfyui/image")!.pods) pod.deleting = true;
+  kube.deployments.get("text/text")!.replicas = 1;
+  kube.tick();
+  await controller.reconcile();
+  await controller.settled;
+  assert.deepEqual(kube.log, ["gone comfyui/image"]);
+  assert.equal((await controller.observe()).history.length, 1);
+  // Once text is stopped, the placement is restored.
+  kube.deployments.get("text/text")!.replicas = 0;
+  for (const pod of kube.deployments.get("text/text")!.pods) pod.deleting = true;
+  kube.tick();
+  await controller.reconcile();
+  await controller.settled;
+  assert.equal(kube.log.at(-1), "scale comfyui/image 1");
 });
 
 test("a deployment reset outside Studio shows as drift and automatic control restores it", async () => {
