@@ -1,5 +1,5 @@
 {
-  "heissUi": {
+  "studio": {
     "id": "z-image-turbo-2k-refine",
     "name": "Z-Image Turbo 2K Refine",
     "description": "Doubles a picture with RealESRGAN, then lets Z-Image Turbo redraw its fine detail. From Comfy-Org's Z-Image Turbo 2K upscaler template.",
@@ -110,6 +110,6 @@
   "14": { "class_type": "VAEDecode", "inputs": { "samples": ["13", 0], "vae": ["11", 0] } },
   "15": {
     "class_type": "SaveImage",
-    "inputs": { "images": ["14", 0], "filename_prefix": "heiss-ui/refine" }
+    "inputs": { "images": ["14", 0], "filename_prefix": "studio/refine" }
   }
 }

@@ -21,7 +21,7 @@ import { isInside } from "./paths.js";
 import { parseA1111Parameters, readPngInfo } from "./png-text.js";
 import { loadSharp } from "./sharp-loader.js";
 import { probeVideo } from "./video-previews.js";
-import { outputFolderNames } from "./data-names.js";
+import { outputFolderName } from "./data-names.js";
 
 /**
  * Earlier work in the gallery: images from other folders (old ComfyUI
@@ -44,10 +44,10 @@ export const videoPattern = /\.(mp4|webm|mov|mkv)$/i;
 const mediaPattern = /\.(png|jpe?g|webp|gif|avif|mp4|webm|mov|mkv)$/i;
 export const scanFileLimit = 20000;
 const scanDepth = 8;
-// Studio's output folder (data-names.js), under either name. Wherever one turns
+// Studio's output folder (data-names.js). Wherever one turns
 // up (an output folder not known yet, or an old one), its files are either in
 // the gallery already or deleted on purpose.
-const skippedNames = new Set(["node_modules", "__pycache__", ...outputFolderNames]);
+const skippedNames = new Set(["node_modules", "__pycache__", outputFolderName]);
 
 function realPath(dir) {
   try {
@@ -379,10 +379,7 @@ export function libraryFile(folderId, rel) {
       .split(/[\\/]/)
       .some(
         (part) =>
-          !part ||
-          part.startsWith(".") ||
-          part === ".." ||
-          outputFolderNames.includes(part.toLowerCase()),
+          !part || part.startsWith(".") || part === ".." || part.toLowerCase() === outputFolderName,
       )
   )
     return null;

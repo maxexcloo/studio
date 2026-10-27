@@ -31,7 +31,7 @@ export async function uploadReferenceImage(dataUrl, body = {}) {
   }
   type = prepared.mime;
   const ext = type.includes("jpeg") ? "jpg" : type.includes("webp") ? "webp" : "png";
-  const filename = `heiss-ui-reference-${crypto.randomUUID()}.${ext}`;
+  const filename = `studio-reference-${crypto.randomUUID()}.${ext}`;
   const bytes = prepared.buffer;
   const form = new FormData();
   form.append("image", new Blob([bytes], { type }), filename);

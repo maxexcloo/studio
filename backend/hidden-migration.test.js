@@ -13,7 +13,7 @@ test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const quiet = { log() {}, warn() {} };
 const view = (filename) =>
-  `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`;
+  `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`;
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 let count = 0;
 function dataDir(files = {}) {

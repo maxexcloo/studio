@@ -13,8 +13,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-const { profileBlock, profileBlockName, profileBlocksIn, withWrittenBlock, writtenBlockName } =
-  await import("./profile-block.js");
 const { allCustomWorkflowRecords, metadataFromJson, userWorkflowsDir, saveImportedWorkflow } =
   await import("./custom-workflows.js");
 const { validateProfileText, createEditableProfile, approveEditableProfile } =
@@ -37,46 +35,9 @@ const block = (id, extra = {}) => ({
   ...extra,
 });
 
-test("both the studio and heissUi block names are read; heissUi is still what Studio writes", () => {
-  assert.equal(writtenBlockName, "heissUi");
-  assert.equal(profileBlock({ studio: { name: "New" }, graph })?.name, "New");
-  assert.equal(profileBlock({ heissUi: { name: "Old" }, graph })?.name, "Old");
-  assert.equal(profileBlock({ heiss_ui: { name: "Older" } })?.name, "Older");
-  assert.equal(profileBlock({ graph }), null);
-  assert.equal(profileBlockName({ heissUi: {}, studio: {} }), "studio");
-  assert.deepEqual(profileBlocksIn({ heissUi: {}, studio: {}, graph }), ["studio", "heissUi"]);
-  assert.deepEqual(Object.keys(withWrittenBlock({ graph, studio: { name: "New" } })), [
-    "heissUi",
-    "graph",
-  ]);
-  // Workflows and profiles read through either name.
-  assert.equal(
-    metadataFromJson({ studio: block("new-block"), graph }, "new-block.json").name,
-    "Profile new-block",
-  );
-  assert.equal(
-    metadataFromJson({ heissUi: block("old-block"), graph }, "old-block.json").name,
-    "Profile old-block",
-  );
-  // A template under "studio" drafts a profile under "heissUi".
-  const drafted = draftedProfile({
-    id: "drafted",
-    template: { studio: block("template", { defaults: { model: "model.safetensors" } }), graph },
-    modelFile: "next.safetensors",
-  });
-  assert.deepEqual(
-    [
-      Object.keys(drafted).includes("studio"),
-      drafted.heissUi.id,
-      drafted.graph["1"].inputs.unet_name,
-    ],
-    [false, "drafted", "next.safetensors"],
-  );
-});
-
-test("the profile check accepts either name, names the block it found and refuses both at once", () => {
+test("profiles are read, checked, drafted and saved through the studio block", () => {
+  assert.equal(metadataFromJson({ studio: block("a"), graph }, "a.json").name, "Profile a");
   assert.equal(validateProfileText("a", JSON.stringify({ studio: block("a"), graph })).ok, true);
-  assert.equal(validateProfileText("a", JSON.stringify({ heissUi: block("a"), graph })).ok, true);
   assert.match(
     validateProfileText(
       "a",
@@ -85,30 +46,28 @@ test("the profile check accepts either name, names the block it found and refuse
     /studio\.name is required/,
   );
   assert.match(
-    validateProfileText(
-      "a",
-      JSON.stringify({ studio: block("a"), heissUi: block("a"), graph }),
-    ).errors.join(" "),
-    /Keep one profile block: this file has studio and heissUi/,
-  );
-  assert.match(
     validateProfileText("a", JSON.stringify({ graph })).errors.join(" "),
-    /Missing the heissUi \(or studio\) block/,
+    /Missing the studio block/,
   );
-});
-
-test("an imported workflow carrying a studio block is saved under heissUi only", () => {
+  const drafted = draftedProfile({
+    id: "drafted",
+    template: { studio: block("template", { defaults: { model: "model.safetensors" } }), graph },
+    modelFile: "next.safetensors",
+  });
+  assert.deepEqual(
+    [drafted.studio.id, drafted.graph["1"].inputs.unet_name],
+    ["drafted", "next.safetensors"],
+  );
   const saved = saveImportedWorkflow(
     { studio: block("imported"), graph },
     { name: "Imported Here" },
   );
-  const raw = JSON.parse(fs.readFileSync(saved.path, "utf8"));
-  assert.deepEqual([raw.studio, raw.heissUi.name], [undefined, "Imported Here"]);
+  assert.equal(JSON.parse(fs.readFileSync(saved.path, "utf8")).studio.name, "Imported Here");
 });
 
 test("AI-drafted profiles are live for administrators only until approved", () => {
   fs.mkdirSync(userWorkflowsDir, { recursive: true });
-  createEditableProfile("drafted-gate", JSON.stringify({ heissUi: block("drafted-gate"), graph }), {
+  createEditableProfile("drafted-gate", JSON.stringify({ studio: block("drafted-gate"), graph }), {
     by: "assistant",
   });
   const records = () => allCustomWorkflowRecords({ dedupe: false });

@@ -108,7 +108,7 @@ test(
     )[0];
     fake.finish(prompt.id, {
       outputs: {
-        [save]: { images: [{ filename: "saved.png", subfolder: "heiss-ui", type: "output" }] },
+        [save]: { images: [{ filename: "saved.png", subfolder: "studio", type: "output" }] },
       },
     });
     fake.send(id, { type: "execution_success", data: { prompt_id: prompt.id } });

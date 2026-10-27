@@ -47,7 +47,7 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(dataDir, "workflows/grok-video.json"),
   JSON.stringify({
-    heissUi: {
+    studio: {
       id: "grok-video",
       kind: "video",
       family: "grok",
@@ -430,7 +430,7 @@ test(
     fs.writeFileSync(
       path.join(dataDir, "workflows/renamed-provider.json"),
       JSON.stringify({
-        heissUi: { id: "renamed-provider", family: "custom" },
+        studio: { id: "renamed-provider", family: "custom" },
         1: { class_type: "GrokMedia", inputs: { prompt: "" } },
       }),
     );
@@ -509,7 +509,7 @@ test("cached catalogue reads reflect profile creation, editing, approval and del
   await api("/api/models");
   const before = primary.requests.filter((item) => item.pathname === "/object_info").length;
   const workflow = {
-    heissUi: {
+    studio: {
       id: "cache-readback",
       name: "Cached First",
       kind: "image",
@@ -533,7 +533,7 @@ test("cached catalogue reads reflect profile creation, editing, approval and del
   assert.equal((await selected()).label, "Cached First");
   const current = (await api("/api/profiles/editable/cache-readback")).body;
   const raw = JSON.parse(current.text);
-  raw.heissUi.name = "Cached Edited";
+  raw.studio.name = "Cached Edited";
   assert.equal(
     (
       await api(

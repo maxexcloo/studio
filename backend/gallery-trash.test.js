@@ -6,7 +6,7 @@ import test from "node:test";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-trash-"));
 const outputDir = path.join(temporary, "ComfyUI", "output");
-fs.mkdirSync(path.join(outputDir, "heiss-ui"), { recursive: true });
+fs.mkdirSync(path.join(outputDir, "studio"), { recursive: true });
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_WORKERS = JSON.stringify([
@@ -21,15 +21,15 @@ const trash = await import("./gallery-trash.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
 
 const item = (filename, extra = {}) => ({
-  id: `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`,
-  url: `/comfy/view?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "output" })}`,
+  id: `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`,
+  url: `/comfy/view?${new URLSearchParams({ filename, subfolder: "studio", type: "output" })}`,
   status: "done",
   filename: "a prompt",
   outputName: filename,
   createdAt: new Date().toISOString(),
   ...extra,
 });
-const file = (name) => path.join(outputDir, "heiss-ui", name);
+const file = (name) => path.join(outputDir, "studio", name);
 
 test("clearing moves the files into a trash batch, upscales too, and Undo puts them back", () => {
   fs.writeFileSync(file("image_00001_.png"), "one");
@@ -39,7 +39,7 @@ test("clearing moves the files into a trash batch, upscales too, and Undo puts t
     item("image_00001_.png", {
       upscale: {
         status: "done",
-        url: `/comfy/view?${new URLSearchParams({ filename: "upscale_00001_.png", subfolder: "heiss-ui", type: "output" })}`,
+        url: `/comfy/view?${new URLSearchParams({ filename: "upscale_00001_.png", subfolder: "studio", type: "output" })}`,
       },
     }),
     item("image_00002_.png"),

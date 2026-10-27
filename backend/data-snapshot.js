@@ -18,7 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { trashFolderNames } from "./data-names.js";
+import { trashFolderName } from "./data-names.js";
 import { appVersion, currentDataDir } from "./data-dir.js";
 import { databaseFile } from "./persistence/runtime.ts";
 
@@ -37,7 +37,7 @@ const skipped = new Set([
   ".private-vault",
   "reference-assets",
   "setup-demo",
-  ...trashFolderNames,
+  trashFolderName,
   ".DS_Store",
   "Thumbs.db",
 ]);

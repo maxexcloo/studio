@@ -69,13 +69,13 @@ test("a single-user run from an imported workflow saves where the workflow says;
     3: { class_type: "SaveAnimatedWEBP", inputs: { filename_prefix: "../../elsewhere/" } },
     4: { class_type: "KSampler", inputs: { seed: 1 } },
   });
-  assert.equal(graph[1].inputs.filename_prefix, "heiss-ui/portrait");
+  assert.equal(graph[1].inputs.filename_prefix, "studio/portrait");
   assert.equal(
     graph[2].inputs.filename_prefix,
-    "heiss-ui/output",
+    "studio/output",
     "a prefix fed by another node becomes a plain one",
   );
-  assert.equal(graph[3].inputs.filename_prefix, "heiss-ui/elsewhere");
+  assert.equal(graph[3].inputs.filename_prefix, "studio/elsewhere");
   assert.equal("filename_prefix" in graph[4].inputs, false);
 });
 
@@ -112,7 +112,7 @@ test("account image runs and their upscales save into the owner's folder", async
   const { accountOutputSubfolder } = await import("./account-ownership.js");
   const graph = saveIntoStudioFolder(
     {
-      1: { class_type: "SaveImage", inputs: { filename_prefix: "heiss-ui/upscale" } },
+      1: { class_type: "SaveImage", inputs: { filename_prefix: "studio/upscale" } },
       2: { class_type: "SaveImage", inputs: { filename_prefix: "image" } },
     },
     "account-a",

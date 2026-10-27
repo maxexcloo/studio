@@ -12,7 +12,7 @@ import sharp from "sharp";
 // The real server with Studio media storage: how long a browser may keep each kind of media.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-routes-"));
-const media = path.join(dataDir, "media", "heiss-ui");
+const media = path.join(dataDir, "media", "studio");
 fs.mkdirSync(media, { recursive: true });
 await sharp({ create: { width: 900, height: 900, channels: 3, background: "#a37" } })
   .png()
@@ -99,7 +99,7 @@ const revalidate = (url, etag) =>
       .on("error", reject);
   });
 const address = (route, filename, extra = "") =>
-  `${base}/comfy/${route}?${new URLSearchParams({ filename, subfolder: "heiss-ui", type: "media" })}${extra}`;
+  `${base}/comfy/${route}?${new URLSearchParams({ filename, subfolder: "studio", type: "media" })}${extra}`;
 
 test("a Studio media original is cached for good and answers a revalidation with 304", async () => {
   const response = await fetch(address("view", "still.png"));

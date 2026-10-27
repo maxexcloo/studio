@@ -18,7 +18,7 @@ const { userWorkflowsDir } = await import("./custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const profile = (overrides = {}) => ({
-  heissUi: {
+  studio: {
     id: "image-test",
     name: "Test Image",
     kind: "image",

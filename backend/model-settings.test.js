@@ -294,7 +294,7 @@ test("custom MiniMax H3 profiles use the family's starting aspect", async () => 
     file,
     JSON.stringify({
       graph: { 1: { class_type: "EmptyLatentImage", inputs: { width: 1344, height: 768 } } },
-      heissUi: {
+      studio: {
         id: "h3-aspect",
         name: "H3 Aspect",
         kind: "video",
@@ -565,7 +565,7 @@ test("custom batch counts reach the UI and configured ready profiles become inst
       graph: {
         1: { class_type: "EmptyLatentImage", inputs: { width: 864, height: 1152, batch_size: 4 } },
       },
-      heissUi: {
+      studio: {
         id: "batch-profile",
         name: "Batch Profile",
         kind: "image",
@@ -629,7 +629,7 @@ test("imported-only deployments retain user workflows and model files while hidi
       graph: {
         1: { class_type: "EmptyLatentImage", inputs: { width: 512, height: 512, batch_size: 1 } },
       },
-      heissUi: {
+      studio: {
         id: "imported-only",
         name: "Imported Only",
         kind: "image",
