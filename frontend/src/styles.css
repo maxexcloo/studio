@@ -4,6 +4,14 @@
 a {
   color: inherit;
 }
+/* Scrollbars stay hidden, so content never shifts when it becomes scrollable or a dialog locks
+   the page (Mantine's scroll lock then measures no gap to pad). */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
 button,
 a,
 input,
