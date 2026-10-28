@@ -449,6 +449,15 @@ export class McpMedia {
       return {};
     }
   }
+  /** The account's thumbs up and down per LoRA file, which order every LoRA list. */
+  async loraRatings(owner = "") {
+    try {
+      const { library } = await this.request("GET", "/api/loras/library", undefined, owner);
+      return library?.ratings || {};
+    } catch {
+      return {};
+    }
+  }
   /** Minutes left while the cloud video provider is known to refuse, otherwise 0. */
   cloudPause() {
     const left = this.cloudUnavailableUntil - Date.now();

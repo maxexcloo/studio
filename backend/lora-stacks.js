@@ -105,13 +105,23 @@ function cleanStrengths(value) {
   );
 }
 
+/** Thumbs up or down per LoRA file; anything else is unrated and left out. */
+function cleanRatings(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return Object.fromEntries(
+    Object.entries(source)
+      .filter(([name, rating]) => name.trim() && (rating === "up" || rating === "down"))
+      .slice(0, 2000),
+  );
+}
+
 function cleanLibrary(value) {
   const source = value && typeof value === "object" ? value : {};
   return {
     strengths: cleanStrengths(source.strengths),
     // Stacks are keyed by model family ("family:z-image"); older builds keyed them by workflow id.
     snapshots: cleanSnapshots(source.snapshots),
-    favorites: cleanNames(source.favorites),
+    ratings: cleanRatings(source.ratings),
     recents: cleanNames(source.recents, 12),
   };
 }
@@ -137,7 +147,7 @@ export function loadLoraLibrary(ownerId = "") {
 
 /**
  * Folds another copy of the library into this one without losing anything:
- * stacks are matched by id, new ones added; favorites and recents are joined;
+ * stacks are matched by id, new ones added; recents are joined; ratings and
  * strengths fill in only what is not set yet. Used for the whole-library PUT
  * that older builds (and a device's first sync) send, so it can never wipe
  * stacks saved from another device.
@@ -148,7 +158,7 @@ function mergeLibrary(into, incoming) {
     const list = into.snapshots[key] || (into.snapshots[key] = []);
     for (const stack of stacks) if (!list.some((item) => item.id === stack.id)) list.push(stack);
   }
-  into.favorites = [...new Set([...into.favorites, ...other.favorites])];
+  into.ratings = { ...other.ratings, ...into.ratings };
   into.recents = [...new Set([...into.recents, ...other.recents])].slice(0, 12);
   for (const [workflow, entries] of Object.entries(other.strengths)) {
     into.strengths[workflow] = { ...entries, ...(into.strengths[workflow] || {}) };
@@ -158,7 +168,7 @@ function mergeLibrary(into, incoming) {
 /**
  * One edit, applied to whatever the server holds right now. Each is safe to
  * replay: a retried "add" does not duplicate, a retried "delete" is a no-op,
- * and favorites are set rather than toggled.
+ * and ratings are set rather than toggled.
  */
 function applyOp(state, library, op) {
   const key = String(op?.key || "");
@@ -206,12 +216,11 @@ function applyOp(state, library, op) {
         };
       break;
     }
-    case "favorite": {
+    case "rating": {
       const name = String(op.name || "").trim();
       if (!name) break;
-      library.favorites = op.on
-        ? [...new Set([...library.favorites, name])]
-        : library.favorites.filter((item) => item !== name);
+      if (op.rating === "up" || op.rating === "down") library.ratings[name] = op.rating;
+      else delete library.ratings[name];
       break;
     }
     case "recents": {

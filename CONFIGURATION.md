@@ -241,6 +241,8 @@ It also renames the old `nsfw` marker to `uncensored` (`backend/uncensored-marke
 
 It gives every existing group the **Upscale** feature, on (`upscaleFeature` in the same module), unless the group already sets it; the dry run reports those groups under `upscaleFeature`.
 
+It also turns each account's LoRA favourites into thumbs up (`backend/lora-ratings.js`): every `lora-stacks.json` library's `favorites` list becomes `ratings` of `up`, keeping a rating already set. The dry run reports the files under `loraRatings`; `--apply` copies them to `.backups/lora-ratings-*` (`mapping.json` names each copy's source) and then writes them, with Studio stopped. Until it runs, Studio shows no ratings and the next LoRA library change drops the old list.
+
 With `--dream-owner <account id>`, naming the one account that has used Dream, it also clears Dream answers left on other accounts' records (`backend/dream-ownership.js`): Dream marks on gallery items another account owns, and that account's calibration answers and Dream taste signals about those items. Its own marks, answers and taste summary stay. The dry run reports the counts under `dreamOwnership`; `--apply` writes them with Studio stopped, without a backup.
 
 ## Queue, Sessions & Runtime Control

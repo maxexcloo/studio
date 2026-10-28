@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { closeLoras, create, fixtures, pickerTab, profiles, serveProfiles } from "./fixtures";
 
-test("LoRA favourites persist, tabs and search narrow the choices, and Trigger Words reach the generation", async ({
+test("LoRA ratings persist and order the list, tabs and search narrow the choices, and Trigger Words reach the generation", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -26,12 +26,23 @@ test("LoRA favourites persist, tabs and search narrow the choices, and Trigger W
   const controls = page.getByRole("region", { name: "LoRA Controls", exact: true });
   // Choices apply at once; the popup closes like any other.
   await expect(page.getByRole("button", { name: "Use LoRAs", exact: true })).toHaveCount(0);
-  const star = controls.getByRole("button", { name: "Favourite Soft Style", exact: true });
-  await star.click();
-  await expect(star).toHaveAttribute("aria-pressed", "true");
-  await expect.poll(() => state.loraLibrary.favorites).toEqual(["soft-style.safetensors"]);
-  await pickerTab(page, "LoRAs", "Favourites");
+  const up = controls.getByRole("button", { name: "Thumbs Up Soft Style", exact: true });
+  await up.click();
+  await expect(up).toHaveAttribute("aria-pressed", "true");
+  await controls.getByRole("button", { name: "Thumbs Down Detail Slider", exact: true }).click();
+  await expect
+    .poll(() => state.loraLibrary.ratings)
+    .toEqual({ "soft-style.safetensors": "up", "detail.safetensors": "down" });
   const choices = controls.getByRole("list", { name: "LoRA Choices", exact: true });
+  // Thumbs up lead and thumbs down trail, whatever the alphabet says.
+  await expect
+    .poll(() =>
+      choices
+        .getByRole("button", { name: /^(Soft Style|Detail Slider)$/ })
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+    )
+    .toEqual(["Soft Style", "Detail Slider"]);
+  await pickerTab(page, "LoRAs", "Favourites");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
   await pickerTab(page, "LoRAs", "All");
@@ -58,7 +69,7 @@ test("LoRA favourites persist, tabs and search narrow the choices, and Trigger W
   ]);
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await expect(star).toHaveAttribute("aria-pressed", "true");
+  await expect(up).toHaveAttribute("aria-pressed", "true");
 });
 
 test("Escape inside the LoRA picker closes only its innermost layer", async ({
