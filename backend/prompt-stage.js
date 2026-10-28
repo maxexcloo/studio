@@ -21,6 +21,7 @@ const text = (value, limit = maxPromptCharacters) =>
   String(typeof value === "string" ? value : "")
     .trim()
     .slice(0, limit);
+const writeTimeoutMs = 60_000;
 const whole = (value, max) => Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
 
 /** The admitted writing request: only its kind's request fields, never a written result; or null. */
@@ -121,6 +122,8 @@ export function createPromptStage({
       role: writing.role,
       taste: taste(job.ownerId),
       signal,
+      // No chat waits on this stage: a busy shared text model should delay the image, not fail it.
+      timeout: writeTimeoutMs,
       onThinking,
       onDelta,
     });
