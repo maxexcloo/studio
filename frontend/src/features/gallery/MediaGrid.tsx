@@ -1,4 +1,15 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type KeyboardEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import type { MediaItem } from "../../types";
 import { MediaTile } from "./MediaTile";
@@ -61,7 +72,10 @@ export function MediaGrid({
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
   const hold = useHoldToSelect(items, selection);
-  const dimensions = items.map((item) => `${item.id}:${item.width}:${item.height}`).join("|");
+  const dimensions = useMemo(
+    () => items.map((item) => `${item.id}:${item.width}:${item.height}`).join("|"),
+    [items],
+  );
   const virtual = useWindowVirtualizer({
     count: width ? items.length : 0,
     lanes: columns,
@@ -70,7 +84,23 @@ export function MediaGrid({
     getItemKey: (index) => items[index].id,
     overscan: 2,
     scrollMargin: host.current?.offsetTop || 0,
+    // Scrolling renders in React's own time instead of synchronously inside each scroll event.
+    useFlushSync: false,
   });
+  const onArrow = useCallback(
+    (index: number, event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const direction = arrows[event.key];
+      const next = direction && items[index + direction];
+      if (!next) return;
+      event.preventDefault();
+      pendingFocus.current = next.id;
+      virtual.scrollToIndex(index + direction, { align: "auto" });
+      // Mounted neighbours can receive focus without waiting for a scroll render.
+      if (focusTile(host.current, next.id)) pendingFocus.current = null;
+    },
+    [items, virtual, host],
+  );
   useLayoutEffect(() => virtual.measure(), [width, columns, dimensions, virtual]);
   useLayoutEffect(() => {
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
@@ -92,54 +122,103 @@ export function MediaGrid({
     >
       {virtual.getVirtualItems().map((placement) => {
         const original = items[placement.index];
-        const group = versions?.get(original.id);
-        const version = selection.selecting ? undefined : shown[original.id];
-        const item = (version !== undefined && group?.[version]) || original;
         return (
-          <MediaTile
+          <GridCell
             key={original.id}
-            item={item}
-            group={[original]}
-            versions={group}
-            version={version}
-            onVersion={(index) =>
-              setShown(({ [original.id]: _, ...rest }) =>
-                index === undefined ? rest : { ...rest, [original.id]: index },
-              )
-            }
+            original={original}
+            index={placement.index}
+            left={placement.lane * (cell + galleryGap)}
+            top={placement.start - virtual.options.scrollMargin}
+            width={cell}
+            height={placement.size}
+            versions={versions?.get(original.id)}
+            version={selection.selecting ? undefined : shown[original.id]}
+            setShown={setShown}
+            menuItem={menuItem}
+            setMenuItem={setMenuItem}
+            onArrow={onArrow}
+            open={open}
             selection={selection}
             hold={hold}
             caption={caption}
-            detail={detail(item)}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: placement.lane * (cell + galleryGap),
-              width: cell,
-              height: placement.size,
-              transform: `translateY(${placement.start - virtual.options.scrollMargin}px)`,
-            }}
-            onOpen={() => open(item)}
-            onMenu={() => setMenuItem(item.id)}
+            detail={detail}
+            renderActions={renderActions}
             onSelectionMenu={onSelectionMenu}
             onTryAgain={onTryAgain}
-            actions={renderActions(item, menuItem === item.id, (opened) =>
-              setMenuItem(opened ? item.id : null),
-            )}
-            onKeyDown={(event) => {
-              if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-              const direction = arrows[event.key];
-              const next = direction && items[placement.index + direction];
-              if (!next) return;
-              event.preventDefault();
-              pendingFocus.current = next.id;
-              virtual.scrollToIndex(placement.index + direction, { align: "auto" });
-              // Mounted neighbours can receive focus without waiting for a scroll render.
-              if (focusTile(host.current, next.id)) pendingFocus.current = null;
-            }}
           />
         );
       })}
     </div>
   );
 }
+
+/**
+ * One placed tile. Memoised: a scroll changes which tiles are placed, not the tiles themselves, so
+ * only those entering the window render. Every prop is a value or a stable callback.
+ */
+const GridCell = memo(function GridCell({
+  original,
+  index,
+  left,
+  top,
+  width,
+  height,
+  versions,
+  version,
+  setShown,
+  menuItem,
+  setMenuItem,
+  onArrow,
+  open,
+  detail,
+  renderActions,
+  ...tile
+}: Pick<
+  GalleryViewProps,
+  "open" | "selection" | "caption" | "detail" | "renderActions" | "onSelectionMenu" | "onTryAgain"
+> & {
+  original: MediaItem;
+  index: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  versions?: VersionGroup;
+  version?: number;
+  setShown: Dispatch<SetStateAction<Record<string, number>>>;
+  menuItem: string | null;
+  setMenuItem: (id: string | null) => void;
+  onArrow: (index: number, event: KeyboardEvent<HTMLButtonElement>) => void;
+  hold: ReturnType<typeof useHoldToSelect>;
+}) {
+  const item = (version !== undefined && versions?.[version]) || original;
+  return (
+    <MediaTile
+      {...tile}
+      item={item}
+      group={[original]}
+      versions={versions}
+      version={version}
+      onVersion={(index) =>
+        setShown(({ [original.id]: _, ...rest }) =>
+          index === undefined ? rest : { ...rest, [original.id]: index },
+        )
+      }
+      detail={detail(item)}
+      style={{
+        position: "absolute",
+        top: 0,
+        left,
+        width,
+        height,
+        transform: `translateY(${top}px)`,
+      }}
+      onOpen={() => open(item)}
+      onMenu={() => setMenuItem(item.id)}
+      actions={renderActions(item, menuItem === item.id, (opened) =>
+        setMenuItem(opened ? item.id : null),
+      )}
+      onKeyDown={(event) => onArrow(index, event)}
+    />
+  );
+});
