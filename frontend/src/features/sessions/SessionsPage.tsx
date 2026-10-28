@@ -217,7 +217,16 @@ function SessionPage() {
             {timeline.map((entry) =>
               "message" in entry ? (
                 <Fragment key={entry.key}>
-                  <ChatTurn message={entry.message} quiet={quietLine(entry.message, jobIndex)} />
+                  <ChatTurn
+                    message={entry.message}
+                    quiet={quietLine(entry.message, jobIndex)}
+                    source={
+                      entry.message.draft?.parentJobId &&
+                      jobIndex.has(entry.message.draft.parentJobId)
+                        ? jobIndex.get(entry.message.draft.parentJobId)! + 1
+                        : undefined
+                    }
+                  />
                   {entry.message.jobId &&
                     replies.get(entry.message.jobId) === entry.message.id &&
                     iteration(jobs[jobIndex.get(entry.message.jobId)!])}

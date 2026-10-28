@@ -6,13 +6,26 @@ import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GenerationCard } from "./GenerationCard";
 import classes from "./SessionsPage.module.css";
 
-const requested = { image: "an image", refine: "a refinement", animate: "an animation" };
+/** What a reply asked for: a new image, or an edit of which image (`source`, its iteration). */
+function requestLine(operation: string, source?: number) {
+  if (operation === "refine")
+    return source ? `Editing iteration ${source}` : "Editing the latest image";
+  return operation === "animate" ? "Animation" : "New image";
+}
 
 /**
  * One message. A card's request (`quiet`, such as "Edited iteration 1") is one dimmed line, since
  * the new iteration below shows its prompt and settings.
  */
-export function ChatTurn({ message, quiet }: { message: ChatMessage; quiet?: string }) {
+export function ChatTurn({
+  message,
+  quiet,
+  source,
+}: {
+  message: ChatMessage;
+  quiet?: string;
+  source?: number;
+}) {
   if (message.role === "user")
     return quiet ? (
       <Group gap={6} justify="flex-end" c="dimmed" className={classes.quiet}>
@@ -47,7 +60,7 @@ export function ChatTurn({ message, quiet }: { message: ChatMessage; quiet?: str
       {message.draft && (
         <Group gap={6} c="dimmed">
           <Wand size={13} aria-hidden />
-          <Text size="xs">Requested {requested[message.draft.operation]}</Text>
+          <Text size="xs">{requestLine(message.draft.operation, source)}</Text>
         </Group>
       )}
       {message.status === "cancelled" && (
@@ -57,7 +70,7 @@ export function ChatTurn({ message, quiet }: { message: ChatMessage; quiet?: str
       )}
       {message.status === "failed" && !message.actionError && (
         <Text size="sm" c="red">
-          This response could not be completed.
+          {message.error || "This response could not be completed."}
         </Text>
       )}
       {message.actionError && (
