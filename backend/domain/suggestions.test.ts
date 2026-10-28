@@ -52,6 +52,7 @@ function fixture(
       settings: { profileName: "Flux 2", loras: [{ name: "film", enabled: true }] },
     },
     "alice:job-video": { type: "video", status: "done", prompt: "Waves" },
+    "bob:job-b": { type: "image", status: "done", prompt: "A sultry portrait" },
   };
   const suggestions = createSuggestions({
     taste: {
@@ -66,6 +67,7 @@ function fixture(
     },
     writer: (owner) => ((options.writer || (() => true))(owner) ? model : null),
     online: async () => options.online ?? true,
+    uncensored: (owner) => owner === "bob",
     item: (owner, jobId) => items[`${owner}:${jobId}`],
     save: (item, nextSteps) => Object.assign(item, { nextSteps }),
     now: () => clock,
@@ -166,6 +168,10 @@ test("viewer next steps use the item's prompt and settings, with Title Case labe
     reason: "Next steps are offered for finished images.",
   });
   assert.equal(calls.length, 1);
+  assert.doesNotMatch(calls[0][0].content, /uncensored/);
+  // An account with Uncensored Models gets steps that keep an explicit image explicit.
+  await suggestions.suggest("bob", { surface: "viewer", jobId: "job-b" });
+  assert.match(calls[1][0].content, /may make uncensored images[^\n]*never refuse/);
 });
 
 test("an image's next steps are kept with it, and More asks for different ones", async () => {
