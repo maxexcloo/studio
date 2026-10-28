@@ -93,7 +93,7 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   expect(state.jobs[1].input.profileId).toBe("image:fast");
   expect(state.jobs[1].input.backendId).toBe("worker-a");
   if (testInfo.project.use.isMobile)
-    await expect(page.getByRole("dialog", { name: "Generation Controls" })).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Generate" })).toBeHidden();
   await page.screenshot({
     path: `/tmp/studio-rewrite-${testInfo.project.name}.png`,
     fullPage: false,

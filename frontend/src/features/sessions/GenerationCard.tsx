@@ -106,13 +106,12 @@ export function GenerationCard({
         }
         onClear={() => form.reset()}
         onSubmit={() => void submit()}
-        presets={(close, inline) => (
+        presets={(close) => (
           <PresetPicker
             input={form.values}
             references={references}
             profile={profile}
             selection={preset}
-            onDone={inline ? close : undefined}
             onSelectionChange={setPreset}
             onLoad={(loaded) => {
               setPreset({ presetId: loaded.id, presetTitle: loaded.title });

@@ -21,7 +21,7 @@ function GenerationScrollArea(props: ScrollAreaProps) {
   return (
     <ScrollArea
       {...props}
-      viewportProps={{ "aria-label": "Generation Controls Scroll Area" }}
+      viewportProps={{ "aria-label": "Generate Scroll Area" }}
       styles={{ content: { display: "flex", flexDirection: "column", minHeight: "100%" } }}
     />
   );
@@ -297,7 +297,7 @@ export function ComposerDock({
                 <div
                   id={controlsId}
                   role="region"
-                  aria-label="Generation Controls"
+                  aria-label="Generate"
                   aria-hidden={handingOver || !opened || undefined}
                   inert={!opened}
                 >
@@ -328,8 +328,8 @@ export function ComposerDock({
           }}
           opened={opened}
           onClose={collapse}
-          title="Generation Controls"
-          closeButtonProps={{ "aria-label": "Close Generation Controls" }}
+          title="Generate"
+          closeButtonProps={{ "aria-label": "Close Generate" }}
           position="bottom"
           transitionProps={{ duration: motionDuration }}
           size="100%"

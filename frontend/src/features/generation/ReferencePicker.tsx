@@ -1,16 +1,12 @@
-import { useMotionDuration } from "../../ui/Appearance";
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionIcon,
   Alert,
   Button,
-  Drawer,
   FileButton,
-  FocusTrap,
   getDefaultZIndex,
   Image,
   Loader,
-  Popover,
   ScrollArea,
   Stack,
   Text,
@@ -52,15 +48,8 @@ import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
 import { useReferenceBrowser, type ReferenceBrowser } from "./useReferenceBrowser";
 import { usePhone } from "../../ui/usePhone";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
-import { chipProps, escapePanel } from "./chip";
-import {
-  ChipThumbnails,
-  PanelHeader,
-  PickerFooter,
-  PickerGrid,
-  PickerHeader,
-  PickerTile,
-} from "./Picker";
+import { chipProps } from "./chip";
+import { ChipPopup, ChipThumbnails, PickerGrid, PickerHeader, PickerTile } from "./Picker";
 import classes from "./ReferencePicker.module.css";
 
 export function ReferencePicker({
@@ -69,8 +58,6 @@ export function ReferencePicker({
   onChange,
   profile: selectedProfile,
   input: selectedInput,
-  inline = false,
-  embedded = false,
   opened: controlled,
   onOpenedChange,
   browser: controlledBrowser,
@@ -81,8 +68,6 @@ export function ReferencePicker({
   onChange?: (references: ReferenceAsset[]) => void;
   profile?: Profile;
   input?: GenerationInput;
-  inline?: boolean;
-  embedded?: boolean;
   opened?: boolean;
   onOpenedChange?: (opened: boolean) => void;
 }) {
@@ -92,11 +77,7 @@ export function ReferencePicker({
     setLocalOpen(opened);
     onOpenedChange?.(opened);
   };
-  const close = () => setOpened(false);
   const phone = usePhone();
-  // Phones show the panel as a full-height sheet with its action at the safe bottom.
-  const sheet = inline || phone;
-  const motionDuration = useMotionDuration();
   const { draft } = useGeneration();
   const list = useReferenceList({
     value,
@@ -279,8 +260,6 @@ export function ReferencePicker({
     <Stack
       component="section"
       aria-label="References"
-      data-composer-layer
-      onKeyDown={(event) => escapePanel(event, close)}
       onPaste={(event) => {
         if (event.defaultPrevented || !event.clipboardData.files.length) return;
         event.preventDefault();
@@ -297,12 +276,10 @@ export function ReferencePicker({
       gap="sm"
       style={{
         minHeight: 0,
-        // The sheet fills the phone Drawer below its 3.75rem header, so the grid owns scrolling
-        // and keeps its position while the footer stays at the safe bottom.
-        height: sheet ? "calc(100dvh - 3.75rem)" : "min(70dvh, 620px)",
+        // Phones fill the popup below its header; the grid owns scrolling and keeps its position.
+        height: phone ? "calc(100dvh - 5rem)" : "min(70dvh, 620px)",
       }}
     >
-      {inline && <PanelHeader title="References" onBack={close} />}
       <ReferenceSlots
         references={references}
         profile={profile}
@@ -410,21 +387,6 @@ export function ReferencePicker({
           </Button>
         )}
       </ScrollArea.Autosize>
-      <PickerFooter
-        end={
-          <Button
-            variant="default"
-            disabled={!references.length}
-            onClick={() => {
-              list.set([]);
-              settle();
-            }}
-          >
-            Clear References
-          </Button>
-        }
-        done={sheet ? { label: "Use References", onClick: close } : undefined}
-      />
     </Stack>
   );
   const missing = profile?.mediaInputs?.some(
@@ -475,50 +437,32 @@ export function ReferencePicker({
       )}
     </Button>
   );
-  if (inline && opened)
-    return (
-      <>
-        {content}
-        {deleteDialog}
-      </>
-    );
-  if (phone)
-    return (
-      <>
-        {trigger}
-        <Drawer
-          opened={opened && !embedded}
-          onClose={close}
-          title="References"
-          position="bottom"
-          size="100%"
-          transitionProps={{ duration: motionDuration }}
-          trapFocus={deleteId === null}
-          styles={{ body: { paddingBottom: 0 } }}
-        >
-          <FocusTrap.InitialFocus />
-          {content}
-        </Drawer>
-        {deleteDialog}
-      </>
-    );
   return (
     <>
-      <Popover
-        opened={opened}
-        onChange={setOpened}
+      <ChipPopup
+        title="References"
         width={560}
-        position="top-start"
-        trapFocus={deleteId === null}
-        closeOnClickOutside={deleteId === null}
-        // Escape closes nested layers first; the panel's own handler closes it last.
-        closeOnEscape={false}
-        returnFocus
-        shadow="md"
+        opened={opened}
+        onOpenedChange={setOpened}
+        trap={deleteId === null}
+        target={trigger}
+        headerEnd={
+          <Button
+            size="compact-sm"
+            variant="subtle"
+            color="gray"
+            disabled={!references.length}
+            onClick={() => {
+              list.set([]);
+              settle();
+            }}
+          >
+            Clear References
+          </Button>
+        }
       >
-        <Popover.Target>{trigger}</Popover.Target>
-        <Popover.Dropdown aria-label="References">{content}</Popover.Dropdown>
-      </Popover>
+        {content}
+      </ChipPopup>
       {deleteDialog}
     </>
   );

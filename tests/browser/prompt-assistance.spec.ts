@@ -136,10 +136,8 @@ test("Assistance Undo restores only its changes while keeping later edits and Lo
   await undoAssistance(page, "Prompt improved");
   await expect(prompt).toHaveValue("My later direction");
   await assist(page, "Write Negative");
-  await withExpertSettings(page, () =>
-    expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
-      "poor quality",
-    ),
+  await expect(page.getByRole("textbox", { name: "Negative Prompt", exact: true })).toHaveValue(
+    "poor quality",
   );
   await prompt.fill("My later direction in warm light");
   await undoAssistance(page, "Negative prompt written");
@@ -244,7 +242,7 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await create(page);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
-  await withExpertSettings(page, () => negative.fill("Keep these exclusions"));
+  await negative.fill("Keep these exclusions");
   await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
   let panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await panel.getByRole("button", { name: "Pin Prompt", exact: true }).click();
@@ -254,16 +252,11 @@ test("Prompt history reuses positive and negative prompts independently and pers
   await historySearch.press("ArrowDown");
   await historySearch.press("Enter");
   await expect(prompt).toHaveValue("Earlier landscape");
-  await withExpertSettings(page, async () => {
-    await expect(negative).toHaveValue("Keep these exclusions");
-    await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
-    panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
-    await panel
-      .getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true })
-      .click();
-    // Picking a negative prompt keeps the Expert settings open around it.
-    await expect(negative).toHaveValue("Earlier exclusions");
-  });
+  await expect(negative).toHaveValue("Keep these exclusions");
+  await page.getByRole("button", { name: "Recent Negative Prompts", exact: true }).click();
+  panel = page.getByRole("dialog", { name: "Recent Negative Prompts", exact: true });
+  await panel.getByRole("option", { name: "Use Prompt: Earlier exclusions", exact: true }).click();
+  await expect(negative).toHaveValue("Earlier exclusions");
   await expect(prompt).toHaveValue("Earlier landscape");
   expect(histories.positive[0].pinned).toBe(true);
 });

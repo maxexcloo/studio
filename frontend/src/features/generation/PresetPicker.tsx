@@ -44,7 +44,6 @@ export function PresetPicker({
   selection,
   onSelectionChange,
   onLoad,
-  onDone,
 }: {
   input: GenerationInput;
   references: ReferenceAsset[];
@@ -52,8 +51,6 @@ export function PresetPicker({
   selection: PresetSelection;
   onSelectionChange: (selection: PresetSelection) => void;
   onLoad: (preset: Preset) => void;
-  /** The phone panel's closing action. */
-  onDone?: () => void;
 }) {
   const client = useQueryClient();
   const presets = useQuery(presetsQuery);
@@ -110,7 +107,7 @@ export function PresetPicker({
     .reverse()
     .map((preset) => ({ ...preset, name: preset.title }));
   return (
-    <Stack gap="sm" flex={onDone ? 1 : undefined} mih={0}>
+    <Stack gap="sm">
       <PickerHeader
         label="Presets"
         query={query}
@@ -123,7 +120,7 @@ export function PresetPicker({
           {presets.error.message}
         </Text>
       )}
-      <ScrollArea.Autosize mah={onDone ? undefined : "min(45dvh, 360px)"}>
+      <ScrollArea.Autosize mah="min(45dvh, 360px)">
         <SavedList
           label="Saved Presets"
           noun="Preset"
@@ -172,7 +169,6 @@ export function PresetPicker({
             Clear Preset
           </Button>
         }
-        done={onDone && { label: "Done", onClick: onDone }}
       />
     </Stack>
   );

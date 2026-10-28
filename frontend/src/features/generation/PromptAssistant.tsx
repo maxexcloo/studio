@@ -291,33 +291,35 @@ export function usePromptAssistant({
         {info.presets.length > 1 ? (
           <>
             <Menu.Label>Improve Prompt</Menu.Label>
-            {/* Each style is a choice that runs at once; the last one used comes first. */}
-            {[preset!, ...info.presets.filter((item) => item.id !== preset?.id)].map((item) => (
-              <Menu.Item
-                key={item.id}
-                disabled={disabled}
-                aria-label={`Improve Prompt: ${item.label}`}
-                rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
-                onClick={() => run("rewrite", item.id)}
-              >
-                {item.label}
-              </Menu.Item>
-            ))}
-            <Menu.Divider />
+            {/* Each style is a choice that runs at once; the last one used carries a check. */}
+            {[...info.presets]
+              .sort((a, b) => a.label.localeCompare(b.label))
+              .map((item) => (
+                <Menu.Item
+                  key={item.id}
+                  disabled={disabled}
+                  aria-label={`Improve Prompt: ${item.label}`}
+                  rightSection={item.id === preset?.id ? <Check size={14} /> : undefined}
+                  onClick={() => run("rewrite", item.id)}
+                >
+                  {item.label}
+                </Menu.Item>
+              ))}
+            {(negativeOffered || lorasOffered) && <Menu.Divider />}
           </>
         ) : (
           <Menu.Item disabled={disabled} onClick={() => run("rewrite", preset?.id)}>
             Improve Prompt
           </Menu.Item>
         )}
-        {negativeOffered && (
-          <Menu.Item disabled={disabled} onClick={() => run("negative")}>
-            Write Negative
-          </Menu.Item>
-        )}
         {lorasOffered && (
           <Menu.Item disabled={disabled} onClick={() => run("loras")}>
             Suggest LoRAs
+          </Menu.Item>
+        )}
+        {negativeOffered && (
+          <Menu.Item disabled={disabled} onClick={() => run("negative")}>
+            Write Negative
           </Menu.Item>
         )}
         {!!references.length && info.vision && (
