@@ -25,7 +25,10 @@ imageInfo.LoraLoader.input.required.lora_name[0] = ["private-lora.safetensors"];
 const videoInfo = structuredClone(source);
 videoInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["minimax_h3_test.safetensors"];
 const primary = await startFakeComfy({ objectInfo: imageInfo });
-const video = await startFakeComfy({ objectInfo: videoInfo });
+const video = await startFakeComfy({
+  objectInfo: videoInfo,
+  outputFiles: new Map([["after-restart.mp4", Buffer.from("video")]]),
+});
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backend-routes-"));
 writeTestWorkflows(dataDir);
 // LoRAs on the test image profile, which an SFW instance hides.
