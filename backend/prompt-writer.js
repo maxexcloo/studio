@@ -162,53 +162,55 @@ export function createPromptWriter(
         `Request: ${clean(request)}`,
         ...changes.slice(-maxChanges).map((change) => `Change: ${clean(change)}`),
       ].join("\n");
+      const system = instructions({
+        profile,
+        guide: writerGuide(guide),
+        count,
+        index,
+        of,
+        references,
+        role,
+        suggest,
+        taste,
+      });
+      const shape =
+        count === 1 && !suggest ? "Reply with only the prompt." : "Reply with only the JSON.";
       let reason;
-      try {
-        const reply = await engine.chat({
-          model: settings.model,
-          messages: [
-            {
-              role: "system",
-              content: instructions({
-                profile,
-                guide: writerGuide(guide),
-                count,
-                index,
-                of,
-                references,
-                role,
-                suggest,
-                taste,
-              }),
-            },
-            { role: "user", content: user },
-          ],
-          temperature: 0.7,
-          // Reasoning models spend part of this on thinking before the prompts.
-          maxTokens: 4000 + 400 * count,
-          signal,
-          onThinking,
-          onDelta,
-        });
-        const prompts = parseWrittenPrompts(reply.text, count);
-        if (prompts) {
-          log.info?.(
-            `MCP prompt writer: ${count} prompt${count > 1 ? "s" : ""} for ${profile.id} in ${Date.now() - started} ms`,
-          );
-          return {
-            prompts,
-            thinking: reply.thinking,
+      // An unusable reply gets one retry with a reminder of the reply's shape.
+      for (let attempt = 0; attempt < 2; attempt += 1)
+        try {
+          const reply = await engine.chat({
             model: settings.model,
-            source: "studio",
-            ms: Date.now() - started,
-            ...(suggest ? { suggestions: parseSuggestions(reply.text) } : {}),
-          };
+            messages: [
+              { role: "system", content: system },
+              { role: "user", content: attempt ? `${user}\n\n${shape}` : user },
+            ],
+            temperature: 0.7,
+            maxTokens: 4000 + 400 * count,
+            signal,
+            onThinking,
+            onDelta,
+          });
+          const prompts = parseWrittenPrompts(reply.text, count);
+          if (prompts) {
+            log.info?.(
+              `MCP prompt writer: ${count} prompt${count > 1 ? "s" : ""} for ${profile.id} in ${Date.now() - started} ms`,
+            );
+            return {
+              prompts,
+              thinking: reply.thinking,
+              model: settings.model,
+              source: "studio",
+              ms: Date.now() - started,
+              ...(suggest ? { suggestions: parseSuggestions(reply.text) } : {}),
+            };
+          }
+          reason = "unusable reply";
+        } catch (error) {
+          if (signal?.aborted) throw error;
+          reason = error instanceof AssistantError ? error.reason : "unreachable";
+          if (!/reply/.test(reason)) break;
         }
-        reason = "unusable reply";
-      } catch (error) {
-        if (signal?.aborted) throw error;
-        reason = error instanceof AssistantError ? error.reason : "unreachable";
-      }
       if (fallback === undefined) throw new AssistantError(reason);
       log.warn?.(
         `MCP prompt writer fell back to the request for ${profile.id} after ${Date.now() - started} ms: ${reason}`,

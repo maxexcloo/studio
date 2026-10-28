@@ -4423,7 +4423,7 @@ test("a prompt the writer can't write fails its job with the reason, and writing
   assert.equal(await reason(unavailable.jobs[0]), "Writing the prompt failed: HTTP 503");
   answer = () => Response.json({ choices: [{ message: { content: "" } }] });
   const empty = data(await call(client, "Generate", { kind: "image", request: "an egg" }));
-  assert.equal(await reason(empty.jobs[0]), "Writing the prompt failed: unusable reply");
+  assert.equal(await reason(empty.jobs[0]), "Writing the prompt failed: empty reply");
   answer = () => {
     throw new TypeError("fetch failed");
   };
