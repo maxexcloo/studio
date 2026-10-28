@@ -179,7 +179,7 @@ import {
   setPromptHistoryEnabled,
   setPromptPinned,
 } from "./prompt-history.js";
-import { fillVideoSizes, libraryFile, libraryFolders, rescanLibraryFolders } from "./library.js";
+import { fillVideoSizes } from "./library.js";
 import {
   getComfyVideoPoster,
   getComfyVideoPreview,
@@ -238,7 +238,6 @@ import {
   runUpscaleJob,
   toggleUpscaleView,
 } from "./upscale-jobs.js";
-import { autoDetectOutputDir } from "./output-folder.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { isMediaUrl, mediaRoot, mediaStorageEnabled, mediaType } from "./media-paths.js";
@@ -1564,21 +1563,6 @@ app.post("/api/prompts/clear", (req, res) => {
   });
 });
 
-app.get("/api/library/file", (req, res) => {
-  const file = libraryFile(req.query.folder, req.query.path);
-  if (!file) {
-    res.status(404).json({ ok: false, error: "That image is gone." });
-    return;
-  }
-  const disposition = req.query.download === "1" ? "attachment" : "inline";
-  res.sendFile(file, {
-    headers: {
-      "Cache-Control": "private, max-age=0, must-revalidate",
-      "Content-Disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`,
-    },
-  });
-});
-
 /**
  * A thumbnail's caching. The gallery asks for every thumbnail with a `v` that
  * names its item (mediaUrl.ts), so a reused file name is a new address: that
@@ -2622,15 +2606,6 @@ async function queueUpscaleOnWorker(account, request, origin) {
       status: 400,
       payload: { ok: false, reason: "video", error: "Upscale supports gallery images and videos." },
     };
-  if (item.library)
-    return {
-      status: 400,
-      payload: {
-        ok: false,
-        reason: "library",
-        error: "Images from an added folder stay in that folder, so they can’t be upscaled.",
-      },
-    };
   if (item.status !== "done")
     return {
       status: 409,
@@ -3157,9 +3132,6 @@ setTimeout(
   () =>
     recoverGalleryFromHistory()
       .catch(() => null)
-      // A library scan skips the output folder, so it has to be known before one runs.
-      .then(() => (libraryFolders().length ? autoDetectOutputDir() : null))
-      .then(() => rescanLibraryFolders())
       // Videos imported before their size was read get it now.
       .then(() => fillVideoSizes())
       .catch(() => null),

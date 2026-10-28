@@ -84,7 +84,6 @@ test("captions the newest uncaptioned image, one at a time and at most one every
     image("new"),
     image("video", "alice", { type: "video" }),
     image("running", "alice", { status: "running" }),
-    image("library", "alice", { library: true }),
     image("hidden", "alice", { hidden: true } as Partial<CaptionItem>),
     image("captioned", "alice", { caption: old }),
     image("old"),
