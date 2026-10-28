@@ -5,6 +5,7 @@ import { Copy, Download, Eraser, ExternalLink, ScanText, Square } from "lucide-r
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { useIsAdmin } from "../auth/AccountGate";
+import { GalleryPass } from "./GalleryPass";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
 /** A Caption Gallery pass (backend/domain/idle-work.ts). */
@@ -157,6 +158,15 @@ export function MaintenanceSettings() {
             Export
           </Button>
         </SettingRow>
+        {admin && (
+          <GalleryPass
+            route="/api/gallery/embeddings"
+            label="Index Gallery"
+            description="Read every image for Image Search, on Studio's CPU while it is idle. The first run downloads the model."
+            remaining="to index"
+            progressLabel="Index Progress"
+          />
+        )}
       </SettingGroup>
       <SettingGroup title="Help">
         <SettingRow

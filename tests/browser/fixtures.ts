@@ -646,7 +646,7 @@ export async function fixtures(page: Page) {
           },
         ],
       });
-    if (path === "/api/gallery/captions")
+    if (path === "/api/gallery/captions" || path === "/api/gallery/embeddings")
       return respond({
         state: "finished",
         active: false,

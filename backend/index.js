@@ -31,14 +31,21 @@ import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
-import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
+import { createCaptioner } from "./domain/captions.ts";
+import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
+import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createTitler } from "./domain/titles.ts";
-import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import {
+  readRuntimeDocument,
+  runtimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { providerMediaWriter } from "./providers/media.ts";
+import { createSiglip, siglipVersion } from "./providers/siglip.ts";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
@@ -148,7 +155,7 @@ import {
   settingSource,
 } from "./deployment-settings.js";
 import { civitaiTokenStatus } from "./civitai-access.js";
-import { hfTokenStatus } from "./hf-access.js";
+import { hfFetch, hfTokenStatus } from "./hf-access.js";
 import { primeModelMetadata } from "./model-families.js";
 import {
   deleteOwnedGalleryItems,
@@ -1351,6 +1358,7 @@ app.delete("/api/workflows/:id", (req, res) => {
 });
 
 registerGalleryReadRoutes(app, {
+  near: (text) => imageSearch.near(text),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(rewriteStore.sessions(ownerId).map((chat) => [chat.id, chat.title]));
@@ -1455,6 +1463,7 @@ const jobAdmitted = (job) => {
   dream.admitted(job);
   finishing.admitted(job);
   captioner.interrupt();
+  imageSearch.interrupt();
   titler.interrupt();
   nextSteps.interrupt();
 };
@@ -1910,10 +1919,12 @@ const generationQueue = new GenerationQueue(
     ...generationAdapter,
     settled: async (job) => {
       await generationAdapter.settled(job);
-      if (job.status === "completed")
-        void titler.completed(
-          gallery.filter((item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId),
-        );
+      if (job.status !== "completed") return;
+      const items = gallery.filter(
+        (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
+      );
+      void titler.completed(items);
+      void imageSearch.completed(items);
     },
   },
   promptStage,
@@ -2172,6 +2183,14 @@ async function smallImage(item) {
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
 // Gallery captions (domain/captions.ts) let search match what an image shows.
+const runtimeLoad = (name) => () => {
+  try {
+    return readRuntimeDocument(dataDir, name);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+};
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
@@ -2181,17 +2200,24 @@ const captioner = createCaptioner({
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
-  load: () => {
-    try {
-      return readRuntimeDocument(dataDir, "captions");
-    } catch (error) {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    }
-  },
+  load: runtimeLoad("captions"),
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
-registerCaptionRoutes(app, { captioner, requireAdmin });
+registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
+// Image search (domain/image-search.ts): SigLIP 2 on the CPU, so search finds what images show.
+const imageSearch = createImageSearch({
+  // Demo images are placeholders, and demo test runs must not download the model.
+  enabled: () => !demoMode && flagEnabled("STUDIO_IMAGE_SEARCH"),
+  encoder: createSiglip({ dataDir, fetch: hfFetch }),
+  vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
+  idle: studioIdle,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  image: async (item) => (await publicGalleryBuffer(item)).buffer,
+  load: runtimeLoad("image-search"),
+  persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
+});
+registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
   writer: assistantEngine,
@@ -2471,6 +2497,7 @@ generationQueue.start();
 dream.start();
 finishing.start();
 captioner.start();
+imageSearch.start();
 titler.start();
 nextSteps.start();
 

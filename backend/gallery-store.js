@@ -326,13 +326,15 @@ function gallerySearchText(item) {
 }
 
 /**
- * A gallery filter for a search: every word must appear somewhere, and
+ * A gallery filter for a search: every word must appear somewhere, or the
+ * image looks like the search (`near`, from domain/image-search.ts), and
  * `favorites` keeps starred images only. Runs still generating always pass,
  * so a search never hides the progress of what is being made right now.
  * Null when there is nothing to filter by.
  */
 export function galleryFilter({
   q = "",
+  near = null,
   favorites = false,
   lora = "",
   model = "",
@@ -353,7 +355,7 @@ export function galleryFilter({
     if (!matchesGalleryFilters(item, { lora, model, workflow, size, aspect })) return false;
     if (!terms.length) return true;
     const text = gallerySearchText(item);
-    return terms.every((term) => text.includes(term));
+    return terms.every((term) => text.includes(term)) || Boolean(near?.(item));
   };
 }
 
