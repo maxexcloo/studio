@@ -85,7 +85,7 @@ const mediaInstructions = (writing) =>
     writing
       ? ": Studio picks the model and writes each prompt with that model's prompting guide, so don't fetch guides, expand the request or deliberate over wording or models"
       : ", as one clear prompt that keeps their subjects and scene"
-  }. Use prompts only for prompts the user gave; count is images per prompt. Make one Generate call per set, one after another; for several models at once pass profile_ids, or each_profile with tier ("each turbo model"). To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "landscape" or "16:9" is aspect; "2K" is size; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+  }. Use prompts only for prompts the user gave; count is images per prompt. Make one Generate call per set, one after another; for several models at once pass profile_ids, or each_profile with tier ("each turbo model"). To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -929,7 +929,7 @@ export function registerMcpRoutes(
             .string()
             .optional()
             .describe("landscape, portrait, square or a ratio like 16:9; prefer to width/height."),
-          size: z.enum(["2k", "4k"]).optional(),
+          resolution: z.enum(["1K", "2K", "4K"]).optional(),
           width: z.number().int().positive().max(16384).optional(),
           height: z.number().int().positive().max(16384).optional(),
           steps: z.number().int().positive().max(10000).optional(),
@@ -969,7 +969,6 @@ export function registerMcpRoutes(
           kind,
           tier: wanted,
           aspect,
-          size,
           request,
           apply_guide,
           preview,
@@ -1075,9 +1074,9 @@ export function registerMcpRoutes(
             ? previewed.plans
             : await Promise.all(
                 targets.map(async ({ profile, note }, index) => {
-                  const sized = mcpSize(profile, { aspect, size });
+                  const sized = mcpSize(profile, { aspect });
                   if (sized && (args.width !== undefined || args.height !== undefined))
-                    throw new Error("Pass aspect and size, or width and height, not both.");
+                    throw new Error("Pass aspect or width and height, not both.");
                   const plan = {
                     ...args,
                     ...sized,

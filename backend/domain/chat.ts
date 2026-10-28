@@ -60,6 +60,7 @@ const contextKeys = [
   "fps",
   "duration",
   "resolution",
+  "resolutionTier",
   "denoise",
   "referenceRole",
   "backendId",

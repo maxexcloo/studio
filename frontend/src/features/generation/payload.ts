@@ -1,5 +1,6 @@
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { profileBackendLabels } from "../../../../shared/profiles";
+import { withResolution } from "../../../../shared/resolution";
 
 /** Whether `profile` is the one a recorded id names, including an id merged into it. */
 export const isProfile = (profile: Profile, id: unknown) =>
@@ -96,11 +97,21 @@ export function generationInput(
   references: ReferenceAsset[],
 ) {
   const details = referenceDetails(references, input, profile);
+  // The size tier sets the size here as on the server, so the pending tile has the run's shape.
+  const sized = withResolution(
+    {
+      ...input,
+      referenceAssets: references.length
+        ? details.map((asset) => ({ assetId: asset.id, slot: asset.slot! }))
+        : input.referenceAssets,
+    },
+    profile,
+  );
   const large =
-    input.kind === "image" &&
-    (Math.max(input.width, input.height) >= 2048 || input.width * input.height >= 2048 * 1152);
+    sized.kind === "image" &&
+    (Math.max(sized.width, sized.height) >= 2048 || sized.width * sized.height >= 2048 * 1152);
   return {
-    ...input,
+    ...sized,
     // 2K and larger draws decode in tiles, matching MCP's generation path.
     ...(large ? { tiledDecode: true } : {}),
     profileId: profile?.id || input.profileId,

@@ -475,6 +475,10 @@ test("The chip composer offers supported sizes and settings, follows the output 
       { label: "1:1", w: 1024, h: 1024 },
       { label: "16:9", w: 1344, h: 768 },
     ],
+    constraints: {
+      width: { min: 64, max: 4096, step: 64 },
+      height: { min: 64, max: 4096, step: 64 },
+    },
     capabilities: { ...profiles[0].capabilities, variations: true },
   };
   const motion: Profile = {
@@ -510,8 +514,11 @@ test("The chip composer offers supported sizes and settings, follows the output 
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
   await aspect.click();
   const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
-  // A size the model isn't documented to draw is shown but can't be chosen.
-  await expect(resolution.getByRole("radio", { name: "4K", exact: true })).toBeDisabled();
+  // 4K, which the model doesn't draw itself, draws at 2K and upscales.
+  await resolution.locator("label").filter({ hasText: "4K" }).click();
+  await expect(
+    page.getByText("This model draws 4K at 2K, then Upscale enlarges it.", { exact: true }),
+  ).toBeVisible();
   await resolution.locator("label").filter({ hasText: "2K" }).click();
   await page.getByRole("button", { name: "16:9 2048 × 1152", exact: true }).click();
   await aspect.click();
@@ -684,9 +691,7 @@ test("Prompt boxes copy and undoably clear, and open full screen on phones", asy
   await expect(prompt).toHaveValue("A lantern in fog at dusk");
 });
 
-test("Generation size presets and custom dimensions preserve profile constraints", async ({
-  page,
-}) => {
+test("Image presets draw at the chosen resolution within profile constraints", async ({ page }) => {
   const state = await fixtures(page);
   const profile = {
     ...profiles[0],
@@ -702,15 +707,28 @@ test("Generation size presets and custom dimensions preserve profile constraints
   await serveProfiles(page, [profile]);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A wide landscape");
-  await page.getByRole("button", { name: "Aspect", exact: true }).click();
-  await page.getByRole("button", { name: "Landscape 1536 × 1024", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1536");
-  await page.getByRole("textbox", { name: "Width", exact: true }).fill("1600");
+  const aspect = page.getByRole("button", { name: "Aspect", exact: true });
+  await expect(aspect).toHaveText("Square · 1K");
+  await aspect.click();
+  // The preset gives the shape; 1K sets its long edge, rounded to the profile's step.
+  await page.getByRole("button", { name: "Landscape 1024 × 704", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Width", exact: true })).toBeHidden();
+  const resolution = page.getByRole("radiogroup", { name: "Resolution", exact: true });
+  await resolution.locator("label").filter({ hasText: "2K" }).click();
+  // A model that doesn't draw 2K itself draws at 1K and upscales in the same run.
+  await expect(
+    page.getByText("This model draws 2K at 1K, then Upscale enlarges it.", { exact: true }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(aspect).toHaveText("Landscape · 2K");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.width).toBe(1600);
-  expect(state.jobs[0].input.height).toBe(1024);
+  expect(state.jobs[0].input).toMatchObject({
+    width: 1024,
+    height: 704,
+    resolutionTier: "2K",
+    autoUpscale: { quality: "balanced", target: 2048 },
+  });
 });
 
 test("Images and Videos retain independent prompts and expert settings", async ({

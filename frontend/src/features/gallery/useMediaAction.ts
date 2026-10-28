@@ -22,6 +22,10 @@ interface AnimateChoice {
   size?: { width: number; height: number };
 }
 /** The video profile that animates this image (backend/animate-profile.js), or why none can. */
+/** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
+export const typedPrompt = (item: MediaItem) =>
+  typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
+
 export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =>
   queryOptions({
     queryKey: ["animate-profile", item.width || 0, item.height || 0],
@@ -156,7 +160,7 @@ export async function mediaDraft(
               : source?.backend || source?.input.backendId || profile.workerIds?.[0],
         // Reused drafts draw a new seed; only Exact Repeat keeps the recorded one.
         seed: "",
-        prompt: item.prompt || "",
+        prompt: typedPrompt(item),
         negative: item.negative || "",
         ...(choice?.size ??
           (item.width ? { width: item.width, height: item.height || item.width } : {})),
