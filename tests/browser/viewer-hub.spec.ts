@@ -383,6 +383,10 @@ test("Details copy the prompt in one click and Copy Settings copies every input"
   }
   await details.getByRole("button", { name: "Copy Prompt", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("An amber bird");
+  // The top-right notification covers the desktop Details header, so dismiss it first.
+  const copied = page.getByRole("alert").filter({ hasText: "Prompt copied" });
+  await copied.getByRole("button").click();
+  await expect(copied).toBeHidden();
   await details.getByRole("button", { name: "Copy Settings", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => (window as any).copied))
