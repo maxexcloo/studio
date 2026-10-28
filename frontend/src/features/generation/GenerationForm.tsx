@@ -78,25 +78,21 @@ export function GenerationForm({
   autoFocusPrompt = false,
   focusPrompt = false,
   fill = false,
-  embedded = false,
 }: {
   onSubmitted?: (jobId: string) => void;
   compact?: boolean;
   autoFocusPrompt?: boolean;
   focusPrompt?: boolean;
   fill?: boolean;
-  /** A composer inside another surface (the viewer) stays there instead of changing route. */
-  embedded?: boolean;
 }) {
-  const { draft, setDraft, changeKind, input, update, profile, selectProfile, models } =
-    useGeneration();
+  const { draft, setDraft, input, update, profile, selectProfile, models } = useGeneration();
   const navigate = useNavigate();
   const location = useLocation();
   const compare = useCompare();
   useEffect(() => {
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
-  const submit = useDraftSubmit({ onSubmitted, embedded });
+  const submit = useDraftSubmit({ onSubmitted });
   const { label, blockedReason } = useSubmitState({
     input,
     profile,
@@ -170,9 +166,7 @@ export function GenerationForm({
       onReferencesChange={setReferences}
       // The output toggle switches the gallery; the route restores that output's draft.
       onKindChange={(kind) =>
-        embedded
-          ? changeKind(kind)
-          : navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
+        navigate({ pathname: kind === "video" ? "/video" : "/images", search: location.search })
       }
       onClear={() =>
         setDraft((previous) => ({

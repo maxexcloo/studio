@@ -27,23 +27,11 @@ function GenerationScrollArea(props: ScrollAreaProps) {
   );
 }
 const composerLayers = `[role="dialog"], [data-composer-layer], ${popupLayer}`;
-/**
- * Gallery modes render the generation composer; Chat passes its own composer as `chat`. An
- * `embedded` composer (the viewer's, in its own GenerationProvider) sits in its surface's flow and
- * leaves the page's URL alone.
- */
-export function ComposerDock({
-  chat,
-  embedded = false,
-  onSubmitted,
-}: {
-  chat?: ReactNode;
-  embedded?: boolean;
-  onSubmitted?: (jobId: string) => void;
-}) {
+/** Gallery modes render the generation composer; Chat passes its own composer as `chat`. */
+export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const [params, setParams] = useSearchParams();
-  // The page's composer answers `?compose=1` and shared images.
-  const main = !chat && !embedded;
+  // The gallery's composer answers `?compose=1` and shared images.
+  const main = !chat;
   const [opened, { open, close }] = useDisclosure(main && params.get("compose") === "1");
   // The compact bar stays under the expanded panel until it has slid in, so nothing blinks and
   // keystrokes typed meanwhile land in the shared draft.
@@ -137,12 +125,9 @@ export function ComposerDock({
       setParams(next, { replace: true });
     }
   }
-  function submitted(jobId: string) {
-    collapse();
-    onSubmitted?.(jobId);
-  }
+  const submitted = () => collapse();
   // A layer over the composer (a dialog, popup or picker) is not outside it, unless it is the
-  // surface the composer sits in, such as the viewer.
+  // surface the composer sits in.
   const inLayer = (element: Element) => {
     const layer = element.closest(composerLayers);
     return Boolean(layer && !layer.contains(dock.current));
@@ -158,19 +143,6 @@ export function ComposerDock({
     (event) => {
       if (closingPopup() || inLayer(event.target as HTMLElement)) return;
       collapse(false);
-      // In the viewer the press only folds the composer back to its bar; the click that follows
-      // must not also act beneath it (closing the viewer). The next press drops a stale guard.
-      if (!embedded) return;
-      const swallow = (click: MouseEvent) => {
-        click.preventDefault();
-        click.stopPropagation();
-      };
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      window.addEventListener(
-        "pointerdown",
-        () => window.removeEventListener("click", swallow, true),
-        { capture: true, once: true },
-      );
     },
     ["mousedown", "touchstart"],
     undefined,
@@ -195,7 +167,6 @@ export function ComposerDock({
         className={classes.dock}
         data-composer-dock
         data-chat={chat ? true : undefined}
-        data-embedded={embedded || undefined}
         hidden={!chat && phone && opened && expanded}
         data-reference-drop={dragging || undefined}
         onPaste={pasteReferences}
@@ -244,14 +215,10 @@ export function ComposerDock({
             collapse();
           }
         }}
-        style={
-          embedded
-            ? undefined
-            : {
-                bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
-                marginBottom: chat ? keyboardInset : undefined,
-              }
-        }
+        style={{
+          bottom: `calc(var(--studio-composer-gap) + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+          marginBottom: chat ? keyboardInset : undefined,
+        }}
       >
         {(chat || !opened || !expanded) && (
           <Paper
@@ -274,7 +241,7 @@ export function ComposerDock({
               open();
             }}
           >
-            {chat || <GenerationForm compact embedded={embedded} onSubmitted={onSubmitted} />}
+            {chat || <GenerationForm compact />}
           </Paper>
         )}
         {!chat && !phone && (
@@ -303,7 +270,6 @@ export function ComposerDock({
                 >
                   <GenerationForm
                     onSubmitted={submitted}
-                    embedded={embedded}
                     focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
                   />
                 </div>
@@ -347,7 +313,6 @@ export function ComposerDock({
             <GenerationForm
               fill
               onSubmitted={submitted}
-              embedded={embedded}
               autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}
               focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
             />

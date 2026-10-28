@@ -3,6 +3,7 @@ import type { PointerEvent } from "react";
 import { Button, Loader, Stack, Text, VisuallyHidden } from "@mantine/core";
 import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
 import { MediaZoomControls, useMediaZoom } from "./MediaZoom";
+import { swipeDirection, type SwipeDirection } from "./swipe";
 import classes from "./ZoomImage.module.css";
 
 export function ZoomImage({
@@ -20,7 +21,7 @@ export function ZoomImage({
   width?: number;
   height?: number;
   /** Touch swipes at Fit: left/right navigate, down closes, up reveals details. */
-  swipe?: (direction: "left" | "right" | "up" | "down") => void;
+  swipe?: (direction: SwipeDirection) => void;
 }) {
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
@@ -121,11 +122,10 @@ export function ZoomImage({
       if (event.type === "pointercancel") suppressClick.current = true;
       return;
     }
-    const horizontal = Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.3;
-    const vertical = Math.abs(dy) > 80 && Math.abs(dy) > Math.abs(dx) * 1.3;
-    if (swipe && start.fit && zoom.modeRef.current === "Fit" && (horizontal || vertical)) {
+    const direction = swipeDirection(dx, dy);
+    if (swipe && start.fit && zoom.modeRef.current === "Fit" && direction) {
       suppressClick.current = true;
-      swipe(horizontal ? (dx < 0 ? "left" : "right") : dy < 0 ? "up" : "down");
+      swipe(direction);
       return;
     }
     // A double tap on the picture zooms in at that point, or back to Fit.
