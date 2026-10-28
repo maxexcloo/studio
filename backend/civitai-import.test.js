@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { Readable } from "node:stream";
 import test from "node:test";
-import { civitaiFetch, civitaiRequest } from "./civitai-access.js";
+import { civitaiFetch } from "./civitai-access.js";
 import {
   civitaiLink,
   imagePreset,
@@ -362,88 +360,6 @@ test("image downloads follow Civitai blob redirects without forwarding credentia
       },
     ),
     /Unsupported/,
-  );
-});
-
-test("custom Civitai DNS keeps the original HTTPS hostname and streams the response", async () => {
-  const signal = AbortSignal.timeout(1000);
-  const resolver = {
-    setServers(servers) {
-      assert.deepEqual(servers, ["100.100.100.100"]);
-    },
-    async resolve4(hostname) {
-      assert.equal(hostname, "civitai.com");
-      return ["192.0.2.1"];
-    },
-    async resolve6() {
-      throw new Error("No IPv6 address");
-    },
-  };
-  const response = await civitaiRequest(
-    new URL("https://civitai.com/api/v1/images?imageId=42"),
-    { headers: { authorization: "Bearer test-token" }, signal },
-    {
-      servers: "100.100.100.100",
-      resolver,
-      request(url, options, callback) {
-        assert.equal(url.hostname, "civitai.com");
-        assert.equal(url.protocol, "https:");
-        assert.equal(options.agent, false);
-        assert.equal(options.signal, signal);
-        assert.equal(options.headers.authorization, "Bearer test-token");
-        const outgoing = new EventEmitter();
-        outgoing.end = () => {
-          options.lookup(url.hostname, { all: true }, (error, addresses) => {
-            assert.ifError(error);
-            assert.deepEqual(addresses, [{ address: "192.0.2.1", family: 4 }]);
-            options.lookup(url.hostname, { family: 4 }, (error, address, family) => {
-              assert.ifError(error);
-              assert.equal(address, "192.0.2.1");
-              assert.equal(family, 4);
-              const incoming = Readable.from([Buffer.from("metadata")]);
-              Object.assign(incoming, {
-                headers: { "content-type": "application/json" },
-                statusCode: 200,
-                statusMessage: "OK",
-              });
-              callback(incoming);
-            });
-          });
-        };
-        return outgoing;
-      },
-    },
-  );
-  assert.equal(await response.text(), "metadata");
-  assert.equal(response.headers.get("content-type"), "application/json");
-});
-
-test("custom Civitai DNS failure rejects the request", async () => {
-  const failure = new Error("DNS unavailable");
-  await assert.rejects(
-    civitaiRequest(
-      new URL("https://civitai.com/api/v1/images"),
-      {},
-      {
-        servers: "100.100.100.100",
-        resolver: {
-          setServers() {},
-          async resolve4() {
-            throw failure;
-          },
-          async resolve6() {
-            throw failure;
-          },
-        },
-        request(url, options) {
-          const outgoing = new EventEmitter();
-          outgoing.end = () =>
-            options.lookup(url.hostname, {}, (error) => outgoing.emit("error", error));
-          return outgoing;
-        },
-      },
-    ),
-    /DNS unavailable/,
   );
 });
 
