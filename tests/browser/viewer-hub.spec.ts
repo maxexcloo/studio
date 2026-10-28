@@ -106,7 +106,7 @@ test("Chat starts a new Chat about the item, attached as its reference", async (
   ).toBeVisible();
 });
 
-test("A regenerated result joins its source's grid tile as a version until All Versions", async ({
+test("A regenerated result shows beside its source until All Versions collapses them", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
@@ -115,11 +115,11 @@ test("A regenerated result joins its source's grid tile as a version until All V
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
   const tiles = page.getByRole("button", { name: /^Open image: An amber bird/ });
-  await expect(tiles).toHaveCount(1);
-  await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
+  await expect(tiles).toHaveCount(2);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "All Versions", exact: true }).click();
-  await expect(tiles).toHaveCount(2);
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles).toHaveAccessibleName("Open image: An amber bird, Version 1 of 2");
 });
 
 test("The strip holds the item's versions, not the other results of its run", async ({ page }) => {
@@ -623,7 +623,13 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
   await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
   await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
+  // Navigation stops at the ends instead of wrapping round.
   await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Next Generation", exact: true }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("ArrowLeft");
   await expect(dialog.getByRole("img", { name: "Viewer Study", exact: true })).toBeVisible();
   if (testInfo.project.use.browserName !== "webkit") {
     const picture = await dialog

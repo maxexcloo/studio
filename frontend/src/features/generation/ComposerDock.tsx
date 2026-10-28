@@ -92,8 +92,14 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
-    const resize = () =>
-      setKeyboardInset(Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop));
+    // Only typing in the dock lifts it above the keyboard; scrolling and the address bar never move it.
+    const resize = () => {
+      const field = document.activeElement;
+      const typing = dock.current?.contains(field) && field?.matches("input, textarea");
+      setKeyboardInset(
+        typing ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0,
+      );
+    };
     viewport.addEventListener("resize", resize);
     viewport.addEventListener("scroll", resize);
     return () => {
