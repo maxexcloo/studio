@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocalStorage } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { failure } from "../../api";
 import type { MediaItem } from "../../types";
@@ -9,21 +8,6 @@ import { mediaDownload } from "./download";
 interface MediaTransfer {
   href: string;
   download: string;
-}
-export function useShareWithoutSettings() {
-  return useLocalStorage<boolean>({
-    key: "studio-share-without-settings",
-    defaultValue: false,
-    getInitialValueInEffect: false,
-  });
-}
-function canCopyMediaImage() {
-  return (
-    window.isSecureContext &&
-    typeof ClipboardItem !== "undefined" &&
-    typeof navigator.clipboard?.write === "function" &&
-    (!ClipboardItem.supports || ClipboardItem.supports("image/png"))
-  );
 }
 function canShareMedia(type: "image" | "video") {
   if (!window.isSecureContext || !navigator.share || !navigator.canShare) return false;
@@ -42,35 +26,13 @@ function canShareMedia(type: "image" | "video") {
 function ownMediaUrl(href: string) {
   const url = new URL(href, location.href);
   if (url.origin !== location.origin)
-    throw new Error("Save this media in Studio before copying or sharing it.");
+    throw new Error("Save this media in Studio before sharing it.");
   return url.href;
 }
 async function mediaBlob(target: MediaTransfer, signal?: AbortSignal) {
   const response = await fetch(ownMediaUrl(target.href), { credentials: "same-origin", signal });
   if (!response.ok) throw new Error(`Studio could not prepare this media (${response.status}).`);
   return response.blob();
-}
-async function pngBlob(blob: Blob): Promise<Blob> {
-  const bitmap = await createImageBitmap(blob);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  try {
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Your browser could not prepare an image for the clipboard.");
-    context.drawImage(bitmap, 0, 0);
-  } finally {
-    bitmap.close();
-  }
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (blob) =>
-        blob
-          ? resolve(blob)
-          : reject(new Error("Your browser could not prepare an image for the clipboard.")),
-      "image/png",
-    ),
-  );
 }
 function downloadMedia(target: MediaTransfer) {
   const link = document.createElement("a");
@@ -79,26 +41,6 @@ function downloadMedia(target: MediaTransfer) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-}
-/** ClipboardItem receives a promise so Safari sees the write during the original tap. */
-async function copyMediaImage(
-  target: MediaTransfer,
-  withoutSettings: boolean,
-): Promise<"copied" | "downloaded"> {
-  if (!canCopyMediaImage()) {
-    downloadMedia(target);
-    return "downloaded";
-  }
-  try {
-    const png = mediaBlob(target).then((blob) =>
-      blob.type === "image/png" && !withoutSettings ? blob : pngBlob(blob),
-    );
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
-    return "copied";
-  } catch {
-    downloadMedia(target);
-    return "downloaded";
-  }
 }
 async function prepareMediaShare(target: MediaTransfer, signal?: AbortSignal) {
   const blob = await mediaBlob(target, signal);
@@ -121,18 +63,16 @@ async function sharePreparedMedia(
   return "downloaded";
 }
 /**
- * Download, Copy Image and Share for one result. Phones prepare the share file while `active`
+ * Download and Share for one result. Phones prepare the share file while `active`
  * and keep it, so the Share tap itself can call the native share sheet.
  */
 export function useMediaTransfer(item: MediaItem, active: boolean) {
   const phone = usePhone();
-  const [withoutSettings] = useShareWithoutSettings();
-  const download = mediaDownload(item, withoutSettings);
+  const download = mediaDownload(item);
   const key = `${download.href}\n${download.download}`;
   const [prepared, setPrepared] = useState<{ key: string; file: File } | null>(null);
   const file = prepared?.key === key ? prepared.file : null;
   const [preparing, setPreparing] = useState(false);
-  const [copying, setCopying] = useState(false);
   const [sharing, setSharing] = useState(false);
   const canShare = Boolean(item.url) && phone && canShareMedia(item.type);
   useEffect(() => {
@@ -175,24 +115,8 @@ export function useMediaTransfer(item: MediaItem, active: boolean) {
       setSharing(false);
     }
   }
-  async function copyImage() {
-    setCopying(true);
-    try {
-      const result = await copyMediaImage(download, withoutSettings);
-      notifications.show({
-        message: result === "copied" ? "Image copied" : "Clipboard unavailable. Download started.",
-      });
-    } catch (error) {
-      failure(error);
-    } finally {
-      setCopying(false);
-    }
-  }
   return {
     download,
-    canCopy: Boolean(item.url) && item.type === "image" && canCopyMediaImage(),
-    copying,
-    copyImage,
     canShare,
     shareReady: Boolean(file),
     sharing: preparing || sharing,

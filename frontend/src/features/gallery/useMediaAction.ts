@@ -202,7 +202,7 @@ export const animateThemes = {
   living: "Living Photo",
   action: "Action",
   spicy: "Spicy",
-  custom: "Custom Instruction",
+  custom: "Custom Animation",
 } as const;
 export type AnimateTheme = keyof typeof animateThemes;
 export type Iteration =

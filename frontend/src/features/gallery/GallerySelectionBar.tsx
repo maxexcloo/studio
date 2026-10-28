@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { Download, RotateCw, Share, Square, Star, Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, actionBarClass, type ActionGroups } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, actionBarClass } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import { itemAction, itemActionGroups } from "./MediaActions";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
@@ -17,8 +18,9 @@ import type { useTryAgain } from "./useTryAgain";
 const shareLimit = 20;
 
 /**
- * The selection header (count and quick selections), the bulk action bar, matching the viewer's,
- * with Cancel, and the same actions as a context menu at `menu` (right-click or Shift+F10).
+ * The selection header (count and quick selections), the bulk action bar in the viewer's sections
+ * (labelled on desktop) with Close, and the same actions as a context menu at `menu` (right-click
+ * or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -103,74 +105,54 @@ export function GallerySelectionBar({
     }
   }
   const pending = busy !== null;
-  const actions: ActionGroups = [
-    [
-      {
-        id: "star",
-        label: allStarred ? "Unstar Selected" : "Star Selected",
-        icon: Star,
-        pressed: allStarred,
-        disabled: !ready.length || pending,
-        onClick: () =>
-          favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
-      },
-      {
-        id: "download",
-        label: "Download Selected",
-        icon: Download,
-        disabled: !ready.length || downloadTooLarge,
-        link: { href: ready.length && !downloadTooLarge ? downloadUrl : undefined, download: true },
-      },
-      ...(phone && typeof navigator.share === "function"
-        ? [
-            {
-              id: "share",
-              label: prepared ? "Share Selected" : "Prepare Share",
-              icon: Share,
-              disabled: !ready.length || ready.length > shareLimit,
-              loading: prepare.isPending,
-              onClick: () => void share(),
-            },
-          ]
-        : []),
-    ],
-    [
-      ...(failed.length || busy === "retry"
-        ? [
-            {
-              id: "retry",
-              label: "Retry Selected",
-              icon: RotateCw,
-              disabled: pending || !failed.length,
-              loading: busy === "retry",
-              onClick: () => void retrySelected(),
-            },
-          ]
-        : []),
-      ...(runningJobs.length || busy === "stop"
-        ? [
-            {
-              id: "stop",
-              label: "Stop Selected",
-              icon: Square,
-              disabled: pending || !runningJobs.length,
-              loading: busy === "stop",
-              onClick: () => void stopSelected(),
-            },
-          ]
-        : []),
-    ],
-    [
-      {
-        id: "delete",
-        label: "Delete Selected",
-        icon: Trash2,
-        color: "red",
-        disabled: !deletable.length || pending,
-        onClick: () => setConfirm(true),
-      },
-    ],
-  ];
+  // Actions for one item at a time stay in place, greyed out, so the bar matches the viewer's.
+  const single = { disabled: true };
+  const actions = itemActionGroups([
+    itemAction("animate", single),
+    itemAction("edit", single),
+    itemAction("recreate", single),
+    itemAction("reference", single),
+    (failed.length > 0 || busy === "retry") &&
+      itemAction("retry", {
+        disabled: pending || !failed.length,
+        loading: busy === "retry",
+        onClick: () => void retrySelected(),
+      }),
+    (runningJobs.length > 0 || busy === "stop") &&
+      itemAction("stop", {
+        disabled: pending || !runningJobs.length,
+        loading: busy === "stop",
+        onClick: () => void stopSelected(),
+      }),
+    itemAction("compare", single),
+    itemAction("upscale", single),
+    itemAction("copy", single),
+    // Phones that share natively share instead of downloading.
+    phone && typeof navigator.share === "function"
+      ? itemAction("share", {
+          label: prepared ? "Share" : "Prepare Share",
+          disabled: !ready.length || ready.length > shareLimit,
+          loading: prepare.isPending,
+          onClick: () => void share(),
+        })
+      : itemAction("download", {
+          disabled: !ready.length || downloadTooLarge,
+          link: {
+            href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
+            download: true,
+          },
+        }),
+    itemAction("delete", {
+      disabled: !deletable.length || pending,
+      onClick: () => setConfirm(true),
+    }),
+    itemAction("star", {
+      label: allStarred ? "Unstar" : "Star",
+      pressed: allStarred,
+      disabled: !ready.length || pending,
+      onClick: () => favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+    }),
+  ]);
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -257,19 +239,22 @@ export function GallerySelectionBar({
         }}
         transitionProps={{ transition: "slide-up" }}
       >
-        <Stack gap={4} align="center">
-          <Group gap={2} wrap="nowrap">
+        <Stack gap={4} align="center" miw={0}>
+          <Group gap={2} wrap="nowrap" maw="100%">
             <ActionBarGroups
               groups={actions}
+              labelled={!phone}
               trailing={
                 <Button
                   variant="subtle"
                   color="gray"
-                  size="sm"
+                  size="compact-sm"
+                  leftSection={<X size={16} />}
+                  aria-label="Close Selection"
                   disabled={pending}
                   onClick={selection.end}
                 >
-                  Cancel
+                  Close
                 </Button>
               }
             />
