@@ -167,6 +167,41 @@ test("request_media applies the number of images the user asked for", async () =
   fixture.db.close();
 });
 
+test("several request_media calls in one turn start one generation each", async () => {
+  const call = (index: number, prompt: string) => ({
+    index,
+    function: {
+      name: "request_media",
+      arguments: JSON.stringify({ operation: "image", prompt }),
+    },
+  });
+  const fixture = setup([
+    frame({ choices: [{ delta: { tool_calls: [call(0, "at the beach")] } }] }),
+    frame({ choices: [{ delta: { tool_calls: [call(1, "in a cafe")] } }] }),
+    frame({ choices: [{ delta: { tool_calls: [call(2, "at a gym")] } }] }),
+    "data: [DONE]\n\n",
+  ]);
+  const events: ChatEvent[] = [];
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    {
+      content: "A few variations in different settings",
+      generation: { operation: "image", input: { profileId: "chosen" } },
+    },
+    (event) => events.push(event),
+  );
+  const prompts = (fixture.admissions as { draft: { input: { prompt: string } } }[]).map(
+    (request) => request.draft.input.prompt,
+  );
+  assert.deepEqual(prompts, ["at the beach", "in a cafe", "at a gym"]);
+  assert.equal(events.filter((event) => event.event === "generation").length, 3);
+  const reply = fixture.service.messages("alice", fixture.session.id)[1];
+  assert.equal(reply.status, "completed");
+  assert.equal(reply.draft?.input.prompt, "at the beach");
+  fixture.db.close();
+});
+
 test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
   const fixture = setup([
     frame({
