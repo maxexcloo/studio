@@ -4743,6 +4743,7 @@ test("admin tools register only for an administrator’s own token, and for a ga
     "CombineBackends",
     "Export",
     "Placement",
+    "Accounts",
   ]);
   const direct = await toolNames(await f.client("", adminToken));
   assert.deepEqual(

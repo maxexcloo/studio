@@ -30,6 +30,9 @@ registerMultiUserAuthRoutes(
     patch: (route, handler) => {
       routes[`PATCH ${route}`] = handler;
     },
+    delete: (route, handler) => {
+      routes[`DELETE ${route}`] = handler;
+    },
   },
   {
     oidcClient: {

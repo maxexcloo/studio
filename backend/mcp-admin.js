@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * MCP's admin tools (design §6): an administrator's chat manages the Library, downloads, the
- * catalogue, profiles and guides through the same routes the UI uses (library-routes.js,
- * model-download-routes.js, profile-editor.js, profile-routes.js), with the administrator's own
- * credential, so the same validation, Undo and versioning apply and every change records chat as
- * its origin. Registered only for the admin scope (mcp.js): an administrator's own MCP token, or a
- * gateway-linked administrator while Chat Gateway Admin Tools is on.
+ * catalogue, profiles, guides and accounts' groups through the same routes the UI uses
+ * (library-routes.js, model-download-routes.js, profile-editor.js, profile-routes.js,
+ * multi-user-auth.js), with the administrator's own credential, so the same validation, Undo and
+ * versioning apply and every change records chat as its origin. Registered only for the admin
+ * scope (mcp.js): an administrator's own MCP token, or a gateway-linked administrator while Chat
+ * Gateway Admin Tools is on.
  *
  * Nothing irreversible is exposed: edits are new versions, Cancel only stops a download (its
  * partial file stays for Resume), an update keeps the old file until the new one verifies, Combine
- * Backends backs up the profiles it replaces, and no tool deletes a model file or touches a GPU.
+ * Backends backs up the profiles it replaces, only an empty group can be deleted, and no tool
+ * deletes a model file or touches a GPU.
  */
 import { z } from "zod";
 import { mcpJson } from "./mcp-media.js";
@@ -28,9 +30,10 @@ export const adminToolNames = Object.freeze([
   "CombineBackends",
   "Export",
   "Placement",
+  "Accounts",
 ]);
 export const adminInstructions =
-  "Admin tools manage the Library, catalogue, profiles and guides only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
+  "Admin tools manage the Library, catalogue, profiles, guides and accounts' groups only when the user asks. Nothing downloads unless asked (Downloads start), edits are new versions with base_hash from Profiles get, only CombineBackends apply removes files (the profiles it combines, after a backup), and no tool touches GPUs.";
 
 const kinds = ["lora", "checkpoint", "diffusion_model", "text_encoder", "vae", "clip_vision"];
 const maxListed = 50;
@@ -868,5 +871,52 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         ).placement,
       ),
     { readOnlyHint: true },
+  );
+
+  tool(
+    server,
+    "Accounts",
+    "Accounts & Groups",
+    "Manage accounts' groups as Settings › Accounts does, only when asked. list returns accounts, groups, the default group and the profiles a group can grant; save_group creates or replaces a group (group: id, name, generationProfiles, allModels and features, each feature set explicitly since an unsaved one is off); set_default makes group_id the group new accounts start in (\"\" for none); delete_group removes an empty group that isn't the default; set_user moves an ordinary account (account_id) to group_id or sets disabled.",
+    {
+      action: z
+        .enum(["list", "save_group", "set_default", "delete_group", "set_user"])
+        .default("list"),
+      group: z.record(z.string(), z.unknown()).optional(),
+      group_id: z.string().trim().max(200).optional(),
+      account_id: id.optional(),
+      disabled: z.boolean().optional(),
+    },
+    async ({ action, group, group_id, account_id, disabled }, signal) => {
+      if (action === "list") {
+        const { gateway: _gateway, ...admin } = await api(
+          "GET",
+          "/api/accounts/admin",
+          undefined,
+          signal,
+        );
+        return mcpJson(admin);
+      }
+      if (action === "save_group") {
+        if (!group) throw new Error("Pass group: the whole group to save.");
+        return mcpJson(await api("POST", "/api/accounts/profiles", group, signal));
+      }
+      if (action === "set_default") {
+        if (group_id === undefined) throw new Error('Pass group_id: the default group, or "".');
+        const body = { accessProfileId: group_id };
+        return mcpJson(await api("POST", "/api/accounts/default-profile", body, signal));
+      }
+      if (action === "delete_group") {
+        if (!group_id) throw new Error("Pass group_id: the group to delete.");
+        const route = `/api/accounts/profiles/${encodeURIComponent(group_id)}`;
+        return mcpJson(await api("DELETE", route, undefined, signal));
+      }
+      if (!account_id) throw new Error("Pass account_id from Accounts list.");
+      if (Boolean(group_id) === (disabled !== undefined))
+        throw new Error("Pass one of group_id or disabled.");
+      const route = `/api/accounts/users/${encodeURIComponent(account_id)}`;
+      const body = group_id ? { accessProfileId: group_id } : { disabled };
+      return mcpJson(await api("PATCH", route, body, signal));
+    },
   );
 }

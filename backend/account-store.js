@@ -222,6 +222,19 @@ export function saveAccessProfile(input, availableProfiles = [], cloudProfiles =
   return structuredClone(profile);
 }
 
+/** Deletes a group nobody belongs to that isn't the default for new accounts. */
+export function deleteAccessProfile(profileId) {
+  const store = readStore();
+  if (!validAccountKey(profileId) || !store.profiles[profileId])
+    throw new Error("Choose an existing group");
+  if (store.defaultAccessProfileId === profileId)
+    throw new Error("Choose another default group before deleting this one.");
+  if (store.accounts.some((account) => account.accessProfileId === profileId))
+    throw new Error("Move this group's members to another group before deleting it.");
+  delete store.profiles[profileId];
+  saveStore();
+}
+
 export function assignAccessProfile(accountId, profileId) {
   const store = readStore();
   const account = store.accounts.find(

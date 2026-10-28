@@ -28,6 +28,7 @@ import {
   revokeAccountSession,
   rotateAccountMcpToken,
   saveAccessProfile,
+  deleteAccessProfile,
   setAccountDisabled,
   verifyAccountMcpToken,
   verifyLocalAccount,
@@ -79,7 +80,7 @@ function mcpBearerRouteAllowed(method, routePath) {
 
 /**
  * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
- * guides, Combine Backends and the export. Only an administrator's own MCP token reaches them, or
+ * guides, Combine Backends, the export, and accounts' groups. Only an administrator's own MCP token reaches them, or
  * MCP's loopback credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
  * Nothing here deletes a model file, replaces a download or touches a GPU; Combine Backends backs up
  * the profiles it replaces.
@@ -115,6 +116,11 @@ const mcpAdminRoutes = [
   ["GET", /^\/api\/profiles\/backends$/],
   ["POST", /^\/api\/profiles\/backends\/combine$/],
   ["GET", /^\/api\/profiles\/export$/],
+  ["GET", /^\/api\/accounts\/admin$/],
+  ["POST", /^\/api\/accounts\/profiles$/],
+  ["POST", /^\/api\/accounts\/default-profile$/],
+  ["DELETE", new RegExp(`^/api/accounts/profiles/${routeId}$`)],
+  ["PATCH", new RegExp(`^/api/accounts/users/${routeId}$`)],
 ];
 
 export function mcpAdminRouteAllowed(method, routePath) {
@@ -252,7 +258,7 @@ export function registerMultiUserAuthRoutes(
         ? handler(req, res)
         : res.status(404).json({ ok: false, error: "Accounts are disabled." }),
     );
-  const [get, post, patch] = ["get", "post", "patch"].map(route);
+  const [get, post, patch, del] = ["get", "post", "patch", "delete"].map(route);
   let bootstrapping = null;
 
   get("/api/accounts/status", (req, res) => {
@@ -593,6 +599,16 @@ export function registerMultiUserAuthRoutes(
     try {
       const [profiles, cloud] = await Promise.all([availableProfiles(), cloudProfiles()]);
       res.json({ ok: true, profile: saveAccessProfile(req.body, profiles, cloud) });
+    } catch (error) {
+      res.status(400).json({ ok: false, error: error.message });
+    }
+  });
+
+  del("/api/accounts/profiles/:id", (req, res) => {
+    if (!requireAccountAdmin(req, res)) return;
+    try {
+      deleteAccessProfile(req.params.id);
+      res.json({ ok: true });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
     }
