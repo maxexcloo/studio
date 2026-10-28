@@ -15,8 +15,9 @@
  *
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
- * `<data>/history/guides/<packId>/<n>.json`. The deployment's STUDIO_MCP_PROMPTING_PATH is seed input
- * only: it fills a new install and adds packs and bindings Studio doesn't have, and never
+ * `<data>/history/guides/<packId>/<n>.json`; the profile bindings (`profiles`, `variants`,
+ * `negatives`) are versioned together as `_bindings`, an id no pack can have. The deployment's
+ * STUDIO_MCP_PROMPTING_PATH is seed input only: it fills a new install and adds packs and bindings Studio doesn't have, and never
  * replaces one Studio holds. Studio is the only writer of live profiles and guides; the profiles
  * repository (`ai/profiles/`) is their seed and backup, fed by Settings › Profiles › Export.
  *
@@ -366,6 +367,11 @@ export function createProfileStore({
 /* ------------------------------------------------------------ Guides */
 
 const sections = ["reviewed_on", "families", "profiles", "variants", "negatives"];
+const bindingSections = ["profiles", "variants", "negatives"];
+const bindingsId = "_bindings";
+const versionedId = (id) => id === bindingsId || validPackId(id);
+const bindingsOf = (store) =>
+  Object.fromEntries(bindingSections.map((key) => [key, isObject(store?.[key]) ? store[key] : {}]));
 
 /** A pack is a plain object of guidance; the store adds nothing to it. */
 function cleanPack(pack) {
@@ -404,8 +410,8 @@ export function createGuideStore({
     }
   };
 
-  function writeStore(store) {
-    // Checked as the MCP loader reads it before it replaces the good copy.
+  /** Throws unless the MCP loader reads `store`; run before a version is recorded or the store replaced. */
+  function check(store) {
     const { meta: _meta, ...config } = store;
     const checked = path.join(path.dirname(file), ".check-prompting.json");
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -415,10 +421,19 @@ export function createGuideStore({
     } finally {
       fs.rmSync(checked, { force: true });
     }
+  }
+
+  function writeStore(store) {
+    check(store);
     writeJsonFile(file, store);
   }
 
-  function addVersion(store, packId, pack, { by, origin, aiDrafted = false, note = "" }) {
+  function addVersion(
+    store,
+    packId,
+    pack,
+    { by, origin, aiDrafted = false, note = "", field = "pack" },
+  ) {
     const hash = hashOf(pack);
     const versions = versionsIn(historyDir(packId));
     const version = (versions.at(-1) || 0) + 1;
@@ -432,7 +447,7 @@ export function createGuideStore({
       aiDrafted: Boolean(aiDrafted),
       hash,
       ...(note ? { note } : {}),
-      pack,
+      [field]: pack,
     });
     const current = store.meta[packId] || {};
     store.meta[packId] = {
@@ -533,24 +548,29 @@ export function createGuideStore({
     )
       return pack(packId);
     store.packs[packId] = next;
+    check(store);
     addVersion(store, packId, next, { by, origin, aiDrafted });
     writeStore(store);
     return pack(packId);
   }
 
   function versions(packId) {
-    if (!validPackId(packId)) throw notFound("That guide was not found.");
+    if (!versionedId(packId)) throw notFound("That guide was not found.");
     return versionsIn(historyDir(packId))
       .reverse()
       .map((n) => {
-        const { pack: _pack, ...rest } = readJsonFile(path.join(historyDir(packId), `${n}.json`));
+        const {
+          pack: _pack,
+          bindings: _bindings,
+          ...rest
+        } = readJsonFile(path.join(historyDir(packId), `${n}.json`));
         return rest;
       });
   }
 
   function version(packId, n) {
     const target = path.join(historyDir(packId), `${Number(n)}.json`);
-    if (!validPackId(packId) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(target))
+    if (!versionedId(packId) || !Number.isSafeInteger(Number(n)) || !fs.existsSync(target))
       throw notFound("That guide version was not found.");
     return readJsonFile(target);
   }
@@ -559,6 +579,102 @@ export function createGuideStore({
   function revert(packId, n, { by = "", baseHash = "", origin = "studio" } = {}) {
     const old = version(packId, n);
     return save(packId, old.pack, { by, origin, baseHash });
+  }
+
+  /** The profile bindings with their hash (an edit's base) and meta. */
+  function bindings() {
+    const store = read() || {};
+    const value = bindingsOf(store);
+    return {
+      bindings: value,
+      hash: hashOf(value),
+      meta: store.meta?.[bindingsId] || null,
+    };
+  }
+
+  /**
+   * Writes `next` bindings as a new version, as `save` does for a pack; the bindings before the
+   * first version are recorded first, so revert can always go back. Unchanged is a no-op.
+   */
+  function writeBindings(store, next, { by, origin, aiDrafted, note = "" }) {
+    store.meta = { ...(store.meta || {}) };
+    // Studio's own moves (a drafted profile's binding, Combine Backends) keep the review state.
+    aiDrafted ??= store.meta[bindingsId]?.aiDrafted === true;
+    if (
+      hashOf(next) === hashOf(bindingsOf(store)) &&
+      Boolean(store.meta[bindingsId]?.aiDrafted) === Boolean(aiDrafted)
+    )
+      return bindings();
+    check({ ...store, ...next });
+    if (!versionsIn(historyDir(bindingsId)).length)
+      addVersion(store, bindingsId, bindingsOf(store), {
+        by: "seed",
+        origin: "seed",
+        note: "Before the first edit",
+        field: "bindings",
+      });
+    Object.assign(store, structuredClone(next));
+    addVersion(store, bindingsId, next, {
+      by,
+      origin,
+      aiDrafted,
+      note,
+      field: "bindings",
+    });
+    writeStore(store);
+    return bindings();
+  }
+
+  /**
+   * Replaces the profile bindings (`{profiles, variants, negatives}`, each an object) as a new
+   * version. `baseHash` refuses a stale edit; an AI draft sets aiDrafted, any other save clears it.
+   */
+  function saveBindings(
+    value,
+    { by = "", origin = "studio", aiDrafted = false, baseHash = "", note = "" } = {},
+  ) {
+    if (!versionOrigins.includes(origin)) throw new Error("Choose who made the change.");
+    if (!isObject(value) || bindingSections.some((key) => !isObject(value[key] ?? {})))
+      throw new Error("Guide bindings are an object of profiles, variants and negatives objects.");
+    const store = read();
+    if (!store) throw notFound("There are no guides yet.");
+    if (baseHash && hashOf(bindingsOf(store)) !== baseHash)
+      throw conflict(
+        "These guide bindings changed since you opened them. Reload them, then make your edit again.",
+      );
+    return writeBindings(store, bindingsOf(value), {
+      by,
+      origin,
+      aiDrafted: Boolean(aiDrafted),
+      note,
+    });
+  }
+
+  /** Restores an earlier version of the bindings as a new version. */
+  function revertBindings(n, { by = "", baseHash = "", origin = "studio" } = {}) {
+    return saveBindings(version(bindingsId, n).bindings, {
+      by,
+      origin,
+      baseHash,
+    });
+  }
+
+  /**
+   * Removes every binding, variant and negatives entry keyed by one of `profileIds`
+   * (`custom:<id>`), and copies `from`'s binding and negatives to `to` where `to` has none, as a new
+   * version: Combine Backends gives the combined profile its default backend's and drops the ids it
+   * merged; migrate-runtime drops the ids of profiles that no longer exist.
+   */
+  function moveProfileBindings({ remove = [], from = "", to = "" }, { by = "", note = "" } = {}) {
+    const store = read();
+    if (!store) return bindings();
+    const next = structuredClone(bindingsOf(store));
+    if (from && to)
+      for (const key of ["profiles", "negatives"])
+        if (isObject(next[key][from]) && !Object.hasOwn(next[key], to))
+          next[key][to] = structuredClone(next[key][from]);
+    for (const key of bindingSections) for (const id of remove) delete next[key][id];
+    return writeBindings(store, next, { by, origin: "studio", note });
   }
 
   function approve(packId, { by = "" } = {}) {
@@ -598,25 +714,13 @@ export function createGuideStore({
     if (!store?.packs?.[packId]) throw notFound("That guide was not found.");
     if (!/^[a-z0-9][a-z0-9._:-]{0,119}$/i.test(String(profileId || "")))
       throw new Error("Choose a valid profile id.");
-    if (store.profiles?.[profileId]?.pack === packId) return;
-    store.profiles = { ...(store.profiles || {}), [profileId]: { pack: packId } };
-    writeStore(store);
-  }
-
-  /**
-   * Gives profile `to` (`custom:<id>`) the guide binding and negatives profile `from` has, where
-   * `to` has none of its own, as a combined profile takes its default backend's.
-   */
-  function copyProfileGuide(from, to) {
-    const store = read();
-    if (!store) return;
-    let changed = false;
-    for (const key of ["profiles", "negatives"])
-      if (isObject(store[key]?.[from]) && !Object.hasOwn(store[key], to)) {
-        store[key] = { ...store[key], [to]: structuredClone(store[key][from]) };
-        changed = true;
-      }
-    if (changed) writeStore(store);
+    const next = structuredClone(bindingsOf(store));
+    next.profiles[profileId] = { pack: packId };
+    writeBindings(store, next, {
+      by: "assistant",
+      origin: "ai",
+      note: `Bound ${profileId} to ${packId}`,
+    });
   }
 
   /** Records what an export held, so the next export can say what changed since. */
@@ -647,7 +751,10 @@ export function createGuideStore({
     approve,
     resolve,
     bind,
-    copyProfileGuide,
+    bindings,
+    saveBindings,
+    revertBindings,
+    moveProfileBindings,
     markExported,
     configFile,
     read,

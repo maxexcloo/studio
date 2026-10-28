@@ -12,6 +12,7 @@ import {
 } from "./custom-workflows.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { repointedPreferences } from "./combined-profiles.js";
 import { workflowRisks } from "./workflow-risk.js";
 
 const preferencesPath = path.join(dataDir, "workflow-preferences.json");
@@ -55,23 +56,9 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
 
 /** Moves favourites, last used and thumbnails to the id `canonical` gives each (merged profiles), saved at once. */
 export function repointWorkflowPreferences(canonical) {
-  const preferences = loadWorkflowPreferences();
-  saveWorkflowPreferences(
-    {
-      favorites: [...new Set(preferences.favorites.map(canonical))],
-      lastUsed: Object.entries(preferences.lastUsed).reduce((next, [id, when]) => {
-        const kept = canonical(id);
-        if (!next[kept] || String(when) > String(next[kept])) next[kept] = when;
-        return next;
-      }, {}),
-      thumbnails: Object.entries(preferences.thumbnails).reduce((next, [id, url]) => {
-        const kept = canonical(id);
-        if (!next[kept] || kept === id) next[kept] = url;
-        return next;
-      }, {}),
-    },
-    { immediate: true },
-  );
+  saveWorkflowPreferences(repointedPreferences(loadWorkflowPreferences(), canonical), {
+    immediate: true,
+  });
 }
 
 function updateWorkflowPreferencePatch(patch = {}) {
