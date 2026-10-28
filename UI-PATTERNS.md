@@ -290,14 +290,20 @@ primary component reference and verify APIs against the installed version.
   jobs out of the queue; their records and chat cards stay.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
-- The gallery toolbar keeps its search box in the row on desktop; phones expand
-  it from an icon into a full-width focused input, and closing it (Back or
-  Escape) clears the query while active filters stay. Filter and Select are compact chips at the row's end
-  (icons on phones); Filter swaps the leading controls for a row of facet chips,
-  each opening a scrollable Mantine popover, beside the search box on desktop.
-  Search narrows within the active filters, which show beside the search as
-  removable chips. Normal, search, filters and selection modes use the same
-  toolbar region. Filter actions preserve the query.
+- Image lists share one toolbar row (`GalleryFilters.tsx`): search, the active
+  filters as removable chips with Clear All (scrolling sideways, so the row never
+  changes height), then on desktop the result count and the zoom slider, Filter ▾
+  and Select. Phones expand the search from an icon into a full-width focused
+  input, and closing it (Back or Escape) clears the query while active filters
+  stay. Filter ▾ opens one `ChipPopup` (`GalleryFilterPanel`): the view (Grid or
+  Runs, All Versions), Starred, Uploads, Date, Models, LoRAs, Size, Aspect Ratio
+  and Chats, applying at once. The reference picker uses the same chips, Filter ▾
+  and panel, inline. Search narrows within the filters; filter actions preserve
+  the query. Gallery filters and zoom are remembered per account. Every control
+  that opens a menu or picker shows ▾.
+- Grid and Runs zoom between column counts (1–4 on phones, 2–8 wider) by
+  pinching on phones, or Ctrl/Cmd+scroll and the slider on desktop, holding the
+  tile under the fingers, pointer or view centre in place.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
@@ -329,7 +335,7 @@ primary component reference and verify APIs against the installed version.
   takes the same swipes: the stage shows its status (streaming the prompt while
   it is written) and Details its prompt; once saved, the viewer follows it to
   the result (`currentMedia`).
-- Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
+- Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
   generation by default (the All Versions filter chip, on). Turning it off
   collapses a result and its versions (runs made from it: Edit, Prompt, New Seed
