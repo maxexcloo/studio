@@ -20,7 +20,7 @@ import {
   setRequireApproval,
   gatewayAdminTools,
   setGatewayAdminTools,
-  ensureBuiltInAccessProfiles,
+  ensureBuiltInAccessProfile,
   listAccessProfiles,
   setDefaultAccessProfile,
   listAccounts,
@@ -525,7 +525,7 @@ export function registerMultiUserAuthRoutes(
   get("/api/accounts/admin", async (req, res) => {
     if (!requireAccountAdmin(req, res)) return;
     const profiles = await availableProfiles();
-    ensureBuiltInAccessProfiles();
+    ensureBuiltInAccessProfile();
     res.setHeader("Cache-Control", "no-store");
     res.json({
       ok: true,

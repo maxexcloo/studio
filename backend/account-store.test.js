@@ -119,7 +119,7 @@ test("ordinary accounts cannot be created without one existing profile", async (
   );
 });
 
-test("the built-in access profiles are added only where their IDs are free", () => {
+test("the built-in User profile is added only where its ID is free, and an empty Administrator group is removed", () => {
   const file = path.join(temporary, "data", "accounts.json");
   const saved = JSON.parse(fs.readFileSync(file, "utf8"));
   saved.profiles.user = {
@@ -128,19 +128,20 @@ test("the built-in access profiles are added only where their IDs are free", () 
     generationProfiles: ["image-fast"],
     features: { gallery: true },
   };
+  saved.profiles.administrator = { id: "administrator", name: "Administrator", allModels: true };
   fs.writeFileSync(file, JSON.stringify(saved));
   store.resetAccountStoreForTests();
-  assert.deepEqual(store.ensureBuiltInAccessProfiles(), ["administrator"]);
+  assert.equal(store.ensureBuiltInAccessProfile(), false);
   const profiles = store.listAccessProfiles();
   assert.equal(
     profiles.find((item) => item.id === "user").name,
     "Our Users",
     "an existing profile is never replaced",
   );
-  const administrator = profiles.find((item) => item.id === "administrator");
-  assert.equal(administrator.allModels, true);
-  assert.equal(Object.values(administrator.features).every(Boolean), true);
-  assert.deepEqual(store.ensureBuiltInAccessProfiles(), []);
+  assert.equal(
+    profiles.some((item) => item.id === "administrator"),
+    false,
+  );
 });
 
 test("new accounts start on the default access profile: local at once, single sign-on and chat gateway after approval unless it is off", async () => {
