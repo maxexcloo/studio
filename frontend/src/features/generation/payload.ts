@@ -5,6 +5,14 @@ import { profileBackendLabels } from "../../../../shared/profiles";
 export const isProfile = (profile: Profile, id: unknown) =>
   profile.id === id || (typeof id === "string" && Boolean(profile.aliases?.includes(id)));
 
+/** A provider-backed cloud profile (Grok), as the server's `isCloudProfile` judges it. */
+export const isCloudProfile = (profile: Pick<Profile, "id" | "family" | "provider">) =>
+  profile.provider === "cliproxyapi" || profile.family === "grok" || /^grok/i.test(profile.id);
+
+/** Whether a run on `profile` takes a negative prompt. */
+export const usesNegative = (profile?: Profile) =>
+  Boolean(profile && profile.capabilities.negativePrompt !== false);
+
 /** A combined profile's backend by name ("Radiance"). */
 export const backendLabel = (id: string) => profileBackendLabels[id] || id;
 

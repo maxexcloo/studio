@@ -22,15 +22,17 @@ import { mediaDraft } from "../gallery/useMediaAction";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useTryAgain } from "../gallery/useTryAgain";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { useCompare } from "./CompareDialog";
 import { comparisonQuery, type Comparison } from "./queries";
 import classes from "./ComparePage.module.css";
 
-/** A compare set side by side; starring the winner loads its settings into the composer. */
+/** A compare set side by side; starring the winner loads its settings, and Compare Again starts from it. */
 export function ComparePage() {
   const id = useParams().id!;
   const comparison = useQuery(comparisonQuery(id));
   const client = useQueryClient();
   const { profiles, setDraft } = useGenerationActions();
+  const compare = useCompare();
   const [open, setOpen] = useState<MediaItem | null>(null);
   const items = (comparison.data?.variants || []).flatMap((variant) =>
     variant.item ? [variant.item] : [],
@@ -67,7 +69,8 @@ export function ComparePage() {
         {comparison.error.message}
       </Alert>
     );
-  const { variants, vote, seed, prompt } = comparison.data;
+  const { variants, vote, seed, prompt, negative } = comparison.data;
+  const winner = items.find((item) => item.jobId === vote);
   const sized = items.find((item) => item.width && item.height);
   const aspect = sized ? sized.width! / sized.height! : 1;
   return (
@@ -93,10 +96,19 @@ export function ComparePage() {
           {[`${variants.length} Variants`, seed && `Seed ${seed}`].filter(Boolean).join(" · ")}
         </Text>
       </Group>
-      {prompt && (
-        <Text size="sm" lineClamp={3}>
-          {prompt}
-        </Text>
+      {(prompt || negative) && (
+        <Stack gap={4}>
+          {prompt && (
+            <Text size="sm" lineClamp={3}>
+              {prompt}
+            </Text>
+          )}
+          {negative && (
+            <Text size="xs" c="dimmed" lineClamp={2}>
+              Negative: {negative}
+            </Text>
+          )}
+        </Stack>
       )}
       <SimpleGrid
         cols={{ base: 2, sm: variants.length }}
@@ -106,14 +118,9 @@ export function ComparePage() {
         style={{ "--compare-columns": variants.length, "--compare-aspect": aspect }}
       >
         {variants.map(({ jobId, label, item }) => {
-          const winner = vote === jobId;
+          const won = vote === jobId;
           return (
-            <Stack
-              key={jobId}
-              gap={6}
-              className={classes.variant}
-              data-winner={winner || undefined}
-            >
+            <Stack key={jobId} gap={6} className={classes.variant} data-winner={won || undefined}>
               <Text size="sm" fw={600} truncate title={label}>
                 {label}
               </Text>
@@ -129,18 +136,18 @@ export function ComparePage() {
                   onTryAgain={(failed) => tryAgain([failed.jobId || ""]).then(() => undefined)}
                   actions={
                     item.status === "done" && (
-                      <Tooltip label={winner ? "Clear Winner" : "Star as Winner"}>
+                      <Tooltip label={won ? "Clear Winner" : "Star as Winner"}>
                         <ActionIcon
                           className={classes.star}
-                          variant={winner ? "filled" : "default"}
+                          variant={won ? "filled" : "default"}
                           radius="xl"
                           size="lg"
-                          aria-label={winner ? `Clear Winner ${label}` : `Star ${label} as Winner`}
-                          aria-pressed={winner}
+                          aria-label={won ? `Clear Winner ${label}` : `Star ${label} as Winner`}
+                          aria-pressed={won}
                           loading={star.isPending && star.variables?.id === item.id}
                           onClick={() => star.mutate(item)}
                         >
-                          <Star size={18} fill={winner ? "currentColor" : "none"} />
+                          <Star size={18} fill={won ? "currentColor" : "none"} />
                         </ActionIcon>
                       </Tooltip>
                     )
@@ -156,18 +163,30 @@ export function ComparePage() {
                   {item.prompt}
                 </Text>
               )}
+              {negative === undefined && item?.negative && (
+                <Text size="xs" c="dimmed" lineClamp={2}>
+                  Negative: {item.negative}
+                </Text>
+              )}
             </Stack>
           );
         })}
       </SimpleGrid>
-      {vote && star.isSuccess && (
+      {winner && (
         <Group justify="center" gap="sm" className={classes.applied}>
-          <Text size="sm" c="dimmed">
-            The winner’s settings are in the composer.
-          </Text>
-          <Button component={Link} to="/images?compose=1" variant="light" radius="xl" size="xs">
-            Open Composer
+          {star.isSuccess && (
+            <Text size="sm" c="dimmed">
+              The winner’s settings are in the composer.
+            </Text>
+          )}
+          <Button variant="default" onClick={() => void compare.openItem(winner)}>
+            Compare Again
           </Button>
+          {star.isSuccess && (
+            <Button component={Link} to="/images?compose=1">
+              Open Composer
+            </Button>
+          )}
         </Group>
       )}
       {open && (

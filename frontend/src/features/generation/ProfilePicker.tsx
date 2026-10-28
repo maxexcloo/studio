@@ -36,6 +36,19 @@ function profileLabel(profile: Profile, profiles: Profile[]) {
   return `${name} · ${own.slice(start, end).join("-")}`;
 }
 
+/** Profiles grouped by readable family name, for every profile selector. */
+export function profileOptions(available: Profile[]) {
+  const family = (profile: Profile) => modelFamilyLabel(profile.family, profile.familyName);
+  return [...new Set(available.map(family))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((group) => ({
+      group,
+      items: available
+        .filter((profile) => family(profile) === group)
+        .map((profile) => ({ value: profile.id, label: profileLabel(profile, available) })),
+    }));
+}
+
 export function ProfilePicker({
   value,
   onChange,
@@ -46,9 +59,6 @@ export function ProfilePicker({
   const available = context.profiles.filter((profile) => profile.kind === input.kind);
   const selected = available.find((profile) => isProfile(profile, input.profileId));
   const selectedLabel = selected && profileLabel(selected, available);
-  const families = [
-    ...new Set(available.map((profile) => modelFamilyLabel(profile.family, profile.familyName))),
-  ].sort((a, b) => a.localeCompare(b));
   const readiness = selected && profileReadiness(selected, workers);
   // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the
   // profile's; with several to choose from, the Backend chip shows it instead.
@@ -66,12 +76,7 @@ export function ProfilePicker({
         position: "top-start",
         withinPortal: true,
       }}
-      data={families.map((family) => ({
-        group: family,
-        items: available
-          .filter((profile) => modelFamilyLabel(profile.family, profile.familyName) === family)
-          .map((profile) => ({ value: profile.id, label: profileLabel(profile, available) })),
-      }))}
+      data={profileOptions(available)}
       value={selected?.id ?? null}
       renderOption={({ option, checked }) => {
         const profile = available.find((profile) => profile.id === option.value);
