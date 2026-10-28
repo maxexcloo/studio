@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -11,6 +12,7 @@ import { useForm } from "@mantine/form";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { api } from "../../api";
+import { useAccount } from "../auth/AccountGate";
 import { isProfile } from "./payload";
 
 export const modelsQuery = queryOptions({
@@ -85,17 +87,36 @@ const empty: Draft = {
 };
 const emptyProfiles: Profile[] = [];
 type Workspace = "chat" | "gallery";
-function useGenerationState(workspace: Workspace) {
+const initialDrafts: Record<MediaKind, Draft> = {
+  image: empty,
+  video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
+};
+/** The gallery composer's image and video drafts as last saved for this account, over the defaults. */
+function savedDrafts(key: string): Record<MediaKind, Draft> {
+  const saved: Partial<Record<MediaKind, Draft>> = key
+    ? JSON.parse(localStorage.getItem(key) || "{}")
+    : {};
+  const restore = (kind: MediaKind) => ({
+    ...initialDrafts[kind],
+    ...saved[kind],
+    input: { ...initialDrafts[kind].input, ...saved[kind]?.input },
+  });
+  return { image: restore("image"), video: restore("video") };
+}
+function useGenerationState(workspace: Workspace, remember: boolean) {
   // A Chat card staged by Refine, Animate or Recreate keeps its own input beside the composer's.
   const [staged, setStaged] = useState<Draft | null>(null);
-  const initialDrafts: Record<MediaKind, Draft> = {
-    image: empty,
-    video: { ...empty, input: { ...initialInput, kind: "video" }, operation: "animate" },
-  };
-  const drafts = useRef({ chat: { ...initialDrafts }, gallery: { ...initialDrafts } });
-  const options = { mode: "controlled" as const, initialValues: empty };
-  const chatForm = useForm<Draft>(options);
-  const galleryForm = useForm<Draft>(options);
+  // The gallery composer's drafts survive a reload, saved per account as they change.
+  const account = useAccount().data?.account?.id;
+  const storageKey = remember ? `studio-composer-draft:${account ?? "local"}` : "";
+  const [restored] = useState(() => savedDrafts(storageKey));
+  const drafts = useRef({ chat: { ...initialDrafts }, gallery: restored });
+  const chatForm = useForm<Draft>({ mode: "controlled", initialValues: empty });
+  const galleryForm = useForm<Draft>({ mode: "controlled", initialValues: restored.image });
+  const galleryDraft = galleryForm.values;
+  useEffect(() => {
+    if (storageKey) localStorage.setItem(storageKey, JSON.stringify(drafts.current.gallery));
+  }, [galleryDraft, storageKey]);
   const form = workspace === "chat" ? chatForm : galleryForm;
   const draft = form.values;
   const forms = useRef({ chat: chatForm, gallery: galleryForm });
@@ -164,11 +185,14 @@ const GenerationActionsContext = createContext<Pick<
 export function GenerationProvider({
   children,
   workspace,
+  remember = false,
 }: {
   children: ReactNode;
   workspace: Workspace;
+  /** Keeps the gallery draft across reloads: the page's provider, not a surface's own. */
+  remember?: boolean;
 }) {
-  const value = useGenerationState(workspace);
+  const value = useGenerationState(workspace, remember);
   const actions = useMemo(
     () => ({
       profiles: value.profiles,

@@ -119,7 +119,9 @@ primary component reference and verify APIs against the installed version.
   profile takes one, and a row of compact chips: Profile, Backend (when the
   profile has several), Reference Role (once references are placed), References,
   LoRAs, Aspect, Count, a set Seed (clearable), Expert settings, Compare and
-  Presets, then Image/Video and Generate. Recent Prompts, References, LoRAs,
+  Presets, then Image/Video and Generate. Placing the first reference applies the
+  profile's reference-mode settings (a partial denoise, as Edit does); removing
+  the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
   few controls (Clear References sits there), then the content; choices apply at
   once and closing the popup is the only dismissal, with no Use or Done action.
@@ -229,15 +231,17 @@ primary component reference and verify APIs against the installed version.
 - Suggestions never move the layout or act on their own: prompt ideas float
   over an empty, focused prompt and fill it (in Chat as "Create an image: …");
   viewer next steps hold their row with placeholder chips while loading, written
-  ahead of time while Studio is idle; a step puts its prompt in the prompt bar
-  and generates it, showing progress on the chip, and a small refresh action
+  ahead of time while Studio is idle; a step generates its prompt with the
+  item's settings, showing progress on the chip, and a small refresh action
   asks for different ones. With none to offer, nothing shows.
 
 ## Data & Feedback
 
 - TanStack Query owns server data, polling and invalidation; drafts stay within
   their feature. Chat and gallery generation drafts are independent; switching
-  modes preserves unsent prompts, references and settings. Typing must not rerender an unchanged gallery or conversation
+  modes preserves unsent prompts, references and settings, and the gallery
+  composer's image and video drafts survive a reload, saved per account in
+  browser storage. Typing must not rerender an unchanged gallery or conversation
   history; shared provider commands retain their identity. Keep account data
   and credentials out of browser storage.
 - Account access groups own model grants and Cloud Models/uncensored permissions.
@@ -275,11 +279,10 @@ primary component reference and verify APIs against the installed version.
 
 ## Media, Motion & Accessibility
 
-- The viewer is the iteration hub. Under the image, its prompt bar is the
-  composer collapsed (the same `ComposerDock`, in its own draft that never
-  touches the page's), prefilled with the item's settings; clicking it expands
-  in place over the open viewer with the prompt focused, and a click outside it
-  only folds it back to the bar. Its runs queue as usual
+- The viewer is the iteration hub. There is no prompt bar on the image: Prompt
+  opens the item in the page's composer and Chat starts a Chat about it (the
+  item attached as its reference, its settings as the input) to rework its
+  prompt or edit the image. Runs started from the viewer queue as usual
   into a strip of the item's versions, grouped as the grid groups them
   (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
   shared item actions, sized to them; Animate opens its LLM prompt menu
@@ -288,18 +291,19 @@ primary component reference and verify APIs against the installed version.
   Show Upscale and Compare Upscale. Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
-  bounded height. The desktop details sidebar is open by
-  default and its toggle is remembered. Phones show the image full-bleed with
-  an icon row and prompt bar; swipe left/right navigates, down closes and up
-  reveals details and further options. Running, failed and cancelled work opens
-  too, in the gallery and in Chat: the stage shows its status (streaming the
-  prompt while it is written) and Details its prompt; once saved, the viewer
-  follows it to the result (`currentMedia`).
+  bounded height; LoRAs have their own heading, each with its strength. The
+  desktop details sidebar is open by default and its toggle is remembered.
+  Phones show the image full-bleed with an icon row; swipe left/right navigates,
+  down closes and up reveals details and further options. Running, failed and
+  cancelled work opens too, in the gallery and in Chat, and takes the same
+  swipes: the stage shows its status (streaming the prompt while it is written)
+  and Details its prompt; once saved, the viewer follows it to the result
+  (`currentMedia`).
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows a
-  result and its versions (runs made from it: Edit, Recreate, New Seed and the
-  like, linked by `parentJobId` and `parentItemId`) as one tile showing the latest,
-  with a version count; crossing it with the pointer, or a sideways swipe on
+  result and its versions (runs made from it: Edit, Prompt, New Seed and the
+  like, linked by `parentJobId` and `parentItemId`) as one tile showing the
+  original (its first version), with a version count; crossing it with the pointer, or a sideways swipe on
   phones, flips through them. The All Versions filter chip lists them
   separately. `versions.ts` owns the grouping for every consumer.
 - Viewers always fill the viewport independently of workspace width. Transparent
@@ -308,18 +312,22 @@ primary component reference and verify APIs against the installed version.
   around the viewer's controls does not. Media, native video controls and
   details/actions remain interactive. Images open fitted but never beyond
   their actual size, showing the gallery thumbnail until the full image has
-  loaded. Opened videos play, muted when the browser refuses sound. Keep
+  loaded. Opened videos play, muted when the browser refuses sound, with their
+  controls hidden until a pointer moves over or taps them, fading again. Keep
   focus trapping, Escape and return focus. Image zoom and bottom details are
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Item actions have one definition (`gallery/MediaActions.tsx`): Animate, Edit,
-  Recreate ▾, Reference | Compare, Upscale | Copy ▾, Download | Delete, Star,
-  alphabetical within each section, in every menu and action bar. Options are
-  submenus in menus and split buttons or menus in bars: Animate › themes,
-  Custom Animation, Animate in Composer (Extend for videos); Recreate › In
-  Composer, New Seed, Exact Repeat; Upscale › Show Upscale, Compare Upscale;
-  Copy (Details by default) › Details, Prompt. Phones that share natively show
+- Item actions have one definition (`gallery/MediaActions.tsx`): Chat, Prompt ▾
+  | Animate, Edit ▾ | Upscale | Copy ▾, Download | Delete, Star, Chat and Prompt
+  first and the rest alphabetical within each section, in every menu and action
+  bar. Compare joins Upscale's section in menus (the tile and right-click menu)
+  and the selection bar, never the viewer's bar. Options are submenus in menus
+  and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
+  Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
+  Reference; Animate ›
+  themes, Custom Animation, Animate in Composer (Extend for videos); Upscale ›
+  Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out
