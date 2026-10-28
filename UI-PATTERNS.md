@@ -343,9 +343,12 @@ primary component reference and verify APIs against the installed version.
   card that fans out in place; its images open the viewer hub. Grid shows every
   generation by default (the All Versions filter chip, on). Turning it off
   collapses a result and its versions (runs made from it: Edit, Prompt, New Seed
-  and the like, linked by `parentJobId` and `parentItemId`) into one tile
+  and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it
-  with the pointer, or a sideways swipe on phones, flips through them.
+  with the pointer, or a sideways swipe on phones, flips through them. Sharing a
+  session or prompt never groups, and a run from a result's settings that
+  changes its profile or most of its prompt (`isVersion` in `shared/versions.ts`)
+  stands alone; Details links it and its source as From and Derived.
   `versions.ts` owns the grouping for every consumer.
 - Viewers always fill the viewport independently of workspace width. Transparent
   stage/content reveal the blurred gallery behind. Empty-stage clicks close,

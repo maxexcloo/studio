@@ -243,6 +243,8 @@ It gives every existing group the **Upscale** feature, on (`upscaleFeature` in t
 
 It also turns each account's LoRA favourites into thumbs up (`backend/lora-ratings.js`): every `lora-stacks.json` library's `favorites` list becomes `ratings` of `up`, keeping a rating already set. The dry run reports the files under `loraRatings`; `--apply` copies them to `.backups/lora-ratings-*` (`mapping.json` names each copy's source) and then writes them, with Studio stopped. Until it runs, Studio shows no ratings and the next LoRA library change drops the old list.
 
+It regroups versions by their recorded source (`backend/version-sources.js`): a queued run whose parent run's result is its first reference (Chat edits and animations) records that result as `parentItemId`, which is all that groups versions now. The dry run reports those runs under `versionSources.recorded`, and counts the runs that now stand alone: `ungrouped` (a Chat turn that only followed an earlier one) and `derived` (made from a result but changed too much to be its version); `--apply` copies the changed rows to `.backups/version-sources-*` and then writes them, with Studio stopped.
+
 With `--dream-owner <account id>`, naming the one account that has used Dream, it also clears Dream answers left on other accounts' records (`backend/dream-ownership.js`): Dream marks on gallery items another account owns, and that account's calibration answers and Dream taste signals about those items. Its own marks, answers and taste summary stay. The dry run reports the counts under `dreamOwnership`; `--apply` writes them with Studio stopped, without a backup.
 
 ## Queue, Sessions & Runtime Control
