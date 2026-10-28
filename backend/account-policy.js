@@ -29,6 +29,7 @@ const accessFeatures = Object.freeze([
   "uncensoredModels",
   "presets",
   "promptAssistant",
+  "upscale",
 ]);
 
 const keyPattern = /^[a-z0-9][a-z0-9:-]{0,127}$/;
@@ -116,6 +117,9 @@ export function mayUseGenerationProfile(access, profile) {
     return access.features.cloudModels === true;
   return access.allModels === true || access.generationProfiles.includes(id);
 }
+
+/** Upscale (and Finish Starred Images, smart upscale in a run) needs the Upscale feature. */
+export const upscaleOffMessage = "Upscaling is disabled for this account.";
 
 export function mayUseFeature(access, feature) {
   return Boolean(

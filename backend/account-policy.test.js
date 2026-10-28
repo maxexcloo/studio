@@ -76,6 +76,7 @@ test("access profiles contain only currently available generation profiles and k
         uncensoredModels: false,
         presets: false,
         promptAssistant: false,
+        upscale: false,
       },
     },
   );
@@ -83,6 +84,7 @@ test("access profiles contain only currently available generation profiles and k
 
 test("Prompt Assistant is on for built-ins and follows each stored profile", () => {
   assert.equal(builtInAccessProfile.features.promptAssistant, true);
+  assert.equal(builtInAccessProfile.features.upscale, true);
   const stored = {
     id: "artists",
     name: "Artists",

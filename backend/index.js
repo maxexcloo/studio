@@ -270,6 +270,7 @@ import {
 import {
   isCloudProfile,
   mayUseFeature,
+  upscaleOffMessage,
   mayUseGenerationProfile,
   visibleGenerationProfiles,
 } from "./account-policy.js";
@@ -2083,6 +2084,12 @@ const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
   online: textOnline,
+  uncensored: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    return (
+      !ownerId || Boolean(account?.authenticated && mayUseFeature(account, "uncensoredModels"))
+    );
+  },
   item: (ownerId, jobId) =>
     filterVisibleGallery(
       gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
@@ -2178,7 +2185,11 @@ const finishing = createFinishing({
   allowed: (ownerId) => {
     if (!ownerId) return !multiUserEnabled;
     const account = accountAccessForId(ownerId);
-    return Boolean(account?.authenticated && mayUseFeature(account, "gallery"));
+    return Boolean(
+      account?.authenticated &&
+      mayUseFeature(account, "gallery") &&
+      mayUseFeature(account, "upscale"),
+    );
   },
   item: (ownerId, itemId) =>
     gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
@@ -2622,6 +2633,8 @@ app.get(
  * `{ status, payload }` as the route sends it. `origin` sets the queue tier (Finish Starred Images).
  */
 async function queueUpscale(account, request, origin) {
+  if (account && !mayUseFeature(account, "upscale"))
+    return { status: 403, payload: { ok: false, error: upscaleOffMessage } };
   const worker = routeJob("upscale");
   if (!worker) return noUpscaleWorker();
   return withComfyBackend(worker.id, () => queueUpscaleOnWorker(account, request, origin));

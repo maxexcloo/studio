@@ -10,7 +10,7 @@ export const assistantPresets = Object.freeze([
     label: "Enhance",
     description: "Richer detail in the guide’s own style.",
     instruction:
-      "Enhance: make the prompt richer and more specific in the way the guide recommends (subject detail, setting, light, composition), without changing what is asked for.",
+      "Enhance: make the prompt clearly richer and more specific in the way the guide recommends: concrete subject detail, the setting, the light and its direction, composition and camera, without changing what is asked for.",
   },
   {
     id: "spicy",
@@ -39,7 +39,7 @@ export const assistantPresets = Object.freeze([
     label: "Concise",
     description: "Short and direct, essentials only.",
     instruction:
-      "Concise: keep only what matters. One or two short sentences (under 40 words) naming the subject, the action, the setting and the style. Drop filler and adjectives that add nothing.",
+      "Concise: cut it to the essentials only: the subject, its key details, the style and the framing, as one short sentence (under 25 words) or, where the guide prefers tags, a few comma-separated tags. Drop filler, scene-setting that adds nothing and every repeated or generic quality word. It should be much shorter than the input.",
   },
   {
     id: "candid",
