@@ -29,6 +29,7 @@ import { mediaDraft } from "../gallery/useMediaAction";
 import { inputForProfile, useGenerationActions } from "../generation/GenerationProvider";
 import { blockedProps, submitBlockedReason } from "../generation/GenerationEditor";
 import {
+  byRating,
   compatibleLoras,
   defaultStrength,
   LoraPicker,
@@ -45,6 +46,7 @@ import {
   stepsRange,
   usesNegative,
 } from "../generation/payload";
+import { loraLibraryQuery } from "../generation/LoraStacks";
 import { profileOptions } from "../generation/ProfilePicker";
 import { PromptFields } from "../generation/PromptFields";
 import { queueQuery } from "../generation/Queue";
@@ -130,6 +132,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   const loraPicker = useLoraPicker();
   const info = useQuery(loraInfoQuery);
   const metadata = info.data?.loras || {};
+  const ratings = useQuery(loraLibraryQuery).data?.library.ratings || {};
   const assisting = useIsMutating({ mutationKey: ["prompt-assistance"] }) > 0;
   const profileOf = (input: GenerationInput) =>
     profiles.find((profile) => isProfile(profile, input.profileId));
@@ -140,8 +143,10 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
   const options = profileOptions(local);
   const optionLabel = (id: string) =>
     options.flatMap((group) => group.items).find((item) => item.value === id)?.label || id;
-  const baseLoras = baseProfile?.capabilities.lora ? compatibleLoras(baseProfile, metadata) : [];
   const title = (name: string) => loraTitle(metadata[name], name);
+  const baseLoras = baseProfile?.capabilities.lora
+    ? compatibleLoras(baseProfile, metadata).sort(byRating(ratings, title))
+    : [];
   // A cloud draft compares only against local profiles; its other settings don't run locally.
   const baseLocal = Boolean(baseProfile && local.includes(baseProfile));
   const available = dimensions.filter(

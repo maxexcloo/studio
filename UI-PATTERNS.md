@@ -188,8 +188,12 @@ primary component reference and verify APIs against the installed version.
   names such as Flux 2. Each option is a complete profile, titled with its name and
   its description beneath; preserve exact profile IDs. The LoRA picker's tabs are
   Recommended (the default: LoRAs for the profile's family), Favourites (this
-  family's), All (every LoRA, with Unclassified, those without a family, as a
-  filter) and saved Stacks; type filters follow the catalogue Type.
+  family's thumbs up), All (every LoRA, with Unclassified, those without a family,
+  as a filter) and saved Stacks; type filters follow the catalogue Type.
+- Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
+  clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
+  up, then unrated, then thumbs down, each alphabetically; Dream loads only thumbs
+  up.
 - References pick from the gallery. Uploads are the uploader's gallery images,
   hidden until the gallery's Uploads filter is on (the picker's too, where the
   Upload tile sits). Gallery drag-and-drop passes an
