@@ -190,7 +190,7 @@ export function usePromptAssistant({
       });
       abort.signal.throwIfAborted();
       if (action !== "loras" && result.source === "fallback")
-        throw new Error(result.reason || "Prompt assistance is unavailable.");
+        throw new Error(`The prompt assistant is unavailable (${result.reason || "no reply"}).`);
       return { action, result, source, preset };
     },
     onSuccess: ({ action, result, source, preset }) => {
