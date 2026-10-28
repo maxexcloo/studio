@@ -10,6 +10,7 @@ import { dreamOwnership } from "../dream-ownership.js";
 import { loraRatings } from "../lora-ratings.js";
 import { uncensoredMarker, upscaleFeature } from "../uncensored-marker.js";
 import { migrateUploads } from "../uploads.js";
+import { versionSources } from "../version-sources.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -39,6 +40,7 @@ else {
     uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
     upscaleFeature: upscaleFeature(dataDir, { apply: values.apply }),
     loraRatings: loraRatings(dataDir, { apply: values.apply }),
+    versionSources: versionSources(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
       ? {
           dreamOwnership: dreamOwnership(dataDir, {

@@ -493,7 +493,16 @@ export function MediaViewer({
                       </Stack>
                       <DetailsCopyActions item={displayed} />
                     </Group>
-                    <MediaDetails item={displayed} />
+                    <MediaDetails
+                      item={displayed}
+                      open={
+                        navigate &&
+                        ((next) => {
+                          setCompare(false);
+                          navigate(next);
+                        })
+                      }
+                    />
                   </Stack>
                 </ScrollArea>
               </aside>
@@ -520,7 +529,16 @@ export function MediaViewer({
                 </Text>
                 <DetailsCopyActions item={displayed} />
               </Group>
-              <MediaDetails item={displayed} />
+              <MediaDetails
+                item={displayed}
+                open={
+                  navigate &&
+                  ((next) => {
+                    setCompare(false);
+                    navigate(next);
+                  })
+                }
+              />
             </Stack>
           </Drawer>
         )}

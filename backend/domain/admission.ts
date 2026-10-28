@@ -1,4 +1,5 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
+import { referencedResult } from "../../shared/versions.ts";
 import { GenerationQueue } from "./queue.ts";
 import { queuePriority, RewriteStore, type OwnedJob, type QueueOrigin } from "./store.ts";
 
@@ -41,10 +42,8 @@ export function createGenerationAdmission(options: AdmissionOptions) {
     const ownerId = account?.userId || "";
     const scopedSession = scope && options.store.session(ownerId, scope.sessionId);
     if (scope && !scopedSession) return { status: 404, payload: { error: "Session not found." } };
-    if (
-      scope?.parentJobId &&
-      options.store.job(ownerId, scope.parentJobId)?.sessionId !== scope.sessionId
-    )
+    const parent = scope?.parentJobId ? options.store.job(ownerId, scope.parentJobId) : undefined;
+    if (scope?.parentJobId && parent?.sessionId !== scope.sessionId)
       return { status: 400, payload: { error: "Parent generation must belong to this chat." } };
     const clientId = String(input.clientJobId || "").replace(/[^\w-]/g, "");
     let release: (() => void) | undefined;
@@ -85,7 +84,11 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             scope?.parentJobId,
             await options.resourceFor(input),
             clientId || undefined,
-            origin,
+            {
+              ...origin,
+              // A Chat run is made from its parent's result only when it uses it as its reference.
+              parentItemId: parent && referencedResult(input, parent),
+            },
           );
         } catch (error) {
           const failure = error as Error & { code?: string };
