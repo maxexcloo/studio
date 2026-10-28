@@ -1,6 +1,5 @@
 import {
   ingestRunResults,
-  mediaStorageEnabled,
   noteIngested,
   removeComfyFiles,
   temporaryInputFiles,
@@ -466,12 +465,6 @@ function watchProgress(id, run, socket = openProgressSocket(id), graph = {}) {
   return socket;
 }
 
-/** A run's temporary input copies (resized references, legacy uploads) go when it ends. */
-function forgetTemporaryInputs(body) {
-  if (body?.temporaryInputNames?.length)
-    forgetComfyRun({ inputNames: body.temporaryInputNames }).catch(() => null);
-}
-
 // What each running job asked for, so a failure can be read against it.
 const jobBodies = new Map();
 
@@ -565,7 +558,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       setTerminalJob(id, { status: "canceled" });
       updateGalleryJob(id, { status: "canceled" });
       socket?.close();
-      forgetTemporaryInputs(body);
       return;
     }
     submissionStarted = true;
@@ -612,12 +604,9 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
      */
     const deliver = async (results, missed = null) => {
       // ComfyUI as a worker: the pictures move into Studio media before anything shows them.
-      let comfyCopies = [];
-      if (mediaStorageEnabled) {
-        const moved = await ingestRunResults(results, body.ownerId || "");
-        results = moved.results;
-        comfyCopies = moved.comfyFiles;
-      }
+      const moved = await ingestRunResults(results, body.ownerId || "");
+      results = moved.results;
+      const comfyCopies = moved.comfyFiles;
       const upscaled = (result) =>
         result.upscale && !missed ? runUpscaleState(embed, result.upscale) : null;
       const missedState = (result) =>
@@ -656,17 +645,13 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
       markWorkflowUsed(body.profileId || body.model || body.workflow || "");
       setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
-      if (body.temporaryInputNames?.length)
-        await forgetComfyRun({ inputNames: body.temporaryInputNames });
       // The gallery has Studio's copies now: ComfyUI keeps no outputs, run-only inputs or history of the run.
       // Only once the gallery is on disk, so a crash here can never leave a run with neither copy.
-      if (mediaStorageEnabled) {
-        await flushGalleryStrict();
-        noteIngested([id]);
-        await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
-        if (comfyCopies.length)
-          await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
-      }
+      await flushGalleryStrict();
+      noteIngested([id]);
+      await removeComfyFiles([...comfyCopies, ...temporaryInputFiles(body)]);
+      if (comfyCopies.length)
+        await forgetComfyRun({ promptIds: [queued.prompt_id] }).catch(() => false);
       socket?.close();
     };
     // The pictures Smart upscale was working on, from what ComfyUI said as each was saved.
@@ -693,7 +678,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
       // The socket already recorded the failure; history would only add an empty result.
       if (jobs.get(id)?.status === "error") {
         socket?.close();
-        forgetTemporaryInputs(body);
         return;
       }
       const checked = await tracker
@@ -713,7 +697,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           updateGalleryJob(id, { status: "canceled" });
           setTerminalJob(id, { status: "canceled" });
           socket?.close();
-          forgetTemporaryInputs(body);
         }
         return;
       }
@@ -744,7 +727,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
           updateGalleryJob(id, { status: "canceled" });
           setTerminalJob(id, { status: "canceled" });
           socket?.close();
-          forgetTemporaryInputs(body);
         }
         return;
       }
@@ -829,7 +811,6 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
     setTerminalJob(id, { status: "error", error: failure.summary, failure });
     updateGalleryJob(id, { status: "error", filename: failure.title, failure });
     socket?.close();
-    forgetTemporaryInputs(body);
   } finally {
     // The progress socket can report an error a moment after this loop ends.
     setTimeout(() => jobBodies.delete(id), 60_000).unref?.();

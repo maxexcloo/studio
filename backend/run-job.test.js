@@ -16,7 +16,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-run-"));
 writeTestWorkflows(process.env.STUDIO_DATA_DIR);
-process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const store = await import("./gallery-store.js");
 test.after(() => fake.close());

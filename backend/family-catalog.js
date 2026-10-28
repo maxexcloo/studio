@@ -715,8 +715,7 @@ const hy15Shift = (shift) => ({ node: "ModelSamplingSD3", shift });
  * back conditionings and latent; startImage: "required" makes the composer ask
  * for that picture. clipVision: vision encoder kinds that also read it.
  * refines: a family the detection finds, which a name pattern narrows to this
- * one (the weights cannot tell them apart); weightsTell: only when the weights
- * were out of reach, because they can. excludes: a name that marks a sibling
+ * one (the weights cannot tell them apart). excludes: a name that marks a sibling
  * with the same layout, which is `as` (a knownFamilies id) instead.
  * pack: a node-packs.js id when the family runs on custom nodes. ownLoaders:
  * the pack loads encoder and VAE itself (no pickers, no LoRAs).
@@ -875,7 +874,7 @@ export const families = {
       {
         id: "vpred",
         label: "V-prediction",
-        match: (name, header) => Boolean(header && "v_pred" in header) || /v[-_ ]?pred/i.test(name),
+        match: (name) => /v[-_ ]?pred/i.test(name),
         vpred: true,
         defaults: { steps: 30, cfg: 4.5, sampler: "euler", scheduler: "normal" },
       },
@@ -983,8 +982,7 @@ export const families = {
       {
         id: "schnell",
         label: "Schnell",
-        match: (name, header, detail) =>
-          detail?.schnell === true || (detail?.schnell === undefined && /schnell/i.test(name)),
+        match: (name) => /schnell/i.test(name),
         defaults: { steps: 4, cfg: 1, sampler: "euler", scheduler: "simple" },
       },
       // De-distilled fine-tunes trade Flux guidance back for real CFG, so the negative prompt works again.
@@ -1506,7 +1504,7 @@ export const families = {
     label: "Wan 2.2 14B I2V",
     kind: "video",
     sources: ["unet"],
-    refines: { family: "wan22_14b", name: /i2v/i, weightsTell: true },
+    refines: { family: "wan22_14b", name: /i2v/i },
     // Wan 2.2 Fun inpaint shares this layout exactly; it needs its own nodes.
     excludes: { name: /fun[-_ ]|inpaint|camera|control|vace|animate|s2v/i, as: "wan_other" },
     pair: {
@@ -1913,7 +1911,7 @@ export const families = {
       {
         id: "sprint",
         label: "Sprint",
-        match: (name, header, detail) => detail?.sprint ?? /sprint/i.test(name),
+        match: (name) => /sprint/i.test(name),
         native: draws2kMaybe,
         negative: "none",
         dtype: "FP32",
@@ -1948,10 +1946,7 @@ export const families = {
         id: "1600m",
         label: "1.6B",
         defaults: { steps: 28, cfg: 2, sampler: "euler", scheduler: "normal" },
-        match: (name, header, detail) =>
-          detail?.depth
-            ? detail.depth === 20 && !detail.qkNorm
-            : /1600m|1[._]6b/i.test(name) && !/1[._]5/.test(name),
+        match: (name) => /1600m|1[._]6b/i.test(name) && !/1[._]5/.test(name),
       },
       {
         id: "standard",
@@ -2025,8 +2020,7 @@ export const families = {
       {
         id: "base",
         label: "Base",
-        match: (name, header, detail) =>
-          detail?.flowMap !== undefined ? !detail.flowMap : /(^|[^a-z])base([^a-z]|$)/i.test(name),
+        match: (name) => /(^|[^a-z])base([^a-z]|$)/i.test(name),
         negative: "text",
         defaults: { steps: 50, cfg: 4, sampler: "euler", scheduler: "simple" },
       },
@@ -2161,218 +2155,10 @@ export function familyFromName(name = "", source = "unet") {
   return source === "checkpoint" ? "sdxl_or_sd15" : "";
 }
 
-/* ------------------------------------------------------------ Headers */
-
-const prefixes = ["model.diffusion_model.", "model.model.", "net."];
-
-/** The diffusion model's own keys, prefix stripped (unet_prefix_from_state_dict). */
-function diffusionKeys(header) {
-  const all = Object.keys(header || {}).filter((key) => key !== "__metadata__");
-  let best = "";
-  let bestCount = 5;
-  for (const prefix of prefixes) {
-    const count = all.filter((key) => key.startsWith(prefix)).length;
-    if (count > bestCount) {
-      best = prefix;
-      bestCount = count;
-    }
-  }
-  if (!best) return new Map(all.map((key) => [key, header[key]]));
-  return new Map(
-    all.filter((key) => key.startsWith(best)).map((key) => [key.slice(best.length), header[key]]),
-  );
-}
-
-const dim = (keys, key, axis = 0) => {
-  const shape = keys.get(key)?.shape;
-  return Array.isArray(shape) ? Number(shape[axis < 0 ? shape.length + axis : axis]) : NaN;
-};
-
-/**
- * { family, detail } from a header, in ComfyUI's detection order. family is one
- * of `families`, a `knownFamilies` id, or "" when the header has nothing to say.
- */
-export function familyFromHeader(header) {
-  if (!header) return { family: "" };
-  const keys = diffusionKeys(header);
-  if (!keys.size) return { family: "" };
-  const has = (key) => keys.has(key);
-  if (has("joint_blocks.0.context_block.attn.qkv.weight")) return { family: "sd3" };
-  if (has("double_layers.0.attn.w1q.weight")) return { family: "auraflow" };
-  if (has("txt_in.individual_token_refiner.blocks.0.norm1.weight")) {
-    if (!has("vision_in.proj.0.weight")) return { family: "hunyuan_video" };
-    return dim(keys, "img_in.proj.weight", 1) === 98
-      ? { family: "other" }
-      : { family: "hunyuan15" };
-  }
-  // FLUX.3, before Flux: its own text, image and reference mode blocks. A flow map (Klein,
-  // distilled) also reads the step it jumps to.
-  if (
-    has("content_mode_blocks.image.0.attn_out.weight") &&
-    has("single_stream_modulations.txt.lin.weight")
-  ) {
-    return { family: "flux3", detail: { flowMap: has("ref_time_in.in_layer.weight") } };
-  }
-  const fluxLike =
-    (has("double_blocks.0.img_attn.norm.key_norm.weight") ||
-      has("double_blocks.0.img_attn.norm.key_norm.scale")) &&
-    (has("img_in.weight") ||
-      has("distilled_guidance_layer.norms.0.weight") ||
-      has("distilled_guidance_layer.norms.0.scale"));
-  if (fluxLike) {
-    if (
-      [
-        "distilled_guidance_layer.0.norms.0.weight",
-        "distilled_guidance_layer.0.norms.0.scale",
-        "distilled_guidance_layer.norms.0.weight",
-        "distilled_guidance_layer.norms.0.scale",
-      ].some(has)
-    ) {
-      return has("nerf_blocks.0.norm.weight") || has("nerf_blocks.0.norm.scale")
-        ? { family: "other" }
-        : { family: "chroma" };
-    }
-    if (has("double_stream_modulation_img.lin.weight")) {
-      // Three tapped encoder layers x the encoder's width (comfy/sd.py: "3-layer tap -> 12288").
-      const context = dim(keys, "txt_in.weight", 1);
-      if (context === 7680) return { family: "flux2_klein_4b" };
-      if (context === 12288) return { family: "flux2_klein_9b" };
-      if (context === 15360) return { family: "flux2_dev" };
-      return { family: "flux2_dev", detail: { unsure: true } };
-    }
-    if (dim(keys, "img_in.weight", 1) === 384) return { family: "inpaint" };
-    return { family: "flux1", detail: { schnell: !has("guidance_in.in_layer.weight") } };
-  }
-  if (has("video_patch_proj.weight") && has("audio_patch_proj.weight"))
-    return { family: "minimax_h3" };
-  // Sana's GLUMBConv feed-forward, in its own and in diffusers' naming.
-  if (
-    has("blocks.0.mlp.inverted_conv.conv.weight") ||
-    has("transformer_blocks.0.ff.conv_inverted.weight")
-  ) {
-    const native = has("blocks.0.mlp.inverted_conv.conv.weight");
-    const block = native ? /^blocks\.(\d+)\./ : /^transformer_blocks\.(\d+)\./;
-    const depth =
-      Math.max(...[...keys.keys()].map((key) => Number(block.exec(key)?.[1] ?? -1))) + 1;
-    const sprint = native
-      ? has("cfg_embedder.mlp.0.weight")
-      : [...keys.keys()].some((key) => key.includes("guidance"));
-    const qkNorm = has(
-      native ? "blocks.0.attn.q_norm.weight" : "transformer_blocks.0.attn1.norm_q.weight",
-    );
-    return { family: "sana", detail: { depth, sprint, qkNorm } };
-  }
-  if (has("adaln_single.emb.timestep_embedder.linear_1.bias") && !has("pos_embed.proj.bias")) {
-    return { family: has("audio_adaln_single.linear.weight") ? "ltx" : "ltxv" };
-  }
-  if (has("cap_embedder.1.weight") && has("noise_refiner.0.attention.k_norm.weight")) {
-    const width = dim(keys, "cap_embedder.1.weight", 0);
-    if (has("dec_net.cond_embed.weight")) return { family: "other" };
-    if (width === 3840) return { family: "zimage" };
-    if (width !== 2304) return { family: "other" };
-    // NewBie keeps Lumina's body but adds a pooled CLIP input, so it needs other encoders.
-    return has("clip_text_pooled_proj.0.weight") ? { family: "newbie" } : { family: "lumina2" };
-  }
-  if (has("head.modulation")) {
-    if (["vace_patch_embedding.weight", "control_adapter.conv.weight"].some(has))
-      return { family: "wan_other" };
-    if (dim(keys, "head.head.weight", 0) / 4 === 48) return { family: "wan22_5b" };
-    // Wan 2.2 14B I2V: the picture and its mask ride in as 20 more input channels, with no CLIP vision (Wan 2.1's has img_emb).
-    if (
-      !has("img_emb.proj.0.bias") &&
-      dim(keys, "patch_embedding.weight", 1) === 36 &&
-      dim(keys, "head.modulation", -1) === 5120
-    )
-      return { family: "wan22_14b_i2v" };
-    if (has("img_emb.proj.0.bias") || dim(keys, "patch_embedding.weight", 1) >= 36)
-      return { family: "wan_i2v" };
-    // Wan 2.2 14B and Wan 2.1 14B share every key; the high/low-noise pair is a naming convention.
-    return { family: "wan21", detail: { width: dim(keys, "head.modulation", -1) } };
-  }
-  if (has("caption_projection.0.linear.weight")) return { family: "hidream" };
-  if (has("blocks.0.mlp.layer1.weight")) {
-    return has("llm_adapter.blocks.0.cross_attn.q_proj.weight")
-      ? { family: "anima" }
-      : { family: "cosmos" };
-  }
-  // Qwen-Image 2.1 renamed Qwen-Image's text input (txt_in.text_norm, no txt_norm) and fused its MLP.
-  if (
-    [
-      "txt_in.text_norm.weight",
-      "modulation.1.weight",
-      "transformer_blocks.0.attn.norm_q.weight",
-      "img_in.weight",
-      "proj_out.weight",
-    ].every(has) &&
-    (has("transformer_blocks.0.img_mlp.gate_up.weight") ||
-      has("transformer_blocks.0.img_mlp.proj.weight"))
-  )
-    return { family: "qwen_image_21" };
-  if (has("txt_norm.weight")) {
-    if (
-      has("transformer_blocks.0.attn.norm_added_q.weight") &&
-      has("transformer_blocks.0.img_mlp.w1.weight")
-    )
-      return { family: "other" };
-    if (dim(keys, "txt_norm.weight", 0) === 2560 && dim(keys, "proj_out.weight", 0) === 128)
-      return { family: "mage_flow" };
-    if (has("__index_timestep_zero__") || has("time_text_embed.addition_t_embedding.weight"))
-      return { family: "qwen_image_edit" };
-    return { family: "qwen_image" };
-  }
-  if (has("embed_image_indicator.weight")) return { family: "ideogram4" };
-  // MOSS-Image: one shared modulation for every block, fused feed-forward up/gate.
-  if (has("shared_block_modulation.weight") && has("layers.0.proj.ffn_up_gate.weight"))
-    return { family: "moss_image" };
-  if (has("txtfusion.projector.weight")) return { family: "krea2" };
-  if (has("visual_transformer_blocks.0.cross_attention.key_norm.weight"))
-    return { family: "kandinsky5" };
-  if (has("layers.0.mlp.linear_fc2.weight")) return { family: "ernie" };
-  if (has("input_blocks.0.0.weight")) {
-    if (dim(keys, "input_blocks.0.0.weight", 1) > 4) return { family: "inpaint" };
-    const context = [1, 2, 4, 5, 7, 8]
-      .map((block) =>
-        dim(keys, `input_blocks.${block}.1.transformer_blocks.0.attn2.to_k.weight`, 1),
-      )
-      .find((value) => Number.isFinite(value));
-    if (context === 768) return { family: "sd15" };
-    if (context === 1024) return { family: "sd2" };
-    if (context === 2048) return { family: "sdxl" };
-    if (context === 1280) return { family: "sdxl_refiner" };
-    return { family: "other" };
-  }
-  // No signature we know: an architecture newer than this build, so its name gets a say.
-  return { family: "other", detail: { unrecognized: true } };
-}
-
 /* ------------------------------------------------------------ Quantized files */
 
-// Tensor suffixes each format adds next to (or instead of) the plain weights.
-const quantMarkers = [
-  ["svdq", /\.(qweight|wscales|wcscales|wtscale|smooth_factor|smooth_factor_orig)$/],
-  [
-    "nf4",
-    /\.(absmax|quant_map|nested_absmax|nested_quant_map|quant_state\.bitsandbytes__(nf4|fp4))$/,
-  ],
-];
-
-/**
- * Which quantized format a file is in, from its tensor keys, else its
- * metadata; by name only when the weights are out of reach. "" for anything
- * ComfyUI loads natively (fp8, int8 ConvRot, NVFP4 and the like).
- */
-export function quantFromHeader(header, name = "") {
-  if (header) {
-    for (const key of Object.keys(header)) {
-      if (key === "__metadata__") continue;
-      const found = quantMarkers.find(([, pattern]) => pattern.test(key));
-      if (found) return found[0];
-    }
-    const metadata = JSON.stringify(header.__metadata__ || {});
-    if (/nunchaku|svdquant|svdq/i.test(metadata)) return "svdq";
-    if (/bitsandbytes|bnb[-_]?nf4/i.test(metadata)) return "nf4";
-    return "";
-  }
+/** Which quantized format a file is in, by name. "" for anything ComfyUI loads natively. */
+export function quantFromName(name = "") {
   const base = String(name).split(/[\\/]/).pop() || "";
   if (/svdq|nunchaku/i.test(base)) return "svdq";
   if (/(^|[^a-z])(bnb[-_]?)?nf4([^a-z]|$)/i.test(base)) return "nf4";
@@ -2382,18 +2168,14 @@ export function quantFromHeader(header, name = "") {
 /**
  * The family a detected one narrows to by name (see `refines`): Wan 2.1 14B
  * named high/low noise is Wan 2.2 14B, and HunyuanVideo 1.5 named i2v is its
- * image-to-video model. A refinement the weights can make is only taken from
- * the name when they were out of reach.
+ * image-to-video model.
  */
-export function refinedFamily(familyId = "", name = "", weightsRead = false) {
+export function refinedFamily(familyId = "", name = "") {
   const base = String(name).split(/[\\/]/).pop() || "";
   let id = familyId;
   for (let step = 0; step < 4; step += 1) {
     const next = Object.entries(families).find(
-      ([, spec]) =>
-        spec.refines?.family === id &&
-        spec.refines.name.test(base) &&
-        !(weightsRead && spec.refines.weightsTell),
+      ([, spec]) => spec.refines?.family === id && spec.refines.name.test(base),
     );
     if (!next) break;
     id = next[0];
@@ -2405,13 +2187,13 @@ export function refinedFamily(familyId = "", name = "", weightsRead = false) {
 
 /* ------------------------------------------------------------ Speed LoRAs */
 
-/** The variant of a family a file is, by name (and header where it can tell). */
-export function variantFor(familyId, name = "", header = null, detail = null) {
+/** The variant of a family a file is, by name. */
+export function variantFor(familyId, name = "") {
   const family = families[familyId];
   if (!family) return null;
   const base = String(name).split(/[\\/]/).pop() || "";
   return (
-    family.variants.find((variant) => !variant.match || variant.match(base, header, detail)) ||
+    family.variants.find((variant) => !variant.match || variant.match(base)) ||
     family.variants.at(-1)
   );
 }

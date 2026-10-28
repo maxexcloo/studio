@@ -39,8 +39,6 @@ await new Promise((resolve) => comfy.listen(0, "127.0.0.1", resolve));
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.STUDIO_OUTPUT_STORAGE = "studio";
-process.env.STUDIO_COMFY_OUTPUT_DIR = path.join(temporary, "comfy-output");
 process.env.STUDIO_WORKER_TOKEN = "worker-secret";
 process.env.STUDIO_WORKERS = JSON.stringify([
   {
@@ -156,18 +154,4 @@ test("ingested runs are remembered across restarts so recovery never imports the
   media.noteIngested(["job-remembered"]);
   const saved = JSON.parse(fs.readFileSync(path.join(temporary, "media-ingested.json"), "utf8"));
   assert.ok(saved.jobs["job-remembered"]);
-});
-
-test("output storage accepts studio or comfy and refuses anything else", () => {
-  assert.equal(paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "studio" }), true);
-  assert.equal(
-    paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "comfy", STUDIO_MULTI_USER: "1" }),
-    false,
-  );
-  assert.equal(paths.outputStorageFromEnv({ STUDIO_MULTI_USER: "1" }), true);
-  assert.equal(paths.outputStorageFromEnv({}), false);
-  assert.throws(
-    () => paths.outputStorageFromEnv({ STUDIO_OUTPUT_STORAGE: "elsewhere" }),
-    /STUDIO_OUTPUT_STORAGE must be "studio" or "comfy"/,
-  );
 });

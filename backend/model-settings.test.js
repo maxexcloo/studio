@@ -4,41 +4,19 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Point ComfyUI and the data folder at a scratch tree before the modules read them.
+// Point the data folder at a scratch tree before the modules read it.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-settings-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
-const dirs = Object.fromEntries(
-  ["diffusion_models", "checkpoints", "text_encoders", "vae", "loras"].map((name) => {
-    const dir = path.join(scratch, "ComfyUI", "models", name);
-    fs.mkdirSync(dir, { recursive: true });
-    return [name, dir];
-  }),
-);
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel } = await import("./model-families.js");
 const { variantFor } = await import("./family-catalog.js");
 const { inferModels } = await import("./models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
-function put(folder, name, header) {
-  const json = Buffer.from(JSON.stringify(header));
-  const length = Buffer.alloc(8);
-  length.writeBigUInt64LE(BigInt(json.length));
-  fs.writeFileSync(path.join(dirs[folder], name), Buffer.concat([length, json]));
-  return name;
-}
 const zimage = {
   "cap_embedder.1.weight": t([3840, 2560]),
   "noise_refiner.0.attention.k_norm.weight": t([128]),
-};
-const klein4b = {
-  "double_blocks.0.img_attn.norm.key_norm.scale": t([128]),
-  "img_in.weight": t([3072, 128]),
-  "double_stream_modulation_img.lin.weight": t([1, 1]),
-  "txt_in.weight": t([3072, 7680]),
 };
 const wan14b = {
   "head.modulation": t([1, 2, 5120]),
@@ -122,8 +100,6 @@ test("a renamed fine-tune runs at its family's usual settings: Turbo or Distille
   );
   assert.equal(variantFor("krea2", "krea2_turbo_bf16.safetensors").id, "turbo");
   assert.equal(variantFor("krea2", "krea2_raw_bf16.safetensors").id, "raw");
-  put("diffusion_models", "renamed_klein.safetensors", klein4b);
-  assert.equal(classifyModel("unet", "renamed_klein.safetensors").variant.id, "distilled");
 });
 
 test("custom MiniMax H3 profiles use the family's starting aspect", async () => {

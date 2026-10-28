@@ -1,9 +1,8 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { localOutputFile, modelFolders } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
-import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
+import { writeBytesFileAsync } from "./json-store.js";
+import { mediaFile, mediaParams } from "./media-paths.js";
 import { withPngText } from "./png-text.js";
 import { appVersion } from "./data-dir.js";
 
@@ -16,12 +15,9 @@ import { appVersion } from "./data-dir.js";
  * negative prompt, then steps, sampler, CFG, seed, size and model. Civitai
  * reads that to fill in an upload and link the model and LoRAs by hash.
  *
- * It is written into the stored file (Studio media, or ComfyUI's output folder
- * when Studio doesn't store media) right after a run, so the file you
- * download or share carries it.
+ * It is written into the stored file in Studio media right after a run, so the
+ * file you download or share carries it.
  */
-
-const hashesPath = path.join(dataDir, "model-hashes.json");
 
 // The old on/off switch is gone: a saved choice, "off" included, is dropped quietly.
 try {
@@ -123,126 +119,20 @@ export function parametersText(body = {}, { width = 0, height = 0, hashes = {} }
   return lines.join("\n");
 }
 
-/* ------------------------------------------------------------ Hashes */
-
-let hashCache = null;
-const hashing = new Set();
-
-function loadHashes() {
-  if (hashCache) return hashCache;
-  try {
-    hashCache = readJsonFile(hashesPath) || {};
-  } catch {
-    hashCache = {};
-  }
-  return hashCache;
-}
-
-const folderKinds = {
-  checkpoint: ["checkpoints", ["checkpoints"]],
-  unet: ["diffusion_models", ["diffusion_models", "unet"]],
-  lora: ["loras", ["loras"]],
-};
-
-function localModel(kinds, name) {
-  const parts = String(name || "")
-    .split(/[\\/]/)
-    .filter(Boolean);
-  if (!parts.length || parts.some((part) => part === "..")) return "";
-  for (const kind of kinds) {
-    for (const dir of modelFolders(...folderKinds[kind])) {
-      const file = path.join(dir, ...parts);
-      try {
-        if (fs.statSync(file).isFile()) return file;
-      } catch {
-        /* next folder */
-      }
-    }
-  }
-  return "";
-}
-
-/**
- * A model file's AutoV2 hash when it is already known. Otherwise it is worked
- * out in the background (a big model takes a few seconds to read) and the
- * next image carries it: a run never waits for a hash.
- */
-export function knownHash(kinds, name) {
-  const file = localModel(kinds, name);
-  if (!file) return "";
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return "";
-  }
-  const key = `${file}|${stat.size}|${Math.round(stat.mtimeMs)}`;
-  const cache = loadHashes();
-  if (cache[key]) return String(cache[key]).slice(0, 10);
-  if (!hashing.has(key)) {
-    hashing.add(key);
-    const hash = crypto.createHash("sha256");
-    fs.createReadStream(file)
-      .on("data", (data) => hash.update(data))
-      .on("error", () => hashing.delete(key))
-      .on("end", () => {
-        hashing.delete(key);
-        loadHashes()[key] = hash.digest("hex");
-        try {
-          writeJsonFile(hashesPath, hashCache);
-        } catch {
-          /* next run tries again */
-        }
-      });
-  }
-  return "";
-}
-
-function hashesFor(body) {
-  const hashes = {};
-  const modelFile = body.modelName || body.model || "";
-  if (modelFile && !String(modelFile).startsWith("custom:")) {
-    const kinds =
-      body.source === "checkpoint"
-        ? ["checkpoint"]
-        : body.source === "unet"
-          ? ["unet"]
-          : ["checkpoint", "unet"];
-    const hash = knownHash(kinds, modelFile);
-    if (hash) hashes[modelFile] = hash;
-  }
-  for (const lora of Array.isArray(body.loras) ? body.loras : []) {
-    if (!lora?.name) continue;
-    const hash = knownHash(["lora"], lora.name);
-    if (hash) hashes[lora.name] = hash;
-  }
-  return hashes;
-}
-
 /* ------------------------------------------------------------ Writing */
 
 function outputFile(output) {
-  try {
-    const params = new URL(String(output?.url || ""), "http://studio.local").searchParams;
-    return localOutputFile(
-      params.get("filename") || "",
-      params.get("subfolder") || "",
-      params.get("type") || "output",
-    );
-  } catch {
-    return null;
-  }
+  const media = mediaParams(output?.url);
+  return media ? mediaFile(media.filename, media.subfolder) : null;
 }
 
 /**
- * Writes the parameters text into a run's PNGs in the output folder, all of
- * them at once and without holding up the server. A file this cannot reach
- * (ComfyUI on another computer) or that is not a PNG is left as it is. Never
- * rejects: a run's images matter more than their tags. Resolves to how many
- * it wrote.
+ * Writes the parameters text into a run's PNGs in Studio media, all of them at
+ * once and without holding up the server. A file that is not a PNG is left as
+ * it is. Never rejects: a run's images matter more than their tags. Resolves to
+ * how many it wrote.
  */
 export async function writeCivitaiParameters(outputs, body) {
-  const hashes = hashesFor(body);
   const files = (outputs || [])
     .filter((output) => output?.type !== "video")
     .map(outputFile)
@@ -253,11 +143,7 @@ export async function writeCivitaiParameters(outputs, body) {
         const buffer = await fs.promises.readFile(file);
         const width = buffer.length > 24 ? buffer.readUInt32BE(16) : 0;
         const height = buffer.length > 24 ? buffer.readUInt32BE(20) : 0;
-        const next = withPngText(
-          buffer,
-          "parameters",
-          parametersText(body, { width, height, hashes }),
-        );
+        const next = withPngText(buffer, "parameters", parametersText(body, { width, height }));
         if (!next) return false;
         await writeBytesFileAsync(file, next);
         return true;

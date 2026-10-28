@@ -7,7 +7,6 @@ import { compareGalleryItems } from "./gallery-order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
-process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { pageGallery, setGallery, sortGallery } = await import("./gallery-store.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 

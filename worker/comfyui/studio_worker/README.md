@@ -2,7 +2,7 @@
 
 A ComfyUI custom node for running ComfyUI as a stateless worker behind Studio.
 
-With Studio media storage (on by default in multi-user mode, or `STUDIO_OUTPUT_STORAGE=studio`), Studio fetches each finished output over ComfyUI's `/view` API into its own per-account storage. It then calls this node to delete ComfyUI's copy, along with any reference images staged for that run only. ComfyUI has no delete API of its own, so this node is what keeps it free of studio data. Studio and ComfyUI no longer need to share a folder.
+Studio fetches each finished output over ComfyUI's `/view` API into its own per-account storage. It then calls this node to delete ComfyUI's copy, along with any reference images staged for that run only. ComfyUI has no delete API of its own, so this node is what keeps it free of studio data. Studio and ComfyUI no longer need to share a folder.
 
 ## Install
 
@@ -19,8 +19,8 @@ Mount it read-only where possible.
 - `POST /studio/worker/models/file`: `{ "folder": "loras", "file": "example.safetensors", "action": "stat" }`. Actions are `stat`, `hash`, `discard`, explicit `replace` and `remove`; replacement preserves the original as a `.previous.*` file, and `remove` (Library updates) deletes an installed model only when its SHA-256 matches the `sha256` given.
 - `PUT /studio/worker/models/upload`: streamed weights with `folder`, `file`, `offset`, `size` and `sha256` query parameters. `X-Studio-Model-Metadata` contains ASCII-escaped JSON with a source fingerprint and resume validators. Transfers require a published SHA-256 checksum, stay below 256 GiB and never overwrite an existing destination. Partial bytes resume only when their source, checksum and total size match.
 
-Model endpoints always require a nonempty matching token. Enable them in Studio
-with `STUDIO_MODEL_STORAGE=worker` and give ComfyUI a writable models mount.
+Model endpoints always require a nonempty matching token. Give the worker with
+the `models` capability a writable models mount.
 Studio keeps Civitai and Hugging Face credentials and fetches the provider;
 only weight bytes and safe resume metadata reach this node. No provider URL or
 credential is stored in its sidecar files. Configured ComfyUI folder aliases and

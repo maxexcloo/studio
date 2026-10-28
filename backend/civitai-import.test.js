@@ -1,18 +1,8 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 import { civitaiFetch } from "./civitai-access.js";
-import {
-  civitaiLink,
-  imagePreset,
-  importCivitaiImage,
-  matchResources,
-  useModelHashCache,
-  versionResource,
-} from "./civitai-import.js";
+import { civitaiLink, imagePreset, importCivitaiImage, versionResource } from "./civitai-import.js";
 
 const bytes = Buffer.from("test model weights");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
@@ -101,7 +91,7 @@ test("nested Civitai metadata recovers prompts, exact seeds and model resources"
   assert.equal(nested.resources[0].weight, 0);
 });
 
-test("filename-only LoRAs retain strengths, deduplicate and match local files explicitly", async () => {
+test("filename-only LoRAs retain strengths and deduplicate", async () => {
   const source = {
     ...image,
     modelVersionIds: [],
@@ -125,21 +115,6 @@ test("filename-only LoRAs retain strengths, deduplicate and match local files ex
   assert.equal(preset.resources[1].weight, 0.35);
   assert.equal(preset.resources[1].nameOnly, true);
   assert.equal(preset.resources[1].supported, false);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-named-lora-"));
-  try {
-    fs.writeFileSync(path.join(dir, "style.safetensors"), bytes);
-    const matched = await matchResources(
-      preset,
-      { loras: ["style.safetensors"] },
-      { foldersFor: () => [dir] },
-    );
-    assert.equal(matched.resources[1].status, "installed");
-    assert.equal(matched.resources[1].localName, "style.safetensors");
-    assert.match(matched.resources[1].note, /unverified/);
-    assert.equal(matched.resources[0].status, "unsupported");
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 test("absent and unsupported metadata produce explicit partial imports", () => {
@@ -185,90 +160,6 @@ test("model downloads require safe formats, supported resource types and full ch
     versionResource({ ...version, files: [{ ...version.files[0], hashes: {} }] }).spec,
     null,
   );
-});
-
-test("installed resources are identified by checksum, including renamed weights", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-hashes-"));
-  try {
-    fs.writeFileSync(path.join(dir, "renamed.safetensors"), bytes);
-    fs.writeFileSync(path.join(dir, "style.safetensors"), "wrong");
-    const preset = { resources: [versionResource(version)] };
-    const match = await matchResources(
-      preset,
-      { loras: ["style.safetensors", "renamed.safetensors"] },
-      { foldersFor: () => [dir] },
-    );
-    assert.equal(match.resources[0].status, "installed");
-    assert.equal(match.resources[0].localName, "renamed.safetensors");
-    assert.equal(match.resources[0].spec, undefined);
-    const conflict = await matchResources(
-      preset,
-      { loras: ["style.safetensors"] },
-      { foldersFor: () => [dir] },
-    );
-    assert.equal(conflict.resources[0].status, "conflict");
-    fs.writeFileSync(path.join(dir, "renamed.safetensors"), "changed weights");
-    const changed = await matchResources(
-      preset,
-      { loras: ["renamed.safetensors"] },
-      { foldersFor: () => [dir] },
-    );
-    assert.equal(changed.resources[0].status, "missing");
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("the quick match never reads a model, and a worked-out checksum outlives a restart", async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-preset-quick-"));
-  try {
-    fs.writeFileSync(path.join(dir, "style.safetensors"), bytes);
-    const preset = { resources: [versionResource(version)] };
-    const read = fs.createReadStream;
-    let reads = 0;
-    fs.createReadStream = (...args) => {
-      reads += 1;
-      return read(...args);
-    };
-    try {
-      // Same name and size: installed, but unverified, and nothing was read.
-      const quick = await matchResources(
-        preset,
-        { loras: ["style.safetensors"] },
-        { foldersFor: () => [dir], verify: false },
-      );
-      assert.equal(quick.resources[0].status, "installed");
-      assert.equal(quick.resources[0].unverified, true);
-      assert.equal(reads, 0);
-      // The full check reads it once and keeps the checksum on disk.
-      const cache = path.join(dir, "model-hashes.json");
-      useModelHashCache(cache);
-      const full = await matchResources(
-        preset,
-        { loras: ["style.safetensors"] },
-        { foldersFor: () => [dir] },
-      );
-      assert.equal(full.resources[0].status, "installed");
-      assert.equal(full.resources[0].unverified, undefined);
-      assert.equal(reads, 1);
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      assert.ok(Object.values(JSON.parse(fs.readFileSync(cache, "utf8"))).includes(sha256));
-      // After a restart the saved checksum answers the quick match as verified, still without reading.
-      useModelHashCache(cache);
-      const again = await matchResources(
-        preset,
-        { loras: ["style.safetensors"] },
-        { foldersFor: () => [dir], verify: false },
-      );
-      assert.equal(again.resources[0].unverified, undefined);
-      assert.equal(reads, 1);
-    } finally {
-      fs.createReadStream = read;
-      useModelHashCache("");
-    }
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 test("Civitai authentication stays on its API origin through CDN redirects", async () => {
