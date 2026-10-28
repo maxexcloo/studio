@@ -16,7 +16,7 @@ import { jobResults } from "./queries";
 import classes from "./SessionsPage.module.css";
 
 const operationLabels = {
-  image: "Image",
+  image: "New image",
   refine: "Refine",
   animate: "Animate",
   upscale: "Upscale",
@@ -204,12 +204,18 @@ export function SessionIteration({
     : [];
   const number = index + 1;
   const single = tiles.length === 1;
+  const source = parentIndex >= 0 ? `iteration ${parentIndex + 1}` : "";
+  // A request says whether it made a new image or edited an earlier one, and which.
   const label = [
     `Iteration ${number}`,
-    input.kind === "video" && job.operation !== "upscale"
-      ? "Video"
-      : operationLabels[job.operation],
-    parentIndex >= 0 ? `from iteration ${parentIndex + 1}` : "",
+    ...(input.kind !== "video" && job.operation === "refine"
+      ? [source ? `Editing ${source}` : "Editing a reference image"]
+      : [
+          input.kind === "video" && job.operation !== "upscale"
+            ? "Video"
+            : operationLabels[job.operation],
+          source && `from ${source}`,
+        ]),
   ]
     .filter(Boolean)
     .join(" · ");

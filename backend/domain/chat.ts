@@ -138,7 +138,7 @@ const tool = {
   function: {
     name: "request_media",
     description:
-      "Generate media ONLY when the user explicitly asks to create, change or animate media. Use image for a new image, refine for a change to an earlier image, and animate for motion. Refine and animate use the selected parent or the latest completed session result. Call it once for each different image the user asks for (other outfits, settings or poses), up to 4 calls in one turn; use count for several images of one prompt. Discussion and questions need text only. Preserve the selected model and settings; never substitute a model.",
+      "Generate media ONLY when the user explicitly asks to create, change or animate media. Use image (the default) for a new picture, including a new scene, outfit, pose, look or rewritten prompt; selected references still guide it. Use refine only when the user clearly asks to change an earlier image itself (edit that image, fix something in it); it edits the selected parent or the latest completed session result. Use animate for motion. Call it once for each different image the user asks for (other outfits, settings or poses), up to 4 calls in one turn; use count for several images of one prompt. Discussion and questions need text only. Preserve the selected model and settings; never substitute a model.",
     parameters: {
       type: "object",
       properties: {
