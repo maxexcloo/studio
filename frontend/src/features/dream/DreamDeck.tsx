@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
-import { Clapperboard, Copy, Heart, Star, X } from "lucide-react";
+import { usePhone } from "../../ui/usePhone";
+import { Clapperboard, Heart, Star, WandSparkles, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { post } from "../../api";
@@ -16,13 +17,14 @@ import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
 import { popupLayer } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
-type Verdict = "discard" | "keep" | "variations" | "star" | "animate";
+type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine";
 const directions: Record<Verdict, Direction> = {
   discard: "left",
   keep: "right",
   variations: "up",
   star: "right",
   animate: "right",
+  refine: "right",
 };
 const layers = `[role="dialog"], [role="alertdialog"], ${popupLayer}`;
 // Calibration joins in once Dream has fewer unseen results than this.
@@ -126,11 +128,11 @@ function useJudge(onFailed: (card: DeckCard) => void) {
       // Starring an unseen result keeps it (backend/domain/dream.ts).
       if (verdict === "star") return star(item);
       await post(dreamItemPath(item, "keep"));
-      if (verdict === "animate") {
-        // As the viewer's Animate in Composer, staged in the Videos composer for review.
-        const { draft } = await mediaDraft(item, "animate", profiles, client);
+      // As the viewer's Animate in Composer and Edit, staged in the composer for review.
+      if (verdict === "animate" || verdict === "refine") {
+        const { draft } = await mediaDraft(item, verdict, profiles, client);
         setDraft(draft);
-        navigate("/video?compose=1");
+        navigate(`${verdict === "animate" ? "/video" : "/images"}?compose=1`);
       }
     },
     onError: (_error, { card }) => onFailed(card),
@@ -161,9 +163,34 @@ function Caption({ item }: { item: DreamItem }) {
   );
 }
 
+/** The current batch as a strip: judged results filled, the current one marked, the rest to come. */
+function BatchStrip({ done, total }: { done: number; total: number }) {
+  if (total < 2) return null;
+  return (
+    <div
+      className={classes.strip}
+      role="progressbar"
+      aria-label="Dream Batch"
+      aria-valuemin={0}
+      aria-valuemax={total}
+      aria-valuenow={done}
+      aria-valuetext={`${done + 1} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, index) => (
+        <span
+          key={index}
+          data-done={index < done || undefined}
+          data-current={index === done || undefined}
+        />
+      ))}
+    </div>
+  );
+}
+
 /**
- * The Dream deck: the oldest unseen result on top, the next beneath it. Swipe or press ← to
- * discard, → to keep, ↑ to keep and queue variations; Star and Animate keep the result too.
+ * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
+ * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Refine, Animate and Star
+ * in the compact bar keep the result too.
  * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
  * judging them changes nothing in the gallery beyond an optional Star. `empty` shows once the
  * deck is through, told whether calibration images are available.
@@ -177,6 +204,7 @@ export function DreamDeck({
   calibrate: boolean;
   empty: (calibration: boolean) => ReactNode;
 }) {
+  const phone = usePhone();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
   const [counts, setCounts] = useState({ judged: 0, calibrated: 0 });
   const judge = useJudge((card) =>
@@ -230,7 +258,7 @@ export function DreamDeck({
         await choose.current?.(index);
         return commit({ card: top, verdict: index });
       }
-      if ((choice === "variations" || choice === "animate") && !(image && dream)) return;
+      if (["variations", "animate", "refine"].includes(choice) && !(image && dream)) return;
       await fly.current?.(directions[choice]);
       commit({ card: top, verdict: choice } as Judgement);
     } finally {
@@ -265,29 +293,44 @@ export function DreamDeck({
   }, []);
 
   if (!top) return empty(gallery.length > 0);
+  const calibrating = top.kind !== "dream";
+  // Phones show the bar's icons alone, named by their tooltips.
   const button = (
     choice: Verdict,
     label: string,
     icon: ReactNode,
-    options: { size?: number; color?: string; disabled?: boolean } = {},
+    options: { hint?: string; primary?: boolean; disabled?: boolean } = {},
   ) => (
-    <Tooltip label={label}>
-      <ActionIcon
-        variant="default"
-        radius="xl"
-        size={options.size ?? 48}
-        c={options.color}
-        aria-label={label}
-        disabled={options.disabled}
-        onClick={() => void act(choice)}
-      >
-        {icon}
-      </ActionIcon>
+    <Tooltip label={options.hint ? `${label} (${options.hint})` : label}>
+      {phone ? (
+        <ActionIcon
+          variant={options.primary ? "filled" : "default"}
+          radius="xl"
+          size={44}
+          aria-label={label}
+          disabled={options.disabled}
+          onClick={() => void act(choice)}
+        >
+          {icon}
+        </ActionIcon>
+      ) : (
+        <Button
+          variant={options.primary ? "filled" : "default"}
+          radius="xl"
+          leftSection={icon}
+          disabled={options.disabled}
+          onClick={() => void act(choice)}
+        >
+          {label}
+        </Button>
+      )}
     </Tooltip>
   );
-  const calibrating = top.kind !== "dream";
+  const dreamed = counts.judged - counts.calibrated;
+  const batch = dreamed + unseen.length;
   return (
     <>
+      <BatchStrip done={dreamed} total={batch} />
       <div className={classes.stage}>
         {top.kind === "pair" ? (
           <PairCard
@@ -349,31 +392,44 @@ export function DreamDeck({
           )
         )}
       </div>
-      <Group className={classes.actions} justify="center" gap="md" wrap="nowrap" h={60}>
+      <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
         {top.kind === "pair" ? (
           <Button variant="default" radius="xl" onClick={skip}>
             Skip
           </Button>
         ) : (
           <>
-            {button("discard", calibrating ? "Pass" : "Discard", <X size={26} />, {
-              size: 60,
-              color: "red.5",
-            })}
-            {button("star", "Star", <Star size={20} />)}
-            {button("animate", "Animate", <Clapperboard size={20} />, {
+            {button("discard", calibrating ? "Pass" : "Skip", <X size={18} />, { hint: "←" })}
+            {button("refine", "Refine", <WandSparkles size={18} />, {
               disabled: !(image && dream),
             })}
-            {button("variations", "Keep & Variations", <Copy size={20} />, {
+            {button("animate", "Animate", <Clapperboard size={18} />, {
               disabled: !(image && dream),
             })}
-            {button("keep", calibrating ? "Like" : "Keep", <Heart size={26} />, {
-              size: 60,
-              color: "green.5",
+            <Tooltip label="Star">
+              <ActionIcon
+                variant="default"
+                radius="xl"
+                size={phone ? 44 : 36}
+                aria-label="Star"
+                onClick={() => void act("star")}
+              >
+                <Star size={18} />
+              </ActionIcon>
+            </Tooltip>
+            {button("keep", calibrating ? "Like" : "Keep", <Heart size={18} />, {
+              hint: "→",
+              primary: true,
             })}
           </>
         )}
       </Group>
+      {!phone && top.kind !== "pair" && (
+        <Text size="xs" c="dimmed" ta="center">
+          ← {calibrating ? "Pass" : "Skip"} · → {calibrating ? "Like" : "Keep"}
+          {image && dream ? " · ↑ Keep & Variations" : ""}
+        </Text>
+      )}
     </>
   );
 }

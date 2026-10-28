@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
-  Accordion,
   ActionIcon,
   Alert,
   Badge,
@@ -22,11 +21,11 @@ import {
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, UserCog } from "lucide-react";
 import { api, post } from "../../api";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
@@ -178,7 +177,7 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
       }}
     >
       <Stack>
-        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+        <Stack>
           <TextInput
             label="Email"
             type="email"
@@ -199,7 +198,7 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
             allowDeselect={false}
             {...form.getInputProps("accessProfileId")}
           />
-        </SimpleGrid>
+        </Stack>
         {create.error && <Alert color="red">{create.error.message}</Alert>}
         <Button type="submit" loading={create.isPending} style={{ alignSelf: "start" }}>
           Create User
@@ -270,8 +269,27 @@ const groupFeature = (on: boolean | undefined, label: string) => (
   </Badge>
 );
 
+/** An icon action in a section toolbar, named by its tooltip. */
+function ToolbarAction({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip label={label}>
+      <ActionIcon variant="subtle" color="gray" aria-label={label} onClick={onClick}>
+        {icon}
+      </ActionIcon>
+    </Tooltip>
+  );
+}
+
 /** Settings › Groups: what each access group may use. */
-export function GroupsAdmin() {
+export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const { admin, refresh } = useAdministration();
   const [editing, setEditing] = useState<AccessGroup | "new" | null>(null);
@@ -282,21 +300,18 @@ export function GroupsAdmin() {
     data.accounts.filter((account) => account.accessProfileId === group.id).length;
   return (
     <Stack gap="md">
-      <SectionToolbar
-        label="Groups"
-        actions={
-          <Tooltip label="New Group">
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              aria-label="New Group"
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Groups"
+          actions={
+            <ToolbarAction
+              label="New Group"
+              icon={<Plus size={18} />}
               onClick={() => setEditing("new")}
-            >
-              <Plus size={18} />
-            </ActionIcon>
-          </Tooltip>
-        }
-      />
+            />
+          }
+        />
+      </SectionHeader>
       <DataTable
         label="Access Groups"
         rows={data.accessProfiles}
@@ -371,10 +386,11 @@ export function GroupsAdmin() {
   );
 }
 
-/** Settings › Users: accounts, their groups, chat identities and the new-account policy. */
-export function UsersAdmin() {
+/** Settings › Users: accounts, their groups and the new-account policy. */
+export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const { admin, refresh } = useAdministration();
   const [query, setQuery] = useState("");
+  const [popup, setPopup] = useState<"new" | "policy" | null>(null);
   const change = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) =>
       api(`/api/accounts/users/${encodeURIComponent(id)}`, {
@@ -389,8 +405,28 @@ export function UsersAdmin() {
   const groupOf = (account: Account) =>
     data.accessProfiles.find((group) => group.id === account.accessProfileId);
   return (
-    <Stack gap="lg">
-      <SectionToolbar label="Users" query={query} onQueryChange={setQuery} />
+    <Stack gap="md">
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label="Users"
+          query={query}
+          onQueryChange={setQuery}
+          actions={
+            <>
+              <ToolbarAction
+                label="New Account Policy"
+                icon={<UserCog size={18} />}
+                onClick={() => setPopup("policy")}
+              />
+              <ToolbarAction
+                label="New User"
+                icon={<Plus size={18} />}
+                onClick={() => setPopup("new")}
+              />
+            </>
+          }
+        />
+      </SectionHeader>
       <DataTable
         label="User Accounts"
         rows={data.accounts}
@@ -483,31 +519,39 @@ export function UsersAdmin() {
           </Menu.Item>
         )}
       />
-      {/* Opening without a height animation keeps nested Select dropdowns anchored to their inputs. */}
-      <Accordion variant="separated" transitionDuration={0}>
-        <Accordion.Item value="new-user">
-          <Accordion.Control>Create a User</Accordion.Control>
-          <Accordion.Panel>
-            <NewAccount admin={data} saved={refresh} />
-          </Accordion.Panel>
-        </Accordion.Item>
-        <Accordion.Item value="defaults">
-          <Accordion.Control>New Account Policy</Accordion.Control>
-          <Accordion.Panel>
-            <DefaultPolicy
-              key={`${data.defaultAccessProfileId}:${data.requireApproval}`}
-              admin={data}
-              saved={refresh}
-            />
-          </Accordion.Panel>
-        </Accordion.Item>
-        <Accordion.Item value="gateway">
-          <Accordion.Control>Chat Gateway</Accordion.Control>
-          <Accordion.Panel>
-            <ChatGatewayAccounts gateway={data.gateway} accounts={data.accounts} />
-          </Accordion.Panel>
-        </Accordion.Item>
-      </Accordion>
+      <Modal
+        opened={popup !== null}
+        onClose={() => setPopup(null)}
+        title={popup === "policy" ? "New Account Policy" : "New User"}
+      >
+        <FocusTrap.InitialFocus />
+        {popup === "new" && (
+          <NewAccount
+            admin={data}
+            saved={() => {
+              setPopup(null);
+              refresh();
+            }}
+          />
+        )}
+        {popup === "policy" && (
+          <DefaultPolicy
+            admin={data}
+            saved={() => {
+              setPopup(null);
+              refresh();
+            }}
+          />
+        )}
+      </Modal>
     </Stack>
   );
+}
+
+/** Settings › Chat Gateway: chat identities linked to accounts. */
+export function ChatGatewayAdmin() {
+  const { admin } = useAdministration();
+  if (admin.isPending) return <LoadingState label="Loading Chat Gateway" />;
+  if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
+  return <ChatGatewayAccounts gateway={admin.data.gateway} accounts={admin.data.accounts} />;
 }

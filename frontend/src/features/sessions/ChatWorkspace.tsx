@@ -6,6 +6,7 @@ import {
   Group,
   NavLink,
   Stack,
+  Text,
   Title,
   type ButtonProps,
 } from "@mantine/core";
@@ -85,20 +86,50 @@ export function NewChatButton({ onClick, ...props }: ButtonProps & { onClick?: (
   );
 }
 
-/** New Chat and the account's Chats, in the desktop sidebar and the phone status Drawer. */
+/** When a chat was last updated, as the list's date heading. */
+function period(value: string) {
+  const date = new Date(value);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.floor((today.getTime() - date.getTime()) / 86400000) + 1;
+  if (Number.isNaN(days) || days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return "Previous 7 Days";
+  if (days < 30) return "Previous 30 Days";
+  return "Older";
+}
+
+/** New Chat and the account's Chats under date headings, in the desktop sidebar and the phone Drawer. */
 export function SessionList({ close = () => {} }: { close?: () => void }) {
   const id = useMatch("/chat/:id")?.params.id;
   const sessions = useQuery(sessionsQuery);
+  const groups = new Map<string, Session[]>();
+  for (const session of sessions.data?.sessions || []) {
+    const key = period(session.updatedAt);
+    groups.set(key, [...(groups.get(key) || []), session]);
+  }
   return (
     <Stack gap={4} flex={1} mih={0}>
-      <NewChatButton mb="sm" onClick={close} />
+      <NewChatButton mb="xs" onClick={close} />
       {sessions.error ? (
         <Alert color="red">{sessions.error.message}</Alert>
       ) : sessions.data?.sessions.length === 0 ? (
         <EmptyState fill>No Chats</EmptyState>
       ) : (
-        sessions.data?.sessions.map((session) => (
-          <ChatRow key={session.id} session={session} active={session.id === id} close={close} />
+        [...groups].map(([label, entries]) => (
+          <Stack key={label} gap={2} component="section" aria-label={label}>
+            <Text size="xs" fw={600} c="dimmed" px="sm" pt="sm" pb={4}>
+              {label}
+            </Text>
+            {entries.map((session) => (
+              <ChatRow
+                key={session.id}
+                session={session}
+                active={session.id === id}
+                close={close}
+              />
+            ))}
+          </Stack>
         ))
       )}
     </Stack>

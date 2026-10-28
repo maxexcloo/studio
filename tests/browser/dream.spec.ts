@@ -19,8 +19,11 @@ test("The Dream deck judges results with keys, a drag and its buttons", async ({
     "Waiting for idle time",
   );
 
+  const batch = page.getByRole("progressbar", { name: "Dream Batch", exact: true });
+  await expect(batch).toHaveAttribute("aria-valuetext", "1 of 5");
   await page.keyboard.press("ArrowRight");
   await expect(current(page)).toContainText("Dream prompt two");
+  await expect(batch).toHaveAttribute("aria-valuetext", "2 of 5");
   await page.keyboard.press("ArrowLeft");
   await expect(current(page)).toContainText("Dream prompt three");
   await page.keyboard.press("ArrowUp");
