@@ -79,7 +79,7 @@ def image_request(values, references=None):
     }
     # Krea 2's text-tap rebalance; Radiance refuses it for other models.
     rebalance = values.get("rebalance", "off")
-    if rebalance not in {False, "off"}:
+    if rebalance != "off":
         body["rebalance"] = rebalance
     # Turbo owns its eight-step, guidance-1 schedule. Ignore tuning carried over
     # from another UI profile rather than failing an otherwise valid job.
@@ -197,15 +197,6 @@ class RadianceImageGenerate:
                 "rebalance": (REBALANCE, {"default": "off"}),
             },
         }
-
-    @classmethod
-    def VALIDATE_INPUTS(cls, rebalance="off"):
-        # Replaces ComfyUI's list check so profiles saved with the old boolean still run.
-        return (
-            isinstance(rebalance, bool)
-            or rebalance in REBALANCE
-            or (f"rebalance must be one of {', '.join(REBALANCE)}.")
-        )
 
     RETURN_TYPES = ("IMAGE",)
     FUNCTION = "generate"
