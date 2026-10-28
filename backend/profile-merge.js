@@ -10,11 +10,13 @@
  * single id does is listed, not merged. Same-named profiles that differ are listed with what
  * differs.
  *
- * Applying copies the removed files and the records it changes to
+ * Applying copies the removed files and the records it changes (aliases, workflow preferences,
+ * guides and LoRA stacks) to
  * `<data>/backups/profile-merges/<time>/`, records each removed id as an alias of the kept one
  * (profile-store.js), then removes the removed files. Version history stays, so a seed never brings
- * a merged id back. Gallery records, presets, jobs, Chats and taste signals keep the ids they hold;
- * readers resolve them through the aliases.
+ * a merged id back. Workflow preferences and LoRA stacks move to the kept id and the removed ids'
+ * guide bindings go (the kept one has the same); gallery records, presets, jobs, Chats and taste
+ * signals keep the ids they hold, and readers resolve them through the aliases.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -23,6 +25,7 @@ import { dataDir } from "./gallery-store.js";
 import { writeJsonFile } from "./json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./profile-editor.js";
 import { guideStore, hashOf, profileStore } from "./profile-store.js";
+import { loraStackFiles, repointLoraStacks } from "./combined-profiles.js";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "./workflow-catalog.js";
 
 const newerId = /^(image|video)-[a-z0-9._-]+-(comfyui|radiance|cloud)$/;
@@ -170,6 +173,11 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
     },
     { mode: 0o600 },
   );
+  for (const file of [guideStore().file, ...loraStackFiles(dataDir)].filter(fs.existsSync)) {
+    const target = path.join(backup, path.relative(dataDir, file));
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.copyFileSync(file, target);
+  }
   for (const { from } of plan.merges) {
     const { text } = readEditableProfile(from);
     fs.writeFileSync(path.join(backup, `${from}.json`), text, { mode: 0o600 });
@@ -183,6 +191,11 @@ export function mergeDuplicateProfiles({ hash, by = "" } = {}) {
   );
   for (const { from } of plan.merges) fs.rmSync(path.join(userWorkflowsDir, `${from}.json`));
   repointWorkflowPreferences((id) => store.canonical(id));
+  repointLoraStacks(dataDir, (id) => store.canonical(id));
+  guideStore().moveProfileBindings(
+    { remove: plan.merges.map(({ from }) => `custom:${from}`) },
+    { by, note: "Merged duplicate profiles" },
+  );
   return {
     merged: plan.merges.map(({ from, to, name, kind }) => ({ from, to, name, kind })),
     backup: path.relative(dataDir, backup),

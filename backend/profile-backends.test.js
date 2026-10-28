@@ -99,8 +99,25 @@ fs.writeFileSync(
   }),
 );
 saveWorkflowPreferences(
-  { favorites: [`custom:${radianceId}`], lastUsed: {}, thumbnails: {} },
+  {
+    favorites: [`custom:${radianceId}`],
+    lastUsed: { [`custom:${comfyId}`]: "2026-10-20T00:00:00.000Z" },
+    thumbnails: {},
+  },
   { immediate: true },
+);
+fs.mkdirSync(path.join(temporary, "accounts", "owner"), { recursive: true });
+fs.writeFileSync(
+  path.join(temporary, "accounts", "owner", "lora-stacks.json"),
+  JSON.stringify({
+    stacks: { [`custom:${comfyId}`]: [{ name: "detail", strength: 0.5 }] },
+    library: {
+      strengths: {
+        [`custom:${radianceId}`]: { detail: 0.4, grain: 0.2 },
+        [`custom:${comfyId}`]: { detail: 0.6 },
+      },
+    },
+  }),
 );
 for (const backend of ["radiance", "comfyui"])
   for (let run = 0; run < 3; run++)
@@ -297,9 +314,24 @@ test("combining needs the preview's hash, backs up, aliases each id to its backe
     [profileStore().aliases()[comfyId].to, profileStore().aliases()[comfyId].backend],
     [combinedId, "comfyui"],
   );
-  // The guide binding and negatives of the default backend go to the combined id... here Radiance has none.
-  assert.equal(guideStore().read().profiles[`custom:${combinedId}`], undefined);
+  // The guide binding and negatives of the default backend go to the combined id... here Radiance
+  // has none; the old ids' entries go.
+  const { bindings } = guideStore().bindings();
+  for (const section of Object.values(bindings))
+    assert.deepEqual(
+      Object.keys(section).filter((key) => key.startsWith("custom:")),
+      [],
+    );
+  assert.ok(fs.existsSync(path.join(backup, "accounts", "owner", "lora-stacks.json")));
   assert.deepEqual(loadWorkflowPreferences().favorites, [`custom:${combinedId}`]);
+  assert.deepEqual(Object.keys(loadWorkflowPreferences().lastUsed), [`custom:${combinedId}`]);
+  // LoRA stacks and strengths follow; strengths of both old ids join.
+  const stacks = JSON.parse(
+    fs.readFileSync(path.join(temporary, "accounts", "owner", "lora-stacks.json"), "utf8"),
+  );
+  assert.deepEqual(Object.keys(stacks.stacks), [`custom:${combinedId}`]);
+  assert.deepEqual(Object.keys(stacks.library.strengths), [`custom:${combinedId}`]);
+  assert.equal(stacks.library.strengths[`custom:${combinedId}`].grain, 0.2);
   // Earlier timings now speak for the combined profile on each backend.
   const sized = { kind: "image", width: 1024, height: 1024, steps: 8 };
   assert.equal(

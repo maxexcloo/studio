@@ -4931,6 +4931,25 @@ test("admin tools go through the Library and profile routes with the administrat
       warnings: [],
     }),
   );
+  const bindingsHash = "d".repeat(64);
+  f.app.get("/api/profiles/guide-bindings", (_req, res) =>
+    res.json({
+      ok: true,
+      bindings: {
+        profiles: { "custom:fast": { pack: "fast" }, "custom:gone": { pack: "fast" } },
+        variants: {},
+        negatives: {},
+      },
+      hash: bindingsHash,
+      meta: null,
+    }),
+  );
+  f.app.get("/api/profiles/guide-bindings/versions", (_req, res) =>
+    res.json({ ok: true, versions: [] }),
+  );
+  f.app.put("/api/profiles/guide-bindings", (req, res) =>
+    res.json({ ok: true, ...req.body, hash: "e".repeat(64), meta: { version: 2 } }),
+  );
   const backendPair = { key: "fast|fast-comfyui", id: "fast", name: "Fast", differences: [] };
   f.app.get("/api/profiles/backends", (_req, res) =>
     res.json({ ok: true, hash: "pairs-hash", pairs: [backendPair] }),
@@ -5109,6 +5128,22 @@ test("admin tools go through the Library and profile routes with the administrat
   assert.deepEqual(
     [JSON.parse(put.body.text).steps, put.body.baseHash, put.body.draft],
     [6, profileHash, true],
+  );
+
+  const bindings = data(await call(client, "Profiles", { action: "list", target: "bindings" }));
+  assert.equal(bindings.hash, bindingsHash);
+  data(
+    await call(client, "ProfileEdit", {
+      action: "edit",
+      target: "bindings",
+      patch: { profiles: { "custom:gone": null } },
+      base_hash: bindingsHash,
+    }),
+  );
+  assert.deepEqual(
+    seen.filter((item) => item.method === "PUT").at(-1).body.bindings.profiles,
+    { "custom:fast": { pack: "fast" } },
+    "a merge patch null removes a binding",
   );
 
   const preview = data(await call(client, "CombineBackends"));

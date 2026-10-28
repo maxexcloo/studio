@@ -9,13 +9,14 @@
  * references, modes, LoRAs, guide). The administrator picks pairs, each one's name and the backend
  * it runs on by default.
  *
- * Applying copies both files, the aliases, workflow preferences, guides and timings to
+ * Applying copies both files, the aliases, workflow preferences, guides, LoRA stacks and timings to
  * `<data>/backups/profile-backends/<time>/`, writes the combined profile (`studio.backend` and
  * `studio.backends.<id>`, custom-workflows.js) as a new profile with its own version history, gives
- * it the default backend's guide binding and negatives, records each old id as an alias
- * `{to, backend}` (profile-store.js), so records that name it run again on the backend they ran on,
- * then removes the old files; their version history stays, so a seed never brings them back. Run
- * timings move to the combined profile's per-backend keys. Owner records are left as they are.
+ * it the default backend's guide binding and negatives and drops both old ids' guide entries,
+ * records each old id as an alias `{to, backend}` (profile-store.js), so records that name it run
+ * again on the backend they ran on, then removes the old files; their version history stays, so a
+ * seed never brings them back. Workflow preferences, every account's LoRA stacks and strengths, and
+ * run timings (per backend) move to the combined profile. Owner records are left as they are.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -34,6 +35,7 @@ import {
   listEditableProfiles,
   readEditableProfile,
 } from "./profile-editor.js";
+import { loraStackFiles, repointLoraStacks } from "./combined-profiles.js";
 import { guideStore, hashOf, profileStore } from "./profile-store.js";
 import { renameTimingKeys } from "./timings.js";
 import { loadWorkflowPreferences, repointWorkflowPreferences } from "./workflow-catalog.js";
@@ -248,6 +250,11 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
     });
   for (const file of [guideStore().file, path.join(dataDir, "timings.json")])
     if (fs.existsSync(file)) fs.copyFileSync(file, path.join(backup, path.basename(file)));
+  for (const file of loraStackFiles(dataDir)) {
+    const target = path.join(backup, path.relative(dataDir, file));
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.copyFileSync(file, target);
+  }
 
   const guides = guideStore();
   const timingKeys = {};
@@ -264,7 +271,17 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
         aiDrafted: drafted,
         note: `Combined from ${pair.radiance.id} and ${pair.comfyui.id}`,
       });
-    guides.copyProfileGuide(`custom:${pair[backend].id}`, `custom:${pair.id}`);
+    guides.moveProfileBindings(
+      {
+        from: `custom:${pair[backend].id}`,
+        to: `custom:${pair.id}`,
+        remove: [`custom:${pair.radiance.id}`, `custom:${pair.comfyui.id}`],
+      },
+      {
+        by,
+        note: `Combined ${pair.radiance.id} and ${pair.comfyui.id} into ${pair.id}`,
+      },
+    );
     for (const key of ["radiance", "comfyui"]) {
       const from = pair[key].id;
       const { text } = readEditableProfile(from);
@@ -293,6 +310,7 @@ export function combineBackends({ hash, selections = [], by = "" } = {}) {
     });
   }
   repointWorkflowPreferences((id) => store.canonical(id));
+  repointLoraStacks(dataDir, (id) => store.canonical(id));
   renameTimingKeys(timingKeys);
   return { combined, backup: path.relative(dataDir, backup) };
 }

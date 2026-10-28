@@ -14,6 +14,12 @@
  *   GET  /api/profiles/guides/:packId/versions/:n   one version with its pack
  *   POST /api/profiles/guides/:packId/revert        {version, baseHash}
  *   POST /api/profiles/guides/:packId/approve       clears AI-Drafted on the pack
+ *   GET  /api/profiles/guide-bindings               the profile bindings, variants and negatives, with their hash and meta
+ *   PUT  /api/profiles/guide-bindings               {bindings, baseHash, draft?}: saves them as a new version
+ *   GET  /api/profiles/guide-bindings/versions      their versions, newest first
+ *   GET  /api/profiles/guide-bindings/versions/:n   one version with its bindings
+ *   POST /api/profiles/guide-bindings/revert        {version, baseHash}
+ *   POST /api/profiles/guide-bindings/approve       clears AI-Drafted on the bindings
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
  *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile-merge.js)
@@ -250,6 +256,59 @@ export function registerProfileRoutes(
     route((req, res) => {
       guides().pack(req.params.packId);
       res.json({ ok: true, meta: guides().approve(req.params.packId, { by: accountName(req) }) });
+    }),
+  );
+
+  app.get(
+    "/api/profiles/guide-bindings",
+    route((_req, res) => {
+      res.json({ ok: true, ...guides().bindings() });
+    }),
+  );
+  app.put(
+    "/api/profiles/guide-bindings",
+    route((req, res) => {
+      const chat = fromChat(req);
+      const saved = guides().saveBindings(req.body?.bindings, {
+        by: accountName(req),
+        origin: chat ? "chat" : "studio",
+        aiDrafted: chat && req.body?.draft === true,
+        baseHash: String(req.body?.baseHash || ""),
+      });
+      res.json({ ok: true, ...saved });
+    }),
+  );
+  app.get(
+    "/api/profiles/guide-bindings/versions",
+    route((_req, res) => {
+      const { meta, hash } = guides().bindings();
+      res.json({ ok: true, versions: guides().versions("_bindings"), meta, hash });
+    }),
+  );
+  app.get(
+    "/api/profiles/guide-bindings/versions/:n",
+    route((req, res) => {
+      res.json({ ok: true, version: guides().version("_bindings", versionNumber(req.params.n)) });
+    }),
+  );
+  app.post(
+    "/api/profiles/guide-bindings/revert",
+    route((req, res) => {
+      const saved = guides().revertBindings(versionNumber(req.body?.version), {
+        by: accountName(req),
+        baseHash: String(req.body?.baseHash || ""),
+        origin: fromChat(req) ? "chat" : "studio",
+      });
+      res.json({ ok: true, ...saved });
+    }),
+  );
+  app.post(
+    "/api/profiles/guide-bindings/approve",
+    route((req, res) => {
+      res.json({
+        ok: true,
+        meta: guides().approve("_bindings", { by: accountName(req) }),
+      });
     }),
   );
 

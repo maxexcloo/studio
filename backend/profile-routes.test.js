@@ -20,6 +20,7 @@ const { profileStore, guideStore, createProfileStore } = await import("./profile
 const editor = await import("./profile-editor.js");
 const { registerProfileRoutes } = await import("./profile-routes.js");
 const { buildExport } = await import("./profile-export.js");
+const { mcpAdminRouteAllowed } = await import("./multi-user-auth.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const profile = (name, extra = {}) =>
@@ -381,6 +382,39 @@ test("chat edits through the same routes record chat as the origin, and a chat d
     baseHash: ui.body.hash,
   });
   assert.equal(reverted.body.meta.origin, "chat");
+
+  // Bindings: a chat draft removes one, an administrator approves, a stale edit is refused.
+  const bindings = await call("GET", "/api/profiles/guide-bindings");
+  const removed = await call("PUT", "/api/profiles/guide-bindings", {
+    bindings: { ...bindings.body.bindings, profiles: { "custom:krea-test": { pack: "krea2" } } },
+    baseHash: bindings.body.hash,
+    draft: true,
+  });
+  assert.deepEqual(removed.body.bindings.profiles, { "custom:krea-test": { pack: "krea2" } });
+  assert.deepEqual([removed.body.meta.origin, removed.body.meta.aiDrafted], ["chat", true]);
+  assert.equal(
+    (
+      await call("PUT", "/api/profiles/guide-bindings", {
+        ...bindings.body,
+        baseHash: bindings.body.hash,
+      })
+    ).status,
+    409,
+  );
+  const history = await call("GET", "/api/profiles/guide-bindings/versions");
+  assert.equal(history.body.versions[0].version, removed.body.meta.version);
+  assert.ok((await call("GET", "/api/profiles/guide-bindings/versions/1")).body.version.bindings);
+  assert.equal(
+    (await call("POST", "/api/profiles/guide-bindings/approve", {}, false)).body.meta.aiDrafted,
+    false,
+  );
+  for (const [method, route] of [
+    ["GET", "/api/profiles/guide-bindings"],
+    ["GET", "/api/profiles/guide-bindings/versions/2"],
+    ["PUT", "/api/profiles/guide-bindings"],
+    ["POST", "/api/profiles/guide-bindings/revert"],
+  ])
+    assert.ok(mcpAdminRouteAllowed(method, route), route);
 
   const current = editor.readEditableProfile("krea-test");
   assert.equal(

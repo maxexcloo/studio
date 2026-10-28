@@ -592,44 +592,38 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     },
   );
 
-  const versionsOf = async (target, name, signal) => {
-    const route =
-      target === "guide"
-        ? `/api/profiles/guides/${encodeURIComponent(name)}/versions`
-        : `/api/profiles/editable/${encodeURIComponent(name)}/versions`;
-    return (await api("GET", route, undefined, signal)).versions || [];
-  };
+  // Guide bindings are one versioned document, so they take no id.
+  const baseOf = (target, name) =>
+    target === "bindings"
+      ? "/api/profiles/guide-bindings"
+      : target === "guide"
+        ? `/api/profiles/guides/${encodeURIComponent(name)}`
+        : `/api/profiles/editable/${encodeURIComponent(name)}`;
+  const versionsOf = async (target, name, signal) =>
+    (await api("GET", `${baseOf(target, name)}/versions`, undefined, signal)).versions || [];
   const versionText = async (target, name, n, signal) => {
-    const route =
-      target === "guide"
-        ? `/api/profiles/guides/${encodeURIComponent(name)}/versions/${n}`
-        : `/api/profiles/editable/${encodeURIComponent(name)}/versions/${n}`;
-    const { version } = await api("GET", route, undefined, signal);
-    return target === "guide" ? `${JSON.stringify(version.pack, null, 2)}\n` : version.text;
-  };
-  const current = async (target, name, signal) => {
-    if (target === "guide") {
-      const pack = await api(
-        "GET",
-        `/api/profiles/guides/${encodeURIComponent(name)}`,
-        undefined,
-        signal,
-      );
-      return {
-        id: name,
-        text: `${JSON.stringify(pack.pack, null, 2)}\n`,
-        value: pack.pack,
-        hash: pack.hash,
-        meta: pack.meta,
-      };
-    }
-    const profile = await api(
+    const { version } = await api(
       "GET",
-      `/api/profiles/editable/${encodeURIComponent(name)}`,
+      `${baseOf(target, name)}/versions/${n}`,
       undefined,
       signal,
     );
-    return { id: name, text: profile.text, hash: profile.hash, meta: profile.version };
+    return target === "profile"
+      ? version.text
+      : `${JSON.stringify(target === "guide" ? version.pack : version.bindings, null, 2)}\n`;
+  };
+  const current = async (target, name, signal) => {
+    const now = await api("GET", baseOf(target, name), undefined, signal);
+    if (target === "profile")
+      return { id: name, text: now.text, hash: now.hash, meta: now.version };
+    const value = target === "guide" ? now.pack : now.bindings;
+    return {
+      id: name,
+      text: `${JSON.stringify(value, null, 2)}\n`,
+      value,
+      hash: now.hash,
+      meta: now.meta,
+    };
   };
   const versionRow = ({ version, at, by, origin, aiDrafted, note }) => ({
     version,
@@ -644,14 +638,15 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "Profiles",
     "Profiles & Guides",
-    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default) or guide. Read-only.",
+    "Read Studio’s model profiles and prompting guides. list lists them with version, origin and AI-Drafted state; get returns one’s text, hash (pass it as base_hash to ProfileEdit) and recent versions, or an older version with version; diff compares version (default: the one before) with the current text. target is profile (default), guide (a pack) or bindings: which pack, variant and mode each profile (custom:<id>) uses, the variants and each profile's negatives, one document without an id. Read-only.",
     {
       action: z.enum(["list", "get", "diff"]).default("list"),
-      target: z.enum(["profile", "guide"]).default("profile"),
+      target: z.enum(["profile", "guide", "bindings"]).default("profile"),
       id: z.string().trim().min(1).max(120).optional(),
       version: z.number().int().min(1).optional(),
     },
     async ({ action, target, id: name, version }, signal) => {
+      if (target === "bindings" && action === "list") action = "get";
       if (action === "list") {
         if (target === "guide")
           return mcpJson({
@@ -682,7 +677,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           ),
         });
       }
-      if (!name) throw new Error(`Pass id: the ${target} to ${action} (from list).`);
+      if (!name && target !== "bindings")
+        throw new Error(`Pass id: the ${target} to ${action} (from list).`);
       const now = await current(target, name, signal);
       const versions = await versionsOf(target, name, signal);
       if (action === "get") {
@@ -722,11 +718,11 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "ProfileEdit",
     "Edit Profile or Guide",
-    "Change a profile or guide when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version. edit, draft and revert need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back.",
+    'Change a profile, guide or the guide bindings when the user asks; every change is a new version recorded as from chat. edit saves text (the whole JSON) or patch (a JSON merge patch; null removes a key, so {"profiles": {"custom:<id>": null}} removes a profile\'s binding); draft saves the same way but marks it AI-Drafted, visible to administrators only until approved; approve clears AI-Drafted; revert restores version as a new version. edit, draft and revert need base_hash from Profiles get: a stale one is refused. Profiles are checked like Settings › Profiles; warnings come back. bindings takes no id.',
     {
       action: z.enum(["draft", "edit", "approve", "revert"]),
-      target: z.enum(["profile", "guide"]).default("profile"),
-      id: z.string().trim().min(1).max(120),
+      target: z.enum(["profile", "guide", "bindings"]).default("profile"),
+      id: z.string().trim().min(1).max(120).optional(),
       text: z.string().min(2).max(2000000).optional(),
       patch: z.record(z.string(), z.unknown()).optional(),
       base_hash: z
@@ -736,10 +732,8 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       version: z.number().int().min(1).optional(),
     },
     async ({ action, target, id: name, text, patch, base_hash, version }, signal) => {
-      const base =
-        target === "guide"
-          ? `/api/profiles/guides/${encodeURIComponent(name)}`
-          : `/api/profiles/editable/${encodeURIComponent(name)}`;
+      if (!name && target !== "bindings") throw new Error(`Pass id: the ${target} to change.`);
+      const base = baseOf(target, name);
       const reply = (saved) =>
         mcpJson({
           target,
@@ -763,23 +757,26 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
       if (Boolean(text) === Boolean(patch))
         throw new Error("Pass text (the whole JSON) or patch (a JSON merge patch), not both.");
       const draft = action === "draft";
-      if (target === "guide") {
-        let pack;
+      if (target !== "profile") {
+        let value;
         if (patch) {
-          const now = await current("guide", name, signal);
+          const now = await current(target, name, signal);
           if (now.hash !== base_hash)
             throw new Error(
-              "This guide changed since you read it. Call Profiles get again, then make the change.",
+              `This ${target === "guide" ? "guide" : "binding document"} changed since you read it. Call Profiles get again, then make the change.`,
             );
-          pack = mergePatch(now.value, patch);
+          value = mergePatch(now.value, patch);
         } else {
           try {
-            pack = JSON.parse(text);
+            value = JSON.parse(text);
           } catch (error) {
             throw new Error(`text is not valid JSON: ${error.message}`);
           }
         }
-        return reply(await api("PUT", base, { pack, baseHash: base_hash, draft }, signal));
+        const field = target === "guide" ? "pack" : "bindings";
+        return reply(
+          await api("PUT", base, { [field]: value, baseHash: base_hash, draft }, signal),
+        );
       }
       let next = text;
       if (patch) {

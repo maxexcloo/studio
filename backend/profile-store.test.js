@@ -290,6 +290,56 @@ test("a guide resolves per profile, binds to a drafted profile and records its e
   );
 });
 
+test("guide bindings are edited, removed, reverted and approved as versions, and a stale edit is refused", (t) => {
+  const dir = scratch(t);
+  const seedFile = path.join(dir, "prompting.json");
+  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
+  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
+  store.migrate();
+  const first = store.bindings();
+  assert.deepEqual(first.bindings.profiles, { "custom:fixture": { pack: "other" } });
+  const edited = store.saveBindings(
+    {
+      ...first.bindings,
+      profiles: { "custom:other": { pack: "krea2" } },
+      negatives: {},
+    },
+    { by: "chat-admin", origin: "chat", aiDrafted: true, baseHash: first.hash },
+  );
+  assert.deepEqual(edited.bindings.profiles, { "custom:other": { pack: "krea2" } });
+  assert.equal(edited.meta.aiDrafted, true);
+  // The bindings before the first edit are version 1, so revert can go back.
+  assert.deepEqual(
+    store.versions("_bindings").map(({ version, origin }) => [version, origin]),
+    [
+      [2, "chat"],
+      [1, "seed"],
+    ],
+  );
+  assert.throws(() => store.saveBindings(first.bindings, { baseHash: first.hash }), {
+    status: 409,
+  });
+  // A binding to a pack that doesn't exist fails the loader's check and is not saved.
+  assert.throws(() =>
+    store.saveBindings({ ...edited.bindings, profiles: { "custom:x": { pack: "missing" } } }),
+  );
+  assert.equal(store.approve("_bindings", { by: "admin" }).aiDrafted, false);
+  const reverted = store.revertBindings(1, { by: "admin", baseHash: edited.hash });
+  assert.deepEqual(reverted.bindings, first.bindings);
+  assert.equal(reverted.meta.version, 3);
+
+  store.moveProfileBindings({
+    from: "custom:fixture",
+    to: "custom:kept",
+    remove: ["custom:fixture"],
+  });
+  const moved = store.bindings().bindings;
+  assert.deepEqual(moved.profiles, { "custom:kept": { pack: "other" } });
+  assert.deepEqual(Object.keys(moved.negatives), ["custom:kept"]);
+  // Packs list without the bindings' history.
+  assert.deepEqual(Object.keys(store.read().packs).sort(), ["krea2", "other"]);
+});
+
 test("the guide loader reads the store first, falls back to the seed, reloads on change and fills negatives", (t) => {
   const dir = scratch(t);
   const seedFile = path.join(dir, "prompting.json");
