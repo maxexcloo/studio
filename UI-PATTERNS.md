@@ -23,7 +23,7 @@ primary component reference and verify APIs against the installed version.
   `MutationCache` default notification. Do not add per-call duplicate surfaces.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
-  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo` and `copyText`.
+  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and `copyText`.
 - Style with Mantine props and theme `extend` defaults first; component-specific
   CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
   global class rules and per-call sizes that the theme should own.
@@ -132,6 +132,12 @@ primary component reference and verify APIs against the installed version.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
   a short transition and the standard accessible close action.
+- Every multi-line text box is the shared `TextBox`. The composer's prompt and
+  negative prompt carry compact Copy and Clear beside their other actions; Clear
+  offers Undo in its notification. On phones, tapping a text box (prompt,
+  negative, Chat message, profile and guide editors and the rest) opens it full
+  screen with Copy, Clear and Done, and floating prompt ideas move under its text;
+  Done, Escape or dismissing the keyboard returns to the page. Desktop edits in place.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.

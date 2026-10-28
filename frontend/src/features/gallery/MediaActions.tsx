@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Group, Modal, Stack, Textarea } from "@mantine/core";
+import { Button, Group, Modal, Stack } from "@mantine/core";
 import {
   Camera,
   Columns2,
@@ -34,6 +34,7 @@ import { useLocation, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
+import { TextBox } from "../../ui/TextBox";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -433,14 +434,14 @@ export function CustomAnimationDialog({
         }}
       >
         <Stack>
-          <Textarea
+          <TextBox
             label="Instruction"
             placeholder="What should happen in the video?"
             autosize
             minRows={3}
             data-autofocus
             value={instruction}
-            onChange={(event) => setInstruction(event.currentTarget.value)}
+            onChange={setInstruction}
           />
           <Group justify="flex-end">
             <Button type="submit" disabled={!instruction.trim()}>

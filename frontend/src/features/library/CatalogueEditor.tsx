@@ -11,7 +11,6 @@ import {
   Stack,
   TagsInput,
   Text,
-  Textarea,
   TextInput,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
@@ -21,6 +20,7 @@ import { modelFamilyLabel } from "../../ui/modelFamily";
 import { modelsQuery } from "../generation/GenerationProvider";
 import { loraInfoQuery } from "../generation/LoraPicker";
 import { libraryItemCategory, type LibraryItem } from "./LibraryCatalogueTable";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 interface CatalogueItem extends LibraryItem {
   baseModel?: string;
@@ -206,12 +206,13 @@ function CatalogueForm({
         />
         <TagsInput label="Tags" {...form.getInputProps("tags")} />
         {(["description", "note", "guidance"] as const).map((key) => (
-          <Textarea
+          <TextBox
             key={key}
             label={key[0].toUpperCase() + key.slice(1)}
             autosize
             minRows={2}
             {...form.getInputProps(key)}
+            value={form.values[key]}
           />
         ))}
         {save.error && <Alert color="red">{save.error.message}</Alert>}

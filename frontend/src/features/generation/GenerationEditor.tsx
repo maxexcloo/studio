@@ -7,7 +7,6 @@ import {
   Group,
   SegmentedControl,
   Stack,
-  Textarea,
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
@@ -25,6 +24,7 @@ import { usePromptIdeas } from "./PromptIdeas";
 import { PromptHistory } from "./PromptHistory";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./GenerationEditor.module.css";
 const MaskEditor = lazy(() => import("./MaskEditor"));
@@ -250,8 +250,9 @@ export function GenerationEditor({
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
           <div className={classes.promptArea} {...(offerIdeas ? ideas.focusProps : {})}>
-            <Textarea
+            <TextBox
               ref={prompt}
+              tools
               data-expanded-prompt
               classNames={{
                 root: classes.prompt,
@@ -284,12 +285,13 @@ export function GenerationEditor({
               rightSectionPointerEvents="all"
               rightSectionProps={{ style: { alignItems: "flex-start" } }}
               value={input.prompt}
-              onChange={(event) => onChange({ prompt: event.currentTarget.value })}
+              onChange={(prompt) => onChange({ prompt })}
+              overlay={offerIdeas && ideas.ideas}
             />
-            {offerIdeas && ideas.ideas}
           </div>
           {profile && profile.capabilities.negativePrompt !== false && (
-            <Textarea
+            <TextBox
+              tools
               aria-label="Negative Prompt"
               placeholder="Negative prompt: what to leave out…"
               size="sm"
@@ -305,7 +307,7 @@ export function GenerationEditor({
               }
               rightSectionPointerEvents="all"
               value={input.negative}
-              onChange={(event) => onChange({ negative: event.currentTarget.value })}
+              onChange={(negative) => onChange({ negative })}
             />
           )}
           {assistant.suggestions}

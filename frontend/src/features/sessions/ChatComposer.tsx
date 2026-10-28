@@ -1,8 +1,9 @@
-import { ActionIcon, Alert, Group, Select, Stack, Text, Textarea, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Group, Select, Stack, Text, Tooltip } from "@mantine/core";
 import { ArrowUp, Square } from "lucide-react";
 import { ComposerDock } from "../generation/ComposerDock";
 import { usePromptIdeas } from "../generation/PromptIdeas";
 import { ReferencePicker } from "../generation/ReferencePicker";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useChat } from "./ChatProvider";
 import { useIsMutating } from "@tanstack/react-query";
@@ -33,7 +34,7 @@ function ChatComposer() {
       <Group wrap="nowrap" gap={4} align="center">
         <ReferencePicker compact />
         <div className={classes.message} {...ideas.focusProps}>
-          <Textarea
+          <TextBox
             aria-label="Message"
             placeholder="Message Studio…"
             variant="unstyled"
@@ -42,7 +43,8 @@ function ChatComposer() {
             maxRows={5}
             className={classes.writing}
             value={text}
-            onChange={(event) => setText(event.currentTarget.value)}
+            onChange={setText}
+            overlay={ideas.ideas}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
@@ -50,7 +52,6 @@ function ChatComposer() {
               }
             }}
           />
-          {ideas.ideas}
         </div>
         <Select
           aria-label="Chat Model"

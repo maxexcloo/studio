@@ -28,6 +28,7 @@ import { loraInfoQuery } from "../generation/LoraPicker";
 import { WorkflowConnections } from "./WorkflowConnections";
 import { backendLabel } from "../generation/payload";
 import { sharedProfileFields } from "../../../../shared/profiles";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 
 export type DefinitionKind = "profile" | "guide";
@@ -267,12 +268,12 @@ function DefinitionForm({
                         checked={metadata.uncensored === true}
                         onChange={(event) => field("uncensored", event.currentTarget.checked)}
                       />
-                      <Textarea
+                      <TextBox
                         label="Description"
                         autosize
                         minRows={2}
                         value={String(metadata.description || "")}
-                        onChange={(event) => field("description", event.currentTarget.value)}
+                        onChange={(value) => field("description", value)}
                       />
                       <SimpleGrid cols={{ base: 1, sm: 2 }}>
                         <TextInput
@@ -334,12 +335,12 @@ function DefinitionForm({
                     </>
                   ) : (
                     <>
-                      <Textarea
+                      <TextBox
                         label="Summary"
                         autosize
                         minRows={3}
                         value={String(metadata.summary || "")}
-                        onChange={(event) => field("summary", event.currentTarget.value)}
+                        onChange={(value) => field("summary", value)}
                       />
                       {Object.entries(metadata)
                         .filter(
@@ -351,35 +352,28 @@ function DefinitionForm({
                                 value.every((item) => typeof item === "string"))),
                         )
                         .map(([key, value]) => (
-                          <Textarea
+                          <TextBox
                             key={key}
                             label={key.replaceAll("_", " ")}
                             description={Array.isArray(value) ? "One entry per line." : undefined}
                             autosize
                             minRows={2}
                             value={Array.isArray(value) ? value.join("\n") : String(value)}
-                            onChange={(event) =>
-                              field(
-                                key,
-                                Array.isArray(value)
-                                  ? event.currentTarget.value.split("\n")
-                                  : event.currentTarget.value,
-                              )
+                            onChange={(text) =>
+                              field(key, Array.isArray(value) ? text.split("\n") : text)
                             }
                           />
                         ))}
                       {(!Object.hasOwn(metadata, "rules") ||
                         (Array.isArray(metadata.rules) &&
                           metadata.rules.every((rule) => typeof rule === "string"))) && (
-                        <Textarea
+                        <TextBox
                           label="Rules"
                           description="One rule per line."
                           autosize
                           minRows={3}
                           value={Array.isArray(metadata.rules) ? metadata.rules.join("\n") : ""}
-                          onChange={(event) =>
-                            field("rules", event.currentTarget.value.split("\n"))
-                          }
+                          onChange={(value) => field("rules", value.split("\n"))}
                         />
                       )}
                     </>
@@ -411,7 +405,7 @@ function DefinitionForm({
                 Edit workflow graphs, control mappings or nested guide variants here. Structured
                 fields preserve everything else in this document.
               </Text>
-              <Textarea
+              <TextBox
                 label={kind === "profile" ? "Profile JSON" : "Guide JSON"}
                 autosize
                 minRows={14}
@@ -419,8 +413,8 @@ function DefinitionForm({
                 spellCheck={false}
                 value={form.values.text}
                 styles={{ input: { fontFamily: "monospace" } }}
-                onChange={(event) => {
-                  form.setFieldValue("text", event.currentTarget.value);
+                onChange={(text) => {
+                  form.setFieldValue("text", text);
                   setCheck(null);
                 }}
               />
