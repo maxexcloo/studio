@@ -855,7 +855,25 @@ export function createDream(options: {
     try {
       const jobs = live();
       if (busy(jobs)) return await stopWaiting();
-      if (jobs.some(dreamJob)) return;
+      // A waiting Dream job whose worker went offline or was parked steps aside instead of holding
+      // Dream up; Dream makes new work for that kind once the worker is back.
+      const reach = new Map<Kind, Promise<Reach>>();
+      const stranded = await Promise.all(
+        jobs
+          .filter((job) => dreamJob(job) && waiting(job))
+          .map(async (job) => {
+            const kind = kindOf(job.input);
+            if (!reach.has(kind))
+              reach.set(
+                kind,
+                options.online(kind).then((online) => online.media),
+              );
+            return (await reach.get(kind)) === "online" ? null : job;
+          }),
+      );
+      for (const job of stranded)
+        if (job) await options.cancel(job.ownerId, job.id).catch(() => undefined);
+      if (live().some(dreamJob)) return;
       const owners = options.owners();
       // Accounts take turns: the search starts after the one served last.
       for (let step = 0; step < owners.length; step++) {
