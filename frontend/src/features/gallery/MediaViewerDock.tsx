@@ -19,7 +19,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, terminal } from "../generation/Queue";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { mediaDraft, typedPrompt } from "./useMediaAction";
-import { versionGroups } from "./versions";
+import { derivation, versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 
 interface Entry {
@@ -48,11 +48,11 @@ export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
       ...queued.flatMap(results).filter((result) => !group.some(({ id }) => id === result.id)),
     ];
     const ids = new Set(versions.map((version) => version.id));
-    const runs = new Set(versions.map((version) => version.jobId));
-    const from = (job: QueueJob) =>
-      job.parentItemId
-        ? ids.has(job.parentItemId)
-        : Boolean(job.parentJobId) && runs.has(job.parentJobId);
+    const byJob = new Map(all.map((job) => [job.id, job]));
+    const from = (job: QueueJob) => {
+      const made = derivation(job, byJob);
+      return Boolean(made?.version && ids.has(made.source));
+    };
     const waiting = all
       .filter(
         (job) =>

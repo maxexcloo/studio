@@ -1,5 +1,6 @@
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Group,
   Image,
@@ -18,6 +19,8 @@ import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
+import { mediaTitle } from "./mediaLabels";
+import { useDerivations } from "./versions";
 import { WritingThinking } from "../generation/PromptWriting";
 import { referenceLabel } from "../generation/references";
 import classes from "./MediaViewer.module.css";
@@ -261,8 +264,54 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   );
 }
 
-/** Details › Caption, Prompt, Model, LoRAs, References, Settings, Output and Timing for one result. */
-export function MediaDetails({ item }: { item: MediaItem }) {
+/** Links to the results an item was made from or made, opening each in the viewer when it can. */
+function Related({
+  title,
+  items,
+  open,
+}: {
+  title: string;
+  items: MediaItem[];
+  open?: (item: MediaItem) => void;
+}) {
+  if (!items.length) return null;
+  return (
+    <Stack gap={6}>
+      <Title order={6}>{title}</Title>
+      {items.map((related) =>
+        open ? (
+          <Anchor
+            key={related.id}
+            component="button"
+            type="button"
+            size="sm"
+            ta="left"
+            onClick={() => open(related)}
+          >
+            {mediaTitle(related)}
+          </Anchor>
+        ) : (
+          <Text key={related.id} size="sm">
+            {mediaTitle(related)}
+          </Text>
+        ),
+      )}
+    </Stack>
+  );
+}
+
+/**
+ * Details › Caption, Prompt, From, Derived, Model, LoRAs, References, Settings, Output and Timing
+ * for one result; `open` shows a related result in the viewer.
+ */
+export function MediaDetails({
+  item,
+  open,
+}: {
+  item: MediaItem;
+  open?: (item: MediaItem) => void;
+}) {
+  const related = useDerivations(item);
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
   const details = useGenerationDetails(item, url && size.isPending ? null : size.data);
@@ -304,6 +353,8 @@ export function MediaDetails({ item }: { item: MediaItem }) {
         <WritingThinking writing={item.writing} />
         {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
       </Stack>
+      <Related title="From" items={related.source ? [related.source] : []} open={open} />
+      <Related title="Derived" items={related.derived} open={open} />
       {details.profile && (
         <Stack gap={6}>
           <Title order={6}>Model</Title>
