@@ -32,11 +32,8 @@ export function createChatRouter(
       next(error);
     }
   });
+  // A dropped connection leaves the reply running and stored; the client reloads it on return.
   router.post("/sessions/:id/chat", async (request, response, next) => {
-    const abort = new AbortController();
-    response.once("close", () => {
-      if (!response.writableFinished) abort.abort();
-    });
     try {
       const owner = await authorize(request);
       const emit = (event: { event: string; data: unknown }) => {
@@ -49,16 +46,10 @@ export function createChatRouter(
         response.write(`event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`);
       };
       try {
-        await service.stream(
-          owner,
-          String(request.params.id),
-          request.body as ChatInput,
-          abort.signal,
-          emit,
-        );
+        await service.stream(owner, String(request.params.id), request.body as ChatInput, emit);
       } catch (error) {
         if (!response.headersSent) throw error;
-        if (!abort.signal.aborted)
+        if (!(error instanceof Error && error.name === "AbortError"))
           emit({
             event: "error",
             data: {
@@ -70,6 +61,14 @@ export function createChatRouter(
           });
       }
       response.end();
+    } catch (error) {
+      next(error);
+    }
+  });
+  router.post("/sessions/:id/chat/stop", async (request, response, next) => {
+    try {
+      const owner = await authorize(request);
+      response.json({ stopped: service.stop(owner, String(request.params.id)) });
     } catch (error) {
       next(error);
     }
