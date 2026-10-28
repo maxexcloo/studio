@@ -86,7 +86,10 @@ test(
     const profileFile = path.join(dataDir, "workflows", "cold.json");
     writeFileSync(profileFile, JSON.stringify(raw));
     const info = JSON.parse(
-      readFileSync(new URL("../fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
+      readFileSync(
+        new URL("../fixtures/object_info-comfyui-0.41.0-master-ce1e922.json", import.meta.url),
+        "utf8",
+      ),
     );
     info.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
     const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: "white" } })
