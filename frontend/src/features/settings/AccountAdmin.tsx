@@ -40,6 +40,7 @@ const featureLabels = {
   presets: "Presets",
   promptAssistant: "Prompt Assistance",
   promptHistory: "Prompt History",
+  upscale: "Upscale",
   videoGeneration: "Video Generation",
   videoReferences: "Video References",
 };
