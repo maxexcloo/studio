@@ -10,6 +10,8 @@ export interface Comparison {
   seed: string;
   /** Present when every variant used the same prompt. */
   prompt?: string;
+  /** Present when every variant used the same negative prompt, even an empty one. */
+  negative?: string;
   /** The starred winner's job ID. */
   vote: string | null;
   variants: { jobId: string; label: string; item: MediaItem | null }[];

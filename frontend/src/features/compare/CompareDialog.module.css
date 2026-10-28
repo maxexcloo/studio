@@ -1,0 +1,17 @@
+@media (min-width: 48em) {
+  .dimensions {
+    align-self: flex-start;
+  }
+}
+
+/* A new variant fades in where it lands. */
+.variant {
+  animation: arrive var(--studio-motion-duration) ease-out both;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
