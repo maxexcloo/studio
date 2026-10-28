@@ -313,6 +313,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           {focusIntent.current !== "[data-expanded-prompt]" && <FocusTrap.InitialFocus />}
           <div
             className={classes.panel}
+            data-generate-drawer
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
           >
