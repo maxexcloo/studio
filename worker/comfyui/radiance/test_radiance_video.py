@@ -41,8 +41,8 @@ class VideoRequestTests(unittest.TestCase):
         }
 
     def test_stock_request_keeps_its_steps_and_text_only_fields(self):
-        body, frames = video_request(self.values)
-        self.assertEqual(frames, 192)
+        body, files = video_request(self.values)
+        self.assertEqual(files, [])
         self.assertEqual(
             body,
             {
@@ -106,6 +106,34 @@ class VideoRequestTests(unittest.TestCase):
                 dict(self.values, model=FAST, latent_upscale=2, upscale_refine_steps=8)
             )
 
+    def test_tasks_send_keyframes_or_numbered_references(self):
+        for task, images, files in [
+            ("i2va", [b"a"], [("first_frame", b"a")]),
+            ("l2va", [b"a"], [("last_frame", b"a")]),
+            ("fl2va", [b"a", b"b"], [("first_frame", b"a"), ("last_frame", b"b")]),
+            ("ref2va", [b"a", b"b"], [("ref_image_1", b"a"), ("ref_image_2", b"b")]),
+        ]:
+            with self.subTest(task=task):
+                body, sent = video_request(dict(self.values, task=task), images)
+                self.assertEqual(body["task"], task)
+                self.assertEqual(sent, files)
+        body, _ = video_request(
+            dict(self.values, task="ref2va", latent_upscale=2), [b"a"]
+        )
+        self.assertEqual(body["latent_upscale"], 2)
+        for change, images in [
+            ({"task": "i2va"}, []),
+            ({"task": "fl2va"}, [b"a"]),
+            ({"task": "ref2va"}, []),
+            ({"task": "ref2va"}, [b"a"] * 10),
+            ({"task": "t2va"}, [b"a"]),
+            ({"task": "i2va", "latent_upscale": 2}, [b"a"]),
+            ({"task": "i2va", "model": FAST, "steps": 8}, [b"a"]),
+            ({"task": "v2va"}, []),
+        ]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                video_request(dict(self.values, **change), images)
+
     def test_frames_follow_the_h3_grid_and_radiance_duration(self):
         # Radiance rounds seconds up to 17-frame steps, so stay just below the exact frame time.
         self.assertEqual(
@@ -115,8 +143,7 @@ class VideoRequestTests(unittest.TestCase):
             value = float(seconds(frames)) * 24
             self.assertTrue(frames - 17 < value <= frames, frames)
         for frames in range(124, 346, 17):
-            body, actual = video_request(dict(self.values, frames=frames))
-            self.assertEqual(actual, frames)
+            body, _ = video_request(dict(self.values, frames=frames))
             self.assertEqual(body["seconds"], seconds(frames))
         for frames in [130, 362]:
             with self.subTest(frames=frames), self.assertRaises(ValueError):
@@ -189,7 +216,7 @@ class FakeClient:
         self.responses = list(responses)
         self.calls = []
 
-    def request(self, method, route, body=None, raw=False, timeout=None):
+    def request(self, method, route, body=None, raw=False, timeout=None, files=()):
         self.calls.append((method, route))
         if method == "DELETE":
             return 200, {}

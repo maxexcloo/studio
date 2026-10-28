@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from radiance import image_request
+from radiance import RadianceImageGenerate, image_request
 
 
 class ImageRequestTests(unittest.TestCase):
@@ -122,8 +122,16 @@ class ImageRequestTests(unittest.TestCase):
         (self.models / "krea-2-turbo-fp8.rad").touch()
         values = dict(self.values, model="krea-2-turbo-fp8.rad")
         self.assertNotIn("rebalance", json.loads(image_request(values)[1]))
-        body = json.loads(image_request(dict(values, rebalance=True))[1])
-        self.assertIs(body["rebalance"], True)
+        self.assertNotIn(
+            "rebalance", json.loads(image_request(dict(values, rebalance="off"))[1])
+        )
+        for value in [True, "legacy", "balanced", "detail", "subtle"]:
+            body = json.loads(image_request(dict(values, rebalance=value))[1])
+            self.assertEqual(body["rebalance"], value)
+        # Profiles saved with the old boolean pass ComfyUI's validation; Radiance reads true as legacy.
+        self.assertIs(RadianceImageGenerate.VALIDATE_INPUTS(rebalance=True), True)
+        self.assertIs(RadianceImageGenerate.VALIDATE_INPUTS(rebalance="detail"), True)
+        self.assertIsInstance(RadianceImageGenerate.VALIDATE_INPUTS(rebalance="x"), str)
 
     def test_flux3_stays_under_two_megapixels(self):
         (self.models / "flux-3-klein-fp8.rad").touch()

@@ -1,6 +1,7 @@
 """Reuse one Radiance worker within a ComfyUI container's serial queue."""
 
 import atexit
+import io
 import json
 import math
 import os
@@ -10,6 +11,7 @@ import sys
 import threading
 import time
 import urllib.request
+import uuid
 from collections import deque
 from contextlib import contextmanager
 from pathlib import Path
@@ -91,6 +93,46 @@ def lora_tags(value):
             raise ValueError(f"LoRA strength must be a number from -10 to 10: {name}")
         tags.append(f"<lora:{name.removesuffix('.safetensors')}:{weight:g}>")
     return tags
+
+
+def pngs(batches):
+    """Encode every picture of the connected ComfyUI IMAGE batches, in input order, as PNG."""
+    import numpy as np
+    from PIL import Image
+
+    encoded = []
+    for batch in batches:
+        if batch is None:
+            continue
+        for tensor in batch:
+            array = (
+                (tensor.detach().cpu().numpy().clip(0, 1) * 255)
+                .round()
+                .astype(np.uint8)
+            )
+            stream = io.BytesIO()
+            Image.fromarray(array).save(stream, format="PNG")
+            encoded.append(stream.getvalue())
+    return encoded
+
+
+def multipart(fields, files):
+    """A form of text fields and (field, PNG) parts, as Radiance's media requests take."""
+    boundary = "ai-" + uuid.uuid4().hex
+    chunks = []
+    for name, value in fields.items():
+        if isinstance(value, bool):
+            value = json.dumps(value)
+        chunks.append(
+            (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'
+            ).encode()
+        )
+    for index, (name, data) in enumerate(files):
+        header = f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"; filename="reference-{index}.png"\r\nContent-Type: image/png\r\n\r\n'
+        chunks.extend([header.encode(), data, b"\r\n"])
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks), "multipart/form-data; boundary=" + boundary
 
 
 def visible_devices():
