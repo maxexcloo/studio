@@ -1,9 +1,17 @@
 import {
+  hasMigration,
   readRuntimeDocument,
+  runtimeDatabase,
   usesRuntimeDatabase,
   writeRuntimeDocument,
   writeRuntimeText,
 } from "./persistence/runtime.ts";
+import {
+  galleryKey,
+  galleryRowsMigration,
+  readGalleryRows,
+  writeGalleryRows,
+} from "./persistence/gallery-rows.ts";
 import { generationRecord } from "./generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
 import { mediaFile, mediaParams, mediaPath } from "./media-paths.js";
@@ -41,33 +49,55 @@ let galleryRevision = Date.now();
 // Bumped whenever the hide markers change, so a cached page list knows to rebuild.
 let hiddenVersion = 0;
 
+/**
+ * Where the gallery lives: `gallery.json` until the runtime migration, then the `gallery` document,
+ * then (after migrate-runtime's gallery-rows-v1) one SQLite row per item, written as items change.
+ */
+const storage = !usesRuntimeDatabase(dataDir)
+  ? "json"
+  : hasMigration(runtimeDatabase(dataDir), galleryRowsMigration)
+    ? "rows"
+    : "document";
+
+/**
+ * In row storage, each saved item by key as last written. Items are replaced, never changed in
+ * place, so a save writes only the keys whose item is a different object.
+ */
+let savedRows = new Map();
+
+function readStoredGallery() {
+  if (storage === "json") return readJsonFile(galleryPath);
+  if (storage === "document") return readRuntimeDocument(dataDir, "gallery");
+  const items = readGalleryRows(runtimeDatabase(dataDir));
+  savedRows = new Map(items.map((item) => [galleryKey(item), item]));
+  return sortGallery(items);
+}
+
 function loadGallery() {
-  const database = usesRuntimeDatabase(dataDir);
+  const database = storage !== "json";
   try {
     if (!database) removeStaleTemporaries(galleryPath);
     const staleAfter = 30 * 60 * 1000;
-    return (database ? readRuntimeDocument(dataDir, "gallery") : readJsonFile(galleryPath)).map(
-      (item) => {
-        let next = item;
-        if (
-          !database &&
-          next.status === "pending" &&
-          Date.now() - Date.parse(next.createdAt || 0) > staleAfter
-        ) {
-          next = { ...next, status: "canceled" };
-        }
-        // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
-        if (
-          next.type === "image" &&
-          !next.thumbnailUrl &&
-          typeof next.url === "string" &&
-          next.url.startsWith("/comfy/view?")
-        ) {
-          next = { ...next, thumbnailUrl: next.url.replace("/comfy/view?", "/comfy/thumb?") };
-        }
-        return next;
-      },
-    );
+    return readStoredGallery().map((item) => {
+      let next = item;
+      if (
+        !database &&
+        next.status === "pending" &&
+        Date.now() - Date.parse(next.createdAt || 0) > staleAfter
+      ) {
+        next = { ...next, status: "canceled" };
+      }
+      // Backfill thumbnailUrl for items saved before the thumbnail pipeline existed.
+      if (
+        next.type === "image" &&
+        !next.thumbnailUrl &&
+        typeof next.url === "string" &&
+        next.url.startsWith("/comfy/view?")
+      ) {
+        next = { ...next, thumbnailUrl: next.url.replace("/comfy/view?", "/comfy/thumb?") };
+      }
+      return next;
+    });
   } catch (error) {
     if (database && error.code !== "ENOENT") throw error;
     return [];
@@ -151,9 +181,7 @@ function loadHiddenGalleryIds() {
   return markers;
 }
 
-export function galleryKey(item) {
-  return item?.url || item?.id || item?.outputName || item?.filename || "";
-}
+export { galleryKey };
 
 export function galleryRevisionValue() {
   return galleryRevision;
@@ -700,11 +728,12 @@ export function hasExistingOutputFile(item) {
 }
 
 /**
- * Saving. A large gallery is tens of megabytes of JSON, so changes are
- * gathered for a moment and turned into compact text in the background (see
- * jsonTextAsync): the server keeps answering while it saves. The file is
- * still replaced whole, with the previous copy kept as .bak, and a save that
- * is due when the server stops is written before it exits.
+ * Saving. Changes are gathered for a moment, and a save that is due when the
+ * server stops is written before it exits. Row storage writes only the items
+ * that changed. The file and the document hold the whole gallery, tens of
+ * megabytes of JSON, so they are turned into compact text in the background
+ * (see jsonTextAsync) and replaced whole, the file keeping its previous copy as
+ * .bak.
  */
 const saveDelayMs = Math.max(0, Number(process.env.STUDIO_GALLERY_SAVE_MS ?? 1000));
 let saveTimer = null;
@@ -726,6 +755,23 @@ function persistableGallery() {
     if (items.length >= galleryLimit) break;
   }
   return items;
+}
+
+/** Row storage: upserts the items that changed since the last save and deletes the ones gone. */
+function writeChangedRows() {
+  const current = new Map();
+  for (const item of gallery) {
+    const key = galleryKey(item);
+    if (key && !current.has(key)) current.set(key, item);
+    if (current.size >= galleryLimit) break;
+  }
+  const changed = [];
+  for (const [key, item] of current)
+    if (savedRows.get(key) !== item) changed.push(item.preview ? withoutPreview(item) : item);
+  const removed = [...savedRows.keys()].filter((key) => !current.has(key));
+  if (changed.length || removed.length)
+    writeGalleryRows(runtimeDatabase(dataDir), changed, removed);
+  savedRows = current;
 }
 
 export function saveGallery() {
@@ -753,16 +799,21 @@ export async function flushGallery() {
   const sequence = (writeSequence += 1);
   const changes = changeCount;
   writing = (
-    usesRuntimeDatabase(dataDir)
-      ? jsonTextAsync(persistableGallery()).then((text) => {
-          // A blocking save (writeGalleryNow) may have landed while the text was made.
-          if (sequence <= committedSequence) return false;
-          writeRuntimeText(dataDir, "gallery", text);
+    storage === "rows"
+      ? Promise.resolve().then(() => {
+          writeChangedRows();
           return true;
         })
-      : writeJsonFileAsync(galleryPath, persistableGallery(), {
-          shouldCommit: () => sequence > committedSequence,
-        })
+      : storage === "document"
+        ? jsonTextAsync(persistableGallery()).then((text) => {
+            // A blocking save (writeGalleryNow) may have landed while the text was made.
+            if (sequence <= committedSequence) return false;
+            writeRuntimeText(dataDir, "gallery", text);
+            return true;
+          })
+        : writeJsonFileAsync(galleryPath, persistableGallery(), {
+            shouldCommit: () => sequence > committedSequence,
+          })
   )
     .then((replaced) => {
       if (replaced) committedSequence = sequence;
@@ -818,8 +869,8 @@ function writeGalleryNow() {
   const sequence = (writeSequence += 1);
   const changes = changeCount;
   try {
-    if (usesRuntimeDatabase(dataDir))
-      writeRuntimeDocument(dataDir, "gallery", persistableGallery());
+    if (storage === "rows") writeChangedRows();
+    else if (storage === "document") writeRuntimeDocument(dataDir, "gallery", persistableGallery());
     else writeJsonFile(galleryPath, persistableGallery(), { compact: true });
   } catch (error) {
     saveFailure = error;
