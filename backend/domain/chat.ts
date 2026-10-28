@@ -38,6 +38,8 @@ interface ChatOptions {
   taste?: (ownerId: string) => string;
   fetchImpl?: typeof fetch;
 }
+/** Separate images (different outfits or settings) one turn may request. */
+const maxActions = 4;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const contextKeys = [
   "profileId",
@@ -129,7 +131,7 @@ const tool = {
   function: {
     name: "request_media",
     description:
-      "Generate media ONLY when the user explicitly asks to create, change or animate media. Use image for a new image, refine for a change to an earlier image, and animate for motion. Refine and animate use the selected parent or the latest completed session result. Discussion and questions need text only. Preserve the selected model and settings; never substitute a model.",
+      "Generate media ONLY when the user explicitly asks to create, change or animate media. Use image for a new image, refine for a change to an earlier image, and animate for motion. Refine and animate use the selected parent or the latest completed session result. Call it once for each different image the user asks for (other outfits, settings or poses), up to 4 calls in one turn; use count for several images of one prompt. Discussion and questions need text only. Preserve the selected model and settings; never substitute a model.",
     parameters: {
       type: "object",
       properties: {
@@ -384,9 +386,9 @@ export class ChatService {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "",
-        argumentsText = "",
-        functionName = "",
         completed = false;
+      // Tool calls by index: one request_media call per distinct image, up to `maxActions`.
+      const calls: { name: string; arguments: string }[] = [];
       try {
         frames: while (true) {
           const chunk = await reader.read();
@@ -426,13 +428,20 @@ export class ChatService {
               emit({ event: "delta", data: { id: assistant.id, text: delta.content } });
             }
             for (const call of delta?.tool_calls || []) {
-              if (call.index !== 0)
-                throw failure("The assistant requested more than one generation in a turn.", 502);
-              functionName += call.function?.name || "";
-              argumentsText += call.function?.arguments || "";
+              const index = Number(call.index) || 0;
+              if (index >= maxActions)
+                throw failure(
+                  `The assistant requested more than ${maxActions} generations in a turn.`,
+                  502,
+                );
+              calls[index] ||= { name: "", arguments: "" };
+              calls[index].name += call.function?.name || "";
+              calls[index].arguments += call.function?.arguments || "";
             }
             if (
-              assistant.content.length + (assistant.thinking?.length || 0) + argumentsText.length >
+              assistant.content.length +
+                (assistant.thinking?.length || 0) +
+                calls.reduce((sum, call) => sum + call.arguments.length, 0) >
               256_000
             )
               throw failure("The assistant response exceeded its limit.", 502);
@@ -444,19 +453,24 @@ export class ChatService {
       signal.throwIfAborted();
       if (!completed)
         throw failure("The text gateway disconnected before completing its answer.", 502);
-      if (functionName || revision) {
-        if (functionName && functionName !== "request_media")
-          throw failure("Unknown assistant action.", 502);
-        const action = revision
-          ? { operation: revision.operation, prompt: revision.input.prompt }
-          : JSON.parse(argumentsText);
-        if (
-          !["image", "refine", "animate"].includes(action.operation) ||
-          typeof action.prompt !== "string" ||
-          !action.prompt.trim()
+      const requested = calls.filter(Boolean);
+      if (requested.some((call) => call.name !== "request_media"))
+        throw failure("Unknown assistant action.", 502);
+      // A card revision is its own single action; otherwise each call is one generation.
+      const actions = revision
+        ? [{ operation: revision.operation, prompt: revision.input.prompt }]
+        : requested.map((call) => JSON.parse(call.arguments || "{}"));
+      if (
+        actions.some(
+          (action) =>
+            !["image", "refine", "animate"].includes(action.operation) ||
+            typeof action.prompt !== "string" ||
+            !action.prompt.trim(),
         )
-          throw failure("The assistant returned an invalid media request.", 502);
-        assistant.draft = {
+      )
+        throw failure("The assistant returned an invalid media request.", 502);
+      for (const [index, action] of actions.entries()) {
+        const draft: ChatDraft = {
           ...(revision ? { parentJobId: revision.sourceJobId } : input.generation),
           operation: action.operation,
           input: revision
@@ -468,6 +482,8 @@ export class ChatService {
                 ...(action.count === undefined ? {} : { count: action.count }),
               },
         };
+        // The reply keeps its first action; later ones join the chat as their own cards.
+        if (index === 0) assistant.draft = draft;
         if (!assistant.content) {
           assistant.content =
             action.operation === "animate"
@@ -482,26 +498,31 @@ export class ChatService {
           const { job, note } = await this.options.admit({
             ownerId,
             sessionId,
-            turnId: assistant.id,
-            draft: assistant.draft,
+            turnId: index === 0 ? assistant.id : crypto.randomUUID(),
+            draft,
             revision,
           });
           // Animate's own pick says where it went when the user chose no video model.
-          if (note) {
+          if (note && index === 0) {
             const text = `${assistant.content ? "\n\n" : ""}${note}`;
             assistant.content += text;
             emit({ event: "delta", data: { id: assistant.id, text } });
           }
-          assistant.jobId = job.id;
-          assistant.draft = {
-            operation: assistant.draft.operation,
-            input: job.input,
-            parentJobId: job.parentJobId,
-          };
+          if (index === 0) {
+            assistant.jobId = job.id;
+            assistant.draft = {
+              operation: draft.operation,
+              input: job.input,
+              parentJobId: job.parentJobId,
+            };
+          }
           emit({ event: "generation", data: { job } });
         } catch (error) {
-          assistant.actionError =
+          const message =
             error instanceof Error ? error.message : "Generation could not be started.";
+          assistant.actionError = assistant.actionError
+            ? `${assistant.actionError}\n${message}`
+            : message;
         }
       }
       assistant.status = "completed";
