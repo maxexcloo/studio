@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { uncensoredMarker } from "./uncensored-marker.js";
+import { uncensoredMarker, upscaleFeature } from "./uncensored-marker.js";
 
 test("the old nsfw marker becomes uncensored in profiles, the catalogue and groups, once", () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-uncensored-"));
@@ -56,4 +56,24 @@ test("the old nsfw marker becomes uncensored in profiles, the catalogue and grou
   });
   const again = uncensoredMarker(dataDir);
   assert.deepEqual([again.profiles, again.files, again.accessProfiles], [[], {}, []]);
+});
+
+test("existing groups get Upscale on, once, and a group that has it keeps its choice", () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-upscale-"));
+  const file = path.join(dataDir, "accounts.json");
+  const profiles = () => JSON.parse(fs.readFileSync(file, "utf8")).profiles;
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      profiles: { user: { features: { gallery: true } }, off: { features: { upscale: false } } },
+    }),
+  );
+  assert.deepEqual(upscaleFeature(dataDir).accessProfiles, ["user"]);
+  assert.equal(profiles().user.features.upscale, undefined, "a dry run writes nothing");
+  upscaleFeature(dataDir, { apply: true });
+  assert.deepEqual(profiles(), {
+    user: { features: { gallery: true, upscale: true } },
+    off: { features: { upscale: false } },
+  });
+  assert.deepEqual(upscaleFeature(dataDir).accessProfiles, []);
 });

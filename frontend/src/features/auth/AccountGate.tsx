@@ -37,6 +37,11 @@ export function useIsAdmin() {
   const { data } = useAccount();
   return !!data && (data.mode !== "multi-user" || data.account?.role === "administrator");
 }
+/** Whether the account may upscale (Upscale and Finish Starred Images). */
+export function useMayUpscale() {
+  const { data } = useAccount();
+  return useIsAdmin() || data?.account?.features?.upscale === true;
+}
 export const ownAccountQuery = queryOptions({
   queryKey: ["own-account"],
   queryFn: () => api<{ account: Account; mcp?: McpTokenStatus }>("/api/accounts/me"),
