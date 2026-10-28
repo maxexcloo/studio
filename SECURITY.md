@@ -30,10 +30,6 @@ Deployments run Studio in account mode (`STUDIO_MULTI_USER=1`, see [Configuratio
 - **Workflows** you import can contain custom nodes that run code, read or write any file, or go online; the import review names them. A workflow runs every node in it with ComfyUI's access to its computer, so only import workflows from people you trust.
 - **No telemetry.** Studio talks to your ComfyUI, to Hugging Face or Civitai when you ask it to download something, and to the catalogue, text and cloud provider endpoints an administrator configures.
 
-## Reporting a vulnerability
-
-Please report security issues privately through a [GitHub security advisory](https://github.com/maxexcloo/studio/security/advisories/new) rather than a public issue.
-
 ## Single-user mode
 
 Only without accounts (`STUDIO_MULTI_USER` unset), for development on your own computer. It answers only the computer running Studio, which also looks after it; there is no sign-in. A request from any other address, or one that carries `X-Forwarded-For`, `Forwarded`, `X-Real-IP`, `Via` or a similar proxy header, is refused, even when the proxy runs on the same computer. Use account mode for any other device.
