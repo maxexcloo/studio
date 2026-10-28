@@ -19,11 +19,40 @@ export const runtimeStatusQuery = queryOptions({
   // Follow a running change closely; otherwise refresh with the service status.
   refetchInterval: (query) => (query.state.data?.operation ? 2000 : 15000),
 });
-const phaseColour = (phase: WorkloadPhase) =>
+/** Applies a previewed placement; the signature proves nothing changed since the preview. */
+export const applyPlacement = (plan: RuntimePreview) =>
+  post<RuntimeOperation>("/api/runtime/apply", {
+    workloads: plan.target,
+    signature: plan.signature,
+  });
+
+/** What a previewed placement stops, starts and keeps, for its confirmation. */
+export function PlacementChanges({
+  preview,
+  label,
+}: {
+  preview: RuntimePreview;
+  label: (id: string) => string;
+}) {
+  const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
+  return (
+    <Stack gap={4}>
+      <Text size="sm">Stop: {names(preview.stop)}</Text>
+      <Text size="sm">Start: {names(preview.start)}</Text>
+      <Text size="sm">Keep: {names(preview.keep)}</Text>
+      <Text size="xs" c="dimmed">
+        Studio waits for accepted work on stopping workloads to finish and save, then stops them
+        before it starts the others.
+      </Text>
+    </Stack>
+  );
+}
+
+export const phaseColour = (phase: WorkloadPhase) =>
   ({ running: "green", starting: "yellow", stopping: "yellow", stopped: "gray", unknown: "red" })[
     phase
   ];
-const phaseLabel = (phase: WorkloadPhase) =>
+export const phaseLabel = (phase: WorkloadPhase) =>
   ({
     running: "Running",
     starting: "Starting",
@@ -55,11 +84,7 @@ export function RuntimeWorkloads() {
     onSuccess: setPreview,
   });
   const applying = useMutation({
-    mutationFn: (plan: RuntimePreview) =>
-      post<RuntimeOperation>("/api/runtime/apply", {
-        workloads: plan.target,
-        signature: plan.signature,
-      }),
+    mutationFn: applyPlacement,
     meta: { inlineError: true },
     onSuccess: () => {
       setPreview(null);
@@ -217,17 +242,7 @@ export function RuntimeWorkloads() {
           applying.reset();
         }}
       >
-        {preview && (
-          <Stack gap={4}>
-            <Text size="sm">Stop: {names(preview.stop)}</Text>
-            <Text size="sm">Start: {names(preview.start)}</Text>
-            <Text size="sm">Keep: {names(preview.keep)}</Text>
-            <Text size="xs" c="dimmed">
-              Studio waits for accepted work on stopping workloads to finish and save, then stops
-              them before it starts the others.
-            </Text>
-          </Stack>
-        )}
+        {preview && <PlacementChanges preview={preview} label={label} />}
       </ConfirmDialog>
       <ConfirmDialog
         opened={Boolean(restarting)}

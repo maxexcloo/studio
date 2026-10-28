@@ -60,6 +60,7 @@ export function kubernetesWorkloads(environment: Environment) {
       gpus: record.gpus!,
       url: record.url!.replace(/\/$/, ""),
       ...(record.apiKeyEnv ? { apiKeyEnv: record.apiKeyEnv } : {}),
+      ...(record.kind === "text" && record.model ? { model: record.model } : {}),
       ...(record.worker ? { worker: record.worker } : {}),
       ...(record.capabilities ? { capabilities: record.capabilities } : {}),
     };

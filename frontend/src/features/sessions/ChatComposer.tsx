@@ -1,20 +1,104 @@
-import { ActionIcon, Alert, Group, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Alert, Badge, CloseButton, Group, Loader, Text, Tooltip } from "@mantine/core";
 import { ArrowUp, Square } from "lucide-react";
+import { useIsMutating } from "@tanstack/react-query";
+import type { ChatModel } from "../../../../shared/chat";
+import type { WorkloadPhase } from "../../../../shared/runtime";
+import { useIsAdmin } from "../auth/AccountGate";
+import { ChipOption, ChipSelect } from "../generation/ChipSelect";
 import { ComposerDock } from "../generation/ComposerDock";
+import railClasses from "../generation/GenerationInputControls.module.css";
 import { usePromptIdeas } from "../generation/PromptIdeas";
 import { ReferencePicker } from "../generation/ReferencePicker";
+import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
+import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { useChat } from "./ChatProvider";
-import { useIsMutating } from "@tanstack/react-query";
 import classes from "./ChatComposer.module.css";
+
+/**
+ * The composer's text model chip. Administrators also see models whose Studio workloads are
+ * stopped: choosing one starts it (asking first when that stops others) and selects it once ready.
+ */
+function ChatModelPicker({
+  disabled,
+  runtime,
+}: {
+  disabled: boolean;
+  runtime: ReturnType<typeof useWorkloadStart>;
+}) {
+  const { status, modelId, selectModel } = useChat();
+  const models = status.data?.models || [];
+  const workloads = runtime.status.data?.workloads;
+  /** A Studio-served model runs while any of its workloads does. */
+  const phase = (model?: ChatModel): WorkloadPhase | undefined => {
+    if (!model?.workloads?.length || !workloads) return undefined;
+    const phases = workloads
+      .filter((item) => model.workloads!.includes(item.id))
+      .map((item) => item.phase);
+    return (
+      (["running", "starting", "stopping", "unknown"] as const).find((value) =>
+        phases.includes(value),
+      ) ?? "stopped"
+    );
+  };
+  const selected = models.find((model) => model.id === modelId);
+  const selectedPhase = phase(selected);
+  return (
+    <>
+      <ChipSelect
+        name="Chat Model"
+        target={{ disabled: !models.length || disabled }}
+        searchable={models.length > 8}
+        nothingFoundMessage="No Matching Models"
+        data={models.map((model) => ({ value: model.id, label: model.label }))}
+        value={modelId || null}
+        renderOption={({ option, checked }) => {
+          const model = models.find((item) => item.id === option.value);
+          const state = phase(model);
+          return (
+            <ChipOption
+              label={option.label}
+              description={model?.provider}
+              checked={checked}
+              badges={
+                state &&
+                state !== "running" && (
+                  <Badge size="xs" variant="light" color={phaseColour(state)}>
+                    {phaseLabel(state)}
+                  </Badge>
+                )
+              }
+            />
+          );
+        }}
+        onChange={(id) => {
+          const model = models.find((item) => item.id === id);
+          if (!model) return;
+          if (model.workloads?.length && phase(model) !== "running")
+            void runtime.start(model.workloads, model.label, () => selectModel(model.id));
+          else selectModel(model.id);
+        }}
+        swatch={selectedPhase && phaseColour(selectedPhase)}
+        title={[selected?.label, selected?.provider].filter(Boolean).join(" · ")}
+        label={selected?.label || "Model"}
+      />
+      {runtime.dialog}
+    </>
+  );
+}
+
+/** The Chat prompt box: the message above a short chip rail (References, Model) and Send/Stop. */
 function ChatComposer() {
-  const { text, setText, send, sendingSession, stop, status, modelId, selectModel } = useChat();
+  const { text, setText, send, sendingSession, stop, status } = useChat();
   const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
   const unavailable =
     uploadingReferences || status.isPending || status.isError || status.data?.available === false;
-  const models = status.data?.models || [];
   const phone = usePhone();
+  const admin = useIsAdmin();
+  const runtime = useWorkloadStart(
+    admin && !!status.data?.models.some((model) => model.workloads?.length),
+  );
   const ideas = usePromptIdeas({
     kind: "image",
     empty: !text.trim(),
@@ -31,65 +115,35 @@ function ChatComposer() {
         void send();
       }}
     >
-      <Group wrap="nowrap" gap={4} align="center">
-        <ReferencePicker compact />
-        <div className={classes.message} {...ideas.focusProps}>
-          <TextBox
-            aria-label="Message"
-            placeholder="Message Studio…"
-            variant="unstyled"
-            autosize
-            minRows={1}
-            maxRows={5}
-            className={classes.writing}
-            value={text}
-            onChange={setText}
-            overlay={ideas.ideas}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                if (!sendingSession && !unavailable) void send();
-              }
-            }}
-          />
-        </div>
-        <Select
-          aria-label="Chat Model"
-          placeholder="Model"
-          data={models.map((model) => ({ value: model.id, label: model.label }))}
-          value={modelId || null}
-          onChange={selectModel}
-          allowDeselect={false}
-          disabled={!models.length || !!sendingSession}
+      <div className={classes.message} {...ideas.focusProps}>
+        <TextBox
+          aria-label="Message"
+          placeholder="Message Studio…"
           variant="unstyled"
-          size="xs"
-          searchable={models.length > 8}
-          // Sizes the field to the chosen model's name where `field-sizing` is unsupported.
-          style={{
-            "--model-chars": Math.max(
-              5,
-              models.find((model) => model.id === modelId)?.label.length || 0,
-            ),
+          autosize
+          minRows={1}
+          maxRows={6}
+          className={classes.writing}
+          value={text}
+          onChange={setText}
+          overlay={ideas.ideas}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              if (!sendingSession && !unavailable) void send();
+            }
           }}
-          maw={{ base: 112, sm: 220 }}
-          miw={0}
-          className={classes.model}
-          comboboxProps={{ withinPortal: true, width: 280, position: "top-end" }}
-          renderOption={({ option }) => (
-            <Stack gap={0}>
-              <Text size="sm">{option.label}</Text>
-              {models.find((model) => model.id === option.value)?.provider && (
-                <Text size="xs" c="dimmed">
-                  {models.find((model) => model.id === option.value)?.provider}
-                </Text>
-              )}
-            </Stack>
-          )}
         />
+      </div>
+      <Group wrap="nowrap" gap="xs" justify="space-between" align="flex-end">
+        <div className={railClasses.rail} role="group" aria-label="Chat Inputs">
+          <ReferencePicker />
+          <ChatModelPicker disabled={!!sendingSession} runtime={runtime} />
+        </div>
         {sendingSession ? (
           <Tooltip label="Stop Response">
-            <ActionIcon aria-label="Stop Response" variant="default" size={44} onClick={stop}>
-              <Square size={17} />
+            <ActionIcon aria-label="Stop Response" variant="default" onClick={stop}>
+              <Square size={16} />
             </ActionIcon>
           </Tooltip>
         ) : (
@@ -98,14 +152,32 @@ function ChatComposer() {
               type="submit"
               aria-label="Send Message"
               disabled={!text.trim() || unavailable}
-              size={44}
               variant="filled"
             >
-              <ArrowUp size={20} />
+              <ArrowUp size={18} />
             </ActionIcon>
           </Tooltip>
         )}
       </Group>
+      {runtime.starting && (
+        <Group gap={6} wrap="nowrap" className={classes.starting} role="status">
+          {runtime.starting.error ? (
+            <>
+              <Text size="xs" c="red" flex={1}>
+                Couldn’t start {runtime.starting.label}: {runtime.starting.error}
+              </Text>
+              <CloseButton size="sm" aria-label="Dismiss" onClick={runtime.dismiss} />
+            </>
+          ) : (
+            <>
+              <Loader size={12} color="gray" />
+              <Text size="xs" c="dimmed" flex={1} lineClamp={2}>
+                Starting {runtime.starting.label}: {runtime.starting.progress}
+              </Text>
+            </>
+          )}
+        </Group>
+      )}
     </form>
   );
 }

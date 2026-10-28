@@ -1,19 +1,20 @@
 import { useState, type ReactNode } from "react";
 import {
+  ActionIcon,
   Alert,
   Badge,
-  Button,
   Group,
   NavLink,
   Stack,
   Text,
   Title,
-  type ButtonProps,
+  Tooltip,
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
-import { Link, useMatch } from "react-router";
+import { SquarePen, X } from "lucide-react";
+import { Link, useMatch, useNavigate } from "react-router";
 import { EmptyState } from "../../ui/EmptyState";
+import { SectionHeading } from "../../ui/SectionHeading";
 import type { Session } from "../../types";
 import { initialInput, useGenerationActions } from "../generation/GenerationProvider";
 import { ChatMenu, ChatRename, chatTitle } from "./ChatActions";
@@ -21,6 +22,9 @@ import { sessionsQuery } from "./queries";
 import classes from "./ChatWorkspace.module.css";
 
 export const chatShellClass = classes.shell;
+
+/** Opens the header's Chats list, for phones, which have no sidebar. */
+export const openChatsEvent = "studio-open-chats";
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 /** The time for today's chats, otherwise the date (with the year once it differs). */
@@ -66,23 +70,33 @@ function ChatRow({
   );
 }
 
-/** New Chat: an empty draft on `/chat`, ready for the first message. */
-export function NewChatButton({ onClick, ...props }: ButtonProps & { onClick?: () => void }) {
+/** Leaves the open chat for an empty draft on `/chat`, where the first message starts a new one. */
+function useNewChat() {
   const { setDraft } = useGenerationActions();
+  const navigate = useNavigate();
+  return () => {
+    setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
+    void navigate("/chat");
+  };
+}
+
+/** New Chat as a small icon action beside the Chats heading; `onDone` closes the phone sheet. */
+export function NewChatAction({ onDone }: { onDone?: () => void }) {
+  const newChat = useNewChat();
   return (
-    <Button
-      component={Link}
-      to="/chat"
-      variant="default"
-      leftSection={<Plus size={16} />}
-      {...props}
-      onClick={() => {
-        setDraft({ input: initialInput, sessionId: "", references: [], operation: "image" });
-        onClick?.();
-      }}
-    >
-      New Chat
-    </Button>
+    <Tooltip label="New Chat">
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label="New Chat"
+        onClick={() => {
+          newChat();
+          onDone?.();
+        }}
+      >
+        <SquarePen size={18} />
+      </ActionIcon>
+    </Tooltip>
   );
 }
 
@@ -99,7 +113,7 @@ function period(value: string) {
   return "Older";
 }
 
-/** New Chat and the account's Chats under date headings, in the desktop sidebar and the phone Drawer. */
+/** The account's Chats under date headings, in the desktop sidebar and the phone Drawer. */
 export function SessionList({ close = () => {} }: { close?: () => void }) {
   const id = useMatch("/chat/:id")?.params.id;
   const sessions = useQuery(sessionsQuery);
@@ -110,7 +124,6 @@ export function SessionList({ close = () => {} }: { close?: () => void }) {
   }
   return (
     <Stack gap={4} flex={1} mih={0}>
-      <NewChatButton mb="xs" onClick={close} />
       {sessions.error ? (
         <Alert color="red">{sessions.error.message}</Alert>
       ) : sessions.data?.sessions.length === 0 ? (
@@ -136,7 +149,10 @@ export function SessionList({ close = () => {} }: { close?: () => void }) {
   );
 }
 
-/** The open chat's title with Rename and Delete; follows the list so generated titles arrive. */
+/**
+ * The open chat's title with Rename and Delete, and a close cross back to No Chat Selected;
+ * follows the list so generated titles arrive.
+ */
 function ChatHeading({ session }: { session: Session }) {
   const listed = useQuery({
     ...sessionsQuery,
@@ -144,6 +160,7 @@ function ChatHeading({ session }: { session: Session }) {
   }).data;
   const current = listed || session;
   const [renaming, setRenaming] = useState(false);
+  const newChat = useNewChat();
   return (
     <Group gap={4} wrap="nowrap" mb="sm" mih={36} className={classes.heading}>
       {renaming ? (
@@ -159,6 +176,17 @@ function ChatHeading({ session }: { session: Session }) {
             </Badge>
           )}
           <ChatMenu session={current} onRename={() => setRenaming(true)} />
+          <Tooltip label="Close Chat">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              aria-label="Close Chat"
+              ml="auto"
+              onClick={newChat}
+            >
+              <X size={18} />
+            </ActionIcon>
+          </Tooltip>
         </>
       )}
     </Group>
@@ -169,6 +197,10 @@ export function ChatWorkspace({ children, session }: { children: ReactNode; sess
   return (
     <div className={classes.workspace} data-chat-workspace>
       <aside className={classes.sidebar} aria-label="Chats">
+        <Group justify="space-between" wrap="nowrap" className={classes.sidebarHeading}>
+          <SectionHeading>Chats</SectionHeading>
+          <NewChatAction />
+        </Group>
         <SessionList />
       </aside>
       <div className={classes.main}>

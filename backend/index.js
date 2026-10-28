@@ -70,7 +70,7 @@ import { registerProfileRoutes } from "./profile-routes.js";
 import { draftProfileFromImport } from "./profile-drafts.js";
 import { seedSamples } from "./profile-seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
-import { chatModelAllowed, chatSettings } from "./chat-settings.js";
+import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { familyFromName } from "./family-catalog.js";
 import {
@@ -2310,9 +2310,19 @@ const sessionChat = new ChatService({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated) return [];
     chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
-    return ((await chatGateway?.listModelDetails()) || []).filter((model) =>
+    const models = ((await chatGateway?.listModelDetails()) || []).filter((model) =>
       chatModelAllowed(model.id, settings.patterns),
     );
+    const workloads = runtime?.controller.workloads || [];
+    if (!models.some((model) => workloads.some((item) => item.model === model.id))) return models;
+    // Only administrators may start a stopped model, as in Settings › Workers.
+    const admin = !multiUserEnabled || account?.role === "administrator";
+    const running = admin
+      ? undefined
+      : (await runtime.controller.observe()).workloads
+          .filter((item) => item.phase === "running")
+          .map(({ id }) => id);
+    return servedChatModels(models, workloads, running);
   },
   revision: async (ownerId, sessionId, revision) => {
     const source = rewriteStore.job(ownerId, revision.sourceJobId);

@@ -16,6 +16,8 @@ export interface ChatModel {
   id: string;
   label: string;
   provider?: string;
+  /** Studio text workloads serving it, in start order; listed for administrators, who may start them. */
+  workloads?: string[];
 }
 export interface ChatStatus {
   available: boolean;

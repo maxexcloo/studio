@@ -257,6 +257,26 @@ test("automatic control never stops or starts text; an administrator's apply can
   (await controller.acquire("video-tp2")).release();
 });
 
+test("an explicit start uses a free GPU, else names what it stops, media before text", async () => {
+  const { kube, controller } = fixture(["image", "text"]);
+  const preview = await controller.previewStart(["video-tp2"]);
+  assert.deepEqual(
+    [preview.target, preview.stop, preview.start],
+    [["video-tp2"], ["image", "text"], ["video-tp2"]],
+  );
+  assert.deepEqual((await controller.previewStart(["gaming"])).stop, []);
+  // A running candidate needs nothing; otherwise the first that fits beside what runs starts.
+  assert.deepEqual((await controller.previewStart(["gaming", "text"])).start, []);
+  const media = fixture(["image", "video"]).controller;
+  const replace = await media.previewStart(["text"]);
+  assert.deepEqual([replace.stop, replace.start], [["image"], ["text"]]);
+  const free = fixture(["image"]).controller;
+  const fits = await free.previewStart(["video-tp2", "video"]);
+  assert.deepEqual([fits.stop, fits.start], [[], ["video"]]);
+  await assert.rejects(controller.previewStart([]), { status: 400 });
+  assert.deepEqual(kube.log, []);
+});
+
 test("restoring the last placement leaves text started outside Studio running", async () => {
   const { kube, controller } = fixture(["image", "video"], { automaticLifecycle: true });
   const preview = await controller.preview(["image", "video"]);
