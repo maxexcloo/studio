@@ -58,9 +58,10 @@ export function galleryJobResponse(account, id, settings = false) {
 
 /**
  * `jobChats(req)` maps the account's job IDs to the Chat that ran them, `{ id, title }`; items
- * carry it as `sessionId`, and `chat` (repeatable) filters by it.
+ * carry it as `sessionId`, and `chat` (repeatable) filters by it. `near(q)` resolves to a test for
+ * items that look like the search (domain/image-search.ts), or null.
  */
-export function registerGalleryReadRoutes(app, { jobChats }) {
+export function registerGalleryReadRoutes(app, { jobChats, near }) {
   /**
    * A gallery search from the query string, or null. `lora`, `model`, `size`
    * and `aspect` may repeat (any of them matches); `q` and `workflow` are
@@ -71,10 +72,12 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
       .map((item) => String(item ?? "").slice(0, 200))
       .filter(Boolean)
       .slice(0, 50);
-  function searchFilter(req) {
+  async function searchFilter(req) {
     const one = (value) => String((Array.isArray(value) ? value[0] : value) ?? "").slice(0, 200);
+    const q = one(req.query.q);
     return galleryFilter({
-      q: one(req.query.q),
+      q,
+      near: await near(q),
       favorites: req.query.favorites === "1",
       workflow: one(req.query.workflow),
       ...Object.fromEntries(
@@ -148,7 +151,7 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
     });
   });
 
-  app.get("/api/gallery", (req, res) => {
+  app.get("/api/gallery", async (req, res) => {
     if (!requireGalleryAccess(req, res))
       return res.json({
         items: [],
@@ -165,7 +168,7 @@ export function registerGalleryReadRoutes(app, { jobChats }) {
     const includeFailed = req.query.includeFailed !== "0";
     const chats = jobChats(req);
     const chatIds = many(req.query.chat);
-    const search = searchFilter(req);
+    const search = await searchFilter(req);
     const page = pageGallery({
       type,
       limit: limit || 200,
