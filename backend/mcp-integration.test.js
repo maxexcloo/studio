@@ -2411,6 +2411,16 @@ test("Models indexes every compatible LoRA compactly and details only the LoRAs 
     data(await call(client, "Models", { profile_id: imageProfile.id, lora_query: "glowfx" })),
     { id: imageProfile.id, loras: [full], loras_total: 2 },
   );
+  // Without a model, one lookup searches every ready profile and says which take each LoRA.
+  const across = data(
+    await call(client, "Models", { lora_names: ["Fixture Effect", "fixture-glow"] }),
+  );
+  assert.deepEqual(across.loras, [{ ...full, profiles: [imageProfile.id] }]);
+  assert.deepEqual(across.missing, ["fixture-glow"]);
+  assert.deepEqual(
+    data(await call(client, "Models", { lora_query: "glowfx" })).loras.map((lora) => lora.name),
+    ["fixture-effect"],
+  );
   assert.deepEqual(
     data(
       await call(client, "Models", {
