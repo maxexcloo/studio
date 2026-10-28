@@ -24,7 +24,7 @@ export interface Action {
   keepOpen?: boolean;
   /**
    * Its options: a submenu in menus. In bars, with `onClick` a split button whose chevron opens
-   * them (Recreate ▾, Copy ▾); without, the icon opens them (Animate).
+   * them (Prompt ▾, Copy ▾); without, the icon opens them (Animate).
    */
   menu?: ActionGroups;
   /** A line above the options, such as the model Animate runs on. */

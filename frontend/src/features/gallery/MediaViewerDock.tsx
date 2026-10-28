@@ -13,7 +13,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, RefreshCw } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
-import { ComposerDock } from "../generation/ComposerDock";
 import { useDraftSubmit } from "../generation/GenerationForm";
 import { GenerationProvider, useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -77,7 +76,7 @@ const steppable = (item: MediaItem | undefined, assistant: boolean): item is Med
 
 /**
  * Taste-led next steps for a finished image. Placeholder chips hold the row while they load; a
- * chip puts its rewritten prompt in the viewer's composer and generates it at once, and More Next
+ * chip generates its rewritten prompt with the item's settings at once, and More Next
  * Steps asks for different ones. The neighbour's steps are fetched once these have arrived.
  */
 function NextSteps({
@@ -155,11 +154,10 @@ function NextSteps({
 }
 
 /**
- * The viewer's composer: the page's composer, collapsed to its bar, in its own GenerationProvider
- * so its draft never touches the page's. It is prefilled with the item's settings whenever the item
- * changes, and its runs join the strip.
+ * The next steps' draft, in its own GenerationProvider so it never touches the page's: the item's
+ * settings, refilled whenever the item changes. Its runs join the strip.
  */
-function ItemComposer({
+function ItemNextSteps({
   item,
   neighbour,
   sessionId,
@@ -172,7 +170,6 @@ function ItemComposer({
 }) {
   const { setDraft, profiles } = useGeneration();
   const client = useQueryClient();
-  const assistant = useQuery(assistantQuery);
   useEffect(() => {
     setDraft((previous) => ({
       ...previous,
@@ -188,19 +185,10 @@ function ItemComposer({
       current = false;
     };
   }, [item.id, profiles.length > 0]);
-  return (
-    <>
-      {steppable(item, Boolean(assistant.data?.available)) && (
-        <NextSteps key={item.jobId} item={item} neighbour={neighbour} onQueued={onQueued} />
-      )}
-      <div onClick={(event) => event.stopPropagation()}>
-        <ComposerDock embedded onSubmitted={onQueued} />
-      </div>
-    </>
-  );
+  return <NextSteps key={item.jobId} item={item} neighbour={neighbour} onQueued={onQueued} />;
 }
 
-/** The version strip, the actions and the viewer's own composer under the viewer image. */
+/** The version strip, the actions and the next steps under the viewer image. */
 export function MediaViewerDock({
   item,
   neighbour,
@@ -216,11 +204,11 @@ export function MediaViewerDock({
   family: Entry[];
   choose?: (item: MediaItem) => void;
   sessionId?: string;
-  /** A run queued from the viewer's composer, which joins the strip. */
+  /** A run queued from a next step, which joins the strip. */
   onQueued: (jobId: string) => void;
   actions: React.ReactNode;
 }) {
-  const ready = item.status === "done" && Boolean(item.url);
+  const assistant = useQuery(assistantQuery);
   // Only variations that arrive while this family is shown animate in, not those present on open.
   const root = family[0]?.key;
   const [shown, setShown] = useState(() => ({ root, keys: new Set(family.map(({ key }) => key)) }));
@@ -277,9 +265,9 @@ export function MediaViewerDock({
         </ScrollArea>
       )}
       {actions}
-      {ready && (
+      {steppable(item, Boolean(assistant.data?.available)) && (
         <GenerationProvider workspace="gallery">
-          <ItemComposer
+          <ItemNextSteps
             item={item}
             neighbour={neighbour}
             sessionId={sessionId}

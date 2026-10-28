@@ -129,10 +129,10 @@ export function GallerySelectionBar({
     const single = (id: ItemActionId) =>
       one.find((action) => action.id === id) ?? itemAction(id, { disabled: true });
     return itemActionGroups([
+      single("chat"),
+      single("prompt"),
       single("animate"),
       single("edit"),
-      single("recreate"),
-      single("reference"),
       (failed.length > 0 || busy === "retry") &&
         itemAction("retry", {
           disabled: pending || !failed.length,

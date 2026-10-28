@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, image, stamp, viewerAction } from "./fixtures";
+import { create, fixtures, image, stamp } from "./fixtures";
 
 test("Compare Variants from the composer queues one seeded set and starring the winner loads it", async ({
   page,
@@ -39,7 +39,7 @@ test("Compare Variants from the composer queues one seeded set and starring the 
   await expect(page.getByRole("button", { name: "Clear Seed 4242", exact: true })).toBeVisible();
 });
 
-test("Compare Variants from the viewer keeps the result's seed and opens variants in the viewer", async ({
+test("Compare Variants from the tile menu keeps the result's seed and opens variants in the viewer", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -58,8 +58,10 @@ test("Compare Variants from the viewer keeps the result's seed and opens variant
     settings,
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
-  await viewerAction(page, "Compare");
+  await page
+    .getByRole("button", { name: "Open image: An amber bird", exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Compare", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Compare Variants", exact: true });
   await expect(dialog).toContainText("Every variant uses seed 1234567.");
   await dialog.getByText("Steps & Guidance", { exact: true }).click();

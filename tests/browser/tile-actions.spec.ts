@@ -93,13 +93,13 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
-  // The viewer's sections and order: Animate, Edit, Recreate, Reference | Compare, Upscale |
-  // Copy, Download | Delete, Star.
+  // The viewer's sections and order, plus Compare: Chat, Prompt | Animate, Edit | Compare,
+  // Upscale | Copy, Download | Delete, Star.
   await expect(page.getByRole("menuitem")).toContainText([
+    "Chat",
+    "Prompt",
     "Animate",
     "Edit",
-    "Recreate",
-    "Reference",
     "Compare",
     "Upscale",
     "Copy",
@@ -117,9 +117,9 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeVisible();
   await expect(page.getByRole("menu").locator(":focus")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Animate", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Chat", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Prompt", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(more).toBeFocused();
 });
@@ -131,8 +131,12 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    if (operation === "Animate")
-      await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
+    await page
+      .getByRole("menuitem", {
+        name: operation === "Animate" ? "Animate in Composer" : "Edit Image",
+        exact: true,
+      })
+      .click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
@@ -170,6 +174,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.reload();
   await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await page.locator("[data-composer-prompt]").click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
@@ -178,6 +183,35 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   expect(state.jobs[1].input).toMatchObject({
     operation: "refine",
     profileId: "image:test",
+    denoise: 0.65,
+    referenceAssets: [{ assetId: "asset-tile-bird", slot: "image" }],
+  });
+});
+
+test("A reference placed by hand applies the profile's reference-mode settings", async ({
+  page,
+}) => {
+  const state = await galleryFixture(page);
+  await serveProfiles(page, [
+    {
+      ...profiles[0],
+      defaults: { ...profiles[0].defaults, denoise: 1 },
+      imageModes: {
+        generate: { defaults: { denoise: 1 } },
+        reference: { defaults: { denoise: 0.65 } },
+      },
+    },
+    ...profiles.slice(1),
+  ]);
+  await page.reload();
+  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
+  await expect.poll(() => state.referenceRequests.length).toBe(1);
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
+  await page.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({
     denoise: 0.65,
     referenceAssets: [{ assetId: "asset-tile-bird", slot: "image" }],
   });
@@ -251,13 +285,14 @@ for (const surface of ["tile", "viewer"]) {
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
-      await viewerAction(page, "Reference");
+      await viewerAction(page, "Edit Options");
     } else {
       await page
         .getByRole("button", { name: "More Actions for A copper bird", exact: true })
         .click();
-      await page.getByRole("menuitem", { name: "Reference", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
     }
+    await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
     const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
     await expect(prompt).toHaveValue("Keep this separate visual direction");
