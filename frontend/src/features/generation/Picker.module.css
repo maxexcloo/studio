@@ -26,12 +26,15 @@
   animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
+/* The open filter panel scrolls within a cap so the picker's grid keeps room below it. */
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
   min-width: 0;
+  max-height: min(14rem, 30dvh);
+  overflow-y: auto;
 }
 
 @keyframes reveal {
