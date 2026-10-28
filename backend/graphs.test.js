@@ -103,7 +103,6 @@ test("legacy start images resize before upload and register their temporary copy
   assert.equal(meta.width % 8, 0);
   assert.deepEqual([body.width, body.height], [meta.width, meta.height]);
   assert.deepEqual(body.requestedSize, { width: 1024, height: 1024 });
-  assert.deepEqual(body.temporaryInputNames, [name]);
   assert.deepEqual(body.stagedInputNames, [name]);
   await uploadReferenceImage(url, { width: 1024, height: 1024, autoResizeInputs: false });
   assert.deepEqual(uploads[1], buffer);

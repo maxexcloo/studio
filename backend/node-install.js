@@ -1,6 +1,5 @@
-import fs from "node:fs";
 import path from "node:path";
-import { comfyModelsDir, missingNodes } from "./comfy.js";
+import { missingNodes } from "./comfy.js";
 import { nodePack } from "./node-packs.js";
 
 /**
@@ -9,59 +8,25 @@ import { nodePack } from "./node-packs.js";
  * upscale (SeedVR2) and the model families that run on a pack (Sana).
  */
 
-/** The ComfyUI folder itself, when it sits on this machine next to the models folder we found. */
-function comfyRootDir() {
-  const models = comfyModelsDir();
-  return models ? path.dirname(models) : "";
-}
-
-/** The local ComfyUI virtual environment, when Studio can see it. */
-function comfyPython(root) {
-  if (!root) return "";
-  return (
-    [
-      path.join(root, ".venv", "bin", "python"),
-      path.join(root, "venv", "bin", "python"),
-      path.join(root, "..", ".venv", "bin", "python"),
-    ].find((file) => fs.existsSync(file)) || ""
-  );
-}
-
-/** A reviewed node pack installed with the Python from its existing local environment. */
-export function packInstallPlan(pack, root = comfyRootDir()) {
-  const customNodes = root ? path.join(root, "custom_nodes") : "";
-  const python = comfyPython(root);
-  const cloned = Boolean(customNodes) && fs.existsSync(path.join(customNodes, pack.folder));
+/** A reviewed node pack cloned into ComfyUI's custom_nodes, with its requirements installed. */
+export function packInstallPlan(pack) {
   const source = pack.subdir ? `${pack.folder}.src` : pack.folder;
-  const fetchSteps = cloned
-    ? []
-    : [
-        `git clone ${pack.repository}${pack.subdir ? ` ${source}` : ""}`,
-        ...(pack.commit ? [`git -C ${source} checkout --detach ${pack.commit}`] : []),
-        ...(pack.subdir
-          ? [
-              `cp -R "${path.join(source, ...pack.subdir.split("/"))}" "${pack.folder}"`,
-              `rm -rf "${source}"`,
-            ]
-          : []),
-      ];
   const command = [
-    `cd "${customNodes || path.join("ComfyUI", "custom_nodes")}"`,
-    ...fetchSteps,
-    ...(pack.requirements !== false
+    `cd "${path.join("ComfyUI", "custom_nodes")}"`,
+    `git clone ${pack.repository}${pack.subdir ? ` ${source}` : ""}`,
+    ...(pack.commit ? [`git -C ${source} checkout --detach ${pack.commit}`] : []),
+    ...(pack.subdir
       ? [
-          `${python ? `"${python}"` : "python3"} -m pip install -r ${path.join(pack.folder, "requirements.txt")}`,
+          `cp -R "${path.join(source, ...pack.subdir.split("/"))}" "${pack.folder}"`,
+          `rm -rf "${source}"`,
         ]
       : []),
+    // python3, since many Linux systems have no `python`.
+    ...(pack.requirements !== false
+      ? [`python3 -m pip install -r ${path.join(pack.folder, "requirements.txt")}`]
+      : []),
   ].join(" && ");
-  return {
-    exact: Boolean(customNodes && python),
-    customNodesDir: customNodes,
-    python,
-    cloned,
-    needsGit: !cloned,
-    commands: [{ shell: "sh", label: "Terminal", command }],
-  };
+  return { commands: [{ shell: "sh", label: "Terminal", command }] };
 }
 
 /**

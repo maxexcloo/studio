@@ -2,13 +2,7 @@ import crypto from "node:crypto";
 import { mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  comfyRecentlyUnreachable,
-  comfyUrl,
-  localOutputFile,
-  noteComfyFetchError,
-  noteComfyReachable,
-} from "./comfy.js";
+import { comfyUrl, localOutputFile, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
@@ -228,19 +222,12 @@ function cachedThumbnail(key) {
     : null;
 }
 
-/** The original's bytes: from ComfyUI, or from disk while ComfyUI is not answering. */
+/** The original's bytes: Studio media from its folder, anything else from ComfyUI. */
 async function sourceBytes(filename, subfolder, type) {
   const params = new URLSearchParams({ filename, subfolder, type });
-  const local = async () => {
+  if (type === mediaType) {
     const file = localOutputFile(filename, subfolder, type);
-    return file ? fs.promises.readFile(file) : undefined;
-  };
-  // Studio media is only ever on this computer.
-  if (type === mediaType) return (await local()) || null;
-  // ComfyUI just failed to answer: skip the slow refused connection when the file is here.
-  if (comfyRecentlyUnreachable()) {
-    const bytes = await local();
-    if (bytes) return bytes;
+    return file ? fs.promises.readFile(file) : null;
   }
   try {
     const response = await fetch(`${comfyUrl}/view?${params}`, {
@@ -250,61 +237,8 @@ async function sourceBytes(filename, subfolder, type) {
     return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
   } catch (error) {
     noteComfyFetchError(error);
-    return local();
-  }
-}
-
-/*
- * The local copy of an output is only used when it is the file ComfyUI means.
- * If the output folder Studio reads isn't ComfyUI's (another install, a
- * moved folder), a file of the same name there is some other picture, and a
- * thumbnail made from it shows the wrong image while the viewer, which asks
- * ComfyUI, shows the right one. So ComfyUI is asked for one byte of the file,
- * which comes back with the file's full size, and the local copy is trusted
- * only when the sizes match. Remembered per file version, so it is one tiny
- * request per new output. With ComfyUI not answering, the disk is all there is.
- */
-const checkedLocal = new Map();
-
-export async function trustedLocalOutput(filename, subfolder = "", type = "output") {
-  const file = localOutputFile(filename, subfolder, type);
-  if (!file) return null;
-  // Studio media is the file itself; there is no ComfyUI copy to compare it with.
-  if (type === mediaType) return file;
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
     return null;
   }
-  const version = `${file}:${stat.size}:${stat.mtimeMs}`;
-  if (checkedLocal.has(version)) return checkedLocal.get(version) ? file : null;
-  if (comfyRecentlyUnreachable()) return file;
-  let same;
-  try {
-    const params = new URLSearchParams({ filename, subfolder, type });
-    const response = await fetch(`${comfyUrl}/view?${params}`, {
-      headers: { Range: "bytes=0-0" },
-      signal: AbortSignal.timeout(5000),
-    });
-    noteComfyReachable();
-    await response.body?.cancel().catch(() => {});
-    const total =
-      response.status === 206
-        ? Number(String(response.headers.get("content-range") || "").split("/")[1])
-        : response.ok
-          ? Number(response.headers.get("content-length"))
-          : NaN;
-    // ComfyUI doesn't have it at all: the local file belongs to some other folder.
-    if (response.status === 404) same = false;
-    else same = !Number.isFinite(total) || total <= 0 || total === stat.size;
-  } catch (error) {
-    noteComfyFetchError(error);
-    return file;
-  }
-  if (checkedLocal.size > 5000) checkedLocal.delete(checkedLocal.keys().next().value);
-  checkedLocal.set(version, same);
-  return same ? file : null;
 }
 
 /**
@@ -313,7 +247,7 @@ export async function trustedLocalOutput(filename, subfolder = "", type = "outpu
  * and hashing the full image on every request. A reused filename changes both.
  */
 async function localSource(filename, subfolder, type) {
-  const file = await trustedLocalOutput(filename, subfolder, type);
+  const file = localOutputFile(filename, subfolder, type);
   if (!file) return null;
   try {
     const stat = fs.statSync(file);

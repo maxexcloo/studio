@@ -18,7 +18,7 @@ import { mediaFile, mediaParams, mediaPath } from "./media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyOutputDir, localOutputFile } from "./comfy.js";
+import { localOutputFile } from "./comfy.js";
 import { defaultWorkerId } from "./workers.js";
 
 import {
@@ -28,7 +28,6 @@ import {
   writeJsonFile,
   writeJsonFileAsync,
 } from "./json-store.js";
-import { isInside } from "./paths.js";
 import {
   compareGalleryItems,
   compareGalleryKeys,
@@ -271,7 +270,7 @@ export function filterVisibleGallery(items) {
  * large gallery asks for page after page; filtering and sorting all of it for
  * each one made every page cost as much as the whole. The list is rebuilt when
  * anything it depends on changes: the gallery (its revision), hide markers,
- * the output folder, or a folder listing (a file added or deleted outside).
+ * or a folder listing (a file added or deleted outside).
  */
 let visibleCache = { key: "", lists: new Map() };
 
@@ -281,8 +280,7 @@ export const visibleListBuildCount = () => visibleListBuilds;
 
 function visibleItems({ type = "", includeFailed = true, uploads = false, filter = null } = {}) {
   refreshFolderListings();
-  const trusted = comfyOutputDir ? outputFolderTrusted() : true;
-  const key = `${galleryRevision}|${hiddenVersion}|${listingGeneration}|${comfyOutputDir}|${trusted}`;
+  const key = `${galleryRevision}|${hiddenVersion}|${listingGeneration}`;
   if (visibleCache.key !== key) visibleCache = { key, lists: new Map() };
   const listKey = `${type}|${includeFailed}|${uploads}`;
   let entry = visibleCache.lists.get(listKey);
@@ -470,43 +468,11 @@ export function importedImageFile(item) {
     : "";
 }
 
-export function outputFileCandidates(item, baseDir = comfyOutputDir) {
-  // Studio-owned media has exactly one place, whatever folder ComfyUI uses.
+/** Where an item's file is on this computer: Studio media has exactly one place. */
+export function outputFileCandidates(item) {
   const media = mediaParams(item?.url);
-  if (media) {
-    const file = mediaPath(media.filename, media.subfolder);
-    return file ? [file] : [];
-  }
-  if (!baseDir) return [];
-  const keys = [item?.url, item?.id, item?.outputName, item?.filename].filter(Boolean);
-  const candidates = [];
-  for (const key of keys) {
-    let filename = "";
-    let subfolder = "";
-    if (String(key).startsWith("/comfy/view?")) {
-      const params = new URLSearchParams(String(key).split("?")[1] || "");
-      filename = params.get("filename") || "";
-      subfolder = params.get("subfolder") || "";
-    } else if (String(key).startsWith("http")) {
-      try {
-        const parsed = new URL(String(key));
-        filename = parsed.searchParams.get("filename") || path.basename(parsed.pathname);
-        subfolder = parsed.searchParams.get("subfolder") || "";
-      } catch {
-        filename = path.basename(String(key));
-      }
-    } else {
-      filename = path.basename(String(key));
-    }
-    if (!filename || filename === "." || filename === "/") continue;
-    const base = path.resolve(baseDir);
-    const withSubfolder =
-      subfolder && path.basename(base).toLowerCase() !== path.basename(subfolder).toLowerCase()
-        ? path.resolve(base, subfolder, filename)
-        : path.resolve(base, filename);
-    candidates.push(withSubfolder);
-  }
-  return [...new Set(candidates)];
+  const file = media ? mediaPath(media.filename, media.subfolder) : null;
+  return file ? [file] : [];
 }
 
 let galleryFilesDeleted = () => {};
@@ -517,7 +483,6 @@ export function onGalleryFilesDeleted(listener) {
 
 export function deleteGalleryFiles(items) {
   galleryFilesDeleted(items);
-  const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   let deleted = 0;
   let skipped = 0;
   for (const item of items) {
@@ -544,74 +509,9 @@ export function deleteGalleryFiles(items) {
       } catch {
         skipped += 1;
       }
-      continue;
-    }
-    if (!base) continue;
-    for (const file of outputFileCandidates(item)) {
-      const resolved = path.resolve(file);
-      if (!isInside(base, resolved, { orSame: true })) {
-        skipped += 1;
-        continue;
-      }
-      try {
-        if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-          fs.unlinkSync(resolved);
-          deleted += 1;
-        }
-      } catch {
-        skipped += 1;
-      }
     }
   }
   return { deleted, skipped };
-}
-
-function outputFileExistsIn(item, baseDir) {
-  const base = path.resolve(baseDir);
-  return outputFileCandidates(item, base).some((file) => {
-    const resolved = path.resolve(file);
-    if (!isInside(base, resolved, { orSame: true })) return false;
-    try {
-      return fs.existsSync(resolved) && fs.statSync(resolved).isFile();
-    } catch {
-      return false;
-    }
-  });
-}
-
-/**
- * How many of the newest finished Comfy outputs actually sit in `baseDir`.
- * This is what tells a right output folder from a merely existing one.
- */
-export function outputFolderMatch(baseDir = comfyOutputDir, items = gallery, sampleSize = 12) {
-  if (!baseDir) return { checked: 0, found: 0 };
-  const sample = sortGallery(
-    items.filter((item) => item?.status === "done" && isComfyOutputItem(item)),
-  ).slice(0, sampleSize);
-  return {
-    checked: sample.length,
-    found: sample.filter((item) => outputFileExistsIn(item, baseDir)).length,
-  };
-}
-
-// A wrong output folder must never read as an empty gallery. Missing files only
-// hide cards once the folder has shown it holds at least one recent output.
-let folderTrust = { dir: "", checkedAt: 0, trusted: true };
-function outputFolderTrusted() {
-  const now = Date.now();
-  if (folderTrust.dir === comfyOutputDir && now - folderTrust.checkedAt < 15000)
-    return folderTrust.trusted;
-  let trusted = false;
-  try {
-    if (fs.statSync(comfyOutputDir).isDirectory()) {
-      const { checked, found } = outputFolderMatch();
-      trusted = checked === 0 || found > 0;
-    }
-  } catch {
-    trusted = false;
-  }
-  folderTrust = { dir: comfyOutputDir, checkedAt: now, trusted };
-  return trusted;
 }
 
 // Counts listing changes, so the cached page list notices a file added or deleted outside the app.
@@ -677,21 +577,6 @@ function folderListing(dir) {
   return names;
 }
 
-// Where an item's output could be, worked out once per item object (items are
-// replaced, never mutated) and output folder.
-const itemOutputPaths = new WeakMap();
-
-function outputPathsFor(item, base) {
-  const cached = itemOutputPaths.get(item);
-  if (cached?.base === base) return cached.paths;
-  const paths = outputFileCandidates(item, base)
-    .map((file) => path.resolve(file))
-    .filter((file) => isInside(base, file, { orSame: true }))
-    .map((file) => ({ file, dir: path.dirname(file), name: listedName(path.basename(file)) }));
-  itemOutputPaths.set(item, { base, paths });
-  return paths;
-}
-
 // Outputs this server just recorded as finished. A folder listing can lag
 // behind a new file (it is re-read at most once a second, and a network or
 // synced folder's own listing can trail by more), and a page or the reference
@@ -718,16 +603,8 @@ export function hasExistingOutputFile(item) {
     const freshAt = freshOutputs.get(galleryKey(item));
     return Boolean(freshAt && Date.now() - freshAt < freshOutputMs && fs.existsSync(file));
   }
-  if (!comfyOutputDir || !outputFolderTrusted()) return true;
-  const base = path.resolve(comfyOutputDir);
-  const paths = outputPathsFor(item, base);
-  if (paths.some(({ dir, name }) => Boolean(folderListing(dir)?.has(name)))) return true;
-  const freshAt = freshOutputs.get(galleryKey(item));
-  return Boolean(
-    freshAt &&
-    Date.now() - freshAt < freshOutputMs &&
-    paths.some(({ file }) => fs.existsSync(file)),
-  );
+  // Anything else is ComfyUI's to serve; Studio cannot see it.
+  return true;
 }
 
 /**

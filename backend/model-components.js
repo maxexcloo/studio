@@ -1,14 +1,7 @@
-import fs from "node:fs";
-import path from "node:path";
-import { modelFolders } from "./comfy.js";
-import { isGguf, readGgufHeader } from "./gguf.js";
-import { readSafetensorsHeader } from "./model-families.js";
-
 /**
- * Text encoders and VAEs, recognised the way ComfyUI recognises them: by tensor
- * names and shapes in the safetensors header (comfy/sd.py detect_te_model and
- * VAE.__init__). A remote ComfyUI only gives us file names, so each kind also
- * carries a filename pattern as the fallback.
+ * Text encoders and VAEs. ComfyUI recognises them by tensor names and shapes in
+ * the safetensors header (comfy/sd.py detect_te_model and VAE.__init__); the
+ * worker only gives Studio file names, so each kind carries a filename pattern.
  */
 
 /* ------------------------------------------------------------ Kinds */
@@ -44,7 +37,7 @@ export const encoderKinds = {
   llama31_8b: { label: "Llama 3.1 8B", name: /llama/i },
 };
 
-// VAE layouts are what the header can prove; `hint` is what only a name can add
+// VAE layouts group kinds whose shapes match exactly
 // (an SD1.5 and an SDXL VAE, a Flux and an SD3 VAE, or a Wan 2.1 and a Qwen-Image
 // VAE share their shapes exactly).
 export const vaeKinds = {
@@ -67,155 +60,6 @@ export const vaeKinds = {
   mage_flow: { label: "MageFlow VAE", layout: "mage" },
 };
 
-/* ------------------------------------------------------------ Headers */
-
-function keySet(header) {
-  return new Set(Object.keys(header || {}).filter((key) => key !== "__metadata__"));
-}
-
-function shape(header, key) {
-  return Array.isArray(header?.[key]?.shape) ? header[key].shape : [];
-}
-
-/** comfy/sd.py detect_te_model, reduced to the kinds Studio uses, plus UMT5. */
-export function encoderKindFromHeader(header) {
-  const keys = keySet(header);
-  if (!keys.size) return "";
-  if (keys.has("text_model.encoder.layers.30.mlp.fc1.weight")) return "clip_g";
-  if (keys.has("text_model.encoder.layers.22.mlp.fc1.weight")) return "clip_h";
-  if (keys.has("text_model.encoder.layers.0.mlp.fc1.weight")) return "clip_l";
-  if (keys.has("encoder.block.23.layer.1.DenseReluDense.wi_1.weight")) {
-    const width = shape(header, "encoder.block.23.layer.1.DenseReluDense.wi_1.weight")[0];
-    if (width === 5120) return "t5xl";
-    if (width !== 10240) return "other";
-    // UMT5 keeps a relative position bias in every block and a 256k vocabulary.
-    const umt5 =
-      keys.has("encoder.block.1.layer.0.SelfAttention.relative_attention_bias.weight") ||
-      shape(header, "shared.weight")[0] > 200000;
-    return umt5 ? "umt5xxl" : "t5xxl";
-  }
-  if (keys.has("encoder.block.0.layer.0.SelfAttention.k.weight")) {
-    return shape(header, "encoder.block.0.layer.0.SelfAttention.k.weight")[0] === 384
-      ? "byt5_glyph"
-      : "other";
-  }
-  if (keys.has("model.layers.0.post_feedforward_layernorm.weight")) {
-    if (keys.has("model.layers.59.self_attn.q_norm.weight")) return "other";
-    if (
-      keys.has("model.layers.47.self_attn.q_norm.weight") &&
-      keys.has("model.layers.5.self_attn.v_proj.weight")
-    )
-      return "gemma3_12b";
-    if (!keys.has("model.layers.0.self_attn.q_norm.weight")) return "gemma2_2b";
-    return "other";
-  }
-  if (keys.has("model.layers.0.self_attn.k_proj.bias")) {
-    return shape(header, "model.layers.0.self_attn.k_proj.bias")[0] === 512
-      ? "qwen25vl_7b"
-      : "other";
-  }
-  // Qwen3.5: hybrid linear attention, under the multimodal model's language_model prefix.
-  if (
-    keys.has("model.language_model.layers.0.linear_attn.A_log") &&
-    keys.has("model.language_model.layers.0.input_layernorm.weight")
-  ) {
-    return shape(header, "model.language_model.layers.0.input_layernorm.weight")[0] === 4096
-      ? "qwen35_9b"
-      : "other";
-  }
-  if (keys.has("model.visual.deepstack_merger_list.0.norm.weight")) {
-    return shape(header, "model.visual.merger.linear_fc2.weight")[0] === 2560
-      ? "qwen3vl_4b"
-      : "qwen3vl_8b";
-  }
-  if (
-    keys.has("visual.deepstack_merger_list.0.norm.weight") &&
-    keys.has("model.layers.49.self_attn.q_proj.weight")
-  )
-    return "qwen3vl_32b";
-  if (keys.has("model.layers.0.post_attention_layernorm.weight")) {
-    const width = shape(header, "model.layers.0.post_attention_layernorm.weight")[0];
-    if (keys.has("model.layers.0.self_attn.q_norm.weight")) {
-      // Qwen3 keeps separate q/k/v; a fused qkv_proj (MiniMax Music's encoder) only looks like one.
-      if (!keys.has("model.layers.0.self_attn.k_proj.weight")) return "other";
-      return { 2560: "qwen3_4b", 4096: "qwen3_8b", 1024: "qwen3_06b" }[width] || "other";
-    }
-    if (width === 5120) return "mistral3_24b";
-    if (width === 3072) return "ministral3_3b";
-    return "llama31_8b";
-  }
-  return "other";
-}
-
-/** comfy/sd.py VAE.__init__, reduced to a layout plus whatever the shapes pin down. */
-export function vaeLayoutFromHeader(header) {
-  const keys = keySet(header);
-  if (!keys.size) return "";
-  if (keys.has("decoder.middle.0.residual.0.gamma")) {
-    return keys.has("decoder.upsamples.0.upsamples.0.residual.2.weight") ? "wan48" : "wan16";
-  }
-  if (
-    keys.has("decoder.transformer_blocks.0.scale1") &&
-    keys.has("encoder.down.5.block.0.conv1.weight")
-  )
-    return "h3v";
-  if (keys.has("pre_block.attn.zero_k_bias")) return "h3a";
-  // Mage-VAE: a one-step diffusion codec (comfy/sd.py, "student.dconv_encoder").
-  if (keys.has("student.dconv_encoder.proj_out.weight")) return "mage";
-  if (keys.has("decoder.up_blocks.0.res_blocks.0.conv1.conv.weight")) return "ltx";
-  if (keys.has("decoder.conv_in.conv.weight")) {
-    return shape(header, "decoder.conv_in.conv.weight")[1] === 32 ? "hv15" : "hv1";
-  }
-  const convIn = keys.has("decoder.conv_in.weight") ? "decoder.conv_in.weight" : "";
-  if (convIn) {
-    const channels = shape(header, convIn)[1];
-    if (channels === 32 && keys.has("bn.running_mean")) return "flux2";
-    if (channels === 4) return "kl4";
-    if (channels === 16) return "kl16";
-  }
-  if (keys.has("taesd_decoder.1.weight") || keys.has("decoder.22.bias")) return "preview";
-  return "other";
-}
-
-/* ------------------------------------------------------------ Files */
-
-const headerCache = new Map();
-
-function localFile(kind, subfolders, name) {
-  if (!/\.(safetensors|gguf)$/i.test(name)) return "";
-  const parts = String(name).split(/[\\/]/).filter(Boolean);
-  if (parts.some((part) => part === "..")) return "";
-  for (const dir of modelFolders(kind, subfolders)) {
-    const file = path.join(dir, ...parts);
-    try {
-      if (fs.statSync(file).isFile()) return file;
-    } catch {
-      /* next folder */
-    }
-  }
-  return "";
-}
-
-function cachedHeader(file) {
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return null;
-  }
-  const key = `${file}:${stat.size}:${stat.mtimeMs}`;
-  if (!headerCache.has(key)) {
-    let header = null;
-    try {
-      header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file);
-    } catch {
-      header = null;
-    }
-    headerCache.set(key, header);
-  }
-  return headerCache.get(key);
-}
-
 function isAbliterated(name = "") {
   return /abliterat|uncensor|heretic/i.test(String(name));
 }
@@ -228,15 +72,10 @@ function encoderKindFromName(name = "") {
   return "";
 }
 
-/** What one text encoder file is, and how sure we are ("file" beats "name"). */
+/** What one text encoder file is, by its name. */
 export function classifyEncoder(name) {
-  const file = localFile("text_encoders", ["text_encoders", "clip"], name);
-  const header = file ? cachedHeader(file) : null;
-  const fromHeader = header ? encoderKindFromHeader(header) : "";
-  if (fromHeader && fromHeader !== "other") return { name, kind: fromHeader, via: "file" };
-  const fromName = encoderKindFromName(name);
-  if (fromName) return { name, kind: fromName, via: "name" };
-  return { name, kind: fromHeader === "other" ? "other" : "", via: fromHeader ? "file" : "" };
+  const kind = encoderKindFromName(name);
+  return { name, kind, via: kind ? "name" : "" };
 }
 
 const vaeNameHints = [
@@ -258,31 +97,10 @@ const vaeNameHints = [
   ["sd15", /sd[-_ ]?1|vae[-_]ft|mse|ema/i],
 ];
 
-function vaeKindsForLayout(layout) {
-  return Object.entries(vaeKinds)
-    .filter(([, spec]) => spec.layout === layout)
-    .map(([kind]) => kind);
-}
-
-/**
- * What one VAE file is. With a header we know its layout and only let the name
- * choose within it; without one the name decides alone.
- */
+/** What one VAE file is, by its name. */
 export function classifyVae(name) {
   const base = String(name).split(/[\\/]/).pop() || "";
-  const file = localFile("vae", ["vae"], name);
-  const header = file ? cachedHeader(file) : null;
-  const layout = header ? vaeLayoutFromHeader(header) : "";
-  const hinted = vaeNameHints.filter(([, pattern]) => pattern.test(base)).map(([kind]) => kind);
-  if (layout && layout !== "other" && layout !== "preview") {
-    const within = vaeKindsForLayout(layout);
-    const kind =
-      hinted.find((hint) => within.includes(hint) || vaeKinds[hint].layout === "unknown") || "";
-    // Shapes alone cannot split these pairs, so an unnamed file fits either.
-    return { name, layout, kind, kinds: kind ? [kind] : within, via: "file" };
-  }
-  if (layout === "preview") return { name, layout, kind: "", kinds: [], via: "file" };
-  const kind = hinted[0] || "";
+  const kind = vaeNameHints.find(([, pattern]) => pattern.test(base))?.[0] || "";
   return {
     name,
     layout: kind ? vaeKinds[kind].layout : "",

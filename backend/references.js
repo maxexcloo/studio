@@ -3,22 +3,19 @@ import { mediaFile, mediaParams, mediaPath, mediaSubfolder } from "./media-paths
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
-import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
+import { comfy } from "./comfy.js";
 import {
   addGalleryItems,
   importedImageFile,
   filterVisibleGallery,
   gallery,
   galleryKey,
-  outputFileCandidates,
 } from "./gallery-store.js";
 
 import { extractLastFrame } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
-import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
-import { forgetComfyRun } from "./comfy-traces.js";
 import { families } from "./family-catalog.js";
 import { mimeExtension, referenceInputName } from "./reference-names.js";
 import { uploadedGalleryItem } from "./uploads.js";
@@ -249,19 +246,6 @@ export async function publicGalleryBuffer(item) {
       name: item.outputName || path.basename(file),
     };
   }
-  const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
-  const file = outputFileCandidates(item).find((candidate) => {
-    const resolved = path.resolve(candidate);
-    return (
-      base && isInside(base, resolved) && fs.existsSync(resolved) && fs.statSync(resolved).isFile()
-    );
-  });
-  if (file)
-    return {
-      buffer: fs.readFileSync(file),
-      mime: mimeFromName(file),
-      name: item.outputName || path.basename(file),
-    };
   if (!String(item.url || "").startsWith("/comfy/"))
     throw new Error("That image is no longer in the gallery.");
   const relative = String(item.url).replace(/^\/comfy/, "");
@@ -424,41 +408,33 @@ export async function stageReferenceAssetsForAccount(
   { unique = false, generation = null } = {},
 ) {
   const staged = [];
-  try {
-    for (const reference of Array.isArray(references) ? references : []) {
-      const assetId = String(reference?.assetId || "");
-      const slot = String(reference?.slot || "reference");
-      if (!assetId) continue;
-      const family = generation && families[generation.family];
-      // Inpaint stitches the crop back onto the full original. Its existing crop pipeline
-      // already limits sampling pixels and keeps the painted mask aligned.
-      const keepOriginal = generation?.inpaint && staged.length === 0;
-      const pixels =
-        generation && generation.autoResizeInputs !== false && !keepOriginal
-          ? Number(generation.width) * Number(generation.height)
-          : 0;
-      const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
-      const original = await bytesForReferenceAccount(account, assetId);
-      const inspected = await inspectImage(original.buffer, original.mime);
-      const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
-      // Remote ComfyUI has no native input-delete endpoint. Reuse content names there
-      // instead of accumulating a new public resized file on every run.
-      const temporary = unique || Boolean(bytes.resized && comfyInputDir());
-      const uploaded = await uploadBufferToComfy(bytes, { unique: temporary });
-      staged.push({
-        slot,
-        assetId,
-        source: String(reference?.source || ""),
-        ...uploaded,
-        ...(temporary ? { temporary: true } : {}),
-        ...(bytes.width ? { width: bytes.width, height: bytes.height } : {}),
-      });
-    }
-    return staged;
-  } catch (error) {
-    await forgetComfyRun({
-      inputNames: staged.filter((item) => item.temporary).map((item) => item.comfyName),
+  for (const reference of Array.isArray(references) ? references : []) {
+    const assetId = String(reference?.assetId || "");
+    const slot = String(reference?.slot || "reference");
+    if (!assetId) continue;
+    const family = generation && families[generation.family];
+    // Inpaint stitches the crop back onto the full original. Its existing crop pipeline
+    // already limits sampling pixels and keeps the painted mask aligned.
+    const keepOriginal = generation?.inpaint && staged.length === 0;
+    const pixels =
+      generation && generation.autoResizeInputs !== false && !keepOriginal
+        ? Number(generation.width) * Number(generation.height)
+        : 0;
+    const step = family?.img2img && !family.references ? family.sizeStep || 8 : 1;
+    const original = await bytesForReferenceAccount(account, assetId);
+    const inspected = await inspectImage(original.buffer, original.mime);
+    const bytes = await prepareInputImage({ ...original, ...inspected }, { pixels, step });
+    // Content names are reused, so a resized file is not uploaded again on every run; a unique
+    // copy is the run's own and goes when it ends (media-store.js temporaryInputFiles).
+    const uploaded = await uploadBufferToComfy(bytes, { unique });
+    staged.push({
+      slot,
+      assetId,
+      source: String(reference?.source || ""),
+      ...uploaded,
+      ...(unique ? { temporary: true } : {}),
+      ...(bytes.width ? { width: bytes.width, height: bytes.height } : {}),
     });
-    throw error;
   }
+  return staged;
 }

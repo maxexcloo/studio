@@ -19,7 +19,6 @@ const environment = {
   STUDIO_DEV_PROXY_TOKEN: crypto.randomBytes(32).toString("base64url"),
   STUDIO_RUNTIME_AUTOMATIC: "0",
   STUDIO_MULTI_USER: "0",
-  STUDIO_OUTPUT_STORAGE: "studio",
 };
 if (values.demo) environment.STUDIO_DEMO = "1";
 const migration = migrateRuntime(dataDir, { apply: true });
