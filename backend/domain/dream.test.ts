@@ -62,7 +62,7 @@ function fixture(t: TestContext) {
         { ...everything, account: { userId, role: "user" } },
       ]),
     ) as Record<string, DreamAccess>,
-    online: { text: true, image: true, video: true },
+    online: { text: true, image: true, video: true } as Record<string, boolean | "parked">,
     textBusy: false,
     prompts: 0,
     calls: [] as { model: string; system: string; user: string }[],
@@ -88,7 +88,11 @@ function fixture(t: TestContext) {
     owners: () => ["alice", "bob"],
     access: (ownerId) => state.access[ownerId] ?? null,
     catalogue: async () => ({ profiles, defaults: { imageModel: "flux", videoModel: "wan" } }),
-    online: async (kind) => ({ text: state.online.text, media: state.online[kind] }),
+    online: async (kind) => {
+      const reach = (value: boolean | "parked") =>
+        value === "parked" ? value : value ? "online" : "offline";
+      return { text: reach(state.online.text), media: reach(state.online[kind]) };
+    },
     textBusy: () => state.textBusy,
     writer: {
       settings: () => ({ model: "writer" }),
@@ -403,7 +407,13 @@ test("Dream skips accounts without the prompt assistant and offline services, lo
   state.online.image = false;
   await dream.tick();
   assert.equal(dream.status("alice").reason, "The image worker is offline.");
-  assert.equal(state.logs.length, 3);
+  state.online.image = "parked";
+  await dream.tick();
+  assert.match(
+    dream.status("alice").reason!,
+    /^The image worker is parked: it was stopped on purpose/,
+  );
+  assert.equal(state.logs.length, 4);
   assert.equal(state.calls.length, 0);
   assert.equal(dreamJobs().length, 0);
   // Pausing stops a waiting Dream job.

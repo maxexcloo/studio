@@ -18,6 +18,8 @@ export interface ChatModel {
   provider?: string;
   /** Studio text workloads serving it, in start order; listed for administrators, who may start them. */
   workloads?: string[];
+  /** For accounts that may not start workloads: every workload serving it was stopped on purpose. */
+  parked?: boolean;
 }
 export interface ChatStatus {
   available: boolean;

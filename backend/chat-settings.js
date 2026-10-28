@@ -41,14 +41,16 @@ export function chatModelAllowed(id, patterns) {
 }
 
 /**
- * Names the text workloads serving each model. With `running` (an account that may not start
- * workloads), a workload-served model is listed only while one of its workloads runs.
+ * Names the text workloads serving each model. With `phases` (an account that may not start
+ * workloads), a workload-served model is listed while one of its workloads runs, and marked
+ * `parked` while all were stopped on purpose, so it reads as parked rather than missing.
  */
-export function servedChatModels(models, workloads, running) {
+export function servedChatModels(models, workloads, phases) {
   return models.flatMap((model) => {
     const served = workloads.filter((item) => item.model === model.id).map(({ id }) => id);
     if (!served.length) return [model];
-    if (!running) return [{ ...model, workloads: served }];
-    return served.some((id) => running.includes(id)) ? [model] : [];
+    if (!phases) return [{ ...model, workloads: served }];
+    if (served.some((id) => phases[id] === "running")) return [model];
+    return served.every((id) => phases[id] === "parked") ? [{ ...model, parked: true }] : [];
   });
 }

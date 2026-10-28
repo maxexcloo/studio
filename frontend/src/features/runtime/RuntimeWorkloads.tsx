@@ -49,15 +49,21 @@ export function PlacementChanges({
 }
 
 export const phaseColour = (phase: WorkloadPhase) =>
-  ({ running: "green", starting: "yellow", stopping: "yellow", stopped: "gray", unknown: "red" })[
-    phase
-  ];
+  ({
+    running: "green",
+    starting: "yellow",
+    stopping: "yellow",
+    parked: "gray",
+    down: "red",
+    unknown: "red",
+  })[phase];
 export const phaseLabel = (phase: WorkloadPhase) =>
   ({
     running: "Running",
     starting: "Starting",
     stopping: "Stopping",
-    stopped: "Stopped",
+    parked: "Parked",
+    down: "Down",
     unknown: "Unknown",
   })[phase];
 const operationColour = (status: RuntimeOperation["status"]) =>
@@ -81,6 +87,12 @@ export function RuntimeWorkloads() {
   const previewing = useMutation({
     mutationFn: (workloads: string[]) =>
       post<RuntimePreview>("/api/runtime/preview", { workloads }),
+    onSuccess: setPreview,
+  });
+  // Start one stopped workload beside what runs, making room as a Chat model start does.
+  const starting = useMutation({
+    mutationFn: (workload: string) =>
+      post<RuntimePreview>("/api/runtime/preview", { start: [workload] }),
     onSuccess: setPreview,
   });
   const applying = useMutation({
@@ -201,14 +213,20 @@ export function RuntimeWorkloads() {
             cell: (item) => <Badge color={phaseColour(item.phase)}>{phaseLabel(item.phase)}</Badge>,
           },
         ]}
-        rowActions={(item) => (
-          <Menu.Item
-            disabled={Boolean(operation) || item.phase !== "running"}
-            onClick={() => setRestarting(item.id)}
-          >
-            Restart
-          </Menu.Item>
-        )}
+        rowActions={(item) =>
+          item.phase === "parked" || item.phase === "down" ? (
+            <Menu.Item disabled={Boolean(operation)} onClick={() => starting.mutate(item.id)}>
+              Start
+            </Menu.Item>
+          ) : (
+            <Menu.Item
+              disabled={Boolean(operation) || item.phase !== "running"}
+              onClick={() => setRestarting(item.id)}
+            >
+              Restart
+            </Menu.Item>
+          )
+        }
       />
       <Group justify="flex-end" gap="xs">
         <Button

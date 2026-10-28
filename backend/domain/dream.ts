@@ -114,6 +114,11 @@ interface DreamWriting {
   /** More Like This: the prompt of the result the person asked for more like. */
   like?: string;
 }
+type Reach = "online" | "offline" | "parked";
+const unreachable = (what: string, reach: Reach) =>
+  reach === "parked"
+    ? `${what} is parked: it was stopped on purpose. An administrator can start it in Settings › Workers.`
+    : `${what} is offline.`;
 export type DreamStatus = "off" | "paused" | "waiting" | "generating" | "capped" | "unavailable";
 interface DreamRecord {
   settings: DreamSettings;
@@ -209,8 +214,8 @@ export function createDream(options: {
     ownerId: string,
     account?: GenerationAccount,
   ): Promise<{ profiles: DreamProfile[]; defaults?: { imageModel?: string; videoModel?: string } }>;
-  /** Whether the text model and the worker for a kind are reachable. */
-  online(kind: Kind): Promise<{ text: boolean; media: boolean }>;
+  /** Whether the text model and the worker for a kind are reachable, or parked (stopped on purpose). */
+  online(kind: Kind): Promise<{ text: Reach; media: Reach }>;
   /** Whether text work (Chat replies, admitted local text) is running now. */
   textBusy(): boolean;
   writer: DreamWriter | null;
@@ -515,9 +520,10 @@ export function createDream(options: {
     let reason = "";
     for (const kind of allowed) {
       const online = await options.online(kind);
-      if (!online.text) return { status: "unavailable", reason: "The text model is offline." };
-      if (!online.media) {
-        reason = `The ${kind} worker is offline.`;
+      if (online.text !== "online")
+        return { status: "unavailable", reason: unreachable("The text model", online.text) };
+      if (online.media !== "online") {
+        reason = unreachable(`The ${kind} worker`, online.media);
         continue;
       }
       const catalogue = await options.catalogue(ownerId, access.account);

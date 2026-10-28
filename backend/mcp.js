@@ -34,6 +34,7 @@ import {
   localUnlessAsked,
   mcpTiers,
   nameWords,
+  parkedWorker,
   profileFromRequest,
   speedWordList,
   profilesForTier,
@@ -762,8 +763,17 @@ export function registerMcpRoutes(
                   "Pass names to Generate without profile_id and Studio picks a profile that takes them all.",
               });
             }
+            const { backends } = await media.catalogue(owner);
+            const parked = ["image", "video"].filter(
+              (value) => (kind === "all" || kind === value) && backends?.[value]?.parked,
+            );
             return mcpJson({
               ...listed(profiles),
+              ...(parked.length
+                ? {
+                    parked_note: `Local ${parked.join(" and ")} can't run now: ${parkedWorker(parked)}`,
+                  }
+                : {}),
               ...(cloud.length
                 ? {
                     cloud: listed(cloud),
