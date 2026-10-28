@@ -41,7 +41,7 @@ test("Saving and updating a preset never submits a generation", async ({ page })
   expect(state.presets).toHaveLength(1);
   expect(state.jobs).toHaveLength(0);
   await page.reload();
-  await prompt.click();
+  // The draft survives the reload, so clear it to show the preset fills the prompt.
   await prompt.fill("");
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await loadSaved(page, "Preset", "Copper Study");
