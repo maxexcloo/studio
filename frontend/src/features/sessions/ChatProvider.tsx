@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import type { ChatEvent, ChatInput, ChatMessage, ChatStatus } from "../../../../shared/chat";
 import { api, post, request } from "../../api";
 import type { Session } from "../../types";
+import { useRemembered } from "../auth/useRemembered";
 import { useGeneration } from "../generation/GenerationProvider";
 import { generationInput } from "../generation/payload";
 import { queueQuery } from "../generation/Queue";
@@ -59,7 +60,7 @@ function useChatState() {
   const client = useQueryClient(),
     navigate = useNavigate();
   const { draft, setDraft, profile } = useGeneration();
-  const [text, setText] = useState("");
+  const [text, setText] = useRemembered("chat-draft", "");
   const [sendingSession, setSendingSession] = useState("");
   const [error, setError] = useState("");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);

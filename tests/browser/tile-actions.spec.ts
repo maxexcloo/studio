@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  expandComposer,
   fixtures,
   image,
   loadSaved,
@@ -176,7 +177,7 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
-  await page.locator("[data-composer-prompt]").click();
+  await expandComposer(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
   await page.getByRole("button", { name: "Refine Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -278,7 +279,7 @@ for (const surface of ["tile", "viewer"]) {
         referenceAssets: [],
       },
     });
-    await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+    await expandComposer(page);
     await page.getByRole("button", { name: "Presets", exact: true }).click();
     await loadSaved(page, "Preset", "Current Direction");
     await expect(page.getByRole("dialog", { name: "Presets", exact: true })).toBeHidden();

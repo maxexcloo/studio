@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   closeReferences,
+  expandComposer,
   fixtures,
   gallerySearch,
   image,
@@ -129,7 +130,7 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   await expect(search).toHaveValue(testInfo.project.use.isMobile ? "" : "Browse");
   await page.keyboard.press("Escape");
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await prompt.click();
+  await expandComposer(page);
   await prompt.fill("Keep typing");
   await prompt.press("/");
   await expect(prompt).toHaveValue("Keep typing/");
@@ -310,6 +311,12 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Filter By Chats", exact: true }).click();
   await page.getByRole("checkbox", { name: "Bird Chat", exact: true }).check();
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
+    .toEqual(["chat-a"]);
+  // Filters are remembered too.
+  state.galleryRequests.length = 0;
+  await page.reload();
   await expect
     .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
     .toEqual(["chat-a"]);

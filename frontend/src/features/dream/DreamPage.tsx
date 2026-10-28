@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   ActionIcon,
   Alert,
@@ -13,6 +12,7 @@ import { Pause, Play } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { useRemembered } from "../auth/useRemembered";
 import { DiscardedDreams } from "./DiscardedDreams";
 import { DreamDeck } from "./DreamDeck";
 import { DreamSettingsButton, useDreamSettings } from "./DreamSettings";
@@ -93,8 +93,8 @@ function Empty({ dream, onTune }: { dream: Dream; onTune?: () => void }) {
 export function DreamPage() {
   const dream = useQuery(dreamQuery);
   const save = useDreamSettings();
-  const [view, setView] = useState<"deck" | "discarded">("deck");
-  const [tuning, setTuning] = useState(false);
+  const [view, setView] = useRemembered<"deck" | "discarded">("dream-view", "deck");
+  const [tuning, setTuning] = useRemembered("dream-tuning", false);
   const data = dream.data;
   const status = data && statusLine(data);
   return (

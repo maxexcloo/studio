@@ -133,13 +133,17 @@ primary component reference and verify APIs against the installed version.
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
-  a short transition and the standard accessible close action.
+  a short transition and the standard accessible close action; tapping the
+  collapsed bar's prompt summary opens the full-screen prompt editor over it in
+  one tap, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
-  offers Undo in its notification. On phones, tapping a text box (prompt,
-  negative, Chat message, profile and guide editors and the rest) opens it full
-  screen with Copy, Clear and Done, and floating prompt ideas move under its text;
-  Done, Escape or dismissing the keyboard returns to the page. Desktop edits in place.
+  offers Undo in its notification. On phones a text box is a summary of its
+  text; tapping it (prompt, negative, Chat message, profile and guide editors and
+  the rest) opens it full screen with the same actions as the inline box (the
+  prompt's Recent Prompts and Prompt Assistance, Copy, Clear) and Done, with
+  prompt ideas and assistant suggestions under its text; Done, Escape or
+  dismissing the keyboard returns to the page. Desktop edits in place.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
@@ -187,8 +191,8 @@ primary component reference and verify APIs against the installed version.
   never filenames; submission and Chat use owned asset IDs.
 - Profile and size controls share the gallery/card implementation. The prompt
   comes first; `GenerationInputControls` owns the wrapping chip rail in both
-  gallery and timeline editors. Phones keep the full-height editor, giving the
-  prompt generous, easy-to-edit space above the chips. The footer
+  gallery and timeline editors. The phone editor fits one screen without
+  scrolling: the prompt summary takes the room left above the chips. The footer
   places the Image/Video toggle left and Clear/Generate right. For images,
   Size offers only the 1K, 2K and 4K resolutions (the long edge; 1K by default)
   above a vertical list of the profile's aspect presets with the size each
@@ -246,11 +250,16 @@ primary component reference and verify APIs against the installed version.
 
 - TanStack Query owns server data, polling and invalidation; drafts stay within
   their feature. Chat and gallery generation drafts are independent; switching
-  modes preserves unsent prompts, references and settings, and the gallery
-  composer's image and video drafts survive a reload, saved per account in
-  browser storage. Typing must not rerender an unchanged gallery or conversation
-  history; shared provider commands retain their identity. Keep account data
-  and credentials out of browser storage.
+  modes preserves unsent prompts, references and settings. Typing must not
+  rerender an unchanged gallery or conversation history; shared provider
+  commands retain their identity.
+- The UI remembers settled state across reloads, per account, through the one
+  `useRemembered` helper (browser storage under `studio-<name>:<account>`): the
+  gallery composer's image and video drafts, the Chat draft, gallery view,
+  filters and versions, Compare's mode and variants, the last Library and
+  Settings section, Dream's view and tuning, and the LoRA picker tab. Transient
+  state (open popups, selections, search queries) is never remembered. Keep
+  account data and credentials out of browser storage.
 - Account access groups own model grants and Cloud Models/uncensored permissions.
   Read back saved changes. Studio owns editable runtime definitions, with
   administrator approval and conflict handling; user presets support updates and copies.
@@ -280,7 +289,8 @@ primary component reference and verify APIs against the installed version.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
-  views. Generation is the exception: submitting and completing show in the
+  views. Notifications sit bottom right, raised clear of the composer and viewer
+  action bars, so they never cover header buttons. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
   and actions, and Australian English for explanatory prose.
 

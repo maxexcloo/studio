@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { create, fixtures, openNav, profiles, stamp } from "./fixtures";
+import { create, expandComposer, fixtures, openNav, profiles, stamp } from "./fixtures";
 
 test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
   const state = await fixtures(page);
@@ -83,7 +83,7 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await expect(
     page.getByRole("button", { name: "Open image: An amber bird", exact: true }),
   ).toBeVisible();
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expandComposer(page);
   await page.getByRole("combobox", { name: "Profile", exact: true }).click();
   await page.getByRole("option", { name: "Image Fast", exact: true }).click();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();

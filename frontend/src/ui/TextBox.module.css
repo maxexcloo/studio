@@ -45,3 +45,10 @@
 .tool:disabled {
   background: transparent;
 }
+
+.below {
+  flex-shrink: 0;
+  max-height: 40%;
+  overflow-y: auto;
+  padding-top: var(--mantine-spacing-xs);
+}

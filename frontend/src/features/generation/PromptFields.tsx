@@ -1,7 +1,7 @@
 import type { Ref } from "react";
-import { Stack } from "@mantine/core";
 import type { GenerationInput, Profile, ReferenceAsset } from "../../types";
 import { TextBox } from "../../ui/TextBox";
+import { usePhone } from "../../ui/usePhone";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptIdeas } from "./PromptIdeas";
 import { PromptHistory } from "./PromptHistory";
@@ -20,6 +20,7 @@ export function PromptFields({
   negative,
   textareaRef,
   autoFocus = false,
+  edit = false,
   fill = false,
   ideas: offerIdeas = false,
 }: {
@@ -33,11 +34,14 @@ export function PromptFields({
   textareaRef?: Ref<HTMLTextAreaElement>;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocus?: boolean;
+  /** Opens the phone's full-screen prompt editor. */
+  edit?: boolean;
   /** Grows the prompt to fill a phone Drawer that owns scrolling. */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
   ideas?: boolean;
 }) {
+  const phone = usePhone();
   const assistant = usePromptAssistant({
     scopeKey: assistantScope,
     input,
@@ -72,19 +76,19 @@ export function PromptFields({
               ? "Describe the image you want to create…"
               : "Describe the motion and camera…"
           }
-          // The phone editor gives the prompt all the room above the chips.
+          // On phones the prompt summary takes the room left above the chips.
           autosize={!fill}
           minRows={3}
           maxRows={10}
           rightSection={
-            <Stack gap={4}>
+            <>
               <PromptHistory
                 kind="positive"
                 value={input.prompt}
                 onPick={(prompt) => onChange({ prompt })}
               />
               {assistant.action}
-            </Stack>
+            </>
           }
           rightSectionWidth={40}
           rightSectionPointerEvents="all"
@@ -92,6 +96,8 @@ export function PromptFields({
           value={input.prompt}
           onChange={(prompt) => onChange({ prompt })}
           overlay={offerIdeas && ideas.ideas}
+          below={assistant.suggestions}
+          edit={edit}
         />
       </div>
       {negative && (
@@ -102,7 +108,7 @@ export function PromptFields({
           size="sm"
           autosize
           minRows={1}
-          maxRows={4}
+          maxRows={phone ? 2 : 4}
           rightSection={
             <PromptHistory
               kind="negative"
@@ -115,7 +121,6 @@ export function PromptFields({
           onChange={(negative) => onChange({ negative })}
         />
       )}
-      {assistant.suggestions}
     </>
   );
 }

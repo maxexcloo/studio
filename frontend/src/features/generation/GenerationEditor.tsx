@@ -133,6 +133,7 @@ export function GenerationEditor({
   onCompare,
   autoFocusPrompt = false,
   focusPrompt = false,
+  editPrompt = false,
   fill = false,
   ideas: offerIdeas = false,
 }: {
@@ -157,6 +158,8 @@ export function GenerationEditor({
   autoFocusPrompt?: boolean;
   /** Focuses the prompt on mount. */
   focusPrompt?: boolean;
+  /** Opens the phone's full-screen prompt editor. */
+  editPrompt?: boolean;
   /** Fills a phone Drawer that owns scrolling, keeping the actions at its safe bottom. */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
@@ -258,6 +261,7 @@ export function GenerationEditor({
             assistantScope={assistantScope}
             negative={usesNegative(profile)}
             autoFocus={autoFocusPrompt}
+            edit={editPrompt}
             fill={fill}
             ideas={offerIdeas}
           />

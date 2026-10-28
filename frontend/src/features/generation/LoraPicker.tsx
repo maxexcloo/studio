@@ -21,6 +21,7 @@ import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { api, post } from "../../api";
+import { useRemembered } from "../auth/useRemembered";
 import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Profile } from "../../types";
 import { isProfile } from "./payload";
@@ -86,7 +87,7 @@ export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<LoraTab>("recommended");
+  const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "recommended");
   const [sort, setSort] = useState<SavedSort>("name-asc");
   const controlsId = useId();
   const trigger = useRef<HTMLButtonElement>(null);

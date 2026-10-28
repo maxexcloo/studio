@@ -3,6 +3,7 @@ import {
   chooseView,
   closeLoras,
   create,
+  expandComposer,
   fixtures,
   openNav,
   profiles,
@@ -148,7 +149,9 @@ test("Model downloads cancel only the chosen file and explicitly resume or retry
   expect(freshModelReads).toBeGreaterThan(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Library", exact: true })).toBeHidden();
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  // The lasting failure notification would sit over the phone composer's chips.
+  await page.locator(".mantine-Notification-root").getByRole("button").click();
+  await expandComposer(page);
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
   await page.getByRole("option", { name: "Downloaded Model", exact: true }).click();
