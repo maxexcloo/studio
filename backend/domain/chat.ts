@@ -135,6 +135,13 @@ const tool = {
       properties: {
         operation: { type: "string", enum: ["image", "refine", "animate"] },
         prompt: { type: "string" },
+        count: {
+          type: "integer",
+          minimum: 1,
+          maximum: 8,
+          description:
+            "Number of images the user asked for; omit to keep the selected settings' count.",
+        },
       },
       required: ["operation", "prompt"],
       additionalProperties: false,
@@ -450,7 +457,14 @@ export class ChatService {
         assistant.draft = {
           ...(revision ? { parentJobId: revision.sourceJobId } : input.generation),
           operation: action.operation,
-          input: revision ? revision.input : { ...input.generation?.input, prompt: action.prompt },
+          input: revision
+            ? revision.input
+            : {
+                ...input.generation?.input,
+                prompt: action.prompt,
+                // Admission enforces the composer's 1-8 range and the account's limits.
+                ...(action.count === undefined ? {} : { count: action.count }),
+              },
         };
         if (!assistant.content) {
           assistant.content =
