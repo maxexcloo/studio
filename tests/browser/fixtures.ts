@@ -656,10 +656,6 @@ export async function fixtures(page: Page) {
         perMinute: 0,
         etaSeconds: null,
       });
-    if (path === "/api/workers")
-      return respond({
-        workers: [{ id: "gpu", label: "Media Worker", capabilities: ["image", "video"] }],
-      });
     return respond({ ok: true });
   });
   return {
