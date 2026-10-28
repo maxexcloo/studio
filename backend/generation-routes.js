@@ -158,8 +158,13 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             error: `${backend.label} isn’t ready for ${profile.label}: ${backend.reason}`,
           },
         };
-      const worker = pinnedBackend
-        ? workerById(pinnedBackend)
+      // A draft carried over from another kind (an image's worker on an Animate) is not a pin.
+      const pinned =
+        pinnedBackend && workerHas(pinnedBackend, capabilityForProfile(profile))
+          ? pinnedBackend
+          : "";
+      const worker = pinned
+        ? workerById(pinned)
         : routeProfile(profile, {
             prefers: input?.autoUpscale ? ["upscale"] : [],
             backend: backend ? backend.id : "",

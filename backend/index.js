@@ -95,6 +95,7 @@ import {
 import { requireAdmin, requireLocal } from "./route-access.js";
 import express from "express";
 import {
+  allowedProfile,
   configuredBackends,
   currentComfyBackend,
   isDefaultBackend,
@@ -844,8 +845,11 @@ async function mediaModels(force = false) {
         backends,
       };
   models.profiles = (models.profiles || []).map((profile) => {
-    const listing = catalogues.filter(({ result }) =>
-      result.models.profiles?.some((candidate) => candidate.id === profile.id),
+    // Every worker shares the catalogue, so only one whose capabilities run the profile lists it.
+    const listing = catalogues.filter(
+      ({ worker, result }) =>
+        allowedProfile(worker, profile) &&
+        result.models.profiles?.some((candidate) => candidate.id === profile.id),
     );
     // Where a combined profile's backend is ready on some workers only, those are its workers.
     const ready = listing.filter(({ result }) =>
@@ -1712,12 +1716,18 @@ async function queueResourceFor(input) {
     .then((result) => result.models)
     .catch(() => (demoMode ? mockModelResult() : { profiles: [] }));
   const profile = models.profiles?.find((item) => item.id === canonicalProfileId(input.profileId));
-  const worker = routeJob(
-    profile ? capabilityForProfile(profile) : input.kind === "video" ? "video" : "image",
-    { profileId: profileOnBackendKey(input.profileId, input.profileBackend) },
-  );
+  const capability = profile
+    ? capabilityForProfile(profile)
+    : input.kind === "video"
+      ? "video"
+      : "image";
+  const worker = routeJob(capability, {
+    profileId: profileOnBackendKey(input.profileId, input.profileBackend),
+  });
+  // Only a worker that can run the job holds it (generation-routes.js ignores any other pin).
   const backend =
-    typeof input.backendId === "string" && input.backendId
+    typeof input.backendId === "string" &&
+    workerById(input.backendId)?.capabilities.includes(capability)
       ? input.backendId
       : worker?.id || defaultWorkerId() || "";
   return `worker:${backend}`;
