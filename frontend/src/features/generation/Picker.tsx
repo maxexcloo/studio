@@ -277,7 +277,7 @@ export function PickerTile({
   aspect?: string;
   title?: string;
   detail?: string;
-  /** A corner control such as Favourite or Delete. */
+  /** A corner control such as a LoRA's rating or Delete. */
   action?: ReactNode;
   drag?: [type: string, data: string];
   row?: boolean;

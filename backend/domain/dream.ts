@@ -69,9 +69,9 @@ export interface DreamProfile {
   /** The LoRA files this profile can load. */
   options?: { loras?: string[] };
 }
-/** The account's LoRA library: starred LoRA names and saved strengths per workflow. */
+/** The account's LoRA library: thumbs up or down per LoRA and saved strengths per workflow. */
 export interface DreamLoraLibrary {
-  favorites: string[];
+  ratings: Record<string, "up" | "down">;
   strengths: Record<string, Record<string, number>>;
 }
 export interface DreamLora {
@@ -169,7 +169,7 @@ const starredDays = 30;
 const calibrationAgeMs = 86_400_000;
 const judgedLimit = 2000;
 const maxPrompt = 4000;
-/** Dream adds at most this many of the account's starred LoRAs to a result. */
+/** Dream adds at most this many of the account's thumbs-up LoRAs to a result. */
 const dreamLoras = 2;
 /** Every fourth image of the day is a comparison, when a kept or starred image can start one. */
 const pairEvery = 4;
@@ -369,13 +369,16 @@ export function createDream(options: {
   }
 
   /**
-   * Up to two of the account's starred LoRAs the profile can load and that suit its model family,
+   * Up to two of the account's thumbs-up LoRAs (never unrated or thumbs-down ones) the profile can load and that suit its model family,
    * at their saved strength. A LoRA for another family is left out rather than failing the run.
    */
-  function starredLoras(ownerId: string, profile: DreamProfile) {
+  function likedLoras(ownerId: string, profile: DreamProfile) {
     const library = options.loraLibrary(ownerId);
     const available = new Set(profile.options?.loras || []);
-    const names = shuffled((library?.favorites || []).filter((name) => available.has(name)));
+    const ratings = library?.ratings || {};
+    const names = shuffled(
+      Object.keys(ratings).filter((name) => ratings[name] === "up" && available.has(name)),
+    );
     return options
       .fitLoras(
         profile,
@@ -458,7 +461,7 @@ export function createDream(options: {
               ...(recent.length ? recent.map((prompt) => `- ${prompt}`) : ["(none yet)"]),
               ...(like ? [`More like this one: ${clean(like, 1000)}`] : []),
               ...(source ? [`The first frame was made from: ${clean(source, 1000)}`] : []),
-              ...(loras.length ? [`It loads their starred LoRAs: ${loras.join(", ")}`] : []),
+              ...(loras.length ? [`It loads their favourite LoRAs: ${loras.join(", ")}`] : []),
             ].join("\n"),
           },
         ];
@@ -561,7 +564,7 @@ export function createDream(options: {
         }
       }
       const spicy = record.settings.spicy && access.uncensored;
-      const loras = starredLoras(ownerId, profile);
+      const loras = likedLoras(ownerId, profile);
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
         kind: "dream",
@@ -729,13 +732,13 @@ export function createDream(options: {
           ],
         });
     } else {
-      const [starred] = starredLoras(ownerId, profile);
-      if (starred)
+      const [liked] = likedLoras(ownerId, profile);
+      if (liked)
         choices.push({
           question: "Which LoRA?",
           sides: [
-            same(`Without ${loraLabel(starred.name)}`),
-            same(`With ${loraLabel(starred.name)}`, { loras: [starred] }),
+            same(`Without ${loraLabel(liked.name)}`),
+            same(`With ${loraLabel(liked.name)}`, { loras: [liked] }),
           ],
         });
     }

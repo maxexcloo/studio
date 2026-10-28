@@ -76,7 +76,7 @@ export async function fixtures(page: Page) {
   const loraLibrary = {
     strengths: {},
     snapshots: {} as Record<string, any[]>,
-    favorites: [] as string[],
+    ratings: {} as Record<string, string>,
     recents: [],
   };
   const loraOperations: any[] = [];
@@ -315,10 +315,9 @@ export async function fixtures(page: Page) {
               (stack) => stack.id !== operation.id,
             );
             break;
-          case "favorite":
-            loraLibrary.favorites = operation.on
-              ? [...new Set([...loraLibrary.favorites, operation.name])]
-              : loraLibrary.favorites.filter((name) => name !== operation.name);
+          case "rating":
+            if (operation.rating) loraLibrary.ratings[operation.name] = operation.rating;
+            else delete loraLibrary.ratings[operation.name];
             break;
           default:
             throw new Error(`Unsupported fixture LoRA operation: ${operation.op}`);

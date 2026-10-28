@@ -13,9 +13,9 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { Layers, Star, X } from "lucide-react";
+import { Layers, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { loraLibraryQuery, useLoraStacks, type LoraLibrary } from "./LoraStacks";
+import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
 import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
@@ -67,7 +67,7 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/** Recommended LoRAs match the profile's family; Favourites are this family's; All lists every one. */
+/** Recommended LoRAs match the profile's family; Favourites are this family's thumbs up; All lists every one. */
 type LoraTab = "recommended" | "favourites" | "all" | "stacks";
 /** All's filter for LoRAs without a model family. */
 const unclassified = "unclassified";
@@ -82,6 +82,13 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
     const families = metadata[file]?.families || [];
     return !families.length || families.includes(profile!.family);
   });
+
+const ratingOrder = (rating?: LoraRating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+/** Every LoRA list's order: thumbs up, then unrated, then thumbs down, each by title. */
+export const byRating =
+  (ratings: Record<string, LoraRating>, title: (file: string) => string) =>
+  (a: string, b: string) =>
+    ratingOrder(ratings[a]) - ratingOrder(ratings[b]) || title(a).localeCompare(title(b));
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
@@ -188,29 +195,26 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   );
 }
 
-function useFavourite() {
+function useRating() {
   const cache = useQueryClient();
-  const set = (change: (favorites: string[]) => string[], library?: LoraLibrary) =>
-    cache.setQueryData(loraLibraryQuery.queryKey, (old) =>
-      library
-        ? { found: true, library }
-        : old && {
-            ...old,
-            library: { ...old.library, favorites: change(old.library.favorites || []) },
-          },
-    );
   return useMutation({
-    // Favourites are set, not toggled, and run in order, so the last tap wins.
+    // Ratings are set, not toggled, and run in order, so the last tap wins.
     scope: { id: "lora-library" },
-    mutationFn: ({ name, on }: { name: string; on: boolean }) =>
+    mutationFn: ({ name, rating }: { name: string; rating: LoraRating | null }) =>
       post<{ library: LoraLibrary }>("/api/loras/library/ops", {
-        ops: [{ op: "favorite", name, on }],
+        ops: [{ op: "rating", name, rating }],
       }),
-    onMutate: ({ name, on }) =>
-      set((favorites) =>
-        on ? [...new Set([...favorites, name])] : favorites.filter((item) => item !== name),
-      ),
-    onSuccess: ({ library }) => set((favorites) => favorites, library),
+    onMutate: ({ name, rating }) =>
+      cache.setQueryData(loraLibraryQuery.queryKey, (old) => {
+        if (!old) return old;
+        const { [name]: _, ...ratings } = old.library.ratings || {};
+        return {
+          ...old,
+          library: { ...old.library, ratings: rating ? { ...ratings, [name]: rating } : ratings },
+        };
+      }),
+    onSuccess: ({ library }) =>
+      cache.setQueryData(loraLibraryQuery.queryKey, { found: true, library }),
     onError: () => cache.invalidateQueries({ queryKey: loraLibraryQuery.queryKey }),
   });
 }
@@ -235,7 +239,7 @@ function LoraControls({
   const info = useQuery(loraInfoQuery);
   const library = useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
-  const favourite = useFavourite();
+  const rate = useRating();
   const metadata = info.data?.loras || {};
   const family = profile?.family || "";
   const stacks = useLoraStacks(family, profile?.id || "");
@@ -244,13 +248,13 @@ function LoraControls({
   const familiesOf = (file: string) => metadata[file]?.families || [];
   const available = profile?.options?.loras || [];
   const compatible = compatibleLoras(profile, metadata);
-  const favourites = new Set(library.data?.library.favorites || []);
+  const ratings = library.data?.library.ratings || {};
   const tab = picker.tab;
   const listed =
     tab === "recommended"
       ? available.filter((file) => familiesOf(file).includes(family))
       : tab === "favourites"
-        ? compatible.filter((file) => favourites.has(file))
+        ? compatible.filter((file) => ratings[file] === "up")
         : available;
   const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
   const filters = [...(tab === "all" ? [unclassified] : []), ...types];
@@ -267,10 +271,7 @@ function LoraControls({
             .toLowerCase()
             .includes(terms)),
     )
-    .sort(
-      (a, b) =>
-        Number(favourites.has(b)) - Number(favourites.has(a)) || title(a).localeCompare(title(b)),
-    );
+    .sort(byRating(ratings, title));
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>
     update(
@@ -332,21 +333,34 @@ function LoraControls({
             row={phone}
             onToggle={() => toggle(file)}
             action={
-              <ActionIcon
-                variant={phone ? "subtle" : "default"}
-                color="gray"
-                aria-label={`Favourite ${title(file)}`}
-                aria-pressed={favourites.has(file)}
-                onClick={() => favourite.mutate({ name: file, on: !favourites.has(file) })}
-              >
-                <Star
-                  size={16}
-                  color={
-                    favourites.has(file) ? "var(--mantine-color-yellow-filled)" : "currentColor"
-                  }
-                  fill={favourites.has(file) ? "var(--mantine-color-yellow-filled)" : "none"}
-                />
-              </ActionIcon>
+              <Group gap={4} wrap="nowrap">
+                {(
+                  [
+                    ["up", "Thumbs Up", ThumbsUp, "green"],
+                    ["down", "Thumbs Down", ThumbsDown, "red"],
+                  ] as const
+                ).map(([rating, label, Icon, color]) => (
+                  <ActionIcon
+                    key={rating}
+                    variant={phone ? "subtle" : "default"}
+                    color="gray"
+                    aria-label={`${label} ${title(file)}`}
+                    aria-pressed={ratings[file] === rating}
+                    onClick={() =>
+                      rate.mutate({ name: file, rating: ratings[file] === rating ? null : rating })
+                    }
+                  >
+                    <Icon
+                      size={16}
+                      color={
+                        ratings[file] === rating
+                          ? `var(--mantine-color-${color}-filled)`
+                          : "currentColor"
+                      }
+                    />
+                  </ActionIcon>
+                ))}
+              </Group>
             }
           />
         ))}

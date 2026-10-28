@@ -636,19 +636,20 @@ test("Calibration offers the account's older Studio generations, unjudged first,
   );
 });
 
-test("Dream loads up to two of the account's starred LoRAs the profile can use", async (t) => {
+test("Dream loads up to two of the account's thumbs-up LoRAs the profile can use", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
   // A LoRA for another family is left out; the run goes ahead without it.
-  state.loras.alice = { favorites: ["klein.safetensors"], strengths: {} };
+  state.loras.alice = { ratings: { "klein.safetensors": "up" }, strengths: {} };
   await dream.save("alice", { enabled: true });
   assert.deepEqual((await dreamOnce())!.input.loras, []);
   state.loras.alice = {
-    favorites: [
-      "klein.safetensors",
-      "not-installed.safetensors",
-      "fox.safetensors",
-      "film.safetensors",
-    ],
+    ratings: {
+      "klein.safetensors": "up",
+      "not-installed.safetensors": "up",
+      "fox.safetensors": "up",
+      "film.safetensors": "up",
+      "ink.safetensors": "down",
+    },
     strengths: { "family:flux": { "fox.safetensors": 0.6 } },
   };
   await dream.save("alice", { enabled: true });
@@ -658,9 +659,9 @@ test("Dream loads up to two of the account's starred LoRAs the profile can use",
     ["film.safetensors", 1],
     ["fox.safetensors", 0.6],
   ]);
-  state.loras.alice.favorites.push("ink.safetensors");
+  state.loras.alice.ratings["ink.safetensors"] = "up";
   assert.equal(((await dreamOnce())!.input.loras as unknown[]).length, 2);
-  assert.match(state.calls.at(-1)!.user, /starred LoRAs: /);
+  assert.match(state.calls.at(-1)!.user, /favourite LoRAs: /);
   // Without LoRA access nothing is added.
   state.loras = {};
   const next = (await dreamOnce())!;
