@@ -11,6 +11,14 @@ export function mediaTitle(item: Pick<MediaItem, "prompt" | "title">) {
 }
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+// Made once: `toLocaleString` with options builds a formatter on every call, once per tile render.
+const timeOnly = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const dayAndTime = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 /** When it was made · the profile's name, plus a video's length. */
 export function mediaDetail(item: MediaItem, profiles: Profile[]) {
@@ -18,12 +26,7 @@ export function mediaDetail(item: MediaItem, profiles: Profile[]) {
   const created = item.createdAt ? new Date(item.createdAt) : null;
   const time =
     created && !Number.isNaN(created.getTime())
-      ? created.toLocaleString(
-          undefined,
-          sameDay(created, new Date())
-            ? { hour: "numeric", minute: "2-digit" }
-            : { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" },
-        )
+      ? (sameDay(created, new Date()) ? timeOnly : dayAndTime).format(created)
       : "";
   const profile = profiles.find((entry) => isProfile(entry, settings.profileId));
   const name = String(settings.profileName || profile?.displayName || profile?.label || "");

@@ -1,3 +1,4 @@
+import { yieldToEventLoop } from "./json-store.js";
 import { mediaType } from "./media-paths.js";
 import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery-store.js";
 import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
@@ -58,8 +59,17 @@ function stillShown({ filename, subfolder, type }) {
 
 const idle = () => buildStats().building === 0 && buildStats().waiting === 0 && encoderIdle();
 
+// When the event loop last had a turn; see quietly.
+let turnAt = 0;
+
 /** Runs one build when the studio is otherwise quiet, then rests for as long as it took. */
 async function quietly(key, media, build) {
+  // Done and existing files resolve without waiting on anything, so a pass over a large warmed
+  // gallery would hold the event loop for its whole length: give it a turn now and then.
+  if (performance.now() - turnAt > 10) {
+    await yieldToEventLoop();
+    turnAt = performance.now();
+  }
   if (settled.has(key)) return;
   while (!idle()) await sleep(250);
   if (!stillShown(media)) return;

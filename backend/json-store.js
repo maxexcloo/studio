@@ -130,12 +130,31 @@ export async function writeBytesFileAsync(file, bytes, { mode, validate, durable
   }
 }
 
-const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
+export const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
 
 /**
- * The same crash-safe write, without holding up the server: an array is turned
- * into text a slice at a time, with requests served in between, and the file
- * work is asynchronous. The result is exactly JSON.stringify(value), compact.
+ * JSON.stringify(value), compact, without holding up the server: an array is
+ * turned into text a slice at a time, with requests served in between.
+ */
+export async function jsonTextAsync(value, sliceSize = 500) {
+  if (!Array.isArray(value)) return JSON.stringify(value);
+  const slices = [];
+  for (let start = 0; start < value.length; start += sliceSize) {
+    if (start) await yieldToEventLoop();
+    // JSON.stringify writes null for what it cannot represent in an array; so does this.
+    slices.push(
+      value
+        .slice(start, start + sliceSize)
+        .map((item) => JSON.stringify(item) ?? "null")
+        .join(","),
+    );
+  }
+  return `[${slices.join(",")}]`;
+}
+
+/**
+ * The same crash-safe write, without holding up the server: the text is made
+ * by jsonTextAsync and the file work is asynchronous.
  *
  * `shouldCommit` is asked right before the rename; returning false drops this
  * write (a newer one already landed), so an older copy never replaces a newer.
@@ -154,21 +173,7 @@ export async function writeJsonFileAsync(
   let backedUp = false;
   try {
     try {
-      if (Array.isArray(value)) {
-        await handle.write("[");
-        for (let start = 0; start < value.length; start += sliceSize) {
-          if (start) await yieldToEventLoop();
-          // JSON.stringify writes null for what it cannot represent in an array; so does this.
-          const text = value
-            .slice(start, start + sliceSize)
-            .map((item) => JSON.stringify(item) ?? "null")
-            .join(",");
-          await handle.write(start ? `,${text}` : text);
-        }
-        await handle.write("]");
-      } else {
-        await handle.write(JSON.stringify(value));
-      }
+      await handle.write(await jsonTextAsync(value, sliceSize));
       await handle.sync();
     } finally {
       await handle.close();
