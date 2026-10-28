@@ -213,7 +213,10 @@ const stem = (name) =>
 const maxDetails = 5;
 
 /** Profile-compatible optional LoRAs, verified fits first, then by name; the studio picker ranks the same way. */
-function loraCandidates(profile, infos) {
+/** Thumbs up first, then unrated, then thumbs down. */
+const ratingOrder = (rating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+
+function loraCandidates(profile, infos, ratings = {}) {
   if (profile.capabilities?.lora === false) return [];
   const entries = [];
   for (const name of profile.options?.loras || []) {
@@ -225,6 +228,7 @@ function loraCandidates(profile, infos) {
   }
   return entries.sort(
     (left, right) =>
+      ratingOrder(ratings[left.name]) - ratingOrder(ratings[right.name]) ||
       Number(left.fit === "unknown") - Number(right.fit === "unknown") ||
       left.name.localeCompare(right.name),
   );
@@ -325,8 +329,8 @@ export function resolveLoraName(profile, value) {
  * Compatible LoRAs for Models. Without a lookup, a compact index of every compatible LoRA;
  * with lora_query or lora_names, full details for the first few matches.
  */
-export function mcpLoras(profile, infos = {}, { query = "", names = [] } = {}) {
-  const candidates = loraCandidates(profile, infos);
+export function mcpLoras(profile, infos = {}, { query = "", names = [], ratings = {} } = {}) {
+  const candidates = loraCandidates(profile, infos, ratings);
   const short = shortNames(profile);
   const needle = String(query || "")
     .trim()

@@ -12,9 +12,10 @@ interface SavedStack {
 }
 export interface LoraLibrary {
   snapshots: Record<string, SavedStack[]>;
-  favorites?: string[];
+  ratings?: Record<string, LoraRating>;
 }
-/** The account's saved stacks and favourite LoRAs. */
+export type LoraRating = "up" | "down";
+/** The account's saved stacks and LoRA ratings. */
 export const loraLibraryQuery = queryOptions({
   queryKey: ["lora-library"],
   queryFn: () => api<{ found: boolean; library: LoraLibrary }>("/api/loras/library"),

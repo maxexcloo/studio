@@ -742,11 +742,16 @@ export function registerMcpRoutes(
             // A LoRA lookup without a model searches every ready profile, so one call answers it.
             if (lora_query || lora_names.length) {
               const infos = await media.loraInfos(owner);
+              const ratings = await media.loraRatings(owner);
               const found = new Map();
               const missing = new Set(lora_names);
               for (const profile of profiles) {
                 if (!listedControls(profile).loras) continue;
-                const result = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
+                const result = mcpLoras(profile, infos, {
+                  query: lora_query,
+                  names: lora_names,
+                  ratings,
+                });
                 for (const lora of result.loras) {
                   if (!found.has(lora.name)) found.set(lora.name, { ...lora, profiles: [] });
                   found.get(lora.name).profiles.push(profile.id);
@@ -797,12 +802,14 @@ export function registerMcpRoutes(
             profile.options?.loras?.length && profile.capabilities?.lora !== false
               ? await media.loraInfos(owner)
               : {};
+          const ratings = Object.keys(infos).length ? await media.loraRatings(owner) : {};
           const controls = listedControls(profile);
           // A LoRA lookup answers only that question; the profile's guide and controls come without one.
           if (controls.loras && (lora_query || lora_names.length)) {
             const { loras, total, more, missing } = mcpLoras(profile, infos, {
               query: lora_query,
               names: lora_names,
+              ratings,
             });
             return mcpJson({
               id: profile.id,
@@ -840,7 +847,7 @@ export function registerMcpRoutes(
                 ];
               }),
             );
-          const { loras, total } = mcpLoras(profile, infos);
+          const { loras, total } = mcpLoras(profile, infos, { ratings });
           const guide = full_guide
             ? prompting(profile, true)
             : compactGuide(prompting(profile, true), maxShownGuideCharacters);

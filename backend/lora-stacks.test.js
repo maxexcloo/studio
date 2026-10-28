@@ -27,16 +27,16 @@ test("account LoRA stacks and library state use separate files from each other a
   clearLoraState("account-a");
   clearLoraState("account-b");
   saveLoraLibrary(
-    { favorites: ["private-a.safetensors"], snapshots: { [key]: [stack("a", "A")] } },
+    { ratings: { "private-a.safetensors": "up" }, snapshots: { [key]: [stack("a", "A")] } },
     "account-a",
   );
   saveLoraLibrary(
-    { favorites: ["private-b.safetensors"], snapshots: { [key]: [stack("b", "B")] } },
+    { ratings: { "private-b.safetensors": "down" }, snapshots: { [key]: [stack("b", "B")] } },
     "account-b",
   );
-  assert.deepEqual(loadLoraLibrary("account-a").favorites, ["private-a.safetensors"]);
-  assert.deepEqual(loadLoraLibrary("account-b").favorites, ["private-b.safetensors"]);
-  assert.equal(loadLoraLibrary().favorites.includes("private-a.safetensors"), false);
+  assert.deepEqual(loadLoraLibrary("account-a").ratings, { "private-a.safetensors": "up" });
+  assert.deepEqual(loadLoraLibrary("account-b").ratings, { "private-b.safetensors": "down" });
+  assert.equal(loadLoraLibrary().ratings["private-a.safetensors"], undefined);
 });
 
 test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () => {
@@ -49,10 +49,12 @@ test("replayed edits are harmless: no duplicate adds, deletes stay deleted", () 
   ]);
   assert.deepEqual(loadLoraLibrary().snapshots[key], []);
   applyLoraOps([
-    { op: "favorite", name: "a", on: true },
-    { op: "favorite", name: "a", on: true },
+    { op: "rating", name: "a", rating: "up" },
+    { op: "rating", name: "a", rating: "up" },
+    { op: "rating", name: "b", rating: "down" },
+    { op: "rating", name: "b", rating: null },
   ]);
-  assert.deepEqual(loadLoraLibrary().favorites, ["a"]);
+  assert.deepEqual(loadLoraLibrary().ratings, { a: "up" });
 });
 
 test("a stale whole-library save merges instead of wiping newer stacks", () => {
@@ -60,7 +62,7 @@ test("a stale whole-library save merges instead of wiping newer stacks", () => {
   applyLoraOps([{ op: "stack.add", key, stack: stack("new", "Saved on the Mac") }]);
   const library = saveLoraLibrary({
     snapshots: { [key]: [stack("old", "From an old tab")] },
-    favorites: ["b"],
+    ratings: { b: "down" },
     strengths: {},
     recents: [],
   });
@@ -68,7 +70,7 @@ test("a stale whole-library save merges instead of wiping newer stacks", () => {
     library.snapshots[key].map((item) => item.name),
     ["Saved on the Mac", "From an old tab"],
   );
-  assert.deepEqual(library.favorites, ["b"]);
+  assert.deepEqual(library.ratings, { b: "down" });
 });
 
 test("rename, update, strengths, recents and the active stack all apply", () => {

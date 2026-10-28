@@ -146,7 +146,7 @@
   transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
-/* Desktop tiles reveal their corner control on hover or focus; a pressed one (a favourite) stays. */
+/* Desktop tiles reveal their corner control on hover or focus; a pressed one (a LoRA rating) stays. */
 @media (hover: hover) {
   .tile:not([data-row], :hover, :focus-within) .action:not(:has([aria-pressed="true"])) {
     opacity: 0;
@@ -160,6 +160,11 @@
   gap: var(--mantine-spacing-sm);
   min-height: 56px;
   padding: 6px 52px 6px 6px;
+}
+
+/* Two corner controls, such as a LoRA's thumbs up and down. */
+.tile[data-row]:has(.action button + button) .toggle {
+  padding-right: 84px;
 }
 
 .tile[data-row] .media {
