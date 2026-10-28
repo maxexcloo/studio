@@ -21,7 +21,7 @@
   height: 4px;
   border-radius: 2px;
   background: var(--mantine-color-default-border);
-  transition: background-color var(--studio-motion-duration) ease;
+  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 .strip span[data-done] {
   background: var(--mantine-primary-color-light-color);
@@ -55,8 +55,8 @@
   -webkit-user-select: none;
   cursor: grab;
   transition:
-    transform var(--studio-motion-duration) ease,
-    opacity var(--studio-motion-duration) ease;
+    transform var(--studio-motion-duration) var(--studio-ease-enter),
+    opacity var(--studio-motion-duration) var(--studio-ease-enter);
   will-change: transform;
   --dream-left: 0;
   --dream-right: 0;

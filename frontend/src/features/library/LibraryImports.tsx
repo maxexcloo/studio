@@ -200,11 +200,7 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
               cell: (record) => (
                 <Stack gap={4} align="start">
                   {record.grade && (
-                    <Badge
-                      miw="max-content"
-                      variant="light"
-                      color={gradeColours[record.grade.value] || "gray"}
-                    >
+                    <Badge miw="max-content" color={gradeColours[record.grade.value] || "gray"}>
                       {record.grade.value}
                     </Badge>
                   )}

@@ -129,7 +129,7 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
       <Button
         variant="default"
         radius="xl"
-        size="compact-md"
+        size="compact-sm"
         leftSection={<Pencil size={14} />}
         loading={action.isPending && action.variables !== "animate"}
         disabled={action.isPending}
@@ -141,7 +141,7 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
         <Button
           variant="default"
           radius="xl"
-          size="compact-md"
+          size="compact-sm"
           leftSection={<Play size={14} />}
           loading={action.isPending && action.variables === "animate"}
           disabled={action.isPending}
@@ -276,7 +276,7 @@ export function SessionIteration({
                   ref={editButton}
                   variant="subtle"
                   color="gray"
-                  size="compact-md"
+                  size="compact-sm"
                   radius="xl"
                   leftSection={<Pencil size={14} />}
                   style={{ flexShrink: 0 }}

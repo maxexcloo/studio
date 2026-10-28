@@ -95,7 +95,7 @@ export function GalleryFilterPicker({
               {label}
             </Text>
             <Button
-              size="compact-xs"
+              size="compact-sm"
               variant="subtle"
               disabled={!value.length}
               onClick={() => onChange([])}

@@ -263,7 +263,7 @@ function useAdministration() {
   return { admin, refresh };
 }
 const groupFeature = (on: boolean | undefined, label: string) => (
-  <Badge miw="max-content" variant="light" color={on ? "green" : "gray"}>
+  <Badge miw="max-content" color={on ? "green" : "gray"}>
     {label} {on ? "On" : "Off"}
   </Badge>
 );
@@ -450,7 +450,6 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                   {(account.disabled || account.pending || account.role === "administrator") && (
                     <Badge
                       miw="max-content"
-                      variant="light"
                       color={account.disabled ? "red" : account.pending ? "yellow" : "gray"}
                     >
                       {account.disabled
@@ -461,7 +460,7 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                     </Badge>
                   )}
                   {account.signInLinked && (
-                    <Badge miw="max-content" variant="light" color="gray">
+                    <Badge miw="max-content" color="gray">
                       Single Sign-On
                     </Badge>
                   )}

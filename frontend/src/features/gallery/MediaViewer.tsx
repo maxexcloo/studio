@@ -473,7 +473,7 @@ export function MediaViewer({
             />
           </div>
           {!phone && (
-            // The track's width animates so the stage re-centres in step with the sliding panel.
+            // The track opens at once so the stage re-centres while the panel slides in.
             <div className={classes.asideTrack} data-open={details || undefined}>
               <aside
                 className={classes.aside}
