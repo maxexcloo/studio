@@ -2083,6 +2083,12 @@ const suggestions = createSuggestions({
   taste,
   writer: tasteWriter,
   online: textOnline,
+  uncensored: (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    return (
+      !ownerId || Boolean(account?.authenticated && mayUseFeature(account, "uncensoredModels"))
+    );
+  },
   item: (ownerId, jobId) =>
     filterVisibleGallery(
       gallery.filter((entry) => entry.jobId === jobId && (entry.ownerId || "") === ownerId),
