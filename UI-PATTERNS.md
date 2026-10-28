@@ -205,7 +205,8 @@ primary component reference and verify APIs against the installed version.
 - Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.
-- Dream also mixes in random older gallery items, as single cards and
+- Dream also mixes in random older images the account generated in Studio
+  (never uploads or imports), as single cards and
   occasional this-or-that pairs, to calibrate taste without using the GPU;
   judging them never alters the gallery beyond an optional Star.
 - An editable, LLM-maintained taste profile learns from swipes, stars,

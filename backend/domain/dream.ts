@@ -61,6 +61,11 @@ export interface DreamLoraLibrary {
   favorites: string[];
   strengths: Record<string, Record<string, number>>;
 }
+export interface DreamLora {
+  name: string;
+  strength: number;
+  enabled: true;
+}
 /** What an account may do, or null once it is gone; `account` is undefined in single-user mode. */
 export interface DreamAccess {
   account?: GenerationAccount;
@@ -186,6 +191,8 @@ export function createDream(options: {
   mark(ownerId: string, itemId: string, dream: DreamMark): void;
   /** The account's LoRA library, or null where it may not use LoRAs. */
   loraLibrary(ownerId: string): DreamLoraLibrary | null;
+  /** The LoRAs that can run on the profile (its model family), strengths within published ranges. */
+  fitLoras(profile: DreamProfile, loras: DreamLora[]): DreamLora[];
   /** A gallery image as a reference asset for a video, or a throw when it can't be one. */
   reference(
     account: GenerationAccount | undefined,
@@ -240,6 +247,17 @@ export function createDream(options: {
         counts[kindOf(job.input) === "video" ? "videos" : "images"]++;
     return counts;
   }
+  /**
+   * The owner's Studio generations: visible gallery records of a job this Studio queued for the
+   * account (composer, Chat, MCP or Dream). Uploads, imports and records rebuilt without a job
+   * never reach Dream, so it shows and learns only from what the account made here.
+   */
+  function generations(ownerId: string) {
+    const jobs = new Set(store.jobs(ownerId).map((job) => job.id));
+    return options
+      .visible(options.gallery(ownerId))
+      .filter((item) => (item.ownerId || "") === ownerId && item.jobId && jobs.has(item.jobId));
+  }
   const pool = (ownerId: string, state: DreamState) =>
     options.gallery(ownerId).filter((item) => item.dream?.state === state);
   const unseenCount = (ownerId: string) =>
@@ -286,7 +304,7 @@ export function createDream(options: {
     const profiles = catalogue.profiles.filter((profile) => kindOf(profile) === kind);
     const since = now() - starredDays * 86_400_000;
     const stars = new Map<string, number>();
-    for (const item of options.gallery(ownerId))
+    for (const item of generations(ownerId))
       if (item.favorite && Date.parse(item.createdAt || "") >= since) {
         const id = String(item.settings?.profileId || "");
         stars.set(id, (stars.get(id) || 0) + 1);
@@ -303,8 +321,7 @@ export function createDream(options: {
   }
   /** A kept or starred image from the visible gallery, for a video's first frame. */
   function sourceImage(ownerId: string) {
-    const choices = options
-      .visible(options.gallery(ownerId))
+    const choices = generations(ownerId)
       .filter(
         (item) =>
           item.type === "image" &&
@@ -315,16 +332,24 @@ export function createDream(options: {
     return choices.length ? choices[random(choices.length)] : undefined;
   }
 
-  /** Up to two of the account's starred LoRAs the profile can load, at their saved strength. */
+  /**
+   * Up to two of the account's starred LoRAs the profile can load and that suit its model family,
+   * at their saved strength. A LoRA for another family is left out rather than failing the run.
+   */
   function starredLoras(ownerId: string, profile: DreamProfile) {
     const library = options.loraLibrary(ownerId);
     const available = new Set(profile.options?.loras || []);
     const names = shuffled((library?.favorites || []).filter((name) => available.has(name)));
-    return names.slice(0, dreamLoras).map((name) => ({
-      name,
-      strength: library!.strengths[profile.workflow || ""]?.[name] ?? 1,
-      enabled: true,
-    }));
+    return options
+      .fitLoras(
+        profile,
+        names.map((name) => ({
+          name,
+          strength: library!.strengths[profile.workflow || ""]?.[name] ?? 1,
+          enabled: true as const,
+        })),
+      )
+      .slice(0, dreamLoras);
   }
   /**
    * Dream's writing stage (queue.ts): one new idea for the job's profile from the person's taste,
@@ -346,8 +371,7 @@ export function createDream(options: {
     const { spicy, source, loras = [] } = job.input.writing as DreamWriting;
     const { recent } = read(ownerId);
     const media = kindOf(profile);
-    const starred = options
-      .visible(options.gallery(ownerId))
+    const starred = generations(ownerId)
       .filter((item) => item.favorite && item.prompt)
       .slice(0, 5)
       .map((item) => clean(item.prompt, 300));
@@ -576,14 +600,12 @@ export function createDream(options: {
   /** The owner's finished gallery images that are old enough to calibrate with. */
   const calibrationPool = (ownerId: string) => {
     const before = now() - calibrationAgeMs;
-    return options
-      .visible(options.gallery(ownerId))
-      .filter(
-        (item) =>
-          item.type === "image" &&
-          item.status === "done" &&
-          Date.parse(item.createdAt || "") <= before,
-      );
+    return generations(ownerId).filter(
+      (item) =>
+        item.type === "image" &&
+        item.status === "done" &&
+        Date.parse(item.createdAt || "") <= before,
+    );
   };
   function shuffled<T>(items: T[]) {
     const list = [...items];
