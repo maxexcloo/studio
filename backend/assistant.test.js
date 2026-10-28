@@ -214,7 +214,7 @@ test("failures fall back to the original prompt with the reason, and a timeout a
     assert.deepEqual([result.prompt, result.source], ["a cabin", "fallback"]);
     reasons.push(result.reason);
   }
-  assert.deepEqual(reasons, ["HTTP 503", "unreachable", "unusable reply"]);
+  assert.deepEqual(reasons, ["HTTP 503", "unreachable", "empty reply"]);
   const hanging = (_body, options) =>
     new Promise((_resolve, reject) =>
       options.signal.addEventListener("abort", () => reject(options.signal.reason)),
@@ -531,7 +531,19 @@ test("title summarises the prompt in a few words, leaving the model room to thin
     fetchImpl: fakeGateway(() => json("<think>…</think>")).fetchImpl,
     log: quiet,
   });
-  await assert.rejects(empty.title({ prompt: "a barn" }), /unusable reply/);
+  await assert.rejects(empty.title({ prompt: "a barn" }), /empty reply/);
+});
+
+test("chat turns thinking off and names a reply the token limit cut off", async () => {
+  const seen = fakeGateway(() =>
+    Response.json({ choices: [{ message: { content: "" }, finish_reason: "length" }] }),
+  );
+  const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
+  await assert.rejects(
+    engine.chat({ model: "ai/text", messages: [] }),
+    /reply cut off at the token limit/,
+  );
+  assert.equal(seen.calls[0].body.reasoning_effort, "none");
 });
 
 test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown uncensored", async () => {

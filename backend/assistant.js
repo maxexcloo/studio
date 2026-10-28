@@ -533,7 +533,16 @@ export function createAssistant(
       onThinking?.(text);
     };
     const timer = AbortSignal.timeout(ms ?? timeoutMs);
-    const body = { model, messages, temperature, max_tokens: maxTokens, stream };
+    // Every call here wants a structured answer, not deliberation: thinking off makes a prompt
+    // seconds faster and stops long reasoning from spending max_tokens before any content.
+    const body = {
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      reasoning_effort: "none",
+      stream,
+    };
     let response;
     try {
       response = await fetchImpl(endpoint, {
@@ -561,6 +570,7 @@ export function createAssistant(
       });
     }
     let raw = "";
+    let finish = "";
     try {
       if (
         stream &&
@@ -572,6 +582,7 @@ export function createAssistant(
           if (event?.error)
             throw new AssistantError(one(event.error.message || "stream error", 120));
           const choice = event?.choices?.[0];
+          if (choice?.finish_reason) finish = choice.finish_reason;
           const part = choice?.delta || choice?.message;
           if (typeof part?.reasoning_content === "string" && part.reasoning_content)
             thought(part.reasoning_content, "reasoning");
@@ -584,7 +595,9 @@ export function createAssistant(
         const rest = filter.flush();
         if (rest) shown(rest);
       } else {
-        const message = (await response.json())?.choices?.[0]?.message;
+        const choice = (await response.json())?.choices?.[0];
+        const message = choice?.message;
+        finish = String(choice?.finish_reason || "");
         raw = String(message?.content || "");
         const reasoned = String(message?.reasoning_content || "").trim();
         if (reasoned) thought(reasoned, "reasoning");
@@ -599,6 +612,10 @@ export function createAssistant(
         cause: error,
       });
     }
+    if (!stripThinking(raw))
+      throw new AssistantError(
+        finish === "length" ? "reply cut off at the token limit" : "empty reply",
+      );
     return {
       text: stripThinking(raw),
       thinking: reasoning.trim(),
