@@ -112,7 +112,9 @@
   width: min(100%, var(--studio-composer-width));
 }
 
-.strip {
+/* The strip and the action bar are sized to their content. */
+.strip,
+.actions {
   width: auto;
   max-width: min(100%, var(--studio-composer-width));
 }
@@ -179,12 +181,6 @@
   flex-shrink: 0;
   width: 96px;
   height: 26px;
-}
-
-/* Regenerate's menu half stays narrow so the split control reads as one action. */
-.splitMenu {
-  width: 22px;
-  min-width: 22px;
 }
 
 /* The surface extends outward so prompt text stays aligned with the rest of Details. */

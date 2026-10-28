@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { closeReferences, fixtures, gallerySearch, image, stamp } from "./fixtures";
+import {
+  closeReferences,
+  fixtures,
+  gallerySearch,
+  image,
+  selectionAction,
+  stamp,
+} from "./fixtures";
 const results = (count: number) =>
   Array.from({ length: count }, (_, index) => ({
     id: `browse-${index}`,
@@ -176,13 +183,10 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await touch(selected, "touchend");
   await selected.dispatchEvent("click");
   await expect(selected).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+  await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery[1].favorite).toBe(true);
   expect(state.gallery[0].favorite).not.toBe(true);
-  await page
-    .getByRole("group", { name: "Selected Item Actions", exact: true })
-    .getByRole("button", { name: "Cancel", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Close Selection", exact: true }).click();
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
@@ -242,7 +246,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     await expect(selection.getByRole("status")).toHaveText("4 Selected");
-    const retry = page.getByRole("button", { name: "Retry Selected", exact: true });
+    const retry = selectionAction(page, "Retry");
     await retry.click();
     await expect(retry).toBeDisabled();
     await retry.dispatchEvent("click");
@@ -261,7 +265,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
     await retry.click();
     await expect(selection.getByRole("status")).toHaveText("1 Selected");
     expect(attempts).toEqual(["batch-a", "batch-b", "batch-b"]);
-    await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+    await selectionAction(page, "Star").click();
     await expect.poll(() => state.gallery.find((item) => item.id === "ready")?.favorite).toBe(true);
     expect(state.gallery.filter((item) => item.favorite)).toHaveLength(1);
   } finally {
@@ -411,7 +415,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   await expect(status).toHaveText("3 Selected");
   await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
-  await page.getByRole("button", { name: "Stop Selected", exact: true }).click();
+  await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
   await page.getByRole("button", { name: "Select Failed", exact: true }).click();
   await expect(status).toHaveText("1 Selected");
@@ -419,7 +423,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .getByRole("button", { name: "Select image: Browse Result 3", exact: true })
     .click({ button: "right" });
   await expect(status).toHaveText("2 Selected");
-  await expect(page.getByRole("menuitem", { name: "Delete Selected", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Delete");
   const confirm = page.getByRole("dialog", { name: "Delete Selected Items", exact: true });
@@ -522,24 +526,31 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
+  // A sole item's own actions work; with several they grey out.
+  await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
+  await expect(selectionAction(page, "Edit")).toBeEnabled();
   await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  await expect(page.getByRole("link", { name: "Download Selected", exact: true })).toHaveAttribute(
-    "href",
-    /ids=selection-0%2Cselection-1/,
-  );
-  await page.getByRole("button", { name: "Star Selected", exact: true }).click();
+  await expect(selectionAction(page, "Edit")).toBeDisabled();
+  // Phones that share natively share instead of downloading.
+  const sharing =
+    test.info().project.use.isMobile &&
+    (await page.evaluate(() => typeof navigator.share === "function"));
+  if (sharing) await expect(selectionAction(page, "Prepare Share")).toBeEnabled();
+  else
+    await expect(selectionAction(page, "Download", "link")).toHaveAttribute(
+      "href",
+      /ids=selection-0%2Cselection-1/,
+    );
+  await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery.filter((item) => item.favorite).length).toBe(2);
-  await page.getByRole("button", { name: "Delete Selected", exact: true }).click();
+  await selectionAction(page, "Delete").click();
   await page
     .getByRole("dialog", { name: "Delete Selected Items", exact: true })
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect.poll(() => state.gallery.map((item) => item.id)).toEqual(["selection-2"]);
-  await page
-    .getByRole("group", { name: "Selected Item Actions", exact: true })
-    .getByRole("button", { name: "Cancel", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Close Selection", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 
@@ -583,6 +594,17 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
       aspect: ["1:1"],
       q: "bird",
     });
+  // Outside filter mode the active filters stay beside the search as removable chips.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const chips = page.getByRole("group", { name: "Active Filters", exact: true });
+  await expect(chips.getByRole("button")).toHaveCount(5);
+  await chips.getByRole("button", { name: "Remove 1:1 Filter", exact: true }).click();
+  // Removing one leaves the others and the search.
+  await expect(chips.getByRole("button")).toHaveCount(4);
+  const field = await gallerySearch(page);
+  await expect(field).toHaveValue("bird");
+  await field.press("Escape");
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Clear Filters", exact: true }).click();
   await expect(page.getByRole("button", { name: "Clear Filters", exact: true })).toBeHidden();
   // The cleared search is served fresh from cache or requested again, never with the old facets.

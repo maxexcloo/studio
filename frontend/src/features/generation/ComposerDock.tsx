@@ -158,6 +158,19 @@ export function ComposerDock({
     (event) => {
       if (closingPopup() || inLayer(event.target as HTMLElement)) return;
       collapse(false);
+      // In the viewer the press only folds the composer back to its bar; the click that follows
+      // must not also act beneath it (closing the viewer). The next press drops a stale guard.
+      if (!embedded) return;
+      const swallow = (click: MouseEvent) => {
+        click.preventDefault();
+        click.stopPropagation();
+      };
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      window.addEventListener(
+        "pointerdown",
+        () => window.removeEventListener("click", swallow, true),
+        { capture: true, once: true },
+      );
     },
     ["mousedown", "touchstart"],
     undefined,

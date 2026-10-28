@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, loadSaved, stamp, viewerAction } from "./fixtures";
+import { fixtures, image, loadSaved, selectionAction, stamp, viewerAction } from "./fixtures";
 async function galleryFixture(page: Page) {
   const state = await fixtures(page);
   const input = {
@@ -62,11 +62,8 @@ test("A tile can be starred and read back without opening the viewer", async ({
   if (testInfo.project.use.isMobile) {
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
     await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
-    await page.getByRole("button", { name: "Star Selected", exact: true }).click();
-    await page
-      .getByRole("group", { name: "Selected Item Actions", exact: true })
-      .getByRole("button", { name: "Cancel", exact: true })
-      .click();
+    await selectionAction(page, "Star").click();
+    await page.getByRole("button", { name: "Close Selection", exact: true }).click();
   } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Unstar A copper bird", exact: true }),
@@ -87,20 +84,24 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
-  // One shared order: Animate, Edit, Recreate, Reference | Create Comparison, Upscale | Copy
-  // Details, Copy Prompt (and Copy Image where supported) | Delete.
+  // The viewer's sections and order: Animate, Edit, Recreate, Reference | Compare, Upscale |
+  // Copy, Download | Delete, Star.
   await expect(page.getByRole("menuitem")).toContainText([
     "Animate",
     "Edit",
     "Recreate",
-    "Create Comparison",
+    "Reference",
+    "Compare",
     "Upscale",
-    "Copy Details",
-    "Copy Prompt",
+    "Copy",
+    /^(Download|Share Image|Prepare Share)$/,
     "Delete",
+    "Star",
   ]);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
+  // The pointer leaves the tile, so hover opens no submenu under it.
+  await page.mouse.move(0, 0);
   const more = page.getByRole("button", { name: "More Actions for A copper bird", exact: true });
   await more.focus();
   await more.press("Enter");
@@ -121,6 +122,8 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
+    if (operation === "Animate")
+      await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.

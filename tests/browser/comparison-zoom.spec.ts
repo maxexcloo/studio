@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, image, stamp, viewerAction } from "./fixtures";
+import { compareUpscale, fixtures, image, stamp } from "./fixtures";
 
 const png = (width: number, height: number) =>
   sharp({ create: { width, height, channels: 3, background: "#46a3ff" } })
@@ -35,7 +35,7 @@ test("Comparison zoom keeps both layers aligned while panning and using its keyb
   await page.goto("/images");
   const opener = page.getByRole("button", { name: "Open image: Portrait comparison", exact: true });
   await opener.click();
-  await viewerAction(page, "Compare");
+  await compareUpscale(page);
   const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
   const viewport = dialog.locator('[aria-label="Comparison Viewport"]');
   const picture = dialog.getByRole("button", { name: "Change Comparison Zoom", exact: true });
@@ -144,7 +144,7 @@ test("Upscale comparison uses one bounded slider and preserves the original resu
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Comparison Study", exact: true }).click();
-  await viewerAction(page, "Compare");
+  await compareUpscale(page);
   const slider = page.getByRole("slider", { name: "Comparison Position", exact: true });
   await expect(slider).toBeVisible();
   await slider.focus();

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, stamp, viewerOptions } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 for (const kind of ["image", "video"] as const) {
   test(`${kind} version selection persists and downloads the displayed format`, async ({
@@ -63,7 +63,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", originalUrl);
     await expect(download).toHaveAttribute("href", originalUrl);
     await expect(download).toHaveAttribute("download", `source.${originalExtension}`);
-    await viewerOptions(page);
+    await viewerAction(page, "Upscale");
     const version = page.getByRole("switch", { name: "Show Upscale", exact: true });
     await expect(version).not.toBeChecked();
     await version.click();
@@ -73,19 +73,13 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
     await expect(download).toHaveAttribute("download", `source.${upscaleExtension}`);
-    // Phones keep Compare under More Viewer Actions.
-    const phone = test.info().project.use.isMobile;
-    if (phone)
-      await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
-    const compare = phone
-      ? page.getByRole("menuitem", { name: "Compare", exact: true })
-      : viewer.getByRole("button", { name: "Compare", exact: true });
+    // Upscale's options compare an image's upscale with its original.
+    const compare = page.getByRole("switch", { name: "Compare Upscale", exact: true });
     if (kind === "image") await expect(compare).toBeVisible();
     else await expect(compare).toHaveCount(0);
-    if (phone) await page.keyboard.press("Escape");
     await page.reload();
     await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
-    await viewerOptions(page);
+    await viewerAction(page, "Upscale");
     await expect(version).toBeChecked();
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
@@ -98,7 +92,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(download).toHaveAttribute("download", `source.${originalExtension}`);
     await page.reload();
     await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
-    await viewerOptions(page);
+    await viewerAction(page, "Upscale");
     await expect(version).not.toBeChecked();
     await expect(media).toHaveAttribute("src", originalUrl);
   });

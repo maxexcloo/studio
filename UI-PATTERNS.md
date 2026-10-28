@@ -226,8 +226,10 @@ primary component reference and verify APIs against the installed version.
   it from an icon into a full-width focused input, and Escape closes it while
   preserving the query. Filter and Select are compact chips at the row's end
   (icons on phones); Filter swaps the leading controls for a row of facet chips,
-  each opening a scrollable Mantine popover. Normal, search, filters and
-  selection modes use the same toolbar region. Search/filter actions preserve queries.
+  each opening a scrollable Mantine popover, beside the search box on desktop.
+  Search narrows within the active filters, which show beside the search as
+  removable chips. Normal, search, filters and selection modes use the same
+  toolbar region. Search/filter actions preserve queries.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
@@ -240,14 +242,14 @@ primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub. Under the image, its prompt bar is the
   composer collapsed (the same `ComposerDock`, in its own draft that never
   touches the page's), prefilled with the item's settings; clicking it expands
-  in place over the open viewer with the prompt focused. Its runs queue as usual
+  in place over the open viewer with the prompt focused, and a click outside it
+  only folds it back to the bar. Its runs queue as usual
   into a strip of the item's versions, grouped as the grid groups them
   (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
-  shared item actions in their menu groups, plus Star, Download (and Share on
-  phones) first and Regenerate (new seed, with Exact Repeat in its menu) after
-  Recreate; Animate keeps its LLM prompt menu (Cinematic Camera, Living Photo,
-  Action, Spicy for NSFW-granted accounts, Custom Instruction) and Upscale its
-  settings. Details lists
+  shared item actions, sized to them; Animate opens its LLM prompt menu
+  (Cinematic Camera, Living Photo, Action, Spicy for NSFW-granted accounts,
+  Custom Animation, Animate in Composer) and Upscale its settings with Show
+  Upscale and Compare Upscale. Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height. The desktop details sidebar is open by
@@ -259,7 +261,7 @@ primary component reference and verify APIs against the installed version.
   follows it to the result (`currentMedia`).
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows a
-  result and its versions (runs made from it: Edit, Recreate, Regenerate and the
+  result and its versions (runs made from it: Edit, Recreate, New Seed and the
   like, linked by `parentJobId` and `parentItemId`) as one tile showing the latest,
   with a version count; crossing it with the pointer, or a sideways swipe on
   phones, flips through them. The All Versions filter chip lists them
@@ -275,17 +277,22 @@ primary component reference and verify APIs against the installed version.
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Item actions have one definition (`useMediaActions`): Animate, Edit, Recreate,
-  Reference | Create Comparison, Upscale | Copy Details, Copy Prompt | Delete,
-  divided into those groups in every menu and action bar. The viewer and gallery
-  selection share one `ActionBarGroups` bar: icon groups with dividers, phone
-  overflow in a More menu of the same groups, and a trailing control after a
-  divider (Viewer Options for display/sharing switches; Cancel, which ends selection).
+- Item actions have one definition (`gallery/MediaActions.tsx`): Animate, Edit,
+  Recreate ▾, Reference | Compare, Upscale | Copy ▾, Download | Delete, Star,
+  alphabetical within each section, in every menu and action bar. Options are
+  submenus in menus and split buttons or menus in bars: Animate › themes,
+  Custom Animation, Animate in Composer (Extend for videos); Recreate › In
+  Composer, New Seed, Exact Repeat; Upscale › Show Upscale, Compare Upscale;
+  Copy (Details by default) › Details, Prompt. Phones that share natively show
+  Share Image in Download's place; desktop has no Share. The viewer and gallery
+  selection share one `ActionBarGroups` bar of divided groups that scrolls
+  sideways when it overflows. The selection bar labels its buttons on desktop, greys out
+  actions for one item at a time and ends with Close.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
   Image viewing and original/upscale comparison share `MediaZoom` for named
   zoom modes, native transforms, keyboard shortcuts and transient controls.
-- Display, thumbnails, copy, sharing and downloads use the saved original/upscale
+- Display, thumbnails, sharing and downloads use the saved original/upscale
   choice through `mediaSource`. Video upscales stay videos; comparison is an
   image action. Upscale quality, size and optional face detail use the worker’s
   reported capabilities and the durable queue.
@@ -294,8 +301,8 @@ primary component reference and verify APIs against the installed version.
   hiding the tab pauses playback. Heavy tools load only when opened. Near-bottom
   paging preserves loaded results and exposes a retry after failure. Closing
   after viewer navigation reveals and focuses the current gallery item.
-- Tiles share one Mantine actions menu for More and context clicks; Star,
-  Download and Select live on the tile, toolbar and selection instead. Desktop
+- Tiles share one Mantine actions menu for More and context clicks; Star and
+  Download also sit on the tile. Desktop
   reveals quick controls on hover/focus; phones keep More visible and show a
   persistent star for favourites. Selection replaces these controls.
 - Use semantic buttons/links and accessible names for icons. Preserve drafts

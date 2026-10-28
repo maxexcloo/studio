@@ -1,6 +1,24 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 export const stamp = "2026-10-23T00:00:00.000Z";
+/** A ready upscale worker with face detail. */
+export const upscaleCapabilities = {
+  ok: true,
+  ready: true,
+  nodesInstalled: true,
+  missingNodes: [],
+  missingModels: [],
+  qualities: ["fast", "balanced", "high"],
+  targets: [2048, 4096],
+  substituting: false,
+  fallbackFile: "",
+  faceDetail: {
+    nodesInstalled: true,
+    missingNodes: [],
+    detectors: ["bbox/face_yolov8m.pt"],
+    samModels: [],
+  },
+};
 export const image =
   "data:image/svg+xml," +
   encodeURIComponent(
@@ -191,6 +209,7 @@ export async function fixtures(page: Page) {
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
     if (path === "/api/models")
       return respond({ profiles, features: { library: true, presets: true } });
+    if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running: Animate takes the local video profile.
     if (path === "/api/animate/profile")
       return respond({ profileId: "video:test", label: "Motion Quality", cloud: false, note: "" });
@@ -715,19 +734,25 @@ export async function gallerySearch(scope: Page | Locator) {
   return scope.getByRole("textbox", { name: "Search Gallery", exact: true });
 }
 
-/** Runs a viewer action from its bar, or from More Viewer Actions where phones move it. */
-export async function viewerAction(page: Page, label: string) {
-  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
-  const action = viewer.getByRole("button", { name: label, exact: true });
-  if (await action.isVisible()) return action.click();
-  await viewer.getByRole("button", { name: "More Viewer Actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: label, exact: true }).click();
+/** A labelled action in the gallery selection bar. */
+export function selectionAction(page: Page, label: string, role: "button" | "link" = "button") {
+  return page
+    .getByRole("group", { name: "Selected Item Actions", exact: true })
+    .getByRole(role, { name: label, exact: true });
 }
 
-export async function viewerOptions(page: Page) {
+/** Turns on Compare Upscale in the viewer's Upscale options, then closes them. */
+export async function compareUpscale(page: Page) {
+  await viewerAction(page, "Upscale");
+  await page.getByRole("switch", { name: "Compare Upscale", exact: true }).click();
+  await viewerAction(page, "Upscale");
+}
+
+/** Runs a viewer action from its bar, which phones scroll sideways. */
+export async function viewerAction(page: Page, label: string) {
   await page
     .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "Viewer Options", exact: true })
+    .getByRole("button", { name: label, exact: true })
     .click();
 }
 

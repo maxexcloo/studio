@@ -58,6 +58,15 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
+/** Recreate › New Seed: queues the same settings with a new seed, without the composer. */
+async function newSeed(page: Page) {
+  await page
+    .getByRole("dialog", { name: "Generation", exact: true })
+    .getByRole("button", { name: "Recreate Options", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "New Seed", exact: true }).click();
+}
+
 test("The viewer's prompt bar is its own composer: it expands in place, prefilled, and queues into the strip", async ({
   page,
 }) => {
@@ -70,6 +79,13 @@ test("The viewer's prompt bar is its own composer: it expands in place, prefille
   await expect(prompt).toBeFocused();
   await expect(prompt).toHaveValue("An amber bird");
   await expect(viewer).toBeVisible();
+  // A click outside, even on the empty stage, only folds it back to the bar, which reopens it.
+  const stage = (await viewer.locator("[data-zoom-mode]").boundingBox())!;
+  await page.mouse.click(stage.x + 20, stage.y + 20);
+  await expect(prompt).toBeHidden();
+  await expect(viewer).toBeVisible();
+  await compact.click();
+  await expect(prompt).toBeFocused();
   await prompt.fill("An amber bird in snow");
   await prompt.press("ControlOrMeta+Enter");
   await expect.poll(() => state.jobs.length).toBe(2);
@@ -89,7 +105,7 @@ test("The viewer's prompt bar is its own composer: it expands in place, prefille
   ).toBeVisible();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 
-  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await viewer.getByRole("button", { name: "Recreate Options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2]).toMatchObject({ parentJobId: state.jobs[1].id, input: { count: 1 } });
@@ -103,7 +119,7 @@ test("A regenerated result joins its source's grid tile as a version until All V
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
   await viewer.getByRole("button", { name: "Close Generation", exact: true }).click();
@@ -121,7 +137,7 @@ test("The strip holds the item's versions, not the other results of its run", as
     state.jobs[0].items.push(sibling);
     state.gallery.push(sibling);
   });
-  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({ parentJobId: "job-hub", parentItemId: "hub" });
   const strip = viewer.getByRole("list", { name: "Versions", exact: true });
@@ -131,20 +147,16 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
-test("Regenerate and Recreate draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
+test("New Seed and Recreate draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
   const { state, viewer } = await seed(page);
-  // One click regenerates with a new seed; the menu holds New Seed and Exact Repeat.
-  await viewer.getByRole("button", { name: "Regenerate", exact: true }).click();
+  // Recreate's menu queues New Seed and Exact Repeat at once; Recreate itself loads the composer.
+  await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
-  await page.getByRole("menuitem", { name: "New Seed", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(3);
-  expect(state.jobs[2].input).toMatchObject({ seed: "", steps: 28 });
-  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await viewer.getByRole("button", { name: "Recreate Options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
-  await expect.poll(() => state.jobs.length).toBe(4);
-  expect(state.jobs[3].input).toMatchObject({ seed: 1234567, steps: 28 });
+  await expect.poll(() => state.jobs.length).toBe(3);
+  expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Recreate");
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -175,7 +187,7 @@ test("Exact Repeat and Recreate keep the backend a combined profile ran on", asy
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await viewer.getByRole("button", { name: "Recreate Options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -198,7 +210,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewer.getByRole("button", { name: "Regenerate Options", exact: true }).click();
+  await viewer.getByRole("button", { name: "Recreate Options", exact: true }).click();
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect(
     page.getByText(

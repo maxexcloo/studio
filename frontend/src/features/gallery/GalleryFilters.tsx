@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Badge, Button, Group, Scroller, Tooltip } from "@mantine/core";
+import { Badge, Button, Group, Scroller, Stack, Tooltip } from "@mantine/core";
 import { useHotkeys } from "@mantine/hooks";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import {
@@ -13,6 +13,7 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  X,
 } from "lucide-react";
 import { api } from "../../api";
 import { SearchInput } from "../../ui/SearchInput";
@@ -76,8 +77,9 @@ interface GalleryFiltersProps {
 }
 /**
  * Normal, search and filter modes share one toolbar row. Desktop keeps the search box in the row;
- * phones open it from an icon into the full row. The Filter chip swaps the leading controls for a
- * row of labelled facets that apply as they change; Filter again ends it.
+ * phones open it from an icon into the full row. Search narrows within the active filters, which
+ * show beside it as removable chips. The Filter chip swaps the leading controls for a row of
+ * labelled facets that apply as they change; Filter again ends it.
  */
 export function GalleryFilterToolbar({
   query,
@@ -154,17 +156,16 @@ export function GalleryFilterToolbar({
       className={phone ? classes.searchOpen : classes.search}
     />
   );
-  if (searchOpen)
-    return (
-      <Group key="search" ref={toolbar} mih={44} wrap="nowrap" className={classes.mode}>
-        {search}
-      </Group>
-    );
   const filtering = mode === "filters";
-  return (
+  const row = searchOpen ? (
+    <Group key="search" ref={toolbar} mih={44} wrap="nowrap" className={classes.mode}>
+      {search}
+    </Group>
+  ) : (
     <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap">
       {filtering ? (
         <Group key="filters" gap={6} wrap="nowrap" className={`${classes.mode} ${classes.lead}`}>
+          {phone || search}
           <GalleryFilters {...props} />
         </Group>
       ) : (
@@ -185,6 +186,7 @@ export function GalleryFilterToolbar({
           ) : (
             search
           )}
+          {phone || <ActiveFilterChips {...props} />}
           {leading}
         </Group>
       )}
@@ -227,19 +229,18 @@ export function GalleryFilterToolbar({
       </Group>
     </Group>
   );
+  // Phones have no room in the row, so the active filters follow on a row of their own.
+  if (!phone || filtering) return row;
+  return (
+    <Stack gap={0}>
+      {row}
+      <ActiveFilterChips {...props} />
+    </Stack>
+  );
 }
 
-/** The facets as a row, for the gallery toolbar's filter mode and the reference picker. */
-export function GalleryFilters({
-  kind,
-  value,
-  onChange,
-  starred,
-  onStarredChange,
-  withinPortal,
-  allVersions,
-  onAllVersionsChange,
-}: GalleryFiltersProps) {
+/** Each facet's options with readable labels, selected values included. */
+function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues) {
   const { profiles } = useGenerationActions();
   const facets = useQuery(galleryFacetsQuery(kind));
   const loraInfo = useQuery(loraInfoQuery);
@@ -261,6 +262,30 @@ export function GalleryFilters({
       label:
         key === "model" ? modelLabels.get(item) || item : loraInfo.data?.loras[item]?.title || item,
     }));
+  return {
+    facets,
+    options: {
+      model: options("model"),
+      lora: options("lora"),
+      size: facets.data?.sizes || [],
+      aspect: facets.data?.aspects || [],
+      chat: facets.data?.chats || [],
+    } satisfies Record<keyof GalleryFilterValues, GalleryFilterOption[]>,
+  };
+}
+
+/** The facets as a row, for the gallery toolbar's filter mode and the reference picker. */
+export function GalleryFilters({
+  kind,
+  value,
+  onChange,
+  starred,
+  onStarredChange,
+  withinPortal,
+  allVersions,
+  onAllVersionsChange,
+}: GalleryFiltersProps) {
+  const { facets, options } = useFacetOptions(kind, value);
   const picker = (
     key: keyof GalleryFilterValues,
     label: string,
@@ -323,11 +348,11 @@ export function GalleryFilters({
               All Versions
             </Button>
           )}
-          {picker("model", "Models", Boxes, options("model"), true)}
-          {picker("lora", "LoRAs", Layers, options("lora"), true)}
-          {picker("size", "Size", Ruler, facets.data?.sizes || [])}
-          {picker("aspect", "Aspect Ratio", Ratio, facets.data?.aspects || [])}
-          {picker("chat", "Chats", MessageCircle, facets.data?.chats || [], true)}
+          {picker("model", "Models", Boxes, options.model, true)}
+          {picker("lora", "LoRAs", Layers, options.lora, true)}
+          {picker("size", "Size", Ruler, options.size)}
+          {picker("aspect", "Aspect Ratio", Ratio, options.aspect)}
+          {picker("chat", "Chats", MessageCircle, options.chat, true)}
         </Group>
       </Scroller>
       {active && (
@@ -346,5 +371,52 @@ export function GalleryFilters({
         </Button>
       )}
     </>
+  );
+}
+
+/** The active filters as removable chips beside the search, which narrows within them. */
+function ActiveFilterChips({
+  kind,
+  value,
+  onChange,
+  starred,
+  onStarredChange,
+}: GalleryFiltersProps) {
+  const { options } = useFacetOptions(kind, value);
+  const chips = [
+    ...(starred
+      ? [{ key: "starred", label: "Starred", remove: () => onStarredChange(false) }]
+      : []),
+    ...(Object.keys(value) as (keyof GalleryFilterValues)[]).flatMap((facet) =>
+      value[facet].map((selected) => ({
+        key: `${facet}:${selected}`,
+        label: options[facet].find((option) => option.value === selected)?.label || selected,
+        remove: () =>
+          onChange({ ...value, [facet]: value[facet].filter((item) => item !== selected) }),
+      })),
+    ),
+  ];
+  if (!chips.length) return null;
+  return (
+    <Scroller
+      className={classes.facets}
+      edgeGradientColor="var(--mantine-color-body)"
+      controlSize={28}
+    >
+      <Group gap={6} wrap="nowrap" py={4} role="group" aria-label="Active Filters">
+        {chips.map((chip) => (
+          <Button
+            key={chip.key}
+            {...chipProps}
+            variant="light"
+            aria-label={`Remove ${chip.label} Filter`}
+            rightSection={<X size={14} />}
+            onClick={chip.remove}
+          >
+            {chip.label}
+          </Button>
+        ))}
+      </Group>
+    </Scroller>
   );
 }

@@ -2,7 +2,6 @@ import { Fragment } from "react";
 import { Group, Kbd, Stack, Switch, Text } from "@mantine/core";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
-import { useShareWithoutSettings } from "../gallery/mediaShare";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
 import { FinishStarredImages } from "./FinishStarredImages";
 import { SettingGroup, SettingRow } from "./SettingRows";
@@ -27,7 +26,6 @@ export function StudioPreferences() {
   const historyAllowed = admin || account.data?.account?.features?.promptHistory === true;
   const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
   const keep = useKeepRecentPrompts(historyAllowed);
-  const [shareWithoutSettings, setShareWithoutSettings] = useShareWithoutSettings();
   const [tileCaptions, setTileCaptions] = useTileCaptions();
   return (
     <Stack gap="lg">
@@ -47,16 +45,6 @@ export function StudioPreferences() {
             />
           </SettingRow>
         )}
-        <SettingRow
-          label="Share Without Settings"
-          description="Leave the prompt, seed and workflow out of files you download or share."
-        >
-          <Switch
-            aria-label="Share Without Settings"
-            checked={shareWithoutSettings}
-            onChange={(event) => setShareWithoutSettings(event.currentTarget.checked)}
-          />
-        </SettingRow>
       </SettingGroup>
       <SettingGroup title="Gallery">
         <SettingRow
