@@ -52,7 +52,7 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/discarded)?)$/],
   [
     "POST",
-    /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/[^/]+\/(keep|discard|variations))$/,
+    /^\/api\/(comparisons(\/run)?|taste\/refresh|suggestions|dream\/[^/]+\/(keep|discard|variations|more)|dream\/pairs\/[^/]+\/answer)$/,
   ],
   ["PUT", /^\/api\/(comparisons\/[\w-]+\/vote|taste|dream\/settings)$/],
   ["DELETE", /^\/api\/taste$/],
