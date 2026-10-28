@@ -1,10 +1,11 @@
-import { Button, Progress, Text } from "@mantine/core";
+import { useState, type ReactNode } from "react";
+import { Button, Progress, Select, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ScanText, Square } from "lucide-react";
-import type { ReactNode } from "react";
 import { api, post } from "../../api";
 import { SettingRow } from "./SettingRows";
 
+type PassScope = "all" | "outdated" | "missing";
 /** An administrator's pass over idle gallery work (backend/domain/idle-work.ts). */
 export interface PassStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
@@ -14,6 +15,10 @@ export interface PassStatus {
   failed: number;
   remaining: number;
   total: number;
+  /** The latest pass's scope, which `remaining` counts. */
+  scope: PassScope;
+  /** Items each scope's pass would take now. */
+  scopes: Record<PassScope, number>;
   perMinute: number;
   etaSeconds: number | null;
 }
@@ -40,14 +45,23 @@ const stateLabel = {
   finished: "Finished",
   unavailable: "Unavailable",
 };
+const scopeLabels: Record<PassScope, string> = {
+  all: "All",
+  missing: "Missing",
+  outdated: "Out of Date",
+};
 
-/** A Settings › Maintenance row that starts or stops a pass at `route` and follows it. */
+/**
+ * A Settings › Maintenance row that starts or stops a pass at `route` and follows it; with
+ * `scopeLabel` it also chooses the pass's scope (All, Missing or Out of Date, the default).
+ */
 export function GalleryPass({
   route,
   label,
   description,
   remaining,
   progressLabel,
+  scopeLabel,
 }: {
   route: string;
   label: string;
@@ -55,20 +69,26 @@ export function GalleryPass({
   /** What the ready count is waiting for, such as "to index". */
   remaining: string;
   progressLabel: string;
+  /** The scope selector's accessible name; without it every pass is Out of Date. */
+  scopeLabel?: string;
 }) {
   const client = useQueryClient();
   const query = passQuery(route);
   const status = useQuery(query);
+  const [chosen, setChosen] = useState<PassScope>("outdated");
   const change = useMutation({
-    mutationFn: (action: "start" | "stop") => post<PassStatus>(`${route}/${action}`),
+    mutationFn: (action: "start" | "stop") =>
+      post<PassStatus>(`${route}/${action}`, action === "start" ? { scope: chosen } : undefined),
     onSuccess: (data) => client.setQueryData(query.queryKey, data),
   });
   const data = status.data;
+  // A running pass shows its own scope; otherwise the one to start.
+  const scope = data?.active ? data.scope : chosen;
   const progress = data && data.total ? ((data.done + data.failed) / data.total) * 100 : 0;
   const summary = data && [
     data.state === "unavailable" ? `Unavailable: ${data.reason}` : stateLabel[data.state],
     data.state === "ready"
-      ? `${count(data.remaining)} ${remaining}`
+      ? `${count(data.scopes[scope])} ${remaining}`
       : `${count(data.done)} of ${count(data.total)}`,
     data.failed && `${count(data.failed)} failed`,
     data.active && data.perMinute && `${data.perMinute} a minute`,
@@ -91,10 +111,25 @@ export function GalleryPass({
       {data && (data.active || data.state === "stopped") && (
         <Progress size="sm" w={96} value={progress} aria-label={progressLabel} />
       )}
+      {scopeLabel && (
+        <Select
+          aria-label={scopeLabel}
+          w={150}
+          data={(["all", "missing", "outdated"] as const).map((value) => ({
+            value,
+            label: data
+              ? `${scopeLabels[value]} (${count(data.scopes[value])})`
+              : scopeLabels[value],
+          }))}
+          value={scope}
+          allowDeselect={false}
+          disabled={data?.active}
+          onChange={(value) => value && setChosen(value as PassScope)}
+        />
+      )}
       {data?.active ? (
         <Button
           variant="default"
-          size="compact-sm"
           leftSection={<Square size={16} />}
           loading={change.isPending}
           onClick={() => change.mutate("stop")}
@@ -104,10 +139,9 @@ export function GalleryPass({
       ) : (
         <Button
           variant="default"
-          size="compact-sm"
           leftSection={<ScanText size={16} />}
-          loading={change.isPending || status.isPending}
-          disabled={!data || data.state === "unavailable" || !data.remaining}
+          loading={change.isPending}
+          disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
           onClick={() => change.mutate("start")}
         >
           Start

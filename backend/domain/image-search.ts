@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { createIdleWork, type IdleDocument, type IdleItem } from "./idle-work.ts";
+import { createIdleWork, type IdleDocument, type IdleItem, type PassScope } from "./idle-work.ts";
 
 /** The SigLIP 2 encoders (providers/siglip.ts). */
 export interface ImageEncoder {
@@ -97,9 +97,9 @@ export function createImageSearch(options: {
   return {
     ...work,
     /** A pass first forgets vectors of images that left the gallery. */
-    startPass() {
+    startPass(scope: PassScope) {
       vectors.retain(options.items());
-      work.startPass();
+      work.startPass(scope);
     },
     /** Deleted gallery items take their vectors with them. */
     forget: (items: Iterable<IdleItem>) => vectors.delete(items),

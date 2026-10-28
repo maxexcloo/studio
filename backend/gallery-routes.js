@@ -21,6 +21,7 @@ import {
 import { mayUseFeature } from "./account-policy.js";
 import { galleryAspects, gallerySizeBands, otherAspect } from "./gallery-filters.js";
 import { canonicalProfileId } from "./profile-store.js";
+import { requireAdmin } from "./route-access.js";
 
 function requireGalleryAccess(req, res) {
   if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;
@@ -233,15 +234,27 @@ export function registerGalleryHistoryRoutes(app, { starred = () => {} } = {}) {
 }
 
 export function registerGalleryErrorRoutes(app) {
+  // `owner` (administrators only) clears another account's failed items, or "all" every account's.
   app.post("/api/gallery/errors/clear", (req, res) => {
     if (!requireGalleryAccess(req, res)) return;
-    const clears = (item) =>
-      recordBelongsToRequest(item, req) && (item.status === "error" || item.status === "canceled");
+    const owner = req.body?.owner;
+    if (owner !== undefined && !requireAdmin(req, res)) return;
+    const owned =
+      owner === undefined
+        ? (item) => recordBelongsToRequest(item, req)
+        : owner === "all"
+          ? () => true
+          : (item) => item.ownerId === owner;
+    const clears = (item) => owned(item) && (item.status === "error" || item.status === "canceled");
     const cleared = gallery.filter(clears);
     hideGalleryItems(cleared);
     setGallery(gallery.filter((item) => !clears(item)));
     saveGallery();
-    res.json({ ok: true, outputs: filterVisibleGallery(recordsForRequest(gallery, req)) });
+    res.json({
+      ok: true,
+      cleared: cleared.length,
+      outputs: filterVisibleGallery(recordsForRequest(gallery, req)),
+    });
   });
 }
 
