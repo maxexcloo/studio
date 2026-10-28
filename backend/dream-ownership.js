@@ -2,10 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import {
+  hasMigration,
+  runtimeDatabase,
   usesRuntimeDatabase,
   withOfflineDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
+import {
+  galleryRowsMigration,
+  readGalleryRows,
+  writeGalleryRows,
+} from "./persistence/gallery-rows.ts";
 
 /**
  * The migrate-runtime step that clears Dream answers left on records another account owns. Dream
@@ -21,14 +28,19 @@ export function dreamOwnership(dataDir, { owner, apply = false }) {
   if (!owner) throw new Error("Name the account that used Dream with --dream-owner <account id>.");
   const database = usesRuntimeDatabase(dataDir);
   const galleryFile = path.join(dataDir, "gallery.json");
+  let rows = false;
   const documents = withOfflineDatabase(dataDir, (db) => {
+    rows = hasMigration(db, galleryRowsMigration);
     const read = db.prepare("SELECT value FROM studio_documents WHERE name = ?");
-    return Object.fromEntries(
-      ["gallery", `dream:${owner}`, `taste:${owner}`].map((name) => {
-        const row = read.get(name);
-        return [name, row ? JSON.parse(row.value) : null];
-      }),
-    );
+    const document = (name) => {
+      const row = read.get(name);
+      return row ? JSON.parse(row.value) : null;
+    };
+    return {
+      gallery: rows ? readGalleryRows(db) : document("gallery"),
+      [`dream:${owner}`]: document(`dream:${owner}`),
+      [`taste:${owner}`]: document(`taste:${owner}`),
+    };
   });
   const gallery =
     (database
@@ -68,12 +80,15 @@ export function dreamOwnership(dataDir, { owner, apply = false }) {
   if (!apply) return result;
 
   if (marked.length) {
-    const next = gallery.map((item) => {
-      if (!item?.dream || own(item)) return item;
-      const { dream: _dream, ...rest } = item;
-      return rest;
-    });
-    if (database) writeRuntimeDocument(dataDir, "gallery", next);
+    const cleared = new Map(
+      marked.map((item) => {
+        const { dream: _dream, ...rest } = item;
+        return [item, rest];
+      }),
+    );
+    const next = gallery.map((item) => cleared.get(item) || item);
+    if (rows) writeGalleryRows(runtimeDatabase(dataDir), [...cleared.values()]);
+    else if (database) writeRuntimeDocument(dataDir, "gallery", next);
     else writeJsonFile(galleryFile, next);
   }
   if (judged.length)
