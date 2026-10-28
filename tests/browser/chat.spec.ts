@@ -120,7 +120,7 @@ test("Chat cards show their request, settings and every output beneath the reply
   const edited = page.getByRole("article", { name: "Iteration 2", exact: true });
   await expect(edited.getByRole("button", { name: /^Open image: / })).toHaveCount(3);
   await expect(
-    edited.getByText("Iteration 2 · Image · from iteration 1", { exact: true }),
+    edited.getByText("Iteration 2 · New image · from iteration 1", { exact: true }),
   ).toBeVisible();
   await expect(edited.getByRole("listitem").filter({ hasText: "3 Outputs" })).toBeVisible();
   // The edit request is one quiet line, not a second copy of the prompt.
