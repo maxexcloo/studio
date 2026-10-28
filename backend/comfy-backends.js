@@ -62,10 +62,6 @@ export const noteWorkerProfiles = (id, profiles = []) => {
       ),
     );
 };
-export function forgetWorkerState(id) {
-  reachable.delete(id);
-  inventories.delete(id);
-}
 
 /**
  * The worker for a job: `capability` it needs, the `profileId` it runs (a

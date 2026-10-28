@@ -27,10 +27,7 @@ an address and what it can do:
 | `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too  |
 | `models`   | Receives model and LoRA downloads with `STUDIO_MODEL_STORAGE=worker`                               |
 
-The rewrite shows configured workers in **Settings › Workers**. Deployment configuration owns their placement and connection details. The retained `/api/workers` contract can still maintain a local `workers.json` list for standalone instances.
-
-A deployment can define the workers itself. They show as locked in Settings
-and are changed only in the deployment:
+The deployment defines the workers; Studio does not edit them:
 
 ```bash
 STUDIO_WORKERS='[
@@ -48,12 +45,7 @@ the reason.
 On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video workloads in
 [`STUDIO_KUBERNETES_WORKLOADS`](#queue-sessions--runtime-control) are the
 workers, one per address. When `STUDIO_WORKERS` is set, it lists the workers
-instead.
-
-Without either, Studio starts with no workers until an administrator
-adds them in **Settings › Workers**, which saves Studio's own list to
-`workers.json` in the data folder. Deployment workers come first and are never
-written there.
+instead. Without either, Studio starts with no workers.
 
 **Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for [Animate](#cloud-models), which never waits on a stopped video worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
