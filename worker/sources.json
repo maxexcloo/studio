@@ -50,7 +50,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/rgthree-comfy",
-    "revision": "6daaa286444cbe05c6c6d2ffbf70b7fca409efd8",
+    "revision": "218d6347dac5b6499ae56dbfeb25cbb6dd203ac5",
     "url": "https://github.com/rgthree/rgthree-comfy.git"
   }
 ]
