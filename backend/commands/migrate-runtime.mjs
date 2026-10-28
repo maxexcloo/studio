@@ -2,7 +2,6 @@ import { parseArgs } from "node:util";
 import path from "node:path";
 import { migrateRuntime, restoreRuntimeBackup } from "../persistence/migration.ts";
 import { combinedProfiles } from "../combined-profiles.js";
-import { remapProfileIds } from "../persistence/profile-ids.ts";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -25,7 +24,6 @@ else {
   const dataDir = path.resolve(values["data-dir"]);
   result = {
     runtime: migrateRuntime(dataDir, { apply: values.apply }),
-    profileIds: remapProfileIds(dataDir, { apply: values.apply }),
     combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
   };
 }

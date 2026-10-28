@@ -231,12 +231,12 @@ const bento = [
   ],
   [
     "custom:bento-image-fernwood-v5-int8-fast",
-    "fernwood V5 · Fast · 8 Steps · Optional Reference · INT8 ConvRot",
+    "Fernwood V5 · Fast · 8 Steps · Optional Reference · INT8 ConvRot",
     "krea2",
   ],
   [
     "custom:bento-image-fernwood-v5-int8",
-    "fernwood V5 · Quality · 12 Steps · Optional Reference · INT8 ConvRot",
+    "Fernwood V5 · Quality · 12 Steps · Optional Reference · INT8 ConvRot",
     "krea2",
   ],
   [

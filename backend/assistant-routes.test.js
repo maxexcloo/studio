@@ -49,7 +49,7 @@ const encoder = new TextEncoder();
 const calls = [];
 const fetchImpl = async (url, options = {}) => {
   if (url.endsWith("/v1/models"))
-    return Response.json({ data: [{ id: "ai/text-quick" }, { id: "ai/uncensored" }] });
+    return Response.json({ data: [{ id: "ai/text-quick" }, { id: "ai/text-spicy" }] });
   const body = JSON.parse(options.body);
   calls.push(body);
   if (body.stream)
@@ -232,7 +232,7 @@ test("Spicy needs NSFW Models, whatever the profile, and a Spicy model", async (
     "refused before the stream starts",
   );
   assert.equal((await get("/api/assistant", "adult")).spicy, false, "hidden without a Spicy model");
-  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/uncensored";
+  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/text-spicy";
   try {
     assert.equal(
       (await get("/api/assistant", "adult")).presets.some((preset) => preset.id === "spicy"),
@@ -245,7 +245,7 @@ test("Spicy needs NSFW Models, whatever the profile, and a Spicy model", async (
       "adult",
     );
     assert.equal(spicy.status, 200, "an unmarked profile is fine with NSFW Models");
-    assert.equal(calls.at(-1).model, "ai/uncensored");
+    assert.equal(calls.at(-1).model, "ai/text-spicy");
   } finally {
     delete environment.STUDIO_ASSISTANT_SPICY_MODEL;
   }
@@ -284,7 +284,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
       integration.model.vision,
       integration.spicy.effective,
     ],
-    [true, "ai/text-quick", ["ai/text-quick", "ai/uncensored"], "ai/text-quick", false, ""],
+    [true, "ai/text-quick", ["ai/text-quick", "ai/text-spicy"], "ai/text-quick", false, ""],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,

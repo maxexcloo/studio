@@ -346,9 +346,9 @@ test("Dream picks the most-starred ready profile and keeps Spicy to NSFW-granted
   await dreamOnce();
   // A grant without a Spicy model still writes safe prompts.
   assert.equal(state.calls[1].model, "writer");
-  state.spicyModel = "uncensored";
+  state.spicyModel = "text-spicy";
   const spicy = await dreamOnce();
-  assert.equal(state.calls[2].model, "uncensored");
+  assert.equal(state.calls[2].model, "text-spicy");
   assert.match(state.calls[2].system, /Spicy/);
   assert.equal(spicy?.dream?.spicy, true);
 });
