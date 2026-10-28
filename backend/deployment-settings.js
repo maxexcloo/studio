@@ -44,6 +44,11 @@ export const catalogueFlags = [
     "Gallery Captions",
     "While Studio is idle, the assistant model describes finished images so gallery search finds what they show. Needs a model that reads images.",
   ),
+  flag(
+    "STUDIO_IMAGE_SEARCH",
+    "Image Search",
+    "Gallery search also finds images that look like the words, read by SigLIP 2 on Studio's CPU while it is idle. Downloads the model (about 690 MB) into the data folder.",
+  ),
 ];
 
 const flagOn = (item) =>

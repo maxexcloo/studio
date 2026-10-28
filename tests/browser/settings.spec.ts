@@ -89,14 +89,18 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
   await page.goto("/settings#maintenance");
   const row = page.getByRole("region", { name: "Clean Up", exact: true });
   await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
-  await row.getByRole("button", { name: "Start", exact: true }).click();
+  // Index Gallery (Image Search) is the same kind of pass.
+  await expect(row.getByText("Index Gallery", { exact: true })).toBeVisible();
+  // Caption Gallery comes first; Index Gallery has its own Start.
+  const start = row.getByRole("button", { name: "Start", exact: true }).first();
+  await start.click();
   await expect(
     row.getByText("Running · 120 of 7,000 · 30 a minute · about 3 h 49 min left", { exact: true }),
   ).toBeVisible();
   await expect(row.getByRole("progressbar", { name: "Caption Progress" })).toBeVisible();
   await row.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
-  await expect(row.getByRole("button", { name: "Start", exact: true })).toBeEnabled();
+  await expect(start).toBeEnabled();
   expect(actions).toEqual(["start", "stop"]);
 });
 
