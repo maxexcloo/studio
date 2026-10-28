@@ -139,7 +139,11 @@ export async function mediaDraft(
       input: {
         ...initialInput,
         ...profile.defaults,
-        ...(operation === "image" ? { ...source?.input, ...item.settings } : {}),
+        // An edit runs the profile's reference mode, so it takes that mode's settings (a partial
+        // denoise) rather than text-to-image's, which would redraw the image from scratch.
+        ...(operation === "image"
+          ? { ...source?.input, ...item.settings }
+          : profile.imageModes?.reference?.defaults),
         kind: targetKind,
         profileId: profile.id,
         model: profile.model,

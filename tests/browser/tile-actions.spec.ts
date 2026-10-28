@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, loadSaved, selectionAction, stamp, viewerAction } from "./fixtures";
+import {
+  fixtures,
+  image,
+  loadSaved,
+  profiles,
+  selectionAction,
+  serveProfiles,
+  stamp,
+  viewerAction,
+} from "./fixtures";
 async function galleryFixture(page: Page) {
   const state = await fixtures(page);
   const input = {
@@ -143,6 +152,36 @@ for (const operation of ["Edit", "Animate"] as const) {
     expect(state.jobs).toHaveLength(1);
   });
 }
+
+test("Edit submits the image with the profile's reference-mode settings", async ({ page }) => {
+  const state = await galleryFixture(page);
+  // Text-to-image samples from scratch; only the reference mode's partial denoise keeps the image.
+  await serveProfiles(page, [
+    {
+      ...profiles[0],
+      defaults: { ...profiles[0].defaults, denoise: 1 },
+      imageModes: {
+        generate: { defaults: { denoise: 1 } },
+        reference: { defaults: { denoise: 0.65 } },
+      },
+    },
+    ...profiles.slice(1),
+  ]);
+  await page.reload();
+  await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await expect.poll(() => state.referenceRequests.length).toBe(1);
+  await page.locator("[data-composer-prompt]").click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
+  await page.getByRole("button", { name: "Refine Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({
+    operation: "refine",
+    profileId: "image:test",
+    denoise: 0.65,
+    referenceAssets: [{ assetId: "asset-tile-bird", slot: "image" }],
+  });
+});
 
 test("A failed tile retries its owned durable job and refreshes the gallery", async ({ page }) => {
   const state = await galleryFixture(page);
