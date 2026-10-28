@@ -7,7 +7,7 @@ import {
 } from "../persistence/migration.ts";
 import { combinedProfiles } from "../combined-profiles.js";
 import { dreamOwnership } from "../dream-ownership.js";
-import { uncensoredMarker } from "../uncensored-marker.js";
+import { uncensoredMarker, upscaleFeature } from "../uncensored-marker.js";
 import { migrateUploads } from "../uploads.js";
 const { values } = parseArgs({
   options: {
@@ -36,6 +36,7 @@ else {
     uploads: migrateUploads(dataDir, { apply: values.apply }),
     combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
     uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
+    upscaleFeature: upscaleFeature(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
       ? {
           dreamOwnership: dreamOwnership(dataDir, {

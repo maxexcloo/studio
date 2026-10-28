@@ -33,7 +33,7 @@ import { referenceExistsForAccount, stageReferenceAssets } from "./references.js
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
-import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
+import { mayUseFeature, mayUseGenerationProfile, upscaleOffMessage } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
 
 export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, comfyDownMessage }) {
@@ -127,6 +127,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
             status: 403,
             payload: { ok: false, error: "LoRAs are not enabled for this account." },
           };
+        if (input?.autoUpscale && !mayUseFeature(account, "upscale"))
+          return { status: 403, payload: { ok: false, error: upscaleOffMessage } };
         const hasReference = Boolean(
           input?.startImage || input?.startImageId || input?.referenceAssets?.length,
         );

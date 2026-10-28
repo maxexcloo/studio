@@ -79,28 +79,45 @@ export function uncensoredMarker(dataDir, { apply = false } = {}) {
     if (apply) writeJsonFile(full, next);
   }
 
+  result.accessProfiles = updateAccessProfiles(dataDir, { apply }, (features) => {
+    if (!Object.hasOwn(features, "nsfwModels")) return false;
+    features.uncensoredModels ??= features.nsfwModels;
+    delete features.nsfwModels;
+    return true;
+  });
+  return result;
+}
+
+/** The migrate-runtime step that gives every existing access profile the Upscale feature, on. */
+export function upscaleFeature(dataDir, { apply = false } = {}) {
+  const accessProfiles = updateAccessProfiles(dataDir, { apply }, (features) => {
+    if (Object.hasOwn(features, "upscale")) return false;
+    features.upscale = true;
+    return true;
+  });
+  return { applied: apply, accessProfiles };
+}
+
+/**
+ * Runs `change(features)` on each access profile's features and saves them when `apply` is set;
+ * returns the ids of the profiles it changed (those `change` returns true for).
+ */
+function updateAccessProfiles(dataDir, { apply }, change) {
+  const changed = [];
   const database = usesRuntimeDatabase(dataDir);
   const accountsFile = path.join(dataDir, "accounts.json");
-  if (database || fs.existsSync(accountsFile)) {
-    const accounts = database
-      ? withOfflineDatabase(dataDir, (db) => {
-          const row = db
-            .prepare("SELECT value FROM studio_documents WHERE name = ?")
-            .get("accounts");
-          return row ? JSON.parse(row.value) : null;
-        })
-      : readJsonFile(accountsFile);
-    for (const [id, profile] of Object.entries(accounts?.profiles || {})) {
-      const features = profile?.features;
-      if (!isObject(features) || !Object.hasOwn(features, "nsfwModels")) continue;
-      result.accessProfiles.push(id);
-      features.uncensoredModels ??= features.nsfwModels;
-      delete features.nsfwModels;
-    }
-    if (apply && result.accessProfiles.length) {
-      if (database) writeRuntimeDocument(dataDir, "accounts", accounts);
-      else writeJsonFile(accountsFile, accounts);
-    }
+  if (!database && !fs.existsSync(accountsFile)) return changed;
+  const accounts = database
+    ? withOfflineDatabase(dataDir, (db) => {
+        const row = db.prepare("SELECT value FROM studio_documents WHERE name = ?").get("accounts");
+        return row ? JSON.parse(row.value) : null;
+      })
+    : readJsonFile(accountsFile);
+  for (const [id, profile] of Object.entries(accounts?.profiles || {}))
+    if (isObject(profile?.features) && change(profile.features)) changed.push(id);
+  if (apply && changed.length) {
+    if (database) writeRuntimeDocument(dataDir, "accounts", accounts);
+    else writeJsonFile(accountsFile, accounts);
   }
-  return result;
+  return changed;
 }
