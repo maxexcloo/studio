@@ -43,7 +43,7 @@ import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.j
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
-import { registerRewriteRoutes } from "./domain/routes.ts";
+import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createServicesObserver, createTextVision } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
@@ -2057,6 +2057,7 @@ registerRewriteRoutes(app, {
   title: chatTitle,
   admitted: jobAdmitted,
 });
+registerMaintenanceRoutes(app, { store: rewriteStore, queue: generationQueue, requireAdmin });
 const admitGeneration = createGenerationAdmission({
   store: rewriteStore,
   queue: generationQueue,

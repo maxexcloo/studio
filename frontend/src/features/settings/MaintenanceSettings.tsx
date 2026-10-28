@@ -1,12 +1,28 @@
-import { Button, Progress, Stack, Text } from "@mantine/core";
+import { useState } from "react";
+import { Badge, Button, Menu, Modal, Progress, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Download, Eraser, ExternalLink, ScanText, Square } from "lucide-react";
+import {
+  Copy,
+  Download,
+  ExternalLink,
+  ListRestart,
+  RotateCcw,
+  ScanText,
+  Square,
+  Trash2,
+} from "lucide-react";
+import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
-import { useIsAdmin } from "../auth/AccountGate";
+import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { DataTable } from "../../ui/DataTable";
+import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { statusLabels } from "../generation/Queue";
+import { accountAdminQuery } from "./AccountAdmin";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
+type CaptionScope = "all" | "outdated" | "missing";
 /** A Caption Gallery pass (backend/domain/idle-work.ts). */
 export interface CaptionStatus {
   state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
@@ -16,6 +32,8 @@ export interface CaptionStatus {
   failed: number;
   remaining: number;
   total: number;
+  scope: CaptionScope;
+  scopes: Record<CaptionScope, number>;
   perMinute: number;
   etaSeconds: number | null;
 }
@@ -24,6 +42,10 @@ const galleryCaptionsQuery = queryOptions({
   queryFn: () => api<CaptionStatus>("/api/gallery/captions"),
   // Progress moves while a pass runs; otherwise only a new image changes it.
   refetchInterval: (query) => (query.state.data?.active ? 2_000 : 60_000),
+});
+const unfinishedQuery = queryOptions({
+  queryKey: ["unfinished-jobs"],
+  queryFn: () => api<{ jobs: UnfinishedJob[] }>("/api/maintenance/unfinished"),
 });
 
 const count = (value: number) => value.toLocaleString();
@@ -41,22 +63,33 @@ const stateLabel = {
   finished: "Finished",
   unavailable: "Unavailable",
 };
+const scopeLabels: Record<CaptionScope, string> = {
+  all: "All",
+  missing: "Missing",
+  outdated: "Out of Date",
+};
 
-/** Settings › Maintenance › Caption Gallery: start or stop a full captioning pass and follow it. */
+/** Settings › Maintenance › Caption Gallery: start or stop a captioning pass and follow it. */
 function CaptionGallery() {
   const client = useQueryClient();
   const status = useQuery(galleryCaptionsQuery);
+  const [chosen, setChosen] = useState<CaptionScope>("outdated");
   const change = useMutation({
     mutationFn: (action: "start" | "stop") =>
-      post<CaptionStatus>(`/api/gallery/captions/${action}`),
+      post<CaptionStatus>(
+        `/api/gallery/captions/${action}`,
+        action === "start" ? { scope: chosen } : undefined,
+      ),
     onSuccess: (data) => client.setQueryData(galleryCaptionsQuery.queryKey, data),
   });
   const data = status.data;
+  // A running pass shows its own scope; otherwise the one to start.
+  const scope = data?.active ? data.scope : chosen;
   const progress = data && data.total ? ((data.done + data.failed) / data.total) * 100 : 0;
   const summary = data && [
     data.state === "unavailable" ? `Unavailable: ${data.reason}` : stateLabel[data.state],
     data.state === "ready"
-      ? `${count(data.remaining)} to caption`
+      ? `${count(data.scopes[scope])} to caption`
       : `${count(data.done)} of ${count(data.total)}`,
     data.failed && `${count(data.failed)} failed`,
     data.active && data.perMinute && `${data.perMinute} a minute`,
@@ -67,8 +100,8 @@ function CaptionGallery() {
       label="Caption Gallery"
       description={
         <>
-          Describe every image without a current caption, as fast as the assistant model allows
-          while Studio is idle.
+          Describe and tag images for search, as fast as the assistant model allows while Studio is
+          idle. Out of Date takes missing captions and those written under older rules.
           {summary && (
             <Text span display="block" size="xs" aria-live="polite">
               {summary.filter(Boolean).join(" · ")}
@@ -80,6 +113,19 @@ function CaptionGallery() {
       {data && (data.active || data.state === "stopped") && (
         <Progress size="sm" w={96} value={progress} aria-label="Caption Progress" />
       )}
+      <Select
+        aria-label="Images to Caption"
+        size="xs"
+        w={150}
+        data={(["all", "missing", "outdated"] as const).map((value) => ({
+          value,
+          label: data ? `${scopeLabels[value]} (${count(data.scopes[value])})` : scopeLabels[value],
+        }))}
+        value={scope}
+        allowDeselect={false}
+        disabled={data?.active}
+        onChange={(value) => value && setChosen(value as CaptionScope)}
+      />
       {data?.active ? (
         <Button
           variant="default"
@@ -96,7 +142,7 @@ function CaptionGallery() {
           size="compact-sm"
           leftSection={<ScanText size={16} />}
           loading={change.isPending || status.isPending}
-          disabled={!data || data.state === "unavailable" || !data.remaining}
+          disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
           onClick={() => change.mutate("start")}
         >
           Start
@@ -106,9 +152,213 @@ function CaptionGallery() {
   );
 }
 
+/**
+ * Settings › Maintenance › Delete Failed Items: everyone deletes their own; administrators of a
+ * multi-user Studio may choose another account's, or every account's.
+ */
+function DeleteFailedItems() {
+  const client = useQueryClient();
+  const account = useAccount().data;
+  const others = account?.mode === "multi-user" && account.account?.role === "administrator";
+  const accounts = useQuery({ ...accountAdminQuery, enabled: others });
+  const [owner, setOwner] = useState("mine");
+  const [confirming, setConfirming] = useState(false);
+  const owners = [
+    { value: "all", label: "All Users" },
+    { value: "mine", label: "Mine" },
+    ...(accounts.data?.accounts || [])
+      .filter((entry) => entry.id !== account?.account?.id)
+      .map((entry) => ({ value: entry.id, label: entry.username }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+  const whose =
+    owner === "all"
+      ? "every account's"
+      : owner === "mine"
+        ? "your"
+        : `${owners.find((entry) => entry.value === owner)?.label}'s`;
+  const remove = useMutation({
+    mutationFn: () =>
+      post<{ cleared: number }>(
+        "/api/gallery/errors/clear",
+        owner === "mine" ? undefined : { owner },
+      ),
+    onSuccess: ({ cleared }) => {
+      for (const queryKey of [["gallery"], ["gallery-filters"], ["queue"]])
+        void client.invalidateQueries({ queryKey });
+      setConfirming(false);
+      notifications.show({
+        message: cleared === 1 ? "1 failed item deleted" : `${count(cleared)} failed items deleted`,
+      });
+    },
+  });
+  return (
+    <SettingRow
+      label="Delete Failed Items"
+      description="Remove failed and cancelled items from the gallery."
+    >
+      {others && (
+        <Select
+          aria-label="Whose Failed Items"
+          size="xs"
+          w={150}
+          data={owners}
+          value={owner}
+          allowDeselect={false}
+          searchable={owners.length > 8}
+          onChange={(value) => value && setOwner(value)}
+        />
+      )}
+      <Button
+        variant="default"
+        size="compact-sm"
+        leftSection={<Trash2 size={16} />}
+        onClick={() => setConfirming(true)}
+      >
+        Delete
+      </Button>
+      <ConfirmDialog
+        opened={confirming}
+        title="Delete Failed Items"
+        action="Delete"
+        pending={remove.isPending}
+        onConfirm={() => remove.mutate()}
+        onClose={() => setConfirming(false)}
+      >
+        Remove {whose} failed and cancelled items from the gallery?
+      </ConfirmDialog>
+    </SettingRow>
+  );
+}
+
+/**
+ * Settings › Maintenance › Unfinished Items, for administrators: every account's generations that
+ * have not finished, to retry or delete one that is stuck.
+ */
+function UnfinishedItems() {
+  const client = useQueryClient();
+  const [opened, setOpened] = useState(false);
+  const [deleting, setDeleting] = useState<UnfinishedJob | null>(null);
+  const multiUser = useAccount().data?.mode === "multi-user";
+  const unfinished = useQuery({ ...unfinishedQuery, refetchInterval: opened ? 5_000 : 60_000 });
+  const accounts = useQuery({ ...accountAdminQuery, enabled: multiUser && opened });
+  const ownerName = (job: UnfinishedJob) =>
+    accounts.data?.accounts.find((entry) => entry.id === job.ownerId)?.username || job.ownerId;
+  const act = useMutation({
+    mutationFn: ({ action, job }: { action: "retry" | "delete"; job: UnfinishedJob }) =>
+      post(`/api/maintenance/unfinished/${action}`, { ownerId: job.ownerId, id: job.id }),
+    onSuccess: (_data, { action }) => {
+      for (const queryKey of [unfinishedQuery.queryKey, ["queue"], ["gallery"]])
+        void client.invalidateQueries({ queryKey });
+      setDeleting(null);
+      notifications.show({ message: action === "retry" ? "Queued again" : "Item deleted" });
+    },
+  });
+  const jobs = unfinished.data?.jobs || [];
+  const title = (job: UnfinishedJob) =>
+    String(job.input.prompt || "").trim() || `Untitled ${job.operation}`;
+  return (
+    <SettingRow
+      label="Unfinished Items"
+      description={[
+        "Every account's generations that haven't finished, to retry or delete one that is stuck.",
+        unfinished.data && `${count(jobs.length)} now.`,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <Button
+        variant="default"
+        size="compact-sm"
+        leftSection={<ListRestart size={16} />}
+        onClick={() => setOpened(true)}
+      >
+        Review
+      </Button>
+      <Modal opened={opened} onClose={() => setOpened(false)} title="Unfinished Items" size="xl">
+        <DataTable
+          label="Unfinished Items"
+          rows={jobs}
+          rowKey={(job) => `${job.ownerId}/${job.id}`}
+          rowName={title}
+          loading={unfinished.isPending && "Loading Unfinished Items"}
+          empty="No Unfinished Items"
+          columns={[
+            {
+              key: "item",
+              header: "Item",
+              main: true,
+              sortValue: title,
+              cell: (job) => (
+                <Stack gap={0} miw={0}>
+                  <Text size="sm" truncate>
+                    {title(job)}
+                  </Text>
+                  <Text size="xs" c="dimmed" truncate>
+                    {[job.dream && "Dream", job.reason, multiUser && ownerName(job)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                </Stack>
+              ),
+            },
+            {
+              key: "status",
+              header: "Status",
+              sortValue: (job) => statusLabels[job.status],
+              cell: (job) => (
+                <Badge variant="light" color="gray" miw="max-content">
+                  {statusLabels[job.status]}
+                </Badge>
+              ),
+            },
+            {
+              key: "updated",
+              header: "Updated",
+              visibleFrom: "sm",
+              sortValue: (job) => job.updatedAt,
+              cell: (job) => (
+                <Text size="xs" style={{ whiteSpace: "nowrap" }}>
+                  {new Date(job.updatedAt).toLocaleString()}
+                </Text>
+              ),
+            },
+          ]}
+          rowActions={(job) => (
+            <>
+              <Menu.Item
+                leftSection={<Trash2 size={16} />}
+                color="red"
+                onClick={() => setDeleting(job)}
+              >
+                Delete
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<RotateCcw size={16} />}
+                onClick={() => act.mutate({ action: "retry", job })}
+              >
+                Retry
+              </Menu.Item>
+            </>
+          )}
+        />
+      </Modal>
+      <ConfirmDialog
+        opened={Boolean(deleting)}
+        title="Delete Unfinished Item"
+        action="Delete"
+        pending={act.isPending}
+        onConfirm={() => deleting && act.mutate({ action: "delete", job: deleting })}
+        onClose={() => setDeleting(null)}
+      >
+        End {deleting ? `"${title(deleting)}"` : "this item"} and take it out of the queue?
+      </ConfirmDialog>
+    </SettingRow>
+  );
+}
+
 /** Settings › Maintenance: clean-up and bug-report tools backed by the gallery and diagnostics routes. */
 export function MaintenanceSettings() {
-  const client = useQueryClient();
   const admin = useIsAdmin();
   // Read ahead so copying stays inside the tap, which Safari requires for the clipboard.
   const diagnostics = useQuery({
@@ -116,32 +366,11 @@ export function MaintenanceSettings() {
     queryFn: () => api<{ text: string }>("/api/diagnostics"),
     staleTime: 60_000,
   });
-  const clear = useMutation({
-    mutationFn: () => post("/api/gallery/errors/clear"),
-    onSuccess: () => {
-      for (const queryKey of [["gallery"], ["gallery-filters"], ["queue"]])
-        void client.invalidateQueries({ queryKey });
-      notifications.show({ message: "Failed items cleared" });
-    },
-  });
   return (
     <Stack gap="lg">
       <SettingGroup title="Clean Up">
         {admin && <CaptionGallery />}
-        <SettingRow
-          label="Clear Failed Items"
-          description="Remove your failed and cancelled items from the gallery."
-        >
-          <Button
-            variant="default"
-            size="compact-sm"
-            leftSection={<Eraser size={16} />}
-            loading={clear.isPending}
-            onClick={() => clear.mutate()}
-          >
-            Clear
-          </Button>
-        </SettingRow>
+        <DeleteFailedItems />
         <SettingRow
           label="Export Gallery"
           description="Download every finished image and video as one ZIP."
@@ -157,6 +386,7 @@ export function MaintenanceSettings() {
             Export
           </Button>
         </SettingRow>
+        {admin && <UnfinishedItems />}
       </SettingGroup>
       <SettingGroup title="Help">
         <SettingRow

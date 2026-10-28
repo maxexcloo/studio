@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { createIdleWork, type IdleDocument, type IdleItem } from "./idle-work.ts";
+import {
+  createIdleWork,
+  passScopes,
+  type IdleDocument,
+  type IdleItem,
+  type PassScope,
+} from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
@@ -64,8 +70,15 @@ export function createCaptioner(options: {
       if (!(await writer.supportsVision())) return "The running text model can't read images.";
       return "";
     },
-    wanted: (item, all) =>
-      item.type === "image" && (all ? item.caption?.version !== captionVersion : !item.caption),
+    // The trickle and a Missing pass caption new images; Out of Date also redoes captions from older
+    // rules, and All redoes every caption written before the pass began.
+    wanted: (item, all, target) =>
+      item.type === "image" &&
+      (!all || target?.scope === "missing"
+        ? !item.caption
+        : target?.scope === "all"
+          ? !(item.caption?.at && item.caption.at >= target.startedAt)
+          : item.caption?.version !== captionVersion),
     async run(item, signal) {
       const image = await options.image(item);
       if (signal.aborted) return;
@@ -88,6 +101,7 @@ interface Request {
   body?: Record<string, unknown>;
 }
 interface Response {
+  status(code: number): Response;
   json(value: unknown): unknown;
 }
 type Handler = (req: Request, res: Response) => unknown;
@@ -108,7 +122,10 @@ export function registerCaptionRoutes(
   });
   app.post("/api/gallery/captions/start", async (req, res) => {
     if (!requireAdmin(req, res)) return;
-    captioner.startPass();
+    const scope = req.body?.scope as PassScope;
+    if (!passScopes.includes(scope))
+      return res.status(400).json({ error: `Choose a scope: ${passScopes.join(", ")}.` });
+    captioner.startPass(scope);
     res.json(await captioner.status());
   });
   app.post("/api/gallery/captions/stop", async (req, res) => {

@@ -422,11 +422,34 @@ export class GenerationQueue {
     return this.store.job(ownerId, id);
   }
 
+  /**
+   * Settings › Maintenance: ends an unfinished job for good. It is cancelled as usual; one whose
+   * provider never confirms (a lost worker, a recording nothing can recover) is marked cancelled
+   * anyway, so it stops holding its place.
+   */
+  async abandon(ownerId: string, id: string): Promise<OwnedJob | undefined> {
+    const job = await this.cancel(ownerId, id).catch(() => this.store.job(ownerId, id));
+    if (!job || terminalStatuses.has(job.status)) return job;
+    const abandoned = this.store.save({
+      ...job,
+      status: "cancelled",
+      progress: undefined,
+      reason: "Ended by an administrator.",
+    });
+    await this.adapter.settled?.(abandoned);
+    return abandoned;
+  }
+
   retry(ownerId: string, id: string): OwnedJob | undefined {
     const job = this.store.job(ownerId, id);
     if (!job || job.status !== "failed") return;
+    return this.requeue(job);
+  }
+
+  /** Queues the job's input again as a new job. */
+  requeue(job: OwnedJob): OwnedJob {
     return this.store.enqueue(
-      ownerId,
+      job.ownerId,
       job.sessionId,
       job.input,
       job.operation,

@@ -224,7 +224,7 @@ test("a pass captions everything flat out, two at a time, including older captio
   assert.deepEqual((await captioner.status()).remaining, 4);
   assert.equal((await captioner.status()).state, "ready");
   state.hold = true;
-  captioner.startPass();
+  captioner.startPass("outdated");
   for (let wait = 0; wait < 5; wait++) await settle();
   assert.equal(state.open, passConcurrency, "two in flight at once");
   assert.equal((await captioner.status()).state, "running");
@@ -248,10 +248,38 @@ test("a pass captions everything flat out, two at a time, including older captio
   assert.equal(state.saved?.trickle?.count || 0, 0, "a pass doesn't use the trickle's day");
 });
 
+test("a pass takes only missing captions, or redoes every caption once", async () => {
+  const current = { ...old, tags: [], version: captionVersion };
+  const items = () => [
+    image("new"),
+    image("current", "alice", { caption: current }),
+    image("outdated", "alice", { caption: old }),
+  ];
+  const missing = fixture(items());
+  assert.deepEqual((await missing.captioner.status()).scopes, {
+    all: 3,
+    outdated: 2,
+    missing: 1,
+  });
+  missing.captioner.startPass("missing");
+  await missing.captioner.settled();
+  assert.deepEqual(missing.state.sent, ["new"]);
+  assert.equal((await missing.captioner.status()).scope, "missing");
+
+  const all = fixture(items());
+  all.captioner.startPass("all");
+  await all.captioner.settled();
+  assert.deepEqual(all.state.sent.sort(), ["current", "new", "outdated"], "each once");
+  assert.deepEqual(
+    [(await all.captioner.status()).state, (await all.captioner.status()).remaining],
+    ["finished", 0],
+  );
+});
+
 test("a pass yields to work, reports waiting and resumes once idle", async () => {
   const { state, captioner } = fixture([image("a"), image("b"), image("c")]);
   state.hold = true;
-  captioner.startPass();
+  captioner.startPass("outdated");
   for (let wait = 0; wait < 5; wait++) await settle();
   assert.equal(state.open, 2);
   state.idle = false;
@@ -273,7 +301,7 @@ test("a pass yields to work, reports waiting and resumes once idle", async () =>
 test("a stopped pass stays stopped across a restart; a running one resumes", async () => {
   const { state, captioner, make } = fixture([image("a"), image("b"), image("c")]);
   state.hold = true;
-  captioner.startPass();
+  captioner.startPass("outdated");
   await settle();
   captioner.stopPass();
   await captioner.settled();
@@ -287,7 +315,7 @@ test("a stopped pass stays stopped across a restart; a running one resumes", asy
   assert.equal(await restarted.tick(), "done", "the trickle carries on");
   assert.equal(await restarted.tick(), "spaced");
 
-  restarted.startPass();
+  restarted.startPass("outdated");
   state.hold = true;
   await settle();
   const resumed = make();

@@ -3,6 +3,7 @@ import type {
   GenerationOperation,
   QueueCancelAllResponse,
   QueueMedia,
+  UnfinishedJob,
 } from "../../shared/queue.ts";
 import { GenerationQueue, terminalStatuses } from "./queue.ts";
 import { publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
@@ -272,5 +273,57 @@ export function registerRewriteRoutes(
     if (!job) return res.status(409).json({ error: "Only failed generations can be retried." });
     void queue.tick().catch(() => undefined);
     return res.status(202).json({ job: publicJob(job) });
+  });
+}
+
+/**
+ * Settings › Maintenance › Unfinished Items, for administrators: every account's jobs that have not
+ * finished, oldest first, to retry (end it and queue it again) or delete (end it and take it out of
+ * the queue).
+ */
+export function registerMaintenanceRoutes(
+  app: Router,
+  {
+    store,
+    queue,
+    requireAdmin,
+  }: {
+    store: RewriteStore;
+    queue: GenerationQueue;
+    requireAdmin(req: Request, res: Response): boolean;
+  },
+) {
+  const target = (req: Request) =>
+    store.job(String(req.body?.ownerId ?? ""), String(req.body?.id ?? ""));
+  const end = async (job: OwnedJob) => {
+    await queue.abandon(job.ownerId, job.id);
+    return clear(store, store.job(job.ownerId, job.id)!);
+  };
+  app.get("/api/maintenance/unfinished", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const jobs: UnfinishedJob[] = store
+      .jobs()
+      .filter((job) => !terminalStatuses.has(job.status) && !job.cleared)
+      .map((job) => ({
+        ...publicJob(job),
+        ownerId: job.ownerId,
+        dream: job.priority === queuePriority.dream,
+      }));
+    return res.json({ jobs });
+  });
+  app.post("/api/maintenance/unfinished/retry", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const job = target(req);
+    if (!job) return missing(res);
+    await end(job);
+    const retried = queue.requeue(job);
+    void queue.tick().catch(() => undefined);
+    return res.status(202).json({ job: publicJob(retried) });
+  });
+  app.post("/api/maintenance/unfinished/delete", async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const job = target(req);
+    if (!job) return missing(res);
+    return res.json({ job: publicJob(await end(job)) });
   });
 }

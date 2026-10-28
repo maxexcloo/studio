@@ -19,10 +19,20 @@ export type IdleTick =
   | "yielded"
   | "failed";
 
-/** An administrator's pass, saved so a restart resumes or reports it. */
-interface IdlePass {
-  state: "running" | "stopped" | "finished";
+/**
+ * What a pass redoes: every item, items whose work is missing or from older rules, or only missing
+ * ones. The work's `wanted` decides what each means for it.
+ */
+export type PassScope = "all" | "outdated" | "missing";
+export const passScopes: PassScope[] = ["all", "outdated", "missing"];
+/** The pass an item is weighed for: its scope, and when it started (for `all`). */
+export interface PassTarget {
+  scope: PassScope;
   startedAt: string;
+}
+/** An administrator's pass, saved so a restart resumes or reports it. */
+interface IdlePass extends PassTarget {
+  state: "running" | "stopped" | "finished";
   endedAt?: string;
   done: number;
   failed: number;
@@ -42,6 +52,10 @@ export interface IdleStatus {
   failed: number;
   remaining: number;
   total: number;
+  /** The scope of the latest pass, which `remaining` counts. */
+  scope: PassScope;
+  /** Items each scope's pass would take now. */
+  scopes: Record<PassScope, number>;
   /** Items a minute over the pass's recent ones, 0 until there are two. */
   perMinute: number;
   /** Seconds left at that rate, null while unknown. */
@@ -83,8 +97,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
   items(): Iterable<Item>;
   /** Whether the record shows in the gallery (not hidden, not in Dream's pool, its file present). */
   visible(item: Item): boolean;
-  /** Whether the item still needs the work; `all` during a pass, which also redoes outdated work. */
-  wanted(item: Item, all: boolean): boolean;
+  /** Whether the item still needs the work; `all` and the pass's `target` during a pass. */
+  wanted(item: Item, all: boolean, target?: PassTarget): boolean;
   /** Does the work for one item and saves it, unless `signal` aborted first; throws with the reason. */
   run(item: Item, signal: AbortSignal): Promise<void>;
   continuous?: boolean;
@@ -117,21 +131,46 @@ export function createIdleWork<Item extends IdleItem>(options: {
   const counting = () => !options.continuous && pass?.state === "running";
 
   const direct = new Set<string>();
-  function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
-    const allowed = new Map<string, boolean>();
-    for (const item of items) {
+  const target = (): PassTarget => ({
+    scope: pass?.scope || "outdated",
+    startedAt: pass?.startedAt || "",
+  });
+  /** Items open to the work at all, before `wanted` weighs them. */
+  function* open(items: Iterable<Item>) {
+    for (const item of items)
       if (
-        item.status !== "done" ||
-        item.library ||
-        failed.has(key(item)) ||
-        direct.has(key(item)) ||
-        !options.wanted(item, all)
+        item.status === "done" &&
+        !item.library &&
+        !failed.has(key(item)) &&
+        !direct.has(key(item))
       )
-        continue;
+        yield item;
+  }
+  /** Whether the item's owner may have the work done and the item shows in the gallery. */
+  function shown() {
+    const allowed = new Map<string, boolean>();
+    return (item: Item) => {
       const owner = item.ownerId || "";
       if (!allowed.has(owner)) allowed.set(owner, options.allowed(owner));
-      if (allowed.get(owner) && options.visible(item)) yield item;
+      return allowed.get(owner)! && options.visible(item);
+    };
+  }
+  function* eligible(all: boolean, items: Iterable<Item> = options.items()) {
+    const passing = all ? target() : undefined;
+    const visible = shown();
+    for (const item of open(items))
+      if (options.wanted(item, all, passing) && visible(item)) yield item;
+  }
+  /** How many items each scope's pass would take, counted in one walk over the gallery. */
+  function scopeCounts() {
+    const startedAt = running() ? target().startedAt : stamp();
+    const counts = { all: 0, outdated: 0, missing: 0 };
+    const visible = shown();
+    for (const item of open(options.items())) {
+      const wanted = passScopes.filter((scope) => options.wanted(item, true, { scope, startedAt }));
+      if (wanted.length && visible(item)) for (const scope of wanted) counts[scope] += 1;
     }
+    return counts;
   }
 
   /** Runs `tick` in the background; `settled` waits for every such run. */
@@ -269,10 +308,10 @@ export function createIdleWork<Item extends IdleItem>(options: {
     interrupt() {
       for (const controller of inflight.values()) controller.abort();
     },
-    /** Work through every eligible item, flat out while idle, until done or stopped. */
-    startPass() {
+    /** Work through every item the scope takes, flat out while idle, until done or stopped. */
+    startPass(scope: PassScope) {
       if (!running()) {
-        pass = { state: "running", startedAt: stamp(), done: 0, failed: 0 };
+        pass = { state: "running", scope, startedAt: stamp(), done: 0, failed: 0 };
         failed.clear();
         finishes = [];
         backoff = { until: -Infinity, reason: "" };
@@ -288,7 +327,9 @@ export function createIdleWork<Item extends IdleItem>(options: {
     },
     async status(): Promise<IdleStatus> {
       const reason = await unavailable();
-      const remaining = [...eligible(true)].length;
+      const scopes = scopeCounts();
+      const scope = target().scope;
+      const remaining = scopes[scope];
       const done = pass?.done || 0;
       const failures = pass?.failed || 0;
       const span = finishes.length > 1 ? finishes.at(-1)! - finishes[0] : 0;
@@ -310,6 +351,8 @@ export function createIdleWork<Item extends IdleItem>(options: {
         failed: failures,
         remaining,
         total: done + failures + remaining,
+        scope,
+        scopes,
         perMinute: Math.round(perMinute * 10) / 10,
         etaSeconds: perMinute ? Math.round((remaining / perMinute) * 60) : null,
         startedAt: pass?.startedAt || "",

@@ -653,6 +653,8 @@ export async function fixtures(page: Page) {
         failed: 0,
         remaining: 0,
         total: 0,
+        scope: "outdated",
+        scopes: { all: 0, outdated: 0, missing: 0 },
         perMinute: 0,
         etaSeconds: null,
       });
