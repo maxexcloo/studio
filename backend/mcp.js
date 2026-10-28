@@ -82,11 +82,9 @@ const stableJson = (value) =>
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
 const mediaInstructions = (writing) =>
-  `Studio makes images and videos. Pass the user's words to Generate as request${
-    writing
-      ? ": Studio picks the model and writes each prompt with that model's prompting guide, so don't fetch guides, expand the request or deliberate over wording or models"
-      : ", as one clear prompt that keeps their subjects and scene"
-  }. Use prompts only for prompts the user gave; count is images per prompt. Make one Generate call per set, one after another; for several models at once pass profile_ids, or each_profile with tier ("each turbo model"). To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+  `Studio makes images and videos. Write Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them as written${
+    writing ? "; request alone has Studio write them up (slower), only for a short idea" : ""
+  }. count is images per prompt. Make one Generate call per set, one after another. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -413,7 +411,7 @@ export function registerMcpRoutes(
     ) => {
       const label = profile.label || profile.id;
       // Iterations that rebuild a whole Generate call drift from the result; Reuse keeps its settings.
-      const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and the change as request.`;
+      const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt (or the change as request).`;
       // A set Studio expects to finish within the wait comes back finished, so the agent needs no Result call;
       // anything longer, or with no trusted estimate, hands back its links at once.
       const [endsAt] = await media.finishTimes(owner, [submission], {
@@ -639,11 +637,11 @@ export function registerMcpRoutes(
       );
     };
     /**
-     * Queues a submission with the request behind it. Without a prompt writer, the profile's guide goes to a
-     * conversation that has not had it, marked before any wait; with one, the chat never needs it.
+     * Queues a submission with the request behind it. The profile's guide goes to a conversation that has
+     * not had it, marked before any wait, so the chat writes its later prompts itself.
      */
     const submit = async (profile, args, record = {}, { guide = true } = {}) => {
-      const fresh = guide && !writer && review(refs, profile.id);
+      const fresh = guide && review(refs, profile.id);
       try {
         const queued = await media.queue(owner, args, refs, {
           ...record,
@@ -724,7 +722,7 @@ export function registerMcpRoutes(
           full_guide: z
             .boolean()
             .optional()
-            .describe("The whole prompting guide; rarely needed, as Studio applies it."),
+            .describe("The whole prompting guide; rarely needed beyond its gist."),
         },
         async ({
           kind,
@@ -897,7 +895,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass the user's words as request: Studio picks the model${writer ? " and writes each prompt with that model's prompting guide, so never fetch guides or deliberate over wording" : ""}. prompts run as written, one image each${writer ? "; apply_guide rewrites them for each model's guide" : ""}. Several images ("six photos" is count 6) take one call; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts${writer ? " and concept suggestions" : ""} without queuing, for "suggest first". Put a model the user names (Krea, FLUX.3) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts and the user's words as request, which picks the model${writer ? "; request alone or apply_guide has Studio write prompts (slower)" : ""}. Several images ("six photos" is count 6) take one call; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts${writer ? " and concept suggestions" : ""} without queuing, for "suggest first". Put a model the user names (Krea, FLUX.3) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
         {
           request: z
             .string()
@@ -1358,7 +1356,7 @@ export function registerMcpRoutes(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: request changes it in words, prompt replaces its prompt, preserve_seed keeps its seed. mode animate makes an image a video. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt replaces its prompt (fastest), request changes it in words, preserve_seed keeps its seed. mode animate makes an image a video. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
         {
           ...output,
           job_id: z
