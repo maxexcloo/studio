@@ -2,6 +2,7 @@ import { AppShell, FocusTrap, Modal } from "@mantine/core";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { AccountGate } from "./features/auth/AccountGate";
+import { useRemembered } from "./features/auth/useRemembered";
 import { GenerationProvider } from "./features/generation/GenerationProvider";
 import { GalleryPage } from "./features/gallery/GalleryPage";
 import { CompareProvider } from "./features/compare/CompareDialog";
@@ -24,6 +25,7 @@ const loadDream = () => import("./features/dream/DreamPage");
 const loadChat = () => import("./features/sessions/SessionsPage");
 const DreamPage = lazy(() => loadDream().then((module) => ({ default: module.DreamPage })));
 const ChatPage = lazy(() => loadChat().then((module) => ({ default: module.ChatPage })));
+const noSections: Partial<Record<"library" | "settings", string>> = {};
 function Workspace() {
   const { appearance } = useAppearance();
   const library = useLibraryAccess();
@@ -40,6 +42,12 @@ function Workspace() {
   useEffect(() => {
     if (overlay) setLastPanel(overlay);
   }, [overlay]);
+  // Opening Library or Settings returns to the section last shown there.
+  const [sections, setSections] = useRemembered("sections", noSections);
+  useEffect(() => {
+    if (overlay && location.hash) setSections((saved) => ({ ...saved, [overlay]: location.hash }));
+  }, [overlay, location.hash, setSections]);
+  const resumeSection = overlay && !location.hash && sections[overlay];
   // The other modes load once the first one is up, so switching never shows their loader.
   useEffect(() => {
     void loadDream();
@@ -148,7 +156,13 @@ function Workspace() {
             >
               {/* Initial focus lands here, so the close button doesn't show a focus ring on open. */}
               <FocusTrap.InitialFocus />
-              {panel === "library" ? (
+              {resumeSection ? (
+                <Navigate
+                  to={{ pathname: location.pathname, search: location.search, hash: resumeSection }}
+                  replace
+                  state={location.state}
+                />
+              ) : panel === "library" ? (
                 library.allowed ? (
                   <LibraryPage />
                 ) : (

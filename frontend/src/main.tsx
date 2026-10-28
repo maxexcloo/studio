@@ -38,7 +38,7 @@ void fontReady.then(() =>
         <BrowserRouter useTransitions={false}>
           <App />
         </BrowserRouter>
-        <Notifications position="top-right" />
+        <Notifications position="bottom-right" />
       </QueryClientProvider>
     </AppearanceProvider>,
   ),
