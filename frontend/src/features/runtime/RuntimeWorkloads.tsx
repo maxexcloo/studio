@@ -198,11 +198,7 @@ export function RuntimeWorkloads() {
             key: "state",
             header: "State",
             sortValue: (item) => phaseLabel(item.phase),
-            cell: (item) => (
-              <Badge variant="light" color={phaseColour(item.phase)}>
-                {phaseLabel(item.phase)}
-              </Badge>
-            ),
+            cell: (item) => <Badge color={phaseColour(item.phase)}>{phaseLabel(item.phase)}</Badge>,
           },
         ]}
         rowActions={(item) => (
@@ -292,9 +288,7 @@ export function RuntimeWorkloads() {
               header: "Status",
               sortValue: (entry) => operationLabel(entry.status),
               cell: (entry) => (
-                <Badge variant="light" color={operationColour(entry.status)}>
-                  {operationLabel(entry.status)}
-                </Badge>
+                <Badge color={operationColour(entry.status)}>{operationLabel(entry.status)}</Badge>
               ),
             },
           ]}

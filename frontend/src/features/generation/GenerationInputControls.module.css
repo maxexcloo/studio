@@ -9,8 +9,8 @@
   max-width: 100%;
   font-weight: 500;
   transition:
-    background-color var(--studio-motion-duration) ease,
-    border-color var(--studio-motion-duration) ease;
+    background-color var(--studio-motion-duration) var(--studio-ease-enter),
+    border-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .iconChip {

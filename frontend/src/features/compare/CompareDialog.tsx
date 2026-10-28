@@ -547,7 +547,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
           {(dimension === "profile" || dimension === "loras") && variants.length > 0 && (
             <Group gap={6} aria-label="Variants" role="list">
               {labels.map((label, index) => (
-                <Badge key={index} role="listitem" variant="light" tt="none">
+                <Badge key={index} role="listitem" tt="none">
                   {letter(index)} · {label}
                 </Badge>
               ))}

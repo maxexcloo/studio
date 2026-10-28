@@ -61,7 +61,7 @@
   top: 50%;
   translate: 0 -50%;
   opacity: 0;
-  transition: opacity var(--studio-motion-duration) ease;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .row:hover .menu,

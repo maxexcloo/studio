@@ -3,7 +3,7 @@
 }
 
 .tile {
-  transition: box-shadow var(--studio-motion-duration) ease;
+  transition: box-shadow var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .variant[data-winner] .tile {
@@ -26,7 +26,7 @@
 }
 
 .applied {
-  animation: arrive var(--studio-motion-duration) ease-out both;
+  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 @keyframes arrive {

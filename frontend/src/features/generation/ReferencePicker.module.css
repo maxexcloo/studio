@@ -27,9 +27,9 @@
   border-radius: var(--mantine-radius-md);
   background: var(--mantine-color-default);
   transition:
-    border-color var(--studio-motion-duration) ease-out,
-    box-shadow var(--studio-motion-duration) ease-out,
-    opacity var(--studio-motion-duration) ease-out;
+    border-color var(--studio-motion-duration) var(--studio-ease-enter),
+    box-shadow var(--studio-motion-duration) var(--studio-ease-enter),
+    opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .cell {

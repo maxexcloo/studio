@@ -142,11 +142,11 @@
   outline: 1px solid var(--studio-glass-border);
   outline-offset: -1px;
   opacity: 0.7;
-  transition: opacity var(--studio-motion-duration) ease;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .variation[data-entering] {
-  animation: arrive var(--studio-motion-duration) ease-out;
+  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .variation:hover,
@@ -202,6 +202,8 @@
   background: var(--mantine-color-default-hover);
 }
 
+/* The track takes its width at once on opening and only after the panel has slid away on closing;
+   the panel itself moves by transform, so nothing animates layout. */
 .asideTrack {
   display: flex;
   justify-content: flex-end;
@@ -210,14 +212,14 @@
   overflow: hidden;
   visibility: hidden;
   transition:
-    width var(--studio-motion-duration) ease,
-    visibility 0s var(--studio-motion-duration);
+    width 0s var(--studio-motion-exit),
+    visibility 0s var(--studio-motion-exit);
 }
 
 .asideTrack[data-open] {
   width: var(--studio-viewer-aside-width);
   visibility: visible;
-  transition: width var(--studio-motion-duration) ease;
+  transition: none;
 }
 
 .aside {
@@ -228,12 +230,25 @@
   background: var(--studio-glass-chrome);
   backdrop-filter: var(--studio-glass-filter);
   -webkit-backdrop-filter: var(--studio-glass-filter);
+  opacity: 0;
+  transform: translateX(16px);
+  transition:
+    opacity var(--studio-motion-exit) var(--studio-ease-exit),
+    transform var(--studio-motion-exit) var(--studio-ease-exit);
+}
+
+.asideTrack[data-open] .aside {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--studio-motion-duration) var(--studio-ease-enter),
+    transform var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 @keyframes arrive {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.98);
   }
 }
 

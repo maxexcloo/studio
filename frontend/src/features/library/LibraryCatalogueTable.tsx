@@ -326,7 +326,7 @@ export function LibraryCatalogueTable({
             width: 130,
             sortValue: (item) => statusOf(item).label,
             cell: (item) => (
-              <Badge color={statusOf(item).color} variant="light" miw="max-content">
+              <Badge color={statusOf(item).color} miw="max-content">
                 {statusOf(item).label}
               </Badge>
             ),

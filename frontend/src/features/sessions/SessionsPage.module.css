@@ -55,7 +55,7 @@
 /* Edit and staged cards open in place from the shared motion token. */
 .editor,
 .staged {
-  animation: reveal var(--studio-motion-duration) ease-out both;
+  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 @keyframes reveal {

@@ -6,7 +6,7 @@
 
 /* A new variant fades in where it lands. */
 .variant {
-  animation: arrive var(--studio-motion-duration) ease-out both;
+  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter) both;
 }
 
 @keyframes arrive {

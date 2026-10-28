@@ -77,7 +77,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
                     state={{ backgroundLocation: location }}
                     variant="subtle"
                     color="gray"
-                    size="compact-xs"
+                    size="compact-sm"
                     leftSection={<Server size={14} />}
                     onClick={close}
                   >

@@ -122,7 +122,7 @@ export function usePromptAssistant({
           <Text size="sm">{message}</Text>
           <Button
             data-composer-layer
-            size="compact-xs"
+            size="compact-sm"
             variant="subtle"
             onClick={() => {
               notifications.hide(notification);
@@ -348,7 +348,7 @@ export function usePromptAssistant({
               )}
             </Stack>
             <Button
-              size="compact-xs"
+              size="compact-sm"
               variant="default"
               disabled={added || assistance.isPending}
               aria-label={`Apply ${item.title || item.name}`}

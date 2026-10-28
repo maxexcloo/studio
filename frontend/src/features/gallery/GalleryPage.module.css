@@ -4,7 +4,7 @@
 }
 
 .results {
-  transition: opacity var(--studio-motion-duration) ease;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 /* The previous results stay in place, dimmed, while a new search or filter loads. */

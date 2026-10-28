@@ -231,11 +231,15 @@ export function choicePool(profiles, { kind, tier, references = 0, firstFrame = 
   return tier ? pool : fastestTier(pool);
 }
 
-/** The pool’s usual pick: the deployment default, then its family, then censored before uncensored, then catalogue order. */
+/**
+ * The pool’s usual pick: one not failing, then the deployment default, then its family, then
+ * censored before uncensored, then catalogue order.
+ */
 export function chooseProfile(profiles, { defaultId, ...options }) {
   const fallback = profiles.find((profile) => profile.id === defaultId);
   const score = (profile) =>
     [
+      !profile.failing,
       profile.id === defaultId,
       Boolean(fallback?.family) && profile.family === fallback.family,
       !profile.uncensored,
