@@ -525,12 +525,10 @@ export class McpMedia {
       throw new Error("Supply the references required by this profile.");
     for (const id of reference_asset_ids) this.own(owner, id, "assets");
     if (reference_role !== undefined) {
-      if (
-        !reference_asset_ids.length ||
-        profile.aspectPolicy !== "reference" ||
-        !String(profile.workflow || "").startsWith("family:")
-      )
-        throw new Error("Edit or Reference requires references on a supported built-in profile.");
+      if (!reference_asset_ids.length || profile.aspectPolicy !== "reference")
+        throw new Error(
+          "Edit or Reference requires references on a profile framed by its reference.",
+        );
       controls.referenceRole = reference_role;
     }
     if (upscale_quality) {

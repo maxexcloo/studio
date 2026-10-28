@@ -4,6 +4,7 @@ import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy.js";
 import { inferModels } from "./models.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
+import { inpaintingEnabled } from "./features.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {
@@ -89,6 +90,28 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
     });
   }
   return sanitized;
+}
+
+/**
+ * A painted mask on the first reference: only for a profile that can inpaint,
+ * with a reference to paint on. The mask itself is checked when it is read
+ * (inpaint.js); here only its shape and the two settings.
+ */
+function sanitizeInpaint(input, profile, referenceAssets) {
+  const mask = String(input.inpaint?.mask || "");
+  if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length)
+    return null;
+  if (!mask.startsWith("data:image/png;base64,"))
+    throw new Error("The painted mask didn’t come through. Paint it again.");
+  const strength = Number(input.inpaint.strength);
+  const feather = Number(input.inpaint.feather);
+  return {
+    mask,
+    strength: Number.isFinite(strength)
+      ? Math.round(Math.min(1, Math.max(0.05, strength)) * 100) / 100
+      : 1,
+    feather: Number.isFinite(feather) ? Math.min(1, Math.max(0, feather)) : 0.4,
+  };
 }
 
 export function validateReferenceSlots(references, profile, input = {}) {
@@ -261,6 +284,12 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
     startImageName: String(input.startImageName || ""),
     referenceAssets,
     autoResizeInputs: input.autoResizeInputs !== false,
+    inpaint: sanitizeInpaint(input, available, referenceAssets),
+    // "reference": the first reference guides the picture but doesn't frame it; the picked size does.
+    // A painted mask is an edit of that image, so it keeps the image's framing.
+    referenceRole: input.referenceRole === "reference" && !input.inpaint ? "reference" : "edit",
+    // 2K draws and a retry after the GPU ran out of memory decode in tiles, where ComfyUI has the node.
+    tiledDecode: Boolean(input.tiledDecode) && Boolean(info.VAEDecodeTiled),
     promptPolicy: customWorkflow.promptComposition
       ? {
           policy: customWorkflow.promptComposition.policy,

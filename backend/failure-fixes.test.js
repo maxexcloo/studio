@@ -39,3 +39,12 @@ test("a damaged catalog file can be downloaded again; any other file cannot", ()
   );
   assert.equal(unknown.redownload, undefined);
 });
+
+test("out of memory while decoding offers a tiled retry only from a plain VAE decode", () => {
+  const oom = (nodeType) =>
+    withFixes(
+      describeFailure({ message: "torch.OutOfMemoryError: Allocation on device", nodeType }),
+    );
+  assert.deepEqual(oom("VAEDecode").retry, { smaller: true, tiledDecode: true });
+  assert.deepEqual(oom("VAEDecodeTiled").retry, { smaller: true });
+});

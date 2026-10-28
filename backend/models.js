@@ -10,6 +10,7 @@ import { classifyModel } from "./model-families.js";
 import { families } from "./family-catalog.js";
 import { canonicalProfileId } from "./profile-store.js";
 import { inpaintingEnabled, lorasEnabled, presetsEnabled } from "./features.js";
+import { imageSaves, inpaintNodes } from "./inpaint.js";
 
 function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;
@@ -443,7 +444,18 @@ export function inferModels(
           ...samplerRange,
         },
         imageModes: workflow.imageModes,
-        capabilities: workflow.capabilities,
+        capabilities: {
+          ...workflow.capabilities,
+          // A mask needs an image the graph takes in, a saved image to stitch into and the stitch's
+          // core nodes (checked once a worker answers).
+          inpaint:
+            inpaintingEnabled &&
+            workflow.kind === "image" &&
+            workflow.capabilities.inpaint !== false &&
+            Boolean(workflow.mediaInputs?.length || workflow.controls?.startImage) &&
+            imageSaves(workflow.graph).length > 0 &&
+            (configuredOnly || !missingNodes(info, inpaintNodes).length),
+        },
         mediaInputs: workflow.mediaInputs || [],
         aspectPolicy: workflow.aspectPolicy,
         maxLoras: workflow.loraStack?.max,

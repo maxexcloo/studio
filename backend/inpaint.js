@@ -11,15 +11,14 @@ import { loadSharp } from "./sharp-loader.js";
  * rest of the image is never VAE encoded or decoded, so it stays exact.
  */
 
-// The nodes every inpaint graph needs on top of the family's own; all are ComfyUI core.
+// The nodes inpainting adds to a profile's graph; all are ComfyUI core.
 export const inpaintNodes = [
-  "SetLatentNoiseMask",
-  "LoadImageMask",
-  "ImageScale",
   "ImageCompositeMasked",
+  "ImageScale",
+  "LoadImage",
+  "LoadImageMask",
   "RepeatImageBatch",
-  "RepeatLatentBatch",
-  "SplitSigmasDenoise",
+  "SetLatentNoiseMask",
 ];
 
 const maxMaskBytes = 16 * 1024 * 1024;
@@ -211,4 +210,58 @@ export async function prepareInpaint(req, body) {
 /** The staged file names an inpaint run adds. */
 export function inpaintInputNames(inpaint) {
   return inpaint ? [inpaint.crop, inpaint.mask, inpaint.composite].filter(Boolean) : [];
+}
+
+/** The graph's image saves, which inpainting stitches into the original picture. */
+export function imageSaves(graph = {}) {
+  return Object.values(graph).filter(
+    (node) => node?.class_type === "SaveImage" && Array.isArray(node.inputs?.images),
+  );
+}
+
+/**
+ * Inpaints with a profile's own graph, which already samples the crop as its
+ * reference at the working size. A sampler that starts from the encoded crop
+ * (img2img) repaints only the painted part, at the inpaint strength; an edit
+ * model edits the whole crop. Either way only the painted part is stitched back.
+ */
+export function inpaintGraph(graph, inpaint, count = 1) {
+  let next = 0;
+  const add = (class_type, inputs) => {
+    const id = `studio_inpaint_${(next += 1)}`;
+    graph[id] = { class_type, inputs };
+    return [id, 0];
+  };
+  for (const node of Object.values(graph)) {
+    const latent = node.inputs?.latent_image;
+    if (graph[latent?.[0]]?.class_type !== "VAEEncode") continue;
+    node.inputs.latent_image = add("SetLatentNoiseMask", {
+      samples: latent,
+      mask: add("LoadImageMask", { image: inpaint.mask, channel: "red" }),
+    });
+    if (typeof node.inputs.denoise === "number")
+      node.inputs.denoise = Number(inpaint.strength ?? 1);
+  }
+  const { box } = inpaint;
+  let destination = add("LoadImage", { image: inpaint.original });
+  if (count > 1) destination = add("RepeatImageBatch", { image: destination, amount: count });
+  const mask = add("LoadImageMask", { image: inpaint.composite, channel: "red" });
+  for (const save of imageSaves(graph)) {
+    const source = add("ImageScale", {
+      image: save.inputs.images,
+      upscale_method: "lanczos",
+      width: box.width,
+      height: box.height,
+      crop: "disabled",
+    });
+    save.inputs.images = add("ImageCompositeMasked", {
+      destination,
+      source,
+      x: box.x,
+      y: box.y,
+      resize_source: false,
+      mask,
+    });
+  }
+  return graph;
 }

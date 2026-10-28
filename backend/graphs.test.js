@@ -121,3 +121,38 @@ test("account image runs and their upscales save into the owner's folder", async
   assert.equal(graph[1].inputs.filename_prefix, `${accountOutputSubfolder("account-a")}/upscale`);
   assert.equal(graph[2].inputs.filename_prefix, `${accountOutputSubfolder("account-a")}/image`);
 });
+
+test("a profile's graph inpaints the crop at its working size, stitches it back and can decode in tiles", async () => {
+  const graph = await customWorkflowGraph({
+    workflow: "custom:flux2-real-dream-image-edit",
+    prompt: "Remove the hat",
+    width: 1216,
+    height: 1536,
+    denoise: 1,
+    seed: 42,
+    referenceAssets: [{ slot: "reference", assetId: "asset-1", comfyName: "original.png" }],
+    inpaint: {
+      original: "original.png",
+      crop: "crop.png",
+      mask: "mask.png",
+      composite: "stitch.png",
+      box: { x: 96, y: 160, width: 512, height: 640 },
+      work: { width: 912, height: 1136 },
+      strength: 0.8,
+    },
+    tiledDecode: true,
+  });
+  const linked = (value) => graph[value[0]];
+  assert.equal(graph["369"].inputs.image, "crop.png");
+  assert.deepEqual([graph["366"].inputs.width, graph["366"].inputs.height], [912, 1136]);
+  const masked = linked(graph["373"].inputs.latent_image);
+  assert.equal(masked.class_type, "SetLatentNoiseMask");
+  assert.equal(linked(masked.inputs.mask).inputs.image, "mask.png");
+  assert.equal(graph["373"].inputs.denoise, 0.8);
+  const stitch = linked(graph["375"].inputs.images);
+  assert.equal(stitch.class_type, "ImageCompositeMasked");
+  assert.deepEqual([stitch.inputs.x, stitch.inputs.y], [96, 160]);
+  assert.equal(linked(stitch.inputs.destination).inputs.image, "original.png");
+  assert.equal(linked(stitch.inputs.mask).inputs.image, "stitch.png");
+  assert.equal(linked(linked(stitch.inputs.source).inputs.image).class_type, "VAEDecodeTiled");
+});
