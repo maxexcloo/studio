@@ -854,12 +854,15 @@ test("media and administrator credentials discover only their own friendly tools
   // Studio owns the chat rules, so clients need no prompt prefix: tool use, following the user and short replies.
   assert.match(
     media.getInstructions(),
-    /^Studio makes images and videos\. Pass the user's words to Generate as request/,
+    /^Studio makes images and videos\. Write Generate prompts yourself/,
   );
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
-  assert.match(media.getInstructions(), /Use prompts only for prompts the user gave/);
+  assert.match(media.getInstructions(), /Studio runs them as written/);
   assert.match(media.getInstructions(), /Make one Generate call per set, one after another/);
-  assert.match(media.getInstructions(), /call Reuse with its ref and the change as request/);
+  assert.match(
+    media.getInstructions(),
+    /call Reuse with its ref and your revised prompt or the change as request/,
+  );
   // Slow jobs hand back at once; Result runs only on the user's request.
   assert.match(
     media.getInstructions(),
@@ -2989,7 +2992,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
   assert.match(
     result.content[0].text,
-    /call Reuse with its ref \(such as "result 1"\) and the change as request/,
+    /call Reuse with its ref \(such as "result 1"\) and your revised prompt \(or the change as request\)/,
   );
   assert.equal(f.downloads.length, 0, "nothing is downloaded until the sheet is fetched");
   const sheet = await fetch(localLink(f, previews(result)[0]));
@@ -3019,7 +3022,7 @@ test("Generate falls back to the queued response when a job outlasts the wait or
   assert.deepEqual(Object.keys(slow.jobs[0]), ["job_id", "ref", "link"]);
   assert.match(
     texts(slowResult),
-    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now or in the background\. When the user later asks to see results, call Result\. Never poll or resubmit\. To change or animate one later, call Reuse with its ref \(such as "result 1"\) and the change as request\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
+    /^Queued on Fixture Image\. Share the links below, not images \(none exist yet\), and end your turn; do not call Result now or in the background\. When the user later asks to see results, call Result\. Never poll or resubmit\. To change or animate one later, call Reuse with its ref \(such as "result 1"\) and your revised prompt \(or the change as request\)\.\n\n\[Result 1\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\) · \[All Results\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   const f = await fixture(t, { imageWaitSeconds: 30, jobEtaMs: 1000 });
   started = performance.now();
@@ -4191,7 +4194,7 @@ test("each job of a Generate call writes its prompt in the queue from the reques
   const client = await f.client();
   assert.match(
     client.getInstructions(),
-    /Studio picks the model and writes each prompt with that model's prompting guide, so don't fetch guides, expand the request or deliberate over wording or models\./,
+    /request alone has Studio write them up \(slower\), only for a short idea/,
   );
   const reply = await call(client, "Generate", {
     kind: "image",
@@ -4200,8 +4203,12 @@ test("each job of a Generate call writes its prompt in the queue from the reques
   });
   const result = data(reply);
   assert.equal(result.prompt_source, "studio");
-  assert.equal(guideOf(reply), undefined, "no guide reaches the chat");
-  assert.equal(reply.content.length, 1);
+  assert.match(
+    guideOf(reply),
+    /Lead with the light/,
+    "the guide reaches the chat once, for its own later prompts",
+  );
+  assert.equal(reply.content.length, 2);
   // The chat waits for nothing: every job is queued with its request and writes its own prompt.
   assert.deepEqual(
     f.submitted.map(({ writing }) => [writing.kind, writing.request, writing.index, writing.of]),
@@ -4322,7 +4329,7 @@ test("six individual photos are one Generate call: six jobs, each with its own w
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
   assert.match(
     generate.description,
-    /writes each prompt with that model's prompting guide, so never fetch guides[\s\S]*Several images \("six photos" is count 6\) take one call/,
+    /request alone or apply_guide has Studio write prompts \(slower\)[\s\S]*Several images \("six photos" is count 6\) take one call/,
   );
   const result = data(
     await call(client, "Generate", {
@@ -4442,7 +4449,7 @@ test("a prompt the writer can't write fails its job with the reason, and writing
   const plain = await off.client();
   assert.match(
     plain.getInstructions(),
-    /as request, as one clear prompt that keeps their subjects/,
+    /Write Generate prompts yourself[^;]*; pass them as prompts and the user.s words as request\. Studio runs them as written\. count/,
   );
   const first = await call(plain, "Generate", { kind: "image", request: "A cabin in warm light" });
   assert.equal(data(first).prompt_source, "request");
@@ -5268,6 +5275,27 @@ test("request and prompts together run the prompts and keep the request as conte
   assert.equal(data(reply).status, "queued");
   assert.match(texts(reply), /The prompts ran as given; the request is kept as context\./);
   assert.equal(f.submitted[0].prompt, "A grey heron at dawn");
+  // With a prompt writer too, the chat's prompts run as given without a writing call, and the guide comes once.
+  const w = await fixture(t, { environment: writerEnvironment, writerReply: writes });
+  await w.profiles(guidedCatalogue());
+  const writing = await w.client();
+  const args = {
+    profile_id: imageProfile.id,
+    request: "a heron",
+    prompts: ["A grey heron at dawn"],
+  };
+  const first = await call(writing, "Generate", args);
+  assert.equal(data(first).prompt_source, "exact");
+  assert.match(guideOf(first), /Lead with the light/);
+  assert.equal(guideOf(await call(writing, "Generate", { ...args, seed: 1 })), undefined);
+  assert.deepEqual(
+    w.submitted.map((body) => [body.prompt, Boolean(body.writing)]),
+    [
+      ["A grey heron at dawn", false],
+      ["A grey heron at dawn", false],
+    ],
+  );
+  assert.equal(written(w).length, 0);
   const missing = await call(client, "Generate", { kind: "image" });
   assert.match(texts(missing), /^Pass request with the user's words, or prompts to run as written/);
 });
