@@ -1,4 +1,4 @@
-"""Radiance MiniMax H3 text-to-video jobs in ComfyUI's video queue."""
+"""Radiance MiniMax H3 video jobs in ComfyUI's video queue."""
 
 import gc
 import http.client
@@ -8,7 +8,15 @@ import math
 import time
 from fractions import Fraction
 
-from .backend import HOST, LORA_TAG, PORT, available_video_models, lora_tags
+from .backend import (
+    HOST,
+    LORA_TAG,
+    PORT,
+    available_video_models,
+    lora_tags,
+    multipart,
+    pngs,
+)
 
 FPS = 24
 # H3 lengths are 17n + 5 frames. Radiance renders 5.17 to 14.4 seconds (124 to 345 frames).
@@ -16,6 +24,15 @@ MIN_FRAMES, MAX_FRAMES, FRAME_STEP, FRAME_OFFSET = 124, 345, 17, 5
 MAX_AREA = 1344 * 768
 MAX_CONTENT_BYTES = 2 * 1024**3
 TERMINAL_FAILURES = {"failed", "cancelled", "canceled", "expired"}
+# H3's tasks: keyframe tasks name the form part of each picture in order; ref2va
+# sends the pictures as numbered references.
+KEYFRAMES = {
+    "i2va": ["first_frame"],
+    "l2va": ["last_frame"],
+    "fl2va": ["first_frame", "last_frame"],
+}
+TASKS = ["t2va", *KEYFRAMES, "ref2va"]
+MAX_REFERENCES = 9
 
 
 def distilled(model):
@@ -30,7 +47,8 @@ def seconds(frames):
     return f"{math.floor(exact * 1000) / 1000:.3f}"
 
 
-def video_request(values):
+def video_request(values, images=()):
+    """The job's fields and its (form part, PNG) media; `images` are in input order."""
     model = values["model"]
     if model not in available_video_models():
         raise ValueError("Choose an available Radiance video model for this account.")
@@ -54,6 +72,25 @@ def video_request(values):
         raise ValueError("Video dimensions must be multiples of 32.")
     if values["latent_upscale"] not in {1, 2, 4}:
         raise ValueError("Latent upscale must be 1 (off), 2 or 4.")
+    task = values.get("task", "t2va")
+    if task not in TASKS:
+        raise ValueError(f"task must be one of {', '.join(TASKS)}.")
+    if task != "t2va" and distilled(model):
+        raise ValueError("FastH3 makes text-to-video only.")
+    if task in KEYFRAMES:
+        if len(images) != len(KEYFRAMES[task]):
+            raise ValueError(f"{task} takes {len(KEYFRAMES[task])} image(s).")
+        if values["latent_upscale"] > 1:
+            raise ValueError("Keyframe videos take no latent upscale.")
+        files = list(zip(KEYFRAMES[task], images))
+    elif task == "ref2va":
+        if not 1 <= len(images) <= MAX_REFERENCES:
+            raise ValueError(f"ref2va takes 1 to {MAX_REFERENCES} reference images.")
+        files = [(f"ref_image_{i}", data) for i, data in enumerate(images, 1)]
+    elif images:
+        raise ValueError("t2va takes no images; choose a keyframe or reference task.")
+    else:
+        files = []
     if not values["prompt"].strip():
         raise ValueError("Enter a video prompt.")
     width, height = values["width"], values["height"]
@@ -81,6 +118,9 @@ def video_request(values):
     total = 8 if distilled(model) else values["steps"]
     if not distilled(model):
         body["num_inference_steps"] = values["steps"]
+    # Radiance reads text to video off a request without media.
+    if task != "t2va":
+        body["task"] = task
     if values["latent_upscale"] > 1:
         body["latent_upscale"] = values["latent_upscale"]
         if values["upscale_refine_steps"]:
@@ -89,7 +129,7 @@ def video_request(values):
                     f"Upscale refine steps must be below the {total}-step schedule."
                 )
             body["upscale_refine_steps"] = values["upscale_refine_steps"]
-    return body, frames
+    return body, files
 
 
 def error_message(data, fallback):
@@ -105,18 +145,19 @@ class Client:
     def __init__(self, host=HOST, port=PORT, timeout=30):
         self.host, self.port, self.timeout = host, port, timeout
 
-    def request(self, method, route, body=None, raw=False, timeout=None):
+    def request(self, method, route, body=None, raw=False, timeout=None, files=()):
         connection = http.client.HTTPConnection(
             self.host, self.port, timeout=timeout or self.timeout
         )
         try:
-            headers = {"Content-Type": "application/json"} if body is not None else {}
-            connection.request(
-                method,
-                route,
-                None if body is None else json.dumps(body).encode(),
-                headers,
-            )
+            payload, headers = None, {}
+            if files:
+                payload, content_type = multipart(body, files)
+                headers["Content-Type"] = content_type
+            elif body is not None:
+                payload = json.dumps(body).encode()
+                headers["Content-Type"] = "application/json"
+            connection.request(method, route, payload, headers)
             response = connection.getresponse()
             if raw and response.status == 200:
                 length = int(response.getheader("Content-Length") or 0)
@@ -143,10 +184,11 @@ def generate_video(
     progress=None,
     poll=1.0,
     deadline_seconds=3 * 3600,
+    files=(),
 ):
     """Create, poll and download one job; cancellation deletes the Radiance job."""
     client = client or Client()
-    status, job = client.request("POST", "/v1/videos", body)
+    status, job = client.request("POST", "/v1/videos", body, files=files)
     if status not in {200, 201, 202} or not isinstance(job, dict) or not job.get("id"):
         raise RuntimeError(error_message(job, "Radiance rejected the video request."))
     identifier = str(job["id"])
@@ -243,7 +285,15 @@ class RadianceVideoGenerate:
                 "upscale_refine_steps": ("INT", {"default": 0, "min": 0, "max": 65}),
                 "seed": ("INT", {"default": 1, "min": 0, "max": 2**64 - 1}),
             },
-            "optional": {"loras": ("STRING", {"default": "[]"})},
+            "optional": {
+                # Studio's optional reference slots drop unused `images.*` inputs (workflow-modes.js).
+                **{
+                    f"images.image_{index}": ("IMAGE",)
+                    for index in range(1, MAX_REFERENCES + 1)
+                },
+                "loras": ("STRING", {"default": "[]"}),
+                "task": (TASKS, {"default": "t2va"}),
+            },
         }
 
     RETURN_TYPES = ("VIDEO", "AUDIO")
@@ -258,7 +308,13 @@ class RadianceVideoGenerate:
 
         from .backend import stop_worker, video_worker
 
-        body, _ = video_request(values)
+        images = pngs(
+            [
+                values.pop(f"images.image_{index}", None)
+                for index in range(1, MAX_REFERENCES + 1)
+            ]
+        )
+        body, files = video_request(values, images)
 
         def prepare():
             stop_worker()
@@ -276,6 +332,7 @@ class RadianceVideoGenerate:
                 body,
                 check_interrupt,
                 progress=lambda value: bar.update_absolute(value, 100),
+                files=files,
             )
         # The MP4 is stream-copied by SaveVideo (format and codec auto).
         return (InputImpl.VideoFromFile(io.BytesIO(data)), audio_from_mp4(data))
