@@ -46,6 +46,8 @@ export function writingRequest(value) {
       kind: "dream",
       ...(value.spicy === true ? { spicy: true } : {}),
       ...(text(value.source, 1000) ? { source: text(value.source, 1000) } : {}),
+      ...(text(value.reword) ? { reword: text(value.reword) } : {}),
+      ...(text(value.like) ? { like: text(value.like) } : {}),
       loras: (Array.isArray(value.loras) ? value.loras : [])
         .map((name) => text(name, 300))
         .filter(Boolean)
