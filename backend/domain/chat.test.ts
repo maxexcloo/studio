@@ -141,6 +141,41 @@ test("explicit media tool preserves selected settings and records stable admissi
   fixture.db.close();
 });
 
+test("request_media applies the number of images the user asked for", async () => {
+  const fixture = setup([
+    frame({
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                function: {
+                  name: "request_media",
+                  arguments: '{"operation":"image","prompt":"teapots","count":4}',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    "data: [DONE]\n\n",
+  ]);
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    {
+      content: "Make four teapots",
+      generation: { operation: "image", input: { profileId: "chosen", count: 1 } },
+    },
+    new AbortController().signal,
+    () => {},
+  );
+  assert.equal(fixture.service.messages("alice", fixture.session.id)[1].draft?.input.count, 4);
+  fixture.db.close();
+});
+
 test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
   const fixture = setup([
     frame({
