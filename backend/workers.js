@@ -1,7 +1,4 @@
 import crypto from "node:crypto";
-import path from "node:path";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { currentDataDir } from "./data-dir.js";
 import { kubernetesWorkloads } from "./runtime/workloads.ts";
 
 /**
@@ -9,12 +6,8 @@ import { kubernetesWorkloads } from "./runtime/workloads.ts";
  * an address and what it runs. A fork module (AGENTS.md): upstream code keeps
  * its one `comfyUrl`, which follows the default worker (comfy.js).
  *
- * Where workers come from, in order:
- * 1. The deployment: `STUDIO_WORKERS` (a JSON list), else the media workloads
- *    in `STUDIO_KUBERNETES_WORKLOADS`. These are locked: Settings shows them
- *    and changes them nowhere.
- * 2. Studio's own list, `workers.json` in the data folder, which
- *    administrators edit in Settings › Workers. It is empty until first saved.
+ * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
+ * workloads in `STUDIO_KUBERNETES_WORKLOADS`.
  */
 
 /** What a worker can be asked to do. `models` receives model downloads (STUDIO_MODEL_STORAGE=worker). */
@@ -25,10 +18,6 @@ export const workerCapabilities = [
   { id: "models", label: "Model Library", description: "Receives model and LoRA downloads." },
 ];
 const capabilityIds = new Set(workerCapabilities.map((item) => item.id));
-
-// Read on each call: tests and the first start may set the folder after this loads.
-const dataDir = () => currentDataDir();
-export const workersFile = () => path.join(dataDir(), "workers.json");
 
 const maxWorkers = 32;
 
@@ -67,7 +56,7 @@ const slug = (text) =>
 const validId = (id) => /^[a-z0-9][a-z0-9_-]{0,39}$/.test(id);
 
 /**
- * One worker as given (by the deployment or an administrator), checked and
+ * One worker as the deployment gives it, checked and
  * tidied: `taken` holds ids already in use, so a new one gets its own.
  */
 export function normalizeWorker(raw, { taken = new Set(), where = "Worker" } = {}) {
@@ -188,56 +177,18 @@ function workloadWorkers(environment) {
 let cache = null;
 const listeners = new Set();
 
-/** Studio's own saved list, or null before an administrator first saves one. */
-function readSaved() {
-  try {
-    const raw = readJsonFile(workersFile());
-    if (!raw || !Array.isArray(raw.workers)) return null;
-    const taken = new Set();
-    const workers = [];
-    for (const [index, item] of raw.workers.entries()) {
-      try {
-        workers.push(normalizeWorker(item, { taken, where: `Saved worker ${index + 1}` }));
-      } catch (error) {
-        console.warn(`[Studio] Skipped a saved worker: ${error.message}`);
-      }
-    }
-    return workers;
-  } catch {
-    return null;
-  }
-}
-
-function build(environment = process.env) {
-  const deployment = deploymentWorkers(environment);
-  const saved = readSaved();
-  const locked = new Set(deployment.workers.map((worker) => worker.id));
-  const own = (saved || [])
-    .filter((worker) => !locked.has(worker.id))
-    .map((worker) => ({ ...worker, source: "studio" }));
-  return {
-    variable: deployment.variable,
-    workers: [
-      ...deployment.workers.map((worker) => ({ ...worker, source: "deployment", locked: true })),
-      ...own.map((worker) => ({ ...worker, locked: false })),
-    ],
-  };
-}
-
 function state() {
-  if (!cache) cache = build();
+  if (!cache) cache = deploymentWorkers();
   return cache;
 }
 
-/** Every worker in list order, each with its source and whether the deployment locks it. */
+/** Every worker in list order. */
 export const listWorkers = () => state().workers;
 export const workerById = (id) => state().workers.find((worker) => worker.id === id) || null;
 export const workerHas = (id, capability) =>
   Boolean(workerById(id)?.capabilities.includes(capability));
 const workersWith = (capability) =>
   state().workers.filter((worker) => worker.capabilities.includes(capability));
-/** The variable the deployment defines workers with, if any. */
-export const workersVariable = () => state().variable;
 
 /**
  * The worker the single `comfyUrl` follows: the first that runs images,
@@ -275,40 +226,6 @@ function changed() {
 
 /** Reads the configuration again (tests). */
 export function reloadWorkers() {
-  changed();
-  return listWorkers();
-}
-
-/**
- * Saves Studio's own workers (the editable ones) in the order given. Locked
- * workers can't be changed or removed here; ids stay the same across edits.
- */
-export function saveWorkers(list) {
-  if (!Array.isArray(list)) throw new WorkerConfigError("Send the list of workers.");
-  const locked = listWorkers().filter((worker) => worker.locked);
-  const lockedIds = new Set(locked.map((worker) => worker.id));
-  const editable = list.filter((item) => !lockedIds.has(String(item?.id || "").toLowerCase()));
-  for (const item of list) {
-    const lockedWorker = locked.find(
-      (worker) => worker.id === String(item?.id || "").toLowerCase(),
-    );
-    if (
-      lockedWorker &&
-      (normalizeWorkerUrl(item.url) !== lockedWorker.url ||
-        (item.name !== undefined && String(item.name).trim() !== lockedWorker.name))
-    ) {
-      throw new WorkerConfigError(
-        `${lockedWorker.name} comes from the deployment configuration. Change it there.`,
-      );
-    }
-  }
-  if (locked.length + editable.length > maxWorkers)
-    throw new WorkerConfigError(`Studio supports up to ${maxWorkers} workers.`);
-  const taken = new Set(lockedIds);
-  const workers = editable.map((raw, index) =>
-    normalizeWorker(raw, { taken, where: `Worker ${index + 1}` }),
-  );
-  writeJsonFile(workersFile(), { version: 1, workers });
   changed();
   return listWorkers();
 }
@@ -354,7 +271,7 @@ export function pickWorker(
   return best;
 }
 
-/** "No worker can run videos": what a refused job says, with where to add one. */
+/** "No worker can run videos": what a refused job says. */
 export function noWorkerMessage(capability) {
   const what =
     {
@@ -364,6 +281,6 @@ export function noWorkerMessage(capability) {
       models: "receive model downloads",
     }[capability] || "run this";
   return listWorkers().length
-    ? `No worker can ${what}. An administrator can add the capability in Settings › Workers.`
-    : "No workers are set up. An administrator can add one in Settings › Workers.";
+    ? `No worker can ${what}. Add the capability in the deployment configuration.`
+    : "No workers are set up. Add one in the deployment configuration.";
 }

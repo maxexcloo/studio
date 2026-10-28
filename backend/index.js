@@ -89,7 +89,6 @@ import express from "express";
 import {
   configuredBackends,
   currentComfyBackend,
-  forgetWorkerState,
   isDefaultBackend,
   mergeWorkerModels,
   noteWorkerProfiles,
@@ -105,7 +104,6 @@ import {
   noWorkerMessage,
   workerById,
 } from "./workers.js";
-import { registerWorkerRoutes } from "./worker-routes.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -427,17 +425,10 @@ const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
 // connection), so its failure is remembered briefly rather than retried on every
-// catalogue load and run. A new address clears it.
+// catalogue load and run.
 // The default worker is always asked: its absence is what the studio's offline screen shows.
 const workerUnreachableForMs = 30_000;
 const workerUnreachableUntil = new Map();
-/** Forgets what Studio knew about a worker whose address or capabilities changed, or that was removed. */
-function forgetWorker(id) {
-  contextCaches.delete(id);
-  contextFailures.delete(id);
-  workerUnreachableUntil.delete(id);
-  forgetWorkerState(id);
-}
 const backendUnreachable = (error) =>
   error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error);
 
@@ -493,10 +484,6 @@ async function fetchComfyContext(backend) {
     rewriteStore.saveWorkerModels(backend, worker.url, { info, stats });
   }
   return result;
-}
-
-function refreshComfyContextSoon() {
-  setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
 const recoverRunningJobs = createJobRecovery({
@@ -1606,43 +1593,6 @@ function thumbnailCacheControl(req) {
 }
 
 registerReferenceRoutes(app);
-
-/** Whether ComfyUI answers at an address, in words Settings can show. */
-async function probeComfy(candidate) {
-  try {
-    const response = await fetch(`${candidate}/system_stats`, {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (response.ok) {
-      const stats = await response.json().catch(() => ({}));
-      return {
-        reachable: true,
-        detail: "",
-        device: stats?.devices?.[0]?.name || "",
-        version: stats?.system?.comfyui_version || "",
-      };
-    }
-    return {
-      reachable: false,
-      detail: `It answered with HTTP ${response.status}. Is that ComfyUI?`,
-    };
-  } catch (error) {
-    return {
-      reachable: false,
-      detail:
-        error?.name === "TimeoutError"
-          ? "Nothing answered there within 4 seconds."
-          : "Nothing is listening at that address.",
-    };
-  }
-}
-
-// Settings › Workers: the list, saving it and testing an address (worker-routes.js).
-registerWorkerRoutes(app, {
-  probe: probeComfy,
-  forget: forgetWorker,
-  refresh: refreshComfyContextSoon,
-});
 
 /**
  * What the deployment decides, for Settings: each value with its source
@@ -3264,7 +3214,9 @@ const serverStartup = startServers(app, {
       // No workers is a setup of its own: say so.
       if (!listWorkers().length) {
         if (!demoMode)
-          console.log("    No workers are set up yet. Add one in Settings › Workers.\n");
+          console.log(
+            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_WORKLOADS.\n",
+          );
         return;
       }
       // Starting before ComfyUI is fine, but say so instead of leaving people to guess.

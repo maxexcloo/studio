@@ -21,9 +21,13 @@ for (const key of [
   "all_proxy",
 ])
   delete process.env[key];
-const { saveWorkers } = await import("./workers.js");
-const useWorker = (url) =>
-  saveWorkers([{ id: "primary", url, capabilities: ["image", "video", "upscale", "models"] }]);
+const { reloadWorkers } = await import("./workers.js");
+const useWorker = (url) => {
+  process.env.STUDIO_WORKERS = JSON.stringify([
+    { id: "primary", url, capabilities: ["image", "video", "upscale", "models"] },
+  ]);
+  return reloadWorkers();
+};
 const worker = await import("./worker-models.js");
 const downloads = await import("./model-downloads.js");
 

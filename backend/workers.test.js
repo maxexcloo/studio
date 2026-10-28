@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-workers-"));
-process.env.STUDIO_DATA_DIR = dataDir;
 delete process.env.STUDIO_WORKERS;
-const workers = await import("./workers.js");
 const {
   deploymentWorkers,
   normalizeWorker,
@@ -15,20 +9,15 @@ const {
   pickWorker,
   listWorkers,
   reloadWorkers,
-  saveWorkers,
   defaultWorkerId,
   modelLibraryWorker,
   noWorkerMessage,
   WorkerConfigError,
-} = workers;
-
-test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+} = await import("./workers.js");
 
 const reset = (environment = {}) => {
   delete process.env.STUDIO_WORKERS;
   Object.assign(process.env, environment);
-  fs.rmSync(workers.workersFile(), { force: true });
-  fs.rmSync(`${workers.workersFile()}.bak`, { force: true });
   return reloadWorkers();
 };
 
@@ -134,76 +123,19 @@ test("STUDIO_WORKERS refuses what it can't use, plainly", () => {
     );
 });
 
-test("locked environment workers come first and can't be changed, removed or reused", () => {
+test("the deployment's workers are listed in order, Model Library included", () => {
   reset({
     STUDIO_WORKERS: JSON.stringify([
-      {
-        id: "primary",
-        name: "Image Worker",
-        url: "http://deployed-image:8188",
-        capabilities: ["image"],
-      },
+      { id: "primary", url: "http://127.0.0.1:8000", capabilities: ["image", "upscale"] },
+      { name: "Video Box", url: "http://video-box:8188", capabilities: ["video", "models"] },
     ]),
   });
   assert.deepEqual(
-    listWorkers().map((worker) => [worker.id, worker.source, worker.locked]),
-    [["primary", "deployment", true]],
+    listWorkers().map((worker) => worker.id),
+    ["primary", "video-box"],
   );
-  assert.throws(
-    () =>
-      saveWorkers([
-        {
-          id: "primary",
-          name: "Image Worker",
-          url: "http://elsewhere:8188",
-          capabilities: ["image"],
-        },
-      ]),
-    /deployment configuration/,
-  );
-  // Leaving a locked worker out of the list removes nothing; adding one beside it works.
-  const saved = saveWorkers([
-    { name: "Spare Upscaler", url: "spare:8188", capabilities: ["upscale"] },
-  ]);
-  assert.deepEqual(
-    saved.map((worker) => [worker.id, worker.source, worker.locked]),
-    [
-      ["primary", "deployment", true],
-      ["spare-upscaler", "studio", false],
-    ],
-  );
-  assert.throws(
-    () =>
-      saveWorkers([
-        { id: "primary", url: "http://x:1", name: "Image Worker", capabilities: ["image"] },
-        { id: "primary", name: "Copy", url: "http://y:1", capabilities: ["video"] },
-      ]),
-    /deployment configuration|reuses/,
-  );
-});
-
-test("a fresh install has no workers until an administrator saves them to workers.json", () => {
-  reset();
-  assert.deepEqual(listWorkers(), []);
-  assert.equal(fs.existsSync(workers.workersFile()), false);
-  saveWorkers([
-    {
-      id: "primary",
-      name: "Desk GPU",
-      url: "http://127.0.0.1:8000",
-      capabilities: ["image", "upscale"],
-    },
-    { name: "Video Box", url: "http://video-box:8188", capabilities: ["video", "models"] },
-  ]);
-  assert.deepEqual(
-    reloadWorkers().map((worker) => [worker.id, worker.name, worker.url, worker.source]),
-    [
-      ["primary", "Desk GPU", "http://127.0.0.1:8000", "studio"],
-      ["video-box", "Video Box", "http://video-box:8188", "studio"],
-    ],
-  );
+  assert.equal(defaultWorkerId(), "primary");
   assert.equal(modelLibraryWorker().id, "video-box");
-  assert.equal(JSON.parse(fs.readFileSync(workers.workersFile(), "utf8")).workers.length, 2);
 });
 
 test("zero workers is a valid setup with a plain message", () => {
@@ -211,9 +143,7 @@ test("zero workers is a valid setup with a plain message", () => {
   assert.deepEqual(listWorkers(), []);
   assert.equal(defaultWorkerId(), "");
   assert.match(noWorkerMessage("image"), /No workers are set up/);
-  reset();
-  saveWorkers([]);
-  assert.deepEqual(reloadWorkers(), []);
+  assert.deepEqual(reset(), []);
 });
 
 test("routing: only capable workers, an online one with the model first, then list order", () => {
@@ -258,7 +188,7 @@ test("routing: only capable workers, an online one with the model first, then li
   assert.equal(pickWorker("image", { workers: list, online: () => false }).id, "a");
 });
 
-test("names, ids and capabilities are tidied when saved", () => {
+test("names, ids and capabilities are tidied", () => {
   const taken = new Set(["image-worker"]);
   const worker = normalizeWorker(
     { name: "  Image   Worker ", url: "gpu:8188", capabilities: ["VIDEO", "image"] },
