@@ -69,6 +69,56 @@ test("Changing the second encoder and weight type preserves the first encoder in
   expect(state.jobs[0].input.weightDtype).toBe("fp8_e4m3fn");
 });
 
+test("A parked profile reads as parked, and an administrator choosing it starts its worker", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const ready = { ...profiles[0], workerIds: ["worker-a"] };
+  const parked = { ...profiles[0], id: "image:parked", label: "Parked Image", workerIds: ["p"] };
+  await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        profiles: [ready, parked],
+        workers: [
+          { id: "worker-a", name: "A", available: true, capabilities: ["image"] },
+          {
+            id: "p",
+            name: "P",
+            available: false,
+            parked: true,
+            workloads: ["image-p"],
+            capabilities: ["image"],
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({ json: { automaticLifecycle: false, pools: [], history: [], workloads: [] } }),
+  );
+  const previews: unknown[] = [];
+  await page.route("**/api/runtime/preview", (route) => {
+    previews.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: { target: ["image-p"], stop: [], start: ["image-p"], keep: [], signature: "fixture" },
+    });
+  });
+  await page.route("**/api/runtime/apply", (route) =>
+    route.fulfill({ status: 202, json: { id: "next", status: "running" } }),
+  );
+  await page.route("**/api/runtime/operations/next", (route) =>
+    route.fulfill({ json: { id: "next", status: "running", progress: "Starting P." } }),
+  );
+  await create(page);
+  const picker = page.getByRole("combobox", { name: "Profile", exact: true });
+  await picker.click();
+  const option = page.getByRole("option", { name: /Parked Image/ });
+  await expect(option).toContainText("Parked");
+  await option.click();
+  await expect(picker).toHaveAttribute("title", /Starting: Starting P\./);
+  expect(previews).toEqual([{ start: ["image-p"] }]);
+});
+
 test("Edit framing uses the portrait reference while Reference mode retains the custom working size", async ({
   page,
 }) => {

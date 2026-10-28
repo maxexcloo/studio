@@ -24,9 +24,16 @@ export const localUnlessAsked = (profiles, { request, name } = {}) =>
 /**
  * What MCP says instead of sending video to the cloud while the local video worker is down. It names Grok
  * only when the account may use a cloud profile; with none granted, there is nothing to offer.
+ * A parked worker was stopped on purpose, so the user hears that, not that it failed.
  */
-export const localVideoUnavailable = (cloudOffered = false) =>
-  `Local video is unavailable right now: the video worker is offline. ${cloudOffered ? "Tell the user; they can ask for Grok to make it in the cloud instead." : "Tell the user to try again later."}`;
+export const localVideoUnavailable = (cloudOffered = false, parked = false) =>
+  `Local video is unavailable right now: ${parked ? parkedWorker("video") : "the video worker is offline."} ${cloudOffered ? "Tell the user; they can ask for Grok to make it in the cloud instead." : parked ? "Tell the user." : "Tell the user to try again later."}`;
+/** What MCP says about a parked local worker: it is stopped on purpose, not broken. */
+export const parkedWorker = (kinds) => {
+  const list = [kinds].flat();
+  const [it, worker] = list.length > 1 ? ["them", "workers are"] : ["it", "worker is"];
+  return `the ${list.join(" and ")} ${worker} parked (stopped on purpose; an administrator can start ${it} in Settings › Workers).`;
+};
 /** Without a tier, chat picks the quickest everyday tier: Fast, then Super Fast, Standard and Quality. */
 const preferredTiers = ["fast", "turbo", "standard", "quality"];
 const labels = { "super fast": "turbo", fast: "fast", quality: "quality", standard: "standard" };

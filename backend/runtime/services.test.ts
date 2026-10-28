@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { RuntimeController, type Workload } from "./controller.ts";
-import { createServicesObserver, createTextVision } from "./services.ts";
+import { createServicesObserver, createTextVision, parkedWorkers } from "./services.ts";
 import { KubernetesEngine } from "./kubernetes.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { fork } from "node:child_process";
@@ -27,11 +27,10 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   });
   const controller = new RuntimeController({
     engine: {
-      state: async () => {
-        throw new Error("Service health never reads or scales deployments");
-      },
+      // Everything runs; parked workloads have their own test.
+      state: async () => ({ replicas: 1, ready: 1, pods: 1 }),
       scale: async () => {
-        throw new Error("Service health never reads or scales deployments");
+        throw new Error("Service health never scales deployments");
       },
     },
     workloads: [
@@ -87,7 +86,7 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   assert.equal(admin.services.text?.state, "healthy");
   assert.equal(admin.services.image?.endpoints[0].device, "Fixture GPU");
   assert.equal(admin.services.image?.endpoints[0].memoryFree, 40);
-  assert.equal(admin.services.image?.endpoints[0].workloadId, "image");
+  assert.deepEqual(admin.services.image?.endpoints[0].workloads, ["image"]);
   assert.equal(
     admin.services.text?.endpoints.find((endpoint) => endpoint.id === "text")?.label,
     "Direct Text",
@@ -124,6 +123,68 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
     "an endpoint without a direct health check does not conceal an observed offline text runtime",
   );
   assert.equal(calls.length, 4);
+});
+
+test("workloads stopped on purpose are parked; one Studio's placement should run is offline", async () => {
+  const workload = (id: string, kind: Workload["kind"], url: string): Workload => ({
+    id,
+    label: id,
+    kind,
+    namespace: "gpu",
+    deployment: id,
+    pool: "gpu",
+    gpus: 1,
+    url,
+  });
+  const workloads = [
+    workload("image", "image", "http://image.invalid"),
+    workload("video", "video", "http://video.invalid"),
+    workload("video-tp2", "video", "http://video.invalid"),
+    workload("text", "text", "http://text.invalid"),
+  ];
+  // Only text was last placed by Studio, so its stop is drift; the media were parked.
+  const controller = new RuntimeController({
+    engine: {
+      state: async () => ({ replicas: 0, ready: 0, pods: 0 }),
+      scale: async () => {},
+    },
+    workloads,
+    pools: { gpu: 2 },
+    store: { read: () => ({ desired: ["text"], operations: [] }), write: () => {} },
+  });
+  const probed: string[] = [];
+  const workers = [
+    { id: "image-worker", name: "Image", url: "http://image.invalid", capabilities: ["image"] },
+    { id: "video-worker", name: "Video", url: "http://video.invalid", capabilities: ["video"] },
+  ];
+  const observe = createServicesObserver({
+    controller,
+    workers: () => workers,
+    environment: {},
+    fetchImpl: async (input) => {
+      probed.push(String(input));
+      throw new Error("connection refused");
+    },
+  });
+  const status = await observe({ allowed: ["image", "video", "text"] });
+  assert.equal(status.services.image?.state, "parked");
+  assert.equal(status.services.video?.state, "parked");
+  assert.deepEqual(status.services.video?.endpoints[0].workloads, ["video", "video-tp2"]);
+  assert.equal(status.services.text?.state, "offline");
+  assert.deepEqual(probed, ["http://text.invalid/health"], "a parked worker is not probed");
+  assert.deepEqual(
+    [...(await parkedWorkers(controller, workers))],
+    ["image-worker", "video-worker"],
+  );
+  const phases = (await controller.observe()).workloads.map(({ id, phase }) => [id, phase]);
+  assert.deepEqual(Object.fromEntries(phases), {
+    image: "parked",
+    video: "parked",
+    "video-tp2": "parked",
+    text: "down",
+  });
+  await assert.rejects(controller.acquire("image"), /image is parked: it was stopped on purpose/);
+  await assert.rejects(controller.acquire("text"), /text is down/);
 });
 
 test("timeouts, authentication failures and non-worker responses never advertise a healthy runtime", async () => {
@@ -170,7 +231,7 @@ test(
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: join(directory, "data"),
         STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
-        // Health observation never calls the API, so it needs no fake.
+        // An unreachable Kubernetes API leaves nothing parked, so health is probed as usual.
         STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",
         STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
           text: {

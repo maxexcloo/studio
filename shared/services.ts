@@ -1,5 +1,6 @@
 export type ServiceKind = "image" | "video" | "text";
-export type ServiceHealth = "healthy" | "offline" | "unknown" | "waiting";
+/** `parked`: its workloads were stopped on purpose (runtime `parked`), unlike `offline`, which should run. */
+export type ServiceHealth = "healthy" | "offline" | "parked" | "unknown" | "waiting";
 
 export interface ServiceEndpoint {
   id: string;
@@ -13,8 +14,8 @@ export interface ServiceEndpoint {
   version?: string;
   memoryTotal?: number;
   memoryFree?: number;
-  /** Catalogue identity; does not establish which model is currently loaded. */
-  workloadId?: string;
+  /** The Studio workloads serving it, in start order; does not establish which model is loaded. */
+  workloads?: string[];
   /** Only present when the direct health response identifies its loaded model. */
   loadedModel?: string;
 }

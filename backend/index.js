@@ -53,7 +53,7 @@ import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createServicesObserver, createTextVision } from "./runtime/services.ts";
+import { createServicesObserver, createTextVision, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library-routes.js";
@@ -805,6 +805,7 @@ async function mediaModels(force = false) {
     .filter((entry) => entry.result);
   if (demoMode && !answered.length && !direct.length)
     throw settled[0]?.reason || new Error("No worker is available.");
+  const parked = await parkedWorkers(runtime?.controller, workers);
   const configured = inferModels({}, {}, { configuredOnly: true });
   const catalogues = workers
     .map((worker) => {
@@ -822,7 +823,7 @@ async function mediaModels(force = false) {
         .map((profile) => ({
           ...profile,
           ready: undefined,
-          availability: "offline",
+          availability: parked.has(worker.id) ? "parked" : "offline",
           readiness: "unknown",
         }));
       return { worker, result: { models: { ...(cached || configured), profiles } } };
@@ -832,7 +833,11 @@ async function mediaModels(force = false) {
         Number(answered.some((item) => item.worker.id === right.worker.id)) -
         Number(answered.some((item) => item.worker.id === left.worker.id)),
     );
-  const backends = workerAvailability(new Set(answered.map(({ worker }) => worker.id)), workers);
+  const backends = workerAvailability(
+    new Set(answered.map(({ worker }) => worker.id)),
+    workers,
+    parked,
+  );
   const primary = answered.find(({ worker }) => isDefaultBackend(worker.id))?.result ||
     answered[0]?.result ||
     catalogues[0]?.result || { models: offlineModelResult() };
@@ -885,14 +890,22 @@ async function mediaModels(force = false) {
     video: models.profiles.some((profile) => profile.kind === "video"),
   };
   if (!answered.length && workers.length)
-    models.reason =
-      "Configured workers are offline. Selected jobs wait until their worker is available.";
-  models.workers = workers.map((worker) => ({
-    id: worker.id,
-    name: worker.name,
-    capabilities: worker.capabilities,
-    available: answered.some((entry) => entry.worker.id === worker.id),
-  }));
+    models.reason = workers.every((worker) => parked.has(worker.id))
+      ? "Configured workers are parked: stopped on purpose. An administrator can start them in Settings › Workers."
+      : "Configured workers are offline. Selected jobs wait until their worker is available.";
+  models.workers = workers.map((worker) => {
+    const available = answered.some((entry) => entry.worker.id === worker.id);
+    const workloads = workerWorkloads(worker);
+    return {
+      id: worker.id,
+      name: worker.name,
+      capabilities: worker.capabilities,
+      available,
+      ...(!available && parked.has(worker.id) ? { parked: true } : {}),
+      // The deployments an administrator can start for it (Settings › Workers).
+      ...(workloads.length ? { workloads } : {}),
+    };
+  });
   return { primary, models };
 }
 
@@ -1018,6 +1031,7 @@ async function animateChoice(account, { width, height } = {}) {
   return animateProfile(models.profiles || [], {
     defaultId: models.defaults?.videoModel,
     localRunning: models.backends?.video?.available !== false,
+    localParked: models.backends?.video?.parked === true,
     width,
     height,
   });
@@ -1462,7 +1476,9 @@ const tasteWriter = (ownerId) => {
     : assistantEngine;
 };
 const textOnline = async () =>
-  (await observeServices({ allowed: ["text"] })).services.text?.state !== "offline";
+  !["offline", "parked"].includes(
+    (await observeServices({ allowed: ["text"] })).services.text?.state,
+  );
 const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
 // Signals name a merged profile by the id it goes by now (profile-merge.js).
 const taste = {
@@ -1725,7 +1741,9 @@ async function queueResourceFor(input) {
 /** The deployments that can serve a job's worker; one- and two-GPU video share its address. */
 function managedWorkloads(job) {
   if (job.resource.startsWith("provider:cliproxyapi")) return [];
-  const worker = workerById(job.backend);
+  return workerWorkloads(workerById(job.backend));
+}
+function workerWorkloads(worker) {
   if (!worker || !runtime) return [];
   return runtime.controller.workloads
     .filter(
@@ -2118,17 +2136,17 @@ const dream = createDream({
     return {
       profiles: (models.profiles || []).filter(
         (profile) =>
-          profile.ready !== false && profile.availability !== "offline" && !isCloudProfile(profile),
+          profile.ready !== false &&
+          !["offline", "parked"].includes(profile.availability) &&
+          !isCloudProfile(profile),
       ),
       defaults: models.defaults,
     };
   },
   online: async (kind) => {
     const { services } = await observeServices({ allowed: ["text", kind] });
-    return {
-      text: services.text?.state !== "offline",
-      media: services[kind]?.state !== "offline",
-    };
+    const reach = (state) => (["offline", "parked"].includes(state) ? state : "online");
+    return { text: reach(services.text?.state), media: reach(services[kind]?.state) };
   },
   textBusy,
   writer: assistantEngine,
@@ -2331,12 +2349,12 @@ const sessionChat = new ChatService({
     if (!models.some((model) => workloads.some((item) => item.model === model.id))) return models;
     // Only administrators may start a stopped model, as in Settings › Workers.
     const admin = !multiUserEnabled || account?.role === "administrator";
-    const running = admin
+    const phases = admin
       ? undefined
-      : (await runtime.controller.observe()).workloads
-          .filter((item) => item.phase === "running")
-          .map(({ id }) => id);
-    return servedChatModels(models, workloads, running);
+      : Object.fromEntries(
+          (await runtime.controller.observe()).workloads.map(({ id, phase }) => [id, phase]),
+        );
+    return servedChatModels(models, workloads, phases);
   },
   revision: async (ownerId, sessionId, revision) => {
     const source = rewriteStore.job(ownerId, revision.sourceJobId);

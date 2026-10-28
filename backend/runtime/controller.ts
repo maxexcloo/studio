@@ -76,6 +76,9 @@ interface Options {
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 const minutes = (ms: number) => plural(Math.round(ms / 60_000), "minute");
 const historyLimit = 100;
+/** Why work for a parked workload waits, in the words every surface uses. */
+export const parkedReason = (label: string) =>
+  `${label} is parked: it was stopped on purpose. An administrator can start it in Settings › Workers.`;
 const memoryStore = (): RuntimeStore => {
   let record: RuntimeRecord | undefined;
   return {
@@ -84,10 +87,6 @@ const memoryStore = (): RuntimeStore => {
   };
 };
 
-function phase(state: DeploymentState): WorkloadPhase {
-  if (state.replicas > 0) return state.ready > 0 ? "running" : "starting";
-  return state.pods > 0 ? "stopping" : "stopped";
-}
 /** A deployment holds its GPUs while it should run or while any of its pods still exists. */
 const holds = (state: DeploymentState) => state.replicas > 0 || state.pods > 0;
 
@@ -178,6 +177,39 @@ export class RuntimeController {
     return workloads.filter((_, index) => states[index].replicas > 0);
   }
 
+  /** Scaled to zero on purpose: not while Studio's last placement (outside a change) has it running. */
+  private isParked(workload: Workload, state: DeploymentState) {
+    return (
+      state.replicas === 0 && (Boolean(this.current) || !this.record.desired?.includes(workload.id))
+    );
+  }
+  private phase(workload: Workload, state: DeploymentState): WorkloadPhase {
+    if (state.replicas > 0) return state.ready > 0 ? "running" : "starting";
+    if (state.pods > 0) return "stopping";
+    return this.isParked(workload, state) ? "parked" : "down";
+  }
+
+  private parkedCache?: { until: number; result: Promise<Set<string>> };
+  /**
+   * The workloads deliberately scaled to zero, cached for five seconds since every status read asks.
+   * A deployment Studio cannot read is not parked, so its worker still shows as down. With automatic
+   * lifecycle control, queued work starts what it needs, so nothing is held back as parked.
+   */
+  parked(): Promise<Set<string>> {
+    if (this.automaticLifecycle) return Promise.resolve(new Set());
+    if (this.parkedCache && this.parkedCache.until > this.now()) return this.parkedCache.result;
+    const result = Promise.all(
+      this.workloads.map((workload) =>
+        this.engine.state(workload).then(
+          (state) => (this.isParked(workload, state) ? workload.id : ""),
+          () => "",
+        ),
+      ),
+    ).then((ids) => new Set(ids.filter(Boolean)));
+    this.parkedCache = { until: this.now() + 5000, result };
+    return result;
+  }
+
   private async states() {
     const states = new Map<string, DeploymentState>();
     await Promise.all(
@@ -231,18 +263,15 @@ export class RuntimeController {
             reason: entry.error,
           };
         const { state } = entry;
-        // Flux upgrades reset the GPU releases to zero replicas; show that as drift from Studio's placement.
-        const stoppedOutside =
-          !this.current && Boolean(desired?.includes(workload.id)) && !holds(state);
+        const phase = this.phase(workload, state);
         return {
           ...base,
-          phase: phase(state),
+          phase,
           replicas: state.replicas,
           ready: state.ready,
-          ...(stoppedOutside
-            ? {
-                reason: "Stopped outside Studio; its last placement had it running.",
-              }
+          // Flux upgrades reset the GPU releases to zero replicas: drift from Studio's placement.
+          ...(phase === "down"
+            ? { reason: "Stopped outside Studio; its last placement had it running." }
             : state.reason
               ? { reason: state.reason }
               : {}),
@@ -470,11 +499,13 @@ export class RuntimeController {
         `Waiting for ${choices[index].label} to start.${reason && !["Loading.", "Starting."].includes(reason) ? ` ${reason}` : ""}`,
       );
     }
+    const [workload] = choices;
     if (!this.automaticLifecycle)
       throw new RuntimeUnavailable(
-        "The selected worker is offline; automatic lifecycle control is disabled.",
+        choices.every((item, index) => this.isParked(item, states[index]))
+          ? parkedReason(workload.label)
+          : `${workload.label} is down; automatic lifecycle control is disabled.`,
       );
-    const [workload] = choices;
     if (workload.kind === "text")
       throw new RuntimeUnavailable(
         `${workload.label} is stopped; automatic control never starts text workloads. Start it in Settings › Workers.`,

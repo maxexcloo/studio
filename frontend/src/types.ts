@@ -180,6 +180,10 @@ export interface Models {
     id: string;
     name: string;
     available: boolean;
+    /** Not answering because its workloads were stopped on purpose. */
+    parked?: boolean;
+    /** The Studio workloads serving it, which an administrator can start. */
+    workloads?: string[];
     capabilities: string[];
     gpuDevices?: string[];
   }[];

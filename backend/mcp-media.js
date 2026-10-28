@@ -17,7 +17,13 @@ import {
 } from "./mcp-controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
-import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
+import {
+  choicePool,
+  chooseProfile,
+  isCloudProfile,
+  localVideoUnavailable,
+  parkedWorker,
+} from "./mcp-tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
 import { withResolution } from "../shared/resolution.ts";
 
@@ -362,12 +368,17 @@ export class McpMedia {
     if (!cloud) {
       const cloudOffered = ready.some(isCloudProfile);
       profiles = ready.filter((profile) => !isCloudProfile(profile));
+      const parked = models.backends?.[kind]?.parked === true;
       if (kind === "video" && models.backends?.video?.available === false) {
         if (!cloudOffered || !flagEnabled("STUDIO_VIDEO_CLOUD_FALLBACK"))
-          throw new Error(localVideoUnavailable(cloudOffered));
+          throw new Error(localVideoUnavailable(cloudOffered, parked));
         profiles = ready.filter(isCloudProfile);
-        note = "The local video worker is offline, so this went to the cloud. Tell the user. ";
-      }
+        note = `The local video worker is ${parked ? "parked" : "offline"}, so this went to the cloud. Tell the user. `;
+      } else if (parked)
+        // Queued work would wait until an administrator starts it, so say why now.
+        throw new Error(
+          `Local ${kind} is unavailable right now: ${parkedWorker(kind)} Tell the user.`,
+        );
     }
     if (loras.length) {
       // Named LoRAs narrow the choice to profiles that can use every one of them.
@@ -1239,6 +1250,7 @@ export class McpMedia {
       const choice = animateProfile(await this.profiles("video", owner), {
         defaultId: models.defaults?.videoModel,
         localRunning: models.backends?.video?.available !== false,
+        localParked: models.backends?.video?.parked === true,
         tier,
         cloud,
       });

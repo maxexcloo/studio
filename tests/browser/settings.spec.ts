@@ -362,7 +362,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
         workloads: [
           workload("image", "Image", "running"),
           workload("text", "Text", "running"),
-          workload("video", "Video", "stopped"),
+          workload("video", "Video", "parked"),
         ],
       },
     }),
@@ -401,4 +401,75 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await expect(dialog).toBeHidden();
   expect(previews).toEqual([{ workloads: ["text", "video"] }]);
   expect(applied).toEqual([{ workloads: ["text", "video"], signature: "fixture" }]);
+  // A parked workload's own Start previews starting it beside what runs.
+  const video = table.getByRole("row", { name: "Video", exact: true });
+  await expect(video).toContainText("Parked");
+  await video.getByRole("button", { name: "Actions for Video", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Start", exact: true }).click();
+  await expect(dialog).toContainText("Start: Video");
+  expect(previews.at(-1)).toEqual({ start: ["video"] });
+});
+
+test("A parked service reads as parked, and administrators start it from Status", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await page.route("**/api/services/status", (route) =>
+    route.fulfill({
+      json: {
+        services: {
+          image: {
+            state: "healthy",
+            reason: "A direct runtime is healthy.",
+            endpoints: [{ id: "image", label: "Image", state: "healthy", reason: "Ready" }],
+          },
+          video: {
+            state: "parked",
+            reason: "Parked: stopped on purpose. An administrator can start it.",
+            endpoints: [
+              {
+                id: "video",
+                label: "Video",
+                state: "parked",
+                reason: "Parked: stopped on purpose. An administrator can start it.",
+                workloads: ["video"],
+              },
+            ],
+          },
+        },
+        runtime: { configured: true, automaticLifecycle: false, reason: "" },
+      },
+    }),
+  );
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({
+      json: { automaticLifecycle: false, pools: [], history: [], workloads: [] },
+    }),
+  );
+  const previews: unknown[] = [];
+  const applied: unknown[] = [];
+  await page.route("**/api/runtime/preview", (route) => {
+    previews.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: { target: ["video"], stop: [], start: ["video"], keep: [], signature: "fixture" },
+    });
+  });
+  await page.route("**/api/runtime/apply", (route) => {
+    applied.push(route.request().postDataJSON());
+    return route.fulfill({ status: 202, json: { id: "next", status: "running" } });
+  });
+  await page.route("**/api/runtime/operations/next", (route) =>
+    route.fulfill({ json: { id: "next", status: "running", progress: "Starting Video." } }),
+  );
+  await page.goto("/images");
+  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  await expect(status).toHaveAttribute("aria-description", "Services Healthy · Some Parked");
+  await status.click();
+  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(drawer.getByLabel("Videos: Parked", { exact: true })).toBeVisible();
+  // Nothing stops, so choosing Start is the request itself.
+  await drawer.getByRole("button", { name: "Start Videos", exact: true }).click();
+  await expect(drawer.getByText("Starting Video.", { exact: true })).toBeVisible();
+  expect(previews).toEqual([{ start: ["video"] }]);
+  expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
 });
