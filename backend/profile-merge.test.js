@@ -75,7 +75,6 @@ saveWorkflowPreferences(
   {
     favorites: [`custom:${oldId}`],
     lastUsed: { [`custom:${oldId}`]: "2026-10-01" },
-    thumbnails: {},
   },
   { immediate: true },
 );

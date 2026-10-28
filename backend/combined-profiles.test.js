@@ -24,7 +24,6 @@ test("combines already applied move preferences and LoRA stacks and prune bindin
       "custom:image-krea2-turbo": "2026-10-01T00:00:00.000Z",
       "custom:image-krea2-turbo-radiance": "2026-10-27T00:00:00.000Z",
     },
-    thumbnails: {},
   });
   write("accounts/abc/lora-stacks.json", {
     stacks: { "custom:image-krea2-turbo-comfyui": [{ name: "detail" }] },
@@ -57,7 +56,6 @@ test("combines already applied move preferences and LoRA stacks and prune bindin
   assert.deepEqual(read("workflow-preferences.json"), {
     favorites: ["custom:image-krea2-turbo"],
     lastUsed: { "custom:image-krea2-turbo": "2026-10-27T00:00:00.000Z" },
-    thumbnails: {},
   });
   const stacks = read("accounts/abc/lora-stacks.json");
   assert.deepEqual(Object.keys(stacks.stacks), ["custom:image-krea2-turbo"]);

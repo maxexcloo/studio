@@ -26,11 +26,10 @@ export function loadWorkflowPreferences() {
     preferencesCache = {
       favorites: Array.isArray(raw.favorites) ? raw.favorites : [],
       lastUsed: raw.lastUsed && typeof raw.lastUsed === "object" ? raw.lastUsed : {},
-      thumbnails: raw.thumbnails && typeof raw.thumbnails === "object" ? raw.thumbnails : {},
     };
     return preferencesCache;
   } catch {
-    preferencesCache = { favorites: [], lastUsed: {}, thumbnails: {} };
+    preferencesCache = { favorites: [], lastUsed: {} };
     return preferencesCache;
   }
 }
@@ -54,7 +53,7 @@ export function saveWorkflowPreferences(preferences, { immediate = false } = {})
   writeJsonFile(preferencesPath, preferences);
 }
 
-/** Moves favourites, last used and thumbnails to the id `canonical` gives each (merged profiles), saved at once. */
+/** Moves favourites and last use to the id `canonical` gives each (merged profiles), saved at once. */
 export function repointWorkflowPreferences(canonical) {
   saveWorkflowPreferences(repointedPreferences(loadWorkflowPreferences(), canonical), {
     immediate: true,
@@ -66,13 +65,12 @@ function updateWorkflowPreferencePatch(patch = {}) {
   const next = {
     favorites: Array.isArray(patch.favorites) ? patch.favorites : current.favorites,
     lastUsed: { ...current.lastUsed, ...(patch.lastUsed || {}) },
-    thumbnails: { ...current.thumbnails, ...(patch.thumbnails || {}) },
   };
   saveWorkflowPreferences(next);
   return next;
 }
 
-export function markWorkflowUsed(profileId, thumbnail = "") {
+export function markWorkflowUsed(profileId) {
   if (!profileId) return loadWorkflowPreferences();
   const patch = { lastUsed: { [profileId]: new Date().toISOString() } };
   return updateWorkflowPreferencePatch(patch);
@@ -169,13 +167,6 @@ function missingFileParts(workflow, info) {
   }));
 }
 
-function latestThumbnailFor(profileId, workflowId, prefs) {
-  const icon = prefs.thumbnails?.[profileId];
-  return typeof icon === "string" && icon.startsWith("/workflow-icons/")
-    ? icon
-    : "/workflow-icons/workflow.svg";
-}
-
 function automaticTags(item, prefs) {
   const tags = [];
   if (prefs.favorites.includes(item.id)) tags.push("Favorite");
@@ -221,7 +212,6 @@ export function workflowSummaries({
       path: custom?.path || "",
       favorite: preferences.favorites.includes(id),
       lastUsedAt: preferences.lastUsed[id] || "",
-      thumbnail: latestThumbnailFor(id, profile.workflow, preferences),
       // Built-in families know exactly which files they still lack.
       validation: {
         ok: profile.ready !== false,
@@ -270,7 +260,6 @@ export function workflowSummaries({
       path: workflow.path || "",
       favorite: preferences.favorites.includes(workflow.profileId),
       lastUsedAt: preferences.lastUsed[workflow.profileId] || "",
-      thumbnail: latestThumbnailFor(workflow.profileId, workflow.profileId, preferences),
       validation,
     };
     summary.tags = automaticTags(summary, preferences);

@@ -102,7 +102,6 @@ saveWorkflowPreferences(
   {
     favorites: [`custom:${radianceId}`],
     lastUsed: { [`custom:${comfyId}`]: "2026-10-20T00:00:00.000Z" },
-    thumbnails: {},
   },
   { immediate: true },
 );

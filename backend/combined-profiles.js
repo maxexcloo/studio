@@ -6,7 +6,7 @@ import { createGuideStore, createProfileStore } from "./profile-store.js";
 
 /**
  * Per-profile preferences that follow a merged or combined profile id to the id it became
- * (profile-store.js `canonical`): workflow preferences (favourites, last use, thumbnails) and every
+ * (profile-store.js `canonical`): workflow preferences (favourites and last use) and every
  * account's LoRA stacks (the active stack, strengths and older per-workflow snapshots). Combine
  * Backends and Merge Duplicate Profiles move them when they run; `combinedProfiles` is the
  * migrate-runtime step that moves what production's earlier combines left behind and prunes
@@ -14,18 +14,13 @@ import { createGuideStore, createProfileStore } from "./profile-store.js";
  */
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-/** Preferences on the kept ids: the latest use wins, and a kept id's own thumbnail. */
+/** Preferences on the kept ids: the latest use wins. */
 export function repointedPreferences(preferences, canonical) {
   return {
     favorites: [...new Set(preferences.favorites.map(canonical))],
     lastUsed: Object.entries(preferences.lastUsed).reduce((next, [id, when]) => {
       const kept = canonical(id);
       if (!next[kept] || String(when) > String(next[kept])) next[kept] = when;
-      return next;
-    }, {}),
-    thumbnails: Object.entries(preferences.thumbnails).reduce((next, [id, url]) => {
-      const kept = canonical(id);
-      if (!next[kept] || kept === id) next[kept] = url;
       return next;
     }, {}),
   };
@@ -111,14 +106,11 @@ export function combinedProfiles(dataDir, { apply = false } = {}) {
     const before = {
       favorites: Array.isArray(raw?.favorites) ? raw.favorites : [],
       lastUsed: isObject(raw?.lastUsed) ? raw.lastUsed : {},
-      thumbnails: isObject(raw?.thumbnails) ? raw.thumbnails : {},
     };
     const next = repointedPreferences(before, canonical);
-    result.preferences = [
-      ...before.favorites,
-      ...Object.keys(before.lastUsed),
-      ...Object.keys(before.thumbnails),
-    ].filter((id) => canonical(id) !== id).length;
+    result.preferences = [...before.favorites, ...Object.keys(before.lastUsed)].filter(
+      (id) => canonical(id) !== id,
+    ).length;
     if (apply && result.preferences) writeJsonFile(preferencesFile, { ...raw, ...next });
   }
 
