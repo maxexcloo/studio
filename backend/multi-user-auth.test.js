@@ -28,6 +28,9 @@ registerMultiUserAuthRoutes(
     patch: (route, handler) => {
       routes[`PATCH ${route}`] = handler;
     },
+    delete: (route, handler) => {
+      routes[`DELETE ${route}`] = handler;
+    },
   },
   { availableProfiles: async () => ["image-fast", "video"] },
 );
@@ -139,6 +142,26 @@ test("only an authenticated administrator can create profiles and approve ordina
   assert.equal(createdUser.body.account.role, "user");
   assert.equal(createdUser.body.account.accessProfileId, "artists");
 
+  // A group is deleted only once it has no members and isn't the default.
+  const remove = (id) =>
+    call(routes["DELETE /api/accounts/profiles/:id"], { ...admin, params: { id } });
+  assert.equal((await remove("artists")).statusCode, 400);
+  await call(routes["POST /api/accounts/profiles"], {
+    ...admin,
+    body: { id: "spare", name: "Spare" },
+  });
+  await call(routes["POST /api/accounts/default-profile"], {
+    ...admin,
+    body: { accessProfileId: "spare" },
+  });
+  assert.equal((await remove("spare")).statusCode, 400);
+  await call(routes["POST /api/accounts/default-profile"], {
+    ...admin,
+    body: { accessProfileId: "" },
+  });
+  assert.equal((await remove("spare")).statusCode, 200);
+  assert.equal((await remove("spare")).statusCode, 400);
+
   const anonymous = await call(routes["GET /api/accounts/admin"], local());
   assert.equal(anonymous.statusCode, 403);
 
@@ -161,7 +184,7 @@ test("only an authenticated administrator can create profiles and approve ordina
     accountForRequest(admin).userId,
   );
   // A personal MCP token is not a general API or administrator credential.
-  assert.equal(accountForRequest(bearer("GET", "/api/accounts/admin")), null);
+  assert.equal(accountForRequest(bearer("POST", "/api/accounts/gateway-admin")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/accounts/mcp-token")), null);
   assert.equal(accountForRequest(bearer("POST", "/api/runtime/restart")), null);
   const { canAdmin } = await import("./access.js");
@@ -514,11 +537,15 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(mcpAdminRouteAllowed("POST", "/api/library/imports"), true);
   assert.equal(mcpAdminRouteAllowed("PUT", "/api/profiles/editable/flux-fast"), true);
   assert.equal(mcpAdminRouteAllowed("POST", "/api/profiles/backends/combine"), true);
-  // Nothing that deletes or replaces files, and no account or GPU administration.
+  assert.equal(mcpAdminRouteAllowed("GET", "/api/accounts/admin"), true);
+  assert.equal(mcpAdminRouteAllowed("DELETE", "/api/accounts/profiles/artists"), true);
+  assert.equal(mcpAdminRouteAllowed("PATCH", "/api/accounts/users/a1"), true);
+  // Nothing that deletes or replaces files, creates accounts or tokens, or administers GPUs.
   for (const [method, routePath] of [
     ["DELETE", "/api/loras"],
     ["DELETE", "/api/models/downloads"],
-    ["GET", "/api/accounts/admin"],
+    ["POST", "/api/accounts/users"],
+    ["POST", "/api/accounts/mcp-token"],
     ["POST", "/api/library/imports/x/folder"],
   ])
     assert.equal(mcpAdminRouteAllowed(method, routePath), false, `${method} ${routePath}`);
@@ -528,7 +555,7 @@ test("MCP admin routes take only an administrator's own token, or a gateway-link
   assert.equal(asAdmin.credential, "mcp-admin");
   assert.equal(canAdmin({ studioAccount: asAdmin }), true);
   assert.equal(fromChat({ studioAccount: asAdmin }), true);
-  assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/accounts/admin")), null);
+  assert.equal(accountForRequest(bearer(adminToken, "POST", "/api/accounts/users")), null);
   assert.equal(accountForRequest(bearer(adminToken, "GET", "/api/models")).credential, "mcp-token");
   assert.equal(
     accountForRequest(bearer(adminToken, "GET", "/api/reference-assets/asset-1/media")).credential,

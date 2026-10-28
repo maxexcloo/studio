@@ -121,7 +121,7 @@ MCP's own requests to the studio use a per-process internal credential. It is ac
 
 ### MCP Admin Tools & External Chat
 
-Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Administrators can edit and approve runtime-owned catalogue, profile and guide definitions through the retained mutation tools. Personal MCP tokens remain distinct from browser administrator credentials.
+Administrator MCP tools retain their published names and permission boundaries. Library transfers and downloads use the same domain services as HTTP. Administrators can edit and approve runtime-owned catalogue, profile and guide definitions through the retained mutation tools, and manage groups with the Accounts tool (list, save, set the default or delete an empty non-default group, move an account or disable it). Personal MCP tokens remain distinct from browser administrator credentials.
 
 Studio's Chat tab uses its own OpenAI-compatible text gateway, configured with three server-side settings:
 
