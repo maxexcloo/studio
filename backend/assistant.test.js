@@ -16,7 +16,7 @@ import { flux3Upsampler } from "./prompt-upsamplers.js";
 const gateway = (extra = {}) => ({
   STUDIO_PROMPT_WRITER_URL: "http://litellm.invalid:4000",
   STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
   ...extra,
 });
 const quiet = { info: () => {}, warn: () => {} };
@@ -37,7 +37,7 @@ const event = (content) => `data: ${JSON.stringify({ choices: [{ delta: { conten
 const json = (content) => Response.json({ choices: [{ message: { content } }] });
 
 /** A fake gateway: `/v1/models` answers from `models`, completions from `reply(body)`. */
-function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-spare"] } = {}) {
+function fakeGateway(reply, { models = ["cloud/text", "cloud/vision", "local/text"] } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     if (url.endsWith("/v1/models")) return Response.json({ data: models.map((id) => ({ id })) });
@@ -48,24 +48,44 @@ function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-s
   return { fetchImpl, calls };
 }
 
-test("settings reuse the prompt writer gateway; the assistant model defaults to its model", () => {
+test("settings reuse the prompt writer gateway, whose model is the cloud route prefix", async () => {
   assert.equal(assistantSettings({}), null);
   assert.throws(
     () => assistantSettings({ STUDIO_PROMPT_WRITER_URL: "http://x.invalid" }),
     /needs STUDIO_PROMPT_WRITER_KEY/,
   );
+  assert.throws(
+    () => assistantSettings(gateway({ STUDIO_PROMPT_WRITER_MODEL: "cloud/text" })),
+    /STUDIO_PROMPT_WRITER_MODEL must be a route prefix/,
+  );
   const plain = assistantSettings(gateway());
   assert.deepEqual(
-    [plain.endpoint, plain.root, plain.model, plain.writerModel],
+    [plain.endpoint, plain.root, plain.cloud, plain.chosen],
     [
       "http://litellm.invalid:4000/v1/chat/completions",
       "http://litellm.invalid:4000",
-      "ai/text-quick",
-      "ai/text-quick",
+      "cloud/",
+      "",
     ],
   );
-  const chosen = assistantSettings(gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision" }));
-  assert.deepEqual([chosen.model, chosen.writerModel], ["ai/vision", "ai/text-quick"]);
+  // Studio asks for a route and level by name: local while a local text workload runs, else cloud.
+  const environment = gateway();
+  let local = null;
+  const engine = createAssistant(environment, { localText: async () => local });
+  assert.deepEqual(
+    [await engine.model("writer"), await engine.model("rewrite"), await engine.supportsVision()],
+    ["cloud/off", "cloud/text", true],
+  );
+  local = { prefix: "local/", vision: false };
+  assert.deepEqual(
+    [await engine.model("writer"), await engine.model("title"), await engine.supportsVision()],
+    ["local/off", "local/text", false],
+  );
+  environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
+  assert.deepEqual(
+    [await engine.model("writer"), await engine.model("rewrite")],
+    ["local/off", "cloud/vision"],
+  );
   assert.equal(createAssistant({}), null);
 });
 
@@ -130,7 +150,7 @@ test("a rewrite streams visible text, returns the cleaned prompt, and logs no pr
       "A secret cabin at dusk, warm window light.",
       "assistant",
       "photographic",
-      "ai/text-quick",
+      "cloud/text",
       false,
     ],
   );
@@ -173,7 +193,7 @@ test("chat streams reasoning_content and <think> blocks as thinking, apart from 
   const thinking = [];
   const shown = [];
   const reply = await engine.chat({
-    model: "ai/text",
+    model: "cloud/text",
     messages: [],
     onThinking: (piece) => thinking.push(piece),
     onDelta: (piece) => shown.push(piece),
@@ -192,7 +212,7 @@ test("chat streams reasoning_content and <think> blocks as thinking, apart from 
     ).fetchImpl,
     log: quiet,
   });
-  const answer = await whole.chat({ model: "ai/text", messages: [] });
+  const answer = await whole.chat({ model: "cloud/text", messages: [] });
   assert.deepEqual([answer.text, answer.thinking], ["Done.", "Plan.\n\nMore."]);
 });
 
@@ -216,9 +236,10 @@ test("failures fall back to the original prompt with the reason, and a timeout a
   }
   assert.deepEqual(reasons, ["HTTP 503", "unreachable", "empty reply"]);
   const hanging = (_body, options) =>
-    new Promise((_resolve, reject) =>
-      options.signal.addEventListener("abort", () => reject(options.signal.reason)),
-    );
+    new Promise((_resolve, reject) => {
+      if (options.signal.aborted) reject(options.signal.reason);
+      options.signal.addEventListener("abort", () => reject(options.signal.reason));
+    });
   const slow = createAssistant(gateway(), {
     fetchImpl: fakeGateway(hanging).fetchImpl,
     log: quiet,
@@ -244,7 +265,7 @@ test("references go to a vision model as image parts; a text-only model gets non
   const vision = createAssistant(gateway(), {
     fetchImpl: seen.fetchImpl,
     log: quiet,
-    supportsVision: async () => true,
+    localText: async () => ({ prefix: "local/", vision: true }),
   });
   const read = await vision.rewrite({ profile, prompt: "a cabin", references });
   assert.equal(read.referencesRead, true);
@@ -255,16 +276,20 @@ test("references go to a vision model as image parts; a text-only model gets non
   );
   assert.equal(content[1].image_url.url, "data:image/jpeg;base64,AAAA");
   assert.match(seen.calls[0].body.messages[0].content, /2 reference images are attached: describe/);
-  // Without a runtime to ask, the text model counts as text-only.
+  // A local text model without `vision: true` is text-only.
   const text = fakeGateway(() => json("A cabin."));
-  const blind = createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet });
+  const blind = createAssistant(gateway(), {
+    fetchImpl: text.fetchImpl,
+    log: quiet,
+    localText: async () => ({ prefix: "local/", vision: false }),
+  });
   const unread = await blind.rewrite({ profile, prompt: "a cabin", references });
   assert.equal(unread.referencesRead, false);
   assert.equal(typeof text.calls[0].body.messages[1].content, "string");
   assert.match(text.calls[0].body.messages[0].content, /not shown to you/);
   assert.deepEqual(
     await createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet }).listModels(),
-    ["ai/text-quick", "ai/text-spare", "ai/vision"],
+    ["cloud/text", "cloud/vision", "local/text"],
   );
 });
 
@@ -273,7 +298,7 @@ test("FLUX.3 Enhance uses the maker’s upsampler prompt verbatim", async () => 
   const engine = createAssistant(gateway(), {
     fetchImpl: seen.fetchImpl,
     log: quiet,
-    supportsVision: async () => true,
+    localText: async () => ({ prefix: "local/", vision: true }),
   });
   await engine.rewrite({
     profile: { ...profile, family: "flux3" },
@@ -306,10 +331,10 @@ test("Spicy runs on the assistant model", async () => {
   const seen = fakeGateway(() => json("A sultry scene."));
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
-  environment.STUDIO_ASSISTANT_MODEL = "ai/vision";
+  environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
   const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
-  assert.equal(result.model, "ai/vision", "a model chosen in Settings applies at once");
-  assert.equal(seen.calls.at(-1).body.model, "ai/vision");
+  assert.equal(result.model, "cloud/vision", "a model chosen in Settings applies at once");
+  assert.equal(seen.calls.at(-1).body.model, "cloud/vision");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
 });
 
@@ -448,7 +473,7 @@ test("describe reads an image with a vision model, writes from a hint without on
   const engine = createAssistant(gateway(), {
     fetchImpl: seen.fetchImpl,
     log: quiet,
-    supportsVision: async () => true,
+    localText: async () => ({ prefix: "local/", vision: true }),
   });
   const read = await engine.describe({
     images: [{ mime: "image/png", data: "AAAA" }],
@@ -463,11 +488,12 @@ test("describe reads an image with a vision model, writes from a hint without on
   const blind = createAssistant(gateway(), {
     fetchImpl: fakeGateway(() => reply.clone()).fetchImpl,
     log: quiet,
+    localText: async () => ({ prefix: "local/", vision: false }),
   });
   assert.deepEqual(await blind.describe({ images: [{ mime: "image/png", data: "AAAA" }] }), {
     available: false,
     vision: false,
-    model: "ai/text-quick",
+    model: "local/off",
     reason: "The running text model can’t read images.",
   });
   const hinted = await blind.describe({
@@ -498,7 +524,7 @@ test("caption sends the image and reads the description and tags, or plain text 
   );
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   const reply = await engine.caption({ image: { mime: "image/jpeg", data: "AAAA" } });
-  assert.equal(reply.model, "ai/text-quick");
+  assert.equal(reply.model, "cloud/off");
   assert.equal(reply.text.length, 600);
   assert.match(reply.text, /^A red barn at noon\. x/);
   assert.equal(reply.tags.length, 15);
@@ -512,7 +538,7 @@ test("caption sends the image and reads the description and tags, or plain text 
   assert.deepEqual(await fallback.caption({ image: { mime: "image/jpeg", data: "AAAA" } }), {
     text: "A red barn at noon.",
     tags: [],
-    model: "ai/text-quick",
+    model: "cloud/off",
   });
 });
 
@@ -523,7 +549,7 @@ test("title summarises the prompt in a few words, leaving the model room to thin
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   assert.deepEqual(await engine.title({ prompt: "a red barn, golden hour, wheat" }), {
     title: "Red Barn at Golden Hour Over",
-    model: "ai/text-quick",
+    model: "cloud/text",
   });
   assert.ok(seen.calls[0].body.max_tokens >= 1000);
   assert.equal(seen.calls[0].body.messages[1].content, "a red barn, golden hour, wheat");
@@ -534,16 +560,16 @@ test("title summarises the prompt in a few words, leaving the model room to thin
   await assert.rejects(empty.title({ prompt: "a barn" }), /empty reply/);
 });
 
-test("chat turns thinking off and names a reply the token limit cut off", async () => {
+test("chat leaves reasoning to the model name and names a reply the token limit cut off", async () => {
   const seen = fakeGateway(() =>
     Response.json({ choices: [{ message: { content: "" }, finish_reason: "length" }] }),
   );
   const engine = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
   await assert.rejects(
-    engine.chat({ model: "ai/text", messages: [] }),
+    engine.chat({ model: "cloud/text", messages: [] }),
     /reply cut off at the token limit/,
   );
-  assert.equal(seen.calls[0].body.reasoning_effort, "none");
+  assert.equal("reasoning_effort" in seen.calls[0].body, false);
 });
 
 test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown uncensored", async () => {

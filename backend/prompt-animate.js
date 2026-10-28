@@ -55,7 +55,7 @@ export async function writeAnimatePrompt({
   onThinking,
   onDelta,
 }) {
-  const { model } = engine.settings();
+  const model = await engine.model("animate");
   const reply = await engine.chat({
     model,
     messages: [

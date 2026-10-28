@@ -142,7 +142,7 @@ export async function runEvals({
   const env = environment || {
     STUDIO_PROMPT_WRITER_URL: "http://recorded.invalid",
     STUDIO_PROMPT_WRITER_KEY: "recorded",
-    STUDIO_PROMPT_WRITER_MODEL: "recorded",
+    STUDIO_PROMPT_WRITER_MODEL: "recorded/",
   };
   const live = typeof fetchImpl === "function";
   let current = { kind: "", id: "" };

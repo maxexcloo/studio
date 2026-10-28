@@ -95,7 +95,7 @@ function fixture(t: TestContext) {
     },
     textBusy: () => state.textBusy,
     writer: {
-      settings: () => ({ model: "writer" }),
+      model: async () => "writer",
       chat: async ({ model, messages }) => {
         state.calls.push({ model, system: messages[0].content, user: messages[1].content });
         state.prompts++;

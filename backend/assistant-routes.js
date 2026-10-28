@@ -132,12 +132,17 @@ export async function assistantIntegration({ environment = process.env, engine, 
       model: row(assistantModelKey, ""),
       writerModel: "",
     };
-  const [models, vision] = await Promise.all([engine.listModels(), engine.supportsVision()]);
+  const [models, vision, writerModel, model] = await Promise.all([
+    engine.listModels(),
+    engine.supportsVision(),
+    engine.model("writer"),
+    engine.model("rewrite"),
+  ]);
   return {
     available: true,
-    writerModel: settings.writerModel,
+    writerModel,
     models,
-    model: { ...row(assistantModelKey, settings.model), vision },
+    model: { ...row(assistantModelKey, model), vision },
   };
 }
 
@@ -159,8 +164,8 @@ export function registerAssistantRoutes(
   {
     environment = process.env,
     fetchImpl = fetch,
-    supportsVision,
-    engine = createAssistant(environment, { fetchImpl, supportsVision }),
+    localText,
+    engine = createAssistant(environment, { fetchImpl, localText }),
     profiles = async () => [],
     guide = () => null,
     loras = async () => [],
@@ -214,7 +219,6 @@ export function registerAssistantRoutes(
     if (!engine || !allowed(req, "promptAssistant"))
       return res.json({ ok: true, available: false, presets: [] });
     try {
-      const settings = engine.settings();
       const spicy = allowed(req, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
       const noNegative = (await profiles(req))
@@ -229,7 +233,7 @@ export function registerAssistantRoutes(
       res.json({
         ok: true,
         available: true,
-        model: settings.model,
+        model: await engine.model("rewrite"),
         vision: await engine.supportsVision(),
         defaultPreset,
         presets: assistantPresets

@@ -237,7 +237,7 @@ test("A queue item streams its prompt's thinking; the result keeps it collapsed 
 }, testInfo) => {
   const thinking = "The bird is perched, so a gentle take-off reads best.";
   const { state, viewer } = await seed(page, {
-    writing: { kind: "animate", model: "ai/text", thinking },
+    writing: { kind: "animate", model: "local/text", thinking },
   });
   state.jobs.push({
     id: "job-writing",
@@ -257,7 +257,7 @@ test("A queue item streams its prompt's thinking; the result keeps it collapsed 
     await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
     details = page.getByRole("dialog", { name: "An amber bird", exact: true });
   }
-  await expect(details.getByText("Written by ai/text", { exact: true })).toBeVisible();
+  await expect(details.getByText("Written by local/text", { exact: true })).toBeVisible();
   const toggle = details.getByRole("button", { name: "Thinking", exact: true });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(details.getByText(thinking, { exact: true })).toBeHidden();

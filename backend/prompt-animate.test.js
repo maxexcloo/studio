@@ -6,7 +6,7 @@ import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.
 const video = { id: "video:test", label: "Motion", kind: "video" };
 const calls = [];
 const engine = {
-  settings: () => ({ model: "ai/text" }),
+  model: async (call) => `local/${call}`,
   chat: async (body) => {
     calls.push(body);
     body.onThinking?.("A push-in suits a bird.");
@@ -61,7 +61,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
   assert.deepEqual(written, {
     prompt: "The camera slowly pushes in.",
     thinking: "A push-in suits a bird.",
-    model: "ai/text",
+    model: "local/animate",
   });
   assert.deepEqual(shown, [
     ["thinking", "A push-in suits a bird."],
@@ -75,7 +75,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     guide: null,
     writing: { theme: "spicy" },
   });
-  assert.equal(spicy.model, "ai/text");
+  assert.equal(spicy.model, "local/animate");
   await assert.rejects(
     writeAnimatePrompt({
       engine: { ...engine, chat: async () => ({ text: "", thinking: "Out of tokens." }) },

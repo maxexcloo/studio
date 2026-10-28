@@ -83,7 +83,7 @@ test(
           STUDIO_CHAT_GATEWAY_MODELS: allowedModels,
           STUDIO_PROMPT_WRITER_URL: "http://127.0.0.1:1",
           STUDIO_PROMPT_WRITER_KEY: "unrelated-fixture",
-          STUDIO_PROMPT_WRITER_MODEL: "unrelated-writer-model",
+          STUDIO_PROMPT_WRITER_MODEL: "unrelated-writer/",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });

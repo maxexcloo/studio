@@ -49,6 +49,8 @@ export function kubernetesWorkloads(environment: Environment) {
       target.origin === new URL(environment.STUDIO_BIFROST_URL).origin
     )
       throw problem("must point directly to its worker, not Bifrost");
+    if (record.kind === "text" && !record.model?.includes("/"))
+      throw problem("needs the Bifrost model it serves, such as local/gemma");
     if (record.apiKeyEnv) required(environment, record.apiKeyEnv);
     return {
       id,
@@ -60,7 +62,8 @@ export function kubernetesWorkloads(environment: Environment) {
       gpus: record.gpus!,
       url: record.url!.replace(/\/$/, ""),
       ...(record.apiKeyEnv ? { apiKeyEnv: record.apiKeyEnv } : {}),
-      ...(record.kind === "text" && record.model ? { model: record.model } : {}),
+      ...(record.kind === "text" ? { model: record.model } : {}),
+      ...(record.kind === "text" && record.vision === true ? { vision: true } : {}),
       ...(record.worker ? { worker: record.worker } : {}),
       ...(record.capabilities ? { capabilities: record.capabilities } : {}),
     };
