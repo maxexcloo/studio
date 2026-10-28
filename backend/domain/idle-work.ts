@@ -5,7 +5,6 @@ export interface IdleItem {
   type?: string;
   status?: string;
   ownerId?: string;
-  library?: unknown;
 }
 export type IdleTick =
   | "off"
@@ -122,7 +121,6 @@ export function createIdleWork<Item extends IdleItem>(options: {
     for (const item of items) {
       if (
         item.status !== "done" ||
-        item.library ||
         failed.has(key(item)) ||
         direct.has(key(item)) ||
         !options.wanted(item, all)

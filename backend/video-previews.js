@@ -413,8 +413,6 @@ export async function forgetItemVideoPreviews(item) {
         url.searchParams.get("subfolder") || "",
         url.searchParams.get("type") || "output",
       );
-    if (url.pathname === "/api/library/file")
-      identity = `library:${url.searchParams.get("folder")}:${url.searchParams.get("path")}`;
   } catch {
     return 0;
   }
