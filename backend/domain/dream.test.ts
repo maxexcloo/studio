@@ -420,8 +420,19 @@ test("Dream skips accounts without the prompt assistant and offline services, lo
   state.online.image = true;
   await dream.tick();
   assert.equal(dreamJobs("alice")[0].status, "queued");
+  // A waiting job whose worker goes offline steps aside, and Dream tries again once it is back.
+  state.online.image = "parked";
+  await dream.tick();
+  assert.deepEqual(
+    dreamJobs("alice").map((job) => job.status),
+    ["cancelled"],
+  );
+  assert.match(dream.status("alice").reason!, /^The image worker is parked/);
+  state.online.image = true;
+  await dream.tick();
+  assert.equal(dreamJobs("alice").filter((job) => job.status === "queued").length, 1);
   await dream.save("alice", { paused: true });
-  assert.equal(dreamJobs("alice")[0].status, "cancelled");
+  assert.ok(dreamJobs("alice").every((job) => job.status === "cancelled"));
   assert.equal(dream.status("alice").status, "paused");
 });
 
