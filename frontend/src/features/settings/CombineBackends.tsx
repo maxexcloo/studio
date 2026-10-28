@@ -4,6 +4,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
+import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { backendLabel } from "../generation/payload";
 
@@ -185,7 +186,7 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
               ))}
             </>
           ) : (
-            !combine.data && <Text size="sm">No Radiance and ComfyUI profiles to combine.</Text>
+            !combine.data && <EmptyState>No Profiles to Combine</EmptyState>
           )}
         </Stack>
       )}
