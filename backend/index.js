@@ -1357,7 +1357,6 @@ app.delete("/api/workflows/:id", (req, res) => {
       (id) => id !== `custom:${result.id}` && id !== result.id,
     );
     delete preferences.lastUsed[`custom:${result.id}`];
-    delete preferences.thumbnails[`custom:${result.id}`];
     saveWorkflowPreferences(preferences);
     res.json(result);
   } catch (error) {

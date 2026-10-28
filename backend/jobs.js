@@ -654,10 +654,7 @@ async function runJobOnBackend(id, body, { prepare = null } = {}) {
         return state ? { ...result.output, upscale: state } : result.output;
       });
       const completed = await replaceGalleryJob(id, withUpscales, body, jobs);
-      markWorkflowUsed(
-        body.profileId || body.model || body.workflow || "",
-        completed[0]?.url || "",
-      );
+      markWorkflowUsed(body.profileId || body.model || body.workflow || "");
       setTerminalJob(id, { status: "done", outputs: completed, ...(kept ? { kept } : {}) });
       if (body.temporaryInputNames?.length)
         await forgetComfyRun({ inputNames: body.temporaryInputNames });
@@ -988,10 +985,7 @@ export function runMockJob(id, body) {
         });
 
         await replaceGalleryJob(id, outputs, body, jobs);
-        markWorkflowUsed(
-          body.profileId || body.model || body.workflow || "",
-          outputs[0]?.url || "",
-        );
+        markWorkflowUsed(body.profileId || body.model || body.workflow || "");
         setTerminalJob(id, { status: "done", outputs });
       }, 400);
     }
