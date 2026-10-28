@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Group, Kbd, Stack, Switch, Text } from "@mantine/core";
-import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useAccount, useIsAdmin, useMayUpscale } from "../auth/AccountGate";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
 import { usePhone } from "../../ui/usePhone";
@@ -26,6 +26,7 @@ export function StudioPreferences() {
   const admin = useIsAdmin();
   const historyAllowed = admin || account.data?.account?.features?.promptHistory === true;
   const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
+  const mayUpscale = useMayUpscale();
   const keep = useKeepRecentPrompts(historyAllowed);
   const [tileCaptions, setTileCaptions] = useTileCaptions();
   // Phones have no keyboard to use shortcuts with.
@@ -43,7 +44,7 @@ export function StudioPreferences() {
             onChange={(event) => setTileCaptions(event.currentTarget.checked)}
           />
         </SettingRow>
-        {galleryAllowed && <FinishStarredImages />}
+        {galleryAllowed && mayUpscale && <FinishStarredImages />}
       </SettingGroup>
       <SettingGroup title="Generation">
         {historyAllowed && (

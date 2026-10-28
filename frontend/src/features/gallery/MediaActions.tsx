@@ -35,6 +35,7 @@ import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { TextBox } from "../../ui/TextBox";
+import { useMayUpscale } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
 import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
@@ -241,6 +242,7 @@ export function useMediaActions(
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
+  const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
   // Animate names the model that will run, or why none can, before anything queues.
@@ -375,6 +377,7 @@ export function useMediaActions(
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     ready &&
+      mayUpscale &&
       itemAction("upscale", {
         label: upscaling(item) ? "Upscaling…" : "Upscale",
         disabled: upscaling(item) && !upscaled,
