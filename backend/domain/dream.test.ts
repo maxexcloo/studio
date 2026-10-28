@@ -28,7 +28,9 @@ const profiles: DreamProfile[] = [
     label: "FLUX",
     workflow: "family:flux",
     defaults: { width: 1024, height: 1024 },
-    options: { loras: ["fox.safetensors", "film.safetensors", "ink.safetensors"] },
+    options: {
+      loras: ["fox.safetensors", "film.safetensors", "ink.safetensors", "klein.safetensors"],
+    },
   },
   { id: "qwen", kind: "image", label: "Qwen" },
   { id: "wan", kind: "video", label: "Wan", mediaInputs: [{ id: "start", required: true }] },
@@ -110,6 +112,8 @@ function fixture(t: TestContext) {
       item.dream = mark;
     },
     loraLibrary: (ownerId) => state.loras[ownerId] ?? null,
+    // As the LoRA policy would: klein.safetensors is for another model family.
+    fitLoras: (_profile, loras) => loras.filter((lora) => lora.name !== "klein.safetensors"),
     reference: (_account, itemId) => ({ id: `asset-${itemId}`, source: "gallery" }),
     // Like the queue's writing stage, then the generation route: a Dream job's pending tile
     // carries its written prompt and mark from the queue record.
@@ -162,7 +166,38 @@ function fixture(t: TestContext) {
     if (job) finish(ownerId, job.id);
     return job;
   };
-  return { dream, store, state, admission, taste, finish, dreamJobs, live, dreamOnce, dataDir };
+  /** Gallery records of jobs Studio ran for their owner, as the composer, Chat or MCP make them. */
+  const generated = (...items: DreamItem[]) => {
+    for (const item of items) {
+      const ownerId = String(item.ownerId);
+      const session = store.createSession(ownerId, "Gallery").id;
+      const input = { kind: "image", prompt: "" };
+      const job = store.enqueue(
+        ownerId,
+        session,
+        input,
+        "image",
+        undefined,
+        "local-media",
+        item.jobId,
+      );
+      store.save({ ...job, status: "completed" });
+      state.items.push({ ...item, jobId: job.id });
+    }
+  };
+  return {
+    dream,
+    store,
+    state,
+    admission,
+    taste,
+    finish,
+    dreamJobs,
+    live,
+    dreamOnce,
+    dataDir,
+    generated,
+  };
 }
 
 test("Dream is off until turned on, queues one hidden job only while Studio is idle and yields at once", async (t) => {
@@ -317,9 +352,9 @@ test("Dream stops at the unseen buffer and today's cap per kind, and animates ke
 });
 
 test("Dream picks the most-starred ready profile and keeps Spicy to accounts with Uncensored Models", async (t) => {
-  const { dream, state, dreamOnce } = fixture(t);
+  const { dream, state, dreamOnce, generated } = fixture(t);
   const starred = (id: string, profileId: string, days = 1) =>
-    state.items.push({
+    generated({
       id,
       ownerId: "alice",
       type: "image",
@@ -521,8 +556,8 @@ test("Dream keeps every discard, most recently discarded first", (t) => {
   assert.equal(dream.discarded("alice")[0].id, "fresh");
 });
 
-test("Calibration offers older gallery images, unjudged first, and only teaches the taste profile", async (t) => {
-  const { dream, state, taste } = fixture(t);
+test("Calibration offers the account's older Studio generations, unjudged first, and only teaches the taste profile", async (t) => {
+  const { dream, state, taste, generated } = fixture(t);
   const old = new Date(state.clock - 2 * 86_400_000).toISOString();
   const image = (id: string, extra: Partial<DreamItem> = {}): DreamItem => ({
     id,
@@ -535,7 +570,7 @@ test("Calibration offers older gallery images, unjudged first, and only teaches 
     settings: { profileId: "flux" },
     ...extra,
   });
-  state.items.push(
+  generated(
     image("a"),
     image("b"),
     image("c"),
@@ -543,6 +578,12 @@ test("Calibration offers older gallery images, unjudged first, and only teaches 
     image("clip", { type: "video" }),
     image("unseen", { dream: { prompt: "p", why: "", at: old, state: "unseen" } }),
     image("bobs", { ownerId: "bob" }),
+  );
+  // Not Studio generations of this account: an upload or import without a job here, and a record
+  // attributed to alice whose job another account ran.
+  state.items.push(
+    image("upload", { jobId: "imported" }),
+    image("borrowed", { jobId: "job-bobs" }),
   );
   const request = await serve(t, dream);
   const offered = async () =>
@@ -552,7 +593,8 @@ test("Calibration offers older gallery images, unjudged first, and only teaches 
   assert.equal((await request("/calibration", { liked: ["a", "b"] })).status, 400);
   assert.equal((await request("/calibration", {})).status, 400);
   assert.equal((await request("/calibration", { liked: ["a"], passed: ["a"] })).status, 400);
-  assert.equal((await request("/calibration", { liked: ["bobs"] })).status, 404);
+  for (const id of ["bobs", "upload", "borrowed"])
+    assert.equal((await request("/calibration", { liked: [id] })).status, 404);
   assert.equal((await request("/calibration", { liked: ["new"] })).status, 404);
   assert.equal((await request("/calibration", { liked: ["a"], passed: ["b"] })).status, 200);
   assert.equal((await request("/calibration", { passed: ["c"] })).status, 200);
@@ -565,18 +607,27 @@ test("Calibration offers older gallery images, unjudged first, and only teaches 
     ],
   );
   // Judged images come after unjudged ones; nothing in the gallery changed.
-  state.items.push(image("d"));
+  generated(image("d"));
   assert.equal((await request("/calibration?limit=1")).body.items[0].id, "d");
   assert.deepEqual(
-    state.items.filter((item) => item.ownerId === "alice").map((item) => item.dream?.state),
-    [undefined, undefined, undefined, undefined, undefined, "unseen", undefined],
+    state.items.filter((item) => item.dream).map((item) => [item.id, item.dream?.state]),
+    [["unseen", "unseen"]],
   );
 });
 
 test("Dream loads up to two of the account's starred LoRAs the profile can use", async (t) => {
   const { dream, state, store, dreamOnce } = fixture(t);
+  // A LoRA for another family is left out; the run goes ahead without it.
+  state.loras.alice = { favorites: ["klein.safetensors"], strengths: {} };
+  await dream.save("alice", { enabled: true });
+  assert.deepEqual((await dreamOnce())!.input.loras, []);
   state.loras.alice = {
-    favorites: ["other-family.safetensors", "fox.safetensors", "film.safetensors"],
+    favorites: [
+      "klein.safetensors",
+      "not-installed.safetensors",
+      "fox.safetensors",
+      "film.safetensors",
+    ],
     strengths: { "family:flux": { "fox.safetensors": 0.6 } },
   };
   await dream.save("alice", { enabled: true });
