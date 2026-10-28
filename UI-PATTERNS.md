@@ -133,13 +133,17 @@ primary component reference and verify APIs against the installed version.
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
-  a short transition and the standard accessible close action.
+  a short transition and the standard accessible close action; tapping the
+  collapsed bar's prompt summary opens the full-screen prompt editor over it in
+  one tap, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
-  offers Undo in its notification. On phones, tapping a text box (prompt,
-  negative, Chat message, profile and guide editors and the rest) opens it full
-  screen with Copy, Clear and Done, and floating prompt ideas move under its text;
-  Done, Escape or dismissing the keyboard returns to the page. Desktop edits in place.
+  offers Undo in its notification. On phones a text box is a summary of its
+  text; tapping it (prompt, negative, Chat message, profile and guide editors and
+  the rest) opens it full screen with the same actions as the inline box (the
+  prompt's Recent Prompts and Prompt Assistance, Copy, Clear) and Done, with
+  prompt ideas and assistant suggestions under its text; Done, Escape or
+  dismissing the keyboard returns to the page. Desktop edits in place.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
@@ -185,8 +189,8 @@ primary component reference and verify APIs against the installed version.
   never filenames; submission and Chat use owned asset IDs.
 - Profile and size controls share the gallery/card implementation. The prompt
   comes first; `GenerationInputControls` owns the wrapping chip rail in both
-  gallery and timeline editors. Phones keep the full-height editor, giving the
-  prompt generous, easy-to-edit space above the chips. The footer
+  gallery and timeline editors. The phone editor fits one screen without
+  scrolling: the prompt summary takes the room left above the chips. The footer
   places the Image/Video toggle left and Clear/Generate right. Size uses
   a vertical list of profile-provided aspect presets with their resolution,
   alongside constrained custom dimensions. Selected

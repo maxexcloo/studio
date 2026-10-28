@@ -45,6 +45,8 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   const returningFocus = useRef(false);
   const tabbing = useRef(false);
   const focusIntent = useRef("[data-profile-picker]");
+  // On phones, tapping the collapsed bar opens the full-screen prompt editor once Generate is up.
+  const [editOnOpen, setEditOnOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const reference = useGalleryReference();
   const placement = useReferenceFiles();
@@ -123,6 +125,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
   }, [shared]);
   function collapse(restoreFocus = true) {
     returningFocus.current = restoreFocus;
+    setEditOnOpen(false);
     close();
     setExpanded(false);
     if (main && params.has("compose")) {
@@ -244,6 +247,7 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
               )
                 return;
               focusIntent.current = "[data-expanded-prompt]";
+              setEditOnOpen(phone);
               open();
             }}
           >
@@ -309,19 +313,14 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
           onEnterTransitionEnd={() => setExpanded(true)}
           onExitTransitionEnd={focusCompact}
         >
-          {/* Without a prompt focus intent, initial focus lands here rather than on Close. */}
-          {focusIntent.current !== "[data-expanded-prompt]" && <FocusTrap.InitialFocus />}
+          {/* Initial focus lands here rather than on Close; the prompt opens in its own editor. */}
+          <FocusTrap.InitialFocus />
           <div
             className={classes.panel}
             aria-hidden={handingOver || !opened || undefined}
             inert={!opened}
           >
-            <GenerationForm
-              fill
-              onSubmitted={submitted}
-              autoFocusPrompt={focusIntent.current === "[data-expanded-prompt]"}
-              focusPrompt={focusIntent.current === "[data-expanded-prompt]"}
-            />
+            <GenerationForm fill onSubmitted={submitted} editPrompt={editOnOpen && expanded} />
           </div>
         </Drawer>
       )}
