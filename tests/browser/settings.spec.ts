@@ -21,13 +21,14 @@ test("Settings follow the settled section order and run maintenance and worker r
   await page.goto("/settings");
   const order = [
     "Account",
+    "Chat Gateway",
     "Groups",
+    "Maintenance",
     "Models",
     "Profiles",
     "Studio",
     "Users",
     "Workers",
-    "Maintenance",
     "About",
   ];
   if ((page.viewportSize()?.width || 1440) < 768) {
@@ -219,7 +220,7 @@ test("Status summarises service health and opens Workers over the current page",
 }) => {
   await fixtures(page);
   await page.goto("/chat");
-  const status = page.getByRole("button", { name: "Open Status", exact: true });
+  const status = page.getByRole("button", { name: "Open Chats", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Services Partly Available");
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Chats", exact: true });

@@ -1,10 +1,33 @@
-/* The deck fills the space below the header, so cards and buttons never move with the content. */
+/* The deck fills the space below the header up to a comfortable height, so cards and buttons never move with the content. */
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--mantine-spacing-sm);
   height: calc(100dvh - var(--app-shell-header-offset, 68px) - 2 * var(--app-shell-padding, 1rem));
+  max-height: 60rem;
   min-height: 0;
+}
+/* The batch: one segment per result, judged ones filled and the current one marked. */
+.strip {
+  flex-shrink: 0;
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
+.strip span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mantine-color-default-border);
+  transition: background-color var(--studio-motion-duration) ease;
+}
+.strip span[data-done] {
+  background: var(--mantine-primary-color-light-color);
+}
+.strip span[data-current] {
+  background: var(--mantine-primary-color-filled);
 }
 .toolbar {
   flex-shrink: 0;

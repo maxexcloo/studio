@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Accordion,
   Alert,
   Badge,
   Button,
@@ -18,6 +17,7 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
+import { SettingGroup } from "./SettingRows";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
@@ -300,42 +300,37 @@ function DefinitionForm({
                           nested("recipe", "conditioning", event.currentTarget.value)
                         }
                       />
-                      <Accordion variant="default">
-                        <Accordion.Item value="defaults">
-                          <Accordion.Control>Generation Defaults</Accordion.Control>
-                          <Accordion.Panel>
-                            <SimpleGrid cols={{ base: 1, sm: 2 }}>
-                              {[
-                                "width",
-                                "height",
-                                "steps",
-                                "cfg",
-                                "denoise",
-                                "count",
-                                "frames",
-                                "fps",
-                                "duration",
-                              ].map((key) => (
-                                <NumberInput
-                                  key={key}
-                                  label={
-                                    key === "cfg" ? "Guidance" : key[0].toUpperCase() + key.slice(1)
-                                  }
-                                  value={
-                                    typeof (metadata.defaults as Record<string, unknown>)?.[key] ===
-                                    "number"
-                                      ? (metadata.defaults as Record<string, number>)[key]
-                                      : ""
-                                  }
-                                  onChange={(value) =>
-                                    nested("defaults", key, value === "" ? undefined : value)
-                                  }
-                                />
-                              ))}
-                            </SimpleGrid>
-                          </Accordion.Panel>
-                        </Accordion.Item>
-                      </Accordion>
+                      <SettingGroup title="Generation Defaults">
+                        <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                          {[
+                            "width",
+                            "height",
+                            "steps",
+                            "cfg",
+                            "denoise",
+                            "count",
+                            "frames",
+                            "fps",
+                            "duration",
+                          ].map((key) => (
+                            <NumberInput
+                              key={key}
+                              label={
+                                key === "cfg" ? "Guidance" : key[0].toUpperCase() + key.slice(1)
+                              }
+                              value={
+                                typeof (metadata.defaults as Record<string, unknown>)?.[key] ===
+                                "number"
+                                  ? (metadata.defaults as Record<string, number>)[key]
+                                  : ""
+                              }
+                              onChange={(value) =>
+                                nested("defaults", key, value === "" ? undefined : value)
+                              }
+                            />
+                          ))}
+                        </SimpleGrid>
+                      </SettingGroup>
                     </>
                   ) : (
                     <>

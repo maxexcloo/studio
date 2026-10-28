@@ -1,12 +1,14 @@
-import { Badge, Button, Group, Stack, Text, Tooltip } from "@mantine/core";
+import type { ReactNode } from "react";
+import { ActionIcon, Badge, Group, Stack, Text, Tooltip } from "@mantine/core";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { RuntimePanel, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { runtimeStatusQuery } from "../runtime/RuntimeWorkloads";
+import { SectionHeader } from "../../ui/SectionToolbar";
 import { WorkspaceSections } from "../../ui/WorkspaceSections";
 import { TasteProfile } from "../taste/TasteProfile";
 import { AboutStudio } from "./AboutStudio";
-import { GroupsAdmin, UsersAdmin } from "./AccountAdmin";
+import { ChatGatewayAdmin, GroupsAdmin, UsersAdmin } from "./AccountAdmin";
 import { MaintenanceSettings } from "./MaintenanceSettings";
 import { ModelSettings } from "./ModelSettings";
 import { OwnAccount } from "./OwnAccount";
@@ -15,7 +17,7 @@ import { useSettingsNavigation } from "./SettingsNavigation";
 import { StudioPreferences } from "./StudioPreferences";
 
 const workerQueries = [servicesStatusQuery.queryKey, runtimeStatusQuery.queryKey];
-function WorkerSettings() {
+function WorkerSettings({ heading }: { heading: ReactNode }) {
   const client = useQueryClient();
   const refreshing =
     useIsFetching({
@@ -23,21 +25,21 @@ function WorkerSettings() {
     }) > 0;
   return (
     <Stack gap="md">
-      <Group justify="flex-end">
-        <Tooltip label="Check every service again">
-          <Button
-            variant="default"
-            size="compact-sm"
-            leftSection={<RefreshCw size={16} />}
+      <SectionHeader heading={heading}>
+        <Tooltip label="Check Every Service Again">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label="Refresh"
             loading={refreshing}
             onClick={() =>
               workerQueries.forEach((queryKey) => void client.refetchQueries({ queryKey }))
             }
           >
-            Refresh
-          </Button>
+            <RefreshCw size={18} />
+          </ActionIcon>
         </Tooltip>
-      </Group>
+      </SectionHeader>
       <RuntimePanel />
     </Stack>
   );
@@ -76,13 +78,14 @@ export function SettingsPage() {
             <TasteProfile />
           </Stack>
         ),
-        groups: <GroupsAdmin />,
-        models: <ModelSettings />,
-        profiles: <ProfileDefinitions />,
-        studio: <StudioPreferences />,
-        users: <UsersAdmin />,
-        workers: <WorkerSettings />,
+        gateway: <ChatGatewayAdmin />,
+        groups: (heading) => <GroupsAdmin heading={heading} />,
         maintenance: <MaintenanceSettings />,
+        models: <ModelSettings />,
+        profiles: (heading) => <ProfileDefinitions heading={heading} />,
+        studio: <StudioPreferences />,
+        users: (heading) => <UsersAdmin heading={heading} />,
+        workers: (heading) => <WorkerSettings heading={heading} />,
         about: <AboutStudio />,
       }}
     />
