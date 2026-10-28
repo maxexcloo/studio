@@ -424,8 +424,8 @@ export function createAssistant(
   environment = process.env,
   {
     fetchImpl = fetch,
-    timeoutMs = 30_000,
-    streamTimeoutMs = 90_000,
+    // Reasoning models think for tens of seconds before a reply, streamed or not.
+    timeoutMs = 90_000,
     log = console,
     now = Date.now,
     resolveSettings = () => assistantSettings(environment),
@@ -532,7 +532,7 @@ export function createAssistant(
       reasoning += text;
       onThinking?.(text);
     };
-    const timer = AbortSignal.timeout(ms ?? (stream ? streamTimeoutMs : timeoutMs));
+    const timer = AbortSignal.timeout(ms ?? timeoutMs);
     const body = { model, messages, temperature, max_tokens: maxTokens, stream };
     let response;
     try {
@@ -985,7 +985,6 @@ export function createAssistant(
         ],
         temperature: 0.3,
         signal,
-        timeout: 60_000,
       });
       const guide = validDraftGuide(replyJson(reply.text));
       if (!guide) throw new AssistantError("unusable reply");
