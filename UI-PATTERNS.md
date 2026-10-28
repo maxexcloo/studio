@@ -69,7 +69,9 @@ primary component reference and verify APIs against the installed version.
   Account and supported Sign Out.
 - Full/Fixed controls the workspace. Chat has a structural desktop sessions
   sidebar, flush below the header through the viewport bottom, with a distinct
-  neutral surface and divider. Phones use a session Drawer. The Chat composer
+  neutral surface and divider, listing Chats under date headings (Today,
+  Yesterday, Previous 7 Days, Previous 30 Days, Older). Phones use a session
+  Drawer opened by the status action, which shows a Chats icon in Chat. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
 - Dialogs are centred on a raised plane from the theme defaults: a dimmed,
@@ -81,9 +83,13 @@ primary component reference and verify APIs against the installed version.
   with scrolling inside the stable modal body. Use shared `WorkspaceSections`: NavLink navigation on desktop and a compact
   Section Select in the phone modal header. Mount sections on first visit and
   keep visited forms mounted to preserve edits. Navigation items carry an icon;
-  each section shows its heading and one-line description, segmented views,
-  an expanding search and filters in one popover above compact rows with status
-  badges and row menus. Dense records use the shared `DataTable` on Mantine Table
+  each section shows its heading and one-line description with its toolbar
+  (`SectionHeader`: segmented views, an expanding search, filters in one popover
+  and icon actions) at the end of the same row, above compact rows with status
+  badges and row menus. Sections are alphabetical, About apart at the end, and
+  so are their groups and rows unless order carries meaning. No accordions:
+  headings group a section's parts, and creating or configuring a record opens
+  a popup. Dense records use the shared `DataTable` on Mantine Table
   (sortable headers, the toolbar query, one empty line, loading and the row menu;
   phones drop secondary columns into the main cell); preview cards are for visual
   content. Account authentication follows the standard Mantine form
@@ -187,9 +193,11 @@ primary component reference and verify APIs against the installed version.
 
 ## Dream & Taste
 
-- Dream is a full-screen card deck of background results. Swipe left discards,
-  right keeps, up keeps and queues variations; Star and Animate are buttons
-  that keep the result too. Dream results stay in their own pool until kept;
+- Dream is a card deck of background results, up to a maximum height, with a
+  strip showing progress through the current batch. Swipe or press left to skip,
+  right to keep and up to keep and queue variations. One compact bar under the
+  card offers Skip, Refine, Animate, Star and Keep; Refine and Animate keep the
+  result and stage it in the composer, and Star keeps it too. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
 - Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its

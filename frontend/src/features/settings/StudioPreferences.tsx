@@ -29,6 +29,19 @@ export function StudioPreferences() {
   const [tileCaptions, setTileCaptions] = useTileCaptions();
   return (
     <Stack gap="lg">
+      <SettingGroup title="Gallery">
+        <SettingRow
+          label="Tile Captions"
+          description="Show each tile’s title and details on phones. Desktop shows them on hover."
+        >
+          <Switch
+            aria-label="Tile Captions"
+            checked={tileCaptions}
+            onChange={(event) => setTileCaptions(event.currentTarget.checked)}
+          />
+        </SettingRow>
+        {galleryAllowed && <FinishStarredImages />}
+      </SettingGroup>
       <SettingGroup title="Generation">
         {historyAllowed && (
           <SettingRow
@@ -45,19 +58,6 @@ export function StudioPreferences() {
             />
           </SettingRow>
         )}
-      </SettingGroup>
-      <SettingGroup title="Gallery">
-        <SettingRow
-          label="Tile Captions"
-          description="Show each tile’s title and details on phones. Desktop shows them on hover."
-        >
-          <Switch
-            aria-label="Tile Captions"
-            checked={tileCaptions}
-            onChange={(event) => setTileCaptions(event.currentTarget.checked)}
-          />
-        </SettingRow>
-        {galleryAllowed && <FinishStarredImages />}
       </SettingGroup>
       <SettingGroup title="Keyboard Shortcuts">
         {shortcuts.map((shortcut) => (

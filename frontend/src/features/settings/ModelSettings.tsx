@@ -117,16 +117,6 @@ export function ModelSettings() {
       )}
       <SettingGroup title="Integrations">
         <SettingRow
-          label="Prompt Assistant"
-          description={
-            integrations.assistant.available
-              ? `Model ${integrations.assistant.model.effective || "not chosen"}`
-              : integrations.assistant.note
-          }
-        >
-          {onOff(integrations.assistant.available)}
-        </SettingRow>
-        <SettingRow
           label="Civitai"
           description={`${integrations.civitai.token.set ? "Token set" : "No token"} · Imports ${integrations.civitai.presets ? "on" : "off"}`}
         >
@@ -155,6 +145,16 @@ export function ModelSettings() {
           <Badge variant="light" color="gray">
             {storage.outputs === "studio" ? "Studio" : "ComfyUI Folder"}
           </Badge>
+        </SettingRow>
+        <SettingRow
+          label="Prompt Assistant"
+          description={
+            integrations.assistant.available
+              ? `Model ${integrations.assistant.model.effective || "not chosen"}`
+              : integrations.assistant.note
+          }
+        >
+          {onOff(integrations.assistant.available)}
         </SettingRow>
       </SettingGroup>
     </Stack>

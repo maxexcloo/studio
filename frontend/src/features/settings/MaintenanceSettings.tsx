@@ -127,6 +127,7 @@ export function MaintenanceSettings() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Clean Up">
+        {admin && <CaptionGallery />}
         <SettingRow
           label="Clear Failed Items"
           description="Remove your failed and cancelled items from the gallery."
@@ -156,7 +157,6 @@ export function MaintenanceSettings() {
             Export
           </Button>
         </SettingRow>
-        {admin && <CaptionGallery />}
       </SettingGroup>
       <SettingGroup title="Help">
         <SettingRow

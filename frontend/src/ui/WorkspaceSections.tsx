@@ -72,7 +72,10 @@ export function WorkspaceSectionSelect({
   );
 }
 
-/** Desktop navigation and mounted panes share the route-backed workspace modal. */
+/**
+ * Desktop navigation and mounted panes share the route-backed workspace modal. A section given as
+ * a function places its heading itself, so its toolbar can sit beside it.
+ */
 export function WorkspaceSections({
   label,
   sections,
@@ -80,7 +83,7 @@ export function WorkspaceSections({
 }: {
   label: string;
   sections: WorkspaceSection[];
-  content: Record<string, ReactNode>;
+  content: Record<string, ReactNode | ((heading: ReactNode) => ReactNode)>;
 }) {
   const { location, active } = useWorkspaceSection(sections);
   const [visited, setVisited] = useState(() => new Set([active]));
@@ -113,28 +116,34 @@ export function WorkspaceSections({
         </Stack>
       </Grid.Col>
       <Grid.Col span={{ base: 12, sm: 9 }} style={{ minWidth: 0 }}>
-        {sections.map((section) => (
-          <Box
-            key={section.value}
-            component="section"
-            aria-label={`${label}: ${section.label}`}
-            hidden={section.value !== active}
-          >
-            <Stack>
-              <div>
-                <SectionHeading>{section.label}</SectionHeading>
-                <Text size="sm" c="dimmed">
-                  {section.description}
-                </Text>
-              </div>
-              {visited.has(section.value) && (
-                <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
-                  {content[section.value]}
-                </Suspense>
-              )}
-            </Stack>
-          </Box>
-        ))}
+        {sections.map((section) => {
+          const body = content[section.value];
+          const heading = (
+            <div>
+              <SectionHeading>{section.label}</SectionHeading>
+              <Text size="sm" c="dimmed">
+                {section.description}
+              </Text>
+            </div>
+          );
+          return (
+            <Box
+              key={section.value}
+              component="section"
+              aria-label={`${label}: ${section.label}`}
+              hidden={section.value !== active}
+            >
+              <Stack>
+                {typeof body !== "function" && heading}
+                {visited.has(section.value) && (
+                  <Suspense fallback={<LoadingState label={`Loading ${section.label}`} />}>
+                    {typeof body === "function" ? body(heading) : body}
+                  </Suspense>
+                )}
+              </Stack>
+            </Box>
+          );
+        })}
       </Grid.Col>
     </Grid>
   );
