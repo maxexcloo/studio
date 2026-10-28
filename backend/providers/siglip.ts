@@ -1,9 +1,9 @@
 import fs from "node:fs";
-import { availableParallelism } from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { Worker } from "node:worker_threads";
 import sharp from "sharp";
-import type { InferenceSession } from "onnxruntime-node";
+import type { InferRequest } from "./siglip-worker.ts";
 
 /**
  * SigLIP 2 (base, patch 16, 224 px; Apache-2.0) as ONNX: the full-precision vision encoder, which
@@ -52,8 +52,7 @@ export function createSiglip({
   let download: Promise<void> | null = null;
   let downloadedBytes = 0;
   let failure = { at: -Infinity, reason: "" };
-  let vision: Promise<InferenceSession> | null = null;
-  let text: Promise<{ session: InferenceSession; encode(value: string): number[] }> | null = null;
+  let tokenizer: Promise<{ encode(value: string): { ids: number[] } }> | null = null;
 
   const downloaded = () => files.every((name) => fs.existsSync(file(name)));
 
@@ -101,39 +100,56 @@ export function createSiglip({
     return download;
   }
 
-  async function session(name: string) {
-    await ensureDownloaded();
-    const ort = await runtime();
-    // Half the cores, so embedding never starves the server or the NAS.
-    return ort.InferenceSession.create(file(name), {
-      intraOpNumThreads: Math.max(1, Math.floor(availableParallelism() / 2)),
-      graphOptimizationLevel: "all",
+  // The encoders run in a worker thread (providers/siglip-worker.ts), off the event loop.
+  let worker: Worker | null = null;
+  const calls = new Map<
+    number,
+    { resolve(vector: Float32Array): void; reject(error: Error): void }
+  >();
+  let callCount = 0;
+  function startWorker() {
+    const started = new Worker(new URL("./siglip-worker.ts", import.meta.url));
+    started.on("message", ({ id, vector, error }) => {
+      const call = calls.get(id);
+      calls.delete(id);
+      // Held open only while it has work, so an idle worker never keeps Studio from exiting.
+      if (!calls.size) started.unref();
+      if (error) call?.reject(new Error(error));
+      else call?.resolve(vector);
     });
+    const fail = (error: Error) => {
+      if (worker === started) worker = null;
+      for (const call of calls.values()) call.reject(error);
+      calls.clear();
+    };
+    started.on("error", fail);
+    started.on("exit", (code) => fail(new Error(`The image search worker exited (${code}).`)));
+    return started;
   }
-  const retry = <T>(load: () => Promise<T>, clear: () => void) =>
-    load().catch((error) => {
-      clear();
+  async function infer(name: string, input: Omit<InferRequest, "id" | "model">) {
+    await ensureDownloaded();
+    const id = (callCount += 1);
+    const result = new Promise<Float32Array>((resolve, reject) =>
+      calls.set(id, { resolve, reject }),
+    );
+    worker ||= startWorker();
+    worker.ref();
+    worker.postMessage({ id, model: file(name), ...input }, [input.data.buffer as ArrayBuffer]);
+    return unit(await result);
+  }
+  const loadTokenizer = () =>
+    (tokenizer ||= (async () => {
+      await ensureDownloaded();
+      const { Tokenizer } = await import("@huggingface/tokenizers");
+      const read = (name: string) => JSON.parse(fs.readFileSync(file(name), "utf8"));
+      return new Tokenizer(
+        read(siglipSource.files.tokenizer),
+        read(siglipSource.files.tokenizerConfig),
+      );
+    })().catch((error) => {
+      tokenizer = null;
       throw error;
-    });
-  const visionSession = () =>
-    (vision ||= retry(
-      () => session(siglipSource.files.vision),
-      () => (vision = null),
-    ));
-  const textSession = () =>
-    (text ||= retry(
-      async () => {
-        const { Tokenizer } = await import("@huggingface/tokenizers");
-        const read = (name: string) => JSON.parse(fs.readFileSync(file(name), "utf8"));
-        const loaded = await session(siglipSource.files.text);
-        const tokenizer = new Tokenizer(
-          read(siglipSource.files.tokenizer),
-          read(siglipSource.files.tokenizerConfig),
-        );
-        return { session: loaded, encode: (value: string) => tokenizer.encode(value).ids };
-      },
-      () => (text = null),
-    ));
+    }));
 
   return {
     /** Why the encoders can't run now ("" when they can or haven't been asked to). */
@@ -150,8 +166,6 @@ export function createSiglip({
     downloaded,
     /** A unit-length image vector; the image is stretched to 224 px square, as SigLIP was trained. */
     async embedImage(bytes: Uint8Array) {
-      const ort = await runtime();
-      const encoder = await visionSession();
       const { data } = await sharp(bytes)
         .rotate()
         .removeAlpha()
@@ -164,32 +178,28 @@ export function createSiglip({
       for (let index = 0; index < area; index += 1)
         for (let channel = 0; channel < 3; channel += 1)
           pixels[channel * area + index] = data[index * 3 + channel] / 127.5 - 1;
-      const output = await encoder.run({
-        pixel_values: new ort.Tensor("float32", pixels, [1, 3, size, size]),
+      return infer(siglipSource.files.vision, {
+        input: "pixel_values",
+        type: "float32",
+        data: pixels,
+        dims: [1, 3, size, size],
       });
-      return unit(output.pooler_output.data as Float32Array);
     },
     /** A unit-length text vector, from the lowercased text as SigLIP 2 was trained. */
     async embedText(value: string) {
-      const ort = await runtime();
-      const encoder = await textSession();
-      const ids = encoder.encode(value.toLowerCase()).slice(0, textLength);
+      const ids = (await loadTokenizer()).encode(value.toLowerCase()).ids.slice(0, textLength);
       const padded = new BigInt64Array(textLength);
       ids.forEach((id, index) => (padded[index] = BigInt(id)));
-      const output = await encoder.session.run({
-        input_ids: new ort.Tensor("int64", padded, [1, textLength]),
+      return infer(siglipSource.files.text, {
+        input: "input_ids",
+        type: "int64",
+        data: padded,
+        dims: [1, textLength],
       });
-      return unit(output.pooler_output.data as Float32Array);
     },
   };
 }
 export type Siglip = ReturnType<typeof createSiglip>;
-
-/** onnxruntime-node, loaded on first use with its usage telemetry to Microsoft turned off. */
-function runtime() {
-  process.env.ORT_DISABLE_TELEMETRY = "1";
-  return import("onnxruntime-node");
-}
 
 function unit(vector: Float32Array) {
   let sum = 0;
