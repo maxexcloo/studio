@@ -3,43 +3,16 @@ import { mayUseFeature } from "./account-policy.js";
 import { clientOf } from "./access.js";
 import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
-  deleteUploadedReference,
-  listReferenceAssets,
+  bytesForReferenceAccount,
   readMultipartImage,
-  readUploadedReference,
   referenceAssetFromGallery,
   referenceAssetMetadataForAccount,
-  saveUploadedReference,
-  saveUploadToGallery,
-} from "./reference-assets.js";
+  saveUploadedImage,
+} from "./references.js";
 import { requireLocal } from "./route-access.js";
 
-export function registerReferenceRoutes(app) {
-  app.get("/api/reference-assets", (req, res) => {
-    try {
-      const source = req.query.source === "generation" ? "generation" : "upload";
-      const canReference =
-        !req.studioAccount ||
-        mayUseFeature(req.studioAccount, "imageReferences") ||
-        mayUseFeature(req.studioAccount, "videoReferences");
-      if (
-        req.studioAccount &&
-        (!canReference || (source === "generation" && !mayUseFeature(req.studioAccount, "gallery")))
-      )
-        return res.json({ items: [], hasMore: false });
-      res.json(
-        listReferenceAssets(req, {
-          source,
-          cursor: String(req.query.cursor || ""),
-          limit: Number(req.query.limit || 60),
-          q: String(req.query.q || ""),
-        }),
-      );
-    } catch (error) {
-      res.status(400).json({ ok: false, error: error.message });
-    }
-  });
-
+/** `uploaded(item)` hears of each new upload's gallery item, for image search. */
+export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
   app.post("/api/reference-assets/upload", async (req, res) => {
     const canReference =
       req.studioAccount &&
@@ -47,8 +20,11 @@ export function registerReferenceRoutes(app) {
         mayUseFeature(req.studioAccount, "videoReferences"));
     if (!canReference && !requireLocal(req, res)) return;
     try {
-      const upload = await readMultipartImage(req);
-      const asset = await saveUploadedReference(upload, ownerIdForRequest(req));
+      const { item, asset } = await saveUploadedImage(
+        await readMultipartImage(req),
+        ownerIdForRequest(req),
+      );
+      uploaded(item);
       res.status(201).json({ ok: true, asset });
     } catch (error) {
       res.status(400).json({ ok: false, error: error.message });
@@ -71,10 +47,11 @@ export function registerReferenceRoutes(app) {
     if (!allowed) return res.redirect(303, "/images");
     req.studioAccount = account;
     try {
-      const asset = await saveUploadedReference(
+      const { item, asset } = await saveUploadedImage(
         await readMultipartImage(req),
         ownerIdForRequest(req),
       );
+      uploaded(item);
       res.redirect(303, `/images?compose=1&shared=${encodeURIComponent(asset.id)}`);
     } catch {
       res.redirect(303, "/images?compose=1");
@@ -101,72 +78,50 @@ export function registerReferenceRoutes(app) {
     }
   });
 
-  app.post("/api/reference-assets/:id/gallery", async (req, res) => {
-    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
-      return res
-        .status(403)
-        .json({ ok: false, error: "The gallery is disabled for this account." });
-    if (!req.studioAccount && !requireLocal(req, res)) return;
-    try {
-      res.json({
-        ok: true,
-        item: await saveUploadToGallery(req.params.id, ownerIdForRequest(req)),
-      });
-    } catch (error) {
-      res.status(404).json({ ok: false, error: error.message });
-    }
-  });
+  /**
+   * The caller's own reference, or a throw. Accounts without the gallery reach their uploads but
+   * not their generations.
+   */
+  function ownedReference(account, id) {
+    if (
+      account &&
+      !mayUseFeature(account, "imageReferences") &&
+      !mayUseFeature(account, "videoReferences")
+    )
+      throw new Error("References are off for this account.");
+    const asset = referenceAssetMetadataForAccount(account, id);
+    if (account && asset.source === "generation" && !mayUseFeature(account, "gallery"))
+      throw new Error("The gallery is off for this account.");
+    return asset;
+  }
+  const gone = (res) => res.status(404).json({ ok: false, error: "That reference image is gone." });
 
   app.get("/api/reference-assets/:id", (req, res) => {
     try {
-      const account = req.studioAccount;
-      if (
-        account &&
-        !mayUseFeature(account, "imageReferences") &&
-        !mayUseFeature(account, "videoReferences")
-      )
-        return res.status(404).json({ ok: false, error: "That reference image is gone." });
-      const asset = referenceAssetMetadataForAccount(account, req.params.id);
-      if (account && asset.source === "generation" && !mayUseFeature(account, "gallery"))
-        return res.status(404).json({ ok: false, error: "That reference image is gone." });
-      return res.json({ asset });
+      res.json({ asset: ownedReference(req.studioAccount, req.params.id) });
     } catch {
-      return res.status(404).json({ ok: false, error: "That reference image is gone." });
+      gone(res);
     }
   });
 
-  app.get("/api/reference-assets/:id/media", (req, res) => {
-    if (
-      req.studioAccount &&
-      !mayUseFeature(req.studioAccount, "imageReferences") &&
-      !mayUseFeature(req.studioAccount, "videoReferences")
-    )
-      return res.status(404).json({ ok: false, error: "That reference image is gone." });
-    const asset = readUploadedReference(req.params.id, "media", ownerIdForRequest(req));
-    if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
-    res.type(asset.mime).setHeader("Cache-Control", "private, max-age=3600");
-    res.sendFile(asset.file);
-  });
-
-  app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
-    if (
-      req.studioAccount &&
-      !mayUseFeature(req.studioAccount, "imageReferences") &&
-      !mayUseFeature(req.studioAccount, "videoReferences")
-    )
-      return res.status(404).json({ ok: false, error: "That reference image is gone." });
-    const asset = readUploadedReference(req.params.id, "thumbnail", ownerIdForRequest(req));
-    if (!asset) return res.status(404).json({ ok: false, error: "That reference image is gone." });
-    res.type(asset.mime).setHeader("Cache-Control", "private, max-age=86400");
-    res.sendFile(asset.file);
-  });
-
-  app.delete("/api/reference-assets/:id", (req, res) => {
-    if (!req.studioAccount && !requireLocal(req, res)) return;
+  // The bytes a run would get for the reference, for the prompt assistant and MCP tools.
+  app.get("/api/reference-assets/:id/media", async (req, res) => {
     try {
-      res.json(deleteUploadedReference(req.params.id, ownerIdForRequest(req)));
-    } catch (error) {
-      res.status(404).json({ ok: false, error: error.message });
+      ownedReference(req.studioAccount, req.params.id);
+      const { buffer, mime } = await bytesForReferenceAccount(req.studioAccount, req.params.id);
+      res.type(mime).setHeader("Cache-Control", "private, max-age=3600");
+      res.send(buffer);
+    } catch {
+      gone(res);
+    }
+  });
+
+  // Saved reference details carry this address; it leads to the reference's gallery thumbnail.
+  app.get("/api/reference-assets/:id/thumbnail", (req, res) => {
+    try {
+      res.redirect(302, ownedReference(req.studioAccount, req.params.id).thumbnailUrl);
+    } catch {
+      gone(res);
     }
   });
 }

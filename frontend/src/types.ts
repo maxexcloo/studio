@@ -118,6 +118,8 @@ export interface MediaItem {
   caption?: { text: string; tags?: string[]; model?: string; at?: string };
   createdAt?: string;
   favorite?: boolean;
+  /** An uploaded image (references.js), listed under the gallery's Uploads filter. */
+  uploaded?: boolean;
   settings?: Record<string, unknown>;
   model?: string;
   filename?: string;

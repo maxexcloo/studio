@@ -13,6 +13,7 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  Upload,
   X,
 } from "lucide-react";
 import { api } from "../../api";
@@ -59,9 +60,15 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
 
-/** How many filters are on, Starred included, for a filter action's badge. */
-export const galleryFilterCount = (filters: GalleryFilterValues, starred: boolean) =>
-  Number(starred) + Object.values(filters).reduce((count, values) => count + values.length, 0);
+/** How many filters are on, Starred and Uploads included, for a filter action's badge. */
+export const galleryFilterCount = (
+  filters: GalleryFilterValues,
+  starred: boolean,
+  uploads: boolean,
+) =>
+  Number(starred) +
+  Number(uploads) +
+  Object.values(filters).reduce((count, values) => count + values.length, 0);
 
 /** The gallery and reference picker share facets, labels and selection behaviour. */
 interface GalleryFiltersProps {
@@ -70,6 +77,9 @@ interface GalleryFiltersProps {
   onChange: (value: GalleryFilterValues) => void;
   starred: boolean;
   onStarredChange: (value: boolean) => void;
+  /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
+  uploads: boolean;
+  onUploadsChange: (value: boolean) => void;
   withinPortal?: boolean;
   /** Grid's versions: on (the default) shows each one; off collapses a chain into one tile. */
   allVersions?: boolean;
@@ -101,7 +111,7 @@ export function GalleryFilterToolbar({
   useEffect(() => {
     if (query && phone) setMode((current) => (current === "normal" ? "search" : current));
   }, [query, phone]);
-  const selectedCount = galleryFilterCount(props.value, props.starred);
+  const selectedCount = galleryFilterCount(props.value, props.starred, props.uploads);
   const toolbar = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchButton = useRef<HTMLButtonElement>(null);
@@ -283,6 +293,8 @@ export function GalleryFilters({
   onChange,
   starred,
   onStarredChange,
+  uploads,
+  onUploadsChange,
   withinPortal,
   allVersions,
   onAllVersionsChange,
@@ -305,7 +317,7 @@ export function GalleryFilters({
       searchable={searchable}
     />
   );
-  const active = starred || hasGalleryFilters(value);
+  const active = starred || uploads || hasGalleryFilters(value);
   return (
     <>
       <Scroller
@@ -338,6 +350,16 @@ export function GalleryFilters({
           >
             Starred
           </Button>
+          <Button
+            {...chipProps}
+            aria-label="Uploads"
+            aria-pressed={uploads}
+            variant={uploads ? "light" : "default"}
+            leftSection={<Upload size={15} />}
+            onClick={() => onUploadsChange(!uploads)}
+          >
+            Uploads
+          </Button>
           {onAllVersionsChange && (
             <Button
               {...chipProps}
@@ -366,6 +388,7 @@ export function GalleryFilters({
           className={`${chipProps.className} ${classes.clear}`}
           onClick={() => {
             onStarredChange(false);
+            onUploadsChange(false);
             onChange(emptyGalleryFilters);
           }}
         >
@@ -383,11 +406,16 @@ function ActiveFilterChips({
   onChange,
   starred,
   onStarredChange,
+  uploads,
+  onUploadsChange,
 }: GalleryFiltersProps) {
   const { options } = useFacetOptions(kind, value);
   const chips = [
     ...(starred
       ? [{ key: "starred", label: "Starred", remove: () => onStarredChange(false) }]
+      : []),
+    ...(uploads
+      ? [{ key: "uploads", label: "Uploads", remove: () => onUploadsChange(false) }]
       : []),
     ...(Object.keys(value) as (keyof GalleryFilterValues)[]).flatMap((facet) =>
       value[facet].map((selected) => ({

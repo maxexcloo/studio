@@ -42,7 +42,7 @@ const image = await sharp({
   .toBuffer();
 const queued = [];
 const store = await import("./gallery-store.js");
-const references = await import("./reference-assets.js");
+const references = await import("./references.js");
 let validImage = true;
 let sourcePrompt = "a landscape";
 let sourceType = "image";

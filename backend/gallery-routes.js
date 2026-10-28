@@ -175,6 +175,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
       limit: limit || 200,
       cursor,
       includeFailed,
+      uploads: req.query.uploads === "1",
       filter: (item) =>
         recordBelongsToRequest(item, req) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&

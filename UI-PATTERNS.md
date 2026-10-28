@@ -190,7 +190,9 @@ primary component reference and verify APIs against the installed version.
   Recommended (the default: LoRAs for the profile's family), Favourites (this
   family's), All (every LoRA, with Unclassified, those without a family, as a
   filter) and saved Stacks; type filters follow the catalogue Type.
-- References share a Gallery & Upload picker. Gallery drag-and-drop passes an
+- References pick from the gallery. Uploads are the uploader's gallery images,
+  hidden until the gallery's Uploads filter is on (the picker's too, where the
+  Upload tile sits). Gallery drag-and-drop passes an
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.
   Explicit slot IDs survive reordering; optional End-only inputs and one asset

@@ -2,10 +2,15 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { comfy } from "./comfy.js";
 import { currentComfyBackend } from "./comfy-backends.js";
-import { accountOutputSubfolder } from "./account-ownership.js";
-import { dataDir, mediaPath, mediaStorageEnabled, mediaType, mediaUrls } from "./media-paths.js";
+import {
+  dataDir,
+  mediaPath,
+  mediaStorageEnabled,
+  mediaSubfolder,
+  mediaType,
+  mediaUrls,
+} from "./media-paths.js";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
-import { outputFolderName } from "./data-names.js";
 
 /*
  * Runs already moved into Studio media, by job ID. Each stored copy gets a unique
@@ -61,11 +66,6 @@ function comfyRef(url) {
   if (!["output", "temp"].includes(type)) return null;
   const filename = params.get("filename") || "";
   return filename ? { filename, subfolder: params.get("subfolder") || "", type } : null;
-}
-
-/** The owner's media folder: the account's own subfolder, or the studio's. */
-export function mediaSubfolder(ownerId = "") {
-  return ownerId ? accountOutputSubfolder(ownerId) : outputFolderName;
 }
 
 /** ComfyUI reuses its numbering once its copies are deleted, so every stored name is made unique. */

@@ -52,7 +52,7 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["POST", "/api/jobs/abc-1/cancel"],
     ["GET", "/api/reference-assets/a1/thumbnail"],
     ["POST", "/api/reference-assets/upload"],
-    ["POST", "/api/reference-assets/a1/gallery"],
+    ["POST", "/api/reference-assets/from-gallery"],
     ["GET", "/api/loras/library"],
     ["GET", "/api/services/status"],
     ["GET", "/comfy/view"],
