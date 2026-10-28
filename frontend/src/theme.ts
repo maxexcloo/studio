@@ -222,6 +222,8 @@ export function studioTheme({
           title: overlayTitle,
         }),
       }),
+      // Compound modals (phone chip popups) skip the Modal defaults above.
+      ModalRoot: { defaultProps: { transitionProps: popupTransition } },
       NavLink: NavLink.extend({ styles: { root: { borderRadius: "var(--mantine-radius-md)" } } }),
       Notification: Notification.extend({ styles: { root: glass } }),
       // Paper also renders Card, Dialog, ActionBar and Modal/Drawer content.
