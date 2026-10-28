@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { chatModelAllowed, chatSettings } from "./chat-settings.js";
+import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 
 test("Chat has a separate required gateway and anchored explicit model allowlist", () => {
   assert.equal(chatSettings({}), null);
@@ -38,4 +38,23 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
     () => chatSettings({ ...environment, STUDIO_CHAT_GATEWAY_URL: "not-a-url" }),
     /STUDIO_CHAT_GATEWAY_URL/,
   );
+});
+
+test("administrators see every model with its workloads; others only models that run", () => {
+  const models = [{ id: "cloud/model" }, { id: "gemma/31b" }, { id: "qwen/27b" }];
+  const workloads = [
+    { id: "text-gemma", model: "gemma/31b" },
+    { id: "text-gemma-tp2", model: "gemma/31b" },
+    { id: "text-qwen", model: "qwen/27b" },
+    { id: "comfyui" },
+  ];
+  assert.deepEqual(servedChatModels(models, workloads), [
+    { id: "cloud/model" },
+    { id: "gemma/31b", workloads: ["text-gemma", "text-gemma-tp2"] },
+    { id: "qwen/27b", workloads: ["text-qwen"] },
+  ]);
+  assert.deepEqual(servedChatModels(models, workloads, ["text-gemma-tp2", "comfyui"]), [
+    { id: "cloud/model" },
+    { id: "gemma/31b" },
+  ]);
 });
