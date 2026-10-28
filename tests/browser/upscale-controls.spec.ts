@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, stamp } from "./fixtures";
+import { fixtures, image, stamp, upscaleCapabilities } from "./fixtures";
 import type { UpscaleRequest } from "../../shared/upscale";
 
 const source = {
@@ -19,24 +19,6 @@ const source = {
     vae: "vae.safetensors",
   },
 };
-const capabilities = {
-  ok: true,
-  ready: true,
-  nodesInstalled: true,
-  missingNodes: [],
-  missingModels: [],
-  qualities: ["fast", "balanced", "high"],
-  targets: [2048, 4096],
-  substituting: false,
-  fallbackFile: "",
-  faceDetail: {
-    nodesInstalled: true,
-    missingNodes: [],
-    detectors: ["bbox/face_yolov8m.pt"],
-    samModels: [],
-  },
-};
-
 test("Upscale quality, 2K/4K size and face detail reach one submission while pending", async ({
   page,
 }) => {
@@ -51,7 +33,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
   await page.route("**/api/upscale/status*", (route) => {
     const quality = new URL(route.request().url()).searchParams.get("quality") || "balanced";
     checkedQualities.push(quality);
-    return route.fulfill({ json: { ...capabilities, quality } });
+    return route.fulfill({ json: { ...upscaleCapabilities, quality } });
   });
   await page.route("**/api/upscale", async (route) => {
     const body: UpscaleRequest = route.request().postDataJSON();
@@ -134,7 +116,7 @@ test("Offline workers and unavailable upscale models explain why submission is d
       ? route.fulfill({ status: 503, json: { error: "The selected upscale worker is offline." } })
       : route.fulfill({
           json: {
-            ...capabilities,
+            ...upscaleCapabilities,
             quality: "balanced",
             ready: false,
             missingModels: ["dit"],

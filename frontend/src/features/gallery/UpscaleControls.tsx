@@ -23,7 +23,7 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useActionIconProps } from "./ActionBar";
+import { useActionIconProps, type Action } from "./ActionBar";
 
 function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void }) {
   const [quality, setQuality] = useState<UpscaleQuality>("balanced");
@@ -141,8 +141,11 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
 }
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
-/** The viewer's Upscale action and its settings popover, styled as an action bar icon. */
-export function UpscaleControls({ item }: { item: MediaItem }) {
+/**
+ * The viewer's Upscale action and its settings popover, styled as an action bar icon. `options`
+ * (Show Upscale, Compare Upscale) show as switches above the form.
+ */
+export function UpscaleControls({ item, options = [] }: { item: MediaItem; options?: Action[] }) {
   const [opened, setOpened] = useState(false);
   const iconProps = useActionIconProps();
   const busy = upscaling(item);
@@ -163,6 +166,15 @@ export function UpscaleControls({ item }: { item: MediaItem }) {
       <Popover.Dropdown>
         <Stack gap="sm">
           <Text fw={600}>Upscale</Text>
+          {options.map((option) => (
+            <Switch
+              key={option.id}
+              label={option.label}
+              checked={Boolean(option.checked)}
+              disabled={option.disabled}
+              onChange={() => option.onClick?.()}
+            />
+          ))}
           <UpscaleForm item={item} onQueued={() => setOpened(false)} />
         </Stack>
       </Popover.Dropdown>

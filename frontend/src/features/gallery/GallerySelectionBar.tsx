@@ -1,24 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { Download, RotateCw, Share, Square, Star, Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, actionBarClass, type ActionGroups } from "./ActionBar";
+import {
+  ActionBarGroups,
+  ActionMenuItems,
+  actionBarClass,
+  type Action,
+  type ActionGroups,
+} from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
+import {
+  CustomAnimationDialog,
+  itemAction,
+  itemActionGroups,
+  useMediaActions,
+  type ItemActionId,
+} from "./MediaActions";
+import { useMediaTransfer } from "./mediaShare";
+import { UpscaleDialog } from "./UpscaleControls";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
+import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 
 const shareLimit = 20;
 
 /**
- * The selection header (count and quick selections), the bulk action bar, matching the viewer's,
- * with Cancel, and the same actions as a context menu at `menu` (right-click or Shift+F10).
+ * The selection header (count and quick selections), the bulk action bar in the viewer's sections
+ * (labelled on desktop) with Close, and the same actions as a context menu at `menu` (right-click
+ * or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -103,74 +120,62 @@ export function GallerySelectionBar({
     }
   }
   const pending = busy !== null;
-  const actions: ActionGroups = [
-    [
-      {
-        id: "star",
-        label: allStarred ? "Unstar Selected" : "Star Selected",
-        icon: Star,
+  // A sole selected item's own actions, kept by `OneItemActions` so the bar never remounts.
+  const oneItem = useRef<Action[]>([]);
+  const [, setOneItemState] = useState("");
+  // Actions for one item at a time act on a sole selected item; for several they stay in place,
+  // greyed out, so the bar matches the viewer's.
+  const groups = (one: Action[]) => {
+    const single = (id: ItemActionId) =>
+      one.find((action) => action.id === id) ?? itemAction(id, { disabled: true });
+    return itemActionGroups([
+      single("animate"),
+      single("edit"),
+      single("recreate"),
+      single("reference"),
+      (failed.length > 0 || busy === "retry") &&
+        itemAction("retry", {
+          disabled: pending || !failed.length,
+          loading: busy === "retry",
+          onClick: () => void retrySelected(),
+        }),
+      (runningJobs.length > 0 || busy === "stop") &&
+        itemAction("stop", {
+          disabled: pending || !runningJobs.length,
+          loading: busy === "stop",
+          onClick: () => void stopSelected(),
+        }),
+      single("compare"),
+      single("upscale"),
+      single("copy"),
+      // Phones that share natively share instead of downloading.
+      phone && typeof navigator.share === "function"
+        ? itemAction("share", {
+            label: prepared ? "Share" : "Prepare Share",
+            disabled: !ready.length || ready.length > shareLimit,
+            loading: prepare.isPending,
+            onClick: () => void share(),
+          })
+        : itemAction("download", {
+            disabled: !ready.length || downloadTooLarge,
+            link: {
+              href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
+              download: true,
+            },
+          }),
+      itemAction("delete", {
+        disabled: !deletable.length || pending,
+        onClick: () => setConfirm(true),
+      }),
+      itemAction("star", {
+        label: allStarred ? "Unstar" : "Star",
         pressed: allStarred,
         disabled: !ready.length || pending,
         onClick: () =>
           favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
-      },
-      {
-        id: "download",
-        label: "Download Selected",
-        icon: Download,
-        disabled: !ready.length || downloadTooLarge,
-        link: { href: ready.length && !downloadTooLarge ? downloadUrl : undefined, download: true },
-      },
-      ...(phone && typeof navigator.share === "function"
-        ? [
-            {
-              id: "share",
-              label: prepared ? "Share Selected" : "Prepare Share",
-              icon: Share,
-              disabled: !ready.length || ready.length > shareLimit,
-              loading: prepare.isPending,
-              onClick: () => void share(),
-            },
-          ]
-        : []),
-    ],
-    [
-      ...(failed.length || busy === "retry"
-        ? [
-            {
-              id: "retry",
-              label: "Retry Selected",
-              icon: RotateCw,
-              disabled: pending || !failed.length,
-              loading: busy === "retry",
-              onClick: () => void retrySelected(),
-            },
-          ]
-        : []),
-      ...(runningJobs.length || busy === "stop"
-        ? [
-            {
-              id: "stop",
-              label: "Stop Selected",
-              icon: Square,
-              disabled: pending || !runningJobs.length,
-              loading: busy === "stop",
-              onClick: () => void stopSelected(),
-            },
-          ]
-        : []),
-    ],
-    [
-      {
-        id: "delete",
-        label: "Delete Selected",
-        icon: Trash2,
-        color: "red",
-        disabled: !deletable.length || pending,
-        onClick: () => setConfirm(true),
-      },
-    ],
-  ];
+      }),
+    ]);
+  };
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -206,6 +211,62 @@ export function GallerySelectionBar({
       items: selection.items.filter((item) => !finished(item)),
     },
   ];
+  const actionSurfaces = (actions: ActionGroups) => (
+    <>
+      <ActionBar
+        opened={selection.selecting}
+        aria-label="Selected Item Actions"
+        radius="xl"
+        shadow="lg"
+        className={actionBarClass}
+        position={{
+          left: 0,
+          right: 0,
+          bottom: "calc(var(--studio-composer-gap) + env(safe-area-inset-bottom))",
+        }}
+        transitionProps={{ transition: "slide-up" }}
+      >
+        <Stack gap={4} align="center" miw={0}>
+          <Group gap={2} wrap="nowrap" maw="100%">
+            <ActionBarGroups
+              groups={actions}
+              labelled={!phone}
+              trailing={
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  size="compact-sm"
+                  leftSection={<X size={16} />}
+                  aria-label="Close Selection"
+                  disabled={pending}
+                  onClick={selection.end}
+                >
+                  Close
+                </Button>
+              }
+            />
+          </Group>
+          {downloadTooLarge && (
+            <Text size="xs" c="dimmed" ta="center" px="sm">
+              Select fewer items to download in one archive.
+            </Text>
+          )}
+        </Stack>
+      </ActionBar>
+      <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>
+        <Menu.Target>
+          <div
+            aria-hidden
+            style={{ position: "fixed", left: menu?.x, top: menu?.y, width: 0, height: 0 }}
+          />
+        </Menu.Target>
+        <Menu.Dropdown aria-label="Selection Actions">
+          <Menu.Label>{selected.length} Selected</Menu.Label>
+          <ActionMenuItems groups={actions} />
+        </Menu.Dropdown>
+      </Menu>
+    </>
+  );
   return (
     <>
       <Group gap={6} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
@@ -244,61 +305,79 @@ export function GallerySelectionBar({
           Clear
         </Button>
       </Group>
-      <ActionBar
-        opened={selection.selecting}
-        aria-label="Selected Item Actions"
-        radius="xl"
-        shadow="lg"
-        className={actionBarClass}
-        position={{
-          left: 0,
-          right: 0,
-          bottom: "calc(var(--studio-composer-gap) + env(safe-area-inset-bottom))",
-        }}
-        transitionProps={{ transition: "slide-up" }}
-      >
-        <Stack gap={4} align="center">
-          <Group gap={2} wrap="nowrap">
-            <ActionBarGroups
-              groups={actions}
-              trailing={
-                <Button
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  disabled={pending}
-                  onClick={selection.end}
-                >
-                  Cancel
-                </Button>
-              }
-            />
-          </Group>
-          {downloadTooLarge && (
-            <Text size="xs" c="dimmed" ta="center" px="sm">
-              Select fewer items to download in one archive.
-            </Text>
-          )}
-        </Stack>
-      </ActionBar>
-      <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>
-        <Menu.Target>
-          <div
-            aria-hidden
-            style={{ position: "fixed", left: menu?.x, top: menu?.y, width: 0, height: 0 }}
-          />
-        </Menu.Target>
-        <Menu.Dropdown aria-label="Selection Actions">
-          <Menu.Label>{selected.length} Selected</Menu.Label>
-          <ActionMenuItems groups={actions} />
-        </Menu.Dropdown>
-      </Menu>
+      {actionSurfaces(groups(selected.length === 1 ? oneItem.current : []))}
+      {selected.length === 1 && (
+        <OneItemActions
+          item={selected[0]}
+          onApplied={selection.end}
+          sink={oneItem}
+          onChange={setOneItemState}
+        />
+      )}
       <DeleteMediaDialog
         opened={confirm}
         ids={deletable.map((item) => item.id)}
         close={() => setConfirm(false)}
         onDeleted={(_deleted, failed) => selection.retain(failed)}
       />
+    </>
+  );
+}
+
+/** What a bar shows of the actions, so their owner re-renders only when it changes. */
+const shownState = (actions: Action[]): string =>
+  actions
+    .map((action) =>
+      [action.id, action.label, action.disabled, action.loading, action.pressed, action.checked]
+        .concat(action.menu ? shownState(action.menu.flat()) : [])
+        .join(","),
+    )
+    .join("|");
+
+/**
+ * A sole selected item's own actions, written to `sink` for the selection's bar and menu (with
+ * `onChange` when what they show changes), and the dialogs they open.
+ */
+function OneItemActions({
+  item,
+  onApplied,
+  sink,
+  onChange,
+}: {
+  item: MediaItem;
+  onApplied: () => void;
+  sink: { current: Action[] };
+  onChange: (state: string) => void;
+}) {
+  const transfer = useMediaTransfer(item, false);
+  const [animating, setAnimating] = useState(false);
+  const [upscaling, setUpscaling] = useState(false);
+  const actions = useMediaActions(item, {
+    transfer,
+    onApplied,
+    onCustomAnimation: () => setAnimating(true),
+    // The selection's own Delete covers it.
+    onDelete: () => {},
+    onUpscale: () => setUpscaling(true),
+  }).flat();
+  sink.current = actions;
+  const state = `${item.id}:${shownState(actions)}`;
+  useEffect(() => onChange(state), [state]);
+  // Another item selected later never shows this one's actions first.
+  useEffect(
+    () => () => {
+      sink.current = [];
+    },
+    [],
+  );
+  return (
+    <>
+      {animating && (
+        <CustomAnimationDialog item={item} opened onClose={() => setAnimating(false)} />
+      )}
+      {item.status === "done" && (
+        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
+      )}
     </>
   );
 }

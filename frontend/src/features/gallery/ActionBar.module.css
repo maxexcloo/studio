@@ -1,4 +1,4 @@
-/* One bar layout for the viewer and the gallery selection: compact icons in divided groups. */
+/* One bar layout for the viewer and the gallery selection: compact controls in divided groups. */
 .bar {
   display: flex;
   align-items: center;
@@ -9,8 +9,19 @@
   padding: 4px;
 }
 
+/* The actions scroll sideways when they outgrow the bar (phones); trailing controls stay put. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
 .divider {
   align-self: stretch;
+  flex-shrink: 0;
   margin: 6px 4px;
 }
 
@@ -19,4 +30,10 @@
   transition:
     background-color var(--studio-motion-duration) ease,
     color var(--studio-motion-duration) ease;
+}
+
+/* A split control's menu half stays narrow so it reads as one action. */
+.splitMenu {
+  width: 22px;
+  min-width: 22px;
 }

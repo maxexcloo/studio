@@ -3,7 +3,7 @@ import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { Download, Ellipsis, Star } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { MediaActionMenu } from "./MediaActions";
+import { CustomAnimationDialog, MediaActionMenu } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
@@ -26,6 +26,7 @@ export function MediaTileActions({
 }) {
   const [deleting, setDeleting] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
+  const [animating, setAnimating] = useState(false);
   const favorite = useMediaFavorite(item);
   const transfer = useMediaTransfer(item, opened);
   const name = mediaTitle(item);
@@ -85,6 +86,7 @@ export function MediaTileActions({
                 sessionId={sessionId}
                 omit={omit}
                 onApplied={() => onOpenedChange(false)}
+                onCustomAnimation={() => setAnimating(true)}
                 onDelete={() => setDeleting(true)}
                 onUpscale={() => setUpscaling(true)}
               />
@@ -98,6 +100,14 @@ export function MediaTileActions({
         close={() => setDeleting(false)}
         onDeleted={() => {}}
       />
+      {animating && (
+        <CustomAnimationDialog
+          item={item}
+          sessionId={sessionId}
+          opened
+          onClose={() => setAnimating(false)}
+        />
+      )}
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
