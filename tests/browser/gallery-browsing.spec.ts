@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   closeReferences,
+  expandComposer,
   fixtures,
   gallerySearch,
   image,
@@ -129,7 +130,7 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   await expect(search).toHaveValue(testInfo.project.use.isMobile ? "" : "Browse");
   await page.keyboard.press("Escape");
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await prompt.click();
+  await expandComposer(page);
   await prompt.fill("Keep typing");
   await prompt.press("/");
   await expect(prompt).toHaveValue("Keep typing/");
