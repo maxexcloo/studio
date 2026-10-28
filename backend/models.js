@@ -97,7 +97,7 @@ export function buildProfile({
   native = {},
   recipe,
   prompting,
-  nsfw = false,
+  uncensored = false,
   aiDrafted = false,
   backend = "",
   backendOptions = [],
@@ -119,7 +119,7 @@ export function buildProfile({
     label,
     // A combined profile: the backend it runs on now and each one it can run on, with whether it is ready.
     ...(backend ? { backend, backendOptions } : {}),
-    ...(nsfw === true ? { nsfw: true } : {}),
+    ...(uncensored === true ? { uncensored: true } : {}),
     // Drafted by the assistant and not yet reviewed: administrators only (account-policy.js).
     ...(aiDrafted === true ? { aiDrafted: true } : {}),
     displayName: displayName || label,
@@ -382,7 +382,7 @@ export function inferModels(
         baseModel: modelBasename(defaults.model || ""),
         workflow: workflow.profileId,
         family: workflow.family,
-        nsfw: workflow.nsfw,
+        uncensored: workflow.uncensored,
         aiDrafted: workflow.aiDrafted,
         recipe: workflow.recipe,
         defaults: {

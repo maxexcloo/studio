@@ -162,7 +162,7 @@ const itemFields = [
   "role",
   "triggers",
   "strength",
-  "nsfw",
+  "uncensored",
   "links",
   "origin",
   "source",
@@ -559,7 +559,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
     server,
     "CatalogueEdit",
     "Edit Catalogue Entry",
-    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max}, nsfw, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
+    "Change one catalogue entry when the user asks: title, triggers, strength {default, min, max}, uncensored, links or notes; null clears a field’s edit. Returns the new entry and the previous values; undo: true reverts its newest change. Recorded as from chat.",
     {
       key,
       patch: z
@@ -567,7 +567,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
           title: z.string().max(300).nullable().optional(),
           triggers: z.array(z.string().max(80)).max(30).nullable().optional(),
           strength: strength.nullable().optional(),
-          nsfw: z.boolean().nullable().optional(),
+          uncensored: z.boolean().nullable().optional(),
           links: links.nullable().optional(),
           notes: z.string().max(500).nullable().optional(),
         })
@@ -666,7 +666,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
               version: n,
               origin,
               aiDrafted,
-              nsfw,
+              uncensored,
             }) => ({
               id: profileId,
               name: label,
@@ -675,7 +675,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
               version: n,
               origin,
               ...(aiDrafted ? { aiDrafted: true } : {}),
-              ...(nsfw ? { nsfw: true } : {}),
+              ...(uncensored ? { uncensored: true } : {}),
             }),
           ),
         });

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The prompt assistant's routes. Every route is account-scoped: it needs the Prompt Assistant
- * access-profile feature, works only with profiles the account may use, and Spicy needs NSFW Models.
+ * access-profile feature, works only with profiles the account may use, and Spicy needs Uncensored Models.
  * LoRA suggestions need the LoRAs feature.
  *
  *   GET  /api/assistant                 what this account may use: presets, models, vision, and the
@@ -15,9 +15,7 @@ import {
   AssistantError,
   assistantModelKey,
   assistantSettings,
-  assistantSpicyModelKey,
   createAssistant,
-  spicyModelOf,
 } from "./assistant.js";
 import { assistantPresets, defaultPreset } from "./assistant-presets.js";
 import { mayUseFeature } from "./account-policy.js";
@@ -28,7 +26,7 @@ const maxImageBytes = 12 * 1024 * 1024;
 const referenceEdge = 1024;
 const modelPattern = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/;
 
-export const assistantSettingKeys = Object.freeze([assistantModelKey, assistantSpicyModelKey]);
+export const assistantSettingKeys = Object.freeze([assistantModelKey]);
 
 /** Whether an account (or single-user Studio, with no account) has a feature. */
 const allowed = (req, feature) => !req.studioAccount || mayUseFeature(req.studioAccount, feature);
@@ -132,7 +130,6 @@ export async function assistantIntegration({ environment = process.env, engine, 
       note: problem || "Set STUDIO_PROMPT_WRITER_URL, _KEY and _MODEL to use the prompt assistant.",
       models: [],
       model: row(assistantModelKey, ""),
-      spicy: row(assistantSpicyModelKey, ""),
       writerModel: "",
     };
   const [models, vision] = await Promise.all([engine.listModels(), engine.supportsVision()]);
@@ -141,10 +138,6 @@ export async function assistantIntegration({ environment = process.env, engine, 
     writerModel: settings.writerModel,
     models,
     model: { ...row(assistantModelKey, settings.model), vision },
-    spicy: {
-      ...row(assistantSpicyModelKey, settings.spicyModel),
-      vision: Boolean(settings.spicyModel) && vision,
-    },
   };
 }
 
@@ -222,7 +215,7 @@ export function registerAssistantRoutes(
       return res.json({ ok: true, available: false, presets: [] });
     try {
       const settings = engine.settings();
-      const spicy = Boolean(settings.spicyModel) && allowed(req, "nsfwModels");
+      const spicy = allowed(req, "uncensoredModels");
       // Profiles whose guide says a negative does nothing: the composer hides its negative writer there.
       const noNegative = (await profiles(req))
         .filter((profile) => {
@@ -256,10 +249,10 @@ export function registerAssistantRoutes(
     const context = await ready(req, res);
     if (!context || signal.aborted) return;
     const preset = String(req.body?.preset || defaultPreset);
-    if (preset === "spicy" && !allowed(req, "nsfwModels"))
+    if (preset === "spicy" && !allowed(req, "uncensoredModels"))
       return res
         .status(403)
-        .json({ ok: false, error: "Spicy needs NSFW Models for this account." });
+        .json({ ok: false, error: "Spicy needs Uncensored Models for this account." });
     const streaming =
       req.body?.stream === true || /text\/event-stream/i.test(String(req.headers.accept || ""));
     try {
@@ -269,8 +262,6 @@ export function registerAssistantRoutes(
       const examples = (await starred(req, context.profile)).examples || [];
       const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       if (streaming) {
-        // Before the first byte, so a refusal (Spicy without a model) is still a plain JSON error.
-        if (preset === "spicy") spicyModelOf(engine.settings());
         res.writeHead(200, {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-store",

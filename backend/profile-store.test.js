@@ -142,7 +142,7 @@ test("saving through the editor records versions, marks AI drafts until an edit 
     ],
   );
   assert.equal(store.approve("image-test", { by: "admin-1" }).aiDrafted, false);
-  editor.saveEditableProfile("image-test", profile("AI Name", { nsfw: true }), {
+  editor.saveEditableProfile("image-test", profile("AI Name", { uncensored: true }), {
     baseHash: drafted.hash,
     by: "assistant",
     origin: "ai",

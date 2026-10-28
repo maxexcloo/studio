@@ -21,7 +21,7 @@ const settingSections = {
   groups: {
     label: "Groups",
     description:
-      "Access groups choose each user’s local models, cloud models and NSFW access; administrators have every permission.",
+      "Access groups choose each user’s local models, cloud models and uncensored access; administrators have every permission.",
     icon: Shield,
     admin: true,
   },

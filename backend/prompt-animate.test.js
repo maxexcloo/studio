@@ -6,7 +6,7 @@ import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.
 const video = { id: "video:test", label: "Motion", kind: "video" };
 const calls = [];
 const engine = {
-  settings: () => ({ model: "ai/text", spicyModel: "ai/spicy" }),
+  settings: () => ({ model: "ai/text" }),
   chat: async (body) => {
     calls.push(body);
     body.onThinking?.("A push-in suits a bird.");
@@ -19,13 +19,16 @@ const issue = (features, writing) =>
   writingIssue(writingRequest({ kind: "animate", ...writing }), { engine, account: user(features) })
     ?.status;
 
-test("Animate is admitted only for known themes, with Spicy behind NSFW Models", () => {
+test("Animate is admitted only for known themes, with Spicy behind Uncensored Models", () => {
   assert.equal(issue({ promptAssistant: true }, { theme: "cinematic" }), undefined);
   assert.equal(issue({}, { theme: "cinematic" }), 403);
   assert.equal(issue({ promptAssistant: true }, { theme: "dance" }), 400);
   assert.equal(issue({ promptAssistant: true }, { theme: "custom" }), 400);
   assert.equal(issue({ promptAssistant: true }, { theme: "spicy" }), 403);
-  assert.equal(issue({ promptAssistant: true, nsfwModels: true }, { theme: "spicy" }), undefined);
+  assert.equal(
+    issue({ promptAssistant: true, uncensoredModels: true }, { theme: "spicy" }),
+    undefined,
+  );
   // A client can't pass off its own text as the written prompt.
   assert.equal(
     writingRequest({ kind: "animate", theme: "living", prompt: "x", thinking: "y" }).prompt,
@@ -72,7 +75,7 @@ test("the writing stage streams the motion prompt and its thinking with room to 
     guide: null,
     writing: { theme: "spicy" },
   });
-  assert.equal(spicy.model, "ai/spicy");
+  assert.equal(spicy.model, "ai/text");
   await assert.rejects(
     writeAnimatePrompt({
       engine: { ...engine, chat: async () => ({ text: "", thinking: "Out of tokens." }) },

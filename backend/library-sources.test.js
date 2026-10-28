@@ -4,7 +4,7 @@ import test from "node:test";
 import { versionResource } from "./civitai-import.js";
 import {
   civitaiAvailability,
-  civitaiNsfw,
+  civitaiUncensored,
   detectLink,
   hfFolder,
   parseHfLink,
@@ -104,7 +104,12 @@ test("a Civitai LoRA link resolves its version and the catalogue entry, and sugg
     civitaiRed: "https://civitai.red/models/9?modelVersionId=20",
   });
   assert.deepEqual(
-    [resolved.entry.title, resolved.entry.version, resolved.entry.baseModel, resolved.entry.nsfw],
+    [
+      resolved.entry.title,
+      resolved.entry.version,
+      resolved.entry.baseModel,
+      resolved.entry.uncensored,
+    ],
     ["Watercolour Style", "V2", "Krea 2", false],
   );
   assert.deepEqual(resolved.entry.triggers, ["wtrclr", "soft wash"]);
@@ -162,13 +167,13 @@ test("a Civitai LoRA link resolves its version and the catalogue entry, and sugg
   );
 });
 
-test("NSFW is never assumed safe", () => {
-  assert.equal(civitaiNsfw({ nsfw: false }), false);
-  assert.equal(civitaiNsfw({ nsfw: true }), true);
-  assert.equal(civitaiNsfw({ nsfwLevel: 1 }), false);
-  assert.equal(civitaiNsfw({ nsfwLevel: 2 }), false);
-  assert.equal(civitaiNsfw({ nsfwLevel: 4 }), true);
-  assert.equal(civitaiNsfw({}), true);
+test("a Civitai model counts as uncensored unless it says otherwise", () => {
+  assert.equal(civitaiUncensored({ nsfw: false }), false);
+  assert.equal(civitaiUncensored({ nsfw: true }), true);
+  assert.equal(civitaiUncensored({ nsfwLevel: 1 }), false);
+  assert.equal(civitaiUncensored({ nsfwLevel: 2 }), false);
+  assert.equal(civitaiUncensored({ nsfwLevel: 4 }), true);
+  assert.equal(civitaiUncensored({}), true);
   assert.equal(plainDescription("<p>A &amp; B</p><p>C</p>"), "A & B\nC");
 });
 
@@ -247,7 +252,7 @@ test("a Hugging Face file link imports that file; a repository lists its model f
   );
   const entry = single.entryFor(resource);
   assert.deepEqual(
-    [entry.baseModel, entry.nsfw, entry.sha256],
+    [entry.baseModel, entry.uncensored, entry.sha256],
     ["black-forest-labs/FLUX.1-dev", true, "d".repeat(64)],
   );
   assert.deepEqual(entry.triggers, ["ohwx style", "film"]);

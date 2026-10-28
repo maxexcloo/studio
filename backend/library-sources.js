@@ -34,8 +34,8 @@ export function plainDescription(html, limit = 10000) {
     .slice(0, limit);
 }
 
-/** Civitai's NSFW marker, or true when it says nothing (never assumed safe). */
-export function civitaiNsfw(model = {}) {
+/** Whether Civitai marks a model NSFW, or true when it says nothing (never assumed safe). */
+export function civitaiUncensored(model = {}) {
   if (typeof model?.nsfw === "boolean" && model.nsfw) return true;
   if (Number.isFinite(model?.nsfwLevel)) return (model.nsfwLevel & ~3) !== 0;
   if (typeof model?.nsfw === "boolean") return model.nsfw;
@@ -124,7 +124,7 @@ export async function resolveCivitaiModel(
     version.settings && typeof version.settings === "object"
       ? Number(version.settings.strength)
       : NaN;
-  const nsfw = civitaiNsfw(model);
+  const uncensored = civitaiUncensored(model);
   const entry =
     folder === "loras" && resource.file
       ? {
@@ -139,7 +139,7 @@ export async function resolveCivitaiModel(
             .filter(Boolean)
             .join("\n\n"),
           links: civitaiLinks(id, version.id),
-          nsfw,
+          uncensored,
           ...(resource.sha256 ? { sha256: resource.sha256 } : {}),
           ...(resource.bytes ? { bytes: resource.bytes } : {}),
           source: {
@@ -155,7 +155,7 @@ export async function resolveCivitaiModel(
     version: resource.version,
     baseModel: resource.baseModel,
     type: resource.type,
-    nsfw,
+    uncensored,
     links: civitaiLinks(id, version.id),
     // A checkpoint's page, for its drafted profile and guide (profile-drafts.js).
     sourceText:
@@ -310,7 +310,7 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
         : "Choose a SafeTensors or GGUF file.",
     );
   if (!files.length) throw new Error("This repository has no SafeTensors or GGUF files.");
-  const nsfw = tags.includes("not-for-all-audiences") ? true : null;
+  const uncensored = tags.includes("not-for-all-audiences") ? true : null;
   const repoUrl = `https://huggingface.co/${owner}/${repo}`;
   const resources = files.map((item) => {
     const file = path.posix.basename(item.rfilename);
@@ -391,7 +391,7 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
     version: metadata.sha.slice(0, 7),
     baseModel,
     type: resources.length === 1 ? resources[0].role : "repository",
-    nsfw,
+    uncensored,
     sourceText: [
       typeof card.description === "string" ? plainDescription(card.description) : "",
       baseModel ? `Base model: ${baseModel}` : "",
@@ -417,7 +417,7 @@ export async function resolveHuggingFace(value, { request = hfFetch, gguf = fals
               typeof card.description === "string" ? card.description : "",
             ),
             links: { hf: resource.want.source.url },
-            nsfw: nsfw ?? true,
+            uncensored: uncensored ?? true,
             ...(resource.want.sha256 ? { sha256: resource.want.sha256 } : {}),
             ...(resource.want.bytes ? { bytes: resource.want.bytes } : {}),
             source: {

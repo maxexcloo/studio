@@ -162,7 +162,9 @@ function combinedText(id, name, backend, members) {
     name,
     kind: first.kind,
     family: first.family,
-    ...(Object.values(blocks).some((block) => block.nsfw === true) ? { nsfw: true } : {}),
+    ...(Object.values(blocks).some((block) => block.uncensored === true)
+      ? { uncensored: true }
+      : {}),
     ...(first.prompting ? { prompting: first.prompting } : {}),
   };
   const backends = {};

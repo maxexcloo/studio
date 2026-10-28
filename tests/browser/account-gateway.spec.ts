@@ -174,7 +174,7 @@ test("Sign-in gate keeps account data behind authentication", async ({ page }) =
   await expect(page.getByRole("link", { name: "Images", exact: true })).toHaveCount(0);
 });
 
-test("Administrators save and verify per-user cloud and NSFW access through assigned groups", async ({
+test("Administrators save and verify per-user cloud and uncensored access through assigned groups", async ({
   page,
 }) => {
   const state = await accountFixture(page);
@@ -184,7 +184,7 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
   await page.getByRole("textbox", { name: "Group Name", exact: true }).fill("Member Cloud");
   await page.getByRole("textbox", { name: "Group ID", exact: true }).fill("member-cloud");
   await page.getByRole("checkbox", { name: "Cloud Models", exact: true }).check();
-  await page.getByRole("checkbox", { name: "NSFW Models", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Uncensored Models", exact: true }).check();
   await page.getByRole("checkbox", { name: "Image Generation", exact: true }).check();
   await page.getByRole("button", { name: "Save Access Group", exact: true }).click();
   await expect
@@ -201,7 +201,7 @@ test("Administrators save and verify per-user cloud and NSFW access through assi
     .click();
   await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
   await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
-  await expect(member.getByText("NSFW Models On", { exact: true })).toBeVisible();
+  await expect(member.getByText("Uncensored Models On", { exact: true })).toBeVisible();
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();

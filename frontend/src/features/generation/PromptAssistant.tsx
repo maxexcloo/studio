@@ -14,7 +14,7 @@ interface AssistantStatus {
   vision?: boolean;
   loras?: boolean;
   noNegative?: string[];
-  /** A Spicy model is configured and the account holds the NSFW grant. */
+  /** The account holds Uncensored Models. */
   spicy?: boolean;
 }
 interface Suggestion {
