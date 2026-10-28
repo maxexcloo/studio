@@ -19,7 +19,8 @@ function fixture(
   const calls: Message[][] = [];
   let clock = 0;
   const model: TasteWriter<ReturnType<typeof userContent>> = {
-    settings: () => ({ model: "text" }),
+    settings: () => ({}),
+    model: async () => "text",
     chat: async ({ messages }) => {
       const seen = messages.map(({ role, content }) =>
         typeof content === "string"

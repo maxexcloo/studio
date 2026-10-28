@@ -12,7 +12,7 @@ import { createChatAssistantMemory } from "./mcp-assistant.js";
 const gateway = {
   STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid:4000",
   STUDIO_PROMPT_WRITER_KEY: "fixture-writer-key",
-  STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
 };
 const profile = {
   id: "fixture-image",
@@ -79,7 +79,7 @@ async function fixture(t, environment = gateway) {
               ok: true,
               prompt: `A ${req.body.preset} cabin at dusk.`,
               preset: req.body.preset,
-              model: "ai/text-quick",
+              model: "cloud/text",
               source: "assistant",
               referencesRead: false,
             },
@@ -202,7 +202,7 @@ test("the tools call the shared engine with the account credential, and Generate
   });
   assert.deepEqual(f.submitted[0].assistant, {
     preset: "cinematic",
-    model: "ai/text-quick",
+    model: "cloud/text",
     source: "chat",
     lorasSuggested: ["glow.safetensors"],
   });
@@ -237,13 +237,13 @@ test("what the chat wrote is kept on disk, so a Generate after a restart still r
   const file = path.join(dataDir, "mcp-assistant.json");
   let clock = 1000;
   const before = createChatAssistantMemory({ now: () => clock, file });
-  before.rewrote("owner-a", "A cabin at dusk.", { preset: "cinematic", model: "ai/text-quick" });
+  before.rewrote("owner-a", "A cabin at dusk.", { preset: "cinematic", model: "cloud/text" });
   before.suggested("owner-a", ["glow.safetensors"]);
   assert.equal((fs.statSync(file).mode & 0o777).toString(8), "600");
   const after = createChatAssistantMemory({ now: () => clock, file });
   assert.deepEqual(after.record("owner-a", ["a cabin at dusk."], [{ name: "glow.safetensors" }]), {
     preset: "cinematic",
-    model: "ai/text-quick",
+    model: "cloud/text",
     source: "chat",
     lorasSuggested: ["glow.safetensors"],
   });

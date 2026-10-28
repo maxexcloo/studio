@@ -90,7 +90,7 @@ export interface DreamAccess {
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply and its reasoning apart. */
 interface DreamWriter {
-  settings(): { model: string };
+  model(call: string): Promise<string>;
   chat(request: {
     model: string;
     messages: { role: "system" | "user"; content: string }[];
@@ -415,7 +415,7 @@ export function createDream(options: {
       .slice(0, 5)
       .map((item) => clean(item.prompt, 300));
     const summary = options.taste.read(ownerId).summary;
-    const { model } = writer.settings();
+    const model = await writer.model("dream");
     const guide = `Prompting guide: ${JSON.stringify(options.guide(profile) ?? null)}`;
     const messages: { role: "system" | "user"; content: string }[] = reword
       ? [

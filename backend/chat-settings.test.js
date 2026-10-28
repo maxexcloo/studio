@@ -15,21 +15,21 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
   const environment = {
     STUDIO_CHAT_GATEWAY_URL: "https://gateway.invalid/openai/v1",
     STUDIO_CHAT_GATEWAY_KEY: "chat-fixture",
-    STUDIO_CHAT_GATEWAY_MODELS: "ai/*,deepseek/specific",
+    STUDIO_CHAT_GATEWAY_MODELS: "local/*,deepseek/specific",
   };
   const settings = chatSettings(environment);
   assert.equal(settings.endpoint, "https://gateway.invalid/openai/v1/chat/completions");
   assert.equal(settings.root, "https://gateway.invalid/openai");
   for (const [id, allowed] of [
-    ["ai/text", true],
+    ["local/text", true],
     ["deepseek/specific", true],
-    ["other/ai/text", false],
+    ["other/local/text", false],
     ["deepseek/specific-extra", false],
   ])
     assert.equal(chatModelAllowed(id, settings.patterns), allowed);
   for (const name of Object.keys(environment))
     assert.throws(() => chatSettings({ ...environment, [name]: "" }), new RegExp(name));
-  for (const patterns of [", ,", "ai/*/text", "ai/**"])
+  for (const patterns of [", ,", "local/*/text", "local/**"])
     assert.throws(
       () => chatSettings({ ...environment, STUDIO_CHAT_GATEWAY_MODELS: patterns }),
       /STUDIO_CHAT_GATEWAY_MODELS/,

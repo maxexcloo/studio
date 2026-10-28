@@ -74,7 +74,7 @@ test("without STUDIO_WORKERS, the image and video workloads give one worker per 
       }),
       "comfyui-video": workload("video", "http://comfyui-video:8188/", { worker: "video" }),
       "comfyui-video-tp2": workload("video", "http://comfyui-video:8188", { gpus: 2 }),
-      "text-qwen": workload("text", "http://qwen:8000"),
+      "text-qwen": { ...workload("text", "http://qwen:8000"), model: "local/qwen" },
     }),
   };
   const { variable, workers: list } = deploymentWorkers(environment);

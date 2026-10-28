@@ -407,7 +407,7 @@ test("the writing stage streams into the item, then queues the written prompt", 
     return {
       prompt: "The camera pushes in.",
       thinking: "A slow push-in suits it.",
-      model: "ai/text",
+      model: "local/text",
     };
   });
   try {
@@ -431,7 +431,7 @@ test("the writing stage streams into the item, then queues the written prompt", 
     assert.deepEqual(written.input.writing, {
       ...writing,
       prompt: "The camera pushes in.",
-      model: "ai/text",
+      model: "local/text",
       thinking: "A slow push-in suits it.",
     });
     assert.equal(written.progress, undefined);
@@ -448,7 +448,7 @@ test("at most two prompts are written at once; the next waits in order", async (
     const step = deferred();
     steps.set(job.id, step);
     await step.promise;
-    return { prompt: "Written.", thinking: "", model: "ai/text" };
+    return { prompt: "Written.", thinking: "", model: "local/text" };
   });
   try {
     const session = store.createSession("alice");

@@ -53,7 +53,7 @@ import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
-import { createServicesObserver, createTextVision, parkedWorkers } from "./runtime/services.ts";
+import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library-routes.js";
@@ -366,7 +366,10 @@ for (const [name, migrate] of [
 }
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
 const runtime = loadRuntime(process.env, { dataDir });
+// The local text route while a local text workload runs; without a runtime, text takes the cloud route.
+const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
 const mcp = registerMcpRoutes(app, {
+  localText,
   dataDir,
   runtime: runtime?.controller,
   gatewayAdminTools,
@@ -1325,8 +1328,7 @@ const assistantGuide = (profile) => {
   }
 };
 const assistantEngine = registerAssistantRoutes(app, {
-  // Without a runtime Studio can't see which text model runs, so it counts as text-only.
-  ...(runtime && { supportsVision: createTextVision({ controller: runtime.controller }) }),
+  localText,
   profiles: assistantProfiles,
   guide: assistantGuide,
   loras: assistantLoras,
@@ -1915,7 +1917,7 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
-  writer: createPromptWriter(),
+  writer: createPromptWriter(process.env, { localText }),
   account: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     return ownerId && !account?.authenticated ? null : account;

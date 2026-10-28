@@ -49,41 +49,32 @@ function directAddress(value: string, path: string) {
 }
 
 /**
- * Whether the running text model reads images: every text workload scaled up must say so on its
- * `/props` (Radiance and llama.cpp report `modalities.vision` there), and at least one must run.
- * Anything unclear counts as text-only. The answer is cached briefly, so a switch shows soon.
+ * The local text route while a text workload is scaled up: the Bifrost prefix of the first one's
+ * `model` (`local/` from `local/gemma`), and whether it reads images (every running one sets
+ * `vision: true`). Null when none runs or the cluster can't be asked. Cached briefly, so a switch
+ * shows soon.
  */
-export function createTextVision({
+export function createLocalText({
   controller,
-  environment = process.env,
-  fetchImpl = fetch,
   now = Date.now,
   cacheMs = 30_000,
-}: Pick<Options, "environment" | "fetchImpl" | "now" | "cacheMs"> & {
-  controller: RuntimeController;
-}) {
-  let cached: { until: number; result: Promise<boolean> } | undefined;
-  const reads = async ({ url, apiKeyEnv }: { url: string; apiKeyEnv?: string }) => {
-    const response = await fetchImpl(directAddress(url, "props")!, {
-      headers: apiKeyEnv ? { Authorization: `Bearer ${environment[apiKeyEnv]}` } : {},
-      redirect: "error",
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      return false;
-    }
-    return (await response.json())?.modalities?.vision === true;
-  };
+}: Pick<Options, "now" | "cacheMs"> & { controller: RuntimeController }) {
+  let cached:
+    | { until: number; result: Promise<{ prefix: string; vision: boolean } | null> }
+    | undefined;
   return () => {
     if (cached && cached.until > now()) return cached.result;
     const result = controller
       .running("text")
-      .then(
-        async (running) =>
-          running.length > 0 && (await Promise.all(running.map(reads))).every(Boolean),
+      .then(([first, ...rest]) =>
+        first
+          ? {
+              prefix: first.model!.slice(0, first.model!.lastIndexOf("/") + 1),
+              vision: [first, ...rest].every((workload) => workload.vision === true),
+            }
+          : null,
       )
-      .catch(() => false);
+      .catch(() => null);
     cached = { until: now() + cacheMs, result };
     return result;
   };

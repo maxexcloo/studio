@@ -20,8 +20,10 @@ export interface Workload {
   gpus: number;
   url: string;
   apiKeyEnv?: string;
-  /** Text: the Chat gateway model ID this deployment serves. */
+  /** Text: the Bifrost model ID this deployment serves; its prefix (`local/`) is the local route. */
   model?: string;
+  /** Text: whether it reads images. */
+  vision?: boolean;
   /** A media workload's worker id and what it runs (workers.js), for workers derived from workloads. */
   worker?: string;
   capabilities?: string[];
