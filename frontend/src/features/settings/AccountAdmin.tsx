@@ -28,6 +28,7 @@ import { LoadingState } from "../../ui/LoadingState";
 import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
+import { isCloudProfile } from "../generation/payload";
 import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   cloudModels: "Cloud Models",
@@ -89,9 +90,7 @@ function GroupEditor({
   const ids = [...new Set([...admin.availableProfiles, ...form.values.generationProfiles])].filter(
     (id) => {
       const profile = profiles.find((profile) => profile.id === id);
-      return (
-        profile?.provider !== "cliproxyapi" && profile?.family !== "grok" && !/^grok/i.test(id)
-      );
+      return !isCloudProfile({ id, family: profile?.family || "", provider: profile?.provider });
     },
   );
   return (

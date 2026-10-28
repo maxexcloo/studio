@@ -22,7 +22,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { api, post } from "../../api";
 import { useGeneration } from "./GenerationProvider";
-import type { GenerationInput } from "../../types";
+import type { GenerationInput, Profile } from "../../types";
 import { isProfile } from "./payload";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "./chip";
@@ -40,7 +40,7 @@ import {
   type SavedSort,
 } from "./Picker";
 import classes from "./LoraPicker.module.css";
-interface LoraInfo {
+export interface LoraInfo {
   title?: string;
   sourceUrl?: string;
   families?: string[];
@@ -71,10 +71,16 @@ type LoraTab = "recommended" | "favourites" | "all" | "stacks";
 /** All's filter for LoRAs without a model family. */
 const unclassified = "unclassified";
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
-const defaultStrength = (range: LoraInfo["strengthRange"]) =>
+export const defaultStrength = (range: LoraInfo["strengthRange"]) =>
   range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1);
-const loraTitle = (info: LoraInfo | undefined, file: string) =>
+export const loraTitle = (info: LoraInfo | undefined, file: string) =>
   info?.title || file.replace(/\.[^.]+$/, "");
+/** The profile's LoRAs that suit its family; one without a family listed may suit any. */
+export const compatibleLoras = (profile: Profile | undefined, metadata: Record<string, LoraInfo>) =>
+  (profile?.options?.loras || []).filter((file) => {
+    const families = metadata[file]?.families || [];
+    return !families.length || families.includes(profile!.family);
+  });
 
 export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
@@ -236,9 +242,7 @@ function LoraControls({
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];
   const available = profile?.options?.loras || [];
-  const compatible = available.filter(
-    (file) => !familiesOf(file).length || familiesOf(file).includes(family),
-  );
+  const compatible = compatibleLoras(profile, metadata);
   const favourites = new Set(library.data?.library.favorites || []);
   const tab = picker.tab;
   const listed =
