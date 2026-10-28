@@ -4,7 +4,7 @@ import { dataDir } from "./gallery-store.js";
 import {
   families,
   familyFromName,
-  quantFromHeader,
+  quantFromName,
   refinedFamily,
   variantFor,
 } from "./family-catalog.js";
@@ -141,10 +141,10 @@ export function classifyModel(source, name) {
   const base = String(name).split(/[\\/]/).pop() || "";
   const bundled = source === "checkpoint" ? assumedBundle : null;
   // A quantized format rides along whatever family the file is: it decides the loader, not the settings.
-  const quant = quantFromHeader(null, name);
+  const quant = quantFromName(name);
   const finish = (familyId, via, variantId = "") => {
     // Families the name narrows (Wan 2.1 and 2.2 14B, HunyuanVideo 1.5 T2V and I2V); a choice stands as made.
-    const id = via === "choice" ? familyId || "" : refinedFamily(familyId || "", base, false);
+    const id = via === "choice" ? familyId || "" : refinedFamily(familyId || "", base);
     const family = families[id];
     const variant = family
       ? (variantId && family.variants.find((item) => item.id === variantId)) || variantFor(id, base)
