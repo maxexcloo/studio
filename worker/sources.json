@@ -32,7 +32,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-Manager",
-    "revision": "2bc8143fa5424d5d84c5579ecfbb5cc9268ded2f",
+    "revision": "00430d61e8f7d34680f424ef49decd008481823d",
     "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git"
   },
   {
