@@ -40,6 +40,8 @@ export interface ChatMessage {
   draft?: ChatDraft;
   jobId?: string;
   actionError?: string;
+  /** Why a failed reply stopped, as Studio said it at the time. */
+  error?: string;
   revision?: ChatRevision;
   modelId?: string;
   actualModelId?: string;

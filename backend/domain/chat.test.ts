@@ -338,6 +338,7 @@ test("truncated gateway response keeps partial text failed and never submits an 
   const message = fixture.service.messages("alice", fixture.session.id)[1];
   assert.equal(message.content, "Partial answer");
   assert.equal(message.status, "failed");
+  assert.match(message.error || "", /disconnected/);
   assert.equal(fixture.admissions.length, 0);
   fixture.db.close();
 });
