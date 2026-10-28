@@ -109,17 +109,23 @@ primary component reference and verify APIs against the installed version.
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
   generation-input action and icon-only Generate. Expanded controls are one prompt
-  box with a history action inside it and a row of compact chips: Profile,
-  Reference Role (once references are placed), References, LoRAs, Aspect, Count,
-  a set Seed (clearable), Expert settings, Compare and Presets, then
-  Image/Video and Generate. References, LoRAs and Presets share one picker
+  box with a history action inside it, the negative prompt under it when the
+  profile takes one, and a row of compact chips: Profile, Backend (when the
+  profile has several), Reference Role (once references are placed), References,
+  LoRAs, Aspect, Count, a set Seed (clearable), Expert settings, Compare and
+  Presets, then Image/Video and Generate. Recent Prompts, References, LoRAs,
+  Expert settings and Presets share one popup (`ChipPopup`): a title row with its
+  few controls (Clear References sits there), then the content; choices apply at
+  once and closing the popup is the only dismissal, with no Use or Done action.
+  Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
+  popover never opens a second level on phones. References, LoRAs and Presets share one picker
   (`Picker.tsx`): tabs, inline search and a filter toggle on one row; a
   selected tile fades with a check and a second click removes it; saved stacks
   and presets sort, rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
-  collapse controls. Phones open a full-height Drawer upward with a short
-  transition and the standard accessible close action.
+  collapse controls. Phones open a full-height Drawer titled Generate upward with
+  a short transition and the standard accessible close action.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
@@ -146,8 +152,11 @@ primary component reference and verify APIs against the installed version.
   while leaving the original intact. Keep card forms independent of the shared
   gallery draft. Do not bypass the assistant with a direct queue request.
 - Profile selection is one searchable Mantine selector grouped by readable family
-  names such as Flux 2. Each option is a complete profile; preserve exact profile IDs.
-  LoRAs follow Family → catalogue Type; unknown types remain unclassified.
+  names such as Flux 2. Each option is a complete profile, titled with its name and
+  its description beneath; preserve exact profile IDs. The LoRA picker's tabs are
+  Recommended (the default: LoRAs for the profile's family), Favourites (this
+  family's), All (every LoRA, with Unclassified, those without a family, as a
+  filter) and saved Stacks; type filters follow the catalogue Type.
 - References share a Gallery & Upload picker. Gallery drag-and-drop passes an
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.
@@ -156,8 +165,7 @@ primary component reference and verify APIs against the installed version.
   into one picker choice, filling their declared capacity without a global reference
   limit. A custom workflow's filename mapping accepts one image; use separate mapped
   inputs for multiple references. Display numbered thumbnails and profile roles,
-  never filenames; submission and Chat use owned asset IDs. Phones show the shared filtered gallery
-  inside generation controls, desktop uses an anchored popover.
+  never filenames; submission and Chat use owned asset IDs.
 - Profile and size controls share the gallery/card implementation. The prompt
   comes first; `GenerationInputControls` owns the wrapping chip rail in both
   gallery and timeline editors. Phones keep the full-height editor, giving the
@@ -166,7 +174,9 @@ primary component reference and verify APIs against the installed version.
   a vertical list of profile-provided aspect presets with their resolution,
   alongside constrained custom dimensions. Selected
   LoRAs retain enable, weight and drag/keyboard ordering controls even when
-  catalogue filters hide them; suggested strength ranges remain visible hints.
+  catalogue filters hide them. A catalogue strength range bounds the slider and
+  its default (else 1 within the range) starts a new LoRA; the range stays a
+  visible hint.
   Saved LoRA stacks reuse the account-owned library and preserve exact family
   keys, order, strengths and disabled entries; legacy profile groups remain explicit.
   Trigger words use copy controls and source links use the published catalogue URL.

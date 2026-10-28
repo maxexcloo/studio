@@ -6,7 +6,6 @@ import {
   Chip,
   Group,
   NumberInput,
-  Popover,
   ScrollArea,
   Slider,
   Stack,
@@ -26,10 +25,10 @@ import { useGeneration } from "./GenerationProvider";
 import type { GenerationInput } from "../../types";
 import { isProfile } from "./payload";
 import { usePhone } from "../../ui/usePhone";
-import { chipProps, escapePanel } from "./chip";
+import { chipProps } from "./chip";
 import {
+  ChipPopup,
   ChipThumbnails,
-  PanelHeader,
   PickerFooter,
   PickerGrid,
   PickerHeader,
@@ -66,8 +65,14 @@ const typeNames: Record<string, string> = {
   style: "Style",
   character: "Character",
   concept: "Concept",
-  unclassified: "Unclassified",
 };
+/** Recommended LoRAs match the profile's family; Favourites are this family's; All lists every one. */
+type LoraTab = "recommended" | "favourites" | "all" | "stacks";
+/** All's filter for LoRAs without a model family. */
+const unclassified = "unclassified";
+/** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
+const defaultStrength = (range: LoraInfo["strengthRange"]) =>
+  range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1);
 const loraTitle = (info: LoraInfo | undefined, file: string) =>
   info?.title || file.replace(/\.[^.]+$/, "");
 
@@ -75,7 +80,7 @@ export function useLoraPicker() {
   const [opened, setOpened] = useState(false);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<"loras" | "stacks">("loras");
+  const [tab, setTab] = useState<LoraTab>("recommended");
   const [sort, setSort] = useState<SavedSort>("name-asc");
   const controlsId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -113,38 +118,14 @@ interface LoraPickerProps {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
-  inline?: boolean;
 }
-export function LoraPicker({ value, onChange, picker, inline = false }: LoraPickerProps) {
+export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
   const context = useGeneration();
   const input = value || context.input;
-  const phone = usePhone();
   // The picker's data loads with the chip, so its first frame is final.
   const info = useQuery(loraInfoQuery);
   useQuery(loraLibraryQuery);
   const previews = useQuery(loraPreviewsQuery);
-  const close = () => picker.setOpened(false);
-  const content = (
-    <Stack
-      role="region"
-      id={picker.controlsId}
-      ref={picker.controls}
-      aria-label="LoRA Controls"
-      data-composer-layer
-      gap="sm"
-      flex={inline ? 1 : undefined}
-      mih={0}
-    >
-      {inline && <PanelHeader title="LoRAs" onBack={close} />}
-      <LoraControls
-        value={value}
-        onChange={onChange}
-        picker={picker}
-        phone={inline}
-        onDone={inline ? close : undefined}
-      />
-    </Stack>
-  );
   // Warms the preview images on intent, so the grid paints them on open.
   const warm = () => {
     for (const url of Object.values(previews.data?.previews || {}).slice(0, 40))
@@ -177,25 +158,26 @@ export function LoraPicker({ value, onChange, picker, inline = false }: LoraPick
       )}
     </Button>
   );
-  if (inline) return content;
-  // Phones show the controls inline in place of the form (see GenerationEditor).
-  if (phone) return trigger;
   return (
-    <Popover
-      opened={picker.opened}
-      onChange={picker.setOpened}
+    <ChipPopup
+      title="LoRAs"
       position="top-end"
-      width="min(56rem, calc(100vw - 2rem))"
-      trapFocus
-      shadow="md"
-      returnFocus
-      closeOnEscape={false}
+      width="min(46rem, calc(100vw - 2rem))"
+      opened={picker.opened}
+      onOpenedChange={picker.setOpened}
+      target={trigger}
     >
-      <Popover.Target>{trigger}</Popover.Target>
-      <Popover.Dropdown data-composer-layer onKeyDown={(event) => escapePanel(event, close)}>
-        {content}
-      </Popover.Dropdown>
-    </Popover>
+      <Stack
+        role="region"
+        id={picker.controlsId}
+        ref={picker.controls}
+        aria-label="LoRA Controls"
+        gap="sm"
+        mih={0}
+      >
+        <LoraControls value={value} onChange={onChange} picker={picker} />
+      </Stack>
+    </ChipPopup>
   );
 }
 
@@ -230,15 +212,12 @@ function LoraControls({
   value,
   onChange,
   picker,
-  phone = false,
-  onDone,
 }: {
   value?: GenerationInput;
   onChange?: (input: GenerationInput) => void;
   picker: LoraPickerState;
-  phone?: boolean;
-  onDone?: () => void;
 }) {
+  const phone = usePhone();
   const context = useGeneration();
   const input = value || context.input;
   const profile = value
@@ -254,20 +233,29 @@ function LoraControls({
   const family = profile?.family || "";
   const stacks = useLoraStacks(family, profile?.id || "");
   const title = (file: string) => loraTitle(metadata[file], file);
-  const typeOf = (file: string) => metadata[file]?.type || "unclassified";
-  const compatible = (profile?.options?.loras || []).filter(
-    (file) => !metadata[file]?.families?.length || metadata[file].families!.includes(family),
+  const typeOf = (file: string) => metadata[file]?.type || "";
+  const familiesOf = (file: string) => metadata[file]?.families || [];
+  const available = profile?.options?.loras || [];
+  const compatible = available.filter(
+    (file) => !familiesOf(file).length || familiesOf(file).includes(family),
   );
-  const types = [...new Set(compatible.map(typeOf))].sort();
   const favourites = new Set(library.data?.library.favorites || []);
-  const filter =
-    picker.filter === "favourites" || types.includes(picker.filter) ? picker.filter : "all";
+  const tab = picker.tab;
+  const listed =
+    tab === "recommended"
+      ? available.filter((file) => familiesOf(file).includes(family))
+      : tab === "favourites"
+        ? compatible.filter((file) => favourites.has(file))
+        : available;
+  const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
+  const filters = [...(tab === "all" ? [unclassified] : []), ...types];
+  const filter = filters.includes(picker.filter) ? picker.filter : "all";
   const terms = picker.query.trim().toLowerCase();
-  const shown = compatible
+  const shown = listed
     .filter(
       (file) =>
         (filter === "all" ||
-          (filter === "favourites" ? favourites.has(file) : typeOf(file) === filter)) &&
+          (filter === unclassified ? !familiesOf(file).length : typeOf(file) === filter)) &&
         (!terms ||
           [title(file), file, ...(metadata[file]?.triggers || [])]
             .join(" ")
@@ -287,18 +275,21 @@ function LoraControls({
             ...input.loras,
             {
               name: file,
-              strength: metadata[file]?.strengthRange?.default ?? 1,
+              strength: defaultStrength(metadata[file]?.strengthRange),
               enabled: true,
               triggers: true,
             },
           ],
     );
   const enabledCount = input.loras.filter((lora) => lora.enabled !== false).length;
-  const empty = !compatible.length
-    ? "No LoRAs"
-    : filter === "favourites" && !favourites.size
-      ? "No Favourites"
-      : "No Matching LoRAs";
+  const empty =
+    terms || filter !== "all"
+      ? "No Matching LoRAs"
+      : tab === "recommended"
+        ? "No Recommended LoRAs"
+        : tab === "favourites"
+          ? "No Favourites"
+          : "No LoRAs";
   const choices =
     picker.tab === "stacks" ? (
       <SavedList
@@ -318,13 +309,17 @@ function LoraControls({
     ) : info.error ? (
       <Alert color="red">{info.error.message}</Alert>
     ) : shown.length ? (
-      <PickerGrid label="Compatible LoRAs" rows={phone}>
+      <PickerGrid label="LoRA Choices" rows={phone}>
         {shown.map((file) => (
           <PickerTile
             key={file}
             label={title(file)}
             title={title(file)}
-            detail={typeNames[typeOf(file)] || typeOf(file)}
+            detail={
+              typeNames[typeOf(file)] ||
+              typeOf(file) ||
+              (familiesOf(file).length ? undefined : "Unclassified")
+            }
             image={previews.data?.previews[file]}
             placeholder={Layers}
             aspect={phone ? "1" : "4 / 3"}
@@ -359,7 +354,9 @@ function LoraControls({
       label="LoRAs"
       searched={picker.tab === "stacks" ? "Stacks" : "LoRAs"}
       tabs={[
-        { value: "loras", label: "LoRAs" },
+        { value: "recommended", label: "Recommended" },
+        { value: "favourites", label: "Favourites" },
+        { value: "all", label: "All" },
         { value: "stacks", label: "Stacks" },
       ]}
       tab={picker.tab}
@@ -372,13 +369,16 @@ function LoraControls({
       }
       filterCount={filter === "all" ? 0 : 1}
       filters={
-        picker.tab === "loras" && (
+        picker.tab !== "stacks" &&
+        filters.length > 0 && (
           <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
             <Group gap={6} role="radiogroup" aria-label="LoRA Filter">
               {[
-                ["all", "All"],
-                ["favourites", "Favourites"],
-                ...types.map((type) => [type, typeNames[type] || type]),
+                ["all", "Any"],
+                ...filters.map((value) => [
+                  value,
+                  value === unclassified ? "Unclassified" : typeNames[value] || value,
+                ]),
               ].map(([value, label]) => (
                 <Chip key={value} value={value} variant="light">
                   {label}
@@ -454,7 +454,6 @@ function LoraControls({
           Clear LoRAs
         </Button>
       }
-      done={onDone && { label: "Use LoRAs", onClick: onDone }}
     />
   );
   if (phone)
@@ -506,6 +505,9 @@ function StackEntry({
   const [dragging, setDragging] = useState<number | null>(null);
   const range = info?.strengthRange;
   const step = range?.step ?? 0.05;
+  // The catalogue's published range bounds the control; without one, 0 to 2.
+  const min = range?.min ?? 0;
+  const max = range?.max ?? 2;
   const strength = dragging ?? lora.strength;
   const enabled = lora.enabled !== false;
   return (
@@ -531,12 +533,12 @@ function StackEntry({
           <Slider
             flex={1}
             size="sm"
-            min={Math.min(0, range?.min ?? 0)}
-            max={Math.max(2, range?.max ?? 2)}
+            min={min}
+            max={max}
             step={step}
             value={strength}
             thumbLabel={`${title} Strength`}
-            marks={range ? [{ value: range.min }, { value: range.max }] : undefined}
+            marks={range?.default !== undefined ? [{ value: range.default }] : undefined}
             onChange={setDragging}
             onChangeEnd={(value) => {
               setDragging(null);
@@ -548,7 +550,9 @@ function StackEntry({
             w={76}
             aria-label={`${title} Strength`}
             value={strength}
-            clampBehavior="none"
+            min={min}
+            max={max}
+            clampBehavior="blur"
             hideControls
             step={step}
             onChange={(value) => {
@@ -560,6 +564,7 @@ function StackEntry({
         {range && (
           <Text size="xs" c="dimmed">
             Suggested {range.min} to {range.max}
+            {range.default !== undefined && `, default ${range.default}`}
           </Text>
         )}
         {!compatible && (

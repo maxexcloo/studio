@@ -451,18 +451,12 @@ test("Generation actions stay in place while the prompt grows and pickers open",
   await expect(generate).toBeInViewport();
   expect((await generate.boundingBox())!.y + initial!.height).toBeLessThanOrEqual(600);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  const useReferences = page.getByRole("button", { name: "Use References", exact: true });
   await page
     .getByRole("button", {
       name: "Use reference: A reference for the pinned generation actions",
       exact: true,
     })
     .click();
-  if (isMobile) {
-    await expect(useReferences).toBeInViewport();
-    const footer = await useReferences.boundingBox();
-    expect(footer!.y + footer!.height).toBeGreaterThan(page.viewportSize()!.height - 48);
-  } else await expect(useReferences).toHaveCount(0);
   await closeReferences(page);
   await generate.click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -634,9 +628,7 @@ test("Generation controls preserve the draft and return keyboard focus with redu
   await prompt.fill("Keep this direction, in soft daylight");
   await prompt.press("Escape");
   if (testInfo.project.use.isMobile)
-    await expect(
-      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
-    ).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
   const controls = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(controls).toBeFocused();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
@@ -696,15 +688,13 @@ test("Images and Videos retain independent prompts and expert settings", async (
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Image draft");
   const negative = page.getByRole("textbox", { name: "Negative Prompt", exact: true });
   const seed = page.getByRole("textbox", { name: "Seed", exact: true });
-  await withExpertSettings(page, async () => {
-    await negative.fill("Image exclusions");
-    await seed.fill("777");
-  });
+  await negative.fill("Image exclusions");
+  await withExpertSettings(page, () => seed.fill("777"));
+  // A set seed shows on the options bar.
+  await expect(page.getByRole("button", { name: "Clear Seed 777", exact: true })).toBeVisible();
   if (testInfo.project.use.isMobile) {
     await page.keyboard.press("Escape");
-    await expect(
-      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
-    ).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
   }
   await page.getByRole("link", { name: "Videos", exact: true }).first().click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Video draft");
@@ -713,15 +703,11 @@ test("Images and Videos retain independent prompts and expert settings", async (
     "Image draft",
   );
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await withExpertSettings(page, async () => {
-    await expect(negative).toHaveValue("Image exclusions");
-    await expect(seed).toHaveValue("777");
-  });
+  await expect(negative).toHaveValue("Image exclusions");
+  await withExpertSettings(page, () => expect(seed).toHaveValue("777"));
   if (testInfo.project.use.isMobile) {
     await page.keyboard.press("Escape");
-    await expect(
-      page.getByRole("dialog", { name: "Generation Controls", exact: true }),
-    ).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
   }
   await page.getByRole("link", { name: "Videos", exact: true }).first().click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(

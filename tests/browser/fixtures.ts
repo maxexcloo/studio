@@ -794,27 +794,23 @@ export async function chooseView(page: Page, list: string, view: string) {
     .click();
 }
 
-/** Runs `steps` with Expert Settings open: a popover on desktop, an inline panel on phones. */
+/** Closes a chip's popup with Escape, leaving the composer open. */
+export async function closePopup(page: Page, title: string) {
+  const popup = page.getByRole("dialog", { name: title, exact: true });
+  await popup.press("Escape");
+  await expect(popup).toBeHidden();
+}
+
+/** Runs `steps` with Expert Settings open. */
 export async function withExpertSettings(page: Page, steps: () => Promise<void>) {
   await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
   await steps();
-  const done = page.getByRole("button", { name: "Done", exact: true });
-  if (await done.isVisible()) await done.click();
-  else await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Expert Settings", exact: true })).toBeHidden();
+  await closePopup(page, "Expert Settings");
 }
 
-/** Phones confirm the reference sheet; desktop closes the popover with Escape, leaving the composer open. */
+/** Closes the References popup, leaving the composer open. */
 export async function closeReferences(page: Page) {
-  const done = page.getByRole("button", { name: "Use References", exact: true });
-  const references = page.getByRole("region", { name: "References", exact: true });
-  if (await done.isVisible()) await done.click();
-  else
-    await references
-      .getByRole("radiogroup", { name: "References View", exact: true })
-      .getByRole("radio", { checked: true })
-      .press("Escape");
-  await expect(references).toBeHidden();
+  await closePopup(page, "References");
 }
 
 /** Saves the draft as a named stack or preset from its picker's footer. */
@@ -831,12 +827,9 @@ export async function openPresets(page: Page) {
     await page.getByRole("button", { name: "Presets", exact: true }).click();
 }
 
-/** Closes the Presets picker: Done in the phone panel, its own chip on desktop (an outside click only dismisses). */
+/** Closes the Presets picker. */
 export async function closePresets(page: Page) {
-  const done = page.getByRole("button", { name: "Done", exact: true });
-  if (await done.isVisible()) await done.click();
-  else await page.getByRole("button", { name: "Presets", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Save Preset", exact: true })).toBeHidden();
+  await closePopup(page, "Presets");
 }
 
 /** Loads a saved stack or preset, confirming when it replaces what the draft has. */
@@ -865,12 +858,9 @@ export async function pickerTab(page: Page, picker: string, tab: string) {
     .click();
 }
 
-/** Closes the LoRA picker: Use LoRAs on phones, Escape in the desktop popover. */
+/** Closes the LoRA picker. */
 export async function closeLoras(page: Page) {
-  const use = page.getByRole("button", { name: "Use LoRAs", exact: true });
-  if (await use.isVisible()) await use.click();
-  else await page.keyboard.press("Escape");
-  await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeHidden();
+  await closePopup(page, "LoRAs");
 }
 
 /** A finished, unseen Dream result. */

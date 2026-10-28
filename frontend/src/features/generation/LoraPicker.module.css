@@ -1,9 +1,9 @@
-/* Desktop: the compatible LoRAs beside the current stack, at a fixed height so filtering never resizes the popover. */
+/* Desktop: the LoRA choices beside the current stack, at a fixed height so filtering never resizes the popover. */
 .panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22rem;
+  grid-template-columns: minmax(0, 1fr) 18rem;
   gap: var(--mantine-spacing-md);
-  height: min(34rem, 65dvh);
+  height: min(30rem, 60dvh);
 }
 
 .column {

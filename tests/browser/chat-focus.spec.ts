@@ -247,7 +247,7 @@ test("Desktop nested pickers retain gallery controls until keyboard focus leaves
   test.skip(Boolean(testInfo.project.use.isMobile), "Phone controls use a focus-trapped Drawer.");
   await fixtures(page);
   await create(page);
-  const controls = page.getByRole("region", { name: "Generation Controls", exact: true });
+  const controls = page.getByRole("region", { name: "Generate", exact: true });
   const profile = page.getByRole("combobox", { name: "Profile", exact: true });
   await profile.click();
   await page.getByRole("option", { name: "Image Fast", exact: true }).click();
