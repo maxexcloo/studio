@@ -10,7 +10,7 @@ import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { scryptAsync } from "./kdf.js";
 import {
   accountRoles,
-  builtInAccessProfiles,
+  builtInAccessProfile,
   effectiveAccountAccess,
   normaliseAccessProfile,
   validAccountKey,
@@ -138,15 +138,25 @@ export function listAccessProfiles() {
 }
 
 /**
- * Adds the built-in Administrator and User access profiles where no profile has their ID.
- * An existing profile with that ID is never changed.
+ * Adds the built-in User access profile where no profile has its ID; an existing one is never
+ * changed. Removes the Administrator group earlier versions added, unless it has members or is the
+ * default: administrators have full access by role.
  */
-export function ensureBuiltInAccessProfiles() {
+export function ensureBuiltInAccessProfile() {
   const store = readStore();
-  const missing = builtInAccessProfiles.filter((profile) => !store.profiles[profile.id]);
-  for (const profile of missing) store.profiles[profile.id] = structuredClone(profile);
-  if (missing.length) saveStore();
-  return missing.map((profile) => profile.id);
+  let changed = false;
+  if (
+    store.profiles.administrator &&
+    store.defaultAccessProfileId !== "administrator" &&
+    !store.accounts.some((account) => account.accessProfileId === "administrator")
+  ) {
+    delete store.profiles.administrator;
+    changed = true;
+  }
+  const added = !store.profiles[builtInAccessProfile.id];
+  if (added) store.profiles[builtInAccessProfile.id] = structuredClone(builtInAccessProfile);
+  if (added || changed) saveStore();
+  return added;
 }
 
 /** The access profile new ordinary accounts start with, or "" when each one waits for an administrator. */

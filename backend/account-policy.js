@@ -131,28 +131,19 @@ export function visibleGenerationProfiles(profiles, access) {
 }
 
 /**
- * The access profiles Studio adds when absent, so a default for new accounts is one choice
- * away. Administrator: everything. User: every local model except uncensored ones, no cloud
- * models, no LoRAs and no presets. Once added they are ordinary access profiles.
+ * The User access profile Studio adds when absent, so a default for new accounts is one choice
+ * away: every local model except uncensored ones, no cloud models, no LoRAs and no presets. Once
+ * added it is an ordinary access profile. Administrators have full access by role.
  */
-export const builtInAccessProfiles = Object.freeze([
-  {
-    id: "administrator",
-    name: "Administrator",
-    generationProfiles: [],
-    allModels: true,
-    features: Object.fromEntries(accessFeatures.map((feature) => [feature, true])),
-  },
-  {
-    id: "user",
-    name: "User",
-    generationProfiles: [],
-    allModels: true,
-    features: Object.fromEntries(
-      accessFeatures.map((feature) => [
-        feature,
-        !["loras", "cloudModels", "uncensoredModels", "presets"].includes(feature),
-      ]),
-    ),
-  },
-]);
+export const builtInAccessProfile = Object.freeze({
+  id: "user",
+  name: "User",
+  generationProfiles: [],
+  allModels: true,
+  features: Object.fromEntries(
+    accessFeatures.map((feature) => [
+      feature,
+      !["loras", "cloudModels", "uncensoredModels", "presets"].includes(feature),
+    ]),
+  ),
+});

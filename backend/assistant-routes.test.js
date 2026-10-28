@@ -18,7 +18,7 @@ const {
   imageFromDataUrl,
 } = await import("./assistant-routes.js");
 const { createAssistant } = await import("./assistant.js");
-const { builtInAccessProfiles, effectiveAccountAccess } = await import("./account-policy.js");
+const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
 
 const environment = {
   STUDIO_PROMPT_WRITER_URL: "http://litellm.invalid:4000",
@@ -33,7 +33,7 @@ const uncensored = {
   family: "krea2",
   uncensored: true,
 };
-const user = builtInAccessProfiles.find((item) => item.id === "user");
+const user = builtInAccessProfile;
 const profiles = {
   user,
   off: { ...user, id: "off", features: { ...user.features, promptAssistant: false } },
