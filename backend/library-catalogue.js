@@ -10,7 +10,6 @@
  *   - definitions: `<data>/config/catalogue.json` (model metadata from a Studio export)
  *   - admin:    `<data>/lora-catalogue.json` (installed by hand)
  *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
- *   - hashes:   `<data>/model-hashes.json` (checksums of unchanged local files)
  *   - manifest: the restore manifest (an imported `<data>/model-manifest.json`, else
  *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
  *
@@ -36,7 +35,7 @@ export const catalogueKinds = Object.freeze({
   clip_vision: "clip_vision",
 });
 const editOrigins = new Set(["admin", "import", "ai", "chat"]);
-const layerNames = ["seed", "definitions", "admin", "provider", "hashes", "manifest"];
+const layerNames = ["seed", "definitions", "admin", "provider", "manifest"];
 const historyLimit = 20;
 const sha = (value) =>
   /^[a-f0-9]{64}$/i.test(String(value || "")) ? String(value).toLowerCase() : "";
@@ -300,7 +299,6 @@ export function createCatalogueStore({
     definitions: () => path.join(dataDir, "config", "catalogue.json"),
     admin: () => path.join(dataDir, "lora-catalogue.json"),
     provider: () => path.join(dataDir, "model-download-sources.json"),
-    hashes: () => path.join(dataDir, "model-hashes.json"),
     manifest: () => {
       const imported = path.join(dataDir, "model-manifest.json");
       if (fs.existsSync(imported)) return imported;
@@ -358,22 +356,6 @@ export function createCatalogueStore({
       for (const [id, spec] of Object.entries(value))
         if (isObject(spec) && safeKey(spec.folder, spec.file) && providerSource({ ...spec, id }))
           layer[id] = { ...structuredClone(spec), id };
-    } else if (name === "hashes") {
-      if (!isObject(value)) return null;
-      for (const [cacheKey, hex] of Object.entries(value)) {
-        const [absolute, size, mtime] = cacheKey.split("|");
-        const match = /[\\/]models[\\/]([a-z_]+)[\\/](.+)$/.exec(absolute || "");
-        const key = match && safeKey(match[1], match[2].replace(/\\/g, "/"));
-        if (!key || !sha(hex)) continue;
-        // Only a file that is still the one hashed: same size and date.
-        try {
-          const stat = fs.statSync(absolute);
-          if (String(stat.size) !== size || String(stat.mtimeMs) !== mtime) continue;
-        } catch {
-          continue;
-        }
-        layer[key] = sha(hex);
-      }
     } else if (name === "manifest") {
       if (!Array.isArray(value)) return null;
       const prefix = manifestPrefix();
@@ -446,7 +428,7 @@ export function createCatalogueStore({
       kind: catalogueKinds[folder],
       folder,
       file: name,
-      sha256: pick("sha256", sha(provider?.sha256), manifest?.sha256, layers.hashes[key]) || "",
+      sha256: pick("sha256", sha(provider?.sha256), manifest?.sha256) || "",
       bytes: Number(fields.bytes) || Number(provider?.bytes) || manifest?.size || 0,
       title: pick("title", text(local.title), providerTitle) || "",
       version: pick("version", text(provider?.version, 200)) || "",

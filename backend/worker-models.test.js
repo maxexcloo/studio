@@ -9,8 +9,6 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-worker-models-"));
 process.env.STUDIO_ENV_FILE = path.join(scratch, ".env");
 process.env.STUDIO_DATA_DIR = scratch;
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "mirror");
-process.env.STUDIO_MODEL_STORAGE = "worker";
 process.env.STUDIO_WORKER_TOKEN = "worker-test-fixture";
 for (const key of [
   "HTTP_PROXY",
@@ -87,11 +85,6 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
   });
   const url = `http://127.0.0.1:${server.address().port}`;
   useWorker(url);
-  assert.equal(
-    worker.remoteModelsEnabled(),
-    true,
-    "A mirror mount must not defeat explicit worker mode.",
-  );
   await worker.refreshWorkerModels({ force: true });
 
   const nativeFetch = globalThis.fetch;
@@ -128,10 +121,6 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
       .update("https://huggingface.co/example/resolve/main/model.safetensors")
       .digest("hex"),
   );
-  assert.equal(
-    fs.existsSync(path.join(scratch, "mirror", "models", "loras", "model.safetensors")),
-    false,
-  );
 
   const { matchResources } = await import("./civitai-import.js");
   const matched = await matchResources(
@@ -141,11 +130,6 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
       ],
     },
     { loras: ["model.safetensors"] },
-    {
-      foldersFor() {
-        throw new Error("The mirror must never be inspected.");
-      },
-    },
   );
   assert.equal(matched.resources[0].status, "installed");
   assert.equal(matched.resources[0].unverified, undefined);
@@ -202,11 +186,4 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
     worker.workerModelFile({ folder: "loras", file: "model.safetensors", workerUrl: url }),
     /STUDIO_WORKER_TOKEN/,
   );
-  delete process.env.STUDIO_MODEL_STORAGE;
-  assert.equal(worker.remoteModelsEnabled(), false);
-  process.env.STUDIO_MODEL_STORAGE = "local";
-  assert.equal(worker.remoteModelsEnabled(), false);
-  process.env.STUDIO_MODEL_STORAGE = "wroker";
-  assert.throws(() => worker.remoteModelsEnabled(), /STUDIO_MODEL_STORAGE/);
-  delete process.env.STUDIO_MODEL_STORAGE;
 });

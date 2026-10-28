@@ -8,7 +8,7 @@ import test from "node:test";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-account-export-"));
 const output = path.join(temporary, "output");
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
-process.env.STUDIO_COMFY_OUTPUT_DIR = output;
+process.env.STUDIO_MEDIA_DIR = output;
 process.env.STUDIO_MULTI_USER = "1";
 const { setGallery } = await import("./gallery-store.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
@@ -32,7 +32,7 @@ setGallery(
       type: "image",
       filename: "account-a.png",
       outputName: "account-a.png",
-      url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=output`,
+      url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=media`,
     },
     {
       id: "b",
@@ -41,7 +41,7 @@ setGallery(
       type: "image",
       filename: "account-b.png",
       outputName: "account-b.png",
-      url: `/comfy/view?filename=account-b.png&subfolder=${accountOutputSubfolder("account-b")}&type=output`,
+      url: `/comfy/view?filename=account-b.png&subfolder=${accountOutputSubfolder("account-b")}&type=media`,
     },
   ],
   { persist: false },
@@ -87,7 +87,7 @@ test("a selection exports only its own items, still within the account", async (
         type: "image",
         filename: "account-a.png",
         outputName: "account-a.png",
-        url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=output`,
+        url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=media`,
       },
       {
         id: "a2",
@@ -96,7 +96,7 @@ test("a selection exports only its own items, still within the account", async (
         type: "image",
         filename: "account-a.png",
         outputName: "account-a-2.png",
-        url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=output&copy=2`,
+        url: `/comfy/view?filename=account-a.png&subfolder=${accountOutputSubfolder("account-a")}&type=media&copy=2`,
       },
       {
         id: "b",
@@ -105,7 +105,7 @@ test("a selection exports only its own items, still within the account", async (
         type: "image",
         filename: "account-b.png",
         outputName: "account-b.png",
-        url: `/comfy/view?filename=account-b.png&subfolder=${accountOutputSubfolder("account-b")}&type=output`,
+        url: `/comfy/view?filename=account-b.png&subfolder=${accountOutputSubfolder("account-b")}&type=media`,
       },
     ],
     { persist: false },

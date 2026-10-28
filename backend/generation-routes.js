@@ -28,7 +28,6 @@ import { jobs, runJob, runMockJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { markWorkflowUsed } from "./workflow-catalog.js";
 
-import { forgetComfyRun } from "./comfy-traces.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
 import { referenceExistsForAccount, stageReferenceAssets } from "./references.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
@@ -384,11 +383,6 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       try {
         body.inpaint = isMockJob ? null : await prepareInpaint(req, body);
       } catch (error) {
-        await forgetComfyRun({
-          inputNames: (body.referenceAssets || [])
-            .filter((item) => item.temporary)
-            .map((item) => item.comfyName),
-        });
         res.status(400).json({ ok: false, error: error.message });
         return;
       }
@@ -409,14 +403,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           unique: Boolean(body.ownerId),
           generation: body,
         });
-        if (first.temporary) await forgetComfyRun({ inputNames: [first.comfyName] });
         body.referenceAssets = [replacement, ...others];
       } catch (error) {
-        await forgetComfyRun({
-          inputNames: (body.referenceAssets || [])
-            .filter((item) => item.temporary)
-            .map((item) => item.comfyName),
-        });
         res.status(400).json({ ok: false, error: error.message });
         return;
       }
@@ -439,15 +427,11 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       })
     )
       body.autoUpscale = null;
-    // Every image this run handed ComfyUI; temporary resized copies go when it ends.
+    // Every image this run handed ComfyUI.
     const staged = (body.referenceAssets || []).filter((item) => item.comfyName);
     body.stagedInputNames = [
       ...staged.map((item) => item.comfyName),
       ...inpaintInputNames(body.inpaint),
-    ];
-    body.temporaryInputNames = [
-      ...(body.temporaryInputNames || []),
-      ...staged.filter((item) => item.temporary).map((item) => item.comfyName),
     ];
     // A random seed is drawn here rather than inside the graph, so the gallery
     // records the number that actually ran and the image can be made again.

@@ -6,14 +6,11 @@ Copy `.env.example` to `.env` when you need different ports or paths.
 HOST=127.0.0.1
 PORT=8787
 STUDIO_DATA_DIR=./data
-STUDIO_COMFY_OUTPUT_DIR=
 ```
-
-`STUDIO_COMFY_OUTPUT_DIR` is optional; the folder is usually found without it. The folder is needed to delete files along with their cards. The retained configuration API accepts only a folder ComfyUI writes to (one with ComfyUI's images, or next to its `models` or `custom_nodes`).
 
 Single-user mode answers only the computer running Studio; other devices need [account mode](#multi-user-mode). `STUDIO_ALLOWED_HOSTS` lists extra names to answer to (comma-separated); TLS terminates at the proxy in front of Studio. See [Security](./SECURITY.md) and [Accounts & Devices](./TROUBLESHOOTING.md#accounts--devices).
 
-With [Studio media storage](#studio-media-storage-comfyui-as-a-worker) workers need no shared storage; with ComfyUI's output folder, they must share input and output storage for local gallery access. See [Workers](#workers) for one or many ComfyUI workers.
+Studio never reads ComfyUI's folders: outputs come into [Studio media storage](#studio-media-storage-comfyui-as-a-worker) and models live on the worker, so workers need no shared storage. See [Workers](#workers) for one or many ComfyUI workers.
 
 ## Workers
 
@@ -25,7 +22,7 @@ an address and what it can do:
 | `image`    | Image generation, and provider-backed cloud runs (Grok), which go through a worker's provider node |
 | `video`    | Local video generation                                                                             |
 | `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too  |
-| `models`   | Receives model and LoRA downloads with `STUDIO_MODEL_STORAGE=worker`                               |
+| `models`   | Holds the model library and receives model and LoRA downloads                                      |
 
 The deployment defines the workers; Studio does not edit them:
 
@@ -63,13 +60,11 @@ While the local video worker is off, other MCP video is refused with a note that
 
 ## Model Manifest
 
-`STUDIO_MODEL_STORAGE=worker` selects the worker with the `models` capability
-(see [Workers](#workers)) for model inventory and downloads, even when Studio has a local mirror mount. Set the same
-nonempty `STUDIO_WORKER_TOKEN` on both services and mount the worker's models
-read-write. Provider credentials remain in Studio; downloads stream directly to
-the worker and resume against their recorded source, size and SHA-256 checksum.
-Local storage uses Studio's ComfyUI model folders. Inventory and downloads in
-worker mode do not inspect or change a local mirror. See
+The worker with the `models` capability (see [Workers](#workers)) holds the model
+inventory and receives downloads. Set the same nonempty `STUDIO_WORKER_TOKEN` on
+both services and mount the worker's models read-write. Provider credentials
+remain in Studio; downloads stream directly to the worker and resume against
+their recorded source, size and SHA-256 checksum. See
 [Studio Worker Node](worker/comfyui/studio_worker/README.md).
 
 `STUDIO_MODEL_MANIFEST` points at a pinned list of the models a deployment expects: a JSON array of `{ "path", "sha256", "size", "url"? }` entries. Each `path` is relative to ComfyUI's model folder; when the manifest's paths start with a deployment folder instead (such as `models/comfyui/`), set `STUDIO_MODEL_MANIFEST_PREFIX` to strip it.
@@ -78,13 +73,13 @@ The catalogue reads this deployment-owned metadata; manage the manifest in the d
 
 ## Studio Media Storage (ComfyUI as a Worker)
 
-With media storage, Studio keeps every finished output in its own folder and treats ComfyUI as a stateless worker:
+Studio keeps every finished output in its own folder and treats ComfyUI as a stateless worker:
 
 - Studio fetches each output over ComfyUI's HTTP API into `STUDIO_MEDIA_DIR` (`<STUDIO_DATA_DIR>/media` by default), with a folder per account.
 - The [Studio worker node](worker/comfyui/studio_worker/README.md) then removes ComfyUI's copy, the run's staged inputs and its history entry.
 - Studio and ComfyUI no longer need to share a folder, so they can run on different servers.
 
-Media storage is on by default in multi-user mode. `STUDIO_OUTPUT_STORAGE=studio` turns it on for a single-user studio, and `STUDIO_OUTPUT_STORAGE=comfy` keeps ComfyUI's output folder; any other value stops Studio at startup. Set the same `STUDIO_WORKER_TOKEN` in Studio and ComfyUI to protect the worker node's endpoints.
+Set the same `STUDIO_WORKER_TOKEN` in Studio and ComfyUI to protect the worker node's endpoints.
 
 Existing ComfyUI outputs stay where they are; only new runs, upscales and recovered runs move. If an output cannot be fetched, it keeps its ComfyUI address instead of being lost. Without the worker node, ComfyUI keeps its copies and Studio logs a warning.
 
@@ -141,7 +136,7 @@ Open the **Library** from the navigation. **Imports** accepts a Civitai image or
 
 **Use Settings** applies the image’s recipe to its installed image workflow without starting a generation. Exact resource matches use SHA-256, including renamed files. Missing LoRAs, unknown weights and unsupported resource types require attention; **Use Prompt** is available independently. Civitai metadata is optional, and additional processing such as ControlNet, high-resolution passes and CLIP skip needs a matching workflow. Imported settings cannot guarantee an identical image.
 
-**Imports** also accepts Civitai model links (including `modelVersionId`) and Hugging Face links to individual SafeTensors or GGUF files. Local downloads use the existing resumable queue and check published SHA-256 values. Hugging Face revisions are pinned to a commit when previewed. A filename conflict is never resolved by replacing the existing file automatically.
+**Imports** also accepts Civitai model links (including `modelVersionId`) and Hugging Face links to individual SafeTensors or GGUF files. Downloads go to the worker through the resumable queue and check published SHA-256 values. Hugging Face revisions are pinned to a commit when previewed. A filename conflict is never resolved by replacing the existing file automatically.
 
 Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server environment for resources your account can access. Tokens are kept on the server and are never returned to the browser or forwarded to the image/file CDN. Imports, image deletion and model downloads are available to administrators (in single-user mode, the computer running Studio). Provider credential changes retain the existing admin boundary; the library does not expose credential controls.
 

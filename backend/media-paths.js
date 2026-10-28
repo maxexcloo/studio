@@ -11,21 +11,10 @@ import { outputFolderName } from "./data-names.js";
  * (media-store.js). Gallery URLs keep ComfyUI's shape with `type=media`:
  * `/comfy/view?filename=…&subfolder=…&type=media`, so owner subfolders, caches
  * and parsers carry over, but such a file is only ever served from here.
- *
- * On by default in multi-user mode; `STUDIO_OUTPUT_STORAGE=studio` opts a
- * single-user studio in and `=comfy` keeps ComfyUI's output folder.
  */
 export const dataDir = currentDataDir();
 
 export const mediaType = "media";
-/** Whether outputs live in Studio media; any value other than `studio` or `comfy` is refused. */
-export function outputStorageFromEnv(env = process.env) {
-  if (!env.STUDIO_OUTPUT_STORAGE) return env.STUDIO_MULTI_USER === "1";
-  if (!["studio", "comfy"].includes(env.STUDIO_OUTPUT_STORAGE))
-    throw new Error('STUDIO_OUTPUT_STORAGE must be "studio" or "comfy".');
-  return env.STUDIO_OUTPUT_STORAGE === "studio";
-}
-export const mediaStorageEnabled = outputStorageFromEnv();
 /** A data folder's media folder: STUDIO_MEDIA_DIR, else its `media`. */
 export const mediaRootFor = (directory) =>
   path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(directory, "media"));

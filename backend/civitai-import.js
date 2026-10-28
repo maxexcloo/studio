@@ -1,8 +1,6 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
-import { comfyUrl, modelFolders } from "./comfy.js";
-import { remoteModelsEnabled, refreshWorkerModels, workerModelFile } from "./worker-models.js";
+import { comfyUrl } from "./comfy.js";
+import { refreshWorkerModels, workerModelFile } from "./worker-models.js";
 import {
   civitaiAssetUrl,
   civitaiGenerationData,
@@ -10,7 +8,6 @@ import {
   isCivitaiHost,
 } from "./civitai-access.js";
 import { sameResourceFilename, workflowModelSources } from "./civitai-workflow.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { civitaiAvailability } from "./library-availability.js";
 import { a1111Samplers, a1111Schedules } from "./image-metadata.js";
 
@@ -24,7 +21,6 @@ const folders = {
   "Text Encoder": "text_encoders",
   VAE: "vae",
 };
-const hashes = new Map();
 
 export function civitaiLink(value, kind = "images") {
   let url;
@@ -465,93 +461,19 @@ export async function importCivitaiImage(
   return { ...preset, resources };
 }
 
-/*
- * Model checksums. Hashing a checkpoint means reading every byte of a file that
- * can run to tens of gigabytes on network storage, so a hash is worked out once
- * per file version (path, size and modified time) and, once the Library names a
- * file for it (useModelHashCache), kept on disk across restarts.
- */
-let hashCacheFile = "";
-let savedHashes = new Map();
-let saveTimer = null;
-const hashKey = (file, stat) => `${file}|${stat.size}|${stat.mtimeMs}`;
-
-/** Keeps worked-out model checksums in `file`, so a restart doesn't read every model again. */
-export function useModelHashCache(file) {
-  hashCacheFile = file;
-  try {
-    const saved = readJsonFile(file);
-    savedHashes = new Map(
-      Object.entries(
-        saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {},
-      ).filter(([, value]) => /^[a-f0-9]{64}$/.test(String(value))),
-    );
-  } catch {
-    savedHashes = new Map();
-  }
-}
-
-function rememberHash(key, hex) {
-  savedHashes.set(key, hex);
-  while (savedHashes.size > 2000) savedHashes.delete(savedHashes.keys().next().value);
-  if (!hashCacheFile || saveTimer) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    try {
-      writeJsonFile(hashCacheFile, Object.fromEntries(savedHashes), { compact: true });
-    } catch {
-      /* A lost cache only costs a rehash. */
-    }
-  }, 500);
-  saveTimer.unref?.();
-}
-
-/** A checksum already worked out for this exact file version, or '' without reading the file. */
-async function knownHash(file) {
-  const key = hashKey(file, await fs.promises.stat(file));
-  if (savedHashes.has(key)) return savedHashes.get(key);
-  const pending = hashes.get(key);
-  return pending ? await pending.catch(() => "") : "";
-}
-
-/** Only candidate files are hashed; cached hashes are invalidated when the file changes. */
-async function hashFile(file) {
-  const stat = await fs.promises.stat(file);
-  const key = hashKey(file, stat);
-  if (savedHashes.has(key)) return savedHashes.get(key);
-  if (!hashes.has(key)) {
-    const promise = (async () => {
-      const hash = crypto.createHash("sha256");
-      for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
-      const hex = hash.digest("hex");
-      rememberHash(key, hex);
-      return hex;
-    })();
-    hashes.set(key, promise);
-    promise.catch(() => hashes.delete(key));
-    if (hashes.size > 512) hashes.delete(hashes.keys().next().value);
-  }
-  return hashes.get(key);
-}
-
-/** A local model file's SHA-256: worked out in full with `verify`, else only one already known ('' if none). */
-export async function modelChecksum(file, { verify = false } = {}) {
-  return verify ? hashFile(file) : knownHash(file);
-}
-
 /**
- * Finds each resource's file among the installed models. `verify: false` (the
- * Library's list) never reads a model: a known checksum decides, otherwise the
- * same file name and size count as installed (marked `unverified`); opening one
- * image checks its checksums in full.
+ * Finds each resource's file in the worker's model library. `verify: false`
+ * (the Library's list) never reads a model: a known checksum decides,
+ * otherwise the same file name and size count as installed (marked
+ * `unverified`); opening one image checks its checksums in full.
  */
 export async function matchResources(
   preset,
   { profiles = [], loras = [], textEncoders = [], vaes = [] } = {},
-  { foldersFor = modelFolders, verify = true } = {},
+  { verify = true } = {},
 ) {
   const workerUrl = comfyUrl;
-  const remote = remoteModelsEnabled() ? await refreshWorkerModels({ workerUrl }) : null;
+  const remote = await refreshWorkerModels({ workerUrl });
   const resources = [];
   for (const resource of preset.resources) {
     let localName = "";
@@ -572,80 +494,37 @@ export async function matchResources(
     for (const name of [...new Set(candidates)]) {
       if (typeof name !== "string" || path.isAbsolute(name) || name.split(/[\\/]/).includes(".."))
         continue;
-      if (remote) {
-        const folders = ["checkpoints", "diffusion_models"].includes(resource.folder)
-          ? ["checkpoints", "diffusion_models"]
-          : [resource.folder];
-        for (const folder of folders) {
-          const file = remote.files.find((item) => item.path === `${folder}/${name}`);
-          if (!file) continue;
-          const sameName = resource.nameOnly
-            ? sameResourceFilename(name, resource.file)
-            : path.basename(name) === resource.file;
-          const sameSize = Boolean(resource.bytes) && Math.abs(file.size - resource.bytes) <= 2048;
-          if (!sameName && !sameSize) continue;
-          if (resource.nameOnly && sameName) {
+      const folders = ["checkpoints", "diffusion_models"].includes(resource.folder)
+        ? ["checkpoints", "diffusion_models"]
+        : [resource.folder];
+      for (const folder of folders) {
+        const file = remote.files.find((item) => item.path === `${folder}/${name}`);
+        if (!file) continue;
+        const sameName = resource.nameOnly
+          ? sameResourceFilename(name, resource.file)
+          : path.basename(name) === resource.file;
+        // Civitai rounds sizeKB; use a small tolerance to find renamed files.
+        const sameSize = Boolean(resource.bytes) && Math.abs(file.size - resource.bytes) <= 2048;
+        if (!sameName && !sameSize) continue;
+        if (resource.nameOnly && sameName) {
+          localName = name;
+          break;
+        }
+        if (resource.sha256) {
+          const hash = verify
+            ? (await workerModelFile({ folder, file: name, workerUrl }, "hash")).sha256
+            : "";
+          if (hash === resource.sha256) {
             localName = name;
             break;
           }
-          if (resource.sha256) {
-            const hash = verify
-              ? (await workerModelFile({ folder, file: name, workerUrl }, "hash")).sha256
-              : "";
-            if (hash === resource.sha256) {
-              localName = name;
-              break;
-            }
-            if (!hash && sameName && sameSize) {
-              localName = name;
-              unverified = true;
-              break;
-            }
-          }
-          if (sameName) conflict = true;
-        }
-        if (localName) break;
-        continue;
-      }
-      const modelDirs = ["checkpoints", "diffusion_models"].includes(resource.folder)
-        ? [
-            ...foldersFor("checkpoints", ["checkpoints"]),
-            ...foldersFor("diffusion_models", ["diffusion_models", "unet"]),
-          ]
-        : resource.folder
-          ? foldersFor(resource.folder, [resource.folder])
-          : [];
-      for (const dir of modelDirs) {
-        const file = path.join(dir, name);
-        try {
-          const stat = await fs.promises.stat(file);
-          const sameName = resource.nameOnly
-            ? sameResourceFilename(name, resource.file)
-            : path.basename(name) === resource.file;
-          const sameSize = Boolean(resource.bytes) && Math.abs(stat.size - resource.bytes) <= 2048;
-          // Civitai rounds sizeKB; use a small tolerance to find renamed files.
-          if (!stat.isFile() || (!sameName && !sameSize)) continue;
-          if (resource.nameOnly && sameName) {
+          if (!hash && sameName && sameSize) {
             localName = name;
+            unverified = true;
             break;
           }
-          if (resource.sha256) {
-            const hash = verify ? await hashFile(file) : await knownHash(file);
-            if (hash === resource.sha256) {
-              localName = name;
-              unverified = false;
-              break;
-            }
-            if (!hash && sameName && sameSize) {
-              localName = name;
-              unverified = true;
-              break;
-            }
-          }
-          if (sameName) conflict = true;
-        } catch {
-          /* Try another configured model folder. */
         }
+        if (sameName) conflict = true;
       }
       if (localName) break;
     }

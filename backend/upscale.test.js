@@ -1,13 +1,7 @@
 import "./fixtures/sample-profiles.js";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-seedvr2-"));
-process.env.STUDIO_SEEDVR2_MODEL_DIR = dir;
-test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const { faceDetailSource, modelFiles, upscaleGraph, upscalePlan, upscaleStatus } =
   await import("./upscale.js");
 
@@ -39,63 +33,33 @@ const registryListing = {
   vae: ["ema_vae_fp16.safetensors"],
 };
 
-/** A sparse file of the exact published size stands in for a real download. */
-function placeModel(file) {
-  const handle = fs.openSync(path.join(dir, file), "w");
-  fs.ftruncateSync(handle, modelFiles[file].bytes);
-  fs.closeSync(handle);
-}
-
-function clearDir() {
-  for (const name of fs.readdirSync(dir)) fs.rmSync(path.join(dir, name), { force: true });
-}
-
-test("registry names in the dropdown do not count as installed", () => {
-  clearDir();
+test("the worker's listing decides what is installed", () => {
   const status = upscaleStatus(infoWith(registryListing), "fast");
   assert.equal(status.nodesInstalled, true);
-  assert.equal(status.ready, false);
-  assert.equal(status.needsDownload, true);
-  assert.deepEqual(status.missingModels, ["dit", "vae"]);
+  assert.equal(status.ready, true);
+  assert.deepEqual(status.missingModels, []);
+  const empty = upscaleStatus(infoWith(), "fast");
+  assert.equal(empty.ready, false);
+  assert.equal(empty.needsDownload, true);
+  assert.deepEqual(empty.missingModels, ["dit", "vae"]);
   assert.equal(
-    status.downloadBytes,
+    empty.downloadBytes,
     modelFiles["seedvr2_ema_3b_fp8_e4m3fn.safetensors"].bytes +
       modelFiles["ema_vae_fp16.safetensors"].bytes,
   );
 });
 
-test("complete files on disk make a tier ready; a short copy does not", () => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  fs.writeFileSync(path.join(dir, "ema_vae_fp16.safetensors"), "truncated");
-  assert.equal(upscaleStatus(infoWith(registryListing), "fast").ready, false);
-  placeModel("ema_vae_fp16.safetensors");
-  assert.equal(upscaleStatus(infoWith(registryListing), "fast").ready, true);
-  // Another tier runs on the weight that is here rather than demanding a download.
-  const high = upscaleStatus(infoWith(registryListing), "high");
-  assert.equal(high.ready, true);
-  assert.equal(high.substituting, true);
-});
-
-test("a file the node discovered elsewhere counts, and a partial download is reported", () => {
-  clearDir();
-  fs.writeFileSync(path.join(dir, "seedvr2_ema_7b_fp16.safetensors.part"), Buffer.alloc(1024));
-  const status = upscaleStatus(
-    infoWith({
-      dit: [...registryListing.dit, "my_seedvr2_finetune.safetensors"],
-      vae: registryListing.vae,
-    }),
+test("another tier runs on the weight the worker has rather than demanding a download", () => {
+  const high = upscaleStatus(
+    infoWith({ dit: ["seedvr2_ema_3b_fp8_e4m3fn.safetensors"], vae: registryListing.vae }),
     "high",
   );
-  assert.equal(status.models.find((model) => model.key === "dit").partialBytes, 1024);
-  assert.equal(status.substituting, false);
-  assert.equal(status.ready, false, "the VAE is still missing");
+  assert.equal(high.ready, true);
+  assert.equal(high.substituting, true);
+  assert.equal(high.fallbackFile, "seedvr2_ema_3b_fp8_e4m3fn.safetensors");
 });
 
 test("the graph uses the machine's own device and skips block swap without an offload device", () => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  placeModel("ema_vae_fp16.safetensors");
   // What a Mac really offers: the offload list has no "cpu" at all.
   const mac = upscaleGraph(
     { width: 1024, height: 1024, quality: "fast" },
@@ -116,31 +80,11 @@ test("the graph uses the machine's own device and skips block swap without an of
   assert.equal(cuda["3"].inputs.blocks_to_swap, 16);
 });
 
-test("the terminal install uses ComfyUI's own folder and Python when it can see them", async () => {
+test("the terminal install clones the pinned pack and installs its requirements", async () => {
   const { packInstallPlan } = await import("./node-install.js");
   const { nodePack } = await import("./node-packs.js");
-  const installPlan = (root) => packInstallPlan(nodePack("seedvr2"), root);
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "studio-comfy-"));
-  fs.mkdirSync(path.join(root, "custom_nodes"));
-  fs.mkdirSync(path.join(root, ".venv", "bin"), { recursive: true });
-  fs.writeFileSync(path.join(root, ".venv", "bin", "python"), "");
-  const fresh = installPlan(root);
-  assert.equal(fresh.exact, true);
-  assert.equal(fresh.commands.length, 1);
-  assert.match(
-    fresh.commands[0].command,
-    /^cd ".*custom_nodes" && git clone https:\/\/github\.com\/numz\/ComfyUI-SeedVR2_VideoUpscaler\.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 && ".*\.venv\/bin\/python" -m pip install -r ComfyUI-SeedVR2_VideoUpscaler\/requirements\.txt$/,
-  );
-  // Cloned but not loading: only the requirements are missing.
-  fs.mkdirSync(path.join(root, "custom_nodes", "ComfyUI-SeedVR2_VideoUpscaler"));
-  const cloned = installPlan(root);
-  assert.equal(cloned.cloned, true);
-  assert.equal(cloned.needsGit, false);
-  assert.doesNotMatch(cloned.commands[0].command, /git clone/);
-  fs.rmSync(root, { recursive: true, force: true });
-  // Nothing known: generic, and python3 since many Linux systems have no `python`.
   assert.equal(
-    installPlan("").commands[0].command,
+    packInstallPlan(nodePack("seedvr2")).commands[0].command,
     'cd "ComfyUI/custom_nodes" && git clone https://github.com/numz/ComfyUI-SeedVR2_VideoUpscaler.git && git -C ComfyUI-SeedVR2_VideoUpscaler checkout --detach 5a4bf428f3735cc72ac760d40f372f94dec28422 && python3 -m pip install -r ComfyUI-SeedVR2_VideoUpscaler/requirements.txt',
   );
 });
@@ -177,9 +121,6 @@ test("face detail on an imported workflow's image loads the workflow's model fil
     { sourceModel: "z_image_turbo.safetensors", sourceSettings: { clipType: "lumina2" } },
   );
 
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  placeModel("ema_vae_fp16.safetensors");
   const info = {
     ...infoWith(registryListing),
     UNETLoader: {
@@ -246,9 +187,6 @@ test("the size menu's 2K/4K reach their long side, whatever the scale", () => {
 });
 
 test("video upscale saves restored frames with the original audio and frame rate", () => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  placeModel("ema_vae_fp16.safetensors");
   const { graph, plan } = upscaleGraph(
     { mediaType: "video", imageName: "clip.mp4", width: 864, height: 480, quality: "fast" },
     infoWith(registryListing),
@@ -263,9 +201,6 @@ test("video upscale saves restored frames with the original audio and frame rate
 });
 
 test("balanced and high upscales decode in smaller tiles without changing the requested scale", () => {
-  clearDir();
-  placeModel("seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors");
-  placeModel("ema_vae_fp16.safetensors");
   const info = infoWith({
     dit: ["seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors"],
     vae: ["ema_vae_fp16.safetensors"],
@@ -283,9 +218,6 @@ test("balanced and high upscales decode in smaller tiles without changing the re
 });
 
 test("image and video upscales use wavelet colour correction across quality tiers", () => {
-  clearDir();
-  placeModel("seedvr2_ema_3b_fp8_e4m3fn.safetensors");
-  placeModel("ema_vae_fp16.safetensors");
   for (const mediaType of ["image", "video"]) {
     for (const quality of ["fast", "balanced", "high"]) {
       const { graph } = upscaleGraph(

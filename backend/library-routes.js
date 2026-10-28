@@ -26,9 +26,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { writeBytesFileAsync } from "./json-store.js";
-import { modelFolders } from "./comfy.js";
 import { civitaiJson } from "./civitai-access.js";
-import { modelChecksum, versionResource } from "./civitai-import.js";
+import { versionResource } from "./civitai-import.js";
 import { presetsEnabled } from "./features.js";
 import { hfFetch } from "./hf-access.js";
 import { catalogueKinds, splitCatalogueKey } from "./library-catalogue.js";
@@ -44,12 +43,7 @@ import { familyFromName } from "./family-catalog.js";
 import { downloadState } from "./model-downloads.js";
 import { fromChat, requireLocal } from "./route-access.js";
 import { libraryPlacement, lookupLibrary } from "./library-lookup.js";
-import {
-  refreshWorkerModels,
-  remoteModelsEnabled,
-  workerInventory,
-  workerModelFile,
-} from "./worker-models.js";
+import { refreshWorkerModels, workerInventory, workerModelFile } from "./worker-models.js";
 
 const pictureEdge = 1280;
 const maxImageBytes = 24 * 1024 * 1024;
@@ -165,38 +159,21 @@ export async function matchImageResource(item, { installed = {}, entries = {}, j
 }
 
 /** Removes an installed model file, only when it is still the one recorded (by checksum when known). */
-export async function removeInstalled(want, { foldersFor = modelFolders } = {}) {
+export async function removeInstalled(want) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder))
     throw new Error("That isn’t a model file Studio manages.");
   const names = subfolders[want.folder] || [want.folder];
-  if (remoteModelsEnabled()) {
-    await refreshWorkerModels({ force: true });
-    const file = workerInventory().files.find((item) =>
-      names.some((folder) => item.path === `${folder}/${want.file}`),
-    );
-    if (!file) return { removed: false };
-    await workerModelFile(
-      { folder: file.path.split("/")[0], file: want.file, sha256: want.sha256 || "" },
-      "remove",
-    );
-    await refreshWorkerModels({ force: true });
-    return { removed: true };
-  }
-  for (const dir of foldersFor(want.folder, names)) {
-    const file = path.join(dir, want.file);
-    let stat;
-    try {
-      stat = await fs.promises.stat(file);
-    } catch {
-      continue;
-    }
-    if (!stat.isFile()) continue;
-    if (want.sha256 && (await modelChecksum(file, { verify: true })) !== want.sha256)
-      throw new Error("The installed file has changed since it was recorded, so it stays.");
-    await fs.promises.rm(file);
-    return { removed: true };
-  }
-  return { removed: false };
+  await refreshWorkerModels({ force: true });
+  const file = workerInventory().files.find((item) =>
+    names.some((folder) => item.path === `${folder}/${want.file}`),
+  );
+  if (!file) return { removed: false };
+  await workerModelFile(
+    { folder: file.path.split("/")[0], file: want.file, sha256: want.sha256 || "" },
+    "remove",
+  );
+  await refreshWorkerModels({ force: true });
+  return { removed: true };
 }
 
 /** Each import's own picture (longest edge 1280 px, WebP), beside the records. */
@@ -247,40 +224,23 @@ const subfolders = {
 };
 
 /** Whether a wanted file is installed: by checksum when known (or `verify`), else by name and size. */
-export async function inspectInstalled(want, { verify = false, foldersFor = modelFolders } = {}) {
+export async function inspectInstalled(want, { verify = false } = {}) {
   if (!want?.file || !Object.hasOwn(catalogueKinds, want.folder)) return { status: "missing" };
   const names = subfolders[want.folder] || [want.folder];
   const sized = (size) => !want.bytes || Math.abs(size - want.bytes) <= 2048;
-  if (remoteModelsEnabled()) {
-    await refreshWorkerModels();
-    const file = workerInventory().files.find((item) =>
-      names.some((folder) => item.path === `${folder}/${want.file}`),
-    );
-    if (!file) return { status: "missing" };
-    if (!want.sha256) return { status: "installed", unverified: true };
-    if (verify) {
-      const hash = (
-        await workerModelFile({ folder: file.path.split("/")[0], file: want.file }, "hash")
-      ).sha256;
-      return hash === want.sha256 ? { status: "installed" } : { status: "conflict" };
-    }
-    return sized(file.size) ? { status: "installed", unverified: true } : { status: "conflict" };
+  await refreshWorkerModels();
+  const file = workerInventory().files.find((item) =>
+    names.some((folder) => item.path === `${folder}/${want.file}`),
+  );
+  if (!file) return { status: "missing" };
+  if (!want.sha256) return { status: "installed", unverified: true };
+  if (verify) {
+    const hash = (
+      await workerModelFile({ folder: file.path.split("/")[0], file: want.file }, "hash")
+    ).sha256;
+    return hash === want.sha256 ? { status: "installed" } : { status: "conflict" };
   }
-  for (const dir of foldersFor(want.folder, names)) {
-    const file = path.join(dir, want.file);
-    let stat;
-    try {
-      stat = await fs.promises.stat(file);
-    } catch {
-      continue;
-    }
-    if (!stat.isFile()) continue;
-    if (!want.sha256) return { status: "installed", unverified: true };
-    const hash = await modelChecksum(file, { verify });
-    if (hash) return hash === want.sha256 ? { status: "installed" } : { status: "conflict" };
-    return sized(stat.size) ? { status: "installed", unverified: true } : { status: "conflict" };
-  }
-  return { status: "missing" };
+  return sized(file.size) ? { status: "installed", unverified: true } : { status: "conflict" };
 }
 
 const itemFields = [
@@ -750,12 +710,12 @@ export function registerLibraryRoutes(
     "/api/library/placement",
     route(
       async (req, res) => {
-        if (remoteModelsEnabled()) await refreshWorkerModels().catch(() => null);
+        await refreshWorkerModels().catch(() => null);
         res.json({
           ok: true,
           placement: libraryPlacement(
             { key: String(req.query.key || "") },
-            { remote: remoteModelsEnabled(), inventory: workerInventory, foldersFor: modelFolders },
+            { inventory: workerInventory },
           ),
         });
       },

@@ -38,8 +38,6 @@ export async function uploadReferenceImage(dataUrl, body = {}) {
   const uploaded = await comfy("/upload/image", { method: "POST", body: form });
   const comfyName = uploaded.name || filename;
   body.stagedInputNames = [...(body.stagedInputNames || []), comfyName];
-  // Legacy uploads are unique too; release their temporary copy when the run ends.
-  body.temporaryInputNames = [...(body.temporaryInputNames || []), comfyName];
   return comfyName;
 }
 

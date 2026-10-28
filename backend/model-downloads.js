@@ -1,5 +1,4 @@
 import {
-  remoteModelsEnabled,
   workerInventory,
   workerCopy,
   workerModelFile,
@@ -7,30 +6,23 @@ import {
   uploadWorkerModel,
 } from "./worker-models.js";
 import crypto from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
-import { Readable, Transform } from "node:stream";
-import { pipeline } from "node:stream/promises";
-import { comfyModelsDir, comfyUrl, modelFolders } from "./comfy.js";
-import { removeJsonFile, writeJsonFile } from "./json-store.js";
-import { freeBytesAt } from "./paths.js";
+import { comfyUrl } from "./comfy.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
 import { civitaiFetch } from "./civitai-access.js";
 
 /**
- * Fetches catalogue files and verified provider files into ComfyUI's folders.
- * Callers resolve each file on the server and look it up by ID, so a browser
- * request can never point the server at an arbitrary URL
- * or path. One file downloads at a time; the rest wait in order. A stopped
- * download keeps its .part file plus a small .part.json note, so it resumes
- * where it left off, even after Studio restarts.
+ * Streams catalogue files and verified provider files into the worker's model
+ * library (worker-models.js). Callers resolve each file on the server and look
+ * it up by ID, so a browser request can never point the server at an arbitrary
+ * URL or path. One file downloads at a time; the rest wait in order. A stopped
+ * download keeps its partial file on the worker, so it resumes where it left off.
  *
  * Resuming asks for the rest only if the file is still the one it started
  * (If-Range with the ETag or Last-Modified it saw), so a file changed on
  * Hugging Face in between starts over instead of being glued onto the old
- * half. A finished file is checked against its catalog SHA-256 before it is
- * put where ComfyUI reads it.
+ * half. The worker checks a finished file against its catalog SHA-256.
  */
 
 const allowedFolders = new Set([
@@ -54,67 +46,26 @@ export function setDownloadTransport(fn) {
 
 function snapshot(entry) {
   if (!entry) return null;
-  const { controller, alternatives, url, dir, workerUrl, ...rest } = entry;
+  const { controller, alternatives, url, workerUrl, ...rest } = entry;
   return rest;
 }
 
 export function downloadState() {
   return {
-    // Retain the existing capability field for clients; backend names the selected storage.
-    local: remoteModelsEnabled() || Boolean(comfyModelsDir()),
-    backend: remoteModelsEnabled() ? "worker" : "local",
     active: snapshot(active),
     queued: queue.map(snapshot),
     recent: recent.map(snapshot),
     paused: pausedDownloads(),
-    space: downloadSpace(),
+    space: workerInventory().space,
   };
 }
 
-/** Half-finished files on disk that nothing is fetching right now, from their .part.json notes. */
+/** Half-finished files on the worker that nothing is fetching right now. */
 function pausedDownloads() {
-  if (remoteModelsEnabled()) {
-    const busy = new Set(
-      [active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`),
-    );
-    return workerInventory().paused.filter((entry) => !busy.has(`${entry.folder}/${entry.file}`));
-  }
   const busy = new Set(
     [active, ...queue].filter(Boolean).map((entry) => `${entry.folder}/${entry.file}`),
   );
-  const found = [];
-  for (const folder of allowedFolders) {
-    for (const dir of folderDirs(folder)) {
-      let names = [];
-      try {
-        names = fs.readdirSync(dir);
-      } catch {
-        continue;
-      }
-      for (const name of names) {
-        if (!name.endsWith(".part.json")) continue;
-        const file = name.slice(0, -".part.json".length);
-        if (busy.has(`${folder}/${file}`)) continue;
-        const received = fileSize(path.join(dir, `${file}.part`));
-        if (!received) continue;
-        try {
-          const note = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
-          found.push({
-            id: String(note.id || ""),
-            file,
-            folder,
-            label: String(note.label || file),
-            status: "paused",
-            receivedBytes: received,
-            totalBytes: Number(note.totalBytes || 0),
-          });
-        } catch {
-          // A note that cannot be read just means that file starts over.
-        }
-      }
-    }
-  }
-  return found;
+  return workerInventory().paused.filter((entry) => !busy.has(`${entry.folder}/${entry.file}`));
 }
 
 const recent = [];
@@ -123,12 +74,8 @@ function remember(entry) {
   recent.splice(8);
 }
 
-function targetFor(spec) {
-  const modelsDir = remoteModelsEnabled() ? "" : comfyModelsDir();
-  if (!modelsDir && !remoteModelsEnabled())
-    throw new Error(
-      "Connect a Studio worker with model management or configure a local ComfyUI model folder.",
-    );
+/** Refuses anything but a model file from Civitai or Hugging Face for a model folder. */
+function checkSpec(spec) {
   if (!allowedFolders.has(spec.folder))
     throw new Error("That file doesn’t belong in a ComfyUI model folder.");
   const name = path.basename(String(spec.file || ""));
@@ -143,64 +90,17 @@ function targetFor(spec) {
     (url.port && url.port !== "443")
   )
     throw new Error("Only Civitai and Hugging Face downloads are supported.");
-  if (remoteModelsEnabled()) return { dir: "" };
-  // Land it where ComfyUI itself reads that kind from, so it shows up without a restart.
-  const dirs = folderDirs(spec.folder);
-  const dir =
-    dirs.find((item) => path.basename(item) === spec.folder) ||
-    dirs[0] ||
-    path.join(modelsDir, spec.folder);
-  return {
-    dir,
-    target: path.join(dir, name),
-    partial: path.join(dir, `${name}.part`),
-    note: path.join(dir, `${name}.part.json`),
-  };
 }
 
-/** ComfyUI's own folders for this kind first (extra_model_paths.yaml included), then models/<folder>. */
-function folderDirs(folder) {
-  const subfolders =
-    folder === "text_encoders"
-      ? ["text_encoders", "clip"]
-      : folder === "diffusion_models"
-        ? ["diffusion_models", "unet"]
-        : [folder];
-  return modelFolders(folder, subfolders);
-}
-
-/**
- * The file already sitting in any folder ComfyUI loads this kind from. The disk
- * is the record of what was downloaded: it survives restarts and never claims
- * a file someone has since deleted.
- */
+/** The worker's copy of the file, as its last inventory listed it. */
 export function existingCopy(spec) {
-  if (remoteModelsEnabled())
-    return workerCopy(spec)?.size > 0 ? `worker:${spec.folder}/${spec.file}` : "";
-  for (const dir of folderDirs(spec.folder)) {
-    const file = path.join(dir, spec.file);
-    if (fileSize(file) > 0) return file;
-  }
-  return "";
+  return workerCopy(spec)?.size > 0 ? `worker:${spec.folder}/${spec.file}` : "";
 }
 
 /**
  * An error that trying again will not fix (full disk, gated file). `browser`:
  * the file needs a Hugging Face login, so the way on is its page, not a retry.
  */
-/** The Hugging Face page a file's download address belongs to, for looking it up by hand. */
-export function repositoryPage(url = "") {
-  try {
-    const parsed = new URL(url);
-    const [owner, repo, kind] = parsed.pathname.split("/").filter(Boolean);
-    return owner && repo && ["resolve", "blob"].includes(kind)
-      ? `${parsed.origin}/${owner}/${repo}`
-      : "";
-  } catch {
-    return "";
-  }
-}
-
 function finalError(message, { browser = false } = {}) {
   const error = new Error(message);
   error.final = true;
@@ -216,11 +116,6 @@ export function isNetworkError(error) {
     /^(ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|UND_ERR_\w+)$/.test(code) ||
     /terminated|fetch failed|socket|other side closed/i.test(error?.message || "")
   );
-}
-
-// Decimal, like the setup panel and the file browser on a Mac.
-function gigabytes(bytes) {
-  return `${(bytes / 1e9).toFixed(bytes < 10e9 ? 1 : 0)} GB`;
 }
 
 // A connection that drops mid-file is tried again by itself, waiting a little longer each time.
@@ -240,14 +135,6 @@ function wait(ms, signal) {
   });
 }
 
-function fileSize(file) {
-  try {
-    return fs.statSync(file).size;
-  } catch {
-    return 0;
-  }
-}
-
 /** The catalog's published SHA-256 for a file, lower case, or "" when it has none. */
 function catalogSha256(spec) {
   return /^[0-9a-f]{64}$/i.test(String(spec?.sha256 || ""))
@@ -257,37 +144,19 @@ function catalogSha256(spec) {
 
 /** Queue one catalog file. Returns the queued entry, or the running one if it is already going. */
 export function startDownload(spec) {
-  const { dir } = targetFor(spec);
+  checkSpec(spec);
   const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
   if (same(active)) return snapshot(active);
   const waiting = queue.find(same);
   if (waiting) return snapshot(waiting);
-  const existing = existingCopy(spec);
-  if (existing && !remoteModelsEnabled()) {
-    const size = remoteModelsEnabled() ? workerCopy(spec).size : fileSize(existing);
-    const done = {
-      id: spec.id,
-      file: spec.file,
-      folder: spec.folder,
-      label: spec.label || spec.file,
-      status: "done",
-      already: true,
-      receivedBytes: size,
-      totalBytes: size,
-      finishedAt: Date.now(),
-    };
-    remember(done);
-    return done;
-  }
   const entry = {
-    ...(remoteModelsEnabled() ? { workerUrl: spec.workerUrl || comfyUrl } : {}),
+    workerUrl: spec.workerUrl || comfyUrl,
     id: spec.id,
     file: spec.file,
     folder: spec.folder,
     label: spec.label || spec.file,
     url: spec.url,
     sha256: catalogSha256(spec),
-    dir,
     status: "queued",
     receivedBytes: 0,
     totalBytes: Number(spec.bytes || 0),
@@ -323,9 +192,7 @@ async function pump() {
   active.startedAt = Date.now();
   const signal = active.controller.signal;
   const attempt = () =>
-    transport
-      ? transport(active, signal, { targetFor, finishDownload, finalError, fileSize })
-      : fetchInto(active, signal);
+    transport ? transport(active, signal, { finalError }) : fetchIntoWorker(active, signal);
   try {
     for (let retry = 0; ; retry += 1) {
       try {
@@ -395,13 +262,13 @@ function fallbackFor(failed) {
     const same = (entry) => entry && entry.folder === spec.folder && entry.file === spec.file;
     if (queue.some(same)) return null;
     try {
-      targetFor(spec);
+      checkSpec(spec);
     } catch {
       continue;
     }
     if (existingCopy(spec)) return null;
     return {
-      ...(failed.workerUrl ? { workerUrl: failed.workerUrl } : {}),
+      workerUrl: failed.workerUrl,
       // Checked against its own published checksum, like the build it stands in for.
       id: spec.id,
       file: spec.file,
@@ -409,7 +276,6 @@ function fallbackFor(failed) {
       label: spec.label || spec.file,
       url: spec.url,
       sha256: catalogSha256(spec),
-      dir: targetFor(spec).dir,
       status: "queued",
       receivedBytes: 0,
       totalBytes: Number(spec.bytes || 0),
@@ -421,155 +287,6 @@ function fallbackFor(failed) {
     };
   }
   return null;
-}
-
-/** Free space where each kind of model lands, and which disk that is, so a batch can be checked before it starts. */
-function downloadSpace() {
-  if (remoteModelsEnabled()) return workerInventory().space;
-  const space = {};
-  if (!comfyModelsDir()) return space;
-  for (const folder of allowedFolders) {
-    let dir;
-    try {
-      ({ dir } = targetFor({ folder, file: "probe.safetensors", url: "https://huggingface.co/x" }));
-    } catch {
-      continue;
-    }
-    // The folder may not exist yet; its nearest existing parent is on the same disk.
-    let probe = dir;
-    while (probe && !fs.existsSync(probe) && path.dirname(probe) !== probe)
-      probe = path.dirname(probe);
-    let disk = "";
-    try {
-      disk = String(fs.statSync(probe).dev);
-    } catch {
-      /* unknown disk: grouped alone */
-    }
-    const free = freeBytesAt(probe);
-    if (free !== null) space[folder] = { free, disk: disk || folder };
-  }
-  return space;
-}
-
-async function fetchInto(entry, signal) {
-  if (entry.workerUrl) return fetchIntoWorker(entry, signal);
-  const request = new URL(entry.url).hostname === "civitai.com" ? civitaiFetch : fetch;
-  const provider = new URL(entry.url).hostname === "civitai.com" ? "Civitai" : "Hugging Face";
-  const { dir, target, partial, note } = targetFor(entry);
-  fs.mkdirSync(dir, { recursive: true });
-  let offset = fileSize(partial);
-  entry.receivedBytes = offset;
-  const saved = readNote(note);
-  // A whole .part left by a rename that failed last time: asking for the bytes after
-  // its end would only get HTTP 416, so finish it without a request.
-  const known = saved.exact ? Number(saved.totalBytes || 0) : 0;
-  if (offset && known && offset >= known) {
-    if (offset === known) return verifyAndFinish(entry, partial, target, note);
-    offset = 0; // Longer than the file itself: start over.
-  }
-  const validator = resumeValidator(saved);
-  const rangeHeaders = () =>
-    offset ? { range: `bytes=${offset}-`, ...(validator ? { "if-range": validator } : {}) } : {};
-  let response = await request(entry.url, { redirect: "follow", signal, headers: rangeHeaders() });
-  if (offset && response.status === 416) {
-    // Nothing left past the end: complete if the server's size matches, else the part is not this file.
-    const total = Number(/\/(\d+)\s*$/.exec(response.headers.get("content-range") || "")?.[1] || 0);
-    if (total && total === offset && sameFile(saved, response))
-      return verifyAndFinish(entry, partial, target, note);
-    await response.body?.cancel().catch(() => {});
-    offset = 0;
-    response = await request(entry.url, { redirect: "follow", signal });
-  }
-  // Range ignored, or the file changed since the part was saved (If-Range answered with all of it): start over.
-  if (offset && response.status === 200) offset = 0;
-  // A server that ignores If-Range still says which file it sent: a different one is not glued on either.
-  if (offset && response.status === 206 && !sameFile(saved, response)) {
-    await response.body?.cancel().catch(() => {});
-    offset = 0;
-    response = await request(entry.url, { redirect: "follow", signal });
-  }
-  if (!response.ok || !response.body) {
-    await response.body?.cancel().catch(() => {});
-    if (response.status === 401 || response.status === 403) {
-      throw finalError(
-        `${entry.file} needs a ${provider} sign-in or an accepted licence (HTTP ${response.status}). Download it in your browser and put it in ComfyUI’s ${entry.folder} folder.`,
-        { browser: true },
-      );
-    }
-    if (response.status === 404) {
-      // The catalog in this version is out of date; a newer one usually knows where the file went.
-      const page = repositoryPage(entry.url);
-      throw finalError(
-        `${entry.file} is no longer at its download address (HTTP 404). Update Studio in Settings › About, or download it yourself${page ? ` from ${page}` : ""} and put it in ComfyUI’s ${entry.folder} folder.`,
-      );
-    }
-    throw new Error(`${provider} answered ${response.status} for ${entry.file}.`);
-  }
-  // Catalog sizes are approximate; only the server's own length is a check.
-  const length = Number(response.headers.get("content-length") || 0);
-  // Several gigabytes onto a full disk would fail near the end; check first.
-  const free = freeBytesAt(dir);
-  const margin = 256 * 1024 * 1024;
-  if (free !== null && length && free < length + margin) {
-    await response.body.cancel().catch(() => {});
-    throw finalError(
-      `Not enough space: ${entry.file} needs ${gigabytes(length)}, and the disk has ${gigabytes(free)} free.`,
-    );
-  }
-  const expected = length ? offset + length : 0;
-  if (expected) entry.totalBytes = expected;
-  entry.receivedBytes = offset;
-  try {
-    // `exact` marks a length the server sent, not the catalog's estimate; etag and
-    // lastModified say which version of the file the part holds, for the next resume.
-    const etag = offset ? saved.etag || "" : response.headers.get("etag") || "";
-    const lastModified = offset
-      ? saved.lastModified || ""
-      : response.headers.get("last-modified") || "";
-    writeJsonFile(
-      note,
-      {
-        id: entry.id,
-        label: entry.label,
-        totalBytes: entry.totalBytes,
-        exact: Boolean(expected),
-        etag,
-        lastModified,
-      },
-      { compact: true },
-    );
-  } catch {
-    // Without the note it still resumes this session; only a restart forgets it.
-  }
-  // Speed over the last few seconds, for the time-left estimate.
-  let windowStart = Date.now();
-  let windowBytes = 0;
-  await pipeline(
-    Readable.fromWeb(response.body),
-    new Transform({
-      transform(chunk, _encoding, done) {
-        entry.receivedBytes += chunk.length;
-        windowBytes += chunk.length;
-        const elapsed = Date.now() - windowStart;
-        if (elapsed >= 1000) {
-          const rate = (windowBytes * 1000) / elapsed;
-          entry.bytesPerSecond = entry.bytesPerSecond
-            ? entry.bytesPerSecond * 0.6 + rate * 0.4
-            : rate;
-          windowStart = Date.now();
-          windowBytes = 0;
-        }
-        done(null, chunk);
-      },
-    }),
-    fs.createWriteStream(partial, { flags: offset ? "a" : "w" }),
-    { signal },
-  );
-  // Without a published checksum the length is the check: a short file is not a model.
-  if (expected && fileSize(partial) !== expected) {
-    throw new Error(`${entry.file} arrived incomplete. Try again to resume it.`);
-  }
-  await verifyAndFinish(entry, partial, target, note);
 }
 
 /** What If-Range needs: a strong ETag, else the Last-Modified date. Nothing for notes from before. */
@@ -588,73 +305,14 @@ function sameFile(saved, response) {
   return true;
 }
 
-function readNote(note) {
-  try {
-    return JSON.parse(fs.readFileSync(note, "utf8")) || {};
-  } catch {
-    return {};
-  }
-}
-
-async function sha256Of(file, signal) {
-  const hash = crypto.createHash("sha256");
-  await pipeline(
-    fs.createReadStream(file),
-    new Transform({
-      transform(chunk, _encoding, done) {
-        hash.update(chunk);
-        done();
-      },
-    }),
-    { signal },
-  );
-  return hash.digest("hex");
-}
-
-/**
- * The last step: a file with a catalog SHA-256 is checked before it becomes
- * a model. A mismatch is thrown away, so trying again downloads it fresh.
- */
-async function verifyAndFinish(entry, partial, target, note) {
-  if (entry.sha256) {
-    entry.verifying = true;
-    entry.bytesPerSecond = 0;
-    try {
-      const actual = await sha256Of(partial, entry.controller?.signal);
-      if (actual !== entry.sha256) {
-        fs.rmSync(partial, { force: true });
-        removeJsonFile(note);
-        throw new Error(
-          `${entry.file} didn’t match its published checksum, so it was deleted. Try again to download it fresh.`,
-        );
-      }
-    } finally {
-      delete entry.verifying;
-    }
-  }
-  finishDownload(entry, partial, target, note);
-}
-
-function finishDownload(entry, partial, target, note) {
-  entry.receivedBytes = fileSize(partial);
-  entry.totalBytes = entry.receivedBytes;
-  fs.renameSync(partial, target);
-  removeJsonFile(note);
-}
-
 /** Throws away a stopped download's partial file. */
 export function discardDownload(spec) {
   const workerUrl =
     [active, ...queue].find((entry) => entry?.id === spec.id)?.workerUrl || comfyUrl;
   cancelDownload(spec.id);
-  if (remoteModelsEnabled())
-    return workerModelFile({ ...spec, workerUrl }, "discard").then(() =>
-      refreshWorkerModels({ force: true, workerUrl }),
-    );
-  for (const dir of folderDirs(spec.folder)) {
-    fs.rmSync(path.join(dir, `${spec.file}.part`), { force: true });
-    removeJsonFile(path.join(dir, `${spec.file}.part.json`));
-  }
+  return workerModelFile({ ...spec, workerUrl }, "discard").then(() =>
+    refreshWorkerModels({ force: true, workerUrl }),
+  );
 }
 
 /** Studio keeps provider credentials; only streamed weights and resume metadata reach the worker. */

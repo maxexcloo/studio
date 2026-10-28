@@ -36,7 +36,6 @@ test.before(async () => {
         { id: "primary", url: fake.url, capabilities: ["image", "video", "upscale", "models"] },
       ]),
       STUDIO_DATA_DIR: dataDir,
-      STUDIO_COMFY_OUTPUT_DIR: "",
     },
     stdio: ["ignore", "ignore", "pipe", "ipc"],
   });

@@ -1,18 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import {
-  comfy,
-  comfyModelsDir,
-  comfyOutputDir,
-  localOutputFile,
-  modelFolders,
-  optionsFor,
-} from "./comfy.js";
+import { comfy, localOutputFile, optionsFor } from "./comfy.js";
 import { families } from "./family-catalog.js";
 import { classifyModel } from "./model-families.js";
 import { nodePacks } from "./node-packs.js";
-import { freeBytesAt } from "./paths.js";
 import { outputFolderName } from "./data-names.js";
 
 // SeedVR2 restores detail rather than interpolating it, so the pipeline mirrors
@@ -21,9 +13,8 @@ import { outputFolderName } from "./data-names.js";
 export const upscaleQualities = ["fast", "balanced", "high"];
 
 /**
- * Every file Studio may download, with the exact size and SHA-256 Hugging Face
- * publishes for it (the same hashes the SeedVR2 node's own registry checks).
- * A file on disk only counts as present at its published size.
+ * Every SeedVR2 weight a tier names, with the exact size and SHA-256 Hugging
+ * Face publishes for it (the same hashes the SeedVR2 node's own registry checks).
  */
 export const modelFiles = {
   "seedvr2_ema_3b_fp8_e4m3fn.safetensors": {
@@ -66,8 +57,8 @@ export const modelFiles = {
 /**
  * Each tier lists its DiT weights best first. Balanced prefers the mixed fp8
  * build: the plain 7B fp8 file shows artifacts the SeedVR2 authors fixed by
- * keeping the last block in fp16. The plain one still counts if it is already
- * on disk, so nobody re-downloads 8 GB for a small quality difference.
+ * keeping the last block in fp16. The plain one still counts if the worker
+ * already has it, so nobody re-downloads 8 GB for a small quality difference.
  */
 const ditTiers = {
   fast: ["seedvr2_ema_3b_fp8_e4m3fn.safetensors"],
@@ -78,26 +69,6 @@ const ditTiers = {
   high: ["seedvr2_ema_7b_fp16.safetensors"],
 };
 const vaeFile = "ema_vae_fp16.safetensors";
-
-/**
- * Names the SeedVR2 node (2.5+) always offers in its dropdowns, downloaded or
- * not: it fetches a missing one itself on first use, with no progress anyone can
- * see. So a listed registry name proves nothing; only the file on disk does.
- * Names outside this list are files the node discovered on disk, so those count.
- */
-const nodeRegistryNames = new Set([
-  "seedvr2_ema_3b-Q4_K_M.gguf",
-  "seedvr2_ema_3b-Q8_0.gguf",
-  "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
-  "seedvr2_ema_3b_fp16.safetensors",
-  "seedvr2_ema_7b-Q4_K_M.gguf",
-  "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-  "seedvr2_ema_7b_fp16.safetensors",
-  "seedvr2_ema_7b_sharp-Q4_K_M.gguf",
-  "seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors",
-  "seedvr2_ema_7b_sharp_fp16.safetensors",
-  "ema_vae_fp16.safetensors",
-]);
 
 const presets = {
   fast: { preScale: 1, targetScale: 1.5, maxShort: 1280, blocksToSwap: 16, tileSize: 768 },
@@ -115,86 +86,17 @@ export function normalizeQuality(value = "") {
 }
 
 /**
- * SeedVR2 keeps its weights in ComfyUI/models/SEEDVR2. The output folder is the
- * only Comfy path Studio already knows, so derive the sibling models folder from
- * it unless an explicit override is set.
+ * What SeedVR2 can load, by the name its loader expects. The worker's node lists
+ * what it has and downloads anything missing on first use, so its lists are
+ * taken at their word.
  */
-function seedvr2ModelDir() {
-  const override = String(process.env.STUDIO_SEEDVR2_MODEL_DIR || "").trim();
-  if (override) return path.resolve(override);
-  const models = comfyModelsDir();
-  if (models) return path.join(models, "SEEDVR2");
-  if (!comfyOutputDir) return "";
-  return path.join(path.dirname(path.resolve(comfyOutputDir)), "models", "SEEDVR2");
-}
-
-function fileSize(file) {
-  try {
-    const stat = fs.statSync(file);
-    return stat.isFile() ? stat.size : 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** A known file only counts when it is complete; a stray short copy is not a model. */
-function onDisk(dir, file) {
-  if (!dir) return false;
-  const size = fileSize(path.join(dir, file));
-  return size > 0 && (!modelFiles[file] || size === modelFiles[file].bytes);
-}
-
-function partialBytes(dir, file) {
-  return dir ? fileSize(path.join(dir, `${file}.part`)) : 0;
-}
-
-function diskDitFiles(dir) {
-  if (!dir) return [];
-  try {
-    return fs
-      .readdirSync(dir)
-      .filter(
-        (name) => /seedvr2/i.test(name) && /\.(safetensors|gguf)$/i.test(name) && onDisk(dir, name),
-      );
-  } catch {
-    return [];
-  }
-}
-
-/**
- * What SeedVR2 can load right now, by the name its loader expects. With a known
- * local models folder that is the disk plus whatever the node discovered on
- * other model paths. A remote ComfyUI (no folder) has to be taken at its word;
- * its node downloads anything missing on first use.
- */
-function available(info, dir) {
-  const ditOptions = optionsFor(info, "SeedVR2LoadDiTModel", "model").map(String);
-  const vaeOptions = optionsFor(info, "SeedVR2LoadVAEModel", "model").map(String);
-  if (!dir)
-    return {
-      dit: ditOptions.filter((name) => /seedvr2/i.test(name)),
-      vae: vaeOptions,
-      remote: true,
-    };
-  const discovered = (options) =>
-    options.filter((name) => !nodeRegistryNames.has(path.basename(name)));
-  // Every folder ComfyUI reads for SeedVR2 (extra_model_paths.yaml included), not just ComfyUI/models/SEEDVR2.
-  const dirs = [...new Set([dir, ...modelFolders("seedvr2", ["SEEDVR2"])])];
-  const dit = [
-    ...new Set([
-      ...dirs.flatMap(diskDitFiles),
-      ...discovered(ditOptions).filter((name) => /seedvr2/i.test(name)),
-    ]),
-  ]
-    // The node can't load int8 builds (ConvRot and the like): "Only Tensors of floating point ... require gradients".
-    .filter((name) => !/int8|convrot/i.test(name));
-  const vae = [
-    ...new Set([
-      ...(dirs.some((folder) => onDisk(folder, vaeFile)) ? [vaeFile] : []),
-      ...discovered(vaeOptions),
-    ]),
-  ];
-  return { dit, vae, remote: false };
+function available(info) {
+  return {
+    dit: optionsFor(info, "SeedVR2LoadDiTModel", "model")
+      .map(String)
+      .filter((name) => /seedvr2/i.test(name)),
+    vae: optionsFor(info, "SeedVR2LoadVAEModel", "model").map(String),
+  };
 }
 
 const byBase = (list, file) => list.find((name) => path.basename(name) === file);
@@ -216,19 +118,15 @@ function resolveVae(have) {
 }
 
 /** The files this tier would download: its preferred DiT (unless a tier alternate is here) and the VAE. */
-function requiredModelsFor(quality, info, dir = seedvr2ModelDir()) {
+function requiredModelsFor(quality, info) {
   const tier = ditTiers[normalizeQuality(quality)];
-  const have = available(info, dir);
+  const have = available(info);
   const ditPresent = tier.some((file) => byBase(have.dit, file));
   const ditFile = tier.find((file) => byBase(have.dit, file)) || tier[0];
   return [
     { key: "dit", file: ditFile, present: ditPresent },
     { key: "vae", file: vaeFile, present: Boolean(byBase(have.vae, vaeFile) || have.vae.length) },
-  ].map((model) => ({
-    ...model,
-    ...modelFiles[model.file],
-    partialBytes: model.present ? 0 : partialBytes(dir, model.file),
-  }));
+  ].map((model) => ({ ...model, ...modelFiles[model.file] }));
 }
 
 function missingNodeClasses(info, classes) {
@@ -249,9 +147,8 @@ function detectedSeedVR2Nodes(info) {
 export function upscaleStatus(info = {}, quality = "balanced") {
   const normalized = normalizeQuality(quality);
   const missingNodes = missingNodeClasses(info, upscaleNodeClasses);
-  const modelDir = seedvr2ModelDir();
-  const have = available(info, modelDir);
-  const models = requiredModelsFor(normalized, info, modelDir);
+  const have = available(info);
+  const models = requiredModelsFor(normalized, info);
   const missingModels = models.filter((model) => !model.present);
   // A tier can still run on a weight the user already has, so only demand a
   // download when SeedVR2 has nothing at all to load.
@@ -261,21 +158,16 @@ export function upscaleStatus(info = {}, quality = "balanced") {
     nodesInstalled: missingNodes.length === 0,
     missingNodes,
     detectedNodes: detectedSeedVR2Nodes(info),
-    modelDir,
-    remote: have.remote,
-    canDownload: Boolean(modelDir),
-    freeBytes: freeBytesAt(modelDir),
-    models: models.map(({ key, file, label, detail, bytes, present, partialBytes }) => ({
+    models: models.map(({ key, file, label, detail, bytes, present }) => ({
       key,
       file,
       label,
       detail,
       bytes,
       present,
-      partialBytes,
     })),
     missingModels: missingModels.map((model) => model.key),
-    downloadBytes: missingModels.reduce((sum, model) => sum + model.bytes - model.partialBytes, 0),
+    downloadBytes: missingModels.reduce((sum, model) => sum + model.bytes, 0),
     needsDownload: missingModels.length > 0 && !canSubstitute,
     substituting: missingModels.length > 0 && canSubstitute,
     // The weight a substituting tier actually loads, so the UI can name it.
@@ -491,7 +383,7 @@ function devicesFor(info, nodeClass) {
 
 export function upscaleGraph(body, info = {}) {
   const plan = upscalePlan(body);
-  const have = available(info, seedvr2ModelDir());
+  const have = available(info);
   const dit = resolveDit(plan.quality, have);
   const vae = resolveVae(have);
   if (dit.missing || vae.missing) throw new Error("The SeedVR2 models aren’t installed yet.");

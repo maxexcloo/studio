@@ -5,12 +5,10 @@
  *   lookup     a Civitai model or Hugging Face link, or a Civitai search: its versions and files with
  *              availability, licence and whether a profile here fits, without importing or writing
  *   placement  where model files live: the worker's inventory, free space and whether it is
- *              writable, or the local folders; for one catalogue key, where that file sits
+ *              writable; for one catalogue key, where that file sits
  *
  * Nothing here downloads, writes or deletes. Dependencies are injected so tests run offline.
  */
-import fs from "node:fs";
-import path from "node:path";
 import { civitaiLink } from "./civitai-import.js";
 import {
   civitaiAvailability,
@@ -188,11 +186,10 @@ const workerFolders = {
 };
 
 /**
- * Where model files live. `remote` says whether a worker holds the library; `inventory()` is its
- * cached inventory (worker-models.js workerInventory) and `foldersFor(folder, names)` the local
- * folders (comfy.js modelFolders). With `key` (folder/file), where that one file sits.
+ * Where model files live: `inventory()` is the worker's cached inventory (worker-models.js
+ * workerInventory). With `key` (folder/file), where that one file sits.
  */
-export function libraryPlacement({ key = "" } = {}, { remote, inventory, foldersFor }) {
+export function libraryPlacement({ key = "" } = {}, { inventory }) {
   const target = key ? splitCatalogueKey(key) : null;
   if (
     target &&
@@ -202,54 +199,27 @@ export function libraryPlacement({ key = "" } = {}, { remote, inventory, folders
   )
     throw new Error("A key is folder/file in a model folder, such as loras/glow.safetensors.");
   const names = target ? workerFolders[target.folder] || [target.folder] : [];
-  if (remote) {
-    const { files = [], paused = [], space = {}, writable = false } = inventory();
-    const file = target
-      ? files.find((item) => names.some((folder) => item.path === `${folder}/${target.file}`))
-      : null;
-    const counts = {};
-    for (const item of files) {
-      const folder = String(item.path || "").split("/")[0];
-      counts[folder] = (counts[folder] || 0) + 1;
-    }
-    return {
-      storage: "worker",
-      writable,
-      space,
-      files: counts,
-      paused: paused.length,
-      ...(target
-        ? {
-            file: file
-              ? { key, found: true, path: file.path, bytes: file.size || 0 }
-              : { key, found: false },
-          }
-        : {}),
-    };
+  const { files = [], paused = [], space = {}, writable = false } = inventory();
+  const file = target
+    ? files.find((item) => names.some((folder) => item.path === `${folder}/${target.file}`))
+    : null;
+  const counts = {};
+  for (const item of files) {
+    const folder = String(item.path || "").split("/")[0];
+    counts[folder] = (counts[folder] || 0) + 1;
   }
-  const folders = Object.keys(catalogueKinds).map((folder) => ({
-    folder,
-    locations: foldersFor(folder, workerFolders[folder] || [folder]).length,
-  }));
-  if (!target) return { storage: "local", folders };
-  for (const [index, dir] of foldersFor(target.folder, names).entries()) {
-    let stat;
-    try {
-      stat = fs.statSync(path.join(dir, target.file));
-    } catch {
-      continue;
-    }
-    if (stat.isFile())
-      return {
-        storage: "local",
-        folders,
-        file: {
-          key,
-          found: true,
-          location: index === 0 ? target.folder : `${target.folder} (extra model path ${index})`,
-          bytes: stat.size,
-        },
-      };
-  }
-  return { storage: "local", folders, file: { key, found: false } };
+  return {
+    storage: "worker",
+    writable,
+    space,
+    files: counts,
+    paused: paused.length,
+    ...(target
+      ? {
+          file: file
+            ? { key, found: true, path: file.path, bytes: file.size || 0 }
+            : { key, found: false },
+        }
+      : {}),
+  };
 }

@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 import { civitaiGenerationData } from "./civitai-access.js";
-import { importCivitaiImage, matchResources, versionResource } from "./civitai-import.js";
+import { importCivitaiImage, versionResource } from "./civitai-import.js";
 import { sameResourceFilename, workflowModelSources } from "./civitai-workflow.js";
 
 const hash = "a".repeat(64);
@@ -246,37 +242,7 @@ test("generation associations remain available when REST metadata has no resourc
   assert.equal(preset.resources[0].weight, 0.4);
 });
 
-test("extensionless names match local LoRAs and split model parts retain exact hash associations", async () => {
+test("extensionless names match LoRA files of the same name", () => {
   assert.equal(sameResourceFilename("folder\\style_slider", "style_slider.safetensors"), true);
   assert.equal(sameResourceFilename("model.safetensors", "model.gguf"), false);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-import-parts-"));
-  const bytes = Buffer.from("public fixture weights");
-  const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  try {
-    for (const name of ["model.safetensors", "encoder.safetensors", "style_slider.safetensors"])
-      fs.writeFileSync(path.join(dir, name), bytes);
-    const result = await matchResources(
-      {
-        resources: [
-          { folder: "diffusion_models", file: "model.safetensors", supported: true, sha256 },
-          { folder: "text_encoders", file: "encoder.safetensors", supported: true, sha256 },
-          { folder: "loras", file: "style_slider", nameOnly: true, weight: 15 },
-        ],
-      },
-      {
-        profiles: [{ id: "exact-model", kind: "image", model: "model.safetensors" }],
-        textEncoders: ["encoder.safetensors"],
-        loras: ["style_slider.safetensors"],
-      },
-      { foldersFor: () => [dir] },
-    );
-    assert.deepEqual(
-      result.resources.map((resource) => resource.status),
-      ["installed", "installed", "installed"],
-    );
-    assert.equal(result.resources[0].profileId, "exact-model");
-    assert.equal(result.resources[2].localName, "style_slider.safetensors");
-  } finally {
-    fs.rmSync(dir, { force: true, recursive: true });
-  }
 });

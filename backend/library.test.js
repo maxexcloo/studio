@@ -7,7 +7,6 @@ import test from "node:test";
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-")));
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
-process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = dataDir;
 const store = await import("./gallery-store.js");
 test.after(() => {

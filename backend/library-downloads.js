@@ -1,13 +1,5 @@
-import {
-  remoteModelsEnabled,
-  workerInventory,
-  workerModelFile,
-  refreshWorkerModels,
-} from "./worker-models.js";
-import fs from "node:fs";
-import crypto from "node:crypto";
+import { workerInventory, workerModelFile, refreshWorkerModels } from "./worker-models.js";
 import path from "node:path";
-import { comfyModelsDir } from "./comfy.js";
 import { civitaiJson, isCivitaiHost, limitedBody } from "./civitai-access.js";
 import { civitaiLink, versionResource } from "./civitai-import.js";
 import { dataDir } from "./gallery-store.js";
@@ -123,28 +115,13 @@ export async function resolveModelLink(
 }
 
 export function libraryDownloadAccess() {
-  if (remoteModelsEnabled())
-    return {
-      available: workerInventory().writable,
-      backend: "worker",
-      note: workerInventory().writable
-        ? "Downloads enter the worker’s model library."
-        : "Connect a writable Studio worker model library before downloading.",
-    };
-  try {
-    const dir = comfyModelsDir();
-    if (dir) {
-      fs.accessSync(dir, fs.constants.W_OK);
-      return {
-        available: true,
-        backend: "local",
-        note: "Downloads enter your ComfyUI model folders.",
-      };
-    }
-  } catch {
-    /* A read-only mount needs setup. */
-  }
-  return { available: false, backend: "", note: "Downloads need a writable ComfyUI model folder." };
+  const available = workerInventory().writable;
+  return {
+    available,
+    note: available
+      ? "Downloads enter the worker’s model library."
+      : "Connect a writable Studio worker model library before downloading.",
+  };
 }
 
 export async function startLibraryDownload(spec) {
@@ -157,13 +134,7 @@ export async function startLibraryDownload(spec) {
   {
     const file = existingCopy(spec);
     if (file) {
-      let digest;
-      if (remoteModelsEnabled()) digest = (await workerModelFile(spec, "hash")).sha256;
-      else {
-        const hash = crypto.createHash("sha256");
-        for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
-        digest = hash.digest("hex");
-      }
+      const digest = (await workerModelFile(spec, "hash")).sha256;
       if (digest !== spec.sha256)
         throw new Error(
           "A different model already uses this filename. Keep it and choose another file.",

@@ -8,7 +8,6 @@ import sharp from "sharp";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-references-"));
 process.env.STUDIO_DATA_DIR = temporary;
-process.env.STUDIO_COMFY_INPUT_DIR = temporary;
 const referenceAssets = await import(`./references.js?test=${Date.now()}`);
 const { pageGallery } = await import("./gallery-store.js");
 const upload = async (...args) => (await referenceAssets.saveUploadedImage(...args)).asset;
@@ -77,7 +76,7 @@ test("non-image uploads are rejected", async () => {
   );
 });
 
-test("staging resizes every slot before upload, keeps originals, and isolates temporary copies", async (t) => {
+test("staging resizes every slot before upload, keeps originals, and reuses content-named copies", async (t) => {
   const source = await sharp({
     create: {
       width: 3000,
@@ -108,13 +107,9 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
   const generation = { family: "sdxl", width: 1024, height: 1024 };
   const staged = await referenceAssets.stageReferenceAssets({}, refs, { generation });
   assert.equal(staged.length, 2);
-  assert.notEqual(
-    staged[0].comfyName,
-    staged[1].comfyName,
-    "parallel runs must not share deletable resized files",
-  );
+  assert.equal(staged[0].comfyName, staged[1].comfyName, "content-named resized uploads");
   for (const item of staged) {
-    assert.equal(item.temporary, true);
+    assert.equal(item.temporary, undefined);
     assert.ok(item.width * item.height <= 1024 ** 2);
     assert.equal(item.width % 8, 0);
     assert.equal(item.height % 8, 0);
@@ -133,56 +128,15 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
   const painted = await referenceAssets.stageReferenceAssets({}, refs, {
     generation: { ...generation, inpaint: { mask: "painted" } },
   });
-  assert.equal(painted[0].temporary, undefined);
   assert.deepEqual(
     uploads.at(-2).buffer,
     source,
     "inpaint source and mask retain their coordinate system",
   );
-  assert.equal(painted[1].temporary, true, "additional references still resize");
-  delete process.env.STUDIO_COMFY_INPUT_DIR;
-  const remote = await referenceAssets.stageReferenceAssets({}, refs, { generation });
-  assert.equal(
-    remote[0].comfyName,
-    remote[1].comfyName,
-    "remote runs reuse content-named resized uploads",
-  );
-  assert.equal(remote[0].temporary, undefined);
-  process.env.STUDIO_COMFY_INPUT_DIR = temporary;
-});
-
-test("failed staging removes already-uploaded temporary copies", async (t) => {
-  const buffer = await sharp({
-    create: { width: 2000, height: 2000, channels: 3, background: "#334455" },
-  })
-    .png()
-    .toBuffer();
-  const asset = await upload({
-    buffer,
-    name: "rollback.png",
-    mime: "image/png",
-  });
-  let uploadedFile;
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
-    const file = init.body.get("image");
-    uploadedFile = path.join(temporary, file.name);
-    fs.writeFileSync(uploadedFile, Buffer.from(await file.arrayBuffer()));
-    return new Response(JSON.stringify({ name: file.name }), {
-      headers: { "content-type": "application/json" },
-    });
-  });
-  await assert.rejects(() =>
-    referenceAssets.stageReferenceAssets(
-      {},
-      [
-        { slot: "start", assetId: asset.id },
-        { slot: "reference", assetId: "gone" },
-      ],
-      { generation: { width: 512, height: 512 } },
-    ),
-  );
-  assert.ok(uploadedFile);
-  assert.equal(fs.existsSync(uploadedFile), false);
+  assert.notDeepEqual(uploads.at(-1).buffer, source, "additional references still resize");
+  const owned = await referenceAssets.stageReferenceAssets({}, refs, { generation, unique: true });
+  assert.notEqual(owned[0].comfyName, owned[1].comfyName, "an owner's run gets its own copies");
+  assert.equal(owned[0].temporary, true);
 });
 
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));

@@ -5,14 +5,10 @@ import {
   noteWorkerReachable,
 } from "./comfy-backends.js";
 import { defaultWorker, onWorkersChanged } from "./workers.js";
-import { writeLocalEnvValue } from "./env.js";
 import { listensBeyondThisComputer } from "./client-trust.js";
 import { noteComfyState } from "./crash-log.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import fs from "node:fs";
-import os from "node:os";
-import { isInside } from "./paths.js";
 import { mediaFile, mediaType } from "./media-paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,7 +34,7 @@ export function setListeningPort(value) {
 /**
  * A subfolder with a dot folder anywhere in it: the gallery's trash
  * (.studio-trash) and anything else kept out of sight. Never served, whether
- * from the output folder or through ComfyUI.
+ * from Studio media or through ComfyUI.
  */
 export function inDotFolder(subfolder = "") {
   // A query string can name it twice; every value counts.
@@ -48,143 +44,21 @@ export function inDotFolder(subfolder = "") {
       .some((part) => part.startsWith(".")),
   );
 }
-/** What an output can be: images, videos and sound. Anything else in the folder is never served. */
+/** What an output can be: images, videos and sound. Anything else is never served. */
 export const outputMediaPattern =
   /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
 
-/**
- * An output file on this computer, for when ComfyUI itself cannot serve it
- * (stopped, restarting). Only images, videos and sound inside the output
- * folder, checked on the real path so a symlink cannot point outside it, and
- * never from a hidden folder (the trash); null otherwise.
- */
+/** The file behind an output URL's parts when it is Studio media; null otherwise. */
 export function localOutputFile(filename, subfolder = "", type = "output") {
-  // Studio-owned media (media-paths.js) never lives in ComfyUI's folder.
-  if (type === mediaType) return mediaFile(String(filename || ""), String(subfolder || ""));
-  if (type !== "output" || !comfyOutputDir || !filename) return null;
-  if (!outputMediaPattern.test(String(filename))) return null;
-  if (inDotFolder(subfolder)) return null;
-  const base = path.resolve(comfyOutputDir);
-  const file = path.resolve(base, String(subfolder || ""), String(filename));
-  if (!isInside(base, file)) return null;
-  try {
-    if (!isInside(fs.realpathSync(base), fs.realpathSync(file))) return null;
-    return fs.statSync(file).isFile() ? file : null;
-  } catch {
-    return null;
-  }
-}
-
-// Resolved, so a hand-written `D:/x` becomes `D:\x` on Windows (Explorer opens its default view otherwise).
-export let comfyOutputDir = process.env.STUDIO_COMFY_OUTPUT_DIR
-  ? path.resolve(process.env.STUDIO_COMFY_OUTPUT_DIR)
-  : "";
-
-/**
- * Turn whatever got pasted into a folder path: Explorer's "Copy as path" wraps it
- * in quotes, Finder drags arrive as file:// URLs, and shells write ~ for home.
- */
-export function normalizeFolderInput(value = "") {
-  let text = String(value || "")
-    .trim()
-    .replace(/^(["'])(.*)\1$/, "$2")
-    .trim();
-  if (/^file:\/\//i.test(text)) {
-    try {
-      text = fileURLToPath(text);
-    } catch {
-      /* keep the raw text */
-    }
-  }
-  if (text === "~" || /^~[\\/]/.test(text)) text = path.join(os.homedir(), text.slice(1));
-  return text ? path.resolve(text) : "";
-}
-
-export function setComfyOutputDir(value = "") {
-  const next = normalizeFolderInput(value);
-  if (!next) throw new Error("Choose an existing ComfyUI output folder.");
-  if (!fs.existsSync(next) || !fs.statSync(next).isDirectory())
-    throw new Error("That folder doesn’t exist on this computer.");
-  writeLocalEnvValue("STUDIO_COMFY_OUTPUT_DIR", next);
-  comfyOutputDir = next;
-  return comfyOutputDir;
-}
-/**
- * ComfyUI's models folder on this machine, or "" when ComfyUI runs elsewhere.
- * STUDIO_COMFY_ROOT wins; otherwise walk up from the output folder, which is not
- * always a direct child of the ComfyUI root, until a real models/ turns up.
- */
-export function comfyModelsDir() {
-  const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
-  if (comfyRoot) return path.join(path.resolve(comfyRoot), "models");
-  if (!comfyOutputDir) return "";
-  let current = path.resolve(comfyOutputDir);
-  for (let depth = 0; depth < 4; depth += 1) {
-    const parent = path.dirname(current);
-    if (!parent || parent === current) break;
-    try {
-      const models = path.join(parent, "models");
-      if (fs.existsSync(models) && fs.statSync(models).isDirectory()) return models;
-    } catch {
-      // Keep walking; an unreadable level is not fatal.
-    }
-    current = parent;
-  }
-  return "";
-}
-
-// ComfyUI's model folders by kind, from its /internal/folder_paths: its own
-// models/ folder plus every extra_model_paths.yaml location (shared model
-// drives, an A1111 install). Empty until the first scan, or when ComfyUI is remote.
-let comfyFolderPaths = {};
-
-export function setComfyFolderPaths(map = {}) {
-  const next = {};
-  for (const [kind, value] of Object.entries(map || {})) {
-    // Older ComfyUI answers [paths, extensions]; newer ones just the paths.
-    const list = Array.isArray(value?.[0]) ? value[0] : value;
-    if (Array.isArray(list)) next[kind] = list.filter((item) => typeof item === "string");
-  }
-  comfyFolderPaths = next;
-}
-
-/**
- * Folders on this machine that hold one kind of model, ComfyUI's list first,
- * then ComfyUI/models/<subfolder> as found from the output folder.
- */
-export function modelFolders(kind, subfolders = [kind]) {
-  const models = comfyModelsDir();
-  // extra_model_paths.yaml keys are matched loosely by custom nodes (SEEDVR2: and seedvr2: are one folder kind).
-  const named = Object.keys(comfyFolderPaths)
-    .filter((key) => key.toLowerCase() === String(kind).toLowerCase())
-    .flatMap((key) => comfyFolderPaths[key] || []);
-  const dirs = [...named, ...(models ? subfolders.map((sub) => path.join(models, sub)) : [])];
-  return [...new Set(dirs)].filter((dir) => {
-    try {
-      return fs.statSync(dir).isDirectory();
-    } catch {
-      return false;
-    }
-  });
+  return type === mediaType ? mediaFile(String(filename || ""), String(subfolder || "")) : null;
 }
 
 /** Fake models and placeholder generations when ComfyUI is unreachable. A dev opt-in for agent and UI testing without a GPU. */
 export const demoMode = process.env.STUDIO_DEMO === "1";
 
-/*
- * Whether ComfyUI just failed to answer. On Windows a refused localhost
- * connection takes about 2 s, so while this is set the image routes read the
- * output folder first instead of making every image wait. Cleared by any
- * answer from ComfyUI, and expires on its own after a few seconds.
- */
-let comfyUnreachableUntil = 0;
-export const comfyRecentlyUnreachable = () => Date.now() < comfyUnreachableUntil;
 export function noteComfyReachable() {
   noteWorkerReachable(currentComfyBackend(), true);
-  if (isDefaultBackend()) {
-    comfyUnreachableUntil = 0;
-    noteComfyState(true);
-  }
+  if (isDefaultBackend()) noteComfyState(true);
 }
 
 /** Whether an error is a check of ours running out of time, not ComfyUI refusing or dropping it. */
@@ -197,7 +71,6 @@ export function isComfyTimeout(error) {
  */
 export function noteComfyFetchError(error) {
   if (error?.name === "AbortError") return;
-  comfyUnreachableUntil = Date.now() + 5000;
   if (!isComfyTimeout(error)) noteComfyState(false, error);
 }
 
@@ -335,24 +208,4 @@ export function textRange(info, node, key) {
     ...meta,
     max: Number(meta.max || meta.maxLength || meta.max_length || parsedMax || 0) || undefined,
   };
-}
-
-/** ComfyUI's input folder on this machine, next to its output folder, or "" when unknown. */
-export function comfyInputDir() {
-  const explicit = String(process.env.STUDIO_COMFY_INPUT_DIR || "").trim();
-  if (explicit) return path.resolve(explicit);
-  const comfyRoot = String(process.env.STUDIO_COMFY_ROOT || "").trim();
-  const candidates = [
-    comfyRoot ? path.join(path.resolve(comfyRoot), "input") : "",
-    comfyOutputDir ? path.join(path.dirname(path.resolve(comfyOutputDir)), "input") : "",
-  ].filter(Boolean);
-  return (
-    candidates.find((dir) => {
-      try {
-        return fs.statSync(dir).isDirectory();
-      } catch {
-        return false;
-      }
-    }) || ""
-  );
 }

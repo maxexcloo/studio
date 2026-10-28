@@ -2,12 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
 import { civitaiFetch, civitaiJson, limitedBody } from "./civitai-access.js";
-import {
-  importCivitaiImage,
-  matchResources,
-  useModelHashCache,
-  versionResource,
-} from "./civitai-import.js";
+import { importCivitaiImage, matchResources, versionResource } from "./civitai-import.js";
 import {
   dataDir,
   deleteGalleryFiles,
@@ -79,7 +74,6 @@ export function registerPresetRoutes(
   app,
   { models, json = civitaiJson, imageRequest = civitaiFetch, download = startLibraryDownload },
 ) {
-  useModelHashCache(path.join(dataDir, "model-hashes.json"));
   const route =
     (handler, write = false) =>
     async (req, res) => {

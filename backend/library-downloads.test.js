@@ -6,9 +6,7 @@ import test from "node:test";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-downloads-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
-process.env.STUDIO_COMFY_ROOT = dir;
 process.env.STUDIO_ENABLE_PRESETS = "1";
-fs.mkdirSync(path.join(dir, "models", "loras"), { recursive: true });
 fs.mkdirSync(path.join(dir, "data"), { recursive: true });
 fs.writeFileSync(
   path.join(dir, "data", "model-download-sources.json"),
@@ -21,7 +19,7 @@ fs.writeFileSync(
     },
   }),
 );
-const { libraryDownload, libraryDownloadAccess, resolveModelLink, startLibraryDownload } =
+const { libraryDownload, resolveModelLink, startLibraryDownload } =
   await import("./library-downloads.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -75,25 +73,6 @@ test("Civitai alternate-domain model pages resolve their latest version with mod
       json: async () => ({ id: 18, modelId: 10 }),
     }),
     /another model/,
-  );
-});
-
-test("local imports never accept a different existing file as installed", async () => {
-  fs.writeFileSync(path.join(dir, "models", "loras", "existing.safetensors"), "old model");
-  assert.equal(libraryDownloadAccess().available, true);
-  await assert.rejects(
-    startLibraryDownload({
-      id: "civitai:17:3",
-      file: "existing.safetensors",
-      folder: "loras",
-      url: "https://civitai.com/api/download/models/17",
-      sha256: "a".repeat(64),
-    }),
-    /different model/,
-  );
-  assert.equal(
-    fs.readFileSync(path.join(dir, "models", "loras", "existing.safetensors"), "utf8"),
-    "old model",
   );
 });
 
