@@ -247,6 +247,7 @@ export async function fixtures(page: Page) {
       const events: any[] = [
         { event: "message", data: user },
         { event: "message", data: { ...assistant } },
+        { event: "thinking", data: { id: assistant.id, text: "Light first, then subject." } },
         {
           event: "delta",
           data: {
@@ -255,6 +256,7 @@ export async function fixtures(page: Page) {
           },
         },
       ];
+      assistant.thinking = "Light first, then subject.";
       assistant.content =
         "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)";
       if (

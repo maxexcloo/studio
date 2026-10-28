@@ -1,9 +1,12 @@
 import { Alert, Group, Loader, Paper, Stack, Text } from "@mantine/core";
-import { Pencil } from "lucide-react";
+import { Pencil, Wand } from "lucide-react";
 import type { ChatMessage } from "../../../../shared/chat";
+import { WritingStream, WritingThinking } from "../generation/PromptWriting";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GenerationCard } from "./GenerationCard";
 import classes from "./SessionsPage.module.css";
+
+const requested = { image: "an image", refine: "a refinement", animate: "an animation" };
 
 /**
  * One message. A card's request (`quiet`, such as "Edited iteration 1") is one dimmed line, since
@@ -34,7 +37,19 @@ export function ChatTurn({ message, quiet }: { message: ChatMessage; quiet?: str
         </Text>
         {message.status === "streaming" && <Loader size="xs" aria-label="Studio Is Replying" />}
       </Group>
+      {message.thinking &&
+        (message.status === "streaming" && !message.content ? (
+          <WritingStream progress={{ thinking: message.thinking }} />
+        ) : (
+          <WritingThinking writing={{ kind: "chat", thinking: message.thinking }} />
+        ))}
       {message.content && <AssistantMarkdown content={message.content} />}
+      {message.draft && (
+        <Group gap={6} c="dimmed">
+          <Wand size={13} aria-hidden />
+          <Text size="xs">Requested {requested[message.draft.operation]}</Text>
+        </Group>
+      )}
       {message.status === "cancelled" && (
         <Text size="xs" c="dimmed">
           Response stopped.
