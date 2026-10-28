@@ -101,7 +101,6 @@ export function DreamPage() {
     <div className={classes.page}>
       <Group className={classes.toolbar} gap="sm" wrap="nowrap">
         <SegmentedControl
-          size="xs"
           radius="xl"
           aria-label="Dream View"
           value={view}

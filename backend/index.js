@@ -963,6 +963,18 @@ function withProfileAliases(models) {
   };
 }
 
+/** Profiles whose recent runs mostly fail carry `failing`: the composer badges them and MCP's own pick passes them over. */
+function withFailing(models) {
+  if (!models?.profiles) return models;
+  const stats = profileStats(filterVisibleGallery(gallery));
+  return {
+    ...models,
+    profiles: models.profiles.map((profile) =>
+      stats[profile.id]?.failing ? { ...profile, failing: true } : profile,
+    ),
+  };
+}
+
 /** The Library is administration: an administrator account, or whoever may administer a single-user Studio. */
 function withLibrary(models, req) {
   if (!models?.features) return models;
@@ -984,9 +996,11 @@ app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     const { models } = await mediaModels(req.query.cached !== "1");
-    res.json(withProfileAliases(withLibrary(modelsForAccount(models, req), req)));
+    res.json(withFailing(withProfileAliases(withLibrary(modelsForAccount(models, req), req))));
   } catch {
-    res.json(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)));
+    res.json(
+      withFailing(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req))),
+    );
   }
 });
 

@@ -21,7 +21,7 @@
 }
 
 .surface {
-  transition: border-color var(--studio-motion-duration) ease;
+  transition: border-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .surface:focus-within {

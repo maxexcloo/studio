@@ -172,7 +172,7 @@ function UnfinishedItems() {
               header: "Status",
               sortValue: (job) => statusLabels[job.status],
               cell: (job) => (
-                <Badge variant="light" color="gray" miw="max-content">
+                <Badge color="gray" miw="max-content">
                   {statusLabels[job.status]}
                 </Badge>
               ),

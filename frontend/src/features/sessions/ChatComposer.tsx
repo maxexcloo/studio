@@ -64,7 +64,7 @@ function ChatModelPicker({
               badges={
                 state &&
                 state !== "running" && (
-                  <Badge size="xs" variant="light" color={phaseColour(state)}>
+                  <Badge size="xs" color={phaseColour(state)}>
                     {phaseLabel(state)}
                   </Badge>
                 )

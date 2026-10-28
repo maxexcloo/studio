@@ -47,7 +47,7 @@ export function WritingThinking({ writing }: { writing?: MediaItem["writing"] })
           <Button
             variant="subtle"
             color="gray"
-            size="compact-xs"
+            size="compact-sm"
             leftSection={<Chevron size={14} />}
             aria-expanded={opened}
             onClick={toggle}

@@ -30,7 +30,7 @@
   border: 1px solid var(--studio-glass-border);
   background: var(--mantine-color-default);
   transform-origin: 50% 0;
-  transition: transform calc(1.5 * var(--studio-motion-duration)) cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .layer img {

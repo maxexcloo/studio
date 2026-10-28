@@ -74,6 +74,11 @@ test("the chosen profile prefers the default, then its family, then censored pro
     chooseProfile(profiles, { kind: "image", tier: "fast", defaultId: "missing" }).id,
     "plain",
   );
+  // A failing profile is passed over while another fits.
+  const failing = profiles.map((profile) =>
+    profile.id === "kin" ? { ...profile, failing: true } : profile,
+  );
+  assert.equal(chooseProfile(failing, { kind: "image", defaultId: "default" }).id, "plain");
   // Super Fast falls back to Fast; a tier with neither names what is available.
   assert.equal(
     chooseProfile(profiles, { kind: "image", tier: "turbo", defaultId: "default" }).id,

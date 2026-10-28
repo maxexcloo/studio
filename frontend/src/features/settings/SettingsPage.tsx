@@ -54,9 +54,7 @@ export function SettingsPage() {
         account: (
           <Stack component="section" aria-label="Your Account" id="account">
             <Group gap="xs">
-              <Badge variant="light">
-                {multi ? (admin ? "Administrator" : "User") : "Single-User Mode"}
-              </Badge>
+              <Badge>{multi ? (admin ? "Administrator" : "User") : "Single-User Mode"}</Badge>
             </Group>
             {multi ? (
               <>

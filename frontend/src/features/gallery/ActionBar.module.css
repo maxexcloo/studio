@@ -28,8 +28,8 @@
 .action {
   flex-shrink: 0;
   transition:
-    background-color var(--studio-motion-duration) ease,
-    color var(--studio-motion-duration) ease;
+    background-color var(--studio-motion-duration) var(--studio-ease-enter),
+    color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 /* A split control's menu half stays narrow so it reads as one action. */

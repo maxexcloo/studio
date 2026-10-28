@@ -103,7 +103,7 @@ export function TextBox({
           <Text size="sm">{title} cleared</Text>
           <Button
             data-composer-layer
-            size="compact-xs"
+            size="compact-sm"
             variant="subtle"
             onClick={() => {
               notifications.hide(notification);

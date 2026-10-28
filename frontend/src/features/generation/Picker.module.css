@@ -23,7 +23,7 @@
 
 .filters,
 .reveal {
-  animation: reveal var(--studio-motion-duration) ease-out;
+  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .filters {
@@ -62,7 +62,7 @@
   gap: 6px;
   width: 100%;
   border-radius: var(--mantine-radius-md);
-  transition: background-color var(--studio-motion-duration) ease-out;
+  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .toggle:focus-visible {
@@ -93,7 +93,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: opacity var(--studio-motion-duration) ease-out;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .image:not([data-loaded]) {
@@ -124,8 +124,8 @@
   opacity: 0;
   transform: scale(0.8);
   transition:
-    opacity var(--studio-motion-duration) ease-out,
-    transform var(--studio-motion-duration) ease-out;
+    opacity var(--studio-motion-duration) var(--studio-ease-enter),
+    transform var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .tile[data-selected] .check {
@@ -143,7 +143,7 @@
   position: absolute;
   top: 4px;
   right: 4px;
-  transition: opacity var(--studio-motion-duration) ease-out;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 /* Desktop tiles reveal their corner control on hover or focus; a pressed one (a favourite) stays. */
@@ -208,7 +208,7 @@
   min-width: 0;
   padding: 4px 4px 4px 8px;
   border-radius: var(--mantine-radius-md);
-  transition: background-color var(--studio-motion-duration) ease-out;
+  transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .savedRow:hover,
@@ -250,7 +250,7 @@
   outline: 2px solid var(--mantine-color-body);
   background: var(--mantine-color-default-hover);
   color: var(--mantine-color-dimmed);
-  animation: reveal var(--studio-motion-duration) ease-out;
+  animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .thumb + .thumb {

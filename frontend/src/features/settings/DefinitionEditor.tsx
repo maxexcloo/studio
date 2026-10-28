@@ -440,11 +440,7 @@ function DefinitionForm({
                       cell: (entry) => (
                         <Group gap="xs" wrap="nowrap">
                           <Text size="sm">{entry.version}</Text>
-                          {entry.aiDrafted && (
-                            <Badge color="orange" variant="light">
-                              AI-Drafted
-                            </Badge>
-                          )}
+                          {entry.aiDrafted && <Badge color="orange">AI-Drafted</Badge>}
                         </Group>
                       ),
                     },

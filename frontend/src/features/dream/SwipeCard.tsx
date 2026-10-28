@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Paper } from "@mantine/core";
+import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
 import classes from "./DreamPage.module.css";
 
@@ -90,12 +91,12 @@ export function SwipeCard({
     const vertical = direction === "up" || direction === "down";
     const x = vertical ? (from?.dx ?? 0) : (direction === "right" ? 1 : -1) * window.innerWidth;
     const y = vertical ? (direction === "up" ? -1 : 1) * window.innerHeight : (from?.dy ?? 0) + 40;
-    element.style.transition = `transform ${duration * 2}ms cubic-bezier(.2,.7,.3,1), opacity ${duration * 2}ms ease`;
+    element.style.transition = `transform ${duration}ms ${easing.exit}, opacity ${duration}ms ${easing.exit}`;
     place(x, y);
     element.style.opacity = "0";
     return new Promise<void>((resolve) => {
       // transitionend may not fire if the card is hidden or the transition is skipped.
-      const timer = setTimeout(resolve, duration * 2 + 50);
+      const timer = setTimeout(resolve, duration + 50);
       element.addEventListener(
         "transitionend",
         () => {
@@ -116,7 +117,7 @@ export function SwipeCard({
 
   const settle = () => {
     const element = card.current!;
-    element.style.transition = `transform ${duration * 2.5}ms cubic-bezier(.34,1.56,.64,1)`;
+    element.style.transition = `transform ${duration}ms ${easing.enter}`;
     place(0, 0);
     element.style.transform = "";
   };

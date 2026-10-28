@@ -4,6 +4,7 @@ import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { MessageCircle, X } from "lucide-react";
 import { Link } from "react-router";
 import type { MediaItem } from "../../types";
+import { easing } from "../../theme";
 import { useMotionDuration } from "../../ui/Appearance";
 import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
@@ -107,8 +108,8 @@ export function RunsView({
         ?.getBoundingClientRect();
       if (!origin || !panel.current || !motionDuration) return Promise.resolve();
       const timing = {
-        duration: motionDuration * 2,
-        easing: "cubic-bezier(.2, .8, .2, 1)",
+        duration: motionDuration,
+        easing: easing.enter,
         fill: out ? "backwards" : "forwards",
       } as const;
       const shown = [{ opacity: 0 }, { opacity: 1 }];
