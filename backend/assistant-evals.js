@@ -161,7 +161,7 @@ export async function runEvals({
   const engine = createAssistant(env, {
     fetchImpl: transport,
     log: {},
-    timeoutMs: live ? 60_000 : 5_000,
+    ...(live ? {} : { timeoutMs: 5_000 }),
   });
   const results = { rewrite: [], loras: [], negative: [] };
   for (const item of evals.rewrite.cases) {

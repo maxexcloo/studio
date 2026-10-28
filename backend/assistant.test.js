@@ -223,7 +223,6 @@ test("failures fall back to the original prompt with the reason, and a timeout a
     fetchImpl: fakeGateway(hanging).fetchImpl,
     log: quiet,
     timeoutMs: 30,
-    streamTimeoutMs: 30,
   });
   const started = Date.now();
   const timedOut = await slow.rewrite({ profile, prompt: "a cabin", onDelta: () => {} });
