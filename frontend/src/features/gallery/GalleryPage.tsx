@@ -11,7 +11,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { LayoutGrid, Layers, SquareCheck } from "lucide-react";
-import { useDebouncedValue, useLocalStorage } from "@mantine/hooks";
+import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
@@ -40,6 +40,7 @@ import {
   hasGalleryFilters,
 } from "./GalleryFilters";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import classes from "./GalleryPage.module.css";
 
@@ -58,18 +59,10 @@ export function GalleryPage() {
   }, [kind, changeKind]);
   const phone = usePhone();
   const [captions] = useTileCaptions();
-  const [view, setView] = useLocalStorage<"grid" | "runs">({
-    key: "studio-gallery-view",
-    defaultValue: "grid",
-    getInitialValueInEffect: false,
-  });
-  const [starred, setStarred] = useState(false);
-  const [allVersions, setAllVersions] = useLocalStorage({
-    key: "studio-gallery-all-versions",
-    defaultValue: true,
-    getInitialValueInEffect: false,
-  });
-  const [filters, setFilters] = useState(emptyGalleryFilters);
+  const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
+  const [starred, setStarred] = useRemembered("gallery-starred", false);
+  const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
+  const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
   const hasFilters = starred || hasGalleryFilters(filters);
   const [pagingFailed, setPagingFailed] = useState(false);
   useEffect(() => setPagingFailed(false), [search, kind, starred, filters]);

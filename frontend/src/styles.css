@@ -47,6 +47,11 @@ select {
 [data-popup][data-position^="right"] {
   transform-origin: left;
 }
+/* Notifications sit bottom right, raised clear of the composer and viewer action bars, so they never
+   cover a header's buttons (the app header, viewer Details or a dialog's title row). */
+.mantine-Notifications-root[data-position="bottom-right"] {
+  bottom: calc(10rem + env(safe-area-inset-bottom));
+}
 @media (max-width: 48em) {
   :root {
     --studio-composer-gap: 0.5rem;

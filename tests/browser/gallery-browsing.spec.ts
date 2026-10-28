@@ -313,6 +313,12 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
   await expect
     .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
     .toEqual(["chat-a"]);
+  // Filters are remembered too.
+  state.galleryRequests.length = 0;
+  await page.reload();
+  await expect
+    .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
+    .toEqual(["chat-a"]);
 });
 
 test("Running tiles show progress with Cancel and Try Again replaces a failed tile", async ({
