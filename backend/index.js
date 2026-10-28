@@ -175,6 +175,7 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
   storedWritingRecord,
+  onGalleryFilesDeleted,
 } from "./gallery-store.js";
 import { buildStats, getThumbnail } from "./thumbnails.js";
 import {
@@ -2218,6 +2219,7 @@ const imageSearch = createImageSearch({
   persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
 });
 registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
+onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
   writer: assistantEngine,

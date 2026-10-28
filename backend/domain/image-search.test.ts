@@ -25,6 +25,11 @@ test("vectors keep in float16 across restarts and drop another model's", () => {
   assert.equal(first.has(item("a")), true);
   const again = createImageVectors(db, "v1");
   assert.ok(Math.abs(again.get(item("a"))![1] - 0.3) < 0.001, "float16 is close enough");
+  again.set(item("b"), along(1));
+  again.set(item("c"), along(2));
+  again.delete([item("a")]);
+  again.retain([item("b")]);
+  assert.equal(createImageVectors(db, "v1").size, 1, "deleted and orphaned vectors are gone");
   assert.equal(createImageVectors(db, "v2").size, 0, "another model starts again");
   assert.equal(createImageVectors(db, "v1").size, 0, "and the old rows are gone");
 });

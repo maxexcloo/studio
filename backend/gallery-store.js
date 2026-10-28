@@ -476,7 +476,14 @@ export function outputFileCandidates(item, baseDir = comfyOutputDir) {
   return [...new Set(candidates)];
 }
 
+let galleryFilesDeleted = () => {};
+/** Hears every gallery item whose files are deleted, so its derived data (search vectors) goes too. */
+export function onGalleryFilesDeleted(listener) {
+  galleryFilesDeleted = listener;
+}
+
 export function deleteGalleryFiles(items) {
+  galleryFilesDeleted(items);
   const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   let deleted = 0;
   let skipped = 0;

@@ -32,6 +32,7 @@ export function createImageVectors(db: DatabaseSync, version: string) {
     const bytes = row.vector as Uint8Array;
     vectors.set(row.key as string, Float32Array.from(new Float16Array(bytes.slice().buffer)));
   }
+  const remove = db.prepare("DELETE FROM studio_image_vectors WHERE key = ?");
   const save = db.prepare(
     "INSERT INTO studio_image_vectors (key, version, vector) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET version = excluded.version, vector = excluded.vector",
   );
@@ -44,6 +45,15 @@ export function createImageVectors(db: DatabaseSync, version: string) {
     set(item: IdleItem, vector: Float32Array) {
       save.run(key(item), version, new Uint8Array(new Float16Array(vector).buffer));
       vectors.set(key(item), vector);
+    },
+    /** Forgets the vectors of items that left the gallery. */
+    delete(items: Iterable<IdleItem>) {
+      for (const item of items) if (vectors.delete(key(item))) remove.run(key(item));
+    },
+    /** Forgets every vector whose item is no longer among `items`. */
+    retain(items: Iterable<IdleItem>) {
+      const kept = new Set([...items].map(key));
+      this.delete([...vectors.keys()].filter((name) => !kept.has(name)).map((url) => ({ url })));
     },
   };
 }
@@ -86,6 +96,13 @@ export function createImageSearch(options: {
   let failed = "";
   return {
     ...work,
+    /** A pass first forgets vectors of images that left the gallery. */
+    startPass() {
+      vectors.retain(options.items());
+      work.startPass();
+    },
+    /** Deleted gallery items take their vectors with them. */
+    forget: (items: Iterable<IdleItem>) => vectors.delete(items),
     /**
      * A test for gallery items that look like `text`, or null when there is nothing to compare:
      * Image Search off, no image read yet or the model not downloaded.
