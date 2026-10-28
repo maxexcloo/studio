@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  builtInAccessProfiles,
+  builtInAccessProfile,
   effectiveAccountAccess,
   mayUseFeature,
   mayUseGenerationProfile,
@@ -82,10 +82,7 @@ test("access profiles contain only currently available generation profiles and k
 });
 
 test("Prompt Assistant is on for built-ins and follows each stored profile", () => {
-  assert.equal(
-    builtInAccessProfiles.every((profile) => profile.features.promptAssistant === true),
-    true,
-  );
+  assert.equal(builtInAccessProfile.features.promptAssistant, true);
   const stored = {
     id: "artists",
     name: "Artists",
@@ -191,9 +188,12 @@ test("uncensored profiles need Uncensored Models and All Models grants every loc
   const uncensored = { id: "image-spicy", uncensored: true };
   const plain = { id: "image-plain" };
   const grok = { id: "grok-image", family: "grok" };
-  const [administrator, user] = builtInAccessProfiles;
+  const user = builtInAccessProfile;
   const profiles = {
-    administrator,
+    everything: {
+      ...user,
+      features: { ...user.features, cloudModels: true, uncensoredModels: true },
+    },
     user,
     granted: {
       name: "Granted",
@@ -202,7 +202,7 @@ test("uncensored profiles need Uncensored Models and All Models grants every loc
     },
   };
   const as = (id) => effectiveAccountAccess({ id, role: "user", accessProfileId: id }, profiles);
-  assert.deepEqual(visibleGenerationProfiles([uncensored, plain, grok], as("administrator")), [
+  assert.deepEqual(visibleGenerationProfiles([uncensored, plain, grok], as("everything")), [
     uncensored,
     plain,
     grok,
