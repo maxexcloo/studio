@@ -1,4 +1,5 @@
 import { defaultGenerationCount } from "./generation-defaults.js";
+import { isResolution } from "../shared/resolution.ts";
 import { catalogueLoraInfo } from "./lora-info.js";
 import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy.js";
@@ -277,6 +278,8 @@ export function sanitizeGenerateBody(input = {}, info = {}, stats = {}) {
       ? snapInteger(input.duration, profile.defaults.duration, profile.constraints.duration)
       : 0,
     resolution,
+    // The size tier the run's width and height came from (shared/resolution.ts), kept for reuse.
+    ...(isResolution(input.resolutionTier) ? { resolutionTier: input.resolutionTier } : {}),
     frames: kind === "video" ? videoFrames(input.frames, frameRange) : 0,
     fps: snapInteger(input.fps, fpsRange.default, fpsRange),
     startImage: String(input.startImage || ""),

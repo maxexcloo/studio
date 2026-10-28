@@ -19,6 +19,7 @@ import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
 import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
 import { choicePool, chooseProfile, isCloudProfile, localVideoUnavailable } from "./mcp-tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
+import { withResolution } from "../shared/resolution.ts";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -484,6 +485,7 @@ export class McpMedia {
       scheduler,
       upscale_quality,
       face_detail = false,
+      resolution,
     } = args;
     let profile = (await this.profiles("all", owner)).find((item) => item.id === profile_id);
     if (!profile) throw new Error("Choose a ready profile from Models.");
@@ -579,7 +581,9 @@ export class McpMedia {
       const id = reference_asset_ids[primary];
       if (id) Object.assign(body, await this.referenceFrame(owner, profile, id));
     }
-    // Native 2K decodes in tiles, matching the browser’s generation path.
+    if (resolution) body.resolutionTier = resolution;
+    Object.assign(body, withResolution(body, profile));
+    // Large draws decode in tiles, matching the browser’s generation path.
     if (
       profile.kind === "image" &&
       (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)
