@@ -30,7 +30,12 @@ test("values report their source and only deployment values are locked", () => {
   // LoRAs, Cloud Models and presets are access-profile features.
   assert.deepEqual(
     settings.catalogueFlags.map((item) => item.key),
-    ["STUDIO_ENABLE_INPAINT", "STUDIO_VIDEO_CLOUD_FALLBACK", "STUDIO_GALLERY_CAPTIONS"],
+    [
+      "STUDIO_ENABLE_INPAINT",
+      "STUDIO_VIDEO_CLOUD_FALLBACK",
+      "STUDIO_GALLERY_CAPTIONS",
+      "STUDIO_IMAGE_SEARCH",
+    ],
   );
   assert.equal(settings.isCatalogueFlag("STUDIO_ENABLE_LORAS"), false);
   delete process.env.STUDIO_GALLERY_CAPTIONS;

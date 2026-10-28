@@ -229,7 +229,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const reason = await options.unavailable();
     if (reason) return reason;
     if (now() < backoff.until)
-      return `The text model is failing (${backoff.reason}); retrying shortly.`;
+      return `${options.name} keeps failing (${backoff.reason}); retrying shortly.`;
     return "";
   }
 
@@ -315,4 +315,45 @@ export function createIdleWork<Item extends IdleItem>(options: {
       };
     },
   };
+}
+
+interface Request {
+  body?: Record<string, unknown>;
+}
+interface Response {
+  json(value: unknown): unknown;
+}
+type Handler = (req: Request, res: Response) => unknown;
+
+/**
+ * An administrator's pass in Settings › Maintenance, such as Caption Gallery at
+ * `/api/gallery/captions`: its status there, and `/start` and `/stop`.
+ */
+export function registerIdlePassRoutes(
+  app: {
+    get(path: string, handler: Handler): unknown;
+    post(path: string, handler: Handler): unknown;
+  },
+  route: string,
+  {
+    work,
+    requireAdmin,
+  }: {
+    work: Pick<ReturnType<typeof createIdleWork>, "status" | "startPass" | "stopPass">;
+    requireAdmin(req: Request, res: Response): boolean;
+  },
+) {
+  app.get(route, async (req, res) => {
+    if (requireAdmin(req, res)) res.json(await work.status());
+  });
+  app.post(`${route}/start`, async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    work.startPass();
+    res.json(await work.status());
+  });
+  app.post(`${route}/stop`, async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    work.stopPass();
+    res.json(await work.status());
+  });
 }

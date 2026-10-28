@@ -82,38 +82,3 @@ export function createCaptioner(options: {
     },
   });
 }
-type Captioner = ReturnType<typeof createCaptioner>;
-
-interface Request {
-  body?: Record<string, unknown>;
-}
-interface Response {
-  json(value: unknown): unknown;
-}
-type Handler = (req: Request, res: Response) => unknown;
-
-/** Settings › Maintenance › Caption Gallery, for administrators. */
-export function registerCaptionRoutes(
-  app: {
-    get(path: string, handler: Handler): unknown;
-    post(path: string, handler: Handler): unknown;
-  },
-  {
-    captioner,
-    requireAdmin,
-  }: { captioner: Captioner; requireAdmin(req: Request, res: Response): boolean },
-) {
-  app.get("/api/gallery/captions", async (req, res) => {
-    if (requireAdmin(req, res)) res.json(await captioner.status());
-  });
-  app.post("/api/gallery/captions/start", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    captioner.startPass();
-    res.json(await captioner.status());
-  });
-  app.post("/api/gallery/captions/stop", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    captioner.stopPass();
-    res.json(await captioner.status());
-  });
-}

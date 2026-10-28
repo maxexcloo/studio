@@ -7,8 +7,10 @@ RUN npm ci --no-audit --no-fund
 
 COPY . .
 ARG STUDIO_PREBUILT=0
+# onnxruntime-node ships every platform's CPU runtime; the image needs only Linux's.
 RUN if [ "$STUDIO_PREBUILT" = 1 ]; then test -f dist/index.html; else npm run build; fi \
-    && npm prune --no-audit --no-fund --omit=dev
+    && npm prune --no-audit --no-fund --omit=dev \
+    && rm -rf node_modules/onnxruntime-node/bin/napi-v6/darwin node_modules/onnxruntime-node/bin/napi-v6/win32
 
 FROM node:26.12.1-trixie-slim AS runtime
 
