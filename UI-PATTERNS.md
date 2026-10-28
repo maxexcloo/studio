@@ -199,15 +199,23 @@ primary component reference and verify APIs against the installed version.
 - Dream is a card deck of background results, up to a maximum height, with a
   strip showing progress through the current batch. Swipe or press left to skip,
   right to keep and up to keep and queue variations. One compact bar under the
-  card offers Skip, Refine, Animate, Star and Keep; Refine and Animate keep the
-  result and stage it in the composer, and Star keeps it too. Dream results stay in their own pool until kept;
+  card offers Skip, Refine, Animate, Star, More Like This and Keep; Refine and
+  Animate keep the result and stage it in the composer, Star keeps it too and
+  More Like This keeps it and steers the next ideas toward it. Tapping a card,
+  or its View action, opens it in the viewer over the deck; closing returns to
+  the same card. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
+- A comparison is one swipe card of two images, side by side (stacked on
+  phones), named A and B by what differs, under its question (Which Model?,
+  Which LoRA Strength?, Which Wording?…). Swipe or press left for A, right for
+  B, up for Both and down for Neither, or use the bar's A, Both, Neither and B;
+  dragging toward a side fades the other.
 - Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.
 - Dream also mixes in random older images the account generated in Studio
   (never uploads or imports), as single cards and
-  occasional this-or-that pairs, to calibrate taste without using the GPU;
+  occasional Which Image? pairs, to calibrate taste without using the GPU;
   judging them never alters the gallery beyond an optional Star.
 - An editable, LLM-maintained taste profile learns from swipes, stars,
   iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,

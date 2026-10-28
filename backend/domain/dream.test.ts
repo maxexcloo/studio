@@ -590,7 +590,7 @@ test("Calibration offers the account's older Studio generations, unjudged first,
     (await request("/calibration?limit=10")).body.items.map((item: DreamItem) => item.id).sort();
   assert.deepEqual(await offered(), ["a", "b", "c"]);
 
-  assert.equal((await request("/calibration", { liked: ["a", "b"] })).status, 400);
+  assert.equal((await request("/calibration", { liked: ["a", "b"], passed: ["c"] })).status, 400);
   assert.equal((await request("/calibration", {})).status, 400);
   assert.equal((await request("/calibration", { liked: ["a"], passed: ["a"] })).status, 400);
   for (const id of ["bobs", "upload", "borrowed"])
@@ -644,4 +644,81 @@ test("Dream loads up to two of the account's starred LoRAs the profile can use",
   state.loras = {};
   const next = (await dreamOnce())!;
   assert.deepEqual(store.job("alice", next.id)!.input.loras, []);
+});
+
+test("Every fourth image compares one thing on a kept image's prompt; answers keep, discard and teach", async (t) => {
+  const { dream, state, store, taste, finish, live, dreamOnce } = fixture(t);
+  // A kept image alice generated with FLUX: the comparison's starting point.
+  const session = store.createSession("alice", "Gallery").id;
+  const base = store.enqueue(
+    "alice",
+    session,
+    { kind: "image", profileId: "flux", prompt: "a fox in snow", steps: 20, cfg: 3.5, loras: [] },
+    "image",
+  );
+  store.save({ ...base, status: "completed" });
+  state.items.push({
+    id: "base",
+    jobId: base.id,
+    ownerId: "alice",
+    type: "image",
+    status: "done",
+    favorite: true,
+    prompt: "a fox in snow",
+    settings: { profileId: "flux" },
+  });
+  await dream.save("alice", { enabled: true, dailyImages: 10 });
+  for (let made = 0; made < 3; made++) assert.ok(await dreamOnce());
+  await dream.tick();
+  const [a, b] = live("alice");
+  assert.deepEqual(
+    [a, b].map((job) => [job.input.profileId, job.input.prompt, job.input.seed, job.dream?.pair]),
+    [
+      [
+        "flux",
+        "a fox in snow",
+        "0",
+        { id: a.dream!.pair!.id, side: 0, question: "Which Model?", label: "FLUX" },
+      ],
+      [
+        "qwen",
+        "a fox in snow",
+        "0",
+        { id: a.dream!.pair!.id, side: 1, question: "Which Model?", label: "Qwen" },
+      ],
+    ],
+  );
+  // One side waits for the other before the pair shows.
+  finish("alice", a.id);
+  assert.ok(!dream.unseen("alice").some((item) => item.dream?.pair));
+  finish("alice", b.id);
+  assert.equal(dream.unseen("alice").filter((item) => item.dream?.pair).length, 2);
+
+  const request = await serve(t, dream);
+  const pair = a.dream!.pair!.id;
+  assert.equal((await request(`/pairs/${pair}/answer`, { answer: "maybe" })).status, 400);
+  assert.equal(
+    (await request(`/pairs/${pair}/answer`, { answer: "b" }, "POST", "bob")).status,
+    404,
+  );
+  assert.equal((await request(`/pairs/${pair}/answer`, { answer: "b" })).status, 200);
+  assert.deepEqual(
+    state.items.filter((item) => item.dream?.pair).map((item) => item.dream!.state),
+    ["kept", "discarded"],
+  );
+  const [signal] = taste.read("alice").signals;
+  assert.deepEqual(
+    [signal.kind, signal.question, signal.answer, signal.profileId, signal.over?.profileId],
+    ["preferred", "Which Model?", "Qwen over FLUX", "qwen", "flux"],
+  );
+  // The same image never starts a second comparison.
+  assert.deepEqual(dream.read("alice").compared, ["base"]);
+
+  // More Like This keeps the result and steers the next ideas toward it.
+  const [next] = dream.unseen("alice");
+  assert.equal((await request(`/${next.id}/more`, {})).status, 200);
+  const steered = (await dreamOnce())!;
+  assert.equal((steered.input.writing as { like?: string }).like, next.prompt);
+  assert.match(state.calls.at(-1)!.user, new RegExp(`More like this one: ${next.prompt}`));
+  assert.equal(dream.read("alice").steer?.remaining, 3);
 });
