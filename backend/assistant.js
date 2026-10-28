@@ -395,6 +395,7 @@ function rewriteInstructions({
     `You rewrite prompts for the ${media} model ${label}. Follow its prompting guide below.`,
     "Reply with the rewritten prompt only, as plain text: no preamble, labels, quotes, Markdown or notes.",
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for, with quoted text kept exactly; add only what the guide recommends to realise it, never new subjects or content the user did not imply.",
+    "Rewrite it properly, not as a light edit: reorder it the way the guide recommends, fix grammar and awkward wording, merge repeated ideas, and drop filler and stacked quality words (such as masterpiece, best quality, highly detailed, 8k), then apply the style below in full. The result should read clearly different from the input.",
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
     references && vision
       ? `${references} reference image${references > 1 ? "s are" : " is"} attached: describe what the prompt needs from ${references > 1 ? "them" : "it"} into the rewrite, following the guide's editing advice.`
