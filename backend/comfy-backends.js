@@ -95,7 +95,8 @@ export function routeProfile(profile, options = {}) {
 
 const isLocalVideoProfile = (profile) => capabilityForProfile(profile) === "video";
 
-const allowedProfile = (worker, profile) =>
+/** Whether `worker` may run `profile`: local video on video workers, everything else on image workers. */
+export const allowedProfile = (worker, profile) =>
   isLocalVideoProfile(profile)
     ? worker.capabilities.includes("video")
     : worker.capabilities.includes("image");
