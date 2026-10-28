@@ -116,7 +116,7 @@ function useChatState() {
       });
       if (!override?.content) setText((current) => (current.trim() === content ? "" : current));
       await readChat(response, (event) => {
-        if (event.event === "message" || event.event === "delta") {
+        if (event.event === "message" || event.event === "delta" || event.event === "thinking") {
           void client.cancelQueries({ queryKey: ["chat", sessionId] });
           client.setQueryData<ChatHistory>(["chat", sessionId], (previous) => {
             const messages = [...(previous?.messages || [])];
@@ -124,7 +124,12 @@ function useChatState() {
             if (event.event === "message") {
               if (index < 0) messages.push(event.data);
               else messages[index] = event.data;
-            } else if (index >= 0)
+            } else if (index >= 0 && event.event === "thinking")
+              messages[index] = {
+                ...messages[index],
+                thinking: (messages[index].thinking || "") + event.data.text,
+              };
+            else if (index >= 0)
               messages[index] = {
                 ...messages[index],
                 content: messages[index].content + event.data.text,

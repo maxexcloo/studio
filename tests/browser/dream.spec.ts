@@ -111,13 +111,75 @@ test("Calibration judges gallery images, singly and as a pair, even while Dream 
   await page.keyboard.press("ArrowRight");
   await expect(card).toContainText("Dream prompt g2");
   await page.getByRole("button", { name: "Pass", exact: true }).click();
-  await expect(page.getByRole("group", { name: "Which Do You Prefer?" })).toBeVisible();
-  await page.getByRole("button", { name: "Prefer Second Image", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Which Image?" })).toBeVisible();
+  await page.getByRole("button", { name: "B", exact: true }).click();
   await expect(page.getByText("Dream Is Off", { exact: true })).toBeVisible();
   expect(dream.requests.map((request) => request.body)).toEqual([
     { liked: ["g1"] },
     { passed: ["g2"] },
     { liked: ["g4"], passed: ["g3"] },
+  ]);
+});
+
+test("A Dream comparison asks its question and answers with swipes, keys and buttons", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const side = (id: string, pair: string, index: 0 | 1, label: string) =>
+    dreamItem(id, {
+      dream: {
+        prompt: "Dream prompt fox",
+        why: "",
+        at: "",
+        state: "unseen",
+        pair: { id: pair, side: index, question: "Which Steps?", label },
+      },
+    });
+  const dream = await serveDream(page, {
+    unseen: [
+      side("p1a", "one", 0, "20 Steps"),
+      side("p1b", "one", 1, "40 Steps"),
+      side("p2a", "two", 0, "20 Steps"),
+      side("p2b", "two", 1, "40 Steps"),
+      side("p3b", "three", 1, "Guidance 5"),
+      side("p3a", "three", 0, "Guidance 3"),
+      dreamItem("last"),
+    ],
+  });
+  await page.goto("/dream");
+  const pair = page.getByRole("group", { name: "Which Steps?", exact: true });
+  await expect(pair).toContainText("A · 20 Steps");
+  await expect(pair).toContainText("B · 40 Steps");
+
+  // Tapping a side opens it in the viewer; closing it returns to the same comparison.
+  await pair.locator("[data-side='1']").click();
+  const viewer = page.getByRole("dialog");
+  await expect(viewer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewer).toBeHidden();
+  await expect(pair).toContainText("A · 20 Steps");
+
+  // A drag left answers A.
+  const box = (await pair.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.down();
+  await page.mouse.move(centre.x - box.width / 2, centre.y + 10, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(() => dream.requests.length).toBe(1);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("group", { name: "Which Steps?" })).toContainText("Guidance 3");
+  await page.getByRole("button", { name: "Both", exact: true }).click();
+  await expect(page.getByRole("group", { name: "Current Dream", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "More Like This", exact: true }).click();
+  await expect(page.getByText("Nothing New Yet", { exact: true })).toBeVisible();
+  expect(
+    dream.requests.map((request) => `${request.path} ${JSON.stringify(request.body)}`),
+  ).toEqual([
+    '/api/dream/pairs/one/answer {"answer":"a"}',
+    '/api/dream/pairs/two/answer {"answer":"neither"}',
+    '/api/dream/pairs/three/answer {"answer":"both"}',
+    "/api/dream/last/more {}",
   ]);
 });
 

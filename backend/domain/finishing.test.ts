@@ -127,10 +127,9 @@ test("Starring queues finishable images once, unstarring takes them off, and one
     image("c"),
     image("done", "alice", { upscale: { status: "done", url: "/up.png" } }),
     image("video", "alice", { type: "video" }),
-    image("folder", "alice", { library: true }),
     image("rendering", "alice", { status: "pending" }),
   );
-  finishing.starred("alice", ["a", "b", "c", "done", "video", "folder", "rendering"], true);
+  finishing.starred("alice", ["a", "b", "c", "done", "video", "rendering"], true);
   finishing.starred("alice", ["a"], true);
   assert.equal(finishing.waiting("alice"), 3);
   finishing.starred("alice", ["c"], false);

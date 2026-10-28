@@ -58,9 +58,10 @@
     transform var(--studio-motion-duration) ease,
     opacity var(--studio-motion-duration) ease;
   will-change: transform;
-  --dream-keep: 0;
-  --dream-discard: 0;
+  --dream-left: 0;
+  --dream-right: 0;
   --dream-up: 0;
+  --dream-down: 0;
 }
 .card:active {
   cursor: grabbing;
@@ -108,25 +109,39 @@
   pointer-events: none;
   background: var(--studio-glass-raised);
 }
-.hint[data-hint="keep"] {
+/* Each word shows while dragging its way: right's on the left, left's on the right, like a stamp. */
+.hint[data-hint="right"] {
   left: var(--mantine-spacing-lg);
   color: var(--mantine-color-green-5);
-  opacity: var(--dream-keep);
+  opacity: var(--dream-right);
   transform: rotate(-10deg);
 }
-.hint[data-hint="discard"] {
+.hint[data-hint="left"] {
   right: var(--mantine-spacing-lg);
   color: var(--mantine-color-red-5);
-  opacity: var(--dream-discard);
+  opacity: var(--dream-left);
   transform: rotate(10deg);
+}
+.hint[data-hint="up"],
+.hint[data-hint="down"] {
+  left: 50%;
+  translate: -50% 0;
+  color: var(--mantine-color-blue-4);
 }
 .hint[data-hint="up"] {
   top: auto;
   bottom: 30%;
-  left: 50%;
-  translate: -50% 0;
-  color: var(--mantine-color-blue-4);
   opacity: var(--dream-up);
+}
+.hint[data-hint="down"] {
+  top: 30%;
+  color: var(--mantine-color-dimmed);
+  opacity: var(--dream-down);
+}
+/* A pair answers with sides rather than verdicts. */
+.card[data-pair] .hint[data-hint="left"],
+.card[data-pair] .hint[data-hint="right"] {
+  color: var(--mantine-primary-color-filled);
 }
 .actions {
   flex-shrink: 0;
@@ -138,9 +153,6 @@
   height: 100%;
   object-fit: cover;
 }
-.card[data-pair] {
-  cursor: auto;
-}
 .pair {
   flex: 1;
   min-height: 0;
@@ -149,7 +161,9 @@
   gap: var(--mantine-spacing-sm);
   padding: 0 var(--mantine-spacing-sm) var(--mantine-spacing-sm);
 }
+/* Dragging toward a side keeps it bright and fades the other; down fades both. */
 .choice {
+  position: relative;
   min-height: 0;
   display: flex;
   align-items: center;
@@ -158,28 +172,39 @@
   border-radius: var(--mantine-radius-md);
   background: rgb(0 0 0 / 0.18);
   outline: 2px solid transparent;
-  transition:
-    transform calc(var(--studio-motion-duration) * 2) ease,
-    opacity calc(var(--studio-motion-duration) * 2) ease,
-    outline-color var(--studio-motion-duration) ease;
+  cursor: zoom-in;
 }
-.choice:hover,
-.choice:focus-visible {
-  outline-color: var(--mantine-primary-color-filled);
+.choice[data-side="0"] {
+  opacity: calc(1 - 0.7 * var(--dream-right) - 0.6 * var(--dream-down));
+  outline-color: rgb(from var(--mantine-primary-color-filled) r g b / var(--dream-left));
 }
-.choice[data-chosen="true"] {
-  outline-color: var(--mantine-primary-color-filled);
-  transform: scale(1.02);
-}
-.choice[data-chosen="false"] {
-  opacity: 0.2;
-  transform: scale(0.94);
+.choice[data-side="1"] {
+  opacity: calc(1 - 0.7 * var(--dream-left) - 0.6 * var(--dream-down));
+  outline-color: rgb(from var(--mantine-primary-color-filled) r g b / var(--dream-right));
 }
 .choice img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  pointer-events: none;
   -webkit-user-drag: none;
+}
+.side {
+  position: absolute;
+  bottom: var(--mantine-spacing-xs);
+  left: var(--mantine-spacing-xs);
+  max-width: calc(100% - 2 * var(--mantine-spacing-xs));
+  padding: 2px 8px;
+  border-radius: var(--mantine-radius-sm);
+  background: var(--studio-glass-raised);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.view {
+  position: absolute;
+  top: var(--mantine-spacing-sm);
+  right: var(--mantine-spacing-sm);
 }
 @media (max-width: 48em) {
   .pair {

@@ -9,7 +9,6 @@ export interface FinishingItem {
   status?: string;
   prompt?: string;
   favorite?: boolean;
-  library?: unknown;
   upscale?: { status?: string; url?: string };
 }
 /** Whether smart upscale can run now, and with face detail. */
@@ -92,7 +91,6 @@ export function createFinishing(options: {
       item.type === "image" &&
       item.status === "done" &&
       item.favorite &&
-      !item.library &&
       !item.upscale?.url &&
       !["queued", "running"].includes(item.upscale?.status || ""),
     );

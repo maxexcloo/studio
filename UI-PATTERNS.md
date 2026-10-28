@@ -23,7 +23,7 @@ primary component reference and verify APIs against the installed version.
   `MutationCache` default notification. Do not add per-call duplicate surfaces.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
-  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo` and `copyText`.
+  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and `copyText`.
 - Style with Mantine props and theme `extend` defaults first; component-specific
   CSS lives in a co-located CSS module and shared tokens in `theme.ts`. Avoid
   global class rules and per-call sizes that the theme should own.
@@ -132,6 +132,12 @@ primary component reference and verify APIs against the installed version.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
   a short transition and the standard accessible close action.
+- Every multi-line text box is the shared `TextBox`. The composer's prompt and
+  negative prompt carry compact Copy and Clear beside their other actions; Clear
+  offers Undo in its notification. On phones, tapping a text box (prompt,
+  negative, Chat message, profile and guide editors and the rest) opens it full
+  screen with Copy, Clear and Done, and floating prompt ideas move under its text;
+  Done, Escape or dismissing the keyboard returns to the page. Desktop edits in place.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
@@ -149,6 +155,9 @@ primary component reference and verify APIs against the installed version.
   chats get a short LLM title. Deleting a chat offers an unticked per-result
   checklist of media to delete as well.
 - Chat retains streamed text, generation snapshots and results chronologically.
+  A reply streams the model's thinking until its text starts, then keeps it collapsed
+  under Thinking, and names the media it requested. Opening a chat waits for its
+  messages and lands at the bottom once.
   Assistant text appears above each input card and results below it. Discussion
   stays text-only; explicit media requests use selected settings without model
   fallback or an extra confirmation. Refine/Animate stage a new timeline card.
@@ -196,14 +205,23 @@ primary component reference and verify APIs against the installed version.
 - Dream is a card deck of background results, up to a maximum height, with a
   strip showing progress through the current batch. Swipe or press left to skip,
   right to keep and up to keep and queue variations. One compact bar under the
-  card offers Skip, Refine, Animate, Star and Keep; Refine and Animate keep the
-  result and stage it in the composer, and Star keeps it too. Dream results stay in their own pool until kept;
+  card offers Skip, Refine, Animate, Star, More Like This and Keep; Refine and
+  Animate keep the result and stage it in the composer, Star keeps it too and
+  More Like This keeps it and steers the next ideas toward it. Tapping a card,
+  or its View action, opens it in the viewer over the deck; closing returns to
+  the same card. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
+- A comparison is one swipe card of two images, side by side (stacked on
+  phones), named A and B by what differs, under its question (Which Model?,
+  Which LoRA Strength?, Which Wording?…). Swipe or press left for A, right for
+  B, up for Both and down for Neither, or use the bar's A, Both, Neither and B;
+  dragging toward a side fades the other.
 - Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.
-- Dream also mixes in random older gallery items, as single cards and
-  occasional this-or-that pairs, to calibrate taste without using the GPU;
+- Dream also mixes in random older images the account generated in Studio
+  (never uploads or imports), as single cards and
+  occasional Which Image? pairs, to calibrate taste without using the GPU;
   judging them never alters the gallery beyond an optional Star.
 - An editable, LLM-maintained taste profile learns from swipes, stars,
   iterations, prompts and LoRAs. It informs Dream, composer prompt ideas,

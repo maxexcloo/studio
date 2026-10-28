@@ -14,8 +14,7 @@ const nextDay = (key) => {
 };
 
 export function galleryStats(items = [], now = new Date()) {
-  // Earlier images shown from another folder (library.js) were not made here.
-  const done = items.filter((item) => item?.status === "done" && !item.library);
+  const done = items.filter((item) => item?.status === "done");
   const days = new Map();
   const workflows = new Map();
   let renderMs = 0;
@@ -89,7 +88,7 @@ export function profileStats(items = [], now = Date.now()) {
   for (const item of items) {
     const profile = canonicalProfileId(item?.settings?.profileId);
     const at = Date.parse(item?.createdAt || "");
-    if (!profile || item.library || !(now - at < 30 * dayMs)) continue;
+    if (!profile || !(now - at < 30 * dayMs)) continue;
     if (item.status !== "done" && item.status !== "failed") continue;
     const entry = stats.get(profile) || {
       runs: 0,

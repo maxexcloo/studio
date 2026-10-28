@@ -31,14 +31,21 @@ import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
 import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
-import { createCaptioner, registerCaptionRoutes } from "./domain/captions.ts";
+import { createCaptioner } from "./domain/captions.ts";
+import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
+import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createTitler } from "./domain/titles.ts";
-import { readRuntimeDocument, writeRuntimeDocument } from "./persistence/runtime.ts";
+import {
+  readRuntimeDocument,
+  runtimeDatabase,
+  writeRuntimeDocument,
+} from "./persistence/runtime.ts";
 import { createGenerationQueueAdapter } from "./domain/generation-adapter.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./domain/upscale-adapter.ts";
 import { createCloudQueueAdapter, routeQueueAdapters } from "./domain/cloud-adapter.ts";
 import { configuredCliProxy } from "./providers/cliproxy.ts";
 import { providerMediaWriter } from "./providers/media.ts";
+import { createSiglip, siglipVersion } from "./providers/siglip.ts";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
@@ -89,7 +96,6 @@ import express from "express";
 import {
   configuredBackends,
   currentComfyBackend,
-  forgetWorkerState,
   isDefaultBackend,
   mergeWorkerModels,
   noteWorkerProfiles,
@@ -105,7 +111,6 @@ import {
   noWorkerMessage,
   workerById,
 } from "./workers.js";
-import { registerWorkerRoutes } from "./worker-routes.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -150,7 +155,7 @@ import {
   settingSource,
 } from "./deployment-settings.js";
 import { civitaiTokenStatus } from "./civitai-access.js";
-import { hfTokenStatus } from "./hf-access.js";
+import { hfFetch, hfTokenStatus } from "./hf-access.js";
 import { primeModelMetadata } from "./model-families.js";
 import {
   deleteOwnedGalleryItems,
@@ -170,6 +175,7 @@ import {
   updateGalleryJob,
   galleryRevisionValue,
   storedWritingRecord,
+  onGalleryFilesDeleted,
 } from "./gallery-store.js";
 import { buildStats, getThumbnail } from "./thumbnails.js";
 import {
@@ -181,7 +187,7 @@ import {
   setPromptHistoryEnabled,
   setPromptPinned,
 } from "./prompt-history.js";
-import { fillVideoSizes, libraryFile, libraryFolders, rescanLibraryFolders } from "./library.js";
+import { fillVideoSizes } from "./library.js";
 import {
   getComfyVideoPoster,
   getComfyVideoPreview,
@@ -192,7 +198,9 @@ import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
-import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
+import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
+import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
+import { strengthRange } from "./lora-policy.js";
 import {
   deleteImportedWorkflow,
   getCustomWorkflow,
@@ -240,7 +248,6 @@ import {
   runUpscaleJob,
   toggleUpscaleView,
 } from "./upscale-jobs.js";
-import { autoDetectOutputDir } from "./output-folder.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
 import { isMediaUrl, mediaRoot, mediaStorageEnabled, mediaType } from "./media-paths.js";
@@ -427,17 +434,10 @@ const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
 // connection), so its failure is remembered briefly rather than retried on every
-// catalogue load and run. A new address clears it.
+// catalogue load and run.
 // The default worker is always asked: its absence is what the studio's offline screen shows.
 const workerUnreachableForMs = 30_000;
 const workerUnreachableUntil = new Map();
-/** Forgets what Studio knew about a worker whose address or capabilities changed, or that was removed. */
-function forgetWorker(id) {
-  contextCaches.delete(id);
-  contextFailures.delete(id);
-  workerUnreachableUntil.delete(id);
-  forgetWorkerState(id);
-}
 const backendUnreachable = (error) =>
   error?.status ? [502, 503, 504].includes(error.status) : !isComfyTimeout(error);
 
@@ -493,10 +493,6 @@ async function fetchComfyContext(backend) {
     rewriteStore.saveWorkerModels(backend, worker.url, { info, stats });
   }
   return result;
-}
-
-function refreshComfyContextSoon() {
-  setTimeout(() => loadComfyContext({ force: true }).catch(() => null), 0);
 }
 
 const recoverRunningJobs = createJobRecovery({
@@ -1365,6 +1361,7 @@ app.delete("/api/workflows/:id", (req, res) => {
 });
 
 registerGalleryReadRoutes(app, {
+  near: (text) => imageSearch.near(text),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
     const titles = new Map(rewriteStore.sessions(ownerId).map((chat) => [chat.id, chat.title]));
@@ -1469,6 +1466,7 @@ const jobAdmitted = (job) => {
   dream.admitted(job);
   finishing.admitted(job);
   captioner.interrupt();
+  imageSearch.interrupt();
   titler.interrupt();
   nextSteps.interrupt();
 };
@@ -1577,21 +1575,6 @@ app.post("/api/prompts/clear", (req, res) => {
   });
 });
 
-app.get("/api/library/file", (req, res) => {
-  const file = libraryFile(req.query.folder, req.query.path);
-  if (!file) {
-    res.status(404).json({ ok: false, error: "That image is gone." });
-    return;
-  }
-  const disposition = req.query.download === "1" ? "attachment" : "inline";
-  res.sendFile(file, {
-    headers: {
-      "Cache-Control": "private, max-age=0, must-revalidate",
-      "Content-Disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(path.basename(file))}`,
-    },
-  });
-});
-
 /**
  * A thumbnail's caching. The gallery asks for every thumbnail with a `v` that
  * names its item (mediaUrl.ts), so a reused file name is a new address: that
@@ -1606,43 +1589,6 @@ function thumbnailCacheControl(req) {
 }
 
 registerReferenceRoutes(app);
-
-/** Whether ComfyUI answers at an address, in words Settings can show. */
-async function probeComfy(candidate) {
-  try {
-    const response = await fetch(`${candidate}/system_stats`, {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (response.ok) {
-      const stats = await response.json().catch(() => ({}));
-      return {
-        reachable: true,
-        detail: "",
-        device: stats?.devices?.[0]?.name || "",
-        version: stats?.system?.comfyui_version || "",
-      };
-    }
-    return {
-      reachable: false,
-      detail: `It answered with HTTP ${response.status}. Is that ComfyUI?`,
-    };
-  } catch (error) {
-    return {
-      reachable: false,
-      detail:
-        error?.name === "TimeoutError"
-          ? "Nothing answered there within 4 seconds."
-          : "Nothing is listening at that address.",
-    };
-  }
-}
-
-// Settings › Workers: the list, saving it and testing an address (worker-routes.js).
-registerWorkerRoutes(app, {
-  probe: probeComfy,
-  forget: forgetWorker,
-  refresh: refreshComfyContextSoon,
-});
 
 /**
  * What the deployment decides, for Settings: each value with its source
@@ -1976,10 +1922,12 @@ const generationQueue = new GenerationQueue(
     ...generationAdapter,
     settled: async (job) => {
       await generationAdapter.settled(job);
-      if (job.status === "completed")
-        void titler.completed(
-          gallery.filter((item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId),
-        );
+      if (job.status !== "completed") return;
+      const items = gallery.filter(
+        (item) => item.jobId === job.id && (item.ownerId || "") === job.ownerId,
+      );
+      void titler.completed(items);
+      void imageSearch.completed(items);
     },
   },
   promptStage,
@@ -2168,12 +2116,29 @@ const dream = createDream({
   gallery: (ownerId) =>
     gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
-  mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
+  // Only the owner's own record: updateGalleryJob alone matches any account's item.
+  mark: (ownerId, itemId, mark) => {
+    if (!gallery.some((item) => item.id === itemId && (item.ownerId || "") === ownerId))
+      throw new Error("That Dream result is unavailable.");
+    updateGalleryJob(itemId, { dream: mark });
+  },
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return null;
     return loadLoraLibrary(ownerId);
   },
+  // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
+  fitLoras: (profile, loras) =>
+    loras.flatMap((lora) => {
+      const info = catalogueLoraInfo(lora.name);
+      const range = strengthRange(info);
+      const strength = range
+        ? Math.min(range.max, Math.max(range.min, lora.strength))
+        : lora.strength;
+      return optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
+        ? []
+        : [{ ...lora, strength }];
+    }),
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
@@ -2239,6 +2204,14 @@ async function smallImage(item) {
   return { mime: "image/jpeg", data: data.toString("base64") };
 }
 // Gallery captions (domain/captions.ts) let search match what an image shows.
+const runtimeLoad = (name) => () => {
+  try {
+    return readRuntimeDocument(dataDir, name);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+};
 const captioner = createCaptioner({
   enabled: () => flagEnabled("STUDIO_GALLERY_CAPTIONS"),
   writer: assistantEngine,
@@ -2248,17 +2221,25 @@ const captioner = createCaptioner({
   visible: (item) => filterVisibleGallery([item]).length > 0,
   image: smallImage,
   save: (item, caption) => updateGalleryJob(galleryKey(item), { caption }),
-  load: () => {
-    try {
-      return readRuntimeDocument(dataDir, "captions");
-    } catch (error) {
-      if (error.code === "ENOENT") return null;
-      throw error;
-    }
-  },
+  load: runtimeLoad("captions"),
   persist: (document) => writeRuntimeDocument(dataDir, "captions", document),
 });
-registerCaptionRoutes(app, { captioner, requireAdmin });
+registerIdlePassRoutes(app, "/api/gallery/captions", { work: captioner, requireAdmin });
+// Image search (domain/image-search.ts): SigLIP 2 on the CPU, so search finds what images show.
+const imageSearch = createImageSearch({
+  // Demo images are placeholders, and demo test runs must not download the model.
+  enabled: () => !demoMode && flagEnabled("STUDIO_IMAGE_SEARCH"),
+  encoder: createSiglip({ dataDir, fetch: hfFetch }),
+  vectors: createImageVectors(runtimeDatabase(dataDir), siglipVersion),
+  idle: studioIdle,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  image: async (item) => (await publicGalleryBuffer(item)).buffer,
+  load: runtimeLoad("image-search"),
+  persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
+});
+registerIdlePassRoutes(app, "/api/gallery/embeddings", { work: imageSearch, requireAdmin });
+onGalleryFilesDeleted((items) => imageSearch.forget(items));
 // Gallery titles (domain/titles.ts): a few words from the prompt, shown as the item's title.
 const titler = createTitler({
   writer: assistantEngine,
@@ -2538,6 +2519,7 @@ generationQueue.start();
 dream.start();
 finishing.start();
 captioner.start();
+imageSearch.start();
 titler.start();
 nextSteps.start();
 
@@ -2672,15 +2654,6 @@ async function queueUpscaleOnWorker(account, request, origin) {
     return {
       status: 400,
       payload: { ok: false, reason: "video", error: "Upscale supports gallery images and videos." },
-    };
-  if (item.library)
-    return {
-      status: 400,
-      payload: {
-        ok: false,
-        reason: "library",
-        error: "Images from an added folder stay in that folder, so they can’t be upscaled.",
-      },
     };
   if (item.status !== "done")
     return {
@@ -3208,9 +3181,6 @@ setTimeout(
   () =>
     recoverGalleryFromHistory()
       .catch(() => null)
-      // A library scan skips the output folder, so it has to be known before one runs.
-      .then(() => (libraryFolders().length ? autoDetectOutputDir() : null))
-      .then(() => rescanLibraryFolders())
       // Videos imported before their size was read get it now.
       .then(() => fillVideoSizes())
       .catch(() => null),
@@ -3265,7 +3235,9 @@ const serverStartup = startServers(app, {
       // No workers is a setup of its own: say so.
       if (!listWorkers().length) {
         if (!demoMode)
-          console.log("    No workers are set up yet. Add one in Settings › Workers.\n");
+          console.log(
+            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_WORKLOADS.\n",
+          );
         return;
       }
       // Starting before ComfyUI is fine, but say so instead of leaving people to guess.

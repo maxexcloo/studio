@@ -1,17 +1,8 @@
 import { useState } from "react";
-import { Badge, Button, Menu, Modal, Progress, Select, Stack, Text } from "@mantine/core";
+import { Badge, Button, Menu, Modal, Select, Stack, Text } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Copy,
-  Download,
-  ExternalLink,
-  ListRestart,
-  RotateCcw,
-  ScanText,
-  Square,
-  Trash2,
-} from "lucide-react";
+import { Copy, Download, ExternalLink, ListRestart, RotateCcw, Trash2 } from "lucide-react";
 import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
@@ -20,134 +11,14 @@ import { DataTable } from "../../ui/DataTable";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { statusLabels } from "../generation/Queue";
 import { accountAdminQuery } from "./AccountAdmin";
+import { GalleryPass } from "./GalleryPass";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
-type CaptionScope = "all" | "outdated" | "missing";
-/** A Caption Gallery pass (backend/domain/idle-work.ts). */
-export interface CaptionStatus {
-  state: "ready" | "running" | "waiting" | "stopped" | "finished" | "unavailable";
-  active: boolean;
-  reason: string;
-  done: number;
-  failed: number;
-  remaining: number;
-  total: number;
-  scope: CaptionScope;
-  scopes: Record<CaptionScope, number>;
-  perMinute: number;
-  etaSeconds: number | null;
-}
-const galleryCaptionsQuery = queryOptions({
-  queryKey: ["gallery-captions"],
-  queryFn: () => api<CaptionStatus>("/api/gallery/captions"),
-  // Progress moves while a pass runs; otherwise only a new image changes it.
-  refetchInterval: (query) => (query.state.data?.active ? 2_000 : 60_000),
-});
 const unfinishedQuery = queryOptions({
   queryKey: ["unfinished-jobs"],
   queryFn: () => api<{ jobs: UnfinishedJob[] }>("/api/maintenance/unfinished"),
 });
-
 const count = (value: number) => value.toLocaleString();
-const eta = (seconds: number) => {
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 1) return "under a minute left";
-  if (minutes < 60) return `about ${minutes} min left`;
-  return `about ${Math.floor(minutes / 60)} h ${minutes % 60} min left`;
-};
-const stateLabel = {
-  ready: "Ready",
-  running: "Running",
-  waiting: "Waiting for Studio to be idle",
-  stopped: "Stopped",
-  finished: "Finished",
-  unavailable: "Unavailable",
-};
-const scopeLabels: Record<CaptionScope, string> = {
-  all: "All",
-  missing: "Missing",
-  outdated: "Out of Date",
-};
-
-/** Settings › Maintenance › Caption Gallery: start or stop a captioning pass and follow it. */
-function CaptionGallery() {
-  const client = useQueryClient();
-  const status = useQuery(galleryCaptionsQuery);
-  const [chosen, setChosen] = useState<CaptionScope>("outdated");
-  const change = useMutation({
-    mutationFn: (action: "start" | "stop") =>
-      post<CaptionStatus>(
-        `/api/gallery/captions/${action}`,
-        action === "start" ? { scope: chosen } : undefined,
-      ),
-    onSuccess: (data) => client.setQueryData(galleryCaptionsQuery.queryKey, data),
-  });
-  const data = status.data;
-  // A running pass shows its own scope; otherwise the one to start.
-  const scope = data?.active ? data.scope : chosen;
-  const progress = data && data.total ? ((data.done + data.failed) / data.total) * 100 : 0;
-  const summary = data && [
-    data.state === "unavailable" ? `Unavailable: ${data.reason}` : stateLabel[data.state],
-    data.state === "ready"
-      ? `${count(data.scopes[scope])} to caption`
-      : `${count(data.done)} of ${count(data.total)}`,
-    data.failed && `${count(data.failed)} failed`,
-    data.active && data.perMinute && `${data.perMinute} a minute`,
-    data.active && data.etaSeconds !== null && eta(data.etaSeconds),
-  ];
-  return (
-    <SettingRow
-      label="Caption Gallery"
-      description={
-        <>
-          Describe and tag images for search, as fast as the assistant model allows while Studio is
-          idle. Out of Date takes missing captions and those written under older rules.
-          {summary && (
-            <Text span display="block" size="xs" aria-live="polite">
-              {summary.filter(Boolean).join(" · ")}
-            </Text>
-          )}
-        </>
-      }
-    >
-      {data && (data.active || data.state === "stopped") && (
-        <Progress size="sm" w={96} value={progress} aria-label="Caption Progress" />
-      )}
-      <Select
-        aria-label="Images to Caption"
-        w={150}
-        data={(["all", "missing", "outdated"] as const).map((value) => ({
-          value,
-          label: data ? `${scopeLabels[value]} (${count(data.scopes[value])})` : scopeLabels[value],
-        }))}
-        value={scope}
-        allowDeselect={false}
-        disabled={data?.active}
-        onChange={(value) => value && setChosen(value as CaptionScope)}
-      />
-      {data?.active ? (
-        <Button
-          variant="default"
-          leftSection={<Square size={16} />}
-          loading={change.isPending}
-          onClick={() => change.mutate("stop")}
-        >
-          Stop
-        </Button>
-      ) : (
-        <Button
-          variant="default"
-          leftSection={<ScanText size={16} />}
-          loading={change.isPending}
-          disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
-          onClick={() => change.mutate("start")}
-        >
-          Start
-        </Button>
-      )}
-    </SettingRow>
-  );
-}
 
 /**
  * Settings › Maintenance › Delete Failed Items: everyone deletes their own; administrators of a
@@ -363,7 +234,16 @@ export function MaintenanceSettings() {
   return (
     <Stack gap="lg">
       <SettingGroup title="Clean Up">
-        {admin && <CaptionGallery />}
+        {admin && (
+          <GalleryPass
+            route="/api/gallery/captions"
+            label="Caption Gallery"
+            description="Describe and tag images for search, as fast as the assistant model allows while Studio is idle. Out of Date takes missing captions and those written under older rules."
+            remaining="to caption"
+            progressLabel="Caption Progress"
+            scopeLabel="Images to Caption"
+          />
+        )}
         <DeleteFailedItems />
         <SettingRow
           label="Export Gallery"
@@ -379,6 +259,15 @@ export function MaintenanceSettings() {
             Export
           </Button>
         </SettingRow>
+        {admin && (
+          <GalleryPass
+            route="/api/gallery/embeddings"
+            label="Index Gallery"
+            description="Read every image for Image Search, on Studio's CPU while it is idle. The first run downloads the model."
+            remaining="to index"
+            progressLabel="Index Progress"
+          />
+        )}
         {admin && <UnfinishedItems />}
       </SettingGroup>
       <SettingGroup title="Help">

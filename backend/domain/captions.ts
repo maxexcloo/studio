@@ -1,11 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  createIdleWork,
-  passScopes,
-  type IdleDocument,
-  type IdleItem,
-  type PassScope,
-} from "./idle-work.ts";
+import { createIdleWork, type IdleDocument, type IdleItem } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
@@ -93,44 +87,5 @@ export function createCaptioner(options: {
         version: captionVersion,
       });
     },
-  });
-}
-type Captioner = ReturnType<typeof createCaptioner>;
-
-interface Request {
-  body?: Record<string, unknown>;
-}
-interface Response {
-  status(code: number): Response;
-  json(value: unknown): unknown;
-}
-type Handler = (req: Request, res: Response) => unknown;
-
-/** Settings › Maintenance › Caption Gallery, for administrators. */
-export function registerCaptionRoutes(
-  app: {
-    get(path: string, handler: Handler): unknown;
-    post(path: string, handler: Handler): unknown;
-  },
-  {
-    captioner,
-    requireAdmin,
-  }: { captioner: Captioner; requireAdmin(req: Request, res: Response): boolean },
-) {
-  app.get("/api/gallery/captions", async (req, res) => {
-    if (requireAdmin(req, res)) res.json(await captioner.status());
-  });
-  app.post("/api/gallery/captions/start", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    const scope = req.body?.scope as PassScope;
-    if (!passScopes.includes(scope))
-      return res.status(400).json({ error: `Choose a scope: ${passScopes.join(", ")}.` });
-    captioner.startPass(scope);
-    res.json(await captioner.status());
-  });
-  app.post("/api/gallery/captions/stop", async (req, res) => {
-    if (!requireAdmin(req, res)) return;
-    captioner.stopPass();
-    res.json(await captioner.status());
   });
 }

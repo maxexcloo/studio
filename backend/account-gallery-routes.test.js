@@ -21,16 +21,18 @@ const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
 
 const routes = {};
 const jobChats = new Map();
+// Image search (domain/image-search.ts): a test per search, or null.
+let near = () => null;
 registerGalleryReadRoutes(
   {
     get: (route, handler) => {
       routes[route] = handler;
     },
   },
-  { jobChats: () => jobChats },
+  { jobChats: () => jobChats, near: async (q) => near(q) },
 );
 
-function call(handler, req) {
+async function call(handler, req) {
   const res = {
     body: null,
     status() {
@@ -41,7 +43,7 @@ function call(handler, req) {
       return this;
     },
   };
-  handler(req, res);
+  await handler(req, res);
   return res.body;
 }
 
@@ -59,7 +61,7 @@ const item = (ownerId, jobId) => ({
   filename: `${jobId}.png`,
 });
 
-test("gallery pages and exact job reads return only the signed-in account's records", () => {
+test("gallery pages and exact job reads return only the signed-in account's records", async () => {
   const first = item("account-a", "job-a");
   const second = item("account-b", "job-b");
   galleryStore.setGallery([first, second]);
@@ -73,24 +75,24 @@ test("gallery pages and exact job reads return only the signed-in account's reco
     query: {},
   };
 
-  const page = call(routes["/api/gallery"], request);
+  const page = await call(routes["/api/gallery"], request);
   assert.deepEqual(
     page.items.map((record) => record.id),
     [first.id],
   );
   assert.deepEqual(
-    call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } }).items,
+    (await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-b" } })).items,
     [],
   );
   assert.deepEqual(
-    call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items.map(
-      (record) => record.jobId,
-    ),
+    (
+      await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } })
+    ).items.map((record) => record.jobId),
     ["job-a"],
   );
 });
 
-test("access profiles without gallery permission cannot read pages or exact job outputs", () => {
+test("access profiles without gallery permission cannot read pages or exact job outputs", async () => {
   galleryStore.setGallery([item("account-a", "job-a")]);
   const request = {
     studioAccount: {
@@ -102,9 +104,9 @@ test("access profiles without gallery permission cannot read pages or exact job 
     },
     query: {},
   };
-  assert.deepEqual(call(routes["/api/gallery"], request).items, []);
+  assert.deepEqual((await call(routes["/api/gallery"], request)).items, []);
   assert.deepEqual(
-    call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } }).items,
+    (await call(routes["/api/gallery/jobs/:id"], { ...request, params: { id: "job-a" } })).items,
     [],
   );
 });
@@ -126,23 +128,23 @@ test("Clear Failed takes the account's own failed items; administrators may name
     item("account-b", "b-done"),
   ]);
 
-  assert.equal(clear({ ...account("account-a"), body: {} }).cleared, 1);
+  assert.equal((await clear({ ...account("account-a"), body: {} })).cleared, 1);
   assert.deepEqual(left(), ["b-done", "b-failed", "c-failed"]);
   assert.equal(
-    clear({ ...account("account-a"), body: { owner: "all" } }).reason,
+    (await clear({ ...account("account-a"), body: { owner: "all" } })).reason,
     "computer-only",
     "only administrators clear other accounts' items",
   );
   assert.equal(
-    clear({ ...account("admin", "administrator"), body: { owner: "account-b" } }).cleared,
+    (await clear({ ...account("admin", "administrator"), body: { owner: "account-b" } })).cleared,
     1,
   );
   assert.deepEqual(left(), ["b-done", "c-failed"]);
-  clear({ ...account("admin", "administrator"), body: { owner: "all" } });
+  await clear({ ...account("admin", "administrator"), body: { owner: "all" } });
   assert.deepEqual(left(), ["b-done"]);
 });
 
-test("LoRA previews use the account's newest finished image made with each LoRA", () => {
+test("LoRA previews use the account's newest finished image made with each LoRA", async () => {
   const made = (ownerId, jobId, createdAt, loras, status = "done") => ({
     ...item(ownerId, jobId),
     status,
@@ -170,7 +172,7 @@ test("LoRA previews use the account's newest finished image made with each LoRA"
     },
     query: {},
   };
-  assert.deepEqual(call(routes["/api/loras/previews"], request).previews, {
+  assert.deepEqual((await call(routes["/api/loras/previews"], request)).previews, {
     "detail.safetensors": "/thumbs/new.webp",
   });
 });
@@ -196,7 +198,7 @@ test("finished outputs keep the pending tiles' owner and never replace another o
   assert.equal(remaining.find((record) => record.ownerId === "account-b").status, "pending");
 });
 
-test("repeated gallery filters match any of their values and combine across filters", () => {
+test("repeated gallery filters match any of their values and combine across filters", async () => {
   const made = (jobId, model, width, height) => ({
     ...item("account-a", jobId),
     model,
@@ -217,21 +219,21 @@ test("repeated gallery filters match any of their values and combine across filt
     },
     query,
   });
-  const ids = (query) =>
-    call(routes["/api/gallery"], request({ limit: "50", ...query }))
-      .items.map((record) => record.jobId)
+  const ids = async (query) =>
+    (await call(routes["/api/gallery"], request({ limit: "50", ...query }))).items
+      .map((record) => record.jobId)
       .sort();
-  assert.deepEqual(ids({ model: ["flux", "sdxl"] }), ["job-flux", "job-sdxl"]);
-  assert.deepEqual(ids({ model: "wan" }), ["job-wan"]);
-  assert.deepEqual(ids({ model: ["flux", "sdxl"], aspect: ["1:1", "9:16"] }), ["job-flux"]);
+  assert.deepEqual(await ids({ model: ["flux", "sdxl"] }), ["job-flux", "job-sdxl"]);
+  assert.deepEqual(await ids({ model: "wan" }), ["job-wan"]);
+  assert.deepEqual(await ids({ model: ["flux", "sdxl"], aspect: ["1:1", "9:16"] }), ["job-flux"]);
   assert.deepEqual(
-    ids({ model: ["", ""] }),
+    await ids({ model: ["", ""] }),
     ["job-flux", "job-sdxl", "job-wan"],
     "blank values are no filter",
   );
 });
 
-test("gallery filter options cover the owned gallery without exposing other accounts or media kinds", () => {
+test("gallery filter options cover the owned gallery without exposing other accounts or media kinds", async () => {
   galleryStore.setGallery([
     ...Array.from({ length: 65 }, (_, index) => ({
       ...item("account-a", `page-${index}`),
@@ -258,13 +260,13 @@ test("gallery filter options cover the owned gallery without exposing other acco
     },
     query: { type: "image", limit: "60", q: "no-match" },
   };
-  const facets = call(routes["/api/gallery/filters"], request);
+  const facets = await call(routes["/api/gallery/filters"], request);
   assert.deepEqual(facets.models, ["base-model", "late-model", "shared-model"]);
   assert.deepEqual(facets.loras, ["detail.safetensors"]);
   assert.equal(facets.sizes[0].value, "up-to-1k");
   assert.equal(facets.aspects.at(-1).value, "other");
   assert.deepEqual(
-    call(routes["/api/gallery/filters"], {
+    await call(routes["/api/gallery/filters"], {
       ...request,
       studioAccount: { ...request.studioAccount, features: { gallery: false } },
     }),
@@ -272,7 +274,7 @@ test("gallery filter options cover the owned gallery without exposing other acco
   );
 });
 
-test("gallery items carry their Chat, which filters pages and lists as a facet", () => {
+test("gallery items carry their Chat, which filters pages and lists as a facet", async () => {
   galleryStore.setGallery([item("account-a", "job-a"), item("account-a", "job-b")]);
   jobChats.set("job-a", { id: "chat-a", title: "Teapots" });
   const request = (query) => ({
@@ -285,18 +287,18 @@ test("gallery items carry their Chat, which filters pages and lists as a facet",
     query,
   });
   try {
-    const page = call(routes["/api/gallery"], request({ limit: "50" }));
+    const page = await call(routes["/api/gallery"], request({ limit: "50" }));
     assert.deepEqual(page.items.map((record) => [record.jobId, record.sessionId]).sort(), [
       ["job-a", "chat-a"],
       ["job-b", undefined],
     ]);
     assert.deepEqual(
-      call(routes["/api/gallery"], request({ limit: "50", chat: "chat-a" })).items.map(
+      (await call(routes["/api/gallery"], request({ limit: "50", chat: "chat-a" }))).items.map(
         (record) => record.jobId,
       ),
       ["job-a"],
     );
-    assert.deepEqual(call(routes["/api/gallery/filters"], request({})).chats, [
+    assert.deepEqual((await call(routes["/api/gallery/filters"], request({}))).chats, [
       { value: "chat-a", label: "Teapots" },
     ]);
   } finally {
@@ -304,7 +306,7 @@ test("gallery items carry their Chat, which filters pages and lists as a facet",
   }
 });
 
-test("search matches an image's caption as well as its prompt, within the account's own records", () => {
+test("search matches an image's caption as well as its prompt, within the account's own records", async () => {
   const caption = (text, tags = []) => ({
     text,
     tags,
@@ -320,20 +322,57 @@ test("search matches an image's caption as well as its prompt, within the accoun
     { ...item("account-a", "job-plain"), prompt: "red fox portrait" },
     { ...item("account-b", "job-other"), caption: caption("A red fox in the snow.") },
   ]);
-  const ids = (q) =>
-    call(routes["/api/gallery"], {
-      studioAccount: {
-        userId: "account-a",
-        role: "user",
-        authenticated: true,
-        features: { gallery: true },
-      },
-      query: { q },
-    })
-      .items.map((record) => record.jobId)
+  const ids = async (q) =>
+    (
+      await call(routes["/api/gallery"], {
+        studioAccount: {
+          userId: "account-a",
+          role: "user",
+          authenticated: true,
+          features: { gallery: true },
+        },
+        query: { q },
+      })
+    ).items
+      .map((record) => record.jobId)
       .sort();
-  assert.deepEqual(ids("Fox SNOW"), ["job-fox"]);
-  assert.deepEqual(ids("red fox"), ["job-fox", "job-plain"]);
-  assert.deepEqual(ids("dusk private"), ["job-fox"], "words may come from caption and prompt");
-  assert.deepEqual(ids("winter wildlife"), ["job-fox"], "and from the caption's tags");
+  assert.deepEqual(await ids("Fox SNOW"), ["job-fox"]);
+  assert.deepEqual(await ids("red fox"), ["job-fox", "job-plain"]);
+  assert.deepEqual(
+    await ids("dusk private"),
+    ["job-fox"],
+    "words may come from caption and prompt",
+  );
+  assert.deepEqual(await ids("winter wildlife"), ["job-fox"], "and from the caption's tags");
+});
+
+test("search adds images that look like it to the text matches, and filters still apply", async () => {
+  galleryStore.setGallery([
+    { ...item("account-a", "job-cat"), model: "flux" },
+    { ...item("account-a", "job-cat-sdxl"), model: "sdxl" },
+    { ...item("account-a", "job-prompt"), model: "flux", prompt: "ginger cat" },
+    { ...item("account-a", "job-other"), model: "flux" },
+  ]);
+  near = (q) => (q === "ginger cat" ? (record) => record.jobId.startsWith("job-cat") : null);
+  const ids = async (query) =>
+    (
+      await call(routes["/api/gallery"], {
+        studioAccount: {
+          userId: "account-a",
+          role: "user",
+          authenticated: true,
+          features: { gallery: true },
+        },
+        query,
+      })
+    ).items
+      .map((record) => record.jobId)
+      .sort();
+  try {
+    assert.deepEqual(await ids({ q: "ginger cat" }), ["job-cat", "job-cat-sdxl", "job-prompt"]);
+    assert.deepEqual(await ids({ q: "ginger cat", model: "flux" }), ["job-cat", "job-prompt"]);
+    assert.deepEqual(await ids({ q: "dog" }), [], "no look-alikes, no text match");
+  } finally {
+    near = () => null;
+  }
 });

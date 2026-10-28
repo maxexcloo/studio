@@ -247,6 +247,7 @@ export async function fixtures(page: Page) {
       const events: any[] = [
         { event: "message", data: user },
         { event: "message", data: { ...assistant } },
+        { event: "thinking", data: { id: assistant.id, text: "Light first, then subject." } },
         {
           event: "delta",
           data: {
@@ -255,6 +256,7 @@ export async function fixtures(page: Page) {
           },
         },
       ];
+      assistant.thinking = "Light first, then subject.";
       assistant.content =
         "## Lighting Direction\n\nLet's shape the lighting before we generate.\n\n- Soft daylight\n- Gentle contrast\n\n[Lighting reference](https://example.com/lighting)";
       if (
@@ -644,7 +646,7 @@ export async function fixtures(page: Page) {
           },
         ],
       });
-    if (path === "/api/gallery/captions")
+    if (path === "/api/gallery/captions" || path === "/api/gallery/embeddings")
       return respond({
         state: "finished",
         active: false,
@@ -657,10 +659,6 @@ export async function fixtures(page: Page) {
         scopes: { all: 0, outdated: 0, missing: 0 },
         perMinute: 0,
         etaSeconds: null,
-      });
-    if (path === "/api/workers")
-      return respond({
-        workers: [{ id: "gpu", label: "Media Worker", capabilities: ["image", "video"] }],
       });
     return respond({ ok: true });
   });
@@ -954,6 +952,12 @@ export async function serveDream(
           nextCursor: start + limit < state.discarded.length ? String(start + limit) : "",
         },
       });
+    }
+    const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);
+    if (answered) {
+      const pairId = decodeURIComponent(answered[1]);
+      state.unseen = state.unseen.filter((item) => item.dream?.pair?.id !== pairId);
+      return route.fulfill({ json: { items: [] } });
     }
     const [, , , rawId, verdict] = path.split("/");
     const item = [...state.unseen, ...state.discarded].find(

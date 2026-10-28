@@ -3,106 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import sharp from "sharp";
 
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-")));
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
-const earlier = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-earlier-")));
 process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = dataDir;
-fs.writeFileSync(
-  path.join(dataDir, "library-folders.json"),
-  JSON.stringify({
-    version: 1,
-    folders: [{ id: "earlier", path: earlier, name: "Earlier Images" }],
-  }),
-);
 const store = await import("./gallery-store.js");
-const library = await import("./library.js");
-const { withPngText } = await import("./png-text.js");
 test.after(() => {
-  for (const folder of [outputDir, dataDir, earlier])
-    fs.rmSync(folder, { recursive: true, force: true });
-});
-
-const image = (color = "#345") =>
-  sharp({ create: { width: 12, height: 8, channels: 3, background: color } })
-    .png()
-    .toBuffer();
-
-test("a folder of earlier images joins the gallery in place, with its prompts", async () => {
-  fs.mkdirSync(path.join(earlier, "2024", ".cache"), { recursive: true });
-  fs.writeFileSync(
-    path.join(earlier, "2024", "castle.png"),
-    withPngText(
-      await image(),
-      "parameters",
-      "a castle on a hill\nNegative prompt: fog\nSteps: 20, Sampler: Euler a, Model: dreamshaper",
-    ),
-  );
-  fs.writeFileSync(
-    path.join(earlier, "comfy.png"),
-    withPngText(
-      await image("#999"),
-      "prompt",
-      JSON.stringify({ 6: { class_type: "CLIPTextEncode", inputs: { text: "an owl in snow" } } }),
-    ),
-  );
-  fs.writeFileSync(path.join(earlier, "notes.txt"), "not an image");
-  fs.writeFileSync(path.join(earlier, "2024", ".cache", "thumb.png"), await image());
-  // An output folder Studio does not know as one (yet): its own studio folder holds what the gallery already has.
-  fs.mkdirSync(path.join(earlier, "output", "studio"), { recursive: true });
-  fs.writeFileSync(path.join(earlier, "output", "studio", "image_00001_.png"), await image("#111"));
-
-  const result = await library.scanLibraryFolder("earlier");
-  assert.equal(result.added, 2);
-  const items = store.gallery.filter((item) => item.library);
-  const castle = items.find((item) => item.outputName === "castle.png");
-  assert.equal(castle.prompt, "a castle on a hill");
-  assert.equal(castle.negative, "fog");
-  assert.equal(castle.model, "dreamshaper");
-  assert.equal(castle.width, 12);
-  assert.match(castle.url, /^\/api\/library\/file\?/);
-  assert.equal(items.find((item) => item.outputName === "comfy.png").prompt, "an owl in snow");
-  assert.equal(
-    library.libraryFile(castle.library.folder, castle.library.path),
-    path.join(earlier, "2024", "castle.png"),
-  );
-  assert.ok(
-    store.pageGallery({}).items.some((item) => item.id === castle.id),
-    "shown while the file is there",
-  );
-
-  // Rescanning only adds what is new.
-  assert.equal((await library.scanLibraryFolder("earlier")).added, 0);
-});
-
-test("only media inside the folder is served, never a dot folder or Studio's own files", async () => {
-  const [folder] = library.libraryFolders();
-  assert.equal(library.libraryFile(folder.id, "../outside.png"), null);
-  assert.equal(library.libraryFile(folder.id, "notes.txt"), null);
-  assert.equal(library.libraryFile(folder.id, "2024/.cache/thumb.png"), null);
-  assert.equal(library.libraryFile("nope", "comfy.png"), null);
-  assert.ok(fs.existsSync(path.join(earlier, "output", "studio", "image_00001_.png")));
-  assert.equal(library.libraryFile(folder.id, "output/studio/image_00001_.png"), null);
-  assert.ok(
-    !store.gallery.some((item) => item.outputName === "image_00001_.png"),
-    "never scanned in either",
-  );
-});
-
-test("removing one from the gallery leaves its file alone and keeps it out of later scans", async () => {
-  const item = store.gallery.find((entry) => entry.outputName === "comfy.png");
-  assert.deepEqual(store.deleteGalleryFiles([item]), { deleted: 0, skipped: 0 });
-  store.hideGalleryItems([item]);
-  store.setGallery(
-    store.gallery.filter((entry) => entry !== item),
-    { persist: false },
-  );
-  assert.ok(fs.existsSync(path.join(earlier, "comfy.png")));
-  const [folder] = library.libraryFolders();
-  assert.equal((await library.scanLibraryFolder(folder.id)).added, 0);
+  for (const folder of [outputDir, dataDir]) fs.rmSync(folder, { recursive: true, force: true });
 });
 
 test("search looks through prompts, models and LoRAs; favourites filter by star", () => {

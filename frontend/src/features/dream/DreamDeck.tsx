@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { Clapperboard, Heart, Star, WandSparkles, X } from "lucide-react";
+import { Clapperboard, Heart, Layers, Maximize2, Star, WandSparkles, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
+import { MediaViewer } from "../gallery/MediaViewer";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { mediaSource } from "../gallery/mediaSource";
 import { queueQuery } from "../generation/Queue";
-import { deckCards, type DeckCard } from "./deck";
-import { PairCard, type Choose } from "./PairCard";
-import { calibrationQuery, dreamItemPath, dreamQuery, type DreamItem } from "./queries";
+import { deckCards, type DeckCard, type PairDeckCard } from "./deck";
+import { PairContent, sideNames } from "./PairCard";
+import {
+  calibrationQuery,
+  dreamItemPath,
+  dreamQuery,
+  pairAnswerPath,
+  type DreamItem,
+  type PairAnswer,
+} from "./queries";
 import { SwipeCard, type Direction, type Fly } from "./SwipeCard";
 import { popupLayer } from "../../ui/popupClicks";
 import classes from "./DreamPage.module.css";
 
-type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine";
+type Verdict = "discard" | "keep" | "variations" | "star" | "animate" | "refine" | "more";
+type SingleCard = Exclude<DeckCard, PairDeckCard>;
 const directions: Record<Verdict, Direction> = {
   discard: "left",
   keep: "right",
@@ -25,6 +34,23 @@ const directions: Record<Verdict, Direction> = {
   star: "right",
   animate: "right",
   refine: "right",
+  more: "right",
+};
+/** A pair is answered by its direction: A left, B right, Both up and Neither down. */
+const answers: Record<Direction, PairAnswer> = {
+  left: "a",
+  right: "b",
+  up: "both",
+  down: "neither",
+};
+const answerDirections = Object.fromEntries(
+  Object.entries(answers).map(([direction, answer]) => [answer, direction]),
+) as Record<PairAnswer, Direction>;
+const keyDirections: Record<string, Direction> = {
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  ArrowDown: "down",
 };
 const layers = `[role="dialog"], [role="alertdialog"], ${popupLayer}`;
 // Calibration joins in once Dream has fewer unseen results than this.
@@ -93,9 +119,8 @@ function useCalibration(wanted: boolean, decided: Set<string>) {
 }
 
 type Judgement =
-  | { card: Extract<DeckCard, { kind: "dream" }>; verdict: Verdict }
-  | { card: Extract<DeckCard, { kind: "calibration" }>; verdict: Verdict }
-  | { card: Extract<DeckCard, { kind: "pair" }>; verdict: 0 | 1 };
+  | { card: SingleCard; verdict: Verdict }
+  | { card: PairDeckCard; verdict: PairAnswer };
 
 /** Sends a verdict: Dream results move to the gallery or discards; gallery images only teach. */
 function useJudge(onFailed: (card: DeckCard) => void) {
@@ -107,9 +132,19 @@ function useJudge(onFailed: (card: DeckCard) => void) {
   return useMutation({
     mutationFn: async (judgement: Judgement) => {
       if (judgement.card.kind === "pair") {
-        const [first, second] = judgement.card.items;
-        const [liked, passed] = judgement.verdict ? [second, first] : [first, second];
-        return post("/api/dream/calibration", { liked: [liked.id], passed: [passed.id] });
+        const { pairId, items } = judgement.card;
+        const answer = judgement.verdict as PairAnswer;
+        if (pairId) return post(pairAnswerPath(pairId), { answer });
+        const [a, b] = items.map((item) => item.id);
+        return post(
+          "/api/dream/calibration",
+          {
+            a: { liked: [a], passed: [b] },
+            b: { liked: [b], passed: [a] },
+            both: { liked: [a, b] },
+            neither: { passed: [a, b] },
+          }[answer],
+        );
       }
       const { item } = judgement.card;
       const verdict = judgement.verdict as Verdict;
@@ -121,6 +156,7 @@ function useJudge(onFailed: (card: DeckCard) => void) {
         );
       }
       if (verdict === "discard") return post(dreamItemPath(item, "discard"));
+      if (verdict === "more") return post(dreamItemPath(item, "more"));
       if (verdict === "variations") {
         await post(dreamItemPath(item, "variations"));
         return client.invalidateQueries({ queryKey: queueQuery.queryKey });
@@ -147,6 +183,9 @@ function useJudge(onFailed: (card: DeckCard) => void) {
 
 const ids = (card: DeckCard) =>
   card.kind === "pair" ? card.items.map((item) => item.id) : [card.item.id];
+/** How many Dream results a card holds; calibration cards hold none. */
+const dreamed = (card: DeckCard) =>
+  card.kind === "dream" ? 1 : card.kind === "pair" && card.pairId ? 2 : 0;
 
 function Caption({ item }: { item: DreamItem }) {
   return (
@@ -187,10 +226,19 @@ function BatchStrip({ done, total }: { done: number; total: number }) {
   );
 }
 
+const cardLabel = (card: DeckCard, top: boolean) =>
+  card.kind === "pair"
+    ? top
+      ? card.question
+      : "Next Comparison"
+    : `${top ? "Current" : "Next"} ${card.kind === "dream" ? "Dream" : "Gallery Image"}`;
+
 /**
  * The Dream deck: the oldest unseen result on top, the next beneath it, the batch's progress above.
- * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Refine, Animate and Star
- * in the compact bar keep the result too.
+ * Swipe or press ← to skip, → to keep, ↑ to keep and queue variations; Refine, Animate, Star and
+ * More Like This in the compact bar keep the result too. A comparison asks about two results
+ * alike but for one thing: ← or a left swipe answers A, → B, ↑ Both and ↓ Neither. Tapping a
+ * card (or its View action) opens it in the viewer over the deck, which stays where it was.
  * With `calibrate`, older gallery images join in (see `deckCards`) to teach the taste profile;
  * judging them changes nothing in the gallery beyond an optional Star. `empty` shows once the
  * deck is through, told whether calibration images are available.
@@ -206,7 +254,8 @@ export function DreamDeck({
 }) {
   const phone = usePhone();
   const [decided, setDecided] = useState<Set<string>>(() => new Set());
-  const [counts, setCounts] = useState({ judged: 0, calibrated: 0 });
+  const [counts, setCounts] = useState({ judged: 0, calibrated: 0, dreamed: 0 });
+  const [viewing, setViewing] = useState<{ item: MediaItem; items: MediaItem[] } | null>(null);
   const judge = useJudge((card) =>
     setDecided((previous) => {
       const next = new Set(previous);
@@ -220,7 +269,6 @@ export function DreamDeck({
   const [top, next] = cards;
   usePrefetch(cards[2]);
   const fly = useRef<Fly | null>(null);
-  const choose = useRef<Choose | null>(null);
   const busy = useRef(false);
   const single = top?.kind === "pair" ? undefined : top;
   const image = single?.item.type === "image";
@@ -235,47 +283,42 @@ export function DreamDeck({
     });
     setCounts((previous) => ({
       judged: previous.judged + 1,
-      calibrated: previous.calibrated + (card.kind === "dream" ? 0 : 1),
+      calibrated: previous.calibrated + (dreamed(card) ? 0 : 1),
+      dreamed: previous.dreamed + dreamed(card),
     }));
     judge.mutate(judgement);
   }
-  /** Skips a pair without a choice. */
-  function skip() {
-    if (top?.kind !== "pair") return;
-    setDecided((previous) => new Set([...previous, ...ids(top)]));
-    setCounts((previous) => ({
-      judged: previous.judged + 1,
-      calibrated: previous.calibrated + 1,
-    }));
-  }
-  async function act(choice: Verdict) {
+  /** Flies the top card out its way, then commits the verdict or answer. */
+  async function act(choice: Verdict | PairAnswer) {
     if (!top || busy.current) return;
     busy.current = true;
     try {
       if (top.kind === "pair") {
-        if (choice !== "discard" && choice !== "keep") return;
-        const index = choice === "discard" ? 0 : 1;
-        await choose.current?.(index);
-        return commit({ card: top, verdict: index });
+        if (!(choice in answerDirections)) return;
+        await fly.current?.(answerDirections[choice as PairAnswer]);
+        return commit({ card: top, verdict: choice as PairAnswer });
       }
-      if (["variations", "animate", "refine"].includes(choice) && !(image && dream)) return;
-      await fly.current?.(directions[choice]);
-      commit({ card: top, verdict: choice } as Judgement);
+      if (!(choice in directions)) return;
+      if (["variations", "animate", "refine", "more"].includes(choice) && !(image && dream)) return;
+      await fly.current?.(directions[choice as Verdict]);
+      commit({ card: top, verdict: choice as Verdict });
     } finally {
       busy.current = false;
     }
   }
+  /** What a swipe or arrow key in a direction means for the top card. */
+  const intent = (direction: Direction): Verdict | PairAnswer | null =>
+    top?.kind === "pair"
+      ? answers[direction]
+      : ({ left: "discard", right: "keep", up: "variations", down: null } as const)[direction];
+  const keyRef = useRef(intent);
+  keyRef.current = intent;
   const actRef = useRef(act);
   actRef.current = act;
   useEffect(() => {
-    const keys: Record<string, Verdict> = {
-      ArrowLeft: "discard",
-      ArrowRight: "keep",
-      ArrowUp: "variations",
-    };
     function onKey(event: KeyboardEvent) {
-      const choice = keys[event.key];
-      if (!choice || event.defaultPrevented || event.altKey || event.metaKey || event.ctrlKey)
+      const direction = keyDirections[event.key];
+      if (!direction || event.defaultPrevented || event.altKey || event.metaKey || event.ctrlKey)
         return;
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, select, [contenteditable='true']")) return;
@@ -285,6 +328,8 @@ export function DreamDeck({
         )
       )
         return;
+      const choice = keyRef.current(direction);
+      if (!choice) return;
       event.preventDefault();
       void actRef.current(choice);
     }
@@ -292,17 +337,34 @@ export function DreamDeck({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (!top) return empty(gallery.length > 0);
-  const calibrating = top.kind !== "dream";
+  const viewer = viewing && (
+    <MediaViewer
+      item={viewing.items.find((item) => item.id === viewing.item.id) || viewing.item}
+      items={viewing.items}
+      navigate={(item) => setViewing({ ...viewing, item })}
+      close={() => setViewing(null)}
+    />
+  );
+  if (!top)
+    return (
+      <>
+        {empty(gallery.length > 0)}
+        {viewer}
+      </>
+    );
+  const calibrating = top.kind === "calibration";
   // Phones show the bar's icons alone, named by their tooltips.
   const button = (
-    choice: Verdict,
+    choice: Verdict | PairAnswer,
     label: string,
     icon: ReactNode,
-    options: { hint?: string; primary?: boolean; disabled?: boolean } = {},
+    options: { hint?: string; tip?: string; primary?: boolean; disabled?: boolean } = {},
   ) => (
-    <Tooltip label={options.hint ? `${label} (${options.hint})` : label}>
-      {phone ? (
+    <Tooltip
+      key={choice}
+      label={`${options.tip || label}${options.hint ? ` (${options.hint})` : ""}`}
+    >
+      {phone && icon ? (
         <ActionIcon
           variant={options.primary ? "filled" : "default"}
           radius="xl"
@@ -326,77 +388,97 @@ export function DreamDeck({
       )}
     </Tooltip>
   );
-  const dreamed = counts.judged - counts.calibrated;
-  const batch = dreamed + unseen.length;
+  const view = (item: MediaItem, label = "View") => (
+    <Tooltip label={label}>
+      <ActionIcon
+        className={classes.view}
+        variant="default"
+        radius="xl"
+        aria-label={label}
+        onClick={() => setViewing({ item, items: [item] })}
+      >
+        <Maximize2 size={16} />
+      </ActionIcon>
+    </Tooltip>
+  );
+  const batch = counts.dreamed + unseen.length;
   return (
     <>
-      <BatchStrip done={dreamed} total={batch} />
+      <BatchStrip done={counts.dreamed} total={batch} />
       <div className={classes.stage}>
-        {top.kind === "pair" ? (
-          <PairCard
-            key={top.key}
-            items={top.items}
-            choose={choose}
-            onChoose={(index) => commit({ card: top, verdict: index })}
-          />
-        ) : (
-          [next?.kind === "pair" ? undefined : next, top].map(
-            (card) =>
-              card && (
-                <SwipeCard
-                  key={card.key}
-                  depth={card === top ? 0 : 1}
-                  up={card.kind === "dream" && card.item.type === "image"}
-                  fly={fly}
-                  label={
-                    card.kind === "dream"
-                      ? card === top
-                        ? "Current Dream"
-                        : "Next Dream"
-                      : card === top
-                        ? "Current Gallery Image"
-                        : "Next Gallery Image"
-                  }
-                  hints={card.kind === "dream" ? undefined : { keep: "Like", discard: "Pass" }}
-                  onSwipe={(direction) =>
-                    commit({
-                      card,
-                      verdict:
-                        direction === "left"
-                          ? "discard"
-                          : direction === "up"
-                            ? "variations"
-                            : "keep",
-                    } as Judgement)
-                  }
-                >
-                  <div className={classes.media}>
-                    <Media item={card.item} playing={card === top} />
-                    {card.kind === "calibration" && (
-                      <Badge className={classes.label} variant="default">
-                        From Your Gallery
-                      </Badge>
-                    )}
-                  </div>
-                  {card.kind === "dream" ? (
-                    <Caption item={card.item} />
-                  ) : (
-                    <div className={classes.caption}>
-                      <Text size="xs" c="dimmed" lineClamp={2}>
-                        {card.item.prompt}
-                      </Text>
+        {[next, top].map(
+          (card) =>
+            card && (
+              <SwipeCard
+                key={card.key}
+                depth={card === top ? 0 : 1}
+                fly={fly}
+                pair={card.kind === "pair"}
+                label={cardLabel(card, card === top)}
+                hints={
+                  card.kind === "pair"
+                    ? { left: "A", right: "B", up: "Both", down: "Neither" }
+                    : card.kind === "dream"
+                      ? {
+                          left: "Skip",
+                          right: "Keep",
+                          ...(card.item.type === "image" ? { up: "Variations" } : {}),
+                        }
+                      : { left: "Pass", right: "Like" }
+                }
+                onTap={(target) => {
+                  if (card.kind !== "pair")
+                    return setViewing({ item: card.item, items: [card.item] });
+                  const side = target.closest<HTMLElement>("[data-side]")?.dataset.side;
+                  if (side !== undefined)
+                    setViewing({ item: card.items[Number(side)], items: card.items });
+                }}
+                onSwipe={(direction) => {
+                  const choice = card.kind === "pair" ? answers[direction] : intent(direction);
+                  if (choice) commit({ card, verdict: choice } as Judgement);
+                }}
+              >
+                {card.kind === "pair" ? (
+                  <PairContent
+                    card={card}
+                    view={(index) =>
+                      card === top && view(card.items[index], `View ${sideNames[index]}`)
+                    }
+                  />
+                ) : (
+                  <>
+                    <div className={classes.media}>
+                      <Media item={card.item} playing={card === top} />
+                      {card.kind === "calibration" && (
+                        <Badge className={classes.label} variant="default">
+                          From Your Gallery
+                        </Badge>
+                      )}
+                      {card === top && view(card.item)}
                     </div>
-                  )}
-                </SwipeCard>
-              ),
-          )
+                    {card.kind === "dream" ? (
+                      <Caption item={card.item} />
+                    ) : (
+                      <div className={classes.caption}>
+                        <Text size="xs" c="dimmed" lineClamp={2}>
+                          {card.item.prompt}
+                        </Text>
+                      </div>
+                    )}
+                  </>
+                )}
+              </SwipeCard>
+            ),
         )}
       </div>
       <Group className={classes.actions} justify="center" gap="xs" wrap="nowrap">
         {top.kind === "pair" ? (
-          <Button variant="default" radius="xl" onClick={skip}>
-            Skip
-          </Button>
+          <>
+            {button("a", "A", null, { hint: "←", tip: top.labels?.[0] && `A: ${top.labels[0]}` })}
+            {button("both", "Both", null, { hint: "↑" })}
+            {button("neither", "Neither", null, { hint: "↓" })}
+            {button("b", "B", null, { hint: "→", tip: top.labels?.[1] && `B: ${top.labels[1]}` })}
+          </>
         ) : (
           <>
             {button("discard", calibrating ? "Pass" : "Skip", <X size={18} />, { hint: "←" })}
@@ -417,6 +499,9 @@ export function DreamDeck({
                 <Star size={18} />
               </ActionIcon>
             </Tooltip>
+            {button("more", "More Like This", <Layers size={18} />, {
+              disabled: !(image && dream),
+            })}
             {button("keep", calibrating ? "Like" : "Keep", <Heart size={18} />, {
               hint: "→",
               primary: true,
@@ -424,12 +509,16 @@ export function DreamDeck({
           </>
         )}
       </Group>
-      {!phone && top.kind !== "pair" && (
+      {!phone && (
         <Text size="xs" c="dimmed" ta="center">
-          ← {calibrating ? "Pass" : "Skip"} · → {calibrating ? "Like" : "Keep"}
-          {image && dream ? " · ↑ Keep & Variations" : ""}
+          {top.kind === "pair"
+            ? "← A · → B · ↑ Both · ↓ Neither"
+            : `← ${calibrating ? "Pass" : "Skip"} · → ${calibrating ? "Like" : "Keep"}${
+                image && dream ? " · ↑ Keep & Variations" : ""
+              }`}
         </Text>
       )}
+      {viewer}
     </>
   );
 }

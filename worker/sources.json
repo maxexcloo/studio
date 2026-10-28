@@ -32,7 +32,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-Manager",
-    "revision": "571ff65be6025f98025c7177a19f7726cfa046d4",
+    "revision": "2bc8143fa5424d5d84c5579ecfbb5cc9268ded2f",
     "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git"
   },
   {
@@ -50,7 +50,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/rgthree-comfy",
-    "revision": "d7297b42f0fa78bec1c0411478f887423c249502",
+    "revision": "6daaa286444cbe05c6c6d2ffbf70b7fca409efd8",
     "url": "https://github.com/rgthree/rgthree-comfy.git"
   }
 ]

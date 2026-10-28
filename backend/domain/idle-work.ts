@@ -5,7 +5,6 @@ export interface IdleItem {
   type?: string;
   status?: string;
   ownerId?: string;
-  library?: unknown;
 }
 export type IdleTick =
   | "off"
@@ -138,13 +137,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
   /** Items open to the work at all, before `wanted` weighs them. */
   function* open(items: Iterable<Item>) {
     for (const item of items)
-      if (
-        item.status === "done" &&
-        !item.library &&
-        !failed.has(key(item)) &&
-        !direct.has(key(item))
-      )
-        yield item;
+      if (item.status === "done" && !failed.has(key(item)) && !direct.has(key(item))) yield item;
   }
   /** Whether the item's owner may have the work done and the item shows in the gallery. */
   function shown() {
@@ -270,7 +263,7 @@ export function createIdleWork<Item extends IdleItem>(options: {
     const reason = await options.unavailable();
     if (reason) return reason;
     if (now() < backoff.until)
-      return `The text model is failing (${backoff.reason}); retrying shortly.`;
+      return `${options.name} keeps failing (${backoff.reason}); retrying shortly.`;
     return "";
   }
 
@@ -360,4 +353,50 @@ export function createIdleWork<Item extends IdleItem>(options: {
       };
     },
   };
+}
+
+interface Request {
+  body?: Record<string, unknown>;
+}
+interface Response {
+  status(code: number): Response;
+  json(value: unknown): unknown;
+}
+type Handler = (req: Request, res: Response) => unknown;
+
+/**
+ * An administrator's pass in Settings › Maintenance, such as Caption Gallery at
+ * `/api/gallery/captions`: its status there, and `/start` (with a `scope`, Out of Date when none)
+ * and `/stop`.
+ */
+export function registerIdlePassRoutes(
+  app: {
+    get(path: string, handler: Handler): unknown;
+    post(path: string, handler: Handler): unknown;
+  },
+  route: string,
+  {
+    work,
+    requireAdmin,
+  }: {
+    work: Pick<ReturnType<typeof createIdleWork>, "status" | "startPass" | "stopPass">;
+    requireAdmin(req: Request, res: Response): boolean;
+  },
+) {
+  app.get(route, async (req, res) => {
+    if (requireAdmin(req, res)) res.json(await work.status());
+  });
+  app.post(`${route}/start`, async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const scope = (req.body?.scope ?? "outdated") as PassScope;
+    if (!passScopes.includes(scope))
+      return res.status(400).json({ error: `Choose a scope: ${passScopes.join(", ")}.` });
+    work.startPass(scope);
+    res.json(await work.status());
+  });
+  app.post(`${route}/stop`, async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    work.stopPass();
+    res.json(await work.status());
+  });
 }

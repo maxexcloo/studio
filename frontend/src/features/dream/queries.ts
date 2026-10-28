@@ -21,8 +21,12 @@ export type DreamItem = MediaItem & {
     state: "unseen" | "kept" | "discarded";
     decidedAt?: string;
     spicy?: true;
+    /** One side of a comparison: alike but for what `question` asks about. */
+    pair?: { id: string; side: 0 | 1; question: string; label: string };
   };
 };
+/** A comparison's answer: side A or B, both or neither. */
+export type PairAnswer = "a" | "b" | "both" | "neither";
 export interface Dream {
   settings: DreamSettings;
   /** Finished results waiting for a verdict, oldest first. */
@@ -63,3 +67,5 @@ export const calibrationQuery = (round: number) =>
   });
 export const dreamItemPath = (item: { id: string }, action: string) =>
   `/api/dream/${encodeURIComponent(item.id)}/${action}`;
+export const pairAnswerPath = (pairId: string) =>
+  `/api/dream/pairs/${encodeURIComponent(pairId)}/answer`;

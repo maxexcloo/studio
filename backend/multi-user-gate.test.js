@@ -63,7 +63,6 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     assert.equal(call(path, user, method).continued, true, `${method} ${path}`);
   for (const [method, path] of [
     ["GET", "/api/presets"],
-    ["GET", "/api/library/file"],
     ["POST", "/api/models/downloads"],
     ["GET", "/api/accounts/admin"],
     ["POST", "/api/accounts/users"],
@@ -71,19 +70,12 @@ test("ordinary accounts reach only reviewed owner-scoped routes; administrators 
     ["GET", "/comfy/history"],
     ["DELETE", "/api/loras"],
     ["GET", "/api/logs"],
-    ["GET", "/api/workers"],
-    ["PUT", "/api/workers"],
-    ["POST", "/api/workers/test"],
     ["POST", "/api/runtime/restart"],
   ]) {
     const denied = call(path, user, method);
     assert.equal(denied.continued, false, `${method} ${path}`);
     assert.equal(denied.res.statusCode, 403, `${method} ${path}`);
   }
-  assert.equal(
-    call("/api/workers", { userId: "admin", role: "administrator" }, "PUT").continued,
-    true,
-  );
   assert.equal(
     call("/comfy/prompt", { userId: "admin", role: "administrator" }, "POST").continued,
     true,
