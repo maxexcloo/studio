@@ -234,6 +234,8 @@ The same command also finishes what Combine Backends and Merge Duplicate Profile
 
 It also renames the old `nsfw` marker to `uncensored` (`backend/uncensored-marker.js`): each profile's `studio` block, as a new version; every catalogue entry, catalogue source file and import record; and each group's `nsfwModels` feature, which becomes **Uncensored Models**. Earlier profile versions keep their text. The dry run reports the changes under `uncensoredMarker`; `--apply` writes them with Studio stopped, without a backup.
 
+With `--dream-owner <account id>`, naming the one account that has used Dream, it also clears Dream answers left on other accounts' records (`backend/dream-ownership.js`): Dream marks on gallery items another account owns, and that account's calibration answers and Dream taste signals about those items. Its own marks, answers and taste summary stay. The dry run reports the counts under `dreamOwnership`; `--apply` writes them with Studio stopped, without a backup.
+
 ## Queue, Sessions & Runtime Control
 
 `/api/sessions` stores generation inputs and result relationships; `/api/queue` exposes writing, queued, waiting, starting, running, saving, completed, failed and cancelled operations.

@@ -190,7 +190,9 @@ import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
-import { familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
+import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
+import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
+import { strengthRange } from "./lora-policy.js";
 import {
   deleteImportedWorkflow,
   getCustomWorkflow,
@@ -2101,12 +2103,29 @@ const dream = createDream({
   gallery: (ownerId) =>
     gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
-  mark: (_ownerId, itemId, mark) => updateGalleryJob(itemId, { dream: mark }),
+  // Only the owner's own record: updateGalleryJob alone matches any account's item.
+  mark: (ownerId, itemId, mark) => {
+    if (!gallery.some((item) => item.id === itemId && (item.ownerId || "") === ownerId))
+      throw new Error("That Dream result is unavailable.");
+    updateGalleryJob(itemId, { dream: mark });
+  },
   loraLibrary: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return null;
     return loadLoraLibrary(ownerId);
   },
+  // As submit validation (validation.js) would judge them: another family's LoRA is dropped.
+  fitLoras: (profile, loras) =>
+    loras.flatMap((lora) => {
+      const info = catalogueLoraInfo(lora.name);
+      const range = strengthRange(info);
+      const strength = range
+        ? Math.min(range.max, Math.max(range.min, lora.strength))
+        : lora.strength;
+      return optionalLoraPolicyIssue({ name: lora.name, strength }, info, profile)
+        ? []
+        : [{ ...lora, strength }];
+    }),
   reference: (account, itemId) => referenceAssetForAccount(account, itemId),
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
