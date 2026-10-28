@@ -565,6 +565,20 @@ export class McpMedia {
     };
     for (const key of ["width", "height", "steps"])
       if (args[key] !== undefined) body[key] = args[key];
+    // A profile framed by its reference draws at the primary reference's proportions, as the
+    // composer does, unless that reference only guides (reference_role "reference").
+    if (
+      reference_asset_ids.length &&
+      profile.aspectPolicy === "reference" &&
+      reference_role !== "reference"
+    ) {
+      const primary = Math.max(
+        0,
+        slots.findIndex((slot) => slot.role === "start"),
+      );
+      const id = reference_asset_ids[primary];
+      if (id) Object.assign(body, await this.referenceFrame(owner, profile, id));
+    }
     // Native 2K decodes in tiles, matching the browser’s generation path.
     if (
       profile.kind === "image" &&
@@ -1325,6 +1339,19 @@ export class McpMedia {
       content: Buffer.concat(chunks),
       mime: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream",
     };
+  }
+  /** The size a profile framed by its reference draws for reference `id`: its proportions at the profile's pixel count. */
+  async referenceFrame(owner, profile, id) {
+    const response = await this.response(
+      "GET",
+      `/api/reference-assets/${encodeURIComponent(id)}/media`,
+      undefined,
+      owner,
+    );
+    const { width, height } = await sharp(Buffer.from(await response.arrayBuffer()), {
+      limitInputPixels: 80000000,
+    }).metadata();
+    return (width > 0 && height > 0 && frameSize(profile, width, height)) || {};
   }
   async upload(owner, base64, filename = "reference.png") {
     if (
