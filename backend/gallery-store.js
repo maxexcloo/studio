@@ -232,21 +232,8 @@ const inDreamPool = (item) => Boolean(item?.dream && item.dream.state !== "kept"
 export function filterVisibleGallery(items) {
   return items.filter((item) => {
     if (isGalleryHidden(item) || inDreamPool(item)) return false;
-    if (isComfyOutputItem(item)) return hasExistingOutputFile(item);
-    if (item.library) return libraryFileCheck ? libraryFileCheck(item) : true;
-    return !isGalleryHidden(item);
+    return isComfyOutputItem(item) ? hasExistingOutputFile(item) : true;
   });
-}
-
-// Images added from another folder (backend/library.js) show while their file is there.
-let libraryFileCheck = null;
-export function setLibraryFileCheck(check) {
-  libraryFileCheck = check;
-}
-
-/** Whether a file is in a folder, from that folder's cached listing. */
-export function listedInFolder(file) {
-  return Boolean(folderListing(path.dirname(file))?.has(listedName(path.basename(file))));
 }
 
 /**
@@ -258,14 +245,9 @@ export function listedInFolder(file) {
  */
 let visibleCache = { key: "", lists: new Map() };
 
-/** Drops the cached page lists, e.g. when a library folder is added or removed. */
 let visibleListBuilds = 0;
 /** How often a page list was built from the whole gallery; the paging test counts it. */
 export const visibleListBuildCount = () => visibleListBuilds;
-
-export function invalidateVisibleCache() {
-  visibleCache = { key: "", lists: new Map() };
-}
 
 function visibleItems({ type = "", includeFailed = true, filter = null } = {}) {
   refreshFolderListings();
@@ -460,8 +442,7 @@ export function outputFileCandidates(item, baseDir = comfyOutputDir) {
     const file = mediaPath(media.filename, media.subfolder);
     return file ? [file] : [];
   }
-  // An image added from another folder is never in the output folder, whatever its name.
-  if (!baseDir || item?.library) return [];
+  if (!baseDir) return [];
   const keys = [item?.url, item?.id, item?.outputName, item?.filename].filter(Boolean);
   const candidates = [];
   for (const key of keys) {
@@ -510,8 +491,6 @@ export function deleteGalleryFiles(items) {
       }
       continue;
     }
-    // An image added from another folder is only shown here; its file is not ours to delete.
-    if (item.library) continue;
     const media = mediaParams(item.url);
     if (media) {
       const file = mediaFile(media.filename, media.subfolder);

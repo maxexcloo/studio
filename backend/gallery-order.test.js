@@ -35,10 +35,7 @@ test("explicit Civitai imports stay newest first even without source prompts", (
 
 test("server pages and client merges put blank imports last, newest first within both buckets", () => {
   const items = [
-    item("import-old", "2026-01-01", {
-      prompt: "",
-      library: { folder: "photos", path: "old.png" },
-    }),
+    item("import-old", "2026-01-01", { prompt: "" }),
     item("generation", "2026-01-02"),
     item("history-import", "2026-01-05", { prompt: " \n ", jobId: "comfy-history" }),
     item("pending", "2026-01-03", { status: "pending", prompt: "" }),
