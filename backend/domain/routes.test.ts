@@ -3,9 +3,9 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
-import type { QueueCancelAllResponse } from "../../shared/queue.ts";
+import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
-import { registerRewriteRoutes } from "./routes.ts";
+import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
 import { RewriteStore } from "./store.ts";
 const { enforceMultiUserRequest } = await import(
   new URL("../multi-user-gate.js", import.meta.url).href
@@ -196,6 +196,78 @@ test("Deleting a chat is owner scoped, waits for active work and deletes only ch
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    store.close();
+  }
+});
+
+test("Unfinished Items lists every account's unfinished jobs and ends stuck ones for administrators", async () => {
+  const store = new RewriteStore(":memory:");
+  const alice = store.createSession("alice"),
+    bob = store.createSession("bob");
+  // Accepted by a worker that is gone: nothing observes it and cancelling never confirms.
+  const stuck = store.save({
+    ...store.enqueue("alice", alice.id, { prompt: "a fox" }, "image", undefined, "gone"),
+    status: "running",
+    providerJobId: "lost",
+  });
+  const queued = store.enqueue("bob", bob.id, { prompt: "a hare" }, "image");
+  const done = store.save({ ...store.enqueue("bob", bob.id, {}, "image"), status: "completed" });
+  const settled: string[] = [];
+  const queue = new GenerationQueue(store, {
+    observe: async () => undefined,
+    cancel: async () => undefined,
+    settled: async (job: { id: string }) => void settled.push(job.id),
+  } as never);
+  let admin = false;
+  const app = express();
+  app.use(express.json());
+  registerMaintenanceRoutes(app as unknown as Parameters<typeof registerMaintenanceRoutes>[0], {
+    store,
+    queue,
+    requireAdmin: (_req, res) => admin || (res.status(403).json({ error: "Admins only." }), false),
+  });
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/maintenance/unfinished`;
+  const listed = async () =>
+    ((await (await fetch(base)).json()) as { jobs: UnfinishedJob[] }).jobs.map((job) => [
+      job.ownerId,
+      job.input.prompt,
+      job.status,
+    ]);
+  const act = (action: string, job: { ownerId: string; id: string }) =>
+    fetch(`${base}/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownerId: job.ownerId, id: job.id }),
+    });
+  try {
+    assert.equal((await fetch(base)).status, 403);
+    admin = true;
+    assert.deepEqual(await listed(), [
+      ["alice", "a fox", "running"],
+      ["bob", "a hare", "queued"],
+    ]);
+
+    assert.equal((await act("retry", stuck)).status, 202);
+    assert.equal(
+      store.job("alice", stuck.id)?.status,
+      "cancelled",
+      "ended despite no confirmation",
+    );
+    assert.deepEqual(settled, [stuck.id], "its gallery tiles and leases are released");
+    assert.equal((await act("delete", queued)).status, 200);
+    assert.equal(store.job("bob", queued.id)?.status, "cancelled");
+    assert.deepEqual(
+      (await listed()).map(([owner, prompt]) => [owner, prompt]),
+      [["alice", "a fox"]],
+      "the retry is queued afresh",
+    );
+    assert.equal(store.job("bob", done.id)?.status, "completed");
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await queue.stop();
     store.close();
   }
 });

@@ -64,8 +64,15 @@ export function createCaptioner(options: {
       if (!(await writer.supportsVision())) return "The running text model can't read images.";
       return "";
     },
-    wanted: (item, all) =>
-      item.type === "image" && (all ? item.caption?.version !== captionVersion : !item.caption),
+    // The trickle and a Missing pass caption new images; Out of Date also redoes captions from older
+    // rules, and All redoes every caption written before the pass began.
+    wanted: (item, all, target) =>
+      item.type === "image" &&
+      (!all || target?.scope === "missing"
+        ? !item.caption
+        : target?.scope === "all"
+          ? !(item.caption?.at && item.caption.at >= target.startedAt)
+          : item.caption?.version !== captionVersion),
     async run(item, signal) {
       const image = await options.image(item);
       if (signal.aborted) return;
