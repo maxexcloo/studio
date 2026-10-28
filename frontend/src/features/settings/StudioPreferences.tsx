@@ -3,6 +3,7 @@ import { Group, Kbd, Stack, Switch, Text } from "@mantine/core";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { useKeepRecentPrompts } from "../generation/PromptHistory";
 import { useTileCaptions } from "../gallery/useGalleryLayout";
+import { usePhone } from "../../ui/usePhone";
 import { FinishStarredImages } from "./FinishStarredImages";
 import { SettingGroup, SettingRow } from "./SettingRows";
 
@@ -27,6 +28,8 @@ export function StudioPreferences() {
   const galleryAllowed = admin || account.data?.account?.features?.gallery === true;
   const keep = useKeepRecentPrompts(historyAllowed);
   const [tileCaptions, setTileCaptions] = useTileCaptions();
+  // Phones have no keyboard to use shortcuts with.
+  const phone = usePhone();
   return (
     <Stack gap="lg">
       <SettingGroup title="Gallery">
@@ -59,28 +62,30 @@ export function StudioPreferences() {
           </SettingRow>
         )}
       </SettingGroup>
-      <SettingGroup title="Keyboard Shortcuts">
-        {shortcuts.map((shortcut) => (
-          <SettingRow key={shortcut.action} label={shortcut.action}>
-            {shortcut.keys.map((combo, index) => (
-              <Fragment key={combo.join("+")}>
-                {index > 0 && (
-                  <Text span size="xs" c="dimmed">
-                    or
-                  </Text>
-                )}
-                <Group gap={2} wrap="nowrap">
-                  {combo.map((key) => (
-                    <Kbd key={key} size="xs">
-                      {key}
-                    </Kbd>
-                  ))}
-                </Group>
-              </Fragment>
-            ))}
-          </SettingRow>
-        ))}
-      </SettingGroup>
+      {phone || (
+        <SettingGroup title="Keyboard Shortcuts">
+          {shortcuts.map((shortcut) => (
+            <SettingRow key={shortcut.action} label={shortcut.action}>
+              {shortcut.keys.map((combo, index) => (
+                <Fragment key={combo.join("+")}>
+                  {index > 0 && (
+                    <Text span size="xs" c="dimmed">
+                      or
+                    </Text>
+                  )}
+                  <Group gap={2} wrap="nowrap">
+                    {combo.map((key) => (
+                      <Kbd key={key} size="xs">
+                        {key}
+                      </Kbd>
+                    ))}
+                  </Group>
+                </Fragment>
+              ))}
+            </SettingRow>
+          ))}
+        </SettingGroup>
+      )}
     </Stack>
   );
 }

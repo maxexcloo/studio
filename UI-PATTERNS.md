@@ -263,13 +263,13 @@ primary component reference and verify APIs against the installed version.
 - Retry actions share the owned queue command. Bulk retry deduplicates job IDs
   and keeps unsuccessful items selected, preserving unrelated selections.
 - The gallery toolbar keeps its search box in the row on desktop; phones expand
-  it from an icon into a full-width focused input, and Escape closes it while
-  preserving the query. Filter and Select are compact chips at the row's end
+  it from an icon into a full-width focused input, and closing it (Back or
+  Escape) clears the query while active filters stay. Filter and Select are compact chips at the row's end
   (icons on phones); Filter swaps the leading controls for a row of facet chips,
   each opening a scrollable Mantine popover, beside the search box on desktop.
   Search narrows within the active filters, which show beside the search as
   removable chips. Normal, search, filters and selection modes use the same
-  toolbar region. Search/filter actions preserve queries.
+  toolbar region. Filter actions preserve the query.
   Shared `SearchInput` clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
@@ -294,18 +294,20 @@ primary component reference and verify APIs against the installed version.
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
   Phones show the image full-bleed with an icon row; swipe left/right navigates,
-  down closes and up reveals details and further options. Running, failed and
-  cancelled work opens too, in the gallery and in Chat, and takes the same
-  swipes: the stage shows its status (streaming the prompt while it is written)
-  and Details its prompt; once saved, the viewer follows it to the result
-  (`currentMedia`).
+  down closes and up reveals details and further options. Navigation (swipe,
+  arrows, buttons) stops at the first and last item rather than wrapping.
+  Running, failed and cancelled work opens too, in the gallery and in Chat, and
+  takes the same swipes: the stage shows its status (streaming the prompt while
+  it is written) and Details its prompt; once saved, the viewer follows it to
+  the result (`currentMedia`).
 - Images and Videos offer Grid and Runs views. Runs shows each run as a stacked
-  card that fans out in place; its images open the viewer hub. Grid shows a
-  result and its versions (runs made from it: Edit, Prompt, New Seed and the
-  like, linked by `parentJobId` and `parentItemId`) as one tile showing the
-  original (its first version), with a version count; crossing it with the pointer, or a sideways swipe on
-  phones, flips through them. The All Versions filter chip lists them
-  separately. `versions.ts` owns the grouping for every consumer.
+  card that fans out in place; its images open the viewer hub. Grid shows every
+  generation by default (the All Versions filter chip, on). Turning it off
+  collapses a result and its versions (runs made from it: Edit, Prompt, New Seed
+  and the like, linked by `parentJobId` and `parentItemId`) into one tile
+  showing the original (its first version), with a version count; crossing it
+  with the pointer, or a sideways swipe on phones, flips through them.
+  `versions.ts` owns the grouping for every consumer.
 - Viewers always fill the viewport independently of workspace width. Transparent
   stage/content reveal the blurred gallery behind. Empty-stage clicks close,
   including just outside the image; a near-miss within an invisible margin
@@ -352,6 +354,13 @@ primary component reference and verify APIs against the installed version.
 - Use semantic buttons/links and accessible names for icons. Preserve drafts
   and keyboard focus through expansion. Honour the phone keyboard and safe
   areas. Failed images must not expose broken-image icons.
+- Phones fit each view on screen and scroll only content that needs it. The
+  keyboard and address bar never move the layout: the viewport meta sets
+  `interactive-widget=resizes-visual`, so `dvh` and bottom-aligned bars stay put
+  while the keyboard overlays the page. Only a surface being typed into follows
+  the visual viewport: the phone `TextBox` editor (an opaque full-screen surface
+  whose text stops above the keyboard) and the desktop composer dock while one of
+  its fields has focus.
 - The shared gallery toolbar opens search with `/` or Ctrl/Cmd+F only in its
   active surface, without capturing typing, composition or another overlay.
   Viewer F toggles Star and Delete opens the standard confirmation, including

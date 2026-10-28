@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -16,7 +17,9 @@ import {
   Text,
   Textarea,
   Tooltip,
+  type ModalProps,
   type TextareaProps,
+  useProps,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { Copy, X } from "lucide-react";
@@ -51,7 +54,11 @@ export function TextBox({
 }) {
   const phone = usePhone();
   const [editing, setEditing] = useState(false);
-  const [height, setHeight] = useState<number>();
+  // How far the visible viewport sits from the editor's top (iOS scrolls it) and how much of the
+  // editor's bottom the keyboard covers.
+  const [keyboard, setKeyboard] = useState({ top: 0, inset: 0 });
+  const content = useRef<HTMLDivElement>(null);
+  const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const latest = useRef({ value, onChange });
   latest.current = { value, onChange };
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
@@ -61,13 +68,21 @@ export function TextBox({
     let lowest = viewport.height;
     const resize = () => {
       lowest = Math.min(lowest, viewport.height);
-      setHeight(viewport.height);
+      const full = content.current?.clientHeight || viewport.height;
+      setKeyboard({
+        top: viewport.offsetTop,
+        inset: Math.max(0, full - viewport.height - viewport.offsetTop),
+      });
       // Android hides the keyboard (Back) without blurring the field; the viewport grows back.
       if (viewport.height - lowest > 120) setEditing(false);
     };
     resize();
     viewport.addEventListener("resize", resize);
-    return () => viewport.removeEventListener("resize", resize);
+    viewport.addEventListener("scroll", resize);
+    return () => {
+      viewport.removeEventListener("resize", resize);
+      viewport.removeEventListener("scroll", resize);
+    };
   }, [editing]);
   function clear() {
     const previous = value;
@@ -164,14 +179,26 @@ export function TextBox({
           fullScreen
           closeOnEscape={false}
           returnFocus={false}
+          // The page returns at once, rather than showing through a fade while the keyboard drops.
+          transitionProps={{ ...modal.transitionProps, exitDuration: 0 }}
           classNames={{ content: classes.content, body: classes.body }}
         >
           <Modal.Overlay />
           {/* Modal.Content drops onKeyDown, so Escape is caught in the capture phase. */}
           <Modal.Content
+            ref={content}
             data-composer-layer
             aria-label={title}
-            style={{ height }}
+            style={
+              {
+                // Opaque, unlike the glass theme surface, so the page never shows through.
+                background: "var(--mantine-color-body)",
+                backdropFilter: "none",
+                WebkitBackdropFilter: "none",
+                translate: keyboard.top ? `0 ${keyboard.top}px` : undefined,
+                "--keyboard-inset": `${keyboard.inset}px`,
+              } as CSSProperties
+            }
             onKeyDownCapture={escape}
           >
             <Modal.Header>

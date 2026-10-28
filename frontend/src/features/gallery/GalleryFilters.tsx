@@ -71,7 +71,7 @@ interface GalleryFiltersProps {
   starred: boolean;
   onStarredChange: (value: boolean) => void;
   withinPortal?: boolean;
-  /** Grid's version grouping: on (the default) shows one tile per version chain. */
+  /** Grid's versions: on (the default) shows each one; off collapses a chain into one tile. */
   allVersions?: boolean;
   onAllVersionsChange?: (value: boolean) => void;
 }
@@ -132,6 +132,8 @@ export function GalleryFilterToolbar({
   ]);
   function dismiss() {
     const trigger = mode === "filters" ? filtersButton : searchButton;
+    // Closing the phone's search ends it, so no hidden query keeps narrowing the gallery.
+    if (mode === "search") onQueryChange("");
     setMode("normal");
     requestAnimationFrame(() => trigger.current?.focus());
   }

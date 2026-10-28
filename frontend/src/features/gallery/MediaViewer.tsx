@@ -121,10 +121,8 @@ function useNeighbourPrefetch(items: MediaItem[], index: number) {
     index < 0 || items.length < 2
       ? []
       : [1, -1, 2, -2]
-          .map((offset) => items[(index + offset + items.length) % items.length])
-          .filter(
-            (item) => item.type === "image" && item.status === "done" && item !== items[index],
-          )
+          .map((offset) => items[index + offset])
+          .filter((item) => item?.type === "image" && item.status === "done")
           .map((item) => mediaSource(item).url);
   const key = urls.join("\n");
   useEffect(() => {
@@ -196,9 +194,11 @@ export function MediaViewer({
     iteration.mutate(next, { onSuccess: joinStrip });
   }
   function move(direction: -1 | 1) {
-    if (!canNavigate) return;
+    // Navigation stops at either end rather than wrapping round.
+    const next = canNavigate && viewable[currentIndex + direction];
+    if (!next) return;
     setCompare(false);
-    navigate!(viewable[(currentIndex + direction + viewable.length) % viewable.length]);
+    navigate!(next);
   }
   const returnTarget = useRef(document.activeElement as HTMLElement | null);
   const restoreFocus = useRef(true);
@@ -362,6 +362,9 @@ export function MediaViewer({
                     <ActionIcon
                       aria-label="Previous Generation"
                       variant="default"
+                      // Stays focusable at an end, so arrow keys keep working.
+                      data-disabled={currentIndex === 0 || undefined}
+                      aria-disabled={currentIndex === 0 || undefined}
                       onClick={(event) => {
                         event.stopPropagation();
                         move(-1);
@@ -374,6 +377,8 @@ export function MediaViewer({
                     <ActionIcon
                       aria-label="Next Generation"
                       variant="default"
+                      data-disabled={currentIndex === viewable.length - 1 || undefined}
+                      aria-disabled={currentIndex === viewable.length - 1 || undefined}
                       onClick={(event) => {
                         event.stopPropagation();
                         move(1);
@@ -440,7 +445,7 @@ export function MediaViewer({
             </div>
             <MediaViewerDock
               item={displayed}
-              neighbour={canNavigate ? viewable[(currentIndex + 1) % viewable.length] : undefined}
+              neighbour={canNavigate ? viewable[currentIndex + 1] : undefined}
               family={family}
               choose={(next) => {
                 setCompare(false);
