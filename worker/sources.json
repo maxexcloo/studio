@@ -26,13 +26,13 @@
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-KJNodes",
-    "revision": "2371136d2fa6fd0914e514cd99b36dabe5db9adf",
+    "revision": "b5316a9e247338dc1460df8e4d01e906c566299c",
     "url": "https://github.com/kijai/ComfyUI-KJNodes.git"
   },
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-Manager",
-    "revision": "2bc8143fa5424d5d84c5579ecfbb5cc9268ded2f",
+    "revision": "00430d61e8f7d34680f424ef49decd008481823d",
     "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git"
   },
   {
