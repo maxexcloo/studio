@@ -1,4 +1,5 @@
 import type { QueueJob as SharedQueueJob, StudioSession } from "../../shared/queue";
+import type { Resolution } from "../../shared/resolution";
 import type { UpscaleQuality } from "../../shared/upscale";
 export type MediaKind = "image" | "video";
 export interface Profile {
@@ -88,6 +89,8 @@ export interface GenerationInput extends Record<string, unknown> {
   textEncoder?: string;
   textEncoders?: string[];
   weightDtype?: string;
+  /** The size tier; width and height give only the shape where it applies (shared/resolution.ts). */
+  resolutionTier?: Resolution;
   /** The backend a combined profile runs on; the profile's current one when absent. */
   profileBackend?: string;
 }

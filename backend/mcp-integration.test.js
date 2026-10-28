@@ -2235,6 +2235,7 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
     height: 1152,
     reference_asset_ids: [assetId],
     reference_role: "reference",
+    resolution: "2K",
     width: 2048,
   });
   assert.equal(f.submitted[0].referenceRole, "reference");
@@ -4001,7 +4002,7 @@ test("result numbers follow the conversation, and an explicit job id from anothe
   await failure(await chat(t, f, "bob", "new-chat"), "Status", { job_id: earlier.jobs[0].job_id });
 });
 
-test("aspect and size pick the profile’s own preset sizes instead of invented pixels", async (t) => {
+test("aspect picks the profile’s own preset and resolution its long edge", async (t) => {
   const f = await fixture(t);
   const presets = [
     { label: "1:1", w: 1024, h: 1024 },
@@ -4032,18 +4033,22 @@ test("aspect and size pick the profile’s own preset sizes instead of invented 
     const body = f.submitted.at(-1);
     return [body.width, body.height];
   };
-  assert.deepEqual(await size({}), [864, 1152], "the saved size without aspect");
-  assert.deepEqual(await size({ aspect: "landscape" }), [1360, 768]);
-  assert.deepEqual(await size({ aspect: "portrait" }), [768, 1360]);
+  // The saved size and presets give only the shape; the resolution (1K unless named) sets the long edge.
+  assert.deepEqual(await size({}), [768, 1024], "the saved shape without aspect");
+  assert.deepEqual(await size({ aspect: "landscape" }), [1024, 576]);
+  assert.deepEqual(await size({ aspect: "portrait" }), [576, 1024]);
   assert.deepEqual(await size({ aspect: "square" }), [1024, 1024]);
-  assert.deepEqual(await size({ aspect: "4:3" }), [1184, 880]);
-  assert.deepEqual(await size({ aspect: "landscape", size: "2k" }), [2048, 1152]);
+  assert.deepEqual(await size({ aspect: "4:3" }), [1024, 768]);
+  assert.deepEqual(await size({ aspect: "landscape", resolution: "2K" }), [2048, 1152]);
   assert.equal(f.submitted.at(-1).tiledDecode, true);
-  assert.deepEqual(await size({ size: "2k" }), [1536, 2048]);
+  assert.equal(f.submitted.at(-1).autoUpscale, null);
+  assert.deepEqual(await size({ resolution: "2K" }), [1536, 2048]);
+  // Not drawn at 4K: drawn at 2K, then upscaled.
+  assert.deepEqual(await size({ resolution: "4K" }), [1536, 2048]);
+  assert.deepEqual(f.submitted.at(-1).autoUpscale, { quality: "high", target: 4096 });
   for (const [args, message] of [
     [{ aspect: "sideways" }, /Choose aspect from landscape, portrait, square/],
     [{ aspect: "landscape", width: 1344, height: 768 }, /not both/],
-    [{ profile_id: imageProfile.id, size: "2k" }, /does not draw 2K natively/],
   ]) {
     const refused = await call(client, "Generate", { kind: "image", prompts: ["An egg"], ...args });
     assert.equal(refused.isError, true);
@@ -4052,7 +4057,7 @@ test("aspect and size pick the profile’s own preset sizes instead of invented 
   const schema = (await client.listTools()).tools.find((tool) => tool.name === "Generate")
     .inputSchema.properties;
   assert.match(schema.aspect.description, /prefer to width\/height/);
-  assert.deepEqual(schema.size.enum, ["2k", "4k"]);
+  assert.deepEqual(schema.resolution.enum, ["1K", "2K", "4K"]);
 });
 
 test('replies label links Result N with one All Results page, and Result "all" shows the conversation', async (t) => {

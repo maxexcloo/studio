@@ -11,19 +11,16 @@ import { ChevronDown, RectangleHorizontal } from "lucide-react";
 import type { GenerationInput, Profile } from "../../types";
 import { chipProps } from "./chip";
 import { primaryReference } from "./payload";
+import {
+  defaultResolution,
+  resolutionApplies,
+  resolutionPlan,
+  resolutions,
+  resolutionSize,
+  type Resolution,
+} from "../../../../shared/resolution";
 
-type Tier = "standard" | "2k" | "4k";
-const tierLabels: Record<Tier, string> = { standard: "Standard", "2k": "2K", "4k": "4K" };
 type Size = { w: number; h: number };
-
-/** A preset drawn with its long side at the tier's size, snapped to 64 within the profile's limit. */
-function drawnAt(size: Size, tier: Tier, max: number): Size {
-  if (tier === "standard") return size;
-  const scale = Math.min(tier === "4k" ? 4096 : 2048, max) / Math.max(size.w, size.h);
-  const snap = (value: number) =>
-    Math.max(64, Math.min(max, Math.round((value * scale) / 64) * 64));
-  return { w: snap(size.w), h: snap(size.h) };
-}
 
 export function SizePicker({
   input,
@@ -47,49 +44,30 @@ export function SizePicker({
   const divisor = (a: number, b: number): number => (b ? divisor(b, a % b) : a);
   const common = framed ? divisor(framed.width, framed.height) : 1;
   const aspect = framed ? `${framed.width / common}:${framed.height / common}` : "";
-  const max = Math.min(
-    profile?.constraints?.width?.max ?? 8192,
-    profile?.constraints?.height?.max ?? 8192,
-  );
-  // 2K/4K only where the model is documented to draw them itself and the output size is the
-  // composer's to pick; an undocumented size stays visible but disabled.
-  const sizable = input.kind === "image" && !input.inpaint;
-  const tiers: Tier[] = [
-    "standard",
-    ...(["2k", "4k"] as const).filter((tier) => sizable && profile?.native?.[tier] === "yes"),
-  ];
+  // Images whose size is the composer's to pick draw at a tier; the shape comes from the preset.
+  const tiered = resolutionApplies(input, profile);
+  const tier = input.resolutionTier || defaultResolution;
+  const plan = resolutionPlan(profile, tier);
+  const at = (size: Size) => {
+    const { width, height } = resolutionSize({ width: size.w, height: size.h }, tier, profile);
+    return { w: width, h: height };
+  };
   const current = { w: input.width, h: input.height };
-  const same = (a: Size, b: Size) => a.w === b.w && a.h === b.h;
-  const tier =
-    tiers.find((tier) => presets.some((preset) => same(drawnAt(preset, tier, max), current))) ||
-    "standard";
-  const active = presets.find((preset) => same(drawnAt(preset, tier, max), current));
-  const apply = ({ w, h }: Size) => onChange({ width: w, height: h });
-  function changeTier(next: Tier) {
-    // Keep the chosen shape: the active preset, else the preset nearest the current ratio.
-    const ratio = current.w / current.h;
-    const shape =
-      active ||
-      [...presets].sort((a, b) => Math.abs(a.w / a.h - ratio) - Math.abs(b.w / b.h - ratio))[0] ||
-      current;
-    apply(drawnAt(shape, next, max));
-  }
-  // A custom size of a preset's shape still reads as that aspect; the exact size is in the title.
-  const shaped = presets.find((preset) => preset.w * current.h === preset.h * current.w);
+  const shown = tiered ? at(current) : current;
+  // A preset of the current shape is the active one; the exact size is in the title.
+  const active = presets.find((preset) => preset.w * current.h === preset.h * current.w);
   const label = framed
     ? `Reference · ${aspect}`
     : active
-      ? `${active.label}${tier === "standard" ? "" : ` · ${tierLabels[tier]}`}`
-      : shaped
-        ? shaped.label
-        : `${input.width} × ${input.height}`;
+      ? `${active.label}${tiered ? ` · ${tier}` : ""}`
+      : `${shown.w} × ${shown.h}`;
   return (
     <Popover position="top-start" width={300} trapFocus>
       <Popover.Target>
         <Button
           {...chipProps}
           aria-label="Aspect"
-          title={framed ? undefined : `${input.width} × ${input.height}`}
+          title={framed ? undefined : `${shown.w} × ${shown.h}`}
           leftSection={<RectangleHorizontal size={16} />}
           rightSection={<ChevronDown size={14} />}
         >
@@ -114,23 +92,26 @@ export function SizePicker({
           </Stack>
         ) : (
           <Stack gap="sm">
-            {tiers.length > 1 && (
-              <SegmentedControl
-                aria-label="Resolution"
-                fullWidth
-                value={tier}
-                onChange={(value) => changeTier(value as Tier)}
-                data={(Object.keys(tierLabels) as Tier[]).map((value) => ({
-                  value,
-                  label: tierLabels[value],
-                  disabled: !tiers.includes(value),
-                }))}
-              />
+            {tiered && (
+              <Stack gap={4}>
+                <SegmentedControl
+                  aria-label="Resolution"
+                  fullWidth
+                  value={tier}
+                  onChange={(value) => onChange({ resolutionTier: value as Resolution })}
+                  data={[...resolutions]}
+                />
+                {plan.upscaleTo && (
+                  <Text size="xs" c="dimmed">
+                    This model draws {tier} at {plan.draws}, then Upscale enlarges it.
+                  </Text>
+                )}
+              </Stack>
             )}
             {!!presets.length && (
               <Stack gap={4} role="group" aria-label="Aspect Presets">
                 {presets.map((preset) => {
-                  const size = drawnAt(preset, tier, max);
+                  const size = tiered ? at(preset) : preset;
                   const selected = preset === active;
                   return (
                     <Button
@@ -145,7 +126,7 @@ export function SizePicker({
                           {size.w} × {size.h}
                         </Text>
                       }
-                      onClick={() => apply(size)}
+                      onClick={() => onChange({ width: preset.w, height: preset.h })}
                     >
                       {preset.label}
                     </Button>
@@ -153,19 +134,21 @@ export function SizePicker({
                 })}
               </Stack>
             )}
-            <SimpleGrid cols={2} spacing="xs">
-              {(["width", "height"] as const).map((key) => (
-                <NumberInput
-                  key={key}
-                  label={key === "width" ? "Width" : "Height"}
-                  value={input[key]}
-                  min={profile?.constraints?.[key]?.min}
-                  max={profile?.constraints?.[key]?.max}
-                  step={profile?.constraints?.[key]?.step}
-                  onChange={(value) => onChange({ [key]: Number(value) })}
-                />
-              ))}
-            </SimpleGrid>
+            {!tiered && (
+              <SimpleGrid cols={2} spacing="xs">
+                {(["width", "height"] as const).map((key) => (
+                  <NumberInput
+                    key={key}
+                    label={key === "width" ? "Width" : "Height"}
+                    value={input[key]}
+                    min={profile?.constraints?.[key]?.min}
+                    max={profile?.constraints?.[key]?.max}
+                    step={profile?.constraints?.[key]?.step}
+                    onChange={(value) => onChange({ [key]: Number(value) })}
+                  />
+                ))}
+              </SimpleGrid>
+            )}
           </Stack>
         )}
       </Popover.Dropdown>

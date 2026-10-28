@@ -403,7 +403,7 @@ function rewriteInstructions({
       ? `${references} reference image${references > 1 ? "s are" : " is"} attached to the generation but not shown to you; keep the prompt consistent with using ${references > 1 ? "them" : "it"}.`
       : "",
     triggers.length
-      ? `Keep these LoRA trigger words exactly as written: ${[...new Set(triggers)].join(", ")}.`
+      ? `Studio adds these LoRA trigger words when it runs, so don't add them; keep any the prompt already has exactly as written: ${[...new Set(triggers)].join(", ")}.`
       : "",
     negative ? "Describe what should be present; the negative prompt is written separately." : "",
     examples.length

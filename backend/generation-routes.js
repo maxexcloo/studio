@@ -341,14 +341,18 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
       } catch {
         /* a run matters more than its history */
       }
-    // The one place every path (gallery, Chat, MCP) gets its LoRAs' trigger words; history keeps
-    // what was typed, the run and its gallery record keep the prompt that ran.
-    if (body.loras?.length)
+    // The one place every path (composer, Chat, Compare, Dream, MCP) gets its LoRAs' trigger words,
+    // never the prompt field: history and `typedPrompt` keep what was typed, the run and its
+    // gallery record the prompt that ran.
+    if (body.loras?.length) {
+      const typed = body.prompt;
       body.prompt = withLoraTriggers(
-        body.prompt,
+        typed,
         body.loras,
         await loraInfos(body.loras.map((item) => item.name)),
       );
+      if (body.prompt !== typed) body.typedPrompt = typed;
+    }
     // An older page (or a draft restored from before the reference library) can
     // send only the image's id; treat it as the reference instead of losing it.
     if (!isMockJob && !body.referenceAssets?.length && body.startImageId && !body.startImage) {

@@ -18,7 +18,7 @@ import { GenerationProvider, useGeneration } from "../generation/GenerationProvi
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery, terminal } from "../generation/Queue";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import { mediaDraft } from "./useMediaAction";
+import { mediaDraft, typedPrompt } from "./useMediaAction";
 import { versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 
@@ -173,7 +173,7 @@ function ItemNextSteps({
   useEffect(() => {
     setDraft((previous) => ({
       ...previous,
-      input: { ...previous.input, prompt: item.prompt || "" },
+      input: { ...previous.input, prompt: typedPrompt(item) },
     }));
     if (!profiles.length) return;
     let current = true;

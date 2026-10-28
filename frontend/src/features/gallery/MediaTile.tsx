@@ -79,14 +79,16 @@ function TileStatus({
         </Text>
       </div>
       {percent !== undefined && (
-        <Progress
-          className={classes.progress}
-          aria-hidden
-          size="xs"
-          radius={0}
-          value={percent}
-          transitionDuration={motionDuration}
-        />
+        <div className={classes.progress}>
+          <Progress
+            aria-hidden
+            w="100%"
+            size="xs"
+            radius={0}
+            value={percent}
+            transitionDuration={motionDuration}
+          />
+        </div>
       )}
       {(cancellable || retryable) && (
         <div className={classes.statusAction}>

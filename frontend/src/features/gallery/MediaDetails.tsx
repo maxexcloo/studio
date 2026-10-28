@@ -104,7 +104,7 @@ function generationDetails(
       ["VAE", fileStem(settings.vae)],
       ["CLIP Type", settings.clipType],
       ["Weight Type", settings.weightDtype],
-      ["Resolution", settings.resolution],
+      ["Resolution", settings.resolution || settings.resolutionTier],
       ["Steps", settings.steps],
       ["CFG", settings.cfg],
       ["Sampler", settings.sampler],

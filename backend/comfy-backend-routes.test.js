@@ -217,10 +217,12 @@ test(
       const item = (await api("/api/gallery?limit=200")).body.items.find(
         (entry) => entry.jobId === accepted.body.jobId,
       );
-      return { texts, prompt: item.prompt };
+      return { texts, prompt: item.prompt, typed: item.settings?.typedPrompt };
     };
     const on = await run({});
     assert.equal(on.prompt, "privfx, a red ceramic teapot");
+    // Reuse puts the prompt as typed back in the field, never the trigger words.
+    assert.equal(on.typed, "a red ceramic teapot");
     assert.ok(on.texts.includes("privfx, a red ceramic teapot"));
     assert.equal((await run({ triggers: false })).prompt, "a red ceramic teapot");
     assert.equal((await run({ enabled: false })).prompt, "a red ceramic teapot");
