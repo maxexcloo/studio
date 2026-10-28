@@ -93,6 +93,8 @@ function instructions({ profile, guide, count, index, of, references, role, sugg
       ? "Reply with one complete, standalone prompt only, as plain text: no preamble, labels, quotes, Markdown or notes."
       : `Reply with JSON only: {"prompts": [...]} with exactly ${count} complete, standalone prompt${count > 1 ? "s" : ""}, one per ${media}.`,
     "Keep every subject, detail, style, mood, framing and quoted text the user asked for; add only what the guide recommends to realise it, never new subjects or content the user did not imply.",
+    // Without thinking the model drifts to generic filler unless told to follow the guide's form.
+    "Write the guide's way: follow its rules and match its example's form and length. Add concrete visual detail the request implies, never generic quality, resolution or camera tags (such as high detail, 8k, cinematic lighting, shot on a full-frame camera) unless the guide or the request asks for them. Polish an already detailed request lightly rather than rewriting it.",
     'Words about speed, quality tier, model, size, aspect or count (such as "turbo", "fast", "landscape", "16:9", "2K", "two images") are settings, not scene: leave them out.',
     count > 1
       ? `If the request names ${count} different ${media}s, write one prompt for each; otherwise vary composition and details between the prompts while each matches the request.`
@@ -154,6 +156,7 @@ export function createPromptWriter(
       taste = "",
       fallback,
       signal,
+      timeout,
       onThinking,
       onDelta,
     }) {
@@ -188,6 +191,7 @@ export function createPromptWriter(
             temperature: 0.7,
             maxTokens: 4000 + 400 * count,
             signal,
+            timeout,
             onThinking,
             onDelta,
           });
