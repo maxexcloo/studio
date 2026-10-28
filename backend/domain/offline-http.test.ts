@@ -235,7 +235,8 @@ test(
         referenceAssets: references,
       };
       assert.equal((await request("/api/generate", { ...input, prompt: "" })).status, 400);
-      assert.equal((await request("/api/generate", { ...input, width: 1e9 })).status, 400);
+      // The width only shapes the run (its resolution sets the size), so an out-of-range step count stands in.
+      assert.equal((await request("/api/generate", { ...input, steps: 1e9 })).status, 400);
       assert.equal((await request("/api/generate", { ...input, count: 1e9 })).status, 400);
       assert.equal(
         (

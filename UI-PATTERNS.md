@@ -191,9 +191,12 @@ primary component reference and verify APIs against the installed version.
   comes first; `GenerationInputControls` owns the wrapping chip rail in both
   gallery and timeline editors. The phone editor fits one screen without
   scrolling: the prompt summary takes the room left above the chips. The footer
-  places the Image/Video toggle left and Clear/Generate right. Size uses
-  a vertical list of profile-provided aspect presets with their resolution,
-  alongside constrained custom dimensions. Selected
+  places the Image/Video toggle left and Clear/Generate right. For images,
+  Size offers only the 1K, 2K and 4K resolutions (the long edge; 1K by default)
+  above a vertical list of the profile's aspect presets with the size each
+  draws; where the model doesn't draw a resolution itself, the control says it
+  draws smaller and Upscale enlarges it. Videos, and images framed by a
+  reference or mask, keep presets with constrained custom dimensions. Selected
   LoRAs retain enable, weight and drag/keyboard ordering controls even when
   catalogue filters hide them. A catalogue strength range bounds the slider and
   its default (else 1 within the range) starts a new LoRA; the range stays a
@@ -203,7 +206,9 @@ primary component reference and verify APIs against the installed version.
   Trigger words use copy controls and source links use the published catalogue URL.
   Each stacked LoRA has a Trigger Words toggle (on by default); Studio inserts
   enabled LoRAs' trigger words at the start of the prompt in stack order, on
-  every generation path.
+  every generation path, only when the run is sent (skipping any already
+  typed). The prompt field never gets them; reusing a result restores the
+  prompt as typed, and Details shows the prompt that ran.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 
 ## Dream & Taste

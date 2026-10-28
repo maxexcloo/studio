@@ -50,6 +50,7 @@ import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.j
 import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
+import { withResolution } from "../shared/resolution.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createServicesObserver, createTextVision } from "./runtime/services.ts";
@@ -1969,6 +1970,11 @@ async function validateGeneration(input, account) {
   if (combined?.backendIds?.length)
     input.profileBackend = combined.backendIds.includes(wanted) ? wanted : combined.backend;
   else delete input.profileBackend;
+  // Every path (composer, Chat, Compare, Dream, MCP) draws at its size tier, 1K unless it names one.
+  const sized = (await mediaModels().catch(() => null))?.models?.profiles?.find(
+    (profile) => profile.id === input.profileId,
+  );
+  Object.assign(input, withResolution(input, sized));
   if (directCloud?.isProfile(input)) {
     try {
       await directCloud.resolve({ ownerId: account?.userId || "", input });
