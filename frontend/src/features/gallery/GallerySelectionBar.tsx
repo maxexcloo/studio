@@ -6,12 +6,27 @@ import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, actionBarClass } from "./ActionBar";
+import {
+  ActionBarGroups,
+  ActionMenuItems,
+  actionBarClass,
+  type Action,
+  type ActionGroups,
+} from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { itemAction, itemActionGroups } from "./MediaActions";
+import {
+  CustomAnimationDialog,
+  itemAction,
+  itemActionGroups,
+  useMediaActions,
+  type ItemActionId,
+} from "./MediaActions";
+import { useMediaTransfer } from "./mediaShare";
+import { UpscaleDialog } from "./UpscaleControls";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
+import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 
@@ -105,54 +120,62 @@ export function GallerySelectionBar({
     }
   }
   const pending = busy !== null;
-  // Actions for one item at a time stay in place, greyed out, so the bar matches the viewer's.
-  const single = { disabled: true };
-  const actions = itemActionGroups([
-    itemAction("animate", single),
-    itemAction("edit", single),
-    itemAction("recreate", single),
-    itemAction("reference", single),
-    (failed.length > 0 || busy === "retry") &&
-      itemAction("retry", {
-        disabled: pending || !failed.length,
-        loading: busy === "retry",
-        onClick: () => void retrySelected(),
-      }),
-    (runningJobs.length > 0 || busy === "stop") &&
-      itemAction("stop", {
-        disabled: pending || !runningJobs.length,
-        loading: busy === "stop",
-        onClick: () => void stopSelected(),
-      }),
-    itemAction("compare", single),
-    itemAction("upscale", single),
-    itemAction("copy", single),
-    // Phones that share natively share instead of downloading.
-    phone && typeof navigator.share === "function"
-      ? itemAction("share", {
-          label: prepared ? "Share" : "Prepare Share",
-          disabled: !ready.length || ready.length > shareLimit,
-          loading: prepare.isPending,
-          onClick: () => void share(),
-        })
-      : itemAction("download", {
-          disabled: !ready.length || downloadTooLarge,
-          link: {
-            href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
-            download: true,
-          },
+  // A sole selected item's own actions, kept by `OneItemActions` so the bar never remounts.
+  const oneItem = useRef<Action[]>([]);
+  const [, setOneItemState] = useState("");
+  // Actions for one item at a time act on a sole selected item; for several they stay in place,
+  // greyed out, so the bar matches the viewer's.
+  const groups = (one: Action[]) => {
+    const single = (id: ItemActionId) =>
+      one.find((action) => action.id === id) ?? itemAction(id, { disabled: true });
+    return itemActionGroups([
+      single("animate"),
+      single("edit"),
+      single("recreate"),
+      single("reference"),
+      (failed.length > 0 || busy === "retry") &&
+        itemAction("retry", {
+          disabled: pending || !failed.length,
+          loading: busy === "retry",
+          onClick: () => void retrySelected(),
         }),
-    itemAction("delete", {
-      disabled: !deletable.length || pending,
-      onClick: () => setConfirm(true),
-    }),
-    itemAction("star", {
-      label: allStarred ? "Unstar" : "Star",
-      pressed: allStarred,
-      disabled: !ready.length || pending,
-      onClick: () => favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
-    }),
-  ]);
+      (runningJobs.length > 0 || busy === "stop") &&
+        itemAction("stop", {
+          disabled: pending || !runningJobs.length,
+          loading: busy === "stop",
+          onClick: () => void stopSelected(),
+        }),
+      single("compare"),
+      single("upscale"),
+      single("copy"),
+      // Phones that share natively share instead of downloading.
+      phone && typeof navigator.share === "function"
+        ? itemAction("share", {
+            label: prepared ? "Share" : "Prepare Share",
+            disabled: !ready.length || ready.length > shareLimit,
+            loading: prepare.isPending,
+            onClick: () => void share(),
+          })
+        : itemAction("download", {
+            disabled: !ready.length || downloadTooLarge,
+            link: {
+              href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
+              download: true,
+            },
+          }),
+      itemAction("delete", {
+        disabled: !deletable.length || pending,
+        onClick: () => setConfirm(true),
+      }),
+      itemAction("star", {
+        label: allStarred ? "Unstar" : "Star",
+        pressed: allStarred,
+        disabled: !ready.length || pending,
+        onClick: () =>
+          favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+      }),
+    ]);
+  };
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -188,44 +211,8 @@ export function GallerySelectionBar({
       items: selection.items.filter((item) => !finished(item)),
     },
   ];
-  return (
+  const actionSurfaces = (actions: ActionGroups) => (
     <>
-      <Group gap={6} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
-        <Text
-          size="sm"
-          fw={500}
-          role="status"
-          mr={4}
-          style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-        >
-          {selected.length} Selected
-        </Text>
-        {quick.map(
-          ({ label, name, items }, index) =>
-            (index === 0 || items.length > 0) && (
-              <Button
-                key={name}
-                {...chipProps}
-                aria-label={name}
-                disabled={!items.length || pending}
-                onClick={() => {
-                  const ids = new Set(items.map((item) => item.id));
-                  selection.select((item) => ids.has(item.id));
-                }}
-              >
-                {label}
-              </Button>
-            ),
-        )}
-        <Button
-          {...chipProps}
-          aria-label="Clear Selection"
-          disabled={!selected.length || pending}
-          onClick={() => selection.retain([])}
-        >
-          Clear
-        </Button>
-      </Group>
       <ActionBar
         opened={selection.selecting}
         aria-label="Selected Item Actions"
@@ -278,12 +265,119 @@ export function GallerySelectionBar({
           <ActionMenuItems groups={actions} />
         </Menu.Dropdown>
       </Menu>
+    </>
+  );
+  return (
+    <>
+      <Group gap={6} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
+        <Text
+          size="sm"
+          fw={500}
+          role="status"
+          mr={4}
+          style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
+        >
+          {selected.length} Selected
+        </Text>
+        {quick.map(
+          ({ label, name, items }, index) =>
+            (index === 0 || items.length > 0) && (
+              <Button
+                key={name}
+                {...chipProps}
+                aria-label={name}
+                disabled={!items.length || pending}
+                onClick={() => {
+                  const ids = new Set(items.map((item) => item.id));
+                  selection.select((item) => ids.has(item.id));
+                }}
+              >
+                {label}
+              </Button>
+            ),
+        )}
+        <Button
+          {...chipProps}
+          aria-label="Clear Selection"
+          disabled={!selected.length || pending}
+          onClick={() => selection.retain([])}
+        >
+          Clear
+        </Button>
+      </Group>
+      {actionSurfaces(groups(selected.length === 1 ? oneItem.current : []))}
+      {selected.length === 1 && (
+        <OneItemActions
+          item={selected[0]}
+          onApplied={selection.end}
+          sink={oneItem}
+          onChange={setOneItemState}
+        />
+      )}
       <DeleteMediaDialog
         opened={confirm}
         ids={deletable.map((item) => item.id)}
         close={() => setConfirm(false)}
         onDeleted={(_deleted, failed) => selection.retain(failed)}
       />
+    </>
+  );
+}
+
+/** What a bar shows of the actions, so their owner re-renders only when it changes. */
+const shownState = (actions: Action[]): string =>
+  actions
+    .map((action) =>
+      [action.id, action.label, action.disabled, action.loading, action.pressed, action.checked]
+        .concat(action.menu ? shownState(action.menu.flat()) : [])
+        .join(","),
+    )
+    .join("|");
+
+/**
+ * A sole selected item's own actions, written to `sink` for the selection's bar and menu (with
+ * `onChange` when what they show changes), and the dialogs they open.
+ */
+function OneItemActions({
+  item,
+  onApplied,
+  sink,
+  onChange,
+}: {
+  item: MediaItem;
+  onApplied: () => void;
+  sink: { current: Action[] };
+  onChange: (state: string) => void;
+}) {
+  const transfer = useMediaTransfer(item, false);
+  const [animating, setAnimating] = useState(false);
+  const [upscaling, setUpscaling] = useState(false);
+  const actions = useMediaActions(item, {
+    transfer,
+    onApplied,
+    onCustomAnimation: () => setAnimating(true),
+    // The selection's own Delete covers it.
+    onDelete: () => {},
+    onUpscale: () => setUpscaling(true),
+  }).flat();
+  sink.current = actions;
+  const state = `${item.id}:${shownState(actions)}`;
+  useEffect(() => onChange(state), [state]);
+  // Another item selected later never shows this one's actions first.
+  useEffect(
+    () => () => {
+      sink.current = [];
+    },
+    [],
+  );
+  return (
+    <>
+      {animating && (
+        <CustomAnimationDialog item={item} opened onClose={() => setAnimating(false)} />
+      )}
+      {item.status === "done" && (
+        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
+      )}
     </>
   );
 }
