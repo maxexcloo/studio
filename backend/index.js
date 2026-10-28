@@ -200,7 +200,7 @@ import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
 import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
-import { strengthRange } from "./lora-policy.js";
+import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
 import {
   deleteImportedWorkflow,
   getCustomWorkflow,
@@ -2339,6 +2339,29 @@ const sessionChat = new ChatService({
   // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
   taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
   session: (ownerId, id) => rewriteStore.session(ownerId, id),
+  // The LoRAs made for the selected profile's family, as the LoRA picker recommends them.
+  loras: async (ownerId, input) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return [];
+    const profile = await chatProfile(input);
+    if (!profile?.capabilities?.lora) return [];
+    const { info } = await loadComfyContext();
+    const infos = await loraInfos(optionsFor(info, "LoraLoader", "lora_name"));
+    return Object.entries(infos)
+      .filter(
+        ([, item]) =>
+          !["acceleration", "supporting"].includes(item?.role) &&
+          loraCompatibility(item, profile) === "fits",
+      )
+      .map(([name, item]) => {
+        const range = strengthRange(item);
+        return {
+          name,
+          title: loraName(name, item),
+          strength: range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1),
+        };
+      });
+  },
   models: async (ownerId) => {
     const settings = chatSettings();
     if (!settings) return [];

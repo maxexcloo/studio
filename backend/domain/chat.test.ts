@@ -202,6 +202,53 @@ test("several request_media calls in one turn start one generation each", async 
   fixture.db.close();
 });
 
+test("request_media keeps selected LoRAs and adds the ones the user named for this family", async () => {
+  const fixture = setup([
+    frame({
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                index: 0,
+                function: {
+                  name: "request_media",
+                  arguments: JSON.stringify({
+                    operation: "image",
+                    prompt: "film portrait",
+                    loras: ["grain", "Unknown Style"],
+                  }),
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    "data: [DONE]\n\n",
+  ]);
+  fixture.service.options.loras = async () => [
+    { name: "styles/grainscape_krea2.safetensors", title: "Grainscape", strength: 0.8 },
+    { name: "ass_v2.safetensors", title: "Ass V2", strength: 1 },
+  ];
+  const selected = { name: "ass_v2.safetensors", strength: 0.6, enabled: true };
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    {
+      content: "Use the grain LoRA",
+      generation: { operation: "image", input: { profileId: "chosen", loras: [selected] } },
+    },
+    () => {},
+  );
+  assert.deepEqual(fixture.service.messages("alice", fixture.session.id)[1].draft?.input.loras, [
+    selected,
+    { name: "styles/grainscape_krea2.safetensors", strength: 0.8, enabled: true },
+  ]);
+  assert.match(JSON.stringify(fixture.requests[0]), /Grainscape/);
+  fixture.db.close();
+});
+
 test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
   const fixture = setup([
     frame({
