@@ -40,21 +40,36 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
   );
 });
 
-test("administrators see every model with its workloads; others only models that run", () => {
-  const models = [{ id: "cloud/model" }, { id: "gemma/31b" }, { id: "qwen/27b" }];
+test("administrators see every model with its workloads; others models that run or are parked", () => {
+  const models = [
+    { id: "cloud/model" },
+    { id: "gemma/31b" },
+    { id: "qwen/27b" },
+    { id: "mistral/24b" },
+  ];
   const workloads = [
     { id: "text-gemma", model: "gemma/31b" },
     { id: "text-gemma-tp2", model: "gemma/31b" },
     { id: "text-qwen", model: "qwen/27b" },
+    { id: "text-mistral", model: "mistral/24b" },
     { id: "comfyui" },
   ];
   assert.deepEqual(servedChatModels(models, workloads), [
     { id: "cloud/model" },
     { id: "gemma/31b", workloads: ["text-gemma", "text-gemma-tp2"] },
     { id: "qwen/27b", workloads: ["text-qwen"] },
+    { id: "mistral/24b", workloads: ["text-mistral"] },
   ]);
-  assert.deepEqual(servedChatModels(models, workloads, ["text-gemma-tp2", "comfyui"]), [
+  const phases = {
+    "text-gemma": "parked",
+    "text-gemma-tp2": "running",
+    "text-qwen": "parked",
+    "text-mistral": "down",
+    comfyui: "running",
+  };
+  assert.deepEqual(servedChatModels(models, workloads, phases), [
     { id: "cloud/model" },
     { id: "gemma/31b" },
+    { id: "qwen/27b", parked: true },
   ]);
 });

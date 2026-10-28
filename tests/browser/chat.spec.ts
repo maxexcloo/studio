@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, loadSaved, openTheme, profiles, stamp } from "./fixtures";
+import { fixtures, image, loadSaved, openTheme, profiles, signIn, stamp } from "./fixtures";
 
 const at = (seconds: number) => new Date(Date.parse(stamp) + seconds * 1000).toISOString();
 
@@ -404,7 +404,7 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
-test("An administrator's stopped Chat model starts after confirming what it stops", async ({
+test("An administrator's parked Chat model starts after confirming what it stops", async ({
   page,
 }) => {
   await fixtures(page);
@@ -440,7 +440,7 @@ test("An administrator's stopped Chat model starts after confirming what it stop
         workloads: [
           workload("image", "Image", "running"),
           workload("text", "Text", "running"),
-          workload("text-large", "Large Text", "stopped"),
+          workload("text-large", "Large Text", "parked"),
         ],
       },
     }),
@@ -470,7 +470,7 @@ test("An administrator's stopped Chat model starts after confirming what it stop
   const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
   await expect(model).toHaveText("Studio Assistant");
   await model.click();
-  await expect(page.getByRole("option", { name: /Large Model/ })).toContainText("Stopped");
+  await expect(page.getByRole("option", { name: /Large Model/ })).toContainText("Parked");
   await page.getByRole("option", { name: /Large Model/ }).click();
   const dialog = page.getByRole("dialog", { name: "Switch to Large Model" });
   await expect(dialog).toContainText("Stop: Image");
@@ -480,4 +480,32 @@ test("An administrator's stopped Chat model starts after confirming what it stop
   await expect(model).toHaveText("Large Model");
   expect(previews).toEqual([{ start: ["text-large"] }]);
   expect(applied).toEqual([{ workloads: ["text", "text-large"], signature: "fixture" }]);
+});
+
+test("Others see a parked Chat model as parked and cannot send to it", async ({ page }) => {
+  await fixtures(page);
+  await signIn(page, { id: "user", role: "user" });
+  await page.route("**/api/chat/status", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        models: [
+          { id: "text:large", label: "Large Model", parked: true },
+          { id: "text:test", label: "Studio Assistant" },
+        ],
+        defaultModelId: "text:large",
+      },
+    }),
+  );
+  await page.goto("/chat");
+  const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
+  await expect(model).toHaveAttribute("title", /Parked/);
+  await page.getByRole("textbox", { name: "Message", exact: true }).fill("Hello");
+  await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeDisabled();
+  await model.click();
+  const parked = page.getByRole("option", { name: /Large Model/ });
+  await expect(parked).toContainText("Parked");
+  await expect(parked).toHaveAttribute("aria-disabled", "true");
+  await page.getByRole("option", { name: /Studio Assistant/ }).click();
+  await expect(page.getByRole("button", { name: "Send Message", exact: true })).toBeEnabled();
 });

@@ -178,17 +178,26 @@ export function mergeWorkerModels(entries, empty = {}) {
 /**
  * Per capability, whether any worker has it and whether one answered this
  * catalogue load, so MCP refuses local video while no video worker is up
- * (never sending it to the cloud by itself).
+ * (never sending it to the cloud by itself). `parked` marks a capability whose workers were all
+ * stopped on purpose, so it is reported as parked rather than down.
  */
-export function workerAvailability(answered = new Set(), workers = listWorkers()) {
+export function workerAvailability(
+  answered = new Set(),
+  workers = listWorkers(),
+  parked = new Set(),
+) {
   return Object.fromEntries(
     ["image", "video", "upscale"].map((capability) => {
       const capable = workers.filter((worker) => worker.capabilities.includes(capability));
+      const available = capable.some((worker) => answered.has(worker.id));
       return [
         capability,
         {
           configured: capable.length > 0,
-          available: capable.some((worker) => answered.has(worker.id)),
+          available,
+          ...(!available && capable.length && capable.every((worker) => parked.has(worker.id))
+            ? { parked: true }
+            : {}),
         },
       ];
     }),

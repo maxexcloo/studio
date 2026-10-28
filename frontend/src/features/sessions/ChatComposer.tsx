@@ -19,6 +19,7 @@ import classes from "./ChatComposer.module.css";
 /**
  * The composer's text model chip. Administrators also see models whose Studio workloads are
  * stopped: choosing one starts it (asking first when that stops others) and selects it once ready.
+ * Others see parked models marked Parked and cannot choose them.
  */
 function ChatModelPicker({
   disabled,
@@ -32,14 +33,15 @@ function ChatModelPicker({
   const workloads = runtime.status.data?.workloads;
   /** A Studio-served model runs while any of its workloads does. */
   const phase = (model?: ChatModel): WorkloadPhase | undefined => {
+    if (model?.parked) return "parked";
     if (!model?.workloads?.length || !workloads) return undefined;
     const phases = workloads
       .filter((item) => model.workloads!.includes(item.id))
       .map((item) => item.phase);
     return (
-      (["running", "starting", "stopping", "unknown"] as const).find((value) =>
+      (["running", "starting", "stopping", "down", "unknown"] as const).find((value) =>
         phases.includes(value),
-      ) ?? "stopped"
+      ) ?? "parked"
     );
   };
   const selected = models.find((model) => model.id === modelId);
@@ -51,7 +53,11 @@ function ChatModelPicker({
         target={{ disabled: !models.length || disabled }}
         searchable={models.length > 8}
         nothingFoundMessage="No Matching Models"
-        data={models.map((model) => ({ value: model.id, label: model.label }))}
+        data={models.map((model) => ({
+          value: model.id,
+          label: model.label,
+          disabled: model.parked,
+        }))}
         value={modelId || null}
         renderOption={({ option, checked }) => {
           const model = models.find((item) => item.id === option.value);
@@ -80,7 +86,13 @@ function ChatModelPicker({
           else selectModel(model.id);
         }}
         swatch={selectedPhase && phaseColour(selectedPhase)}
-        title={[selected?.label, selected?.provider].filter(Boolean).join(" · ")}
+        title={[
+          selected?.label,
+          selected?.provider,
+          selectedPhase && selectedPhase !== "running" && phaseLabel(selectedPhase),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         label={selected?.label || "Model"}
       />
       {runtime.dialog}
@@ -90,10 +102,16 @@ function ChatModelPicker({
 
 /** The Chat prompt box: the message above a short chip rail (References, Model) and Send/Stop. */
 function ChatComposer() {
-  const { text, setText, send, sendingSession, stop, status } = useChat();
+  const { text, setText, send, sendingSession, stop, status, modelId } = useChat();
   const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
+  // Only an administrator can start a parked model, so others cannot send to one.
+  const parked = status.data?.models.find((model) => model.id === modelId)?.parked;
   const unavailable =
-    uploadingReferences || status.isPending || status.isError || status.data?.available === false;
+    uploadingReferences ||
+    status.isPending ||
+    status.isError ||
+    status.data?.available === false ||
+    parked;
   const phone = usePhone();
   const admin = useIsAdmin();
   const runtime = useWorkloadStart(
@@ -147,7 +165,7 @@ function ChatComposer() {
             </ActionIcon>
           </Tooltip>
         ) : (
-          <Tooltip label="Send Message">
+          <Tooltip label={parked ? "Model Parked by an Administrator" : "Send Message"}>
             <ActionIcon
               type="submit"
               aria-label="Send Message"

@@ -1,6 +1,10 @@
 import type { ServiceKind } from "./services.ts";
 
-export type WorkloadPhase = "running" | "starting" | "stopping" | "stopped" | "unknown";
+/**
+ * `parked`: deliberately scaled to zero, by Studio or an administrator. `down`: scaled to zero
+ * although Studio's last placement had it running, such as after a Flux upgrade reset it.
+ */
+export type WorkloadPhase = "running" | "starting" | "stopping" | "parked" | "down" | "unknown";
 
 interface RuntimeWorkload {
   id: string;

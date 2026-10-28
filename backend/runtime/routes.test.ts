@@ -63,7 +63,7 @@ test("administrator runtime routes preview, apply and report operations, with pl
     status.body.workloads.map((item: { id: string; phase: string }) => [item.id, item.phase]),
     [
       ["text", "running"],
-      ["media", "stopped"],
+      ["media", "parked"],
     ],
   );
   assert.deepEqual(await send("/preview", { workloads: "media" }), {

@@ -89,6 +89,24 @@ export function createTextVision({
   };
 }
 
+const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
+
+/** The media workers every Studio workload behind which is parked; a worker Studio doesn't manage never is. */
+export async function parkedWorkers(controller: RuntimeController | undefined, workers: Worker[]) {
+  if (!controller) return new Set<string>();
+  const parked = await controller.parked();
+  return new Set(
+    workers
+      .filter((worker) => {
+        const serving = controller.workloads.filter(
+          (workload) => workload.kind !== "text" && sameUrl(workload.url, worker.url),
+        );
+        return serving.length > 0 && serving.every((workload) => parked.has(workload.id));
+      })
+      .map((worker) => worker.id),
+  );
+}
+
 /** Observe the direct runtimes only. This never starts, stops or acquires a workload. */
 export function createServicesObserver({
   workers,
@@ -101,7 +119,6 @@ export function createServicesObserver({
 }: Options) {
   const cache = new Map<string, { until: number; result: Promise<Probe> }>();
   const managed = controller?.workloads ?? [];
-  const sameUrl = (a: string, b: string) => a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
   function probe(endpoint: string, kind: ServiceKind, apiKeyEnv?: string): Promise<Probe> {
     for (const [key, entry] of cache) if (entry.until <= now()) cache.delete(key);
     const key = `${kind}:${endpoint}:${apiKeyEnv || ""}`;
@@ -188,6 +205,7 @@ export function createServicesObserver({
     waitingWorkers?: string[];
   }): Promise<ServicesStatus> => {
     const services: ServicesStatus["services"] = {};
+    const parked = (await controller?.parked()) ?? new Set<string>();
     await Promise.all(
       allowed.map(async (kind) => {
         // Text endpoints are the managed text deployments; media endpoints are the workers, matched to theirs by URL.
@@ -199,19 +217,20 @@ export function createServicesObserver({
                   id: workload.id,
                   label: workload.label,
                   url: workload.url,
-                  workloadId: workload.id,
+                  workloads: [workload.id],
                   apiKeyEnv: workload.apiKeyEnv,
                 }))
             : workers()
                 .filter((worker) => worker.capabilities.includes(kind))
                 .map((worker) => {
-                  const match = managed.find((workload) => sameUrl(workload.url, worker.url));
+                  // One- and two-GPU video deployments can serve one worker address.
+                  const matches = managed.filter((workload) => sameUrl(workload.url, worker.url));
                   return {
                     id: worker.id,
                     label: worker.name,
                     url: worker.url,
-                    workloadId: match?.id,
-                    apiKeyEnv: match?.apiKeyEnv,
+                    ...(matches.length ? { workloads: matches.map((item) => item.id) } : {}),
+                    apiKeyEnv: matches[0]?.apiKeyEnv,
                   };
                 });
         const endpoints = await Promise.all(
@@ -232,12 +251,19 @@ export function createServicesObserver({
             } catch {
               endpoint = undefined;
             }
-            const observed: Probe = endpoint
-              ? { ...(await probe(endpoint, kind, apiKeyEnv)) }
-              : {
-                  state: "unknown",
-                  reason: "No direct runtime health endpoint is configured for this workload.",
-                };
+            // A parked worker has no pod to ask; probing it would only wait out the refusal.
+            const observed: Probe = target.workloads?.every((id) => parked.has(id))
+              ? {
+                  state: "parked",
+                  reason: "Parked: stopped on purpose. An administrator can start it.",
+                  checkedAt: new Date(now()).toISOString(),
+                }
+              : endpoint
+                ? { ...(await probe(endpoint, kind, apiKeyEnv)) }
+                : {
+                    state: "unknown",
+                    reason: "No direct runtime health endpoint is configured for this workload.",
+                  };
             if (observed.state === "offline" && waitingWorkers.includes(target.id)) {
               observed.state = "waiting";
               observed.reason = "Your accepted work is waiting for this worker to become ready.";
@@ -250,13 +276,19 @@ export function createServicesObserver({
           }),
         );
         const bound = endpoints.filter((endpoint) => endpoint.checkedAt);
-        const state: ServiceStatus["state"] = bound.some((endpoint) => endpoint.state === "healthy")
+        // Parked endpoints are neither failures nor readiness: the service is parked only when all are.
+        const active = bound.filter((endpoint) => endpoint.state !== "parked");
+        const state: ServiceStatus["state"] = active.some(
+          (endpoint) => endpoint.state === "healthy",
+        )
           ? "healthy"
-          : bound.some((endpoint) => endpoint.state === "waiting")
+          : active.some((endpoint) => endpoint.state === "waiting")
             ? "waiting"
-            : !bound.length || bound.some((endpoint) => endpoint.state === "unknown")
-              ? "unknown"
-              : "offline";
+            : bound.length && !active.length
+              ? "parked"
+              : !active.length || active.some((endpoint) => endpoint.state === "unknown")
+                ? "unknown"
+                : "offline";
         services[kind] = {
           state,
           endpoints,
@@ -266,9 +298,11 @@ export function createServicesObserver({
               ? "A direct runtime is healthy."
               : state === "waiting"
                 ? "Waiting for the selected runtime."
-                : state === "offline"
-                  ? "The direct runtime health checks are offline."
-                  : "Runtime readiness is unknown; inspect the endpoint details.",
+                : state === "parked"
+                  ? "Parked: stopped on purpose. An administrator can start it."
+                  : state === "offline"
+                    ? "The direct runtime health checks are offline."
+                    : "Runtime readiness is unknown; inspect the endpoint details.",
         };
       }),
     );
