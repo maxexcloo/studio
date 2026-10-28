@@ -32,6 +32,13 @@ export interface Profile {
   readyReason?: string;
   defaults: Record<string, string | number>;
   capabilities: Record<string, boolean>;
+  /** What a workflow's text-to-image and with-reference modes change (`defaults` is `generate`'s). */
+  imageModes?: Partial<
+    Record<
+      "generate" | "reference",
+      { defaults?: Record<string, string | number>; capabilities?: Record<string, boolean> }
+    >
+  >;
   mediaInputs?: {
     id: string;
     label?: string;
