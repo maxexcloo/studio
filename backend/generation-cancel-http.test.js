@@ -75,6 +75,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
       deployment: "text",
       url: `http://127.0.0.1:${text.address().port}`,
       apiKeyEnv: "STUDIO_FIXTURE_TEXT_KEY",
+      model: "local/text",
     },
   });
   const launch = () =>

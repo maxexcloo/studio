@@ -153,12 +153,12 @@ export class ChatService {
     try {
       const settings = this.options.settings();
       const models = (settings ? await this.models(ownerId, settings) : []).map((model) => {
-        // A routing alias (such as ai/text) has no name of its own: show the model that answered.
+        // A routing alias (such as local/text) has no name of its own: show the model that answered.
         const bare =
           model.label === model.id ||
           model.id.toLowerCase().endsWith(`/${model.label.toLowerCase()}`);
         const actual = bare && this.options.store.actualModel(model.id);
-        // Bifrost reports only the alias's own name (ai/text answers as "text"), which says nothing new.
+        // Bifrost reports only the alias's own name (local/text answers as "text"), which says nothing new.
         return actual && actual !== model.id && actual !== model.id.split("/").pop()
           ? { ...model, label: actual }
           : model;

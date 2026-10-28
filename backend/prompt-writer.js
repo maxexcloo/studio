@@ -5,7 +5,6 @@
 import {
   AssistantError,
   createAssistant,
-  gatewaySettings,
   maxPromptCharacters,
   stripThinking,
   writerGuide,
@@ -14,14 +13,6 @@ import {
 export { writerGuide };
 
 const maxChanges = 8;
-
-/** The writer's endpoint, key and model, or null when prompt writing is off; a partial setting fails by name. */
-export function promptWriterSettings(environment = process.env) {
-  const settings = gatewaySettings(environment);
-  return settings
-    ? { endpoint: settings.endpoint, key: settings.key, model: settings.model }
-    : null;
-}
 
 const clean = (value) =>
   String(value || "")
@@ -130,18 +121,15 @@ function instructions({ profile, guide, count, index, of, references, role, sugg
  * `fallback`. Without a fallback, a failure throws with the reason: the queue's writing stage
  * (prompt-stage.js) writes each MCP job's prompt that way, one of `of` for a set (`index`),
  * streaming through `onThinking` and `onDelta`.
- * Generate keeps the prompt writer's own model (STUDIO_PROMPT_WRITER_MODEL), a fast one.
  * A preview waits on it, so a slow gateway falls back to the request itself after 15 s.
  */
 export function createPromptWriter(
   environment = process.env,
-  { fetchImpl = fetch, timeoutMs = 15000, log = console } = {},
+  { fetchImpl = fetch, timeoutMs = 15000, log = console, localText } = {},
 ) {
-  const settings = promptWriterSettings(environment);
-  if (!settings) return null;
-  const engine = createAssistant(environment, { fetchImpl, timeoutMs, log: {} });
+  const engine = createAssistant(environment, { fetchImpl, timeoutMs, log: {}, localText });
+  if (!engine) return null;
   return {
-    model: settings.model,
     async write({
       profile,
       guide,
@@ -176,6 +164,7 @@ export function createPromptWriter(
         suggest,
         taste,
       });
+      const model = await engine.model("writer");
       const shape =
         count === 1 && !suggest ? "Reply with only the prompt." : "Reply with only the JSON.";
       let reason;
@@ -183,7 +172,7 @@ export function createPromptWriter(
       for (let attempt = 0; attempt < 2; attempt += 1)
         try {
           const reply = await engine.chat({
-            model: settings.model,
+            model,
             messages: [
               { role: "system", content: system },
               { role: "user", content: attempt ? `${user}\n\n${shape}` : user },
@@ -203,7 +192,7 @@ export function createPromptWriter(
             return {
               prompts,
               thinking: reply.thinking,
-              model: settings.model,
+              model,
               source: "studio",
               ms: Date.now() - started,
               ...(suggest ? { suggestions: parseSuggestions(reply.text) } : {}),
@@ -231,7 +220,7 @@ export function createPromptWriter(
         `- ${profile.id}: ${profile.label || profile.id}${profile.id === preferred?.id ? " (default)" : ""}. ${clean(profile.description).slice(0, 300)}${profile.prompting?.summary ? ` Prompting: ${clean(profile.prompting.summary).slice(0, 200)}` : ""}`;
       try {
         const reply = await engine.chat({
-          model: settings.model,
+          model: await engine.model("pick"),
           messages: [
             {
               role: "system",

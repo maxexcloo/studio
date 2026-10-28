@@ -119,7 +119,8 @@ test("every eighth signal rewrites the summary in the background, at most every 
   const calls: Call[] = [];
   let reply = "Likes misty harbours at dusk on flux-2.";
   const writer = {
-    settings: () => ({ model: "fixture-text" }),
+    settings: () => ({}),
+    model: async () => "fixture-text",
     chat: async (request: Call) => {
       calls.push(request);
       return { text: reply };
@@ -201,7 +202,8 @@ test("a compare winner is preferred over each other variant, which the summary t
   const calls: { messages: { role: string; content: string }[] }[] = [];
   const taste = tasteFixture(t, {
     writer: () => ({
-      settings: () => ({ model: "fixture-text" }),
+      settings: () => ({}),
+      model: async () => "fixture-text",
       chat: async (request) => {
         calls.push(request);
         return { text: "Prefers flux-2 for harbours." };

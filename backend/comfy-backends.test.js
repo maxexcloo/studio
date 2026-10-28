@@ -101,7 +101,7 @@ test(
     // Written by the prompt assistant in chat: the record rides in extra_data, so a rebuild from history keeps it.
     const imageBody = {
       ...request("primary"),
-      assistant: { preset: "cinematic", model: "ai/text-quick", source: "chat" },
+      assistant: { preset: "cinematic", model: "cloud/text", source: "chat" },
     };
     const videoBody = request("video");
     queue("image-one", imageBody);
@@ -151,7 +151,7 @@ test(
       .find((item) => item.jobId === "image-one");
     assert.deepEqual(rebuilt?.assistant, {
       preset: "cinematic",
-      model: "ai/text-quick",
+      model: "cloud/text",
       source: "chat",
     });
     assert.deepEqual(store.makePendingItems("x", imageBody)[0].assistant, imageBody.assistant);

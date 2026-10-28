@@ -4128,7 +4128,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
 const writerEnvironment = {
   STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid:4000",
   STUDIO_PROMPT_WRITER_KEY: "fixture-writer-key",
-  STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
 };
 /** The writer calls that wrote prompts, without model picks. */
 const written = (f) =>
@@ -4221,7 +4221,7 @@ test("each job of a Generate call writes its prompt in the queue from the reques
   const [{ url, authorization, body }, second] = written(f);
   assert.equal(url, "http://fixture-writer.invalid:4000/v1/chat/completions");
   assert.equal(authorization, "Bearer fixture-writer-key");
-  assert.equal(body.model, "ai/text-quick");
+  assert.equal(body.model, "cloud/off");
   assert.match(
     body.messages[0].content,
     /Fixture Image[\s\S]*one complete, standalone prompt only[\s\S]*image 1 of 2[\s\S]*Lead with the light\.[\s\S]*Name the light source\./,
