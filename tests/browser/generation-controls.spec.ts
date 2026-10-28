@@ -4,6 +4,7 @@ import {
   closeLoras,
   closePresets,
   create,
+  expandComposer,
   fixtures,
   image,
   loadSaved,
@@ -305,7 +306,7 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
-  await prompt.click();
+  await expandComposer(page);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(prompt).toHaveValue("");
   await withExpertSettings(page, async () => {
@@ -508,7 +509,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(page.getByRole("button", { name: "Refine Image", exact: true })).toBeVisible();
-  await prompt.click();
+  await expandComposer(page);
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await prompt.fill("A wide copper horizon");
   const aspect = page.getByRole("button", { name: "Aspect", exact: true });
@@ -538,7 +539,7 @@ test("The chip composer offers supported sizes and settings, follows the output 
   expect(state.jobs[0].input.parentJobId).toBeUndefined();
   // Generation reports through its pending tile, never a notification.
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await prompt.click();
+  await expandComposer(page);
   await page
     .getByRole("radiogroup", { name: "Generation Output", exact: true })
     .locator("label")
@@ -651,7 +652,9 @@ test("Generation controls preserve the draft and return keyboard focus with redu
 
 test("Typing straight after clicking the collapsed prompt keeps every keystroke", async ({
   page,
-}) => {
+}, testInfo) => {
+  // Phones type in the full-screen editor, which the collapsed prompt opens instead.
+  test.skip(!!testInfo.project.use.isMobile, "Desktop only");
   await fixtures(page);
   await page.goto("/");
   await page.locator("[data-composer-prompt]").click();
@@ -753,7 +756,7 @@ test("Images and Videos retain independent prompts and expert settings", async (
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Image draft",
   );
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expandComposer(page);
   await expect(negative).toHaveValue("Image exclusions");
   await withExpertSettings(page, () => expect(seed).toHaveValue("777"));
   if (testInfo.project.use.isMobile) {
@@ -773,4 +776,30 @@ test("The composer's draft survives a reload", async ({ page }) => {
   await prompt.fill("A copper bird at dusk");
   await page.reload();
   await expect(prompt).toHaveValue("A copper bird at dusk");
+});
+
+test("The phone composer opens its prompt editor in one tap and fits the screen with a long prompt", async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Phones only");
+  await fixtures(page);
+  await page.goto("/");
+  await page.locator("[data-composer-prompt]").click();
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  await expect(editor.getByRole("button", { name: "Recent Prompts", exact: true })).toBeVisible();
+  await editor
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("A copper fox in a misty forest at dawn, cinematic light, ".repeat(20));
+  await editor.getByRole("button", { name: "Done", exact: true }).click();
+  const scroller = page.getByLabel("Generate Scroll Area");
+  for (const [width, height] of [
+    [375, 667],
+    [390, 844],
+    [430, 932],
+  ]) {
+    await page.setViewportSize({ width, height });
+    await expect
+      .poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight))
+      .toBeLessThanOrEqual(0);
+  }
 });

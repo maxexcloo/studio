@@ -32,7 +32,8 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * Every multi-line text box. `tools` adds compact Copy and Clear (undoable) beside the box's own
- * right section. On phones, tapping the box opens it full screen with Copy, Clear and Done; Done,
+ * right section. On phones the box is a summary of its text: tapping it (or `edit`) opens it full
+ * screen with the same right section, Copy, Clear and Done, and `below` under the text; Done,
  * Escape or dismissing the keyboard returns to the page.
  */
 export function TextBox({
@@ -40,6 +41,8 @@ export function TextBox({
   onChange,
   tools = false,
   overlay,
+  below,
+  edit = false,
   rightSection,
   rightSectionWidth,
   onClick,
@@ -51,6 +54,10 @@ export function TextBox({
   tools?: boolean;
   /** Floats over the text, such as prompt ideas; the phone editor shows it under its text. */
   overlay?: ReactNode;
+  /** Content under the box, such as assistant suggestions, that the phone editor shows too. */
+  below?: ReactNode;
+  /** Opens the phone editor once it turns true. */
+  edit?: boolean;
 }) {
   const phone = usePhone();
   const [editing, setEditing] = useState(false);
@@ -61,6 +68,9 @@ export function TextBox({
   const modal = useProps("Modal", {}, {} as Pick<ModalProps, "transitionProps">);
   const latest = useRef({ value, onChange });
   latest.current = { value, onChange };
+  useEffect(() => {
+    if (edit && phone) setEditing(true);
+  }, [edit, phone]);
   const title = (typeof props.label === "string" && props.label) || props["aria-label"] || "Text";
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -152,14 +162,17 @@ export function TextBox({
         aria-hidden={editing || undefined}
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
+        // A phone box only summarises its text, which the editor scrolls instead.
+        styles={phone ? { input: { overflowY: "hidden" } } : undefined}
         onClick={(event) => {
           onClick?.(event);
           if (phone && !props.readOnly && !props.disabled) setEditing(true);
         }}
+        // While the phone editor is open, it alone carries the actions.
         rightSection={
-          tools ? (
+          editing ? undefined : tools ? (
             <Group gap={stacked ? 4 : 0} wrap="nowrap" align="flex-start">
-              {rightSection}
+              {stacked ? <Stack gap={4}>{rightSection}</Stack> : rightSection}
               {stacked ? <Stack gap={4}>{actions}</Stack> : actions}
             </Group>
           ) : (
@@ -172,6 +185,7 @@ export function TextBox({
         rightSectionPointerEvents={tools ? "all" : props.rightSectionPointerEvents}
       />
       {!editing && overlay}
+      {below}
       {phone && (
         <Modal.Root
           opened={editing}
@@ -204,6 +218,7 @@ export function TextBox({
             <Modal.Header>
               <Modal.Title>{title}</Modal.Title>
               <Group gap={4} wrap="nowrap">
+                {rightSection}
                 {actions}
                 <Button size="compact-sm" onClick={close}>
                   Done
@@ -229,6 +244,7 @@ export function TextBox({
                 onBlur={close}
               />
               {overlay && <div className={classes.overlay}>{overlay}</div>}
+              {below && <div className={classes.below}>{below}</div>}
             </Modal.Body>
           </Modal.Content>
         </Modal.Root>

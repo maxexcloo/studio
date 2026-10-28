@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -24,6 +24,7 @@ import { useNavigate } from "react-router";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import { usePhone } from "../../ui/usePhone";
+import { useRemembered } from "../auth/useRemembered";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { inputForProfile, useGenerationActions } from "../generation/GenerationProvider";
 import { blockedProps, submitBlockedReason } from "../generation/GenerationEditor";
@@ -99,6 +100,28 @@ const strengthBounds = (info?: LoraInfo) => ({
   step: info?.strengthRange?.step ?? 0.05,
 });
 
+/** The last comparison's choices, restored in full while it starts from the same base. */
+interface RememberedComparison {
+  base?: string;
+  dimension?: Dimension;
+  shared?: GenerationInput;
+  profileIds?: string[];
+  patches?: Partial<GenerationInput>[];
+  loraMode?: LoraMode;
+  lora?: string;
+  loraNames?: string[];
+  strength?: number | null;
+  strengths?: string[];
+}
+const noComparison: RememberedComparison = {};
+/** A restored draft orders its fields differently from the live one, so bases compare sorted. */
+const sortedJson = (value: unknown) =>
+  JSON.stringify(value, (_, entry: unknown) =>
+    entry && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(Object.entries(entry).sort(([a], [b]) => a.localeCompare(b)))
+      : entry,
+  );
+
 function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => void }) {
   const { profiles } = useGenerationActions();
   const phone = usePhone();
@@ -131,33 +154,81 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
       (option.value !== "profile" ||
         local.some((other) => usable(other) && other.id !== baseProfile?.id)),
   );
-  const [dimension, setDimension] = useState<Dimension>(available[0]?.value || "profile");
+  // The compared setting and LoRA mode are remembered, and so is the rest while the base matches.
+  const [remembered, setRemembered] = useRemembered("compare", noComparison);
+  const baseKey = sortedJson(base.input);
+  const same = remembered.base === baseKey;
+  const [dimension, setDimension] = useState<Dimension>(
+    available.find((option) => option.value === remembered.dimension)?.value ||
+      available[0]?.value ||
+      "profile",
+  );
   // Every comparison but Prompts shares one prompt, negative and LoRA stack.
-  const [shared, setShared] = useState(base.input);
+  const [shared, setShared] = useState((same && remembered.shared) || base.input);
   const [profileIds, setProfileIds] = useState(() =>
-    [baseProfile, ...local.filter((profile) => profile.id !== baseProfile?.id)]
-      .filter((profile): profile is Profile => Boolean(profile && local.includes(profile)))
-      .filter(usable)
-      .map((profile) => profile.id)
-      .slice(0, 2),
+    same && remembered.profileIds
+      ? remembered.profileIds
+      : [baseProfile, ...local.filter((profile) => profile.id !== baseProfile?.id)]
+          .filter((profile): profile is Profile => Boolean(profile && local.includes(profile)))
+          .filter(usable)
+          .map((profile) => profile.id)
+          .slice(0, 2),
   );
   // Prompts and Steps & Guidance vary these fields over the shared settings.
-  const [patches, setPatches] = useState<Partial<GenerationInput>[]>(() => patchesFor(dimension));
+  const [patches, setPatches] = useState<Partial<GenerationInput>[]>(() =>
+    same && remembered.patches && remembered.dimension === dimension
+      ? remembered.patches
+      : patchesFor(dimension),
+  );
   const firstLora =
     base.input.loras.find((lora) => lora.enabled !== false && baseLoras.includes(lora.name))
       ?.name ||
     baseLoras[0] ||
     "";
-  const [loraMode, setLoraMode] = useState<LoraMode>("toggle");
-  const [lora, setLora] = useState(firstLora);
+  const [loraMode, setLoraMode] = useState<LoraMode>(remembered.loraMode || "toggle");
+  const [lora, setLora] = useState((same && remembered.lora) || firstLora);
   const [loraNames, setLoraNames] = useState(() =>
-    [firstLora, ...baseLoras.filter((name) => name !== firstLora)].filter(Boolean).slice(0, 2),
+    same && remembered.loraNames
+      ? remembered.loraNames
+      : [firstLora, ...baseLoras.filter((name) => name !== firstLora)].filter(Boolean).slice(0, 2),
   );
   const stacked = (name: string) => base.input.loras.find((entry) => entry.name === name);
   const startStrength = (name: string) =>
     stacked(name)?.strength ?? defaultStrength(metadata[name]?.strengthRange);
-  const [strength, setStrength] = useState<number | null>(null);
-  const [strengths, setStrengths] = useState(sweep);
+  const [strength, setStrength] = useState<number | null>(
+    same ? (remembered.strength ?? null) : null,
+  );
+  const [strengths, setStrengths] = useState(() =>
+    same && remembered.strengths ? remembered.strengths : sweep,
+  );
+  useEffect(
+    () =>
+      setRemembered({
+        base: baseKey,
+        dimension,
+        shared,
+        profileIds,
+        patches,
+        loraMode,
+        lora,
+        loraNames,
+        strength,
+        strengths,
+      }),
+    [
+      baseKey,
+      dimension,
+      shared,
+      profileIds,
+      patches,
+      loraMode,
+      lora,
+      loraNames,
+      strength,
+      strengths,
+      setRemembered,
+    ],
+  );
 
   function patchesFor(next: Dimension): Partial<GenerationInput>[] {
     if (next === "prompt") {

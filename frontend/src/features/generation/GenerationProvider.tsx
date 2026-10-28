@@ -12,7 +12,7 @@ import { useForm } from "@mantine/form";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { api } from "../../api";
-import { useAccount } from "../auth/AccountGate";
+import { useRememberedKey } from "../auth/useRemembered";
 import { isProfile } from "./payload";
 
 export const modelsQuery = queryOptions({
@@ -106,9 +106,9 @@ function savedDrafts(key: string): Record<MediaKind, Draft> {
 function useGenerationState(workspace: Workspace, remember: boolean) {
   // A Chat card staged by Refine, Animate or Recreate keeps its own input beside the composer's.
   const [staged, setStaged] = useState<Draft | null>(null);
-  // The gallery composer's drafts survive a reload, saved per account as they change.
-  const account = useAccount().data?.account?.id;
-  const storageKey = remember ? `studio-composer-draft:${account ?? "local"}` : "";
+  // The gallery composer's drafts survive a reload, remembered as they change.
+  const rememberedKey = useRememberedKey("composer-draft");
+  const storageKey = remember ? rememberedKey : "";
   const [restored] = useState(() => savedDrafts(storageKey));
   const drafts = useRef({ chat: { ...initialDrafts }, gallery: restored });
   const chatForm = useForm<Draft>({ mode: "controlled", initialValues: empty });

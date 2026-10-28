@@ -24,7 +24,7 @@
 
 .area[data-fill] .input {
   flex: 1;
-  min-height: 10rem;
+  min-height: 4.75rem;
   font-size: 1.0625rem;
   resize: none;
 }
