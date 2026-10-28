@@ -171,19 +171,19 @@ test("Compare from the tile menu keeps the result's seed, compares prompts with 
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
 
-test("Compare Variants remembers its mode and variants across a reload", async ({ page }) => {
+test("Compare remembers its mode and variants across a reload", async ({ page }) => {
   await fixtures(page);
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper fox");
-  await page.getByRole("button", { name: "Compare Variants", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Compare Variants", exact: true });
-  await dialog.getByText("Prompts", { exact: true }).click();
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
+  await compareBy(dialog, "Prompts");
   const promptB = dialog
     .getByRole("group", { name: "Variant B", exact: true })
     .getByRole("textbox", { name: "Prompt", exact: true });
   await promptB.fill("A silver fox");
   await page.reload();
-  await page.getByRole("button", { name: "Compare Variants", exact: true }).click();
+  await page.getByRole("button", { name: "Compare", exact: true }).click();
   await expect(dialog.getByRole("radio", { name: "Prompts", exact: true })).toBeChecked();
   await expect(promptB).toHaveValue("A silver fox");
 });
