@@ -115,7 +115,6 @@ function CaptionGallery() {
       )}
       <Select
         aria-label="Images to Caption"
-        size="xs"
         w={150}
         data={(["all", "missing", "outdated"] as const).map((value) => ({
           value,
@@ -129,7 +128,6 @@ function CaptionGallery() {
       {data?.active ? (
         <Button
           variant="default"
-          size="compact-sm"
           leftSection={<Square size={16} />}
           loading={change.isPending}
           onClick={() => change.mutate("stop")}
@@ -139,9 +137,8 @@ function CaptionGallery() {
       ) : (
         <Button
           variant="default"
-          size="compact-sm"
           leftSection={<ScanText size={16} />}
-          loading={change.isPending || status.isPending}
+          loading={change.isPending}
           disabled={!data || data.state === "unavailable" || !data.scopes[scope]}
           onClick={() => change.mutate("start")}
         >
@@ -200,7 +197,6 @@ function DeleteFailedItems() {
       {others && (
         <Select
           aria-label="Whose Failed Items"
-          size="xs"
           w={150}
           data={owners}
           value={owner}
@@ -211,7 +207,6 @@ function DeleteFailedItems() {
       )}
       <Button
         variant="default"
-        size="compact-sm"
         leftSection={<Trash2 size={16} />}
         onClick={() => setConfirming(true)}
       >
@@ -269,7 +264,6 @@ function UnfinishedItems() {
     >
       <Button
         variant="default"
-        size="compact-sm"
         leftSection={<ListRestart size={16} />}
         onClick={() => setOpened(true)}
       >
@@ -380,7 +374,6 @@ export function MaintenanceSettings() {
             href="/api/gallery/export"
             download
             variant="default"
-            size="compact-sm"
             leftSection={<Download size={16} />}
           >
             Export
@@ -395,7 +388,6 @@ export function MaintenanceSettings() {
         >
           <Button
             variant="default"
-            size="compact-sm"
             leftSection={<Copy size={16} />}
             loading={diagnostics.isPending}
             disabled={!diagnostics.data}
@@ -411,7 +403,6 @@ export function MaintenanceSettings() {
             target="_blank"
             rel="noopener noreferrer"
             variant="subtle"
-            size="compact-sm"
             rightSection={<ExternalLink size={14} />}
           >
             Open
