@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActionIcon,
   Alert,
@@ -17,7 +17,7 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
@@ -35,6 +35,7 @@ interface DefinitionRow {
   backend?: string;
 }
 const nouns = { profile: "Profile", guide: "Guide" } as const;
+const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
 
 /** Settings › Profiles: generation profiles and prompting guides, each with saved versions. */
 interface ProfileStats {
@@ -76,7 +77,7 @@ function ProfileUse({ stats }: { stats?: ProfileStats }) {
   );
 }
 
-export function ProfileDefinitions() {
+export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [kind, setKind] = useState<DefinitionKind>("profile");
   const [query, setQuery] = useState("");
   const [family, setFamily] = useState<string | null>(null);
@@ -142,112 +143,114 @@ export function ProfileDefinitions() {
   };
   return (
     <Stack gap="md">
-      <SectionToolbar
-        label={`${noun}s`}
-        views={[
-          { value: "profile", label: "Profiles" },
-          { value: "guide", label: "Guides" },
-        ]}
-        view={kind}
-        onViewChange={(value) => {
-          setKind(value as DefinitionKind);
-          setFamily(null);
-        }}
-        query={query}
-        onQueryChange={setQuery}
-        filters={
-          <Select
-            label="Family"
-            placeholder="All Families"
-            data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
-            value={family}
-            onChange={setFamily}
-            clearable
-            searchable
-            openOnFocus={false}
-            comboboxProps={{ withinPortal: false }}
-            data-mantine-stop-propagation
-          />
-        }
-        filterCount={Number(!!family)}
-        onResetFilters={() => setFamily(null)}
-        actions={
-          <>
-            {kind === "profile" ? (
-              <FileButton
-                accept="application/json,.json"
-                onChange={(file) => {
-                  if (file) importing.mutate(file);
-                }}
-              >
-                {(props) => (
-                  <Tooltip label="Import Workflow">
-                    <ActionIcon
-                      {...props}
-                      variant="subtle"
-                      color="gray"
-                      aria-label="Import Workflow"
-                      loading={importing.isPending}
-                    >
-                      <Upload size={18} />
-                    </ActionIcon>
-                  </Tooltip>
-                )}
-              </FileButton>
-            ) : (
-              <Tooltip label="New Guide">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="New Guide"
-                  onClick={() => {
-                    setSelected("");
-                    setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
+      <SectionHeader heading={heading}>
+        <SectionToolbar
+          label={`${noun}s`}
+          views={[
+            { value: "profile", label: "Profiles" },
+            { value: "guide", label: "Guides" },
+          ]}
+          view={kind}
+          onViewChange={(value) => {
+            setKind(value as DefinitionKind);
+            setFamily(null);
+          }}
+          query={query}
+          onQueryChange={setQuery}
+          filters={
+            <Select
+              label="Family"
+              placeholder="All Families"
+              data={families.map((value) => ({ value, label: modelFamilyLabel(value) }))}
+              value={family}
+              onChange={setFamily}
+              clearable
+              searchable
+              openOnFocus={false}
+              comboboxProps={{ withinPortal: false }}
+              data-mantine-stop-propagation
+            />
+          }
+          filterCount={Number(!!family)}
+          onResetFilters={() => setFamily(null)}
+          actions={
+            <>
+              {kind === "profile" ? (
+                <FileButton
+                  accept="application/json,.json"
+                  onChange={(file) => {
+                    if (file) importing.mutate(file);
                   }}
                 >
-                  <Plus size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {kind === "profile" && (
-              <Tooltip label="Merge Duplicate Profiles">
+                  {(props) => (
+                    <Tooltip label="Import Workflow">
+                      <ActionIcon
+                        {...props}
+                        variant="subtle"
+                        color="gray"
+                        aria-label="Import Workflow"
+                        loading={importing.isPending}
+                      >
+                        <Upload size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  )}
+                </FileButton>
+              ) : (
+                <Tooltip label="New Guide">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="New Guide"
+                    onClick={() => {
+                      setSelected("");
+                      setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
+                    }}
+                  >
+                    <Plus size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {kind === "profile" && (
+                <Tooltip label="Merge Duplicate Profiles">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Merge Duplicate Profiles"
+                    onClick={() => setMerging(true)}
+                  >
+                    <Merge size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              {kind === "profile" && (
+                <Tooltip label="Combine Backends">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    aria-label="Combine Backends"
+                    onClick={() => setCombining(true)}
+                  >
+                    <Combine size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
+              <Tooltip label="Export Definitions">
                 <ActionIcon
+                  component="a"
+                  href="/api/profiles/export"
+                  download
                   variant="subtle"
                   color="gray"
-                  aria-label="Merge Duplicate Profiles"
-                  onClick={() => setMerging(true)}
+                  aria-label="Export Definitions"
                 >
-                  <Merge size={18} />
+                  <FileDown size={18} />
                 </ActionIcon>
               </Tooltip>
-            )}
-            {kind === "profile" && (
-              <Tooltip label="Combine Backends">
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  aria-label="Combine Backends"
-                  onClick={() => setCombining(true)}
-                >
-                  <Combine size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            <Tooltip label="Export Definitions">
-              <ActionIcon
-                component="a"
-                href="/api/profiles/export"
-                download
-                variant="subtle"
-                color="gray"
-                aria-label="Export Definitions"
-              >
-                <FileDown size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </>
-        }
-      />
+            </>
+          }
+        />
+      </SectionHeader>
       {importing.error && <Alert color="red">{importing.error.message}</Alert>}
       {list.error ? (
         <Alert color="red">{list.error.message}</Alert>
@@ -273,29 +276,26 @@ export function ProfileDefinitions() {
               header: "Name",
               main: true,
               sortValue: (entry) => entry.name || idOf(entry),
+              // The name and its family wrap rather than cut off; Copy ID has the exact ID.
               cell: (entry) => (
                 <>
-                  <Group gap="xs" wrap="nowrap">
-                    <Text size="sm" fw={500} truncate>
+                  <Group gap="xs">
+                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
                       {entry.name || idOf(entry)}
                     </Text>
                     {entry.backend && (
                       <Badge variant="default">{backendLabel(entry.backend)}</Badge>
                     )}
                   </Group>
-                  <Text size="xs" c="dimmed" truncate>
-                    {idOf(entry)}
+                  <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
+                    {[
+                      entry.family && modelFamilyLabel(entry.family),
+                      entry.kind && kindLabels[entry.kind],
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || idOf(entry)}
                   </Text>
                 </>
-              ),
-            },
-            {
-              key: "family",
-              header: "Family",
-              visibleFrom: "sm",
-              sortValue: (entry) => entry.family && modelFamilyLabel(entry.family),
-              cell: (entry) => (
-                <Text size="sm">{entry.family ? modelFamilyLabel(entry.family) : "—"}</Text>
               ),
             },
             {

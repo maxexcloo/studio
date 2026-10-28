@@ -35,8 +35,7 @@ test("Administrators explicitly link, dismiss and unlink chat identities with sa
     gateway.pending = gateway.pending.filter((item) => item.identity !== body.identity);
     return route.fulfill({ json: { ok: true, gateway } });
   });
-  await page.goto("/settings#users");
-  await page.getByRole("button", { name: "Chat Gateway", exact: true }).click();
+  await page.goto("/settings#gateway");
   await page.getByRole("combobox", { name: "Account for chat-member", exact: true }).click();
   await page.getByRole("option", { name: "member@example.test", exact: true }).click();
   await page.getByRole("button", { name: "Link chat-member", exact: true }).click();
@@ -50,7 +49,7 @@ test("Administrators explicitly link, dismiss and unlink chat identities with sa
   await rowAction("chat-dismiss", "Dismiss");
   await expect(page.getByRole("row", { name: "chat-dismiss", exact: true })).toHaveCount(0);
   await section(page, "Settings", "Account");
-  await section(page, "Settings", "Users");
+  await section(page, "Settings", "Chat Gateway");
   await expect(linked).toBeVisible();
   await rowAction("chat-member", "Unlink");
   await expect(page.getByText("No Chat Users Yet", { exact: true })).toBeVisible();
@@ -82,8 +81,7 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
     gateway.adminTools = route.request().postDataJSON().on;
     return route.fulfill({ json: { ok: true, adminTools: gateway.adminTools } });
   });
-  await page.goto("/settings#users");
-  await page.getByRole("button", { name: "Chat Gateway", exact: true }).click();
+  await page.goto("/settings#gateway");
   const control = page.getByRole("switch", { name: /^Chat Gateway Admin Tools/ });
   await control.click();
   await expect(control).toBeDisabled();
@@ -96,7 +94,6 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
   await expect(control).toBeChecked();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.reload();
-  await page.getByRole("button", { name: "Chat Gateway", exact: true }).click();
   await expect(control).toBeChecked();
   expect(attempts).toBe(2);
 });
@@ -131,32 +128,31 @@ test("Personal MCP credentials can be issued, rotated and revoked without retain
     return route.fulfill({ json: { ok: true, enabled: false, createdAt: "" } });
   });
   await page.goto("/settings#account");
-  await page.getByRole("button", { name: "Personal MCP Connection", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "MCP Endpoint", exact: true })).toHaveValue(
     status.endpoint,
   );
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveValue(
+  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveValue(
     "browser-fixture-token-1",
   );
   await expect(page.getByText("Token Active", { exact: true })).toBeVisible();
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
-  await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Rotate Token", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveValue(
+  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveValue(
     "browser-fixture-token-2",
   );
   await page.getByRole("button", { name: "Revoke Token", exact: true }).click();
   await expect(page.getByText("No Token Issued", { exact: true })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
   await expect.poll(() => issued).toBe(3);
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
   finishLateIssuance();
   await expect(page.getByRole("button", { name: "Rotate Token", exact: true })).toBeEnabled();
-  await expect(page.getByRole("textbox", { name: "New MCP Token", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
   expect({ issued, revoked }).toEqual({ issued: 3, revoked: 1 });
 });
 
@@ -217,7 +213,6 @@ test("Users change their email only behind password-protected controls", async (
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/settings");
   const own = page.getByRole("region", { name: "Your Account", exact: true });
-  await own.getByRole("button", { name: "Email & Password", exact: true }).click();
   await expect(own.getByRole("textbox", { name: "Email", exact: true })).toHaveValue(
     "admin@example.test",
   );

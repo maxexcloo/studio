@@ -15,6 +15,16 @@ import { SearchInput } from "./SearchInput";
 import { usePhone } from "./usePhone";
 import classes from "./SectionToolbar.module.css";
 
+/** A section's heading (from `WorkspaceSections`) with its toolbar beside it. */
+export function SectionHeader({ heading, children }: { heading: ReactNode; children: ReactNode }) {
+  return (
+    <div className={classes.header}>
+      {heading}
+      <div>{children}</div>
+    </div>
+  );
+}
+
 /**
  * Library and Settings lists share one toolbar: segmented views on the left, then an expanding
  * search, one filter popover and the section's own actions. Escape closes search, keeping the query,

@@ -96,7 +96,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
       {issuedToken && (
         <Stack gap="xs">
           <TextInput
-            label="New MCP Token"
+            label="MCP Token"
             description="Shown only during this visit. Store it in your MCP client before leaving Account."
             value={issuedToken}
             readOnly

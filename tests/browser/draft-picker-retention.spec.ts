@@ -64,7 +64,7 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   expect(state.chatRequests[1].references).toEqual(state.chatRequests[0].references);
   expect(state.sessions).toHaveLength(1);
   if (isMobile) {
-    await page.getByRole("button", { name: "Open Status", exact: true }).click();
+    await page.getByRole("button", { name: "Open Chats", exact: true }).click();
     // Wait out the slide-in so the press and release land on the same link.
     await expect(page.getByRole("dialog", { name: "Chats", exact: true })).toBeInViewport({
       ratio: 1,

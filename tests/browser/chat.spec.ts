@@ -101,7 +101,7 @@ async function savedChat(page: Page) {
 /** The Chats list: the desktop sidebar, or the status Drawer on phones. */
 async function chats(page: Page, isMobile: boolean) {
   if (!isMobile) return page.getByRole("complementary", { name: "Chats", exact: true });
-  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  await page.getByRole("button", { name: "Open Chats", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
   // A press during the slide-in can release over another row, which focuses without clicking.
   await expect(drawer).toBeInViewport({ ratio: 1 });

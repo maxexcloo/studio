@@ -105,7 +105,7 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await page.getByRole("link", { name: "Chat", exact: true }).first().click();
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Open Status", exact: true }).click();
+    await page.getByRole("button", { name: "Open Chats", exact: true }).click();
   // The Chat stays New Chat until the text model titles it.
   await expect(page.getByRole("link", { name: /New Chat/ }).first()).toBeVisible();
 });

@@ -11,7 +11,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Server } from "lucide-react";
+import { Activity, MessagesSquare, Server } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, terminal, useQueue } from "../generation/Queue";
@@ -30,11 +30,17 @@ export function StatusAction({ chat }: { chat: boolean }) {
   const summary = serviceSummary(useQuery(servicesStatusQuery));
   const generating = queue.data?.jobs.some((job) => !terminal.has(job.status));
   const title = chat ? "Chats" : "Generations";
+  // In Chat it is plainly the Chats list, still coloured by service health.
+  const Icon = chat ? MessagesSquare : Activity;
   return (
     <>
-      <Tooltip label={generating ? "Generating" : summary.label}>
+      <Tooltip
+        label={[chat && "Chats", generating ? "Generating" : summary.label]
+          .filter(Boolean)
+          .join(" · ")}
+      >
         <ActionIcon
-          aria-label="Open Status"
+          aria-label={chat ? "Open Chats" : "Open Status"}
           aria-description={generating ? "Generating" : summary.label}
           aria-haspopup="dialog"
           aria-expanded={opened}
@@ -42,7 +48,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
           color={generating ? "gray" : summary.colour}
           onClick={open}
         >
-          {generating ? <Loader size={18} color="gray" /> : <Activity size={19} />}
+          {generating ? <Loader size={18} color="gray" /> : <Icon size={19} />}
         </ActionIcon>
       </Tooltip>
       <Drawer

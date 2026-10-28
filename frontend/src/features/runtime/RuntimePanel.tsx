@@ -11,6 +11,7 @@ import type {
 import { api } from "../../api";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
+import { SectionHeading } from "../../ui/SectionHeading";
 import { RuntimeWorkloads } from "./RuntimeWorkloads";
 
 const services = [
@@ -86,76 +87,56 @@ export function ServiceHealthSummary() {
   );
 }
 const memory = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
-function EndpointDetails({ endpoint }: { endpoint: ServiceEndpoint }) {
-  return (
-    <Stack gap={4} style={{ overflowWrap: "anywhere" }}>
-      <Text size="xs" c="dimmed">
-        {endpoint.reason}
-      </Text>
-      {endpoint.endpoint && (
-        <Anchor
-          size="xs"
-          href={endpoint.endpoint}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ overflowWrap: "anywhere" }}
-        >
-          {endpoint.endpoint}
-        </Anchor>
-      )}
-      {endpoint.loadedModel && <Text size="xs">Loaded Model: {endpoint.loadedModel}</Text>}
-      {endpoint.device && <Text size="xs">Device: {endpoint.device}</Text>}
-      {endpoint.version && <Text size="xs">Version: {endpoint.version}</Text>}
-      {(endpoint.memoryTotal != null || endpoint.memoryFree != null) && (
-        <Text size="xs">
-          Memory:{" "}
-          {[
-            endpoint.memoryFree != null ? `${memory(endpoint.memoryFree)} Free` : null,
-            endpoint.memoryTotal != null ? `${memory(endpoint.memoryTotal)} Total` : null,
-          ]
-            .filter(Boolean)
-            .join(" / ")}
-        </Text>
-      )}
-      {endpoint.workloadId && (
-        <Text size="xs" c="dimmed">
-          Configured Workload: {endpoint.workloadId}
-        </Text>
-      )}
-      {endpoint.checkedAt && (
-        <Text size="xs" c="dimmed">
-          Checked: {new Date(endpoint.checkedAt).toLocaleString()}
-        </Text>
-      )}
-    </Stack>
-  );
+/** What the endpoint reports, on one line. */
+function endpointFacts(endpoint: ServiceEndpoint) {
+  const memoryText = [
+    endpoint.memoryFree != null ? `${memory(endpoint.memoryFree)} Free` : null,
+    endpoint.memoryTotal != null ? `${memory(endpoint.memoryTotal)} Total` : null,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  return [
+    endpoint.loadedModel,
+    endpoint.device,
+    endpoint.version && `Version ${endpoint.version}`,
+    memoryText,
+    endpoint.checkedAt && `Checked ${new Date(endpoint.checkedAt).toLocaleTimeString()}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 // Several text workloads may share a display label; the workload ID tells them apart.
 const endpointLabel = (endpoint: ServiceEndpoint, endpoints: ServiceEndpoint[]) =>
   endpoints.filter((other) => other.label === endpoint.label).length > 1
     ? `${endpoint.label} · ${endpoint.id}`
     : endpoint.label;
+/** One service: its health, the endpoint shown (chosen when there are several) and what it reports. */
 function ServiceEndpointRow({ label, service }: { label: string; service: ServiceStatus }) {
   const [selection, setSelection] = useState<string | null>(null);
   const endpoint =
     service.endpoints.find((endpoint) => endpoint.id === selection) ||
     service.endpoints.find((endpoint) => endpoint.state === service.state) ||
     service.endpoints[0];
+  const facts = endpoint && endpointFacts(endpoint);
+  // A healthy service, or a reason that only repeats its badge, needs no explanation.
+  const reason = endpoint?.reason || service.reason;
+  const explained =
+    service.state !== "healthy" &&
+    reason.toLowerCase() !== healthLabel(service.state).toLowerCase();
   return (
-    <Stack gap="xs" component="section" aria-label={label}>
-      <Group gap="xs" justify="space-between">
-        <Text fw={600}>{label}</Text>
-        <Badge variant="light" color={healthColour(service.state)}>
-          {healthLabel(service.state)}
-        </Badge>
-      </Group>
-      <Text size="xs" c="dimmed">
-        {service.reason}
-      </Text>
-      {endpoint && (
-        <>
+    <Stack gap={6} component="section" aria-label={label} style={{ overflowWrap: "anywhere" }}>
+      <Group gap="xs" justify="space-between" wrap="nowrap">
+        <Group gap="xs" wrap="nowrap">
+          <Text fw={600}>{label}</Text>
+          <Badge variant="light" color={healthColour(service.state)}>
+            {healthLabel(service.state)}
+          </Badge>
+        </Group>
+        {endpoint && (
           <Select
             aria-label={`${label} Endpoint`}
+            size="xs"
+            w={{ base: 160, sm: 240 }}
             data={service.endpoints.map((option) => ({
               value: option.id,
               label: endpointLabel(option, service.endpoints),
@@ -182,8 +163,18 @@ function ServiceEndpointRow({ label, service }: { label: string; service: Servic
               );
             }}
           />
-          <EndpointDetails endpoint={endpoint} />
-        </>
+        )}
+      </Group>
+      {explained && (
+        <Text size="xs" c="dimmed">
+          {reason}
+        </Text>
+      )}
+      {facts && <Text size="xs">{facts}</Text>}
+      {endpoint?.endpoint && (
+        <Anchor size="xs" href={endpoint.endpoint} target="_blank" rel="noopener noreferrer">
+          {endpoint.endpoint}
+        </Anchor>
       )}
     </Stack>
   );
@@ -193,24 +184,30 @@ export function RuntimePanel() {
   if (status.isPending) return <LoadingState label="Loading Workers" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
   const available = services.filter(({ kind }) => status.data.services[kind]);
+  const { runtime } = status.data;
   return (
     <Stack gap="lg" aria-label="Runtime">
       <Group gap="xs">
         <Badge color="gray" variant="light">
-          {status.data.runtime.configured ? "Runtime Configured" : "Observe Only"}
+          {runtime.configured ? "Runtime Configured" : "Observe Only"}
         </Badge>
         <Text size="xs" c="dimmed">
-          Automatic Control {status.data.runtime.automaticLifecycle ? "On" : "Off"}
+          Automatic Control {runtime.automaticLifecycle ? "On" : "Off"}
         </Text>
       </Group>
-      <Text size="sm" c="dimmed">
-        {status.data.runtime.reason}
-      </Text>
-      {status.data.runtime.configured && <RuntimeWorkloads />}
-      {available.map(({ kind, label }) => (
-        <ServiceEndpointRow key={kind} label={label} service={status.data.services[kind]!} />
-      ))}
-      {!available.length && <EmptyState>No Services</EmptyState>}
+      {!runtime.configured && (
+        <Text size="sm" c="dimmed">
+          {runtime.reason}
+        </Text>
+      )}
+      {runtime.configured && <RuntimeWorkloads />}
+      <Stack gap="md" component="section" aria-label="Services">
+        <SectionHeading>Services</SectionHeading>
+        {available.map(({ kind, label }) => (
+          <ServiceEndpointRow key={kind} label={label} service={status.data.services[kind]!} />
+        ))}
+        {!available.length && <EmptyState>No Services</EmptyState>}
+      </Stack>
     </Stack>
   );
 }

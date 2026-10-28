@@ -2,6 +2,7 @@ import {
   Boxes,
   FileCog,
   Info,
+  MessagesSquare,
   Server,
   Shield,
   SlidersHorizontal,
@@ -12,11 +13,18 @@ import {
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
 
+// Alphabetical, with About apart at the end.
 const settingSections = {
   account: {
     label: "Account",
     description: "Your role, sign-in details and personal MCP access.",
     icon: UserRound,
+  },
+  gateway: {
+    label: "Chat Gateway",
+    description: "Chat identities linked to Studio accounts, and the gateway's admin tools.",
+    icon: MessagesSquare,
+    admin: true,
   },
   groups: {
     label: "Groups",
@@ -24,6 +32,11 @@ const settingSections = {
       "Access groups choose each user’s local models, cloud models and uncensored access; administrators have every permission.",
     icon: Shield,
     admin: true,
+  },
+  maintenance: {
+    label: "Maintenance",
+    description: "Clean up the gallery and gather details for a bug report.",
+    icon: Wrench,
   },
   models: {
     label: "Models",
@@ -44,7 +57,7 @@ const settingSections = {
   },
   users: {
     label: "Users",
-    description: "Accounts, their access groups, chat identities and the new-account policy.",
+    description: "Accounts, their access groups and the new-account policy.",
     icon: UsersRound,
     admin: true,
   },
@@ -54,11 +67,6 @@ const settingSections = {
     icon: Server,
     admin: true,
   },
-  maintenance: {
-    label: "Maintenance",
-    description: "Clean up the gallery and gather details for a bug report.",
-    icon: Wrench,
-  },
   about: {
     label: "About",
     description: "Version, licences and credits.",
@@ -66,7 +74,7 @@ const settingSections = {
     apart: true,
   },
 };
-const multiUserOnly = new Set(["groups", "users"]);
+const multiUserOnly = new Set(["gateway", "groups", "users"]);
 export function useSettingsNavigation() {
   const multi = useAccount().data?.mode === "multi-user";
   const admin = useIsAdmin();
