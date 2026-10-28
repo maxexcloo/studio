@@ -1,30 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  createPromptWriter,
-  parseWrittenPrompts,
-  promptWriterSettings,
-  writerGuide,
-} from "./prompt-writer.js";
+import { gatewaySettings } from "./assistant.js";
+import { createPromptWriter, parseWrittenPrompts, writerGuide } from "./prompt-writer.js";
 
 const settings = (url) => ({
   STUDIO_PROMPT_WRITER_URL: url,
   STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
 });
 
 test("prompt writer settings are all or nothing and name an OpenAI-compatible endpoint", () => {
-  assert.equal(promptWriterSettings({}), null);
+  assert.equal(gatewaySettings({}), null);
   assert.throws(
-    () => promptWriterSettings({ STUDIO_PROMPT_WRITER_KEY: "fixture-key" }),
+    () => gatewaySettings({ STUDIO_PROMPT_WRITER_KEY: "fixture-key" }),
     /needs STUDIO_PROMPT_WRITER_URL, STUDIO_PROMPT_WRITER_MODEL/,
   );
+  assert.throws(() => gatewaySettings(settings("ftp://writer.invalid")), /absolute HTTP\(S\) URL/);
   assert.throws(
-    () => promptWriterSettings(settings("ftp://writer.invalid")),
-    /absolute HTTP\(S\) URL/,
-  );
-  assert.throws(
-    () => promptWriterSettings(settings("http://user:secret@writer.invalid")),
+    () => gatewaySettings(settings("http://user:secret@writer.invalid")),
     /without credentials/,
   );
   for (const [url, endpoint] of [
@@ -35,7 +28,7 @@ test("prompt writer settings are all or nothing and name an OpenAI-compatible en
       "https://writer.invalid/api/v1/chat/completions",
     ],
   ])
-    assert.equal(promptWriterSettings(settings(url)).endpoint, endpoint);
+    assert.equal(gatewaySettings(settings(url)).endpoint, endpoint);
 });
 
 test("written prompts parse from JSON, fenced JSON or plain text, without thinking", () => {

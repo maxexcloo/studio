@@ -4,9 +4,11 @@
  * operation, shared by the Studio UI routes (assistant-routes.js), MCP Generate's prompt writer
  * (prompt-writer.js) and later the MCP assistant and admin tools, so they cannot drift apart.
  *
- * It uses the prompt writer's gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY, _MODEL) and the
- * model an administrator chooses: STUDIO_ASSISTANT_MODEL (default: the prompt writer's model),
- * which also writes Spicy. Settings are read on every call, so a model chosen in Settings applies at once.
+ * It uses the prompt writer's gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY) and asks Bifrost
+ * for a route and reasoning level by name (`model()`): the local route while a local text workload
+ * runs, otherwise STUDIO_PROMPT_WRITER_MODEL's cloud route. STUDIO_ASSISTANT_MODEL, when an
+ * administrator sets it, replaces both for everything but MCP Generate's writer. Settings are read
+ * on every call, so a model chosen in Settings applies at once.
  *
  * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
@@ -31,6 +33,24 @@ const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
 const titleInstructions =
   "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
+// The Bifrost reasoning level each call asks for: `off` where it wants a structured (JSON) answer,
+// `text` where it writes prose.
+export const textLevels = {
+  animate: "text",
+  caption: "off",
+  describe: "off",
+  dream: "off",
+  guide: "off",
+  loras: "off",
+  negative: "text",
+  pick: "off",
+  profile: "off",
+  rewrite: "text",
+  suggestions: "off",
+  taste: "text",
+  title: "text",
+  writer: "off",
+};
 const maxCandidates = 20;
 const maxExamples = 6;
 const lookupTtlMs = 10 * 60_000;
@@ -46,7 +66,10 @@ export class AssistantError extends Error {
   }
 }
 
-/** The gateway endpoint, key and prompt-writer model, or null when unset; a partial setting fails by name. */
+/**
+ * The gateway endpoint, key and cloud route prefix (STUDIO_PROMPT_WRITER_MODEL, such as `cloud/`), or
+ * null when unset; a partial setting fails by name.
+ */
 export function gatewaySettings(environment = process.env) {
   const values = Object.fromEntries(
     gatewayKeys.map((key) => [key, String(environment[key] || "").trim()]),
@@ -57,10 +80,14 @@ export function gatewaySettings(environment = process.env) {
     throw new Error(
       `Prompt writing needs ${missing.join(", ")}; set all three of ${gatewayKeys.join(", ")} or none.`,
     );
+  if (!values.STUDIO_PROMPT_WRITER_MODEL.endsWith("/"))
+    throw new Error(
+      "STUDIO_PROMPT_WRITER_MODEL must be a route prefix ending in /, such as cloud/.",
+    );
   return {
     ...gatewayAddress(values.STUDIO_PROMPT_WRITER_URL, "STUDIO_PROMPT_WRITER_URL"),
     key: values.STUDIO_PROMPT_WRITER_KEY,
-    model: values.STUDIO_PROMPT_WRITER_MODEL,
+    cloud: values.STUDIO_PROMPT_WRITER_MODEL,
   };
 }
 
@@ -93,16 +120,11 @@ export function gatewayAddress(value, setting) {
   return { endpoint, root };
 }
 
-/** The gateway plus the assistant's models, or null while the gateway is unset. */
+/** The gateway plus the model an administrator chose (empty for none), or null while the gateway is unset. */
 export function assistantSettings(environment = process.env) {
   const gateway = gatewaySettings(environment);
   if (!gateway) return null;
-  const chosen = (key) => String(environment[key] || "").trim();
-  return {
-    ...gateway,
-    writerModel: gateway.model,
-    model: chosen(assistantModelKey) || gateway.model,
-  };
+  return { ...gateway, chosen: String(environment[assistantModelKey] || "").trim() };
 }
 
 /** The guide without provenance or sampling notes, as compact JSON. */
@@ -430,8 +452,8 @@ export function createAssistant(
     log = console,
     now = Date.now,
     resolveSettings = () => assistantSettings(environment),
-    // Whether the running text model reads images (runtime/services.ts); unknown without a runtime.
-    supportsVision = async () => false,
+    // The running local text model's route (runtime/services.ts); none without a runtime.
+    localText = async () => null,
   } = {},
 ) {
   if (!resolveSettings()) return null;
@@ -442,6 +464,23 @@ export function createAssistant(
       throw new AssistantError("The prompt assistant is not configured.", { status: 503 });
     return resolved;
   };
+
+  /** Local while a local text workload runs (reading images as it says), otherwise the cloud, which always does. */
+  async function route() {
+    return (await localText()) || { prefix: settings().cloud, vision: true };
+  }
+
+  /** The Bifrost model a call asks for: its route and `textLevels` level, or the administrator's choice. */
+  async function modelFor(call) {
+    const { chosen } = settings();
+    if (chosen && call !== "writer") return chosen;
+    return `${(await route()).prefix}${textLevels[call]}`;
+  }
+
+  /** Whether the route the calls take reads images. */
+  async function supportsVision() {
+    return (await route()).vision;
+  }
 
   /** A cached GET against the gateway's root, or `fallback` (cached briefly) when it fails. */
   async function lookup(key, path, read, fallback) {
@@ -534,16 +573,8 @@ export function createAssistant(
       onThinking?.(text);
     };
     const timer = AbortSignal.timeout(ms ?? timeoutMs);
-    // Every call here wants a structured answer, not deliberation: thinking off makes a prompt
-    // seconds faster and stops long reasoning from spending max_tokens before any content.
-    const body = {
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      reasoning_effort: "none",
-      stream,
-    };
+    // The model name carries the reasoning level (`textLevels`); Bifrost applies it.
+    const body = { model, messages, temperature, max_tokens: maxTokens, stream };
     let response;
     try {
       response = await fetchImpl(endpoint, {
@@ -660,7 +691,7 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const model = settings().model;
+    const model = await modelFor("rewrite");
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
     const vision = images.length ? await supportsVision() : false;
@@ -731,7 +762,7 @@ export function createAssistant(
     const fallback =
       recommendedNegative(guide, { cfg: cfg ?? 2, stack, infos }) ||
       String(guide?.negative?.default || "").trim();
-    const model = settings().model;
+    const model = await modelFor("negative");
     const system = [
       `You write negative prompts for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || "in use"}.`,
       "Reply with the negative prompt only: a short comma-separated list of unwanted traits (artefacts, defects, styles to avoid), at most 40 words, no preamble.",
@@ -785,7 +816,7 @@ export function createAssistant(
     const candidates = preFilterLoras({ profile, prompt, loras, starred });
     if (!candidates.length) return { loras: [], source: "prefilter" };
     const started = now();
-    const model = settings().model;
+    const model = await modelFor("loras");
     const listed = candidates.map(({ name, info }) => ({
       name,
       title: loraName(name, info),
@@ -862,7 +893,7 @@ export function createAssistant(
     loras = [],
     signal,
   } = {}) {
-    const model = settings().model;
+    const model = await modelFor("describe");
     const started = now();
     const pictures = images.filter((image) => image?.data);
     const vision = pictures.length ? await supportsVision() : false;
@@ -928,7 +959,7 @@ export function createAssistant(
    * JSON is kept as plain text without tags; the text is cut to `captionCharacters`.
    */
   async function caption({ image, signal } = {}) {
-    const model = settings().model;
+    const model = await modelFor("caption");
     const reply = await chat({
       model,
       messages: [
@@ -957,7 +988,7 @@ export function createAssistant(
 
   /** A gallery item's title of a few words, summarised from its prompt; throws on an unusable reply. */
   async function title({ prompt, signal } = {}) {
-    const model = settings().model;
+    const model = await modelFor("title");
     const reply = await chat({
       model,
       messages: [
@@ -983,7 +1014,7 @@ export function createAssistant(
     nearest = null,
     signal,
   } = {}) {
-    const model = settings().model;
+    const model = await modelFor("guide");
     const started = now();
     const system = [
       `You write prompting guides for the ${profile.kind === "video" ? "video" : "image"} model ${profile.label || profile.id || family}${family ? ` (family ${family})` : ""}.`,
@@ -1042,7 +1073,7 @@ export function createAssistant(
         'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "uncensored": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
       try {
         const reply = await chat({
-          model: settings().model,
+          model: await modelFor("profile"),
           messages: [
             { role: "system", content: system },
             { role: "user", content: one(sourceText, 12000) },
@@ -1067,6 +1098,7 @@ export function createAssistant(
 
   return {
     settings,
+    model: modelFor,
     supportsVision,
     listModels,
     listModelDetails,

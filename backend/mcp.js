@@ -181,6 +181,8 @@ export function registerMcpRoutes(
     environment = process.env,
     // Studio's RuntimeController (runtime/controller.ts), which the control key's tools drive.
     runtime,
+    // The local text route (runtime/services.ts) the prompt writer takes while a local text model runs.
+    localText,
     imageWaitSeconds = generateWaitSeconds,
     etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
@@ -239,7 +241,7 @@ export function registerMcpRoutes(
   // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
   const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
   // Optional: with a writer, Studio writes each prompt from the request; a partial setting fails at start.
-  const writer = createPromptWriter(environment, { fetchImpl });
+  const writer = createPromptWriter(environment, { fetchImpl, localText });
   const instructions = mediaInstructions(Boolean(writer));
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));

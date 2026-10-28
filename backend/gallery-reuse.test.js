@@ -120,7 +120,7 @@ test("a result keeps the prompt the queue wrote with its model and thinking, not
       theme: "action",
       source: "An amber bird",
       prompt: "The bird takes flight",
-      model: "ai/text",
+      model: "local/text",
       thinking: "A take-off reads best.",
     },
   };
@@ -133,7 +133,7 @@ test("a result keeps the prompt the queue wrote with its model and thinking, not
   assert.equal(completed.prompt, "The bird takes flight");
   assert.deepEqual(completed.writing, {
     kind: "animate",
-    model: "ai/text",
+    model: "local/text",
     thinking: "A take-off reads best.",
   });
 });
