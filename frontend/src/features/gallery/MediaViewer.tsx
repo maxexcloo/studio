@@ -26,6 +26,7 @@ import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource } from "./mediaSource";
+import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 const MediaComparison = lazy(() =>
@@ -86,6 +87,33 @@ function playVideo(media: HTMLVideoElement | null) {
   };
 }
 
+/** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
+function ViewerVideo({ src, width, height }: { src: string; width?: number; height?: number }) {
+  const [controls, setControls] = useState(false);
+  const hide = useRef(0);
+  useEffect(() => () => clearTimeout(hide.current), []);
+  const reveal = () => {
+    setControls(true);
+    clearTimeout(hide.current);
+    hide.current = window.setTimeout(() => setControls(false), 2500);
+  };
+  return (
+    <video
+      ref={playVideo}
+      src={src}
+      width={width}
+      height={height}
+      controls={controls}
+      playsInline
+      className={classes.video}
+      onPointerMove={reveal}
+      onPointerDown={reveal}
+      onFocus={reveal}
+      onClick={(event) => event.stopPropagation()}
+    />
+  );
+}
+
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
 function useNeighbourPrefetch(items: MediaItem[], index: number) {
   const held = useRef(new Map<string, HTMLImageElement>());
@@ -136,7 +164,8 @@ export function MediaViewer({
   const displayed = version?.id === item.id ? { ...item, upscaleActive: version.active } : item;
   const source = mediaSource(displayed);
   const favorite = useMediaFavorite(displayed);
-  const viewable = items.filter((candidate) => candidate.url);
+  // Work still running is viewable while it is the current item, so it navigates like a result.
+  const viewable = items.filter((candidate) => candidate.url || candidate.id === item.id);
   const currentIndex = viewable.findIndex((candidate) => candidate.id === item.id);
   const canNavigate = !!navigate && currentIndex >= 0 && viewable.length > 1;
   useNeighbourPrefetch(viewable, currentIndex);
@@ -195,6 +224,18 @@ export function MediaViewer({
     .filter(Boolean)
     .join(" · ");
   const toggleDetails = () => (phone ? setSheet(true) : setDetails((open) => !open));
+  function swipe(direction: SwipeDirection) {
+    // A swipe replaces the media before its compatibility click arrives.
+    gestureClick.current = true;
+    requestAnimationFrame(() => {
+      gestureClick.current = false;
+    });
+    if (direction === "down") close();
+    else if (direction === "up") setSheet(phone);
+    else move(direction === "left" ? 1 : -1);
+  }
+  // Running, failed and cancelled work takes the same touch swipes as a picture at Fit.
+  const statusSwipe = useRef<{ id: number; x: number; y: number } | null>(null);
   return (
     <>
       <Modal
@@ -216,8 +257,7 @@ export function MediaViewer({
             !event.nativeEvent.isComposing &&
             !deleting &&
             event.currentTarget.contains(target) &&
-            // The viewer's composer folds back first.
-            !target.closest("input,textarea,select,[aria-haspopup],[data-composer-dock]")
+            !target.closest("input,textarea,select,[aria-haspopup]")
           ) {
             event.preventDefault();
             close();
@@ -345,18 +385,33 @@ export function MediaViewer({
                 </Group>
               )}
               {!item.url ? (
-                <MediaJobStatus item={item} onRetried={setReplacement} />
+                <div
+                  className={classes.status}
+                  onPointerDown={(event) => {
+                    statusSwipe.current =
+                      event.pointerType === "touch"
+                        ? { id: event.pointerId, x: event.clientX, y: event.clientY }
+                        : null;
+                  }}
+                  onPointerUp={(event) => {
+                    const start = statusSwipe.current;
+                    statusSwipe.current = null;
+                    if (start?.id !== event.pointerId) return;
+                    const direction = swipeDirection(
+                      event.clientX - start.x,
+                      event.clientY - start.y,
+                    );
+                    if (direction) swipe(direction);
+                  }}
+                >
+                  <MediaJobStatus item={item} onRetried={setReplacement} />
+                </div>
               ) : item.type === "video" ? (
-                <video
-                  ref={playVideo}
+                <ViewerVideo
                   key={`${item.id}:${source.url}`}
                   src={source.url}
                   width={source.width}
                   height={source.height}
-                  controls
-                  playsInline
-                  className={classes.video}
-                  onClick={(event) => event.stopPropagation()}
                 />
               ) : compare && item.upscale?.url ? (
                 <div className={classes.comparison}>
@@ -378,16 +433,7 @@ export function MediaViewer({
                     placeholder={source.thumbnailUrl}
                     width={source.width}
                     height={source.height}
-                    swipe={(direction) => {
-                      // A swipe replaces the image before its compatibility click arrives.
-                      gestureClick.current = true;
-                      requestAnimationFrame(() => {
-                        gestureClick.current = false;
-                      });
-                      if (direction === "down") close();
-                      else if (direction === "up") setSheet(phone);
-                      else move(direction === "left" ? 1 : -1);
-                    }}
+                    swipe={swipe}
                   />
                 </Suspense>
               )}

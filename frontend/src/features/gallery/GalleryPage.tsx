@@ -164,15 +164,15 @@ export function GalleryPage() {
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
   );
-  // Grid shows each version chain as one tile, its latest version; Runs and All Versions show all.
+  // Grid shows each version chain as one tile, its original; Runs and All Versions show all.
   const groups = useVersionGroups(loaded);
   const grouped = view === "grid" && !allVersions;
   const versions = useMemo(
-    () => (grouped ? new Map(groups.map((group) => [group.at(-1)!.id, group])) : undefined),
+    () => (grouped ? new Map(groups.map((group) => [group[0].id, group])) : undefined),
     [grouped, groups],
   );
   const items = useMemo(
-    () => (versions ? [...versions.values()].map((group) => group.at(-1)!) : loaded),
+    () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
   const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
@@ -325,7 +325,7 @@ export function GalleryPage() {
           items={
             versions
               ? [...versions.values()].map(
-                  (group) => group.find((version) => version.id === selected.id) || group.at(-1)!,
+                  (group) => group.find((version) => version.id === selected.id) || group[0],
                 )
               : items
           }

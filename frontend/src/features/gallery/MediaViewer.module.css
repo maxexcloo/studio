@@ -79,6 +79,16 @@
   object-fit: contain;
 }
 
+/* Running work's status fills the stage, so a swipe anywhere on it navigates. */
+.status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
 .navigation {
   position: absolute;
   inset-inline: var(--mantine-spacing-sm);
@@ -157,7 +167,7 @@
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
 }
 
-/* Next steps hold their row's height while they load, so the prompt bar never moves. */
+/* Next steps hold their row's height while they load, so the dock never jumps. */
 .steps {
   width: auto;
   max-width: min(100%, var(--studio-composer-width));

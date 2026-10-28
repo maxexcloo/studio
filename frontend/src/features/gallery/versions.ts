@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { MediaItem, QueueJob } from "../../types";
 import { queueQuery } from "../generation/Queue";
 
-/** A result and the versions made from it (Edit, Recreate, Animate and so on), oldest first. */
+/** A result and the versions made from it (Edit, Prompt, Animate and so on), oldest first. */
 export type VersionGroup = MediaItem[];
 
 /**

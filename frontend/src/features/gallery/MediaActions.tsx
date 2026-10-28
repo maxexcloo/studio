@@ -13,11 +13,11 @@ import {
   ImageUpscale,
   ListChecks,
   Loader,
+  MessageCircle,
   Pencil,
   PenLine,
   Play,
   Repeat,
-  RotateCcw,
   RotateCw,
   Share,
   Shuffle,
@@ -30,13 +30,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
 import { copyText } from "../../ui/clipboard";
 import { TextBox } from "../../ui/TextBox";
 import { useCompare } from "../compare/CompareDialog";
-import { useGeneration } from "../generation/GenerationProvider";
+import { useGeneration, useGenerationActions } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
@@ -47,6 +47,7 @@ import { upscaling } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
+  mediaDraft,
   useMediaAction,
   useMediaIteration,
   type AnimateTheme,
@@ -56,10 +57,10 @@ import { useMediaFavorite } from "./useMediaFavorite";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
+  chat: { label: "Chat", icon: MessageCircle },
+  prompt: { label: "Prompt", icon: SlidersHorizontal },
   animate: { label: "Animate", icon: Play },
   edit: { label: "Edit", icon: Pencil },
-  recreate: { label: "Recreate", icon: RotateCcw },
-  reference: { label: "Reference", icon: ImagePlus },
   retry: { label: "Retry", icon: RotateCw },
   stop: { label: "Stop", icon: Square },
   compare: { label: "Compare", icon: Columns3 },
@@ -71,9 +72,13 @@ const definitions = {
   star: { label: "Star", icon: Star },
 };
 export type ItemActionId = keyof typeof definitions;
-/** The sections, alphabetical within each; Share takes Download's place where phones share. */
+/**
+ * The sections: Chat and Prompt first, the rest alphabetical within each. Compare shows only in
+ * menus and the selection bar; Share takes Download's place where phones share.
+ */
 const sections: ItemActionId[][] = [
-  ["animate", "edit", "recreate", "reference", "retry", "stop"],
+  ["chat", "prompt"],
+  ["animate", "edit", "retry", "stop"],
   ["compare", "upscale"],
   ["copy", "download", "share"],
   ["delete", "star"],
@@ -126,7 +131,7 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   });
 }
 
-/** Reference: adds the image to the composer's references when the selected profile takes one. */
+/** Edit › Use as Reference: adds the image to the composer's references when its profile takes one. */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
   const { profile } = useGeneration();
   const reference = useGalleryReference();
@@ -140,7 +145,10 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     )
   )
     return null;
-  return itemAction("reference", {
+  return {
+    id: "use-reference",
+    label: "Use as Reference",
+    icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
     onClick: () =>
@@ -154,6 +162,30 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
           }
         },
       }),
+  };
+}
+
+/**
+ * Chat: a new Chat about the result, with it attached as the reference and its settings as the
+ * generation input, so the conversation can rework its prompt or edit the image.
+ */
+function useChatAction(item: MediaItem, onApplied: () => void) {
+  const { setDraft, profiles } = useGenerationActions();
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  return useMutation({
+    mutationFn: async () => {
+      // Without a model that takes the image, the Chat still starts from its settings.
+      const { draft } = await mediaDraft(item, "refine", profiles, client).catch(() =>
+        mediaDraft(item, "image", profiles, client),
+      );
+      setDraft(
+        { ...draft, sessionId: "", parentJobId: undefined, parentItemId: undefined },
+        "chat",
+      );
+      onApplied();
+      navigate("/chat");
+    },
   });
 }
 
@@ -206,6 +238,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
   const image = ready && item.type === "image";
@@ -282,8 +315,32 @@ export function useMediaActions(
         ],
       }),
     image &&
-      itemAction("edit", { disabled: action.isPending, onClick: () => action.mutate("refine") }),
-    itemAction("recreate", {
+      itemAction("edit", {
+        disabled: action.isPending,
+        onClick: () => action.mutate("refine"),
+        menu: reference
+          ? [
+              [
+                {
+                  id: "edit-image",
+                  label: "Edit Image",
+                  icon: Pencil,
+                  disabled: action.isPending,
+                  onClick: () => action.mutate("refine"),
+                },
+              ],
+              [reference],
+            ]
+          : undefined,
+      }),
+    ready &&
+      itemAction("chat", {
+        loading: chat.isPending,
+        disabled: chat.isPending,
+        onClick: () => chat.mutate(),
+      }),
+    // Prompt opens the result in the composer; its options run it again from here.
+    itemAction("prompt", {
       disabled: action.isPending,
       loading: running === "regenerate" || running === "repeat",
       onClick: () => action.mutate("image"),
@@ -291,8 +348,8 @@ export function useMediaActions(
         ? [
             [
               {
-                id: "recreate-composer",
-                label: "In Composer",
+                id: "prompt-composer",
+                label: "Open in Composer",
                 icon: SlidersHorizontal,
                 disabled: action.isPending,
                 onClick: () => action.mutate("image"),
@@ -301,7 +358,7 @@ export function useMediaActions(
             [
               {
                 id: "new-seed",
-                label: "New Seed",
+                label: "Run Again (New Seed)",
                 icon: Shuffle,
                 onClick: () => run({ kind: "regenerate" }),
               },
@@ -315,7 +372,6 @@ export function useMediaActions(
           ]
         : undefined,
     }),
-    image && reference,
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
     ready &&

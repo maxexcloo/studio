@@ -56,7 +56,7 @@ function Workspace() {
   if (location.pathname === "/library" && !library.pending && !library.allowed)
     return <Navigate to="/images" replace />;
   return (
-    <GenerationProvider workspace={chatRoute ? "chat" : "gallery"}>
+    <GenerationProvider workspace={chatRoute ? "chat" : "gallery"} remember>
       <ChatProvider>
         <CompareProvider>
           <AppShell

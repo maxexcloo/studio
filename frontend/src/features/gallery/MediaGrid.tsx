@@ -21,7 +21,7 @@ export interface GalleryViewProps {
   ) => ReactNode;
   onSelectionMenu: (x: number, y: number) => void;
   onTryAgain: (item: MediaItem) => void;
-  /** Each tile's versions, by its latest item; Grid shows one tile per group. */
+  /** Each tile's versions, by its original; Grid shows one tile per group. */
   versions?: Map<string, VersionGroup>;
 }
 
@@ -42,7 +42,7 @@ export function focusTile(host: HTMLElement | null, id: string) {
 
 const arrows: Record<string, number> = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 };
 
-/** A virtualised masonry of every loaded item, or of each version group's latest. */
+/** A virtualised masonry of every loaded item, or of each version group's original. */
 export function MediaGrid({
   items,
   open,
@@ -56,7 +56,7 @@ export function MediaGrid({
   versions,
 }: GalleryViewProps) {
   const { columns, host, width, cell } = useGalleryLayout();
-  // The version each tile shows while flipping, by the tile's latest item.
+  // The version each tile shows while flipping, by the tile's original.
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
   const [menuItem, setMenuItem] = useState<string | null>(null);
@@ -91,20 +91,20 @@ export function MediaGrid({
       style={{ height: virtual.getTotalSize(), position: "relative" }}
     >
       {virtual.getVirtualItems().map((placement) => {
-        const latest = items[placement.index];
-        const group = versions?.get(latest.id);
-        const version = selection.selecting ? undefined : shown[latest.id];
-        const item = (version !== undefined && group?.[version]) || latest;
+        const original = items[placement.index];
+        const group = versions?.get(original.id);
+        const version = selection.selecting ? undefined : shown[original.id];
+        const item = (version !== undefined && group?.[version]) || original;
         return (
           <MediaTile
-            key={latest.id}
+            key={original.id}
             item={item}
-            group={[latest]}
+            group={[original]}
             versions={group}
             version={version}
             onVersion={(index) =>
-              setShown(({ [latest.id]: _, ...rest }) =>
-                index === undefined ? rest : { ...rest, [latest.id]: index },
+              setShown(({ [original.id]: _, ...rest }) =>
+                index === undefined ? rest : { ...rest, [original.id]: index },
               )
             }
             selection={selection}

@@ -16,15 +16,6 @@
   flex-shrink: 0;
 }
 
-/* The viewer's composer sits in its dock's flow; the expanded panel still opens upward over it. */
-.dock[data-embedded] {
-  position: relative;
-  z-index: 3;
-  left: auto;
-  transform: none;
-  width: 100%;
-}
-
 .dock textarea {
   font-size: 1rem;
 }

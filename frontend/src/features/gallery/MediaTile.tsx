@@ -258,7 +258,7 @@ export function MediaTile({
         const dx = event.clientX - start.x;
         if (Math.abs(dx) < 32 || Math.abs(dx) < 2 * Math.abs(event.clientY - start.y)) return;
         swiped.current = true;
-        const shown = version ?? versions!.length - 1;
+        const shown = version ?? 0;
         onVersion!(Math.min(versions!.length - 1, Math.max(0, shown + (dx < 0 ? 1 : -1))));
       }}
       onContextMenu={(event) => {
@@ -275,7 +275,7 @@ export function MediaTile({
           label ||
           `${selecting ? "Select" : "Open"} ${item.type}: ${title}${
             versions && versions.length > 1 && !selecting
-              ? `, Version ${(version ?? versions.length - 1) + 1} of ${versions.length}`
+              ? `, Version ${(version ?? 0) + 1} of ${versions.length}`
               : ""
           }`
         }
