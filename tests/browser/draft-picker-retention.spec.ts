@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeReferences, create, fixtures, image, stamp } from "./fixtures";
+import { closeReferences, create, fixtures, image, showUploads, stamp } from "./fixtures";
 
 function referenceItem() {
   return {
@@ -74,16 +74,13 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   expect(state.chatRequests[2].generation.parentJobId).toBeUndefined();
 });
 
-test("Reference browsing keeps its scroll, query, filters and source in gallery and timeline editors", async ({
+test("Reference browsing keeps its scroll, query and filters, Uploads included, in gallery and timeline editors", async ({
   page,
 }) => {
   const state = await fixtures(page);
   state.gallery.push(referenceItem());
   for (let index = 0; index < 30; index++)
     state.gallery.push({ ...referenceItem(), id: `study-${index}`, prompt: `Study ${index}` });
-  await page.route("**/api/reference-assets?*", (route) =>
-    route.fulfill({ json: { items: [], hasMore: false, nextCursor: "" } }),
-  );
   await create(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird study");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
@@ -119,14 +116,13 @@ test("Reference browsing keeps its scroll, query, filters and source in gallery 
     .getByRole("article", { name: "Iteration 1", exact: true })
     .getByRole("button", { name: "Choose References", exact: true })
     .click();
-  await page.getByText("Uploads", { exact: true }).click();
+  await showUploads(page);
   await page.getByRole("textbox", { name: "Search Uploads", exact: true }).fill("Watercolour");
   await finishReferences(page);
   await page
     .getByRole("article", { name: "Iteration 1", exact: true })
     .getByRole("button", { name: "Choose References", exact: true })
     .click();
-  await expect(page.getByRole("radio", { name: "Uploads", exact: true })).toBeChecked();
   await expect(page.getByRole("textbox", { name: "Search Uploads", exact: true })).toHaveValue(
     "Watercolour",
   );

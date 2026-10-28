@@ -30,7 +30,7 @@ import { markWorkflowUsed } from "./workflow-catalog.js";
 
 import { forgetComfyRun } from "./comfy-traces.js";
 import { inpaintInputNames, prepareInpaint } from "./inpaint.js";
-import { referenceExistsForAccount, stageReferenceAssets } from "./reference-assets.js";
+import { referenceExistsForAccount, stageReferenceAssets } from "./references.js";
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";

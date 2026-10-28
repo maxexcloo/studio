@@ -564,6 +564,23 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 
+test("Uploads stay out of the gallery until its Uploads filter is on", async ({ page }) => {
+  const state = await fixtures(page);
+  const item = { type: "image", status: "done", url: image, thumbnailUrl: image, createdAt: stamp };
+  state.gallery.push(
+    { ...item, id: "made", jobId: "job-made", prompt: "Made here" },
+    { ...item, id: "uploaded", uploaded: true, prompt: "" },
+  );
+  await page.goto("/");
+  const tile = (id: string) => page.locator(`[data-media-id="${id}"]`);
+  await expect(tile("made")).toBeVisible();
+  await expect(tile("uploaded")).toHaveCount(0);
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await page.getByRole("button", { name: "Uploads", exact: true }).click();
+  await expect(tile("uploaded")).toBeVisible();
+  await expect(tile("made")).toHaveCount(0);
+});
+
 test("Gallery facets submit repeated models together with LoRA, size and aspect filters", async ({
   page,
 }) => {

@@ -17,7 +17,7 @@ const digest = (value: string | Buffer) => crypto.createHash("sha256").update(va
  * Writes `files` and a restore manifest (`mapping.json`, holding `plan`) to a new
  * `.backups/<label>-*` folder, verified and synced before the caller makes SQLite authoritative.
  */
-function verifiedBackup(
+export function verifiedBackup(
   dataDir: string,
   label: string,
   files: { source: string; hash: string; bytes: Buffer }[],
@@ -225,20 +225,29 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
   return { ...plan, applied: true, backup };
 }
 
-/** Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. */
+/**
+ * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
+ * uploads step's backup (uploads.js) restores the whole reference store it moved aside.
+ */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
     throw new Error("Restore destination must be empty");
   const manifest = JSON.parse(fs.readFileSync(path.join(backup, "mapping.json"), "utf8"));
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   for (const mapping of manifest.mappings) {
-    if (!documents.some((name) => mapping.source === `${name}.json`))
+    const store = mapping.source === "reference-assets/index.json";
+    if (!store && !documents.some((name) => mapping.source === `${name}.json`))
       throw new Error("Unsupported backup mapping");
     const source = path.join(backup, mapping.source);
     const bytes = fs.readFileSync(source);
     if (digest(bytes) !== mapping.hash)
       throw new Error(`Backup verification failed: ${mapping.source}`);
-    fs.writeFileSync(path.join(destination, mapping.source), bytes, { mode: 0o600, flag: "wx" });
+    if (store)
+      fs.cpSync(path.dirname(source), path.join(destination, path.dirname(mapping.source)), {
+        recursive: true,
+      });
+    else
+      fs.writeFileSync(path.join(destination, mapping.source), bytes, { mode: 0o600, flag: "wx" });
   }
   return { restored: manifest.mappings.length };
 }

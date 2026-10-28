@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 /**
  * The name an image gets in ComfyUI's input folder when a run uses it as a
- * reference (reference-assets.js). It is named by its content, so the same
+ * reference (references.js). It is named by its content, so the same
  * picture is uploaded once.
  */
 export function mimeExtension(mime = "") {

@@ -38,10 +38,8 @@ import {
   placeReference,
   referenceKey,
   referenceLabel,
-  uploadReferenceType,
   useReferenceList,
   useReferencePlacement,
-  useSaveUploadToImages,
   type ReferenceTarget,
 } from "./references";
 import { ReferenceSlots, referenceCellType } from "./ReferenceSlots";
@@ -91,10 +89,9 @@ export function ReferencePicker({
     profile,
   );
   const placement = useReferencePlacement(list);
-  const save = useSaveUploadToImages();
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
-  const { target: chosen, query, source, filters, starred } = browser.state;
+  const { target: chosen, query, filters, starred, uploads } = browser.state;
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
@@ -106,11 +103,11 @@ export function ReferencePicker({
   const client = useQueryClient();
   const deletion = useMutation({
     meta: { inlineError: true },
-    mutationFn: (id: string) =>
-      api(`/api/reference-assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    mutationFn: (id: string) => api(`/api/gallery/${encodeURIComponent(id)}`, { method: "DELETE" }),
     onSuccess: async (_result, id) => {
-      list.set(list.get().filter((asset) => asset.id !== id));
-      await client.invalidateQueries({ queryKey: ["reference-uploads"] });
+      list.set(list.get().filter((asset) => asset.galleryItemId !== id));
+      await client.invalidateQueries({ queryKey: ["reference-gallery"] });
+      await client.invalidateQueries({ queryKey: ["gallery"] });
       setDeleteId(null);
     },
   });
@@ -156,64 +153,40 @@ export function ReferencePicker({
   }
   function dropData(data: DataTransfer, into: ReferenceTarget | null = chosen) {
     const cell = data.getData(referenceCellType);
-    const upload = data.getData(uploadReferenceType);
     const gallery = data.getData(galleryReferenceType);
     if (cell) {
       if (into) moveReference(cell, into);
-    } else if (upload) placement.place(JSON.parse(upload), into);
-    else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
+    } else if (gallery) placement.addGalleryItem(JSON.parse(gallery), into);
     else if (data.files.length) void placement.uploadFiles([...data.files], into);
     settle();
   }
-  const gallery = useInfiniteQuery({
-    queryKey: ["reference-gallery", search, filters, starred],
-    enabled: opened && source === "gallery",
+  // Uploads are gallery images too, behind the gallery's Uploads filter.
+  const listing = useInfiniteQuery({
+    queryKey: ["reference-gallery", search, filters, starred, uploads],
+    enabled: opened,
     // Searching and filtering keep the current tiles until the new ones arrive.
     placeholderData: keepPreviousData,
     initialPageParam: "",
     queryFn: ({ pageParam }) =>
       api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
-        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search, favorites: starred ? "1" : "0" }), filters)}`,
+        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search, favorites: starred ? "1" : "0", uploads: uploads ? "1" : "0" }), filters)}`,
       ),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
-  const uploads = useInfiniteQuery({
-    queryKey: ["reference-uploads", search],
-    enabled: opened && source === "uploads",
-    placeholderData: keepPreviousData,
-    initialPageParam: "",
-    queryFn: ({ pageParam }) =>
-      api<{ items: ReferenceAsset[]; hasMore: boolean; nextCursor: string }>(
-        `/api/reference-assets?${new URLSearchParams({ source: "upload", limit: "60", cursor: pageParam, q: search })}`,
-      ),
-    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
-  });
-  const listing = source === "uploads" ? uploads : gallery;
-  const listed =
-    source === "uploads"
-      ? (uploads.data?.pages.flatMap((page) => page.items) || []).map((asset, index) => ({
-          id: asset.id,
-          name: `Reference ${index + 1}`,
-          deleteId: asset.id,
-          thumbnailUrl: asset.thumbnailUrl || asset.url,
-          drag: [uploadReferenceType, JSON.stringify(asset)] as [string, string],
-          choose: () => placement.place(asset, chosen),
-          matches: (reference: ReferenceAsset) => reference.id === asset.id,
-        }))
-      : (gallery.data?.pages.flatMap((page) => page.items) || [])
-          .filter((item) => item.type === "image" && item.status === "done")
-          .map((item) => ({
-            id: item.id,
-            name: item.prompt || "Result",
-            deleteId: undefined,
-            thumbnailUrl: item.thumbnailUrl || item.url,
-            drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })] as [
-              string,
-              string,
-            ],
-            choose: () => placement.addGalleryItem(item, chosen),
-            matches: (reference: ReferenceAsset) => reference.galleryItemId === item.id,
-          }));
+  const listed = (listing.data?.pages.flatMap((page) => page.items) || [])
+    .filter((item) => item.type === "image" && item.status === "done")
+    .map((item, index) => ({
+      id: item.id,
+      name: item.uploaded ? `Upload ${index + 1}` : item.prompt || "Result",
+      uploaded: Boolean(item.uploaded),
+      thumbnailUrl: item.thumbnailUrl || item.url,
+      drag: [galleryReferenceType, JSON.stringify({ id: item.id, type: item.type })] as [
+        string,
+        string,
+      ],
+      choose: () => placement.addGalleryItem(item, chosen),
+      matches: (reference: ReferenceAsset) => reference.galleryItemId === item.id,
+    }));
   // A selected image removes on a second click, except into a chosen slot, so one image can
   // still play several roles.
   const choices = listed.map((item) => {
@@ -290,7 +263,6 @@ export function ReferencePicker({
           settle();
         }}
         onDrop={dropData}
-        onSave={(asset) => save.mutate(asset.id)}
       />
       {!target && (
         <Text size="xs" c="dimmed">
@@ -299,28 +271,22 @@ export function ReferencePicker({
       )}
       <PickerHeader
         label="References"
-        searched={source === "uploads" ? "Uploads" : "Gallery"}
-        tabs={[
-          { value: "gallery", label: "Gallery" },
-          { value: "uploads", label: "Uploads" },
-        ]}
-        tab={source}
-        onTabChange={(source) => browse({ source })}
+        searched={uploads ? "Uploads" : "Gallery"}
         query={query}
         onQueryChange={(query) => browse({ query })}
-        placeholder={source === "uploads" ? "Search uploads…" : "Search your generations…"}
-        filterCount={source === "gallery" ? galleryFilterCount(filters, starred) : 0}
+        placeholder={uploads ? "Search uploads…" : "Search your generations…"}
+        filterCount={galleryFilterCount(filters, starred, uploads)}
         filters={
-          source === "gallery" && (
-            <GalleryFilters
-              withinPortal={false}
-              kind="image"
-              value={filters}
-              onChange={(filters) => browse({ filters })}
-              starred={starred}
-              onStarredChange={(starred) => browse({ starred })}
-            />
-          )
+          <GalleryFilters
+            withinPortal={false}
+            kind="image"
+            value={filters}
+            onChange={(filters) => browse({ filters })}
+            starred={starred}
+            onStarredChange={(starred) => browse({ starred })}
+            uploads={uploads}
+            onUploadsChange={(uploads) => browse({ uploads })}
+          />
         }
       />
       <ScrollArea.Autosize
@@ -335,9 +301,9 @@ export function ReferencePicker({
           <LoadingState label="Loading References" />
         ) : listing.error ? (
           <Alert color="red">{listing.error.message}</Alert>
-        ) : choices.length || source === "uploads" ? (
+        ) : choices.length || uploads ? (
           <PickerGrid label="Reference Choices">
-            {source === "uploads" && uploadTile}
+            {uploads && uploadTile}
             {choices.map((item, index) => (
               <PickerTile
                 key={item.id}
@@ -352,14 +318,14 @@ export function ReferencePicker({
                   settle();
                 }}
                 action={
-                  item.deleteId && (
+                  item.uploaded && (
                     <ActionIcon
                       variant="default"
                       color="red"
                       aria-label={`Delete Upload ${index + 1}`}
                       onClick={() => {
                         deletion.reset();
-                        setDeleteId(item.deleteId);
+                        setDeleteId(item.id);
                       }}
                     >
                       <Trash2 size={14} />
@@ -372,7 +338,7 @@ export function ReferencePicker({
         ) : (
           <EmptyState fill>{search ? "No Matching Images" : "No Images"}</EmptyState>
         )}
-        {source === "uploads" && !choices.length && !listing.isPending && (
+        {uploads && !choices.length && !listing.isPending && (
           <Text size="xs" c="dimmed" ta="center" mt="sm">
             {search ? "No matching uploads." : "Upload, paste or drop images to use them here."}
           </Text>

@@ -7,6 +7,7 @@ import {
   openNav,
   profiles,
   serveProfiles,
+  showUploads,
   stamp,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
@@ -141,20 +142,24 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
     height: 1024,
     createdAt: stamp,
   });
-  const uploads = ["owned-upload", "another-upload"].map((id) => ({
-    id,
-    name: "private-file.png",
-    url: image,
-    thumbnailUrl: image,
-    width: 1024,
-    height: 1024,
-  }));
-  await page.route("**/api/reference-assets?*", (route) =>
-    route.fulfill({ json: { items: uploads, hasMore: false, nextCursor: "" } }),
-  );
+  for (const id of ["owned-upload", "another-upload"])
+    state.gallery.push({
+      id,
+      uploaded: true,
+      type: "image",
+      status: "done",
+      prompt: "",
+      url: image,
+      thumbnailUrl: image,
+      width: 1024,
+      height: 1024,
+      createdAt: stamp,
+    });
+  const uploads = () => state.gallery.filter((item) => item.uploaded).map((item) => item.id);
   const deleted: string[] = [];
   let refuse = true;
-  await page.route("**/api/reference-assets/owned-upload", (route) => {
+  // An upload is deleted like any gallery item.
+  await page.route("**/api/gallery/owned-upload", (route) => {
     expect(route.request().method()).toBe("DELETE");
     deleted.push("owned-upload");
     if (refuse)
@@ -162,11 +167,7 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
         status: 404,
         json: { error: "That upload is no longer available to this account." },
       });
-    uploads.splice(
-      uploads.findIndex((asset) => asset.id === "owned-upload"),
-      1,
-    );
-    return route.fulfill({ json: { ok: true, deleted: true } });
+    return route.fallback();
   });
   await create(page);
   await page
@@ -177,13 +178,13 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
     .getByRole("button", { name: "Use reference: Kept gallery result", exact: true })
     .click();
   await expect(page.getByRole("button", { name: "Delete Upload 1", exact: true })).toHaveCount(0);
-  await page.getByText("Uploads", { exact: true }).click();
+  await showUploads(page);
   const slots = page.getByRole("group", { name: "Reference Slots", exact: true });
   await slots.getByRole("button", { name: "Slot 3 · End", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
   // One upload can fill several slots: choose the slot, then the selected image.
   await slots.getByRole("button", { name: "Slot 2 · Inputs", exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
   await expect(slots.getByRole("button", { name: "Reference 3 · End", exact: true })).toBeVisible();
   await slots.getByRole("button", { name: "Reference 2 · Inputs", exact: true }).click();
   await page
@@ -202,12 +203,12 @@ test("Removing a picked reference keeps its upload; confirmed deletion removes o
     "no longer available to this account",
   );
   await expect(confirmation).toBeVisible();
-  expect(uploads).toHaveLength(2);
+  expect(uploads()).toHaveLength(2);
   refuse = false;
   await confirmation.getByRole("button", { name: "Delete Upload", exact: true }).click();
   await expect(confirmation).toBeHidden();
   expect(deleted).toEqual(["owned-upload", "owned-upload"]);
-  expect(uploads.map((asset) => asset.id)).toEqual(["another-upload"]);
+  expect(uploads()).toEqual(["another-upload"]);
   await expect(slots.getByRole("button", { name: /^Reference / })).toHaveCount(1);
   await expect(
     slots.getByRole("button", { name: "Reference 1 · Inputs", exact: true }),

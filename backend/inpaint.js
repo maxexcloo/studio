@@ -1,4 +1,4 @@
-import { bytesForReference, uploadBufferToComfy } from "./reference-assets.js";
+import { bytesForReference, uploadBufferToComfy } from "./references.js";
 import { loadSharp } from "./sharp-loader.js";
 
 /**

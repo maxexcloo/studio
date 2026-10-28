@@ -45,9 +45,8 @@ const ordinaryRoutes = [
   ["GET", /^\/api\/loras\/[^/]+$/],
   ["PUT", /^\/api\/loras\/[^/]+$/],
   ["POST", /^\/api\/loras\/library\/ops$/],
-  ["GET", /^\/api\/reference-assets(\/[^/]+(\/[a-z-]+)?)?$/],
-  ["POST", /^\/api\/reference-assets\/(upload|from-gallery|[^/]+\/gallery)$/],
-  ["DELETE", /^\/api\/reference-assets\/[^/]+$/],
+  ["GET", /^\/api\/reference-assets\/[^/]+(\/(media|thumbnail))?$/],
+  ["POST", /^\/api\/reference-assets\/(upload|from-gallery)$/],
   // Comparisons, the taste profile, suggestions and Dream use only the requester's own records.
   ["GET", /^\/api\/(comparisons(\/[\w-]+)?|taste|dream(\/discarded)?)$/],
   [
