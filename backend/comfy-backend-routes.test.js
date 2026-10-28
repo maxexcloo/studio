@@ -16,7 +16,7 @@ const source = JSON.parse(
 );
 const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];
-imageInfo.UNETLoader.input.required.unet_name[0] = ["tessera-v0.3.1-turbo-opd-W8A8.safetensors"];
+imageInfo.UNETLoader.input.required.unet_name[0] = ["krea2-test.safetensors"];
 imageInfo["Power Lora Loader (rgthree)"] = { input: { required: {} } };
 imageInfo.LoraLoader.input.required.lora_name[0] = ["private-lora.safetensors"];
 const videoInfo = structuredClone(source);
@@ -25,19 +25,7 @@ const primary = await startFakeComfy({ objectInfo: imageInfo });
 const video = await startFakeComfy({ objectInfo: videoInfo });
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-backend-routes-"));
 writeTestWorkflows(dataDir);
-// A Tessera profile, which an SFW instance hides, and LoRAs on the test image profile.
-const tessera = {
-  studio: {
-    id: "test-tessera",
-    name: "Test Tessera",
-    kind: "image",
-    family: "tessera",
-    controls: { prompt: { node: "2", input: "text" } },
-  },
-  1: { class_type: "UNETLoader", inputs: { unet_name: "tessera-v0.3.1-turbo-opd-W8A8.safetensors" } },
-  2: { class_type: "CLIPTextEncode", inputs: { text: "" } },
-};
-fs.writeFileSync(path.join(dataDir, "workflows", "test-tessera.json"), JSON.stringify(tessera));
+// LoRAs on the test image profile, which an SFW instance hides.
 fs.writeFileSync(
   path.join(dataDir, "workflows", "test-image.json"),
   JSON.stringify({
@@ -79,7 +67,6 @@ async function start(useVideo = true, restrictModels = false, runtimeDir = dataD
           ? [{ id: "video", name: "Video Worker", url: video.url, capabilities: ["video"] }]
           : []),
       ]),
-      STUDIO_ENABLE_TESSERA: restrictModels ? "0" : "1",
       STUDIO_ENABLE_LORAS: restrictModels ? "0" : "1",
       STUDIO_DATA_DIR: runtimeDir,
       STUDIO_COMFY_OUTPUT_DIR: "",
@@ -343,34 +330,25 @@ test(
   },
 );
 
-test(
-  "SFW instances hide restricted models and LoRAs on either backend configuration",
-  { timeout: 10000 },
-  async () => {
-    const before = (await api("/api/models")).body;
-    assert.ok(before.profiles.some((profile) => profile.family === "tessera"));
-    assert.ok(before.loras.includes("private-lora.safetensors"));
-    try {
-      for (const useVideo of [true, false]) {
-        await stop();
-        await start(useVideo, true);
-        const models = (await api("/api/models")).body;
-        assert.equal(
-          models.profiles.some((profile) => profile.family === "tessera"),
-          false,
-        );
-        assert.deepEqual(models.loras, []);
-        assert.ok(models.profiles.every((profile) => !profile.capabilities.lora));
-        assert.deepEqual((await api("/api/loras/info")).body.loras, {});
-        assert.equal((await api("/api/loras/library")).body.found, false);
-        assert.deepEqual((await api("/api/loras/saved-profile")).body.loras, []);
-      }
-    } finally {
+test("SFW instances hide LoRAs on either backend configuration", { timeout: 10000 }, async () => {
+  const before = (await api("/api/models")).body;
+  assert.ok(before.loras.includes("private-lora.safetensors"));
+  try {
+    for (const useVideo of [true, false]) {
       await stop();
-      await start();
+      await start(useVideo, true);
+      const models = (await api("/api/models")).body;
+      assert.deepEqual(models.loras, []);
+      assert.ok(models.profiles.every((profile) => !profile.capabilities.lora));
+      assert.deepEqual((await api("/api/loras/info")).body.loras, {});
+      assert.equal((await api("/api/loras/library")).body.found, false);
+      assert.deepEqual((await api("/api/loras/saved-profile")).body.loras, []);
     }
-  },
-);
+  } finally {
+    await stop();
+    await start();
+  }
+});
 
 test(
   "repeating an acknowledged client job ID does not queue another video",
@@ -409,13 +387,13 @@ test("cached catalogue reads reflect profile creation, editing, approval and del
       id: "cache-readback",
       name: "Cached First",
       kind: "image",
-      family: "tessera",
+      family: "krea2",
       controls: { prompt: { node: "2", input: "text" } },
     },
     graph: {
       1: {
         class_type: "UNETLoader",
-        inputs: { unet_name: "tessera-v0.3.1-turbo-opd-W8A8.safetensors" },
+        inputs: { unet_name: "krea2-test.safetensors" },
       },
       2: { class_type: "CLIPTextEncode", inputs: { text: "" } },
     },

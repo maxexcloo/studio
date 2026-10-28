@@ -37,7 +37,7 @@ const event = (content) => `data: ${JSON.stringify({ choices: [{ delta: { conten
 const json = (content) => Response.json({ choices: [{ message: { content } }] });
 
 /** A fake gateway: `/v1/models` answers from `models`, completions from `reply(body)`. */
-function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/uncensored"] } = {}) {
+function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-spicy"] } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     if (url.endsWith("/v1/models")) return Response.json({ data: models.map((id) => ({ id })) });
@@ -66,11 +66,11 @@ test("settings reuse the prompt writer gateway; the assistant model defaults to 
     ],
   );
   const chosen = assistantSettings(
-    gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision", STUDIO_ASSISTANT_SPICY_MODEL: "ai/uncensored" }),
+    gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision", STUDIO_ASSISTANT_SPICY_MODEL: "ai/text-spicy" }),
   );
   assert.deepEqual(
     [chosen.model, chosen.writerModel, chosen.spicyModel],
-    ["ai/vision", "ai/text-quick", "ai/uncensored"],
+    ["ai/vision", "ai/text-quick", "ai/text-spicy"],
   );
   assert.equal(createAssistant({}), null);
 });
@@ -271,7 +271,7 @@ test("references go to a vision model as image parts; a text-only model gets non
   assert.match(text.calls[0].body.messages[0].content, /not shown to you/);
   assert.deepEqual(
     await createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet }).listModels(),
-    ["ai/text-quick", "ai/uncensored", "ai/vision"],
+    ["ai/text-quick", "ai/text-spicy", "ai/vision"],
   );
 });
 
@@ -318,10 +318,10 @@ test("Spicy runs on its own model and is refused without one", async () => {
   );
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
-  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/uncensored";
+  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/text-spicy";
   const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
-  assert.equal(result.model, "ai/uncensored", "a model chosen in Settings applies at once");
-  assert.equal(seen.calls.at(-1).body.model, "ai/uncensored");
+  assert.equal(result.model, "ai/text-spicy", "a model chosen in Settings applies at once");
+  assert.equal(seen.calls.at(-1).body.model, "ai/text-spicy");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
 });
 

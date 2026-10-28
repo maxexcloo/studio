@@ -25,9 +25,7 @@ const flag = (key, label, description, { defaultOn = true, applies = "now" } = {
 
 /**
  * Catalogue switches: what the generation catalogue offers. Some are read once,
- * at start. STUDIO_ENABLE_TESSERA remains a
- * deployment variable (features.js) but is no longer switched in Settings.
- * LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features;
+ * at start. LoRAs, Cloud Models and Presets & Civitai Imports are access-profile features;
  * STUDIO_ENABLE_LORAS, STUDIO_ENABLE_GROK and STUDIO_ENABLE_PRESETS stay
  * deployment variables that switch one off for everyone (features.js).
  */

@@ -133,7 +133,7 @@ Chat uses the Prompt Assistant account permission; known Spicy models also requi
 
 MCP assistant records survive a restart and preserve who prepared each generation. Results and signed links stay scoped to the owning account.
 
-`STUDIO_ENABLE_GROK=0`, `STUDIO_ENABLE_TESSERA=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. All three are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
+`STUDIO_ENABLE_GROK=0` and `STUDIO_ENABLE_LORAS=0` disable those optional catalogue features for everyone, administrators included, and reject unavailable generation settings; the matching group features show as locked. Both are enabled by default and Settings no longer switches them. In account mode, a LoRAs or Cloud Models value saved earlier from Settings is carried into every group once (a group keeps a feature only where the switch had it on) and then dropped from Studio's own env file.
 
 `STUDIO_DEFAULT_IMAGE_PROFILE` and `STUDIO_DEFAULT_VIDEO_PROFILE` optionally select the instance’s default ready workflow IDs. They apply to a fresh composer and mode changes; existing drafts remain intact. Missing or unavailable IDs fall back to the first ready profile. Reference-image variants run separately to limit GPU memory. Image workflows apply their batch count when selected; fresh image preferences default to one, while video and workflows without batch support use one.
 
@@ -239,9 +239,7 @@ Verify account ownership, profile identifiers and existing result links on the c
 
 Development uses `data/development` with SQLite migration applied only to that isolated directory. Recovery follows recorded job IDs and never scans or adopts a shared worker's full history.
 
-The same command also rewrites the profile ids that production's 20 and 24 Oct 2026 renames left behind (`backend/persistence/profile-ids.ts` holds the mapping): each `custom:<old id>` in the SQLite rows (gallery records, access grants) and the data folder's JSON (workflow preferences, LoRA stacks) becomes the profile's current id. Profiles, guides, backups and the JSON the SQLite import read are left alone, and ids of removed profiles stay. The dry run reports the changes per store and per old id under `profileIds`; `--apply` writes them with Studio stopped, without a backup, and a second run finds nothing.
-
-It also finishes what Combine Backends and Merge Duplicate Profiles did before they moved preferences and pruned guides (`backend/combined-profiles.js`): following `workflows/.studio-aliases.json`, each merged id's favourite, last use and thumbnail in `workflow-preferences.json` and its LoRA stack, strengths and snapshots in every `lora-stacks.json` move to the id it became, and guide bindings, variants and negatives keyed by a `custom:<id>` whose profile file is gone are removed as a new bindings version. The dry run reports them under `combinedProfiles`; `--apply` writes them with Studio stopped, without a backup.
+The same command also finishes what Combine Backends and Merge Duplicate Profiles did before they moved preferences and pruned guides (`backend/combined-profiles.js`): following `workflows/.studio-aliases.json`, each merged id's favourite, last use and thumbnail in `workflow-preferences.json` and its LoRA stack, strengths and snapshots in every `lora-stacks.json` move to the id it became, and guide bindings, variants and negatives keyed by a `custom:<id>` whose profile file is gone are removed as a new bindings version. The dry run reports them under `combinedProfiles`; `--apply` writes them with Studio stopped, without a backup.
 
 ## Queue, Sessions & Runtime Control
 

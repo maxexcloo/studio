@@ -136,12 +136,12 @@ test("FLUX.3 adapters fit built-in and imported Klein family identifiers", () =>
   assert.equal(loraCompatibility({ families: ["flux3"] }, { family: "flux1" }), "other");
 });
 
-// Tesserafine Turbo as deployed on Bento (ai/config/studio/workflows): a Krea 2 derivative.
+// A Krea 2 derivative profile.
 const tesserafine = {
   id: "custom:bento-image-tesserafine-turbo-int8-convrot",
   family: "krea2",
   label: "Tesserafine Turbo V1.0 · Fast · 8 Steps · Optional Reference · INT8",
-  defaults: { model: "tesserafineTurboBF16FP8_v10_3291478.safetensors" },
+  defaults: { model: "tesserafine-turbo.safetensors" },
 };
 const zimageStyle = { families: ["zimage"], base: "Z-Image", title: "zimage_style" };
 

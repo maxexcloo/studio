@@ -9,8 +9,3 @@ export const lorasEnabled = process.env.STUDIO_ENABLE_LORAS !== "0";
 export function presetsEnabled() {
   return process.env.STUDIO_ENABLE_PRESETS === "1";
 }
-
-export function modelFamilyEnabled(family, model = "") {
-  const tessera = family === "tessera" || /(?:^|[\\/])tessera(?:[-_.]|$)/i.test(model);
-  return (family !== "grok" || grokEnabled) && (!tessera || process.env.STUDIO_ENABLE_TESSERA !== "0");
-}
