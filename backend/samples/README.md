@@ -37,7 +37,7 @@ The controls it can map are `prompt`, `negative`, `seed`, `steps`, `cfg`, `sampl
 
 For existing unannotated imports, the retained parser can infer common mappings from node types and order. Review these mappings before saving. Administrators edit profiles in **Settings › Profiles**: Connections edits existing control and reference mappings using separate Node and Input selectors; Advanced JSON edits the graph or adds declarations. Check and Save retain version-conflict handling, and AI-drafted definitions require approval.
 
-Smart upscale's 2K and 4K picks work with imported workflows too: the upscale runs in the same ComfyUI job, after the workflow's own output. Inpainting doesn't: an imported workflow gets reference and start images, not the brush.
+Smart upscale's 2K and 4K picks work with imported workflows too: the upscale runs in the same ComfyUI job, after the workflow's own output. Inpainting works with any image profile that takes a reference or start image and saves with `SaveImage`: Studio samples a crop around the painted part as the reference, adds a latent noise mask where the sampler starts from the encoded reference, and stitches only the painted part back into the original. Set `"inpaint": false` in `capabilities` to hide the brush.
 
 ## Image-to-image inputs
 

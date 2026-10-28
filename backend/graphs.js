@@ -7,6 +7,7 @@ import { prepareInputImage } from "./input-image-sizing.js";
 import { families } from "./family-catalog.js";
 import { accountOutputSubfolder } from "./account-ownership.js";
 import { outputFolderName } from "./data-names.js";
+import { inpaintGraph } from "./inpaint.js";
 
 export async function uploadReferenceImage(dataUrl, body = {}) {
   if (!dataUrl || !dataUrl.includes(",")) return "";
@@ -234,7 +235,36 @@ export async function customWorkflowGraph(body) {
   const workflow = installed && selectImageMode(installed, body);
   if (!workflow) throw new Error("This workflow isn’t installed.");
   const graph = cloneGraph(workflow.graph);
-  await applyMappedInputs(graph, workflow, body);
+  // Inpainting samples the crop around the painted part as the reference, at its own working size (inpaint.js).
+  const inpaint = body.inpaint?.crop ? body.inpaint : null;
+  const [first, ...others] = body.referenceAssets || [];
+  await applyMappedInputs(
+    graph,
+    workflow,
+    inpaint
+      ? {
+          ...body,
+          width: inpaint.work.width,
+          height: inpaint.work.height,
+          referenceAssets: [{ ...first, comfyName: inpaint.crop }, ...others],
+        }
+      : body,
+  );
+  if (inpaint) inpaintGraph(graph, inpaint, workflow.controls?.count ? Number(body.count) || 1 : 1);
+  // ComfyUI's tiled decode: its default tiles, and for video 64 frames at a time.
+  if (body.tiledDecode)
+    for (const node of Object.values(graph))
+      if (node.class_type === "VAEDecode")
+        Object.assign(node, {
+          class_type: "VAEDecodeTiled",
+          inputs: {
+            ...node.inputs,
+            tile_size: 512,
+            overlap: 64,
+            temporal_size: 64,
+            temporal_overlap: 8,
+          },
+        });
   if (workflow.loraStack?.adapter === "rgthree-stack-v1")
     applyRgthreeLoraStack(graph, body, workflow.loraStack);
   else if (workflow.loraStack?.adapter === "radiance-tags-v1")

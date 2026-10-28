@@ -61,7 +61,11 @@ export function withFixes(failure) {
     if (download) next.redownload = download;
   }
   if (failure.fix === "memory") {
-    next.retry = { smaller: true };
+    // Out of memory in a profile's own VAE decode: the graph can swap it for a tiled one (graphs.js).
+    next.retry = {
+      smaller: true,
+      ...(failure.nodeType === "VAEDecode" ? { tiledDecode: true } : {}),
+    };
   }
   return next;
 }
