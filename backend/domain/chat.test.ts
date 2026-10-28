@@ -67,7 +67,6 @@ test("text discussion streams and persists without submitting media; history sta
     "alice",
     fixture.session.id,
     { content: "What is depth of field?" },
-    new AbortController().signal,
     (event) => events.push(event),
   );
   assert.equal(fixture.service.messages("alice", fixture.session.id)[1].content, "Hello");
@@ -81,13 +80,7 @@ test("text discussion streams and persists without submitting media; history sta
   assert.equal(fixture.admissions.length, 0);
   assert.throws(() => fixture.service.messages("bob", fixture.session.id), /not found/);
   await assert.rejects(
-    fixture.service.stream(
-      "bob",
-      fixture.session.id,
-      { content: "hello" },
-      new AbortController().signal,
-      () => {},
-    ),
+    fixture.service.stream("bob", fixture.session.id, { content: "hello" }, () => {}),
     /not found/,
   );
   fixture.db.close();
@@ -125,7 +118,6 @@ test("explicit media tool preserves selected settings and records stable admissi
         parentJobId: "parent",
       },
     },
-    new AbortController().signal,
     (event) => events.push(event),
   );
   const message = fixture.service.messages("alice", fixture.session.id)[1];
@@ -169,7 +161,6 @@ test("request_media applies the number of images the user asked for", async () =
       content: "Make four teapots",
       generation: { operation: "image", input: { profileId: "chosen", count: 1 } },
     },
-    new AbortController().signal,
     () => {},
   );
   assert.equal(fixture.service.messages("alice", fixture.session.id)[1].draft?.input.count, 4);
@@ -219,7 +210,6 @@ test("all ten selected reference identities reach vision, media admission and la
         input: { profileId: "ten-reference-profile", referenceAssets: references },
       },
     },
-    new AbortController().signal,
     () => {},
   );
   assert.deepEqual(
@@ -245,7 +235,6 @@ test("all ten selected reference identities reach vision, media admission and la
     "alice",
     fixture.session.id,
     { content: "Explain the composition" },
-    new AbortController().signal,
     () => {},
   );
   // The first reply also asked for a title; only streamed requests carry the conversation.
@@ -261,13 +250,7 @@ test("all ten selected reference identities reach vision, media admission and la
 test("truncated gateway response keeps partial text failed and never submits an incomplete action", async () => {
   const fixture = setup([frame({ choices: [{ delta: { content: "Partial answer" } }] })]);
   await assert.rejects(
-    fixture.service.stream(
-      "alice",
-      fixture.session.id,
-      { content: "hello" },
-      new AbortController().signal,
-      () => {},
-    ),
+    fixture.service.stream("alice", fixture.session.id, { content: "hello" }, () => {}),
     /disconnected/,
   );
   const message = fixture.service.messages("alice", fixture.session.id)[1];
@@ -303,7 +286,6 @@ test("card revisions preserve exact settings after a complete text answer and ne
       "alice",
       fixture.session.id,
       { content: "Submit this edited card", revision },
-      new AbortController().signal,
       () => {},
     );
     if (complete) await run;
@@ -317,7 +299,7 @@ test("card revisions preserve exact settings after a complete text answer and ne
     fixture.db.close();
   }
 });
-test("disconnect aborts upstream, persists cancelled partial text and releases session admission", async () => {
+test("only Stop cancels a reply: it aborts upstream, keeps the partial text and frees the chat", async () => {
   const fixture = setup([]);
   let upstreamSignal: AbortSignal | undefined;
   fixture.service.options.fetchImpl = async (_url, options) => {
@@ -335,22 +317,17 @@ test("disconnect aborts upstream, persists cancelled partial text and releases s
       }),
     );
   };
-  const abort = new AbortController();
   await assert.rejects(
-    fixture.service.stream(
-      "alice",
-      fixture.session.id,
-      { content: "hello" },
-      abort.signal,
-      (event) => {
-        if (event.event === "delta") abort.abort();
-      },
-    ),
+    fixture.service.stream("alice", fixture.session.id, { content: "hello" }, (event) => {
+      if (event.event === "delta")
+        assert.equal(fixture.service.stop("alice", fixture.session.id), true);
+    }),
     /aborted/,
   );
   assert.equal(upstreamSignal?.aborted, true);
   assert.equal(fixture.service.messages("alice", fixture.session.id)[1].status, "cancelled");
   assert.equal(fixture.service.active.size, 0);
+  assert.equal(fixture.service.stop("alice", fixture.session.id), false);
   fixture.db.close();
 });
 test("unauthorised reference fails before sending any content or persisting messages", async () => {
@@ -363,7 +340,6 @@ test("unauthorised reference fails before sending any content or persisting mess
       "alice",
       fixture.session.id,
       { content: "Look", references: ["other-owner"] },
-      new AbortController().signal,
       () => {},
     ),
     /not found/,
@@ -426,7 +402,6 @@ test("media admission rejection leaves selected settings and a recoverable inlin
       content: "Animate this",
       generation: { operation: "image", input: { profileId: "image-selected" } },
     },
-    new AbortController().signal,
     () => {},
   );
   const message = fixture.service.messages("alice", fixture.session.id)[1];
@@ -468,7 +443,6 @@ test("an admission note, such as Animate going to Grok, joins the reply", async 
     "alice",
     fixture.session.id,
     { content: "Animate this", generation: { operation: "image", input: {} } },
-    new AbortController().signal,
     (event) => events.push(event),
   );
   const message = fixture.service.messages("alice", fixture.session.id)[1];
@@ -525,6 +499,46 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
     assert.match(events, /Text reply/);
     assert.match(events, /event: done/);
     assert.equal(fixture.service.messages("alice", fixture.session.id).length, 2);
+    // A page that is hidden or loses its connection mid-reply leaves the reply running and stored.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    fixture.service.options.fetchImpl = async () =>
+      new Response(
+        new ReadableStream({
+          async start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode(frame({ choices: [{ delta: { content: "Kept " } }] })),
+            );
+            await held;
+            controller.enqueue(
+              new TextEncoder().encode(
+                frame({ choices: [{ delta: { content: "reply" }, finish_reason: "stop" }] }),
+              ),
+            );
+            controller.close();
+          },
+        }),
+      );
+    const dropped = new AbortController();
+    const streaming = await fetch(`${url}/sessions/${fixture.session.id}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-user": "alice" },
+      body: JSON.stringify({ content: "keep going" }),
+      signal: dropped.signal,
+    });
+    await streaming.body!.getReader().read();
+    dropped.abort();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    release();
+    while (fixture.service.active.size) await new Promise((resolve) => setTimeout(resolve, 10));
+    const stored = fixture.service.messages("alice", fixture.session.id).at(-1)!;
+    assert.equal(stored.status, "completed");
+    assert.equal(stored.content, "Kept reply");
+    const stop = await fetch(`${url}/sessions/${fixture.session.id}/chat/stop`, {
+      method: "POST",
+      headers: { "x-user": "alice" },
+    });
+    assert.deepEqual(await stop.json(), { stopped: false });
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
@@ -583,13 +597,7 @@ test("the system context carries the owner's taste summary as data, and nothing 
     taste: (owner: string) => (owner === "alice" ? "Misty harbours at dawn." : ""),
   });
   const ask = () =>
-    fixture.service.stream(
-      "alice",
-      fixture.session.id,
-      { content: "Any ideas?" },
-      new AbortController().signal,
-      () => {},
-    );
+    fixture.service.stream("alice", fixture.session.id, { content: "Any ideas?" }, () => {});
   const system = (request: Record<string, unknown>) =>
     (request.messages as { content: string }[])[0].content;
   await ask();
@@ -607,13 +615,7 @@ test("a model without a name of its own is labelled with the model that last ans
     "data: [DONE]\n\n",
   ]);
   assert.equal((await fixture.service.status("alice")).models[0].label, "selected-text");
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    { content: "Hello" },
-    new AbortController().signal,
-    () => {},
-  );
+  await fixture.service.stream("alice", fixture.session.id, { content: "Hello" }, () => {});
   assert.deepEqual((await fixture.service.status("alice")).models, [
     { id: "selected-text", label: "qwen3.6-27b" },
   ]);

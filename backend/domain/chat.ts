@@ -151,7 +151,8 @@ const tool = {
 
 /** Session-scoped discussion and media requests share admission with the normal composer. */
 export class ChatService {
-  readonly active = new Set<string>();
+  /** Replies in progress by owner and chat; only `stop` cancels one, never a dropped connection. */
+  readonly active = new Map<string, AbortController>();
   readonly options: ChatOptions;
   constructor(options: ChatOptions) {
     this.options = options;
@@ -258,7 +259,6 @@ export class ChatService {
     ownerId: string,
     sessionId: string,
     input: ChatInput,
-    signal: AbortSignal,
     emit: (event: ChatEvent) => void,
   ) {
     const history = this.messages(ownerId, sessionId);
@@ -280,7 +280,9 @@ export class ChatService {
       throw failure("Choose a text model approved for this account.", 400);
     const key = `${ownerId}:${sessionId}`;
     if (this.active.has(key)) throw failure("This chat already has a reply in progress.", 409);
-    this.active.add(key);
+    const controller = new AbortController();
+    const signal = controller.signal;
+    this.active.set(key, controller);
     let assistant: ReturnType<ChatStore["add"]> | undefined;
     try {
       let revision: ChatRevision | undefined;
@@ -520,5 +522,11 @@ export class ChatService {
     } finally {
       this.active.delete(key);
     }
+  }
+  /** Cancels the chat's reply in progress; false when there is none. */
+  stop(ownerId: string, sessionId: string) {
+    const controller = this.active.get(`${ownerId}:${sessionId}`);
+    controller?.abort();
+    return Boolean(controller);
   }
 }

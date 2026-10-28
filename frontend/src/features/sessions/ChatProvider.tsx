@@ -82,6 +82,7 @@ function useChatState() {
     setSendingSession(draft.sessionId || "new");
     setError("");
     let sessionId = targetSessionId || draft.sessionId;
+    let connected = false;
     try {
       const input = generationInput(draft.input, profile, draft.references);
       if (!sessionId) {
@@ -115,6 +116,7 @@ function useChatState() {
         signal: controller.signal,
         headers: { Accept: "text/event-stream" },
       });
+      connected = true;
       if (!override?.content) setText((current) => (current.trim() === content ? "" : current));
       await readChat(response, (event) => {
         if (event.event === "message" || event.event === "delta" || event.event === "thinking") {
@@ -150,7 +152,9 @@ function useChatState() {
         } else if (event.event === "error") setError(event.data.error);
       });
     } catch (error) {
-      if (!controller.signal.aborted)
+      // A dropped connection (a hidden page, a network change) leaves the reply running on the
+      // server; the chat reloads below and follows it until it is stored.
+      if (!controller.signal.aborted && !(connected && error instanceof TypeError))
         setError(error instanceof Error ? error.message : String(error));
     } finally {
       active.current = null;
@@ -172,7 +176,13 @@ function useChatState() {
     status,
     modelId,
     selectModel: setSelectedModel,
-    stop: () => active.current?.abort(),
+    /** Only Stop cancels a reply; it may be running on the server after this page reconnected. */
+    stop: (sessionId: string) => {
+      active.current?.abort();
+      void post(`/api/sessions/${sessionId}/chat/stop`).finally(
+        () => void client.invalidateQueries({ queryKey: ["chat", sessionId] }),
+      );
+    },
   };
 }
 const Context = createContext<ReturnType<typeof useChatState> | null>(null);

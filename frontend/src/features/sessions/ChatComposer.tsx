@@ -13,7 +13,8 @@ import { phaseColour, phaseLabel } from "../runtime/RuntimeWorkloads";
 import { useWorkloadStart } from "../runtime/WorkloadStart";
 import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
-import { useChat } from "./ChatProvider";
+import { useGeneration } from "../generation/GenerationProvider";
+import { useChat, useChatMessages } from "./ChatProvider";
 import classes from "./ChatComposer.module.css";
 
 /**
@@ -103,6 +104,11 @@ function ChatModelPicker({
 /** The Chat prompt box: the message above a short chip rail (References, Model) and Send/Stop. */
 function ChatComposer() {
   const { text, setText, send, sendingSession, stop, status, modelId } = useChat();
+  const { sessionId } = useGeneration().draft;
+  const history = useChatMessages(sessionId);
+  // A reply continues on the server after a reload or dropped connection, so Stop follows it too.
+  const replying =
+    !!sendingSession || !!history.data?.messages.some((message) => message.status === "streaming");
   const uploadingReferences = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
   // Only an administrator can start a parked model, so others cannot send to one.
   const parked = status.data?.models.find((model) => model.id === modelId)?.parked;
@@ -148,7 +154,7 @@ function ChatComposer() {
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
-              if (!sendingSession && !unavailable) void send();
+              if (!replying && !unavailable) void send();
             }
           }}
         />
@@ -156,11 +162,17 @@ function ChatComposer() {
       <Group wrap="nowrap" gap="xs" justify="space-between" align="flex-end">
         <div className={railClasses.rail} role="group" aria-label="Chat Inputs">
           <ReferencePicker />
-          <ChatModelPicker disabled={!!sendingSession} runtime={runtime} />
+          <ChatModelPicker disabled={replying} runtime={runtime} />
         </div>
-        {sendingSession ? (
+        {replying ? (
           <Tooltip label="Stop Response">
-            <ActionIcon aria-label="Stop Response" variant="default" onClick={stop}>
+            <ActionIcon
+              aria-label="Stop Response"
+              variant="default"
+              onClick={() =>
+                stop(sendingSession && sendingSession !== "new" ? sendingSession : sessionId!)
+              }
+            >
               <Square size={16} />
             </ActionIcon>
           </Tooltip>
