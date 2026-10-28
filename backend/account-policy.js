@@ -6,8 +6,8 @@
  * Cloud (provider-backed) profiles are not granted one by one: the Cloud Models
  * feature grants them all.
  *
- * A generation profile marked `nsfw` needs the NSFW Models feature on top of its
- * grant. The prompt assistant's Spicy preset needs NSFW Models too, whatever profile is selected.
+ * A generation profile marked `uncensored` needs the Uncensored Models feature on top of its
+ * grant. The prompt assistant's Spicy preset needs Uncensored Models too, whatever profile is selected.
  * `allModels` grants every local profile, including ones added later.
  */
 import { isCloudProfile } from "./cloud-profiles.js";
@@ -26,7 +26,7 @@ const accessFeatures = Object.freeze([
   "gallery",
   "promptHistory",
   "cloudModels",
-  "nsfwModels",
+  "uncensoredModels",
   "presets",
   "promptAssistant",
 ]);
@@ -97,14 +97,18 @@ export function effectiveAccountAccess(account, profiles, availableProfiles = nu
 }
 
 /**
- * Pass the profile itself (its id, family and `nsfw` marker) so cloud and NSFW profiles follow
+ * Pass the profile itself (its id, family and `uncensored` marker) so cloud and uncensored profiles follow
  * their features; a bare id is checked as an unmarked local profile.
  */
 export function mayUseGenerationProfile(access, profile) {
   if (!access?.authenticated) return false;
   if (access.role === accountRoles.administrator) return true;
   const id = typeof profile === "string" ? profile : profile?.id;
-  if (typeof profile === "object" && profile?.nsfw === true && access.features.nsfwModels !== true)
+  if (
+    typeof profile === "object" &&
+    profile?.uncensored === true &&
+    access.features.uncensoredModels !== true
+  )
     return false;
   // An AI-drafted profile is live for administrators only until one approves it.
   if (typeof profile === "object" && profile?.aiDrafted === true) return false;
@@ -128,7 +132,7 @@ export function visibleGenerationProfiles(profiles, access) {
 
 /**
  * The access profiles Studio adds when absent, so a default for new accounts is one choice
- * away. Administrator: everything. User: every local model except NSFW ones, no cloud
+ * away. Administrator: everything. User: every local model except uncensored ones, no cloud
  * models, no LoRAs and no presets. Once added they are ordinary access profiles.
  */
 export const builtInAccessProfiles = Object.freeze([
@@ -147,7 +151,7 @@ export const builtInAccessProfiles = Object.freeze([
     features: Object.fromEntries(
       accessFeatures.map((feature) => [
         feature,
-        !["loras", "cloudModels", "nsfwModels", "presets"].includes(feature),
+        !["loras", "cloudModels", "uncensoredModels", "presets"].includes(feature),
       ]),
     ),
   },

@@ -334,7 +334,7 @@ test(
           studio: {
             ...raw.studio,
             name: "Current Studio Title",
-            nsfw: true,
+            uncensored: true,
             defaults: { steps: 7 },
           },
         }),
@@ -344,7 +344,7 @@ test(
       const current = reopened.profiles.find((item: any) => item.id === profile.id);
       assert.equal(current.label, "Current Studio Title");
       assert.equal(current.defaults.steps, 7);
-      assert.equal(current.nsfw, true);
+      assert.equal(current.uncensored, true);
       assert.equal(current.availability, "offline");
       assert.equal(current.ready, undefined);
     } finally {

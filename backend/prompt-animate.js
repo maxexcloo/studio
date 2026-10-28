@@ -2,18 +2,11 @@
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt from the
  * source image's prompt and a theme, as the queue item's writing stage (prompt-stage.js), through
- * the same engine (assistant.js) as assistant-routes.js. Spicy runs on the Spicy model and needs
- * NSFW Models.
+ * the same engine (assistant.js) as assistant-routes.js. Spicy needs Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source }
  */
-import {
-  AssistantError,
-  cleanPrompt,
-  maxPromptCharacters,
-  spicyModelOf,
-  writerGuide,
-} from "./assistant.js";
+import { AssistantError, cleanPrompt, maxPromptCharacters, writerGuide } from "./assistant.js";
 
 export const animateThemes = Object.freeze({
   cinematic:
@@ -42,19 +35,13 @@ export function animateRequest(value) {
 }
 
 /** Why the request can't be written, as { status, error }, or null; `allowed(feature)` is the account's grant. */
-export function animateIssue(writing, { engine, allowed }) {
+export function animateIssue(writing, { allowed }) {
   if (!Object.hasOwn(animateThemes, writing.theme))
     return { status: 400, error: "Choose a known animation theme." };
   if (writing.theme === "custom" && !writing.instruction)
     return { status: 400, error: "Describe what should happen." };
-  if (writing.theme === "spicy" && !allowed("nsfwModels"))
-    return { status: 403, error: "Spicy needs NSFW Models for this account." };
-  if (writing.theme === "spicy")
-    try {
-      spicyModelOf(engine.settings());
-    } catch (error) {
-      return { status: error.status, error: error.message };
-    }
+  if (writing.theme === "spicy" && !allowed("uncensoredModels"))
+    return { status: 403, error: "Spicy needs Uncensored Models for this account." };
   return null;
 }
 
@@ -68,8 +55,7 @@ export async function writeAnimatePrompt({
   onThinking,
   onDelta,
 }) {
-  const settings = engine.settings();
-  const model = writing.theme === "spicy" ? spicyModelOf(settings) : settings.model;
+  const { model } = engine.settings();
   const reply = await engine.chat({
     model,
     messages: [

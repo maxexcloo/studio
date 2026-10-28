@@ -369,7 +369,7 @@ export function createUpdateChecker({
             "tags",
             "negative",
             "description",
-            "nsfw",
+            "uncensored",
             "licence",
             "compatibility",
           ]

@@ -179,7 +179,12 @@ test(
         id: "artists",
         name: "Artists",
         allModels: true,
-        features: { imageGeneration: true, gallery: true, cloudModels: false, nsfwModels: false },
+        features: {
+          imageGeneration: true,
+          gallery: true,
+          cloudModels: false,
+          uncensoredModels: false,
+        },
       });
       await api("/api/accounts/users", "POST", {
         username: "artist",
@@ -231,7 +236,12 @@ test(
         id: "artists",
         name: "Artists",
         allModels: true,
-        features: { imageGeneration: true, gallery: true, cloudModels: true, nsfwModels: false },
+        features: {
+          imageGeneration: true,
+          gallery: true,
+          cloudModels: true,
+          uncensoredModels: false,
+        },
       });
       cookie = artistCookie;
       const own = await api("/api/generate", "POST", {

@@ -254,8 +254,8 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
       : {}),
     kind: meta.kind === "video" ? "video" : "image",
     family: meta.family || "custom",
-    // Adult content: access profiles without NSFW Models never see it.
-    ...(meta.nsfw === true ? { nsfw: true } : {}),
+    // Access profiles without Uncensored Models never see it.
+    ...(meta.uncensored === true ? { uncensored: true } : {}),
     recipe: meta.recipe,
     graph,
     controls,

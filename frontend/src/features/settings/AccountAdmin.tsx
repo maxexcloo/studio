@@ -36,7 +36,7 @@ const featureLabels = {
   imageGeneration: "Image Generation",
   imageReferences: "Image References",
   loras: "LoRAs",
-  nsfwModels: "NSFW Models",
+  uncensoredModels: "Uncensored Models",
   presets: "Presets",
   promptAssistant: "Prompt Assistance",
   promptHistory: "Prompt History",
@@ -330,7 +330,7 @@ export function GroupsAdmin() {
             cell: (group) => (
               <Group gap={4}>
                 {groupFeature(group.features.cloudModels, "Cloud Models")}
-                {groupFeature(group.features.nsfwModels, "NSFW Models")}
+                {groupFeature(group.features.uncensoredModels, "Uncensored Models")}
               </Group>
             ),
           },
@@ -433,7 +433,10 @@ export function UsersAdmin() {
                   {account.role === "user" && groupOf(account) && (
                     <>
                       {groupFeature(groupOf(account)!.features.cloudModels, "Cloud Models")}
-                      {groupFeature(groupOf(account)!.features.nsfwModels, "NSFW Models")}
+                      {groupFeature(
+                        groupOf(account)!.features.uncensoredModels,
+                        "Uncensored Models",
+                      )}
                     </>
                   )}
                 </Group>

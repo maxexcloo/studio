@@ -143,7 +143,6 @@ export async function runEvals({
     STUDIO_PROMPT_WRITER_URL: "http://recorded.invalid",
     STUDIO_PROMPT_WRITER_KEY: "recorded",
     STUDIO_PROMPT_WRITER_MODEL: "recorded",
-    STUDIO_ASSISTANT_SPICY_MODEL: "recorded-spicy",
   };
   const live = typeof fetchImpl === "function";
   let current = { kind: "", id: "" };
@@ -165,13 +164,7 @@ export async function runEvals({
     timeoutMs: live ? 60_000 : 5_000,
   });
   const results = { rewrite: [], loras: [], negative: [] };
-  const skipped = [];
   for (const item of evals.rewrite.cases) {
-    // Live, Spicy runs only with a Spicy model chosen.
-    if (item.preset === "spicy" && !engine.settings().spicyModel) {
-      skipped.push(item.id);
-      continue;
-    }
     current = { kind: "rewrite", id: item.id };
     recorded.current = item.recorded;
     const result = await engine.rewrite({
@@ -212,5 +205,5 @@ export async function runEvals({
     results.negative.push({ ...scoreNegative(item, result), output: result.negative });
   }
   const all = [...results.rewrite, ...results.loras, ...results.negative];
-  return { results, skipped, passed: all.filter((entry) => entry.ok).length, total: all.length };
+  return { results, passed: all.filter((entry) => entry.ok).length, total: all.length };
 }

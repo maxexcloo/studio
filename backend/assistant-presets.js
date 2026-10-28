@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The prompt assistant's rewrite presets. Each is an instruction block added after the profile's
 // guide; a guide may replace one with its own `presets.<id>` text. Spicy runs on the separate,
-// uncensored model an administrator chooses, and only for accounts with NSFW Models.
+// uncensored model an administrator chooses, and only for accounts with Uncensored Models.
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 export const assistantPresets = Object.freeze([
@@ -15,7 +15,7 @@ export const assistantPresets = Object.freeze([
   {
     id: "spicy",
     label: "Spicy",
-    description: "Sensual and explicit, for NSFW models.",
+    description: "Sensual and explicit, for uncensored models.",
     spicy: true,
     instruction:
       "Spicy: make the scene sensual and explicit where the request allows it, with frank, specific wording about bodies, clothing and poses. Every person is an adult. Keep the request’s subjects and setting.",

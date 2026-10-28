@@ -7,8 +7,8 @@
  *   2. The template is the nearest profile Studio holds for that family whose loader reads the
  *      same kind of file (a checkpoint or a diffusion model), never another AI draft.
  *   3. The draft is the template with this file, the page's recommended steps, CFG, sampler and
- *      scheduler (read by the assistant, else from the page's own words) and its NSFW marker
- *      (from the source; unknown counts as NSFW). The template's own guidance is dropped so the
+ *      scheduler (read by the assistant, else from the page's own words) and its uncensored marker
+ *      (from the source; unknown counts as uncensored). The template's own guidance is dropped so the
  *      drafted guide applies.
  *   4. Parts ComfyUI doesn't list (VAE, text encoders) that Studio's catalogue can download join
  *      the import's files, so Download Missing fetches them with the model.
@@ -241,12 +241,12 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   delete meta.prompting;
   for (const mode of Object.values(isObject(meta.imageModes) ? meta.imageModes : {}))
     if (isObject(mode)) delete mode.prompting;
-  delete meta.nsfw;
+  delete meta.uncensored;
 
   const id = draftId([record.title, record.version].filter(Boolean).join(" "), deps.taken);
   const sourceText = String(record.sourceText || "");
   const recommended = recommendedFromText(sourceText);
-  const nsfw = record.nsfw === false ? false : true;
+  const uncensored = record.uncensored === false ? false : true;
   let drafted;
   let read = "page";
   if (deps.engine) {
@@ -256,11 +256,11 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
       modelFile,
       recommended,
       sourceText,
-      nsfw,
+      uncensored,
     });
     drafted = result.profile;
     read = result.source === "assistant" ? "assistant" : "page";
-  } else drafted = deps.draftedProfile({ id, template: base, modelFile, recommended, nsfw });
+  } else drafted = deps.draftedProfile({ id, template: base, modelFile, recommended, uncensored });
   const dmeta = drafted.studio;
   dmeta.id = id;
   dmeta.name = [record.title, record.version].filter(Boolean).join(" ").slice(0, 120) || id;
@@ -270,7 +270,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
         0,
         300,
       );
-  dmeta.nsfw = nsfw;
+  dmeta.uncensored = uncensored;
   const loaderNode = modelLoader(drafted);
   loaderNode.inputs[loaderInput[loaderNode.class_type]] = modelFile;
 
@@ -401,7 +401,7 @@ export async function draftProfileFromImport(record, { index = null, by = "" } =
   for (const warning of checked.warnings.filter((item) => !/doesn’t list the/.test(item)))
     warnings.push(warning);
   record.warnings = [...(record.warnings || []), ...warnings];
-  record.draft = { template: template.id, families, settings: read, nsfw };
+  record.draft = { template: template.id, families, settings: read, uncensored };
   await deps.onSaved?.(id);
   return { id, profileId, guideId: record.results.guideId || "", warnings };
 }

@@ -10,6 +10,6 @@ export const sharedProfileFields: readonly string[] = Object.freeze([
   "name",
   "kind",
   "family",
-  "nsfw",
+  "uncensored",
   "prompting",
 ]);
