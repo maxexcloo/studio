@@ -168,8 +168,9 @@ export function TextBox({
           onClick?.(event);
           if (phone && !props.readOnly && !props.disabled) setEditing(true);
         }}
+        // While the phone editor is open, it alone carries the actions.
         rightSection={
-          tools ? (
+          editing ? undefined : tools ? (
             <Group gap={stacked ? 4 : 0} wrap="nowrap" align="flex-start">
               {stacked ? <Stack gap={4}>{rightSection}</Stack> : rightSection}
               {stacked ? <Stack gap={4}>{actions}</Stack> : actions}

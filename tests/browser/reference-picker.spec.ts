@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   closeReferences,
   create,
+  expandComposer,
   fixtures,
   image,
   profiles,
@@ -146,7 +147,7 @@ test("The compact composer expands on interaction and keeps picked or dragged re
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Preserve the working direction");
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expandComposer(page);
   await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   await page.getByRole("button", { name: "Use reference: Picked Study", exact: true }).click();
@@ -208,7 +209,7 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   expect(state.jobs[0].input.referenceAssets).toEqual([
     { assetId: "asset-slot-source", slot: "end" },
   ]);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  await expandComposer(page);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
   // A second tap removes a selected image; choosing a slot first places it there too.
   await expect(

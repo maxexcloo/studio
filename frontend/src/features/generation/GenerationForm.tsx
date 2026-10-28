@@ -12,7 +12,6 @@ import { queueQuery } from "./Queue";
 import { generationInput, referencePatch } from "./payload";
 import { ReferencePicker } from "./ReferencePicker";
 import { useCompare } from "../compare/CompareDialog";
-import { usePhone } from "../../ui/usePhone";
 import classes from "./ComposerDock.module.css";
 
 /**
@@ -92,7 +91,6 @@ export function GenerationForm({
   const navigate = useNavigate();
   const location = useLocation();
   const compare = useCompare();
-  const phone = usePhone();
   useEffect(() => {
     if (!input.profileId && profile) selectProfile(profile);
   }, [input.profileId, profile]);
@@ -128,8 +126,6 @@ export function GenerationForm({
             minRows={1}
             maxRows={1}
             variant="unstyled"
-            // Phones show the prompt as a summary; tapping it opens the full-screen editor.
-            readOnly={phone}
             className={classes.compactPrompt}
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
