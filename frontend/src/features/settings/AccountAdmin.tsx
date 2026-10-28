@@ -250,7 +250,7 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
     </form>
   );
 }
-const accountAdminQuery = queryOptions({
+export const accountAdminQuery = queryOptions({
   queryKey: ["account-admin"],
   queryFn: () => api<Administration>("/api/accounts/admin"),
 });

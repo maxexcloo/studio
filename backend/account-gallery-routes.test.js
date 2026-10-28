@@ -111,6 +111,39 @@ test("access profiles without gallery permission cannot read pages or exact job 
   );
 });
 
+test("Clear Failed takes the account's own failed items; administrators may name an owner or all", async () => {
+  const { registerGalleryErrorRoutes } = await import("./gallery-routes.js");
+  const posts = {};
+  registerGalleryErrorRoutes({ post: (route, handler) => (posts[route] = handler) });
+  const failed = (ownerId, jobId) => ({ ...item(ownerId, jobId), status: "error", url: "" });
+  const account = (userId, role = "user") => ({
+    studioAccount: { userId, role, authenticated: true, features: { gallery: true } },
+  });
+  const clear = (req) => call(posts["/api/gallery/errors/clear"], req);
+  const left = () => galleryStore.gallery.map((record) => record.jobId).sort();
+  galleryStore.setGallery([
+    failed("account-a", "a-failed"),
+    failed("account-b", "b-failed"),
+    failed("account-c", "c-failed"),
+    item("account-b", "b-done"),
+  ]);
+
+  assert.equal((await clear({ ...account("account-a"), body: {} })).cleared, 1);
+  assert.deepEqual(left(), ["b-done", "b-failed", "c-failed"]);
+  assert.equal(
+    (await clear({ ...account("account-a"), body: { owner: "all" } })).reason,
+    "computer-only",
+    "only administrators clear other accounts' items",
+  );
+  assert.equal(
+    (await clear({ ...account("admin", "administrator"), body: { owner: "account-b" } })).cleared,
+    1,
+  );
+  assert.deepEqual(left(), ["b-done", "c-failed"]);
+  await clear({ ...account("admin", "administrator"), body: { owner: "all" } });
+  assert.deepEqual(left(), ["b-done"]);
+});
+
 test("LoRA previews use the account's newest finished image made with each LoRA", async () => {
   const made = (ownerId, jobId, createdAt, loras, status = "done") => ({
     ...item(ownerId, jobId),

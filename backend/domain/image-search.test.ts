@@ -65,7 +65,7 @@ test("idle work reads finished images once and search matches those that look al
     persist: () => {},
     log: { info: () => {} },
   });
-  search.startPass();
+  search.startPass("outdated");
   await search.settled();
   assert.deepEqual(read.sort(), ["cat", "dog"], "images only");
   assert.equal((await search.status()).remaining, 0);

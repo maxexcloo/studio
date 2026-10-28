@@ -6,11 +6,11 @@ test("Settings follow the settled section order and run maintenance and worker r
 }) => {
   await fixtures(page);
   await signIn(page, { id: "admin", role: "administrator" });
-  let cleared = 0,
-    statusReads = 0;
+  const cleared: unknown[] = [];
+  let statusReads = 0;
   await page.route("**/api/gallery/errors/clear", (route) => {
-    cleared++;
-    return route.fulfill({ json: { ok: true, outputs: [] } });
+    cleared.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ok: true, cleared: 2, outputs: [] } });
   });
   await page.route("**/api/diagnostics", (route) =>
     route.fulfill({ json: { ok: true, text: "Studio 0.0.0" } }),
@@ -40,9 +40,14 @@ test("Settings follow the settled section order and run maintenance and worker r
       page.getByRole("navigation", { name: "Settings Sections", exact: true }).getByRole("link"),
     ).toHaveText(order);
   await section(page, "Settings", "Maintenance");
-  await page.getByRole("button", { name: "Clear", exact: true }).click();
-  await expect(page.getByText("Failed items cleared", { exact: true })).toBeVisible();
-  expect(cleared).toBe(1);
+  await page.getByRole("combobox", { name: "Whose Failed Items", exact: true }).click();
+  await page.getByRole("option", { name: "member@example.test", exact: true }).click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
+  await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("2 failed items deleted", { exact: true })).toBeVisible();
+  expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("combobox", { name: "Images Endpoint", exact: true })).toHaveValue(
     "Image Worker",
@@ -63,8 +68,10 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
     reason: "",
     done: 0,
     failed: 0,
-    remaining: 7000,
-    total: 7000,
+    remaining: 9000,
+    total: 9000,
+    scope: "outdated",
+    scopes: { all: 12_000, outdated: 9000, missing: 7000 },
     perMinute: 0,
     etaSeconds: null,
   };
@@ -74,20 +81,25 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
     active: true,
     done: 120,
     remaining: 6880,
+    total: 7000,
+    scope: "missing",
     perMinute: 30,
     etaSeconds: 13_760,
   };
   let status: Record<string, unknown> = idle;
-  const actions: string[] = [];
+  const actions: unknown[] = [];
   await page.route("**/api/gallery/captions**", (route) => {
     const action = new URL(route.request().url()).pathname.split("/").pop();
     if (action === "start") status = running;
     if (action === "stop") status = { ...running, state: "stopped", active: false, perMinute: 0 };
-    if (action !== "captions") actions.push(action!);
+    if (action !== "captions") actions.push([action, route.request().postDataJSON()]);
     return route.fulfill({ json: status });
   });
   await page.goto("/settings#maintenance");
   const row = page.getByRole("region", { name: "Clean Up", exact: true });
+  await expect(row.getByText("Ready · 9,000 to caption", { exact: true })).toBeVisible();
+  await row.getByRole("combobox", { name: "Images to Caption", exact: true }).click();
+  await page.getByRole("option", { name: "Missing (7,000)", exact: true }).click();
   await expect(row.getByText("Ready · 7,000 to caption", { exact: true })).toBeVisible();
   // Index Gallery (Image Search) is the same kind of pass.
   await expect(row.getByText("Index Gallery", { exact: true })).toBeVisible();
@@ -101,7 +113,63 @@ test("Caption Gallery in Settings › Maintenance starts a pass, shows its progr
   await row.getByRole("button", { name: "Stop", exact: true }).click();
   await expect(row.getByText("Stopped · 120 of 7,000", { exact: true })).toBeVisible();
   await expect(start).toBeEnabled();
-  expect(actions).toEqual(["start", "stop"]);
+  expect(actions).toEqual([
+    ["start", { scope: "missing" }],
+    ["stop", {}],
+  ]);
+});
+
+test("Unfinished Items in Settings › Maintenance retry and delete any account's stuck jobs", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const job = (id: string, ownerId: string, prompt: string) => ({
+    id,
+    jobId: id,
+    sessionId: "session",
+    ownerId,
+    dream: false,
+    operation: "image",
+    status: "running",
+    reason: "Recovering the recorded generation; it will not be submitted again.",
+    input: { prompt },
+    items: [],
+    outputs: [],
+    createdAt: stamp,
+    updatedAt: stamp,
+  });
+  let jobs = [job("stuck", "member", "A lost lighthouse"), job("slow", "admin", "A slow tide")];
+  const actions: unknown[] = [];
+  await page.route("**/api/maintenance/unfinished**", (route) => {
+    const action = new URL(route.request().url()).pathname.split("/").pop();
+    if (action === "unfinished") return route.fulfill({ json: { jobs } });
+    const body = route.request().postDataJSON();
+    actions.push([action, body]);
+    jobs = jobs.filter((entry) => entry.id !== body.id);
+    return route.fulfill({ json: { job: jobs[0] } });
+  });
+  await page.goto("/settings#maintenance");
+  const row = page.getByRole("region", { name: "Clean Up", exact: true });
+  await expect(row.getByText(/2 now\.$/)).toBeVisible();
+  await row.getByRole("button", { name: "Review", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Unfinished Items", exact: true });
+  await expect(dialog.getByRole("row", { name: "A lost lighthouse" })).toContainText(
+    "member@example.test",
+  );
+  await dialog.getByRole("button", { name: "Actions for A lost lighthouse", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Retry", exact: true }).click();
+  await expect(page.getByText("Queued again", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("row", { name: "A lost lighthouse" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Actions for A slow tide", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  const confirm = page.getByRole("dialog", { name: "Delete Unfinished Item", exact: true });
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(dialog.getByText("No Unfinished Items", { exact: true })).toBeVisible();
+  expect(actions).toEqual([
+    ["retry", { ownerId: "member", id: "stuck" }],
+    ["delete", { ownerId: "admin", id: "slow" }],
+  ]);
 });
 
 test("Tile Captions in Settings › Studio pin phone tile captions", async ({ page }, testInfo) => {
