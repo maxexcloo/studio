@@ -74,7 +74,7 @@ export function GenerationInputControls({
   };
   loraPicker: LoraPickerState;
   expert: { opened: boolean; onOpenedChange: (opened: boolean) => void };
-  /** Opens Compare Variants from this draft; the gallery composer passes it. */
+  /** Opens Compare from this draft; the gallery composer passes it. */
   onCompare?: () => void;
 }) {
   const phone = usePhone();
@@ -137,8 +137,8 @@ export function GenerationInputControls({
       )}
       <ExpertSettings input={input} profile={profile} onChange={onChange} {...expert} />
       {onCompare && input.kind === "image" && (
-        <Tooltip label="Compare Variants" disabled={phone}>
-          <Button {...iconChipProps} aria-label="Compare Variants" onClick={onCompare}>
+        <Tooltip label="Compare" disabled={phone}>
+          <Button {...iconChipProps} aria-label="Compare" onClick={onCompare}>
             <Columns3 size={16} />
           </Button>
         </Tooltip>

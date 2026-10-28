@@ -6,7 +6,6 @@ import {
   Center,
   Group,
   SegmentedControl,
-  Stack,
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
@@ -18,13 +17,10 @@ import { defaultProfile, useGeneration } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
 import { chipProps } from "./chip";
 import { useLoraPicker } from "./LoraPicker";
-import { primaryReference, referenceDetails } from "./payload";
-import { usePromptAssistant } from "./PromptAssistant";
-import { usePromptIdeas } from "./PromptIdeas";
-import { PromptHistory } from "./PromptHistory";
+import { primaryReference, referenceDetails, usesNegative } from "./payload";
+import { PromptFields } from "./PromptFields";
 import { ReferencePicker } from "./ReferencePicker";
 import { useReferenceBrowser } from "./useReferenceBrowser";
-import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./GenerationEditor.module.css";
 const MaskEditor = lazy(() => import("./MaskEditor"));
@@ -45,6 +41,33 @@ export function useSubmitState({
 }) {
   const uploading = useIsMutating({ mutationKey: ["reference-upload"] }) > 0;
   const assisting = useIsMutating({ mutationKey: ["prompt-assistance"] }) > 0;
+  const label =
+    operation === "refine"
+      ? "Refine Image"
+      : input.kind === "video"
+        ? "Generate Video"
+        : "Generate Image";
+  return {
+    label,
+    blockedReason:
+      blockedReason || submitBlockedReason({ input, profile, references, uploading, assisting }),
+  };
+}
+
+/** Why a run can't be submitted yet, if it can't; Compare checks each variant with it. */
+export function submitBlockedReason({
+  input,
+  profile,
+  references,
+  uploading,
+  assisting,
+}: {
+  input: GenerationInput;
+  profile?: Profile;
+  references: ReferenceAsset[];
+  uploading: boolean;
+  assisting: boolean;
+}) {
   const requiredReference = profile?.mediaInputs?.some(
     (slot) =>
       slot.required &&
@@ -55,30 +78,21 @@ export function useSubmitState({
   const backend = profile?.backendOptions?.find(
     (option) => option.id === (input.profileBackend || profile.backend),
   );
-  const reason =
-    blockedReason ||
-    (!profile
-      ? "Choose an available profile first."
-      : (backend ? backend.ready === false : profile.ready === false)
-        ? backend?.reason
-          ? `${backend.label} isn’t ready: ${backend.reason}`
-          : "This model is not ready to run."
-        : !input.prompt.trim()
-          ? "Describe what you want to create."
-          : requiredReference
-            ? "This workflow requires a reference image."
-            : uploading
-              ? "Wait for the reference upload to finish."
-              : assisting
-                ? "Wait for the prompt assistant to finish."
-                : undefined);
-  const label =
-    operation === "refine"
-      ? "Refine Image"
-      : input.kind === "video"
-        ? "Generate Video"
-        : "Generate Image";
-  return { label, blockedReason: reason };
+  return !profile
+    ? "Choose an available profile first."
+    : (backend ? backend.ready === false : profile.ready === false)
+      ? backend?.reason
+        ? `${backend.label} isn’t ready: ${backend.reason}`
+        : "This model is not ready to run."
+      : !input.prompt.trim()
+        ? "Describe what you want to create."
+        : requiredReference
+          ? "This workflow requires a reference image."
+          : uploading
+            ? "Wait for the reference upload to finish."
+            : assisting
+              ? "Wait for the prompt assistant to finish."
+              : undefined;
 }
 
 /** Keeps a blocked Generate focusable so its tooltip and description still explain why. */
@@ -164,20 +178,6 @@ export function GenerationEditor({
     operation,
     blockedReason: callerReason,
   });
-  const assistant = usePromptAssistant({
-    scopeKey: assistantScope,
-    input,
-    profile,
-    references,
-    onChange,
-  });
-  const ideas = usePromptIdeas({
-    kind: input.kind,
-    empty: !input.prompt.trim(),
-    onPick: (prompt) => onChange({ prompt }),
-    className: classes.promptIdeas,
-    stacked: fill,
-  });
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
@@ -249,68 +249,18 @@ export function GenerationEditor({
             </Alert>
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}
-          <div className={classes.promptArea} {...(offerIdeas ? ideas.focusProps : {})}>
-            <TextBox
-              ref={prompt}
-              tools
-              data-expanded-prompt
-              classNames={{
-                root: classes.prompt,
-                wrapper: classes.promptWrapper,
-                input: classes.promptInput,
-              }}
-              variant="unstyled"
-              aria-label="Prompt"
-              data-autofocus={autoFocusPrompt || undefined}
-              placeholder={
-                input.kind === "image"
-                  ? "Describe the image you want to create…"
-                  : "Describe the motion and camera…"
-              }
-              // The phone editor gives the prompt all the room above the chips.
-              autosize={!fill}
-              minRows={3}
-              maxRows={10}
-              rightSection={
-                <Stack gap={4}>
-                  <PromptHistory
-                    kind="positive"
-                    value={input.prompt}
-                    onPick={(prompt) => onChange({ prompt })}
-                  />
-                  {assistant.action}
-                </Stack>
-              }
-              rightSectionWidth={40}
-              rightSectionPointerEvents="all"
-              rightSectionProps={{ style: { alignItems: "flex-start" } }}
-              value={input.prompt}
-              onChange={(prompt) => onChange({ prompt })}
-              overlay={offerIdeas && ideas.ideas}
-            />
-          </div>
-          {profile && profile.capabilities.negativePrompt !== false && (
-            <TextBox
-              tools
-              aria-label="Negative Prompt"
-              placeholder="Negative prompt: what to leave out…"
-              size="sm"
-              autosize
-              minRows={1}
-              maxRows={4}
-              rightSection={
-                <PromptHistory
-                  kind="negative"
-                  value={input.negative}
-                  onPick={(negative) => onChange({ negative })}
-                />
-              }
-              rightSectionPointerEvents="all"
-              value={input.negative}
-              onChange={(negative) => onChange({ negative })}
-            />
-          )}
-          {assistant.suggestions}
+          <PromptFields
+            textareaRef={prompt}
+            input={input}
+            profile={profile}
+            references={references}
+            onChange={onChange}
+            assistantScope={assistantScope}
+            negative={usesNegative(profile)}
+            autoFocus={autoFocusPrompt}
+            fill={fill}
+            ideas={offerIdeas}
+          />
           <GenerationInputControls
             loraPicker={loraPicker}
             input={input}

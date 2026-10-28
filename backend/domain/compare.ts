@@ -90,12 +90,16 @@ export function registerCompareRoutes(
       label: record.labels?.[index] || `Variant ${letter(index)}`,
       item: variantItem(record.ownerId, items, jobId),
     }));
-    const prompts = new Set(variants.map((variant) => variant.item?.prompt));
+    const shared = (key: "prompt" | "negative") =>
+      new Set(variants.map((variant) => variant.item?.[key] || "")).size === 1
+        ? { [key]: variants[0].item?.[key] || "" }
+        : {};
     return {
       id: record.id,
       createdAt: record.createdAt,
       seed: record.seed,
-      ...(prompts.size === 1 ? { prompt: variants[0].item?.prompt || "" } : {}),
+      ...shared("prompt"),
+      ...shared("negative"),
       vote: variants.some(
         (variant) => variant.jobId === record.vote && variant.item?.status === "done",
       )
