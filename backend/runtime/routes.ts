@@ -32,7 +32,12 @@ export function createRuntimeRouter(
   );
   router.post(
     "/preview",
-    handle((request) => controller.preview(workloadIds(request.body?.workloads))),
+    // `start` previews starting one of these workloads beside what runs; `workloads` is a complete placement.
+    handle((request) =>
+      request.body?.start
+        ? controller.previewStart(workloadIds(request.body.start))
+        : controller.preview(workloadIds(request.body?.workloads)),
+    ),
   );
   router.post(
     "/apply",

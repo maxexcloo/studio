@@ -359,28 +359,24 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   if (!testInfo.project.use.isMobile) await page.setViewportSize({ width: 1920, height: 1000 });
   await page.goto("/chat");
   await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
-  // The model select names the model and is only as wide as its name.
-  const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
-  await expect(model).toHaveValue("Studio Assistant");
-  if (!testInfo.project.use.isMobile) {
-    // The whole name shows, with no more than a little room to spare.
-    const { field, text } = await model.evaluate((input: HTMLInputElement) => {
-      const style = getComputedStyle(input);
-      const context = document.createElement("canvas").getContext("2d")!;
-      context.font = style.font;
-      return {
-        field: input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
-        text: context.measureText(input.value).width,
-      };
-    });
-    expect(field).toBeGreaterThan(text - 1);
-    expect(field - text).toBeLessThan(8);
-  }
-  // Without a sidebar, the phone's empty state offers New Chat.
+  // The model chip sits on the composer's rail beside References and names the model.
+  const inputs = page.getByRole("group", { name: "Chat Inputs", exact: true });
+  await expect(inputs.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveText(
+    "Studio Assistant",
+  );
+  await expect(inputs.getByRole("button", { name: "Choose References" })).toBeVisible();
+  // Without a sidebar, the phone's empty state opens the Chats list, which offers New Chat.
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   if (testInfo.project.use.isMobile) {
-    await page.getByRole("link", { name: "New Chat", exact: true }).click();
-    await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeFocused();
+    await page.getByRole("button", { name: "Chats", exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
+    await expect(drawer.getByRole("button", { name: "New Chat", exact: true })).toBeVisible();
+    await drawer.getByRole("button", { name: "Close Chats", exact: true }).click();
+    await expect(drawer).toBeHidden();
+  } else {
+    const sidebar = page.getByRole("complementary", { name: "Chats", exact: true });
+    await expect(sidebar.getByRole("heading", { name: "Chats", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("button", { name: "New Chat", exact: true })).toBeVisible();
   }
   const nav = page.getByRole("navigation", { name: "Creative Modes" });
   expect(
@@ -406,4 +402,82 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   const composer = await page.locator("[data-composer-dock]").boundingBox();
   expect(composer!.width).toBeLessThanOrEqual(780);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
+test("An administrator's stopped Chat model starts after confirming what it stops", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const workload = (id: string, label: string, phase: string) => ({
+    id,
+    label,
+    kind: id === "image" ? "image" : "text",
+    pool: "gpu",
+    gpus: 1,
+    phase,
+    replicas: phase === "running" ? 1 : 0,
+    ready: phase === "running" ? 1 : 0,
+    acceptedOperations: 0,
+  });
+  await page.route("**/api/chat/status", (route) =>
+    route.fulfill({
+      json: {
+        available: true,
+        models: [
+          { id: "text:test", label: "Studio Assistant", workloads: ["text"] },
+          { id: "text:large", label: "Large Model", workloads: ["text-large"] },
+        ],
+        defaultModelId: "text:test",
+      },
+    }),
+  );
+  await page.route("**/api/runtime", (route) =>
+    route.fulfill({
+      json: {
+        automaticLifecycle: false,
+        pools: [{ id: "gpu", capacity: 2, used: 2 }],
+        history: [],
+        workloads: [
+          workload("image", "Image", "running"),
+          workload("text", "Text", "running"),
+          workload("text-large", "Large Text", "stopped"),
+        ],
+      },
+    }),
+  );
+  const previews: unknown[] = [];
+  const applied: unknown[] = [];
+  await page.route("**/api/runtime/preview", (route) => {
+    previews.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        target: ["text", "text-large"],
+        stop: ["image"],
+        start: ["text-large"],
+        keep: ["text"],
+        signature: "fixture",
+      },
+    });
+  });
+  await page.route("**/api/runtime/apply", (route) => {
+    applied.push(route.request().postDataJSON());
+    return route.fulfill({ status: 202, json: { id: "next", status: "running" } });
+  });
+  await page.route("**/api/runtime/operations/next", (route) =>
+    route.fulfill({ json: { id: "next", status: "completed", progress: "Done." } }),
+  );
+  await page.goto("/chat");
+  const model = page.getByRole("combobox", { name: "Chat Model", exact: true });
+  await expect(model).toHaveText("Studio Assistant");
+  await model.click();
+  await expect(page.getByRole("option", { name: /Large Model/ })).toContainText("Stopped");
+  await page.getByRole("option", { name: /Large Model/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Switch to Large Model" });
+  await expect(dialog).toContainText("Stop: Image");
+  await expect(dialog).toContainText("Start: Large Text");
+  expect(applied).toEqual([]);
+  await dialog.getByRole("button", { name: "Switch", exact: true }).click();
+  await expect(model).toHaveText("Large Model");
+  expect(previews).toEqual([{ start: ["text-large"] }]);
+  expect(applied).toEqual([{ workloads: ["text", "text-large"], signature: "fixture" }]);
 });

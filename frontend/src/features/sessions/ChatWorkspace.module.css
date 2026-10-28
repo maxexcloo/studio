@@ -20,6 +20,18 @@
   border-right: 1px solid var(--mantine-color-default-border);
 }
 
+/* The Chats heading and New Chat stay put while the list scrolls. */
+.sidebarHeading {
+  position: sticky;
+  top: calc(-1 * var(--mantine-spacing-md));
+  z-index: 1;
+  flex-shrink: 0;
+  margin: calc(-1 * var(--mantine-spacing-md)) calc(-1 * var(--mantine-spacing-md)) 0;
+  padding: var(--mantine-spacing-md) var(--mantine-spacing-md) var(--mantine-spacing-xs)
+    calc(var(--mantine-spacing-md) + var(--mantine-spacing-sm));
+  background: inherit;
+}
+
 .main {
   display: flex;
   flex-direction: column;

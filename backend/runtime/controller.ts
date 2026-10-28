@@ -20,6 +20,8 @@ export interface Workload {
   gpus: number;
   url: string;
   apiKeyEnv?: string;
+  /** Text: the Chat gateway model ID this deployment serves. */
+  model?: string;
   /** A media workload's worker id and what it runs (workers.js), for workers derived from workloads. */
   worker?: string;
   capabilities?: string[];
@@ -501,8 +503,56 @@ export class RuntimeController {
   }
 
   /**
-   * Automatic lifecycle: start a media workload, stopping media in its pool to make room, idle ones
-   * first. If running text holds the GPUs it needs, nothing changes and the work waits.
+   * The running workloads plus `workload`, stopping others in its pool to make room: media before
+   * text, idle ones first. Workloads in `keep` never stop.
+   */
+  private placementWith(
+    workload: Workload,
+    states: Map<string, DeploymentState>,
+    keep: string[] = [],
+  ) {
+    const target = this.workloads
+      .filter((item) => item.id === workload.id || states.get(item.id)!.replicas > 0)
+      .map((item) => item.id);
+    const rank = (id: string) => [
+      this.workload(id).kind === "text" ? 1 : 0,
+      this.active.get(id) ?? 0,
+    ];
+    const candidates = target
+      .filter(
+        (id) =>
+          id !== workload.id && !keep.includes(id) && this.workload(id).pool === workload.pool,
+      )
+      .sort((a, b) => {
+        const [kindA, busyA] = rank(a),
+          [kindB, busyB] = rank(b);
+        return kindA - kindB || busyA - busyB;
+      });
+    while (this.usage(target, workload.pool) > this.pools[workload.pool] && candidates.length)
+      target.splice(target.indexOf(candidates.shift()!), 1);
+    return this.plan(this.validate(target), states);
+  }
+
+  /**
+   * An explicit start, such as choosing a stopped Chat model: the first candidate that is running,
+   * else the first that fits beside what runs, else the first, stopping what it needs room from
+   * (text included). Apply the returned placement with its signature.
+   */
+  async previewStart(candidates: string[]): Promise<RuntimePreview> {
+    const choices = candidates.map((id) => this.workload(id));
+    if (!choices.length) throw new RuntimeRequestError("Name a workload to start.");
+    const states = await this.states();
+    const plans = choices.map((workload) => this.placementWith(workload, states));
+    const { holders: _holders, ...preview } =
+      plans.find((plan) => !plan.start.length && !plan.stop.length) ??
+      plans.find((plan) => !plan.stop.length) ??
+      plans[0];
+    return preview;
+  }
+
+  /**
+   * Automatic lifecycle: start a media workload in place of media in its pool, idle ones first. If
+   * running text holds the GPUs it needs, nothing changes and the work waits.
    */
   private async switchTo(workload: Workload) {
     this.claim();
@@ -517,19 +567,7 @@ export class RuntimeController {
         throw new RuntimeUnavailable(
           `Waiting for a GPU: ${blocking.map((id) => this.workload(id).label).join(", ")} ${blocking.length === 1 ? "is running; stop it" : "are running; stop them"} in Settings › Workers.`,
         );
-      const target = this.workloads
-        .filter((item) => states.get(item.id)!.replicas > 0)
-        .map((item) => item.id)
-        .concat(workload.id);
-      const candidates = target
-        .filter(
-          (id) =>
-            id !== workload.id && !text.includes(id) && this.workload(id).pool === workload.pool,
-        )
-        .sort((a, b) => (this.active.get(a) ?? 0) - (this.active.get(b) ?? 0));
-      while (this.usage(target, workload.pool) > this.pools[workload.pool] && candidates.length)
-        target.splice(target.indexOf(candidates.shift()!), 1);
-      const plan = this.plan(this.validate(target), states);
+      const plan = this.placementWith(workload, states, text);
       this.begin("apply", plan, "automatic");
     } finally {
       this.claimed = false;

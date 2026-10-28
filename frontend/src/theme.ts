@@ -187,10 +187,10 @@ export function studioTheme({
       // Status pills are light; filled colour is for the one primary action in a view.
       Badge: Badge.extend({ defaultProps: { variant: "light" } }),
       Button: Button.extend({ defaultProps: { size: "md", fw: 500, autoContrast: true } }),
-      Drawer: Drawer.extend({
-        defaultProps: { overlayProps: { blur: 6, backgroundOpacity: 0.4 }, transitionProps },
-        styles: { header: overlayHeader, title: overlayTitle },
-      }),
+      Drawer: Drawer.extend({ styles: { header: overlayHeader, title: overlayTitle } }),
+      // On the parts, so a compound Drawer (a header with its own actions) shares them.
+      DrawerOverlay: { defaultProps: { blur: 6, backgroundOpacity: 0.4 } },
+      DrawerRoot: { defaultProps: { transitionProps } },
       // Selection indicators slide between items with the shared motion.
       FloatingIndicator: FloatingIndicator.extend({
         defaultProps: { transitionDuration: motionDuration },

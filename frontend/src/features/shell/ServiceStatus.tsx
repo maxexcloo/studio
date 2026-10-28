@@ -9,20 +9,22 @@ import {
   Stack,
   Tooltip,
 } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
+import { useDisclosure, useWindowEvent } from "@mantine/hooks";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare, Server } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, terminal, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { SessionList } from "../sessions/ChatWorkspace";
+import { NewChatAction, openChatsEvent, SessionList } from "../sessions/ChatWorkspace";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ServiceStatus.module.css";
 
 /** The one header entry to work in progress, Chats and service health on every breakpoint. */
 export function StatusAction({ chat }: { chat: boolean }) {
   const [opened, { open, close }] = useDisclosure(false);
+  // The phone's No Chat Selected view opens the Chats list too.
+  useWindowEvent(openChatsEvent, open);
   const phone = usePhone();
   const admin = useIsAdmin();
   const location = useLocation();
@@ -51,38 +53,42 @@ export function StatusAction({ chat }: { chat: boolean }) {
           {generating ? <Loader size={18} color="gray" /> : <Icon size={19} />}
         </ActionIcon>
       </Tooltip>
-      <Drawer
-        opened={opened}
-        onClose={close}
-        position="left"
-        size={phone ? "85%" : 400}
-        title={title}
-        closeButtonProps={{ "aria-label": `Close ${title}` }}
-        classNames={{ content: classes.content, body: classes.body }}
-      >
-        <FocusTrap.InitialFocus />
-        <div className={classes.list}>{chat ? <SessionList close={close} /> : <Queue />}</div>
-        <Divider />
-        <Stack gap="xs" pt="md">
-          <ServiceHealthSummary />
-          {admin && (
-            <Group justify="end">
-              <Button
-                component={Link}
-                to="/settings#workers"
-                state={{ backgroundLocation: location }}
-                variant="subtle"
-                color="gray"
-                size="compact-xs"
-                leftSection={<Server size={14} />}
-                onClick={close}
-              >
-                Workers
-              </Button>
+      <Drawer.Root opened={opened} onClose={close} position="left" size={phone ? "85%" : 400}>
+        <Drawer.Overlay />
+        <Drawer.Content className={classes.content}>
+          <Drawer.Header>
+            <Drawer.Title>{title}</Drawer.Title>
+            <Group gap="xs" wrap="nowrap">
+              {chat && <NewChatAction onDone={close} />}
+              <Drawer.CloseButton aria-label={`Close ${title}`} />
             </Group>
-          )}
-        </Stack>
-      </Drawer>
+          </Drawer.Header>
+          <Drawer.Body className={classes.body}>
+            <FocusTrap.InitialFocus />
+            <div className={classes.list}>{chat ? <SessionList close={close} /> : <Queue />}</div>
+            <Divider />
+            <Stack gap="xs" pt="md">
+              <ServiceHealthSummary />
+              {admin && (
+                <Group justify="end">
+                  <Button
+                    component={Link}
+                    to="/settings#workers"
+                    state={{ backgroundLocation: location }}
+                    variant="subtle"
+                    color="gray"
+                    size="compact-xs"
+                    leftSection={<Server size={14} />}
+                    onClick={close}
+                  >
+                    Workers
+                  </Button>
+                </Group>
+              )}
+            </Stack>
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
     </>
   );
 }
