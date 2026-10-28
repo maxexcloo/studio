@@ -1146,7 +1146,7 @@ function workflowsForRequest(req, workflows) {
       mayUseGenerationProfile(req.studioAccount, {
         id: item.profileId,
         family: item.family,
-        nsfw: item.nsfw,
+        uncensored: item.uncensored,
         aiDrafted: item.aiDrafted,
       }),
     )
@@ -2142,7 +2142,7 @@ const dream = createDream({
       image: may("imageGeneration"),
       video: may("videoGeneration"),
       assistant: may("promptAssistant"),
-      nsfw: may("nsfwModels"),
+      uncensored: may("uncensoredModels"),
     };
   },
   catalogue: async (_ownerId, account) => {
@@ -2322,14 +2322,10 @@ const sessionChat = new ChatService({
     if (!settings) return [];
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && !account?.authenticated) return [];
-    const spicyModel = String(process.env.STUDIO_ASSISTANT_SPICY_MODEL || "").trim();
-    const permitted = (id) =>
-      !spicyModel || id !== spicyModel || !account || mayUseFeature(account, "nsfwModels");
     chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
-    const models = ((await chatGateway?.listModelDetails()) || []).filter(
-      (model) => chatModelAllowed(model.id, settings.patterns) && permitted(model.id),
+    return ((await chatGateway?.listModelDetails()) || []).filter((model) =>
+      chatModelAllowed(model.id, settings.patterns),
     );
-    return models;
   },
   revision: async (ownerId, sessionId, revision) => {
     const source = rewriteStore.job(ownerId, revision.sourceJobId);

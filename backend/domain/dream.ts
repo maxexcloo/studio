@@ -16,7 +16,7 @@ export interface DreamSettings {
   dailyImages: number;
   dailyVideos: number;
   videos: boolean;
-  /** Takes effect only with NSFW Models and a configured Spicy model. */
+  /** Takes effect only with Uncensored Models. */
   spicy: boolean;
 }
 /** What a Dream job carries from admission to its gallery items. */
@@ -68,11 +68,11 @@ export interface DreamAccess {
   image: boolean;
   video: boolean;
   assistant: boolean;
-  nsfw: boolean;
+  uncensored: boolean;
 }
 /** The assistant gateway (assistant.js): its models and a chat that returns the reply and its reasoning apart. */
 interface DreamWriter {
-  settings(): { model: string; spicyModel?: string };
+  settings(): { model: string };
   chat(request: {
     model: string;
     messages: { role: "system" | "user"; content: string }[];
@@ -352,8 +352,7 @@ export function createDream(options: {
       .slice(0, 5)
       .map((item) => clean(item.prompt, 300));
     const summary = options.taste.read(ownerId).summary;
-    const settings = writer.settings();
-    const model = spicy && settings.spicyModel ? settings.spicyModel : settings.model;
+    const { model } = writer.settings();
     const { text, thinking = "" } = await writer.chat({
       model,
       messages: [
@@ -462,7 +461,7 @@ export function createDream(options: {
           continue;
         }
       }
-      const spicy = record.settings.spicy && access.nsfw && Boolean(writer.settings().spicyModel);
+      const spicy = record.settings.spicy && access.uncensored;
       const loras = starredLoras(ownerId, profile);
       // The prompt is written as the job's first stage (writeJob), streamed into its queue item.
       const writing: DreamWriting = {
@@ -742,7 +741,7 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
       settings: dream.read(ownerId).settings,
       unseen: dream.unseen(ownerId),
       today: dream.today(ownerId),
-      spicyAvailable: Boolean(access?.nsfw),
+      spicyAvailable: Boolean(access?.uncensored),
       ...dream.status(ownerId),
     };
   };
@@ -774,10 +773,10 @@ export function registerDreamRoutes(app: Router, { dream }: { dream: Dream }) {
           .json({ ok: false, error: `Set ${key} to a whole number from ${low} to ${high}.` });
       patch[key] = body[key] as number;
     }
-    if (patch.spicy && !dream.access(owner(req))?.nsfw)
+    if (patch.spicy && !dream.access(owner(req))?.uncensored)
       return res
         .status(403)
-        .json({ ok: false, error: "Spicy needs NSFW Models for this account." });
+        .json({ ok: false, error: "Spicy needs Uncensored Models for this account." });
     await dream.save(owner(req), patch);
     return res.json(show(owner(req)));
   });

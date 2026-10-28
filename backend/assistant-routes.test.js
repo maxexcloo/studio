@@ -25,31 +25,35 @@ const environment = {
   STUDIO_PROMPT_WRITER_KEY: "fixture-key",
   STUDIO_PROMPT_WRITER_MODEL: "ai/text-quick",
 };
-const sfw = { id: "custom:sfw", label: "Safe Image", kind: "image", family: "krea2" };
-const nsfw = {
-  id: "custom:nsfw",
-  label: "Adult Image",
+const plain = { id: "custom:plain", label: "Plain Image", kind: "image", family: "krea2" };
+const uncensored = {
+  id: "custom:uncensored",
+  label: "Uncensored Image",
   kind: "image",
   family: "krea2",
-  nsfw: true,
+  uncensored: true,
 };
 const user = builtInAccessProfiles.find((item) => item.id === "user");
 const profiles = {
   user,
   off: { ...user, id: "off", features: { ...user.features, promptAssistant: false } },
-  adult: { ...user, id: "adult", features: { ...user.features, nsfwModels: true, loras: true } },
+  spicy: {
+    ...user,
+    id: "spicy",
+    features: { ...user.features, uncensoredModels: true, loras: true },
+  },
 };
 const accounts = {
   admin: { id: "a1", role: "administrator" },
   user: { id: "u1", role: "user", accessProfileId: "user" },
   off: { id: "u2", role: "user", accessProfileId: "off" },
-  adult: { id: "u3", role: "user", accessProfileId: "adult" },
+  spicy: { id: "u3", role: "user", accessProfileId: "spicy" },
 };
 const encoder = new TextEncoder();
 const calls = [];
 const fetchImpl = async (url, options = {}) => {
   if (url.endsWith("/v1/models"))
-    return Response.json({ data: [{ id: "ai/text-quick" }, { id: "ai/text-spicy" }] });
+    return Response.json({ data: [{ id: "ai/text-quick" }, { id: "ai/text-spare" }] });
   const body = JSON.parse(options.body);
   calls.push(body);
   if (body.stream)
@@ -87,7 +91,8 @@ const app = express();
 app.use(express.json({ limit: "25mb" }));
 app.use((req, _res, next) => {
   const name = req.headers["x-test-account"];
-  if (name) req.studioAccount = effectiveAccountAccess(accounts[name], profiles, [sfw.id, nsfw.id]);
+  if (name)
+    req.studioAccount = effectiveAccountAccess(accounts[name], profiles, [plain.id, uncensored.id]);
   next();
 });
 const engine = createAssistant(environment, { fetchImpl, log: {} });
@@ -100,15 +105,15 @@ const loras = [
 registerAssistantRoutes(app, {
   engine,
   profiles: async (req) =>
-    [sfw, nsfw].filter(
+    [plain, uncensored].filter(
       (profile) =>
         !req.studioAccount ||
         req.studioAccount.role === "administrator" ||
-        !profile.nsfw ||
-        req.studioAccount.features.nsfwModels,
+        !profile.uncensored ||
+        req.studioAccount.features.uncensoredModels,
     ),
   guide: (profile) =>
-    profile.id === nsfw.id
+    profile.id === uncensored.id
       ? { summary: "Tags.", negative: { effect: "none" } }
       : { summary: "Lead with light." },
   loras: async () => loras,
@@ -148,14 +153,15 @@ test("the assistant is behind Prompt Assistant, on for built-ins, and only for p
     [true, false, false, ["enhance", "photographic", "cinematic", "concise", "candid"]],
   );
   assert.equal(
-    (await post("/api/assistant/rewrite", { profileId: sfw.id, prompt: "a cabin" }, "off")).status,
+    (await post("/api/assistant/rewrite", { profileId: plain.id, prompt: "a cabin" }, "off"))
+      .status,
     403,
   );
   assert.equal(
-    (await post("/api/assistant/rewrite", { profileId: nsfw.id, prompt: "a cabin" }, "user"))
+    (await post("/api/assistant/rewrite", { profileId: uncensored.id, prompt: "a cabin" }, "user"))
       .status,
     404,
-    "an NSFW profile this account can’t use",
+    "an uncensored profile this account can’t use",
   );
   assert.equal(
     (
@@ -169,7 +175,7 @@ test("the assistant is behind Prompt Assistant, on for built-ins, and only for p
   );
   const json = await post(
     "/api/assistant/rewrite",
-    { profileId: sfw.id, prompt: "a cabin", preset: "concise" },
+    { profileId: plain.id, prompt: "a cabin", preset: "concise" },
     "user",
   );
   assert.equal(json.status, 200);
@@ -187,7 +193,7 @@ test("the assistant is behind Prompt Assistant, on for built-ins, and only for p
 test("a rewrite streams as server-sent events: deltas, then the final result", async () => {
   const streamed = await post(
     "/api/assistant/rewrite",
-    { profileId: sfw.id, prompt: "a cabin" },
+    { profileId: plain.id, prompt: "a cabin" },
     "user",
     { accept: "text/event-stream" },
   );
@@ -209,62 +215,45 @@ test("a rewrite streams as server-sent events: deltas, then the final result", a
   );
 });
 
-test("Spicy needs NSFW Models, whatever the profile, and a Spicy model", async () => {
+test("Spicy needs Uncensored Models, whatever the profile, and runs on the assistant model", async () => {
   assert.equal(
     (
       await post(
         "/api/assistant/rewrite",
-        { profileId: sfw.id, prompt: "a couple", preset: "spicy" },
+        { profileId: plain.id, prompt: "a couple", preset: "spicy" },
         "user",
       )
     ).status,
     403,
   );
-  const noModel = await post(
+  assert.equal((await get("/api/assistant", "user")).spicy, false);
+  assert.equal(
+    (await get("/api/assistant", "spicy")).presets.some((preset) => preset.id === "spicy"),
+    true,
+  );
+  const spicy = await post(
     "/api/assistant/rewrite",
-    { profileId: sfw.id, prompt: "a couple", preset: "spicy" },
-    "adult",
-    { accept: "text/event-stream" },
+    { profileId: plain.id, prompt: "a couple", preset: "spicy" },
+    "spicy",
   );
-  assert.deepEqual(
-    [noModel.status, /application\/json/.test(noModel.type)],
-    [409, true],
-    "refused before the stream starts",
-  );
-  assert.equal((await get("/api/assistant", "adult")).spicy, false, "hidden without a Spicy model");
-  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/text-spicy";
-  try {
-    assert.equal(
-      (await get("/api/assistant", "adult")).presets.some((preset) => preset.id === "spicy"),
-      true,
-    );
-    assert.equal((await get("/api/assistant", "user")).spicy, false);
-    const spicy = await post(
-      "/api/assistant/rewrite",
-      { profileId: sfw.id, prompt: "a couple", preset: "spicy" },
-      "adult",
-    );
-    assert.equal(spicy.status, 200, "an unmarked profile is fine with NSFW Models");
-    assert.equal(calls.at(-1).model, "ai/text-spicy");
-  } finally {
-    delete environment.STUDIO_ASSISTANT_SPICY_MODEL;
-  }
+  assert.equal(spicy.status, 200, "an unmarked profile is fine with Uncensored Models");
+  assert.equal(calls.at(-1).model, "ai/text-quick");
 });
 
 test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; drafts are for administrators", async () => {
   assert.equal(
     JSON.parse(
-      (await post("/api/assistant/negative", { profileId: sfw.id, prompt: "a cabin" }, "user"))
+      (await post("/api/assistant/negative", { profileId: plain.id, prompt: "a cabin" }, "user"))
         .text,
     ).negative,
     "blurry",
   );
   assert.equal(
-    (await post("/api/assistant/loras", { profileId: sfw.id, prompt: "a cabin" }, "user")).status,
+    (await post("/api/assistant/loras", { profileId: plain.id, prompt: "a cabin" }, "user")).status,
     403,
   );
   const suggested = JSON.parse(
-    (await post("/api/assistant/loras", { profileId: sfw.id, prompt: "a cabin" }, "adult")).text,
+    (await post("/api/assistant/loras", { profileId: plain.id, prompt: "a cabin" }, "spicy")).text,
   );
   assert.deepEqual(
     suggested.loras.map((item) => [item.name, item.triggers]),
@@ -282,9 +271,8 @@ test("Settings rows: gateway models, vision and validated model names", async ()
       integration.models,
       integration.model.effective,
       integration.model.vision,
-      integration.spicy.effective,
     ],
-    [true, "ai/text-quick", ["ai/text-quick", "ai/text-spicy"], "ai/text-quick", false, ""],
+    [true, "ai/text-quick", ["ai/text-quick", "ai/text-spare"], "ai/text-quick", false],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,
@@ -301,7 +289,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
 });
 
 test("the composer learns which profiles take no negative", async () => {
-  assert.deepEqual((await get("/api/assistant", "adult")).noNegative, [nsfw.id]);
+  assert.deepEqual((await get("/api/assistant", "spicy")).noNegative, [uncensored.id]);
   assert.deepEqual(
     (await get("/api/assistant", "user")).noNegative,
     [],
@@ -380,7 +368,7 @@ test("stopping prompt assistance disconnects the actual gateway request without 
           { log: { warn: (message) => warnings.push(message) } },
         ),
         profiles: async () => [
-          { ...sfw, capabilities: { negativePrompt: true }, defaults: { cfg: 3 } },
+          { ...plain, capabilities: { negativePrompt: true }, defaults: { cfg: 3 } },
         ],
         loras: async () => loras,
       });
@@ -391,7 +379,7 @@ test("stopping prompt assistance disconnects the actual gateway request without 
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          profileId: sfw.id,
+          profileId: plain.id,
           prompt: "A cabin",
           preset: "enhance",
           stream: operation === "rewrite",
@@ -432,7 +420,7 @@ test("stopping during profile discovery does not start a rewrite after discovery
     profiles: async () => {
       discovering.resolve();
       await discovery.promise;
-      return [sfw];
+      return [plain];
     },
   });
   const url = await listen(t, app);
@@ -441,7 +429,7 @@ test("stopping during profile discovery does not start a rewrite after discovery
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: controller.signal,
-    body: JSON.stringify({ profileId: sfw.id, prompt: "A cabin" }),
+    body: JSON.stringify({ profileId: plain.id, prompt: "A cabin" }),
   });
   const cancelled = assert.rejects(request, (error) => error.name === "AbortError");
   await discovering.promise;

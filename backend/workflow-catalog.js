@@ -208,7 +208,7 @@ export function workflowSummaries({
       description: profile.description || "",
       kind: profile.kind,
       family: profile.family,
-      ...(profile.nsfw ? { nsfw: true } : {}),
+      ...(profile.uncensored ? { uncensored: true } : {}),
       ...(profile.aiDrafted || custom?.aiDrafted ? { aiDrafted: true } : {}),
       familyName: profile.familyName || "",
       source: custom || isCustom ? "custom" : "builtin",

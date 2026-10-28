@@ -64,7 +64,7 @@ test(
     let server: ChildProcess | undefined;
     let base = "";
     let cookie = "";
-    let allowedModels = "alternate-*,fixture-text-model,restricted-text,unadvertised-model";
+    let allowedModels = "alternate-*,fixture-text-model,unadvertised-model";
     async function start() {
       server = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
         env: {
@@ -84,7 +84,6 @@ test(
           STUDIO_PROMPT_WRITER_URL: "http://127.0.0.1:1",
           STUDIO_PROMPT_WRITER_KEY: "unrelated-fixture",
           STUDIO_PROMPT_WRITER_MODEL: "unrelated-writer-model",
-          STUDIO_ASSISTANT_SPICY_MODEL: "restricted-text",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });
@@ -170,7 +169,7 @@ test(
         gallery: true,
         promptAssistant: true,
         cloudModels: false,
-        nsfwModels: false,
+        uncensoredModels: false,
       };
       await api("/api/accounts/profiles", "POST", {
         id: "artists",

@@ -174,13 +174,15 @@ test("start and end frames and differently named slots stay separate", () => {
   );
 });
 
-test("the nsfw marker reaches the profile only when it is true", () => {
+test("the uncensored marker reaches the profile only when it is true", () => {
   assert.equal(
-    metadataFromJson({ studio: { id: "spicy", nsfw: true }, graph: {} }, "spicy.json").nsfw,
+    metadataFromJson({ studio: { id: "spicy", uncensored: true }, graph: {} }, "spicy.json")
+      .uncensored,
     true,
   );
   assert.equal(
-    "nsfw" in metadataFromJson({ studio: { id: "plain", nsfw: "yes" }, graph: {} }, "plain.json"),
+    "uncensored" in
+      metadataFromJson({ studio: { id: "plain", uncensored: "yes" }, graph: {} }, "plain.json"),
     false,
   );
 });

@@ -26,7 +26,7 @@ interface Deployment {
   integrations: {
     civitai: { token: { set: boolean }; presets: boolean };
     huggingFace: { token: { set: boolean } };
-    assistant: { available: boolean; note?: string; model: Setting; spicy: Setting };
+    assistant: { available: boolean; note?: string; model: Setting };
   };
   storage: Source & { outputs: "studio" | "comfy" };
 }
@@ -120,7 +120,7 @@ export function ModelSettings() {
           label="Prompt Assistant"
           description={
             integrations.assistant.available
-              ? `Model ${integrations.assistant.model.effective || "not chosen"}${integrations.assistant.spicy.effective ? ` · Spicy ${integrations.assistant.spicy.effective}` : ""}`
+              ? `Model ${integrations.assistant.model.effective || "not chosen"}`
               : integrations.assistant.note
           }
         >

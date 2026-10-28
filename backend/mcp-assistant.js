@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // The prompt assistant's MCP tools: RewritePrompt, SuggestNegative and SuggestLoras. Each one calls
 // Studio's own /api/assistant routes with the account's credential, so the chat and the composer
-// share one engine and one set of rules (Prompt Assistant, NSFW Models for Spicy, LoRAs, the
+// share one engine and one set of rules (Prompt Assistant, Uncensored Models for Spicy, LoRAs, the
 // account's profiles). What the chat used is remembered for six hours, on disk (mcp-assistant.json
 // beside MCP's ownership file), so a Generate with that prompt records it on the result
 // (`assistant`, source "chat") for Details and Recreate, even across a restart.
@@ -129,7 +129,7 @@ export function registerAssistantTools({ tool, server, media, owner, profileOf, 
     server,
     "RewritePrompt",
     "Rewrite Prompt",
-    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; Spicy needs NSFW access), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
+    `Rewrite a prompt for a profile with a preset (${presetIds.join(", ")}; Spicy needs uncensored access), the way Studio's magic button does. Only when the user asks to improve, rewrite or restyle a prompt; Generate already writes prompts from requests. A vision model reads reference_asset_ids from Upload. Show the result; pass it to Generate in prompts.`,
     {
       prompt,
       profile_id: profileId,

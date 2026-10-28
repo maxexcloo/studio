@@ -295,7 +295,7 @@ const itemFields = [
   "triggers",
   "strength",
   "note",
-  "nsfw",
+  "uncensored",
   "links",
   "source",
   "origin",

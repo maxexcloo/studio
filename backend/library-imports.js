@@ -486,7 +486,7 @@ export function createImportEngine({
         version: resolved.version || "",
         baseModel: resolved.baseModel || "",
         modelType: resolved.type || "",
-        nsfw: resolved.nsfw ?? null,
+        uncensored: resolved.uncensored ?? null,
         links: resolved.links || {},
         resources: resolved.resources.map((resource) => ({ ...resource, status: "missing" })),
         offers: resolved.offers || [],

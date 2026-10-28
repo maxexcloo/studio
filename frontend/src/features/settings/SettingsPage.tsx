@@ -60,8 +60,8 @@ export function SettingsPage() {
               <>
                 {!admin && (
                   <Text size="sm" c="dimmed">
-                    Your access group decides which models, cloud models and NSFW content you can
-                    use.
+                    Your access group decides which models, cloud models and uncensored content you
+                    can use.
                   </Text>
                 )}
                 <OwnAccount />

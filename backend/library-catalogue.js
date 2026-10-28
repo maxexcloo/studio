@@ -109,7 +109,7 @@ function rawFromEdit(edit = {}) {
     "role",
     "promptStyle",
     "negative",
-    "nsfw",
+    "uncensored",
     "type",
   ])
     if (edit[key] !== undefined) raw[key] = edit[key];
@@ -149,7 +149,7 @@ const editableFields = new Set([
   "description",
   "note",
   "guidance",
-  "nsfw",
+  "uncensored",
   "licence",
   "links",
   "compatibility",
@@ -192,9 +192,9 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
       case "families":
         clean[key] = list(value, key === "tags" ? 10 : 30, 80);
         break;
-      case "nsfw":
-        if (typeof value !== "boolean") throw new Error("nsfw must be true or false.");
-        clean.nsfw = value;
+      case "uncensored":
+        if (typeof value !== "boolean") throw new Error("uncensored must be true or false.");
+        clean.uncensored = value;
         break;
       case "role":
         if (!["effect", "acceleration", "supporting"].includes(value))
@@ -498,13 +498,13 @@ export function createCatalogueStore({
         ? { compatibility: pick("compatibility", local.compatibility, provider?.compatibility) }
         : {}),
       // Unknown until a source or an administrator says: null, never assumed safe.
-      nsfw:
-        typeof fields.nsfw === "boolean"
-          ? fields.nsfw
-          : typeof local.nsfw === "boolean"
-            ? local.nsfw
-            : typeof provider?.nsfw === "boolean"
-              ? provider.nsfw
+      uncensored:
+        typeof fields.uncensored === "boolean"
+          ? fields.uncensored
+          : typeof local.uncensored === "boolean"
+            ? local.uncensored
+            : typeof provider?.uncensored === "boolean"
+              ? provider.uncensored
               : null,
       licence: fields.licence || { name: "", commercial: null, restrictions: [] },
       source: fields.source || source,

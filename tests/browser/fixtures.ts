@@ -167,7 +167,7 @@ export async function fixtures(page: Page) {
           videoGeneration: true,
           gallery: true,
           cloudModels: false,
-          nsfwModels: false,
+          uncensoredModels: false,
         },
       },
     ],

@@ -124,7 +124,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
       {dream.spicyAvailable && (
         <Switch
           label="Spicy"
-          description="Allow explicit adult themes."
+          description="Allow explicit themes."
           checked={settings.spicy}
           onChange={(event) => save.mutate({ spicy: event.currentTarget.checked })}
         />
