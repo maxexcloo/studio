@@ -651,6 +651,38 @@ test("Typing straight after clicking the collapsed prompt keeps every keystroke"
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("abc");
 });
 
+test("Prompt boxes copy and undoably clear, and open full screen on phones", async ({
+  page,
+}, testInfo) => {
+  await fixtures(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text: string) => ((window as any).copied = text) },
+    });
+  });
+  await page.goto("/");
+  await page.locator("[data-composer-prompt]").click();
+  const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
+  await prompt.fill("A lantern in fog");
+  await page.getByRole("button", { name: "Copy Prompt", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).copied)).toBe("A lantern in fog");
+  await page.getByRole("button", { name: "Clear Prompt", exact: true }).click();
+  await expect(prompt).toHaveValue("");
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(prompt).toHaveValue("A lantern in fog");
+  if (!testInfo.project.use.isMobile) return;
+  await prompt.click();
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  const text = editor.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(text).toBeFocused();
+  await page.keyboard.type(" at dusk");
+  await editor.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(editor).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeVisible();
+  await expect(prompt).toHaveValue("A lantern in fog at dusk");
+});
+
 test("Generation size presets and custom dimensions preserve profile constraints", async ({
   page,
 }) => {

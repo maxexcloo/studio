@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Button, Group, Stack, Text, Textarea } from "@mantine/core";
+import { Alert, Button, Group, Stack, Text } from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
+import { TextBox } from "../../ui/TextBox";
 import { SettingGroup } from "../settings/SettingRows";
 
 export interface Taste {
@@ -66,7 +67,7 @@ export function TasteProfile() {
     <SettingGroup title="Taste Profile">
       <Stack gap="xs" pt="xs">
         {/* The autosized minimum reserves the field's height while the profile loads. */}
-        <Textarea
+        <TextBox
           aria-label="Taste Profile"
           autosize
           minRows={4}
@@ -74,7 +75,7 @@ export function TasteProfile() {
           disabled={!data || refresh.isPending}
           placeholder="Studio learns what you like from your stars, comparisons and iterations. You can also describe your taste here."
           value={value}
-          onChange={(event) => setDraft(event.currentTarget.value)}
+          onChange={setDraft}
         />
         <Text size="xs" c="dimmed" mih="1lh">
           {data &&
