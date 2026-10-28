@@ -705,7 +705,7 @@ export function registerMcpRoutes(
         server,
         "Models",
         "Find Models",
-        'List ready profiles as "id — label" by kind. With profile_id (id, label or words: "flux 3"): the gist of its guide, defaults, controls, reference slots and LoRAs; lora_query or lora_names detail up to five LoRAs. Rarely needed: Generate picks models and resolves names.',
+        'List ready profiles as "id — label" by kind. With profile_id (id, label or words: "flux 3"): the gist of its guide, defaults, controls, reference slots and LoRAs; lora_query or lora_names detail LoRAs, in all profiles without profile_id. Rarely needed: Generate picks models and resolves names.',
         {
           kind: z.enum(["all", "image", "video"]).default("all"),
           tier: tier.optional(),
@@ -740,6 +740,28 @@ export function registerMcpRoutes(
             const cloud = profiles.filter(isCloudProfile);
             profiles = profiles.filter((profile) => !isCloudProfile(profile));
             if (wanted) profiles = profilesNearTier(profiles, wanted);
+            // A LoRA lookup without a model searches every ready profile, so one call answers it.
+            if (lora_query || lora_names.length) {
+              const infos = await media.loraInfos(owner);
+              const found = new Map();
+              const missing = new Set(lora_names);
+              for (const profile of profiles) {
+                if (!listedControls(profile).loras) continue;
+                const result = mcpLoras(profile, infos, { query: lora_query, names: lora_names });
+                for (const lora of result.loras) {
+                  if (!found.has(lora.name)) found.set(lora.name, { ...lora, profiles: [] });
+                  found.get(lora.name).profiles.push(profile.id);
+                }
+                for (const value of lora_names)
+                  if (!result.missing?.some((item) => item.name === value)) missing.delete(value);
+              }
+              return mcpJson({
+                loras: [...found.values()].slice(0, maxListedLoras),
+                ...(missing.size ? { missing: [...missing] } : {}),
+                loras_note:
+                  "Pass names to Generate without profile_id and Studio picks a profile that takes them all.",
+              });
+            }
             return mcpJson({
               ...listed(profiles),
               ...(cloud.length
