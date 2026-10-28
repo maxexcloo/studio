@@ -39,3 +39,16 @@ export function chatModelAllowed(id, patterns) {
     pattern.endsWith("*") ? id.startsWith(pattern.slice(0, -1)) : id === pattern,
   );
 }
+
+/**
+ * Names the text workloads serving each model. With `running` (an account that may not start
+ * workloads), a workload-served model is listed only while one of its workloads runs.
+ */
+export function servedChatModels(models, workloads, running) {
+  return models.flatMap((model) => {
+    const served = workloads.filter((item) => item.model === model.id).map(({ id }) => id);
+    if (!served.length) return [model];
+    if (!running) return [{ ...model, workloads: served }];
+    return served.some((id) => running.includes(id)) ? [model] : [];
+  });
+}

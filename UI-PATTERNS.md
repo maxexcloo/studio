@@ -70,8 +70,12 @@ primary component reference and verify APIs against the installed version.
 - Full/Fixed controls the workspace. Chat has a structural desktop sessions
   sidebar, flush below the header through the viewport bottom, with a distinct
   neutral surface and divider, listing Chats under date headings (Today,
-  Yesterday, Previous 7 Days, Previous 30 Days, Older). Phones use a session
-  Drawer opened by the status action, which shows a Chats icon in Chat. The Chat composer
+  Yesterday, Previous 7 Days, Previous 30 Days, Older), under a Chats heading
+  with a small New Chat icon. Phones use a session Drawer opened by the status
+  action, which shows a Chats icon in Chat, or by Chats in the No Chat Selected
+  view; its header carries New Chat beside Close. With no chat selected, the
+  message box starts one; an open chat's heading ends with a close cross back to
+  No Chat Selected. There is no other New Chat button. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
 - Dialogs are centred on a raised plane from the theme defaults: a dimmed,
@@ -105,7 +109,7 @@ primary component reference and verify APIs against the installed version.
   parent controls and keyboard focus.
 - Use shared `EmptyState` for empty views: one short, centred, subdued Title
   Case line with no title, explanation or decorative card, and at most the one
-  action that fills the view (Turn On, Resume, New Chat on phones). Use the exact empty copy
+  action that fills the view (Turn On, Resume, Chats on phones). Use the exact empty copy
   No Images, No Videos, No Chats in an empty sidebar, No Chat Selected in
   the unselected conversation area, and Empty Queue. Shared `LoadingState` centres
   loading within the content area while the shell and navigation stay mounted.
@@ -149,9 +153,13 @@ primary component reference and verify APIs against the installed version.
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
   While the phone Drawer is open, notifications sit over the prompt text, below
   its header and the prompt's actions, never over the chips or action row.
-- The Chat composer is one quiet inline row: compact reference picker,
-  growing writing area, compact actual text model/provider selector and one
-  Send/Stop action. Media settings belong
+- The Chat composer is the gallery prompt box, compact: the growing message
+  above a chip rail of References and the text model (`ChipSelect`, as
+  Profile), then one Send/Stop action. The model list shows administrators
+  models whose Studio text workloads are stopped; choosing one starts it,
+  confirming first with the workloads it stops when no GPU is free, and selects
+  it once ready, with progress under the rail. Others see only models that
+  run. Media settings belong
   to timeline input cards, never a second mode in the bottom Chat composer.
   Header status owns connection information; keep it out of the conversation.
 - Render assistant Markdown semantically with the shared safe renderer, using

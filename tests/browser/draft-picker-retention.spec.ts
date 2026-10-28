@@ -29,7 +29,6 @@ async function referenceSearch(page: Page) {
 
 test("Mode navigation keeps the unsent Chat reference and resumes the selected source lineage", async ({
   page,
-  isMobile,
 }) => {
   const state = await fixtures(page);
   state.gallery.push(referenceItem());
@@ -63,14 +62,8 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   expect(state.chatRequests[1].generation.parentJobId).toBe(state.jobs[0].id);
   expect(state.chatRequests[1].references).toEqual(state.chatRequests[0].references);
   expect(state.sessions).toHaveLength(1);
-  if (isMobile) {
-    await page.getByRole("button", { name: "Open Chats", exact: true }).click();
-    // Wait out the slide-in so the press and release land on the same link.
-    await expect(page.getByRole("dialog", { name: "Chats", exact: true })).toBeInViewport({
-      ratio: 1,
-    });
-  }
-  await page.getByRole("link", { name: "New Chat", exact: true }).click();
+  // Closing the open chat leaves an empty draft, where the next message starts a new chat.
+  await page.getByRole("button", { name: "Close Chat", exact: true }).click();
   await expect(page).toHaveURL(/\/chat$/);
   await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
   await message.fill("A new independent discussion");

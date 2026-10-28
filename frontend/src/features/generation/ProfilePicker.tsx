@@ -1,11 +1,9 @@
-import { Badge, Button, ColorSwatch, ComboboxPopover, Group, Stack, Text } from "@mantine/core";
-import { ChevronDown } from "lucide-react";
+import { Badge } from "@mantine/core";
 import { inputForProfile, useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Models, Profile } from "../../types";
 import { backendLabel, isProfile } from "./payload";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { chipProps } from "./chip";
-import classes from "./GenerationInputControls.module.css";
+import { ChipOption, ChipSelect } from "./ChipSelect";
 
 /** Readiness from the profile's files and its assigned workers; unknown placement shows nothing. */
 function profileReadiness(profile: Profile, workers: Models["workers"]) {
@@ -65,56 +63,45 @@ export function ProfilePicker({
   const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
   const backendBadge = selectedBackend && (selected.backendOptions?.length || 0) < 2;
   return (
-    <ComboboxPopover
+    <ChipSelect
+      name="Profile"
+      target={{ "data-profile-picker": true }}
       searchable
-      allowDeselect={false}
-      withCheckIcon={false}
-      maxDropdownHeight={320}
       nothingFoundMessage="No Matching Profiles"
-      comboboxProps={{
-        width: "min(440px, 100vw - 32px)",
-        position: "top-start",
-        withinPortal: true,
-      }}
       data={profileOptions(available)}
       value={selected?.id ?? null}
       renderOption={({ option, checked }) => {
         const profile = available.find((profile) => profile.id === option.value);
         const status = profile && profileReadiness(profile, workers);
         return (
-          <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
-            <Stack gap={0} miw={0}>
-              <Text size="sm" fw={checked ? 600 : 500} truncate title={option.label}>
-                {option.label}
-              </Text>
-              {profile?.description && (
-                <Text size="xs" c="dimmed" truncate title={profile.description}>
-                  {profile.description}
-                </Text>
-              )}
-            </Stack>
-            <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
-              {profile?.backend && (
-                <Badge size="xs" variant="default" title={profile.readyReason}>
-                  {backendLabel(
-                    profile.id === selected?.id && selectedBackend
-                      ? selectedBackend
-                      : profile.backend,
-                  )}
-                </Badge>
-              )}
-              {profile?.aiDrafted && (
-                <Badge size="xs" variant="light" color="orange">
-                  AI-Drafted
-                </Badge>
-              )}
-              {status && status.label !== "Ready" && (
-                <Badge size="xs" variant="light" color={status.color}>
-                  {status.label}
-                </Badge>
-              )}
-            </Group>
-          </Group>
+          <ChipOption
+            label={option.label}
+            description={profile?.description}
+            checked={checked}
+            badges={
+              <>
+                {profile?.backend && (
+                  <Badge size="xs" variant="default" title={profile.readyReason}>
+                    {backendLabel(
+                      profile.id === selected?.id && selectedBackend
+                        ? selectedBackend
+                        : profile.backend,
+                    )}
+                  </Badge>
+                )}
+                {profile?.aiDrafted && (
+                  <Badge size="xs" variant="light" color="orange">
+                    AI-Drafted
+                  </Badge>
+                )}
+                {status && status.label !== "Ready" && (
+                  <Badge size="xs" variant="light" color={status.color}>
+                    {status.label}
+                  </Badge>
+                )}
+              </>
+            }
+          />
         );
       }}
       onChange={(id) => {
@@ -123,44 +110,26 @@ export function ProfilePicker({
         if (onChange) onChange(inputForProfile(input, profile));
         else context.selectProfile(profile);
       }}
-    >
-      <ComboboxPopover.Target>
-        <Button
-          aria-label="Profile"
-          data-profile-picker
-          {...chipProps}
-          leftSection={
-            readiness && (
-              <ColorSwatch
-                component="span"
-                size={8}
-                withShadow={false}
-                color={`var(--mantine-color-${readiness.color}-6)`}
-                aria-hidden
-              />
-            )
-          }
-          rightSection={<ChevronDown size={14} />}
-          title={
-            selectedLabel &&
-            [
-              selectedLabel,
-              selectedBackend && backendLabel(selectedBackend),
-              readiness?.label,
-              selected?.readyReason,
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          }
-        >
-          <span className={classes.label}>{selectedLabel || "Choose a Profile"}</span>
-          {backendBadge && (
-            <Badge size="xs" variant="default" ml={6}>
-              {backendLabel(selectedBackend)}
-            </Badge>
-          )}
-        </Button>
-      </ComboboxPopover.Target>
-    </ComboboxPopover>
+      swatch={readiness?.color}
+      title={
+        selectedLabel &&
+        [
+          selectedLabel,
+          selectedBackend && backendLabel(selectedBackend),
+          readiness?.label,
+          selected?.readyReason,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      }
+      label={selectedLabel || "Choose a Profile"}
+      badge={
+        backendBadge && (
+          <Badge size="xs" variant="default" ml={6}>
+            {backendLabel(selectedBackend)}
+          </Badge>
+        )
+      }
+    />
   );
 }

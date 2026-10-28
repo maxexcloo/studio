@@ -73,6 +73,8 @@ test("administrator runtime routes preview, apply and report operations, with pl
   assert.equal((await send("/preview", { workloads: ["text", "media"] })).status, 400);
   const preview = await send("/preview", { workloads: ["media"] });
   assert.deepEqual(preview.body.stop, ["text"]);
+  const start = await send("/preview", { start: ["media"] });
+  assert.deepEqual([start.body.target, start.body.signature], [["media"], preview.body.signature]);
   assert.equal((await send("/apply", { workloads: ["media"], signature: "stale" })).status, 409);
   const applied = await send("/apply", { workloads: ["media"], signature: preview.body.signature });
   assert.equal(applied.status, 202);

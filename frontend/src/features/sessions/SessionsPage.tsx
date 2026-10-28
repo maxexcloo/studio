@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Alert, Paper, Stack } from "@mantine/core";
+import { Alert, Button, Paper, Stack } from "@mantine/core";
+import { MessagesSquare } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
 import type { ChatMessage } from "../../../../shared/chat";
@@ -13,7 +14,7 @@ import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatWorkspace, NewChatButton } from "./ChatWorkspace";
+import { ChatWorkspace, openChatsEvent } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { sessionQuery } from "./queries";
 import { iterationTiles, SessionIteration } from "./SessionIteration";
@@ -32,13 +33,16 @@ export function SessionsPage() {
       <EmptyState
         fill
         action={
-          // Phones have no Chats sidebar, so the empty state offers New Chat.
+          // Phones have no Chats sidebar, so the empty state opens the list; the message box
+          // below starts a new chat.
           phone && (
-            <NewChatButton
-              onClick={() =>
-                document.querySelector<HTMLElement>('textarea[aria-label="Message"]')?.focus()
-              }
-            />
+            <Button
+              variant="default"
+              leftSection={<MessagesSquare size={16} />}
+              onClick={() => window.dispatchEvent(new Event(openChatsEvent))}
+            >
+              Chats
+            </Button>
           )
         }
       >
