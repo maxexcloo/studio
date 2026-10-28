@@ -12,7 +12,6 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  Textarea,
   Tooltip,
 } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +19,7 @@ import { Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
+import { TextBox } from "../../ui/TextBox";
 import { usePhone } from "../../ui/usePhone";
 import { mediaDraft } from "../gallery/useMediaAction";
 import { inputForProfile, useGenerationActions } from "../generation/GenerationProvider";
@@ -134,13 +134,13 @@ function VariantFields({
     );
   if (dimension === "prompt")
     return (
-      <Textarea
+      <TextBox
         aria-label="Prompt"
         autosize
         minRows={3}
         maxRows={8}
         value={input.prompt}
-        onChange={(event) => onChange({ ...input, prompt: event.currentTarget.value })}
+        onChange={(prompt) => onChange({ ...input, prompt })}
       />
     );
   if (dimension === "settings") {
