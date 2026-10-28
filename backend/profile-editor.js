@@ -64,7 +64,7 @@ export function listEditableProfiles() {
         version: version?.version || 0,
         origin: version?.origin || "seed",
         aiDrafted: version?.aiDrafted === true,
-        nsfw: meta.nsfw === true,
+        uncensored: meta.uncensored === true,
         // A combined profile's current backend.
         ...(backendIdsOf(raw).length ? { backend: profileOnBackend(raw).backend } : {}),
       };
@@ -170,8 +170,8 @@ export function validateProfileText(id, text, { info = null } = {}) {
       errors.push(`studio.id must stay "${id}"; save a copy under a new file to rename it.`);
     if (meta.kind && !["image", "video"].includes(meta.kind))
       errors.push(`studio.kind must be image or video.`);
-    if ("nsfw" in meta && typeof meta.nsfw !== "boolean")
-      errors.push(`studio.nsfw must be true or false.`);
+    if ("uncensored" in meta && typeof meta.uncensored !== "boolean")
+      errors.push(`studio.uncensored must be true or false.`);
     if ("backends" in meta) {
       const ids = backendIdsOf(raw);
       if (!ids.length) errors.push("studio.backends must hold at least one backend.");

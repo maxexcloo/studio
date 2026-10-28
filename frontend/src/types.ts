@@ -18,7 +18,7 @@ export interface Profile {
   maxLoras?: number;
   provider?: string;
   ready?: boolean;
-  nsfw?: boolean;
+  uncensored?: boolean;
   /** Drafted by the assistant and not yet approved; only administrators see it. */
   aiDrafted?: boolean;
   /** Merged profile ids that now resolve to this one; older records may still name them. */

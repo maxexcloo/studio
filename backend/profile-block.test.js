@@ -84,7 +84,7 @@ test("AI-drafted profiles are live for administrators only until approved", () =
         name: "User",
         allModels: true,
         generationProfiles: ["custom:drafted-gate"],
-        features: { nsfwModels: true },
+        features: { uncensoredModels: true },
       },
     },
   );

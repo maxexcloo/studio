@@ -5,9 +5,8 @@
  * (prompt-writer.js) and later the MCP assistant and admin tools, so they cannot drift apart.
  *
  * It uses the prompt writer's gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY, _MODEL) and the
- * models an administrator chooses: STUDIO_ASSISTANT_MODEL (default: the prompt writer's model) and
- * STUDIO_ASSISTANT_SPICY_MODEL (uncensored, for Spicy; Spicy is off without one). Settings are read
- * on every call, so a model chosen in Settings applies at once.
+ * model an administrator chooses: STUDIO_ASSISTANT_MODEL (default: the prompt writer's model),
+ * which also writes Spicy. Settings are read on every call, so a model chosen in Settings applies at once.
  *
  * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
@@ -27,7 +26,6 @@ const gatewayKeys = [
   "STUDIO_PROMPT_WRITER_MODEL",
 ];
 export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
-export const assistantSpicyModelKey = "STUDIO_ASSISTANT_SPICY_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
@@ -104,18 +102,7 @@ export function assistantSettings(environment = process.env) {
     ...gateway,
     writerModel: gateway.model,
     model: chosen(assistantModelKey) || gateway.model,
-    spicyModel: chosen(assistantSpicyModelKey),
   };
-}
-
-/** The Spicy model from the assistant's settings, or a 409 AssistantError while none is chosen. */
-export function spicyModelOf(settings) {
-  if (!settings?.spicyModel)
-    throw new AssistantError(
-      "Spicy needs a Spicy model. An administrator chooses one in Settings › Models › Integrations.",
-      { status: 409 },
-    );
-  return settings.spicyModel;
 }
 
 /** The guide without provenance or sampling notes, as compact JSON. */
@@ -631,12 +618,6 @@ export function createAssistant(
     if (error instanceof AssistantError && error.reason === "cancelled") throw error;
   };
 
-  /** The model for a preset: Spicy's own (refused while none is set), else the assistant model. */
-  function modelFor(preset) {
-    const resolved = settings();
-    return preset.spicy ? spicyModelOf(resolved) : resolved.model;
-  }
-
   /**
    * Rewrites a prompt with a preset, streaming through `onDelta`. References are read only by a
    * vision model; otherwise the rewrite is text-only and says so (referencesRead: false).
@@ -661,7 +642,7 @@ export function createAssistant(
       .trim()
       .slice(0, maxPromptCharacters);
     if (!original) throw new AssistantError("Enter a prompt to rewrite.", { status: 400 });
-    const model = modelFor(preset);
+    const model = settings().model;
     const started = now();
     const images = Array.isArray(references) ? references.filter((image) => image?.data) : [];
     const vision = images.length ? await supportsVision() : false;
@@ -1019,7 +1000,7 @@ export function createAssistant(
 
   /**
    * A drafted runtime profile (workflow JSON with a studio block) from a family template: the graph is the
-   * template's, the model file replaces the template's, and only the name, description, NSFW marker
+   * template's, the model file replaces the template's, and only the name, description, uncensored marker
    * and recommended steps, CFG, sampler and scheduler come from the source page (read by the model,
    * else `recommended`). The caller checks it with validateProfileText before saving.
    */
@@ -1029,7 +1010,7 @@ export function createAssistant(
     modelFile,
     recommended = {},
     sourceText = "",
-    nsfw,
+    uncensored,
     signal,
   } = {}) {
     if (!template || typeof template !== "object" || !template.studio || !template.graph)
@@ -1041,7 +1022,7 @@ export function createAssistant(
     const started = now();
     if (String(sourceText).trim()) {
       const system =
-        'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "nsfw": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
+        'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "uncensored": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
       try {
         const reply = await chat({
           model: settings().model,
@@ -1061,7 +1042,7 @@ export function createAssistant(
       }
     }
     return {
-      profile: draftedProfile({ id, template, modelFile, recommended, read, nsfw }),
+      profile: draftedProfile({ id, template, modelFile, recommended, read, uncensored }),
       aiDrafted: true,
       source,
     };
@@ -1137,7 +1118,14 @@ export function validDraftGuide(value) {
 /**
  * The template with the model file, recommended settings and page details in place. Pure.
  */
-export function draftedProfile({ id, template, modelFile, recommended = {}, read = {}, nsfw }) {
+export function draftedProfile({
+  id,
+  template,
+  modelFile,
+  recommended = {},
+  read = {},
+  uncensored,
+}) {
   const profile = structuredClone(template);
   const meta = profile.studio;
   const previousModel = meta.defaults?.model;
@@ -1166,7 +1154,12 @@ export function draftedProfile({ id, template, modelFile, recommended = {}, read
     if (typeof value === "string" && /^[a-z0-9_+.-]{1,60}$/i.test(value))
       meta.defaults[key] = value;
   }
-  // Unknown counts as NSFW until an administrator says otherwise.
-  meta.nsfw = typeof nsfw === "boolean" ? nsfw : typeof read.nsfw === "boolean" ? read.nsfw : true;
+  // Unknown counts as uncensored until an administrator says otherwise.
+  meta.uncensored =
+    typeof uncensored === "boolean"
+      ? uncensored
+      : typeof read.uncensored === "boolean"
+        ? read.uncensored
+        : true;
   return profile;
 }

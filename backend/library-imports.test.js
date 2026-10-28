@@ -32,7 +32,7 @@ const lora = {
   version: "V2",
   baseModel: "Krea 2",
   type: "LORA",
-  nsfw: false,
+  uncensored: false,
   links: { civitaiCom: "https://civitai.com/models/9?modelVersionId=20" },
   resources: [
     {
@@ -62,7 +62,7 @@ const lora = {
       civitaiCom: "https://civitai.com/models/9?modelVersionId=20",
       civitaiRed: "https://civitai.red/models/9?modelVersionId=20",
     },
-    nsfw: false,
+    uncensored: false,
     sha256: "a".repeat(64),
     source: { provider: "civitai", modelId: 9, versionId: 20, fileId: 31 },
   },
@@ -143,7 +143,7 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
     "download specs stay on the server",
   );
 
-  // The catalogue entry: title, version, family, triggers, strength, description, both links, NSFW and hash.
+  // The catalogue entry: title, version, family, triggers, strength, description, both links, uncensored and hash.
   assert.deepEqual(record.results.catalogueKeys, ["loras/water.safetensors"]);
   const entry = h.catalogue.entry("loras/water.safetensors");
   assert.deepEqual(
@@ -154,7 +154,7 @@ test("a LoRA link becomes a durable record with a grade, a catalogue entry and D
       entry.triggers,
       entry.strength,
       entry.description,
-      entry.nsfw,
+      entry.uncensored,
       entry.sha256,
       entry.origin,
       entry.by,

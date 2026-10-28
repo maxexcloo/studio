@@ -27,7 +27,7 @@ interface CatalogueItem extends LibraryItem {
   role?: string;
   triggers?: string[];
   tags?: string[];
-  nsfw?: boolean;
+  uncensored?: boolean;
   guidance?: string;
   strength?: { default?: number; min?: number; max?: number; step?: number };
 }
@@ -55,7 +55,8 @@ function CatalogueForm({
       description: item.description || "",
       note: item.note || "",
       guidance: item.guidance || "",
-      nsfw: item.nsfw === true ? "nsfw" : item.nsfw === false ? "general" : "unknown",
+      uncensored:
+        item.uncensored === true ? "uncensored" : item.uncensored === false ? "general" : "unknown",
       default: item.strength?.default ?? ("" as number | string),
       min: item.strength?.min ?? ("" as number | string),
       max: item.strength?.max ?? ("" as number | string),
@@ -83,15 +84,15 @@ function CatalogueForm({
         "description",
         "note",
         "guidance",
-        "nsfw",
+        "uncensored",
       ] as const) {
         if (!form.isDirty(key)) continue;
         const value = form.values[key];
         patch[key] =
-          key === "nsfw"
+          key === "uncensored"
             ? value === "unknown"
               ? null
-              : value === "nsfw"
+              : value === "uncensored"
             : value === ""
               ? null
               : value;
@@ -198,10 +199,10 @@ function CatalogueForm({
           data={[
             { value: "unknown", label: "Inherit Source Classification" },
             { value: "general", label: "General" },
-            { value: "nsfw", label: "NSFW" },
+            { value: "uncensored", label: "Uncensored" },
           ]}
           allowDeselect={false}
-          {...form.getInputProps("nsfw")}
+          {...form.getInputProps("uncensored")}
         />
         <TagsInput label="Tags" {...form.getInputProps("tags")} />
         {(["description", "note", "guidance"] as const).map((key) => (

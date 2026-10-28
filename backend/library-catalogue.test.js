@@ -125,7 +125,7 @@ test("the migration merges every older file by folder/file with provenance, the 
   assert.deepEqual(style.source, { provider: "civitai", modelId: 1, versionId: 2, fileId: 3 });
   assert.deepEqual(style.links, { civitaiCom: "https://civitai.com/models/1?modelVersionId=2" });
   assert.deepEqual(
-    [style.nsfw, style.licence],
+    [style.uncensored, style.licence],
     [null, { name: "", commercial: null, restrictions: [] }],
     "unknown, never assumed safe",
   );
@@ -193,17 +193,28 @@ test("edits are validated, recorded with who made them, undoable and reviewable"
     /64 hex/,
   );
   assert.throws(() => store.edit("../x", { title: "x" }), /folder\/file/);
-  assert.throws(() => store.edit("loras/style.safetensors", { nsfw: "yes" }), /true or false/);
+  assert.throws(
+    () => store.edit("loras/style.safetensors", { uncensored: "yes" }),
+    /true or false/,
+  );
   const { entry, previous } = store.edit(
     "loras/style.safetensors",
-    { title: "Drafted", triggers: ["newword"], nsfw: true, notes: "Use low" },
+    { title: "Drafted", triggers: ["newword"], uncensored: true, notes: "Use low" },
     { by: "assistant", origin: "ai", aiDrafted: true },
   );
   assert.deepEqual(
-    [entry.title, entry.triggers, entry.nsfw, entry.note, entry.origin, entry.aiDrafted, entry.by],
+    [
+      entry.title,
+      entry.triggers,
+      entry.uncensored,
+      entry.note,
+      entry.origin,
+      entry.aiDrafted,
+      entry.by,
+    ],
     ["Drafted", ["newword"], true, "Use low", "ai", true, "assistant"],
   );
-  assert.deepEqual(previous, { title: null, triggers: null, nsfw: null, note: null });
+  assert.deepEqual(previous, { title: null, triggers: null, uncensored: null, note: null });
   store.edit("loras/style.safetensors", { title: "Reviewed" }, { by: "admin-1" });
   assert.equal(
     store.entry("loras/style.safetensors").aiDrafted,

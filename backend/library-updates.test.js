@@ -88,7 +88,7 @@ function harness(t, { references = async () => [], repoint } = {}) {
       title: "Nightfall Diffusion",
       version: "v1",
       baseModel: "Flux.1 D",
-      nsfw: false,
+      uncensored: false,
       sha256: sha("1"),
       source: { provider: "civitai", modelId: 70, versionId: 701 },
     },

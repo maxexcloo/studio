@@ -2,6 +2,7 @@ import { parseArgs } from "node:util";
 import path from "node:path";
 import { migrateRuntime, restoreRuntimeBackup } from "../persistence/migration.ts";
 import { combinedProfiles } from "../combined-profiles.js";
+import { uncensoredMarker } from "../uncensored-marker.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -25,6 +26,7 @@ else {
   result = {
     runtime: migrateRuntime(dataDir, { apply: values.apply }),
     combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
+    uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
   };
 }
 console.log(JSON.stringify(result, null, 2));

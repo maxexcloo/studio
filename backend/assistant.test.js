@@ -37,7 +37,7 @@ const event = (content) => `data: ${JSON.stringify({ choices: [{ delta: { conten
 const json = (content) => Response.json({ choices: [{ message: { content } }] });
 
 /** A fake gateway: `/v1/models` answers from `models`, completions from `reply(body)`. */
-function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-spicy"] } = {}) {
+function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-spare"] } = {}) {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     if (url.endsWith("/v1/models")) return Response.json({ data: models.map((id) => ({ id })) });
@@ -48,7 +48,7 @@ function fakeGateway(reply, { models = ["ai/text-quick", "ai/vision", "ai/text-s
   return { fetchImpl, calls };
 }
 
-test("settings reuse the prompt writer gateway; the assistant model defaults to its model and Spicy is off without one", () => {
+test("settings reuse the prompt writer gateway; the assistant model defaults to its model", () => {
   assert.equal(assistantSettings({}), null);
   assert.throws(
     () => assistantSettings({ STUDIO_PROMPT_WRITER_URL: "http://x.invalid" }),
@@ -56,22 +56,16 @@ test("settings reuse the prompt writer gateway; the assistant model defaults to 
   );
   const plain = assistantSettings(gateway());
   assert.deepEqual(
-    [plain.endpoint, plain.root, plain.model, plain.writerModel, plain.spicyModel],
+    [plain.endpoint, plain.root, plain.model, plain.writerModel],
     [
       "http://litellm.invalid:4000/v1/chat/completions",
       "http://litellm.invalid:4000",
       "ai/text-quick",
       "ai/text-quick",
-      "",
     ],
   );
-  const chosen = assistantSettings(
-    gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision", STUDIO_ASSISTANT_SPICY_MODEL: "ai/text-spicy" }),
-  );
-  assert.deepEqual(
-    [chosen.model, chosen.writerModel, chosen.spicyModel],
-    ["ai/vision", "ai/text-quick", "ai/text-spicy"],
-  );
+  const chosen = assistantSettings(gateway({ STUDIO_ASSISTANT_MODEL: "ai/vision" }));
+  assert.deepEqual([chosen.model, chosen.writerModel], ["ai/vision", "ai/text-quick"]);
   assert.equal(createAssistant({}), null);
 });
 
@@ -271,7 +265,7 @@ test("references go to a vision model as image parts; a text-only model gets non
   assert.match(text.calls[0].body.messages[0].content, /not shown to you/);
   assert.deepEqual(
     await createAssistant(gateway(), { fetchImpl: text.fetchImpl, log: quiet }).listModels(),
-    ["ai/text-quick", "ai/text-spicy", "ai/vision"],
+    ["ai/text-quick", "ai/text-spare", "ai/vision"],
   );
 });
 
@@ -309,19 +303,14 @@ test("FLUX.3 Enhance uses the maker’s upsampler prompt verbatim", async () => 
   assert.match(seen.calls[2].body.messages[0].content, /Style: Cinematic/);
 });
 
-test("Spicy runs on its own model and is refused without one", async () => {
+test("Spicy runs on the assistant model", async () => {
   const seen = fakeGateway(() => json("A sultry scene."));
-  const off = createAssistant(gateway(), { fetchImpl: seen.fetchImpl, log: quiet });
-  await assert.rejects(
-    off.rewrite({ profile, prompt: "a couple", preset: "spicy" }),
-    (error) => error.status === 409 && /Spicy model/.test(error.message),
-  );
   const environment = gateway();
   const live = createAssistant(environment, { fetchImpl: seen.fetchImpl, log: quiet });
-  environment.STUDIO_ASSISTANT_SPICY_MODEL = "ai/text-spicy";
+  environment.STUDIO_ASSISTANT_MODEL = "ai/vision";
   const result = await live.rewrite({ profile, prompt: "a couple", preset: "spicy" });
-  assert.equal(result.model, "ai/text-spicy", "a model chosen in Settings applies at once");
-  assert.equal(seen.calls.at(-1).body.model, "ai/text-spicy");
+  assert.equal(result.model, "ai/vision", "a model chosen in Settings applies at once");
+  assert.equal(seen.calls.at(-1).body.model, "ai/vision");
   await assert.rejects(live.rewrite({ profile, prompt: "x", preset: "nope" }), /known preset/);
 });
 
@@ -546,7 +535,7 @@ test("title summarises the prompt in a few words, leaving the model room to thin
   await assert.rejects(empty.title({ prompt: "a barn" }), /unusable reply/);
 });
 
-test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown NSFW", async () => {
+test("guide drafts keep only the pack schema; profile drafts keep the template graph and mark unknown uncensored", async () => {
   assert.equal(validDraftGuide({ rules: ["x"] }), null);
   assert.deepEqual(
     validDraftGuide({
@@ -600,7 +589,7 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
       pure.studio.defaults.steps,
       pure.studio.defaults.cfg,
       pure.studio.defaults.sampler,
-      pure.studio.nsfw,
+      pure.studio.uncensored,
       pure.graph[1].inputs.unet_name,
     ],
     ["new-model", "new.safetensors", 28, 3.5, undefined, true, "new.safetensors"],
@@ -608,7 +597,7 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
   assert.equal(template.graph[1].inputs.unet_name, "old.safetensors", "the template is untouched");
   const fromPage = createAssistant(gateway(), {
     fetchImpl: fakeGateway(() =>
-      json('{"name": "New Model", "nsfw": false, "steps": 30, "sampler": "dpmpp_2m"}'),
+      json('{"name": "New Model", "uncensored": false, "steps": 30, "sampler": "dpmpp_2m"}'),
     ).fetchImpl,
     log: quiet,
   });
@@ -621,7 +610,7 @@ test("guide drafts keep only the pack schema; profile drafts keep the template g
   assert.deepEqual(
     [
       read.profile.studio.name,
-      read.profile.studio.nsfw,
+      read.profile.studio.uncensored,
       read.profile.studio.defaults.steps,
       read.profile.studio.defaults.sampler,
       read.aiDrafted,

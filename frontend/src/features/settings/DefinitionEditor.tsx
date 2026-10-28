@@ -263,9 +263,9 @@ function DefinitionForm({
                         />
                       </SimpleGrid>
                       <Switch
-                        label="NSFW"
-                        checked={metadata.nsfw === true}
-                        onChange={(event) => field("nsfw", event.currentTarget.checked)}
+                        label="Uncensored"
+                        checked={metadata.uncensored === true}
+                        onChange={(event) => field("uncensored", event.currentTarget.checked)}
                       />
                       <Textarea
                         label="Description"

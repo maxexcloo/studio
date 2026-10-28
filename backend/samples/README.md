@@ -29,7 +29,7 @@ Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the
 }
 ```
 
-Mark a workflow that makes adult content with `"nsfw": true` in its `studio` block. Access profiles without the NSFW Models feature (such as the built-in User profile) never offer it; administrators always can.
+Mark a workflow that makes uncensored content with `"uncensored": true` in its `studio` block. Access profiles without the Uncensored Models feature (such as the built-in User profile) never offer it; administrators always can.
 
 Only mapped controls are changed by Studio. Everything else stays exactly as it was in the exported ComfyUI API workflow.
 

@@ -64,7 +64,7 @@ const record = (extra = {}) => ({
   title: "Real Skin",
   version: "V3",
   baseModel: "Krea 2",
-  nsfw: null,
+  uncensored: null,
   links: { civitaiCom: "https://civitai.com/models/7?modelVersionId=8" },
   sourceText: "Recommended: Steps: 12, CFG: 1.5, Sampler: DPM++ 2M Karras.",
   resources: [
@@ -182,7 +182,7 @@ test("ids are unique and templates are the nearest same-family profile with the 
   );
 });
 
-test("a checkpoint import drafts an NSFW-by-default profile with the page’s settings and queues its missing parts", async () => {
+test("a checkpoint import drafts an uncensored-by-default profile with the page’s settings and queues its missing parts", async () => {
   const d = deps();
   const target = record();
   const result = await draftProfileFromImport(target, { by: "admin-1" }, d);
@@ -192,9 +192,9 @@ test("a checkpoint import drafts an NSFW-by-default profile with the page’s se
   const raw = JSON.parse(text);
   assert.ok(raw.studio, "written as studio");
   assert.deepEqual(
-    [raw.studio.id, raw.studio.name, raw.studio.nsfw, raw.studio.family],
+    [raw.studio.id, raw.studio.name, raw.studio.uncensored, raw.studio.family],
     ["real-skin-v3-2", "Real Skin V3", true, "krea2"],
-    "unknown NSFW counts as NSFW",
+    "unknown uncensored counts as uncensored",
   );
   assert.deepEqual(
     [
@@ -231,11 +231,11 @@ test("a checkpoint import drafts an NSFW-by-default profile with the page’s se
     template: "krea-fast",
     families: ["krea2"],
     settings: "page",
-    nsfw: true,
+    uncensored: true,
   });
 });
 
-test("a source that says safe is not NSFW, and the template’s own guidance is dropped for the drafted guide", async () => {
+test("a source that says safe is not uncensored, and the template’s own guidance is dropped for the drafted guide", async () => {
   const engine = {
     draftProfile: async (input) => ({
       profile: draftedProfile({ ...input, read: { name: "Ignored Name", steps: 20 } }),
@@ -249,11 +249,11 @@ test("a source that says safe is not NSFW, and the template’s own guidance is 
     engine,
     templates: async () => [template("owned", { prompting: { id: "own", summary: "Own." } })],
   });
-  const target = record({ nsfw: false });
+  const target = record({ uncensored: false });
   await draftProfileFromImport(target, {}, d);
   const raw = JSON.parse(d.saved.profiles["real-skin-v3-2"].text);
   assert.deepEqual(
-    [raw.studio.nsfw, raw.studio.prompting, raw.studio.name, raw.studio.defaults.steps],
+    [raw.studio.uncensored, raw.studio.prompting, raw.studio.name, raw.studio.defaults.steps],
     [false, undefined, "Real Skin V3", 20],
   );
   assert.deepEqual(d.saved.packs["real-skin-v3-2"].options, {
@@ -328,7 +328,7 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
     version: "V3",
     baseModel: "Krea 2",
     type: "Checkpoint",
-    nsfw: null,
+    uncensored: null,
     links: {},
     sourceText: "Steps: 12",
     resources: record().resources.map(({ status: _status, ...resource }) => ({

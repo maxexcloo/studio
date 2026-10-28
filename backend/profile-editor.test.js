@@ -88,16 +88,17 @@ test("checks parse errors, required fields, the id, and controls pointing at rea
   assert.deepEqual([fine.ok, fine.errors, fine.warnings], [true, [], []]);
 });
 
-test("the optional nsfw marker must be a boolean", () => {
+test("the optional uncensored marker must be a boolean", () => {
   assert.match(
     editor
-      .validateProfileText("image-test", JSON.stringify(profile({ nsfw: "yes" })))
+      .validateProfileText("image-test", JSON.stringify(profile({ uncensored: "yes" })))
       .errors.join(" "),
-    /nsfw must be true or false/,
+    /uncensored must be true or false/,
   );
   assert.deepEqual(
-    editor.validateProfileText("image-test", JSON.stringify(profile({ nsfw: true })), { info })
-      .errors,
+    editor.validateProfileText("image-test", JSON.stringify(profile({ uncensored: true })), {
+      info,
+    }).errors,
     [],
   );
 });

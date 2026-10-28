@@ -12,21 +12,21 @@ import {
 
 const available = ["image-fast", "image-quality", "video"];
 
-test("direct provider profiles enforce Cloud Models and NSFW grants even with neutral profile IDs", () => {
+test("direct provider profiles enforce Cloud Models and uncensored grants even with neutral profile IDs", () => {
   const profile = {
     id: "custom:neutral-provider",
     family: "custom",
     provider: "cliproxyapi",
-    nsfw: true,
+    uncensored: true,
   };
   const user = { id: "artist", role: "user", accessProfileId: "artists" };
-  const access = (cloudModels, nsfwModels) =>
+  const access = (cloudModels, uncensoredModels) =>
     effectiveAccountAccess(user, {
       artists: {
         id: "artists",
         name: "Artists",
         allModels: true,
-        features: { cloudModels, nsfwModels, imageGeneration: true },
+        features: { cloudModels, uncensoredModels, imageGeneration: true },
       },
     });
   assert.equal(mayUseGenerationProfile(access(false, true), profile), false);
@@ -73,7 +73,7 @@ test("access profiles contain only currently available generation profiles and k
         gallery: false,
         promptHistory: false,
         cloudModels: false,
-        nsfwModels: false,
+        uncensoredModels: false,
         presets: false,
         promptAssistant: false,
       },
@@ -187,8 +187,8 @@ test("cloud profiles follow the Cloud Models feature, never a grant of their own
   assert.equal(mayUseFeature(admin, "cloudModels"), true);
 });
 
-test("NSFW profiles need NSFW Models and All Models grants every local profile", () => {
-  const nsfw = { id: "image-spicy", nsfw: true };
+test("uncensored profiles need Uncensored Models and All Models grants every local profile", () => {
+  const uncensored = { id: "image-spicy", uncensored: true };
   const plain = { id: "image-plain" };
   const grok = { id: "grok-image", family: "grok" };
   const [administrator, user] = builtInAccessProfiles;
@@ -198,22 +198,22 @@ test("NSFW profiles need NSFW Models and All Models grants every local profile",
     granted: {
       name: "Granted",
       generationProfiles: ["image-spicy"],
-      features: { nsfwModels: false },
+      features: { uncensoredModels: false },
     },
   };
   const as = (id) => effectiveAccountAccess({ id, role: "user", accessProfileId: id }, profiles);
-  assert.deepEqual(visibleGenerationProfiles([nsfw, plain, grok], as("administrator")), [
-    nsfw,
+  assert.deepEqual(visibleGenerationProfiles([uncensored, plain, grok], as("administrator")), [
+    uncensored,
     plain,
     grok,
   ]);
-  assert.deepEqual(visibleGenerationProfiles([nsfw, plain, grok], as("user")), [plain]);
+  assert.deepEqual(visibleGenerationProfiles([uncensored, plain, grok], as("user")), [plain]);
   assert.equal(mayUseFeature(as("user"), "loras"), false);
   assert.equal(
-    mayUseGenerationProfile(as("granted"), nsfw),
+    mayUseGenerationProfile(as("granted"), uncensored),
     false,
-    "a grant alone does not open an NSFW profile",
+    "a grant alone does not open an uncensored profile",
   );
   const admin = effectiveAccountAccess({ id: "admin", role: "administrator" }, {});
-  assert.equal(mayUseGenerationProfile(admin, nsfw), true);
+  assert.equal(mayUseGenerationProfile(admin, uncensored), true);
 });

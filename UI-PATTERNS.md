@@ -181,7 +181,7 @@ primary component reference and verify APIs against the installed version.
   right keeps, up keeps and queues variations; Star and Animate are buttons
   that keep the result too. Dream results stay in their own pool until kept;
   every discard is kept and can be shown with a filter.
-- Dream generates images, videos and (with the NSFW grant) spicy content only
+- Dream generates images, videos and (with Uncensored Models) spicy content only
   while no other work is queued, yields to user and text work, and stops at its
   unseen buffer or daily cap.
 - Dream also mixes in random older gallery items, as single cards and
@@ -204,7 +204,7 @@ primary component reference and verify APIs against the installed version.
   modes preserves unsent prompts, references and settings. Typing must not rerender an unchanged gallery or conversation
   history; shared provider commands retain their identity. Keep account data
   and credentials out of browser storage.
-- Account access groups own model grants and Cloud Models/NSFW permissions.
+- Account access groups own model grants and Cloud Models/uncensored permissions.
   Read back saved changes. Studio owns editable runtime definitions, with
   administrator approval and conflict handling; user presets support updates and copies.
 - Preserve actual model/provider metadata. Wait for the selected backend unless
@@ -247,9 +247,9 @@ primary component reference and verify APIs against the installed version.
   into a strip of the item's versions, grouped as the grid groups them
   (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
   shared item actions, sized to them; Animate opens its LLM prompt menu
-  (Cinematic Camera, Living Photo, Action, Spicy for NSFW-granted accounts,
-  Custom Animation, Animate in Composer) and Upscale its settings with Show
-  Upscale and Compare Upscale. Details lists
+  (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
+  Models, Custom Animation, Animate in Composer) and Upscale its settings with
+  Show Upscale and Compare Upscale. Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height. The desktop details sidebar is open by
