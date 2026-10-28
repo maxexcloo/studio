@@ -84,7 +84,7 @@ export function GenerationInputControls({
   const seed = input.seed === "" || input.seed == null ? "" : String(input.seed);
   return (
     <div className={classes.rail} role="group" aria-label="Generation Inputs">
-      <ProfilePicker value={input} onChange={onChange} />
+      <ProfilePicker value={input} onChange={onChange} startParked />
       {profile?.backend && backends.length > 1 && (
         <ChoiceChip
           label="Backend"

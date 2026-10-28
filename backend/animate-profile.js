@@ -43,13 +43,17 @@ export function frameSize(profile, width, height) {
  */
 export function animateProfile(
   profiles,
-  { defaultId, localRunning, tier, cloud = false, width, height },
+  { defaultId, localRunning, localParked = false, tier, cloud = false, width, height },
 ) {
+  // A parked worker was stopped on purpose; say so rather than call it not running.
+  const notRunning = localParked
+    ? "Local video is parked (an administrator stopped it on purpose)"
+    : "Local video isn't running";
   const usable = profiles.filter(
     (profile) => profile.kind === "video" && profile.ready !== false && profile.mediaInputs?.length,
   );
   const local = usable.filter(
-    (profile) => !isCloudProfile(profile) && profile.availability !== "offline",
+    (profile) => !isCloudProfile(profile) && !["offline", "parked"].includes(profile.availability),
   );
   const grok = usable.filter(isCloudProfile);
   const options = { kind: "video", tier, references: 1, firstFrame: true, defaultId };
@@ -67,7 +71,7 @@ export function animateProfile(
         ? "This account has no Grok video profile; Cloud Models is off for it."
         : localRunning
           ? "No video profile that takes a starting image is available to this account."
-          : "Local video isn't running and this account has no Grok access (Cloud Models), so nothing can animate this image right now.",
+          : `${notRunning} and this account has no Grok access (Cloud Models), so nothing can animate this image right now.`,
     );
   const profile = chooseProfile(grok, options);
   const label = profile.label || profile.id;
@@ -79,7 +83,7 @@ export function animateProfile(
         ? ""
         : localRunning
           ? `No local video profile takes a starting image, so this runs on ${label}.`
-          : `Local video isn't running, so this runs on ${label}.`,
+          : `${notRunning}, so this runs on ${label}.`,
     },
     width,
     height,

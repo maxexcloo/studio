@@ -216,7 +216,7 @@ test("generation waits on a stopped workload: off says so, automatic starts medi
   const manual = fixture(["image"]);
   await assert.rejects(
     manual.controller.acquire("video"),
-    /offline; automatic lifecycle control is disabled/,
+    /Video is parked: it was stopped on purpose/,
   );
   assert.deepEqual(manual.kube.log, []);
   const { kube, controller } = fixture(["image", "text"], { automaticLifecycle: true });
