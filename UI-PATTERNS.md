@@ -143,6 +143,8 @@ primary component reference and verify APIs against the installed version.
 - Keep expanded generation actions reachable while fields scroll. Desktop
   panels bound the fields above their action row; the phone Drawer owns scrolling
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
+  While the phone Drawer is open, notifications sit over the prompt text, below
+  its header and the prompt's actions, never over the chips or action row.
 - The Chat composer is one quiet inline row: compact reference picker,
   growing writing area, compact actual text model/provider selector and one
   Send/Stop action. Media settings belong
