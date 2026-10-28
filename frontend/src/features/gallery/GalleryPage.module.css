@@ -15,21 +15,3 @@
 .viewLabel {
   gap: 6px;
 }
-
-/* The view switch matches the toolbar chips' height: 36px, or the 44px phone touch target. */
-.view {
-  height: 36px;
-  padding-block: 3px;
-}
-
-.viewControl {
-  display: flex;
-  align-items: center;
-  height: 100%;
-}
-
-@media (max-width: 48em) {
-  .view {
-    height: 44px;
-  }
-}

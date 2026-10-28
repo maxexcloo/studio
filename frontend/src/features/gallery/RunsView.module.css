@@ -7,7 +7,7 @@
 
 .runs {
   display: grid;
-  gap: 8px;
+  gap: var(--gallery-gap);
 }
 
 /* Room above the covers for stacked layers; rows of single runs line up with Grid. */
@@ -69,7 +69,7 @@
 .panelGrid {
   display: grid;
   align-items: start;
-  gap: 8px;
+  gap: var(--gallery-gap);
 }
 
 .fanned {

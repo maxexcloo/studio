@@ -8,7 +8,6 @@ import {
 } from "react";
 import {
   ActionIcon,
-  Badge,
   Box,
   Button,
   Group,
@@ -24,7 +23,8 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { ArrowDownUp, Check, Ellipsis, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, Check, Ellipsis, type LucideIcon } from "lucide-react";
+import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
 import { usePhone } from "../../ui/usePhone";
@@ -154,8 +154,11 @@ export function PickerHeader<Tab extends string>({
   placeholder,
   filters,
   filterCount = 0,
+  chips,
   actions,
 }: {
+  /** The active filters as removable chips, beside the search. */
+  chips?: ReactNode;
   /** Names the picker, such as "References" or "LoRAs". */
   label: string;
   /** What the search and filters cover, such as the current tab's "Gallery". */
@@ -194,24 +197,14 @@ export function PickerHeader<Tab extends string>({
           onClear={() => onQueryChange("")}
         />
         {actions}
+        {chips}
         {filters && (
-          <Tooltip label={`Filter ${searched}`}>
-            <ActionIcon
-              aria-label={`Filter ${searched}`}
-              aria-expanded={open}
-              variant={open || filterCount ? "light" : "subtle"}
-              color={open || filterCount ? undefined : "gray"}
-              pos="relative"
-              onClick={() => setFiltering(!open)}
-            >
-              <SlidersHorizontal size={18} />
-              {filterCount > 0 && (
-                <Badge size="xs" circle pos="absolute" top={0} right={0} aria-hidden>
-                  {filterCount}
-                </Badge>
-              )}
-            </ActionIcon>
-          </Tooltip>
+          <FilterButton
+            label={`Filter ${searched}`}
+            count={filterCount}
+            opened={open}
+            onClick={() => setFiltering(!open)}
+          />
         )}
       </div>
       {open && (

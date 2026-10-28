@@ -59,6 +59,38 @@ test("Gallery continues near the bottom and retains loaded results when the next
   await expect(retry).toBeHidden();
 });
 
+test("Ctrl+scroll zooms the grid around the tile under the pointer and is remembered", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones pinch instead");
+  const state = await fixtures(page);
+  state.gallery.push(...results(80));
+  await page.goto("/images");
+  const tile = (index: number) =>
+    page.getByRole("button", { name: `Open image: Browse Result ${index}`, exact: true });
+  await expect(tile(0)).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, 900));
+  const anchored = tile(22);
+  await expect(anchored).toBeInViewport();
+  const before = (await anchored.boundingBox())!;
+  const width = before.width;
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -120);
+  await page.keyboard.up("Control");
+  // Fewer columns: larger tiles, with the one under the pointer still under it.
+  await expect.poll(async () => (await anchored.boundingBox())?.width).toBeGreaterThan(width * 1.1);
+  await page.waitForFunction(() => !document.getAnimations().length);
+  const after = (await anchored.boundingBox())!;
+  const pointer = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
+  expect(after.y).toBeLessThan(pointer.y);
+  expect(after.y + after.height).toBeGreaterThan(pointer.y);
+  const zoomed = after.width;
+  await page.reload();
+  await expect.poll(async () => (await tile(0).boundingBox())?.width).toBeCloseTo(zoomed, 0);
+  await expect(page.getByRole("slider", { name: "Tile Size" })).toBeVisible();
+});
+
 test("Closing a navigated viewer reveals and focuses its current virtualised gallery tile", async ({
   page,
 }) => {
@@ -289,7 +321,10 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
     ...results(1),
   );
   await page.goto("/images");
+  // The view is a Filter choice; the popup closes like any other.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByText("Runs", { exact: true }).click();
+  await page.keyboard.press("Escape");
   const stack = page.getByRole("button", { name: "Run: Bird study 0, 3 Images", exact: true });
   await stack.click();
   await expect(stack).toHaveAttribute("aria-expanded", "true");
@@ -307,10 +342,10 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
   await expect(run).toBeHidden();
   await expect(stack).toHaveAttribute("aria-expanded", "false");
   await page.reload();
-  await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Filter By Chats", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Bird Chat", exact: true }).check();
+  await expect(page.getByRole("radio", { name: "Runs" })).toBeChecked();
+  await page.getByRole("combobox", { name: "Chats", exact: true }).click();
+  await page.getByRole("option", { name: "Bird Chat", exact: true }).click();
   await expect
     .poll(() => new URLSearchParams(state.galleryRequests.at(-1)).getAll("chat"))
     .toEqual(["chat-a"]);
@@ -492,6 +527,7 @@ test("Gallery search closes cleanly and the status panel stops active and clears
     "aria-pressed",
     "true",
   );
+  await page.keyboard.press("Escape");
   const status = page.getByRole("button", { name: "Open Status", exact: true });
   await expect(status).toHaveAttribute("aria-description", "Generating");
   await status.click();
@@ -581,27 +617,33 @@ test("Uploads stay out of the gallery until its Uploads filter is on", async ({ 
   await expect(tile("made")).toHaveCount(0);
 });
 
-test("Gallery facets submit repeated models together with LoRA, size and aspect filters", async ({
+test("Gallery filters submit repeated models together with LoRA, size, aspect and date", async ({
   page,
 }) => {
   const state = await fixtures(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Filter By Models", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Studio Image", exact: true }).check();
-  await page.getByRole("checkbox", { name: "Motion Quality", exact: true }).check();
+  const filter = page.getByRole("button", { name: "Gallery Filters", exact: true });
+  await filter.click();
+  const pick = async (facet: string, option: string) => {
+    await page.getByRole("combobox", { name: facet, exact: true }).click();
+    await page.getByRole("option", { name: option, exact: true }).click();
+    await page.getByRole("combobox", { name: facet, exact: true }).press("Escape");
+  };
+  await pick("Models", "Studio Image");
+  await pick("Models", "Motion Quality");
+  await pick("LoRAs", "Detail Slider");
+  await page.getByRole("button", { name: "Up to 1K", exact: true }).click();
+  await page.getByRole("button", { name: "1:1", exact: true }).click();
+  await page.getByText("Week", { exact: true }).click();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Filter By LoRAs", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Detail Slider", exact: true }).check();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Filter By Size", exact: true }).click();
-  await page.getByRole("checkbox", { name: "Up to 1K", exact: true }).check();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Filter By Aspect Ratio", exact: true }).click();
-  await page.getByRole("checkbox", { name: "1:1", exact: true }).check();
-  await page.keyboard.press("Escape");
-  // Outside filter mode the search narrows within the filters, shown beside it as removable chips.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  await expect(filter).toHaveAttribute("aria-expanded", "false");
+  // The active filters show in the toolbar row as removable chips.
+  const chips = page.getByRole("group", { name: "Active Filters", exact: true });
+  const removable = chips.getByRole("button", { name: /^Remove / });
+  await expect(removable).toHaveCount(6);
+  await chips.getByRole("button", { name: "Remove 1:1 Filter", exact: true }).click();
+  await expect(removable).toHaveCount(5);
+  // The search narrows within them.
   const search = await gallerySearch(page);
   await search.fill("bird");
   await expect
@@ -612,6 +654,7 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
         lora: query.getAll("lora"),
         size: query.getAll("size"),
         aspect: query.getAll("aspect"),
+        since: query.has("since"),
         q: query.get("q"),
       };
     })
@@ -619,31 +662,24 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
       model: ["image.safetensors", "video.safetensors"],
       lora: ["detail.safetensors"],
       size: ["up-to-1k"],
-      aspect: ["1:1"],
+      aspect: [],
+      since: true,
       q: "bird",
     });
-  const chips = page.getByRole("group", { name: "Active Filters", exact: true });
-  await expect(chips.getByRole("button")).toHaveCount(5);
-  await chips.getByRole("button", { name: "Remove 1:1 Filter", exact: true }).click();
-  // Removing one leaves the others and the search.
-  await expect(chips.getByRole("button")).toHaveCount(4);
-  await expect(search).toHaveValue("bird");
   // Closing the phone's search clears it; desktop keeps its box and query.
   const phone = test.info().project.use.isMobile;
   const expected = phone ? "" : "bird";
   await search.press("Escape");
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await page.getByRole("button", { name: "Clear Filters", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Clear Filters", exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Clear All", exact: true }).click();
+  await expect(removable).toHaveCount(0);
   // The cleared search is served fresh from cache or requested again, never with the old facets.
   await expect
     .poll(() =>
       state.galleryRequests.some((search) => {
         const query = new URLSearchParams(search);
-        return query.get("q") === expected && !query.has("model") && !query.has("lora");
+        return query.get("q") === expected && !query.has("model") && !query.has("since");
       }),
     )
     .toBe(true);
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await expect(await gallerySearch(page)).toHaveValue(expected);
 });

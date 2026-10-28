@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Center,
+  Group,
   Loader,
   SegmentedControl,
   Stack,
@@ -10,7 +11,7 @@ import {
   Tooltip,
   VisuallyHidden,
 } from "@mantine/core";
-import { LayoutGrid, Layers, SquareCheck } from "lucide-react";
+import { GalleryVertical, LayoutGrid, Layers, SquareCheck } from "lucide-react";
 import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
@@ -32,13 +33,8 @@ import { useTileCaptions } from "./useGalleryLayout";
 import { useTryAgain } from "./useTryAgain";
 import { useVersionGroups } from "./versions";
 import { mediaDetail } from "./mediaLabels";
-import {
-  GalleryFilterToolbar,
-  appendGalleryFilters,
-  emptyGalleryFilters,
-  galleryFacetsQuery,
-  hasGalleryFilters,
-} from "./GalleryFilters";
+import { appendGalleryFilters, emptyGalleryFilters, galleryFacetsQuery } from "./GalleryFilters";
+import { GalleryToolbar } from "./GalleryToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
@@ -48,6 +44,8 @@ interface Page {
   items: MediaItem[];
   nextCursor: string;
   hasMore: boolean;
+  /** How many items match, across every page. */
+  totalApprox: number;
 }
 export function GalleryPage() {
   const [query, setQuery] = useState("");
@@ -60,13 +58,10 @@ export function GalleryPage() {
   const phone = usePhone();
   const [captions] = useTileCaptions();
   const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
-  const [starred, setStarred] = useRemembered("gallery-starred", false);
-  const [uploads, setUploads] = useRemembered("gallery-uploads", false);
   const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
-  const hasFilters = starred || uploads || hasGalleryFilters(filters);
   const [pagingFailed, setPagingFailed] = useState(false);
-  useEffect(() => setPagingFailed(false), [search, kind, starred, filters, uploads]);
+  useEffect(() => setPagingFailed(false), [search, kind, filters]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
@@ -97,17 +92,10 @@ export function GalleryPage() {
     }),
   }).data;
   const gallery = useInfiniteQuery({
-    queryKey: ["gallery", search, kind, starred, filters, uploads],
+    queryKey: ["gallery", search, kind, filters],
     initialPageParam: "",
     queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams({
-        limit: "60",
-        cursor: pageParam,
-        q: search,
-        type: kind,
-        favorites: starred ? "1" : "0",
-        uploads: uploads ? "1" : "0",
-      });
+      const params = new URLSearchParams({ limit: "60", cursor: pageParam, q: search, type: kind });
       appendGalleryFilters(params, filters);
       return api<Page>(`/api/gallery?${params}`);
     },
@@ -171,10 +159,12 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
-  const selection = useGallerySelection(
-    items,
-    JSON.stringify([kind, search, starred, filters, uploads]),
-  );
+  const selection = useGallerySelection(items, JSON.stringify([kind, search, filters]));
+  const hasFilters = JSON.stringify(filters) !== JSON.stringify(emptyGalleryFilters) || grouped;
+  const clearFilters = () => {
+    setFilters(emptyGalleryFilters);
+    setAllVersions(true);
+  };
   const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
@@ -225,34 +215,47 @@ export function GalleryPage() {
           onMenuClose={() => setMenu(null)}
         />
       ) : (
-        <GalleryFilterToolbar
+        <GalleryToolbar
           query={query}
           onQueryChange={setQuery}
           kind={kind}
           value={filters}
           onChange={setFilters}
-          starred={starred}
-          onStarredChange={setStarred}
-          uploads={uploads}
-          onUploadsChange={setUploads}
-          allVersions={allVersions}
-          onAllVersionsChange={view === "grid" ? setAllVersions : undefined}
-          leading={
-            <SegmentedControl
-              aria-label="Gallery View"
-              classNames={{
-                root: classes.view,
-                control: classes.viewControl,
-                label: classes.viewControl,
-              }}
-              radius="xl"
-              value={view}
-              onChange={(value) => setView(value as "grid" | "runs")}
-              data={[
-                { value: "grid", label: <ViewLabel icon={<LayoutGrid size={15} />} text="Grid" /> },
-                { value: "runs", label: <ViewLabel icon={<Layers size={15} />} text="Runs" /> },
-              ]}
-            />
+          count={gallery.data?.pages.at(-1)?.totalApprox}
+          extraChips={
+            grouped
+              ? [{ key: "versions", label: "Grouped Versions", remove: () => setAllVersions(true) }]
+              : []
+          }
+          view={
+            <Group gap={6} wrap="nowrap">
+              <SegmentedControl
+                aria-label="Gallery View"
+                size="xs"
+                radius="xl"
+                value={view}
+                onChange={(value) => setView(value as "grid" | "runs")}
+                data={[
+                  {
+                    value: "grid",
+                    label: <ViewLabel icon={<LayoutGrid size={14} />} text="Grid" />,
+                  },
+                  { value: "runs", label: <ViewLabel icon={<Layers size={14} />} text="Runs" /> },
+                ]}
+              />
+              {view === "grid" && (
+                <Button
+                  {...chipProps}
+                  aria-label="All Versions"
+                  aria-pressed={allVersions}
+                  variant={allVersions ? "light" : "default"}
+                  leftSection={<GalleryVertical size={15} />}
+                  onClick={() => setAllVersions(!allVersions)}
+                >
+                  All Versions
+                </Button>
+              )}
+            </Group>
           }
           actions={
             <Tooltip label="Select Items" disabled={!phone}>
@@ -296,7 +299,16 @@ export function GalleryPage() {
           />
         </div>
       ) : (
-        <EmptyState fill>
+        <EmptyState
+          fill
+          action={
+            hasFilters && (
+              <Button variant="default" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            )
+          }
+        >
           {search || hasFilters ? "No Matches" : kind === "video" ? "No Videos" : "No Images"}
         </EmptyState>
       )}

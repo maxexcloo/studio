@@ -6,8 +6,6 @@ interface ReferenceBrowserState {
   target: ReferenceTarget | null;
   query: string;
   filters: GalleryFilterValues;
-  starred: boolean;
-  uploads: boolean;
 }
 
 // Owned by the editor so closing or remounting the picker keeps its browsing position.
@@ -16,8 +14,6 @@ export function useReferenceBrowser() {
     target: null,
     query: "",
     filters: emptyGalleryFilters,
-    starred: false,
-    uploads: false,
   });
   const scroll = useRef(0);
   return { state, setState, scroll };
