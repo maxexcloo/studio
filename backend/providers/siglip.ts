@@ -50,7 +50,7 @@ export function createSiglip({
   const file = (name: string) => path.join(folder, name);
   const files = Object.values(siglipSource.files);
   let download: Promise<void> | null = null;
-  let progress = { done: 0, total: 0 };
+  let downloadedBytes = 0;
   let failure = { at: -Infinity, reason: "" };
   let vision: Promise<InferenceSession> | null = null;
   let text: Promise<{ session: InferenceSession; encode(value: string): number[] }> | null = null;
@@ -62,8 +62,6 @@ export function createSiglip({
     const url = `https://huggingface.co/${siglipSource.repository}/resolve/${siglipSource.revision}/${name}`;
     const response = await fetch(url);
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status} for ${name}`);
-    const total = Number(response.headers.get("content-length") || 0);
-    progress.total += total;
     fs.mkdirSync(path.dirname(file(name)), { recursive: true });
     const partial = `${file(name)}.part`;
     try {
@@ -71,7 +69,7 @@ export function createSiglip({
         response.body,
         async function* (chunks: AsyncIterable<Uint8Array>) {
           for await (const chunk of chunks) {
-            progress.done += chunk.byteLength;
+            downloadedBytes += chunk.byteLength;
             yield chunk;
           }
         },
@@ -88,7 +86,7 @@ export function createSiglip({
   function ensureDownloaded() {
     if (downloaded()) return Promise.resolve();
     download ||= (async () => {
-      progress = { done: 0, total: 0 };
+      downloadedBytes = 0;
       log.info(`[Studio] Image search: downloading ${siglipSource.repository} into ${folder}.`);
       for (const name of files) await fetchFile(name);
       for (const entry of fs.readdirSync(path.dirname(folder)))
@@ -141,8 +139,7 @@ export function createSiglip({
     /** Why the encoders can't run now ("" when they can or haven't been asked to). */
     unavailable() {
       if (download) {
-        const share = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
-        return `Downloading the SigLIP 2 model (${share}%).`;
+        return `Downloading the SigLIP 2 model (${Math.round(downloadedBytes / 1e6)} of about 690 MB).`;
       }
       // A failed download waits a minute before the next try.
       if (Date.now() - failure.at < 60_000)
