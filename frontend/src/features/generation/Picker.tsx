@@ -1,4 +1,11 @@
-import { useRef, useState, type DragEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type DragEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import {
   ActionIcon,
   Badge,
@@ -7,23 +14,21 @@ import {
   Group,
   Image,
   Menu,
+  Modal,
+  Popover,
+  type PopoverProps,
   SegmentedControl,
+  Stack,
   Text,
   TextInput,
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import {
-  ArrowDownUp,
-  ArrowLeft,
-  Check,
-  Ellipsis,
-  SlidersHorizontal,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowDownUp, Check, Ellipsis, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
-import editorClasses from "./GenerationEditor.module.css";
+import { usePhone } from "../../ui/usePhone";
+import { escapePanel } from "./chip";
 import classes from "./Picker.module.css";
 
 /**
@@ -31,21 +36,109 @@ import classes from "./Picker.module.css";
  * filters, selection and actions look and behave the same in both and on every breakpoint.
  */
 
-/** A phone panel's Back action and title, shown in place of the composer form. */
-export function PanelHeader({ title, onBack }: { title: string; onBack: () => void }) {
-  return (
-    <Group justify="space-between">
-      <Button
-        autoFocus
-        variant="subtle"
-        color="gray"
-        leftSection={<ArrowLeft size={16} />}
-        onClick={onBack}
-      >
-        Back
-      </Button>
-      <Text fw={500}>{title}</Text>
+/**
+ * A chip's popup, laid out like Recent Prompts: a title row with its few controls (such as Clear),
+ * then the content. Desktop anchors a Popover to the chip; phones open a full-screen Modal, so a
+ * popover never opens a second level there. Escape closes nested layers first.
+ */
+export function ChipPopup({
+  title,
+  opened,
+  onOpenedChange,
+  target,
+  tooltip = false,
+  headerEnd,
+  width,
+  position = "top-start",
+  trap = true,
+  children,
+}: {
+  title: string;
+  opened: boolean;
+  onOpenedChange: (opened: boolean) => void;
+  target: ReactNode;
+  /** Icon-only chips name themselves with the title's tooltip. */
+  tooltip?: boolean;
+  headerEnd?: ReactNode;
+  width: number | string;
+  position?: PopoverProps["position"];
+  /** Off while a confirmation over the popup owns focus and clicks. */
+  trap?: boolean;
+  children: ReactNode;
+}) {
+  const phone = usePhone();
+  const close = () => onOpenedChange(false);
+  // The popup handles its own Escape, so the composer's Drawer behind it stays open.
+  const layer = {
+    "data-composer-layer": true,
+    "data-chip-popup": true,
+    "aria-label": title,
+    onFocusCapture: (event: FocusEvent<HTMLElement>) =>
+      event.target.setAttribute("data-mantine-stop-propagation", "true"),
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => trap && escapePanel(event, close);
+  const end = headerEnd && (
+    <Group gap="xs" wrap="nowrap">
+      {headerEnd}
     </Group>
+  );
+  if (phone)
+    return (
+      <>
+        {target}
+        <Modal.Root
+          opened={opened}
+          onClose={close}
+          fullScreen
+          trapFocus={trap}
+          closeOnEscape={false}
+          returnFocus
+        >
+          <Modal.Overlay />
+          {/* Modal.Content drops onKeyDown, so the phone popup listens in the capture phase. */}
+          <Modal.Content {...layer} onKeyDownCapture={onKeyDown}>
+            <Modal.Header>
+              <Modal.Title>{title}</Modal.Title>
+              <Group gap="xs" wrap="nowrap">
+                {end}
+                <Modal.CloseButton aria-label={`Close ${title}`} />
+              </Group>
+            </Modal.Header>
+            <Modal.Body>{children}</Modal.Body>
+          </Modal.Content>
+        </Modal.Root>
+      </>
+    );
+  return (
+    <Popover
+      opened={opened}
+      onChange={onOpenedChange}
+      width={width}
+      position={position}
+      trapFocus={trap}
+      closeOnClickOutside={trap}
+      closeOnEscape={false}
+      returnFocus
+      shadow="md"
+    >
+      <Tooltip label={title} disabled={!tooltip || opened}>
+        <Popover.Target>{target}</Popover.Target>
+      </Tooltip>
+      <Popover.Dropdown
+        {...layer}
+        aria-labelledby=""
+        maw="calc(100vw - 24px)"
+        onKeyDown={onKeyDown}
+      >
+        <Stack gap="sm">
+          <Group justify="space-between" wrap="nowrap" mih={28}>
+            <Text fw={500}>{title}</Text>
+            {end}
+          </Group>
+          {children}
+        </Stack>
+      </Popover.Dropdown>
+    </Popover>
   );
 }
 
@@ -551,30 +644,13 @@ export function SaveCurrent({
   );
 }
 
-/** Secondary actions at the start and end, like Recent Prompts; sheets add their full-width done action. */
-export function PickerFooter({
-  start,
-  end,
-  done,
-}: {
-  start?: ReactNode;
-  end?: ReactNode;
-  /** The phone sheet's closing action, such as Use References. */
-  done?: { label: string; onClick: () => void };
-}) {
-  const row = (start || end) && (
+/** Secondary actions at the start and end, like Recent Prompts. */
+export function PickerFooter({ start, end }: { start?: ReactNode; end?: ReactNode }) {
+  if (!start && !end) return null;
+  return (
     <Group justify="space-between" gap="xs" wrap="nowrap">
       <Group gap="xs">{start}</Group>
       <Group gap="xs">{end}</Group>
     </Group>
-  );
-  if (!done) return row || null;
-  return (
-    <Box className={`${editorClasses.footer} ${classes.footer}`} data-sticky>
-      {row}
-      <Button fullWidth onClick={done.onClick}>
-        {done.label}
-      </Button>
-    </Box>
   );
 }

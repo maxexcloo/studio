@@ -458,7 +458,7 @@ test("Library shows import grades and reuses compatible inspiration settings", a
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
   await page.getByRole("button", { name: "Detail Slider", exact: true }).click();
   await closeLoras(page);
-  const close = page.getByRole("button", { name: "Close Generation Controls", exact: true });
+  const close = page.getByRole("button", { name: "Close Generate", exact: true });
   if (await close.isVisible()) await close.click();
   else await page.getByRole("textbox", { name: "Prompt", exact: true }).press("Escape");
   await openNav(page, "Library");
