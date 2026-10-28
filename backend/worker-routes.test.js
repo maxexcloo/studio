@@ -11,7 +11,10 @@ import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 // Workers end to end: zero workers, several from STUDIO_WORKERS (locked), Studio's own list, and routing by capability.
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = JSON.parse(
-  fs.readFileSync(path.join(here, "fixtures/object_info-comfyui-0.34.1.json"), "utf8"),
+  fs.readFileSync(
+    path.join(here, "fixtures/object_info-comfyui-0.41.0-master-ce1e922.json"),
+    "utf8",
+  ),
 );
 const imageInfo = structuredClone(source);
 imageInfo.CheckpointLoaderSimple.input.required.ckpt_name[0] = ["sd_xl_base_1.0.safetensors"];

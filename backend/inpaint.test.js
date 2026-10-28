@@ -11,7 +11,10 @@ import {
 } from "./inpaint.js";
 
 const objectInfo = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/object_info-comfyui-0.34.1.json", import.meta.url), "utf8"),
+  fs.readFileSync(
+    new URL("./fixtures/object_info-comfyui-0.41.0-master-ce1e922.json", import.meta.url),
+    "utf8",
+  ),
 );
 const byType = (graph, type) => Object.values(graph).filter((item) => item.class_type === type);
 const inpaint = {
