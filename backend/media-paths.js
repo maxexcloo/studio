@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { isInside } from "./paths.js";
 import { currentDataDir } from "./data-dir.js";
+import { accountOutputSubfolder } from "./account-ownership.js";
+import { outputFolderName } from "./data-names.js";
 
 /**
  * Studio-owned media storage. With it, ComfyUI is a worker: each finished output
@@ -24,7 +26,15 @@ export function outputStorageFromEnv(env = process.env) {
   return env.STUDIO_OUTPUT_STORAGE === "studio";
 }
 export const mediaStorageEnabled = outputStorageFromEnv();
-export const mediaRoot = path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(dataDir, "media"));
+/** A data folder's media folder: STUDIO_MEDIA_DIR, else its `media`. */
+export const mediaRootFor = (directory) =>
+  path.resolve(process.env.STUDIO_MEDIA_DIR || path.join(directory, "media"));
+export const mediaRoot = mediaRootFor(dataDir);
+
+/** The owner's media folder: the account's own subfolder, or the studio's. */
+export function mediaSubfolder(ownerId = "") {
+  return ownerId ? accountOutputSubfolder(ownerId) : outputFolderName;
+}
 
 const mediaPattern =
   /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;

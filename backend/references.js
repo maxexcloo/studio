@@ -1,12 +1,11 @@
 import crypto from "node:crypto";
-import { mediaFile, mediaParams, mediaPath, mediaUrls } from "./media-paths.js";
+import { mediaFile, mediaParams, mediaPath, mediaSubfolder } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
 import { comfy, comfyOutputDir, comfyInputDir } from "./comfy.js";
 import {
   addGalleryItems,
-  dataDir,
   importedImageFile,
   filterVisibleGallery,
   gallery,
@@ -15,24 +14,16 @@ import {
 } from "./gallery-store.js";
 
 import { extractLastFrame } from "./video-previews.js";
-import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
-import { mediaSubfolder } from "./media-store.js";
+import { writeBytesFileAsync } from "./json-store.js";
 import { isInside } from "./paths.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 import { families } from "./family-catalog.js";
 import { mimeExtension, referenceInputName } from "./reference-names.js";
-import {
-  recordBelongsToRequest,
-  recordBelongsToAccount,
-  recordsForRequest,
-} from "./account-ownership.js";
+import { uploadedGalleryItem } from "./uploads.js";
+import { recordBelongsToAccount } from "./account-ownership.js";
 
-const assetsDir = path.join(dataDir, "reference-assets");
-const filesDir = path.join(assetsDir, "files");
-const thumbsDir = path.join(assetsDir, "thumbnails");
-const manifestPath = path.join(assetsDir, "index.json");
 const maxUploadBytes = Math.max(
   1024,
   Number(process.env.STUDIO_REFERENCE_MAX_BYTES || 25 * 1024 * 1024),
@@ -58,41 +49,6 @@ function mimeFromName(name = "") {
   return "image/png";
 }
 
-function ensureDirs() {
-  fs.mkdirSync(filesDir, { recursive: true });
-  fs.mkdirSync(thumbsDir, { recursive: true });
-}
-
-// The crash-safe JSON store (json-store.js), like every other file Studio remembers.
-function loadManifest() {
-  try {
-    const parsed = readJsonFile(manifestPath);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeManifest(items) {
-  ensureDirs();
-  writeJsonFile(manifestPath, items, { mode: 0o600 });
-}
-
-function publicUploadAsset(record) {
-  return {
-    id: record.id,
-    source: "upload",
-    name: record.name,
-    mime: record.mime,
-    width: record.width,
-    height: record.height,
-    size: record.size,
-    createdAt: record.createdAt,
-    thumbnailUrl: `/api/reference-assets/${encodeURIComponent(record.id)}/thumbnail`,
-    url: `/api/reference-assets/${encodeURIComponent(record.id)}/media`,
-  };
-}
-
 function encodedGalleryId(item) {
   return `gallery:${Buffer.from(String(galleryKey(item))).toString("base64url")}`;
 }
@@ -100,8 +56,8 @@ function encodedGalleryId(item) {
 function galleryAsset(item) {
   return {
     id: encodedGalleryId(item),
-    source: "generation",
-    name: item.outputName || item.filename || "Generated image",
+    source: item.uploaded ? "upload" : "generation",
+    name: (item.uploaded ? item.filename : item.outputName || item.filename) || "Generated image",
     mime: item.mime || mimeFromName(item.outputName || item.filename || item.url),
     width: Number(item.width || 0),
     height: Number(item.height || 0),
@@ -117,56 +73,6 @@ function galleryAsset(item) {
     url: item.url || "",
     galleryItemId: item.id,
   };
-}
-
-// The page is mapped, not the whole shelf: a large gallery would otherwise
-// build an asset object for every image before returning thirty of them.
-function paginate(items, cursor = "", limit = 60, map = (item) => item) {
-  const safeLimit = Math.max(1, Math.min(200, Number(limit || 60)));
-  const start = Math.max(0, Number(cursor || 0) || 0);
-  const page = items.slice(start, start + safeLimit).map(map);
-  const next = start + safeLimit;
-  return {
-    items: page,
-    nextCursor: next < items.length ? String(next) : "",
-    hasMore: next < items.length,
-  };
-}
-
-const finishedImage = (item) => item.status === "done" && item.type === "image" && item.url;
-const newestFirst = (a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0);
-
-/** One shelf of references: uploads (the default) or finished generations. */
-export function listReferenceAssets(
-  req,
-  { source = "upload", cursor = "", limit = 60, q = "" } = {},
-) {
-  const words = String(q).trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const matches = (item) => {
-    if (!words.length) return true;
-    const text = [item.name, item.outputName, item.filename, item.prompt, item.model]
-      .filter(Boolean)
-      .join(" ")
-      .toLocaleLowerCase();
-    return words.every((word) => text.includes(word));
-  };
-  if (source === "generation") {
-    return paginate(
-      filterVisibleGallery(recordsForRequest(gallery, req))
-        .filter((item) => finishedImage(item) && matches(item))
-        .sort(newestFirst),
-      cursor,
-      limit,
-      galleryAsset,
-    );
-  }
-
-  const items = loadManifest()
-    .filter(
-      (item) => item.source === "upload" && recordBelongsToRequest(item, req) && matches(item),
-    )
-    .sort(newestFirst);
-  return paginate(items, cursor, limit, publicUploadAsset);
 }
 
 export function readMultipartImage(req) {
@@ -268,10 +174,8 @@ async function inspectImage(buffer, declaredMime = "") {
   return { mime, width, height };
 }
 
-export async function saveUploadedReference(
-  { buffer, name, mime: declaredMime = "" },
-  ownerId = "",
-) {
+/** An uploaded image as a gallery image (uploads.js); the same bytes from the same owner return the first copy. */
+export async function saveUploadedImage({ buffer, name, mime: declaredMime = "" }, ownerId = "") {
   if (!buffer?.length) throw new Error("That image is empty.");
   if (buffer.length > maxUploadBytes)
     throw new Error(
@@ -279,134 +183,34 @@ export async function saveUploadedReference(
     );
   const inspected = await inspectImage(buffer, declaredMime);
   const hash = crypto.createHash("sha256").update(buffer).digest("hex");
-  const existing = loadManifest().find(
+  const stored = (item) => {
+    const media = mediaParams(item.url);
+    return Boolean(media && mediaFile(media.filename, media.subfolder));
+  };
+  const existing = gallery.find(
     (item) =>
-      item.hash === hash && item.source === "upload" && String(item.ownerId || "") === ownerId,
+      item.uploaded && item.hash === hash && (item.ownerId || "") === ownerId && stored(item),
   );
-  if (
-    existing &&
-    fs.existsSync(path.join(filesDir, existing.file)) &&
-    fs.existsSync(path.join(thumbsDir, existing.thumbnail))
-  )
-    return publicUploadAsset(existing);
-  ensureDirs();
+  if (existing) return { item: existing, asset: galleryAsset(existing) };
   const id = crypto.randomUUID();
-  const ext = mimeExtension(inspected.mime);
-  const file = `${id}.${ext}`;
-  fs.writeFileSync(path.join(filesDir, file), buffer, { mode: 0o600 });
-  const sharp = await loadSharp();
-  // Without sharp the thumbnail is a copy of the original, in its own format.
-  const thumbnail = sharp ? `${id}.webp` : `${id}-thumb.${ext}`;
-  if (sharp)
-    await sharp(buffer, { limitInputPixels: maxPixels })
-      .rotate()
-      .resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 78 })
-      .toFile(path.join(thumbsDir, thumbnail));
-  else fs.writeFileSync(path.join(thumbsDir, thumbnail), buffer, { mode: 0o600 });
-  const record = {
-    id,
-    source: "upload",
-    name: safeName(name),
-    mime: inspected.mime,
-    width: inspected.width,
-    height: inspected.height,
-    size: buffer.length,
-    hash,
-    file,
-    thumbnail,
-    ...(ownerId ? { ownerId } : {}),
-    createdAt: new Date().toISOString(),
-  };
-  writeManifest([record, ...loadManifest()]);
-  return publicUploadAsset(record);
-}
-
-export function readUploadedReference(id, variant = "media", ownerId = "") {
-  const record = loadManifest().find(
-    (item) =>
-      item.id === String(id || "") &&
-      item.source === "upload" &&
-      String(item.ownerId || "") === ownerId,
-  );
-  if (!record) return null;
-  const isThumb = variant === "thumbnail";
-  const file = path.join(isThumb ? thumbsDir : filesDir, isThumb ? record.thumbnail : record.file);
-  const base = path.resolve(isThumb ? thumbsDir : filesDir);
-  const resolved = path.resolve(file);
-  if (!resolved.startsWith(`${base}${path.sep}`) || !fs.existsSync(resolved)) return null;
-  return {
-    file: resolved,
-    mime: isThumb && record.thumbnail.endsWith(".webp") ? "image/webp" : record.mime,
-    name: record.name,
-  };
-}
-
-/** Copies an owned upload into the owner's media as a gallery image; saving it again returns the first copy. */
-export async function saveUploadToGallery(id, ownerId = "") {
-  const record = loadManifest().find(
-    (item) =>
-      item.id === String(id || "") &&
-      item.source === "upload" &&
-      String(item.ownerId || "") === ownerId,
-  );
-  if (!record) throw new Error("That reference image is gone.");
-  const saved = gallery.find(
-    (item) => item.savedFromUpload === record.id && String(item.ownerId || "") === ownerId,
-  );
-  if (saved) return saved;
   const subfolder = mediaSubfolder(ownerId);
-  const filename = `upload-${record.id}.${mimeExtension(record.mime)}`;
+  const filename = `${id}.${mimeExtension(inspected.mime)}`;
   const file = mediaPath(filename, subfolder);
   if (!file) throw new Error("This upload's name cannot be stored.");
-  await writeBytesFileAsync(file, fs.readFileSync(path.join(filesDir, record.file)), {
-    mode: 0o600,
-  });
-  const urls = mediaUrls(filename, subfolder);
-  const item = {
-    id: urls.url,
-    ...urls,
-    jobId: `upload-${record.id}`,
-    ...(ownerId ? { ownerId } : {}),
-    type: "image",
-    status: "done",
-    prompt: "",
-    filename: record.name,
-    outputName: filename,
-    width: record.width,
-    height: record.height,
+  await writeBytesFileAsync(file, buffer, { mode: 0o600 });
+  const item = uploadedGalleryItem({
+    id,
+    ownerId,
+    name: safeName(name),
+    ...inspected,
+    size: buffer.length,
+    hash,
     createdAt: new Date().toISOString(),
-    savedFromUpload: record.id,
-  };
+    filename,
+    subfolder,
+  });
   addGalleryItems([item]);
-  return item;
-}
-
-export function deleteUploadedReference(id, ownerId = "") {
-  const records = loadManifest();
-  const record = records.find(
-    (item) =>
-      item.id === String(id || "") &&
-      item.source === "upload" &&
-      String(item.ownerId || "") === ownerId,
-  );
-  if (!record) throw new Error("That reference image is gone.");
-  for (const [baseDir, filename] of [
-    [filesDir, record.file],
-    [thumbsDir, record.thumbnail],
-  ]) {
-    const base = path.resolve(baseDir);
-    const target = path.resolve(baseDir, filename || "");
-    if (filename && target.startsWith(`${base}${path.sep}`)) {
-      try {
-        fs.unlinkSync(target);
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-      }
-    }
-  }
-  writeManifest(records.filter((item) => item.id !== record.id));
-  return { ok: true, id: record.id };
+  return { item, asset: galleryAsset(item) };
 }
 
 function decodeGalleryReference(id = "") {
@@ -522,11 +326,6 @@ export function referenceAssetForAccount(account, galleryItemId, { frame = "" } 
 
 /** Reopen one saved reference without enumerating the catalogue or reading worker media. */
 export function referenceAssetMetadataForAccount(account, id) {
-  const upload = loadManifest().find(
-    (item) => item.id === id && item.source === "upload" && recordBelongsToAccount(item, account),
-  );
-  if (upload && readUploadedReference(id, "media", account?.userId || ""))
-    return publicUploadAsset(upload);
   const lastFrame = String(id).endsWith(lastFrameSuffix);
   const item = findGalleryItemForAccount(
     lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
@@ -571,7 +370,6 @@ async function preferUpscale(original, readUpscale) {
 
 /** Ownership can be checked while a selected worker is offline, without fetching its media. */
 export function referenceExistsForAccount(account, id) {
-  if (readUploadedReference(id, "media", account?.userId || "")) return true;
   const lastFrame = String(id).endsWith(lastFrameSuffix);
   const item = findGalleryItemForAccount(
     lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
@@ -590,17 +388,6 @@ export async function bytesForReference(req, id) {
 export async function bytesForReferenceAccount(account, id) {
   if (String(id).endsWith(lastFrameSuffix))
     return lastFrameBytes(account, String(id).slice(0, -lastFrameSuffix.length));
-
-  const ownerId = account?.userId || "";
-  const upload = loadManifest().find(
-    (item) => item.id === id && item.source === "upload" && String(item.ownerId || "") === ownerId,
-  );
-  if (upload) {
-    const file = path.resolve(filesDir, upload.file);
-    if (!file.startsWith(`${path.resolve(filesDir)}${path.sep}`) || !fs.existsSync(file))
-      throw new Error("That reference image is gone.");
-    return { buffer: fs.readFileSync(file), mime: upload.mime, name: upload.name };
-  }
   const item = findGalleryItemForAccount(id, account);
   if (!item || item.type !== "image" || item.status !== "done")
     throw new Error("That image is no longer in the gallery.");

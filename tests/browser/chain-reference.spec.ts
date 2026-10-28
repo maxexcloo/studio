@@ -7,6 +7,7 @@ import {
   image,
   profiles,
   serveProfiles,
+  showUploads,
   stamp,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
@@ -85,7 +86,7 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
   const picker = page.getByRole("region", { name: "References", exact: true });
   const cells = picker.getByRole("group", { name: "Reference Slots", exact: true });
   await expect(cells.getByRole("button", { name: /^Slot / })).toHaveText(["1", "2", "3"]);
-  await picker.getByText("Uploads", { exact: true }).click();
+  await showUploads(page);
   await picker.locator('input[type="file"]').setInputFiles(
     Array.from({ length: 13 }, (_, index) => ({
       name: `input-${index + 1}.png`,
@@ -110,7 +111,8 @@ test("A linked ten-reference stack fills declared slots and keeps Start/End inde
     .getByRole("menu", { name: "Reference 10 · Reference Image", exact: true })
     .getByRole("menuitem", { name: "Move Earlier", exact: true })
     .click();
-  await picker.getByText("Gallery", { exact: true }).click();
+  // Uploads off again: the gallery's generations.
+  await picker.getByRole("button", { name: "Uploads", exact: true }).click();
   for (const label of ["Reference 11 · Start", "Reference 12 · End"]) {
     await cells.getByRole("button", { name: label, exact: true }).click();
     await page

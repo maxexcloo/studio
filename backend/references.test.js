@@ -6,110 +6,70 @@ import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
 
-const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-reference-assets-"));
+const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-references-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_COMFY_INPUT_DIR = temporary;
-const referenceAssets = await import(`./reference-assets.js?test=${Date.now()}`);
+const referenceAssets = await import(`./references.js?test=${Date.now()}`);
+const { pageGallery } = await import("./gallery-store.js");
+const upload = async (...args) => (await referenceAssets.saveUploadedImage(...args)).asset;
 
-test("uploaded references are validated, indexed, thumbnailed, and deletable", async () => {
+test("an upload becomes its owner's uploaded gallery image, listed only under Uploads", async () => {
   const buffer = await sharp({
     create: { width: 32, height: 24, channels: 3, background: "#223344" },
   })
     .png()
     .toBuffer();
-  const asset = await referenceAssets.saveUploadedReference({
+  const { item, asset } = await referenceAssets.saveUploadedImage({
     buffer,
     name: "sample.png",
     mime: "image/png",
   });
+  assert.equal(item.uploaded, true);
+  assert.equal(item.status, "done");
   assert.equal(asset.source, "upload");
+  assert.equal(asset.name, "sample.png");
+  assert.equal(asset.galleryItemId, item.id);
   assert.equal(asset.width, 32);
   assert.equal(asset.height, 24);
-  assert.equal(referenceAssets.listReferenceAssets({}, { source: "upload" }).items.length, 1);
-  assert.ok(fs.existsSync(referenceAssets.readUploadedReference(asset.id, "media").file));
-  assert.ok(fs.existsSync(referenceAssets.readUploadedReference(asset.id, "thumbnail").file));
-  referenceAssets.deleteUploadedReference(asset.id);
-  assert.equal(referenceAssets.listReferenceAssets({}, { source: "upload" }).items.length, 0);
+  assert.equal(
+    pageGallery({}).items.some((listed) => listed.id === item.id),
+    false,
+  );
+  assert.deepEqual(
+    pageGallery({ uploads: true }).items.map((listed) => listed.id),
+    [item.id],
+  );
+  assert.deepEqual((await referenceAssets.bytesForReference({}, asset.id)).buffer, buffer);
+  assert.deepEqual(
+    (await referenceAssets.bytesForReference({}, item.id)).buffer,
+    buffer,
+    "a reference saved with the upload's own id still resolves",
+  );
+  assert.equal((await upload({ buffer, name: "again.png", mime: "image/png" })).id, asset.id);
 });
 
-test("a reference page maps only the items it returns", async () => {
-  const saved = [];
-  for (let index = 0; index < 5; index += 1) {
-    // Distinct pixels: uploads are keyed by content, and five copies would be one asset.
-    const buffer = await sharp({
-      create: { width: 16 + index, height: 16, channels: 3, background: `#12345${index}` },
-    })
-      .png()
-      .toBuffer();
-    saved.push(
-      await referenceAssets.saveUploadedReference({
-        buffer,
-        name: `page-${index}.png`,
-        mime: "image/png",
-      }),
-    );
-  }
-  const first = referenceAssets.listReferenceAssets({}, { source: "upload", limit: 2 });
-  assert.equal(first.items.length, 2);
-  assert.equal(first.hasMore, true);
-  const second = referenceAssets.listReferenceAssets(
-    {},
-    { source: "upload", cursor: first.nextCursor, limit: 2 },
-  );
-  assert.equal(second.items.length, 2);
-  assert.equal(second.hasMore, true);
-  const third = referenceAssets.listReferenceAssets(
-    {},
-    { source: "upload", cursor: second.nextCursor, limit: 2 },
-  );
-  assert.equal(third.items.length, 1);
-  assert.equal(third.hasMore, false);
-  assert.equal(third.nextCursor, "");
-  for (const asset of saved) referenceAssets.deleteUploadedReference(asset.id);
-});
-
-test("uploaded reference assets and byte reads are limited to their account owner", async () => {
+test("uploaded images and byte reads are limited to their account owner", async () => {
   const buffer = await sharp({
     create: { width: 20, height: 18, channels: 3, background: "#456789" },
   })
     .png()
     .toBuffer();
   const ownerA = { studioAccount: { userId: "account-a", role: "user" } };
-  const ownerB = { studioAccount: { userId: "account-b", role: "user" } };
-  const assetA = await referenceAssets.saveUploadedReference(
-    { buffer, name: "same.png", mime: "image/png" },
-    "account-a",
-  );
-  const assetB = await referenceAssets.saveUploadedReference(
-    { buffer, name: "same.png", mime: "image/png" },
-    "account-b",
-  );
+  const assetA = await upload({ buffer, name: "same.png", mime: "image/png" }, "account-a");
+  const assetB = await upload({ buffer, name: "same.png", mime: "image/png" }, "account-b");
 
-  assert.notEqual(assetA.id, assetB.id, "identical bytes do not join two users' asset records");
-  assert.deepEqual(
-    referenceAssets.listReferenceAssets(ownerA, { source: "upload" }).items.map((item) => item.id),
-    [assetA.id],
-  );
-  assert.deepEqual(
-    referenceAssets.listReferenceAssets(ownerB, { source: "upload" }).items.map((item) => item.id),
-    [assetB.id],
-  );
-  assert.equal(referenceAssets.readUploadedReference(assetB.id, "media", "account-a"), null);
+  assert.notEqual(assetA.id, assetB.id, "identical bytes do not join two users' uploads");
   assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetA.id), true);
   assert.equal(referenceAssets.referenceExistsForAccount(ownerA.studioAccount, assetB.id), false);
   await assert.rejects(
     referenceAssets.bytesForReference(ownerA, assetB.id),
     /no longer in the gallery/,
   );
-  assert.throws(() => referenceAssets.deleteUploadedReference(assetB.id, "account-a"), /gone/);
-  assert.ok(referenceAssets.readUploadedReference(assetB.id, "media", "account-b"));
-  referenceAssets.deleteUploadedReference(assetA.id, "account-a");
-  referenceAssets.deleteUploadedReference(assetB.id, "account-b");
 });
 
 test("non-image uploads are rejected", async () => {
   await assert.rejects(() =>
-    referenceAssets.saveUploadedReference({
+    upload({
       buffer: Buffer.from("not an image"),
       name: "fake.png",
       mime: "image/png",
@@ -128,7 +88,7 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
   })
     .png()
     .toBuffer();
-  const asset = await referenceAssets.saveUploadedReference({
+  const asset = await upload({
     buffer: source,
     name: "portrait.png",
     mime: "image/png",
@@ -189,7 +149,6 @@ test("staging resizes every slot before upload, keeps originals, and isolates te
   );
   assert.equal(remote[0].temporary, undefined);
   process.env.STUDIO_COMFY_INPUT_DIR = temporary;
-  referenceAssets.deleteUploadedReference(asset.id);
 });
 
 test("failed staging removes already-uploaded temporary copies", async (t) => {
@@ -198,7 +157,7 @@ test("failed staging removes already-uploaded temporary copies", async (t) => {
   })
     .png()
     .toBuffer();
-  const asset = await referenceAssets.saveUploadedReference({
+  const asset = await upload({
     buffer,
     name: "rollback.png",
     mime: "image/png",
@@ -224,41 +183,9 @@ test("failed staging removes already-uploaded temporary copies", async (t) => {
   );
   assert.ok(uploadedFile);
   assert.equal(fs.existsSync(uploadedFile), false);
-  referenceAssets.deleteUploadedReference(asset.id);
 });
 
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
-
-test("search filters the full reference library before pagination and matches prompt words", async () => {
-  const { gallery } = await import("./gallery-store.js");
-  const items = Array.from({ length: 120 }, (_, index) => ({
-    id: `search-${index}`,
-    type: "image",
-    status: "done",
-    url: `/images/search-${index}.png`,
-    filename: `search-${index}.png`,
-    prompt: index === 119 ? "A Blue Mountain at Sunset" : "A green forest",
-    model: "test-model",
-    createdAt: new Date(1700000000000 + index).toISOString(),
-  }));
-  gallery.push(...items);
-  try {
-    const found = referenceAssets.listReferenceAssets(
-      {},
-      { source: "generation", q: "mountain BLUE", limit: 1 },
-    );
-    assert.equal(found.items.length, 1);
-    assert.equal(found.items[0].galleryItemId, "search-119");
-    assert.equal(found.hasMore, false);
-    assert.equal(
-      referenceAssets.listReferenceAssets({}, { source: "generation", q: "not found" }).items
-        .length,
-      0,
-    );
-  } finally {
-    for (const item of items) gallery.splice(gallery.indexOf(item), 1);
-  }
-});
 
 test("a video’s last frame is referenced only by its owner and only for finished videos", async () => {
   const { gallery } = await import("./gallery-store.js");

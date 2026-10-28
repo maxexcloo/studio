@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
-  closeReferences,
   closeLoras,
   closePresets,
+  closeReferences,
   create,
   expandComposer,
   fixtures,
@@ -13,9 +13,10 @@ import {
   profiles,
   saveCurrent,
   savedAction,
+  serveProfiles,
+  showUploads,
   stamp,
   withExpertSettings,
-  serveProfiles,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
 
@@ -616,7 +617,7 @@ test("References, masking, expert controls and runtime presets remain editable",
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("An amber bird");
   const upload = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByText("Uploads", { exact: true }).click();
+  await showUploads(page);
   await page.getByRole("button", { name: "Upload Reference", exact: true }).click();
   await (
     await upload

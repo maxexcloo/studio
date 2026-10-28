@@ -1,13 +1,12 @@
 import { useState, type DragEvent } from "react";
 import { Badge, Image, Menu, Text, UnstyledButton } from "@mantine/core";
-import { ArrowLeft, ArrowRight, ImageDown, Plus, Replace, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Replace, Trash2 } from "lucide-react";
 import type { Profile, ReferenceAsset } from "../../types";
 import {
   galleryReferenceType,
   referenceCells,
   referenceKey,
   referenceLabel,
-  uploadReferenceType,
   type ReferenceTarget,
 } from "./references";
 import { dragPicture } from "./Picker";
@@ -15,7 +14,7 @@ import classes from "./ReferencePicker.module.css";
 
 /** A placed reference dragged onto another slot moves there. */
 export const referenceCellType = "application/x-studio-reference-cell";
-const accepted = [galleryReferenceType, uploadReferenceType, referenceCellType, "Files"];
+const accepted = [galleryReferenceType, referenceCellType, "Files"];
 
 /** The profile's reference slots as numbered drop targets, in slot order. */
 export function ReferenceSlots({
@@ -25,7 +24,6 @@ export function ReferenceSlots({
   onChoose,
   onChange,
   onDrop,
-  onSave,
 }: {
   references: ReferenceAsset[];
   profile?: Profile;
@@ -33,7 +31,6 @@ export function ReferenceSlots({
   onChoose: (target: ReferenceTarget) => void;
   onChange: (references: ReferenceAsset[]) => void;
   onDrop: (data: DataTransfer, target: ReferenceTarget) => void;
-  onSave: (asset: ReferenceAsset) => void;
 }) {
   const [over, setOver] = useState<string | null>(null);
   const dropProps = (key: string, cellTarget: ReferenceTarget) => ({
@@ -155,14 +152,6 @@ export function ReferenceSlots({
                           Move Later
                         </Menu.Item>
                       </>
-                    )}
-                    {asset.source === "upload" && (
-                      <Menu.Item
-                        leftSection={<ImageDown size={16} />}
-                        onClick={() => onSave(asset)}
-                      >
-                        Save to Images
-                      </Menu.Item>
                     )}
                     <Menu.Item
                       color="red"

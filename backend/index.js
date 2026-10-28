@@ -232,7 +232,7 @@ import {
   referenceAssetForAccount,
   referenceExistsForAccount,
   stageReferenceAssetsForAccount,
-} from "./reference-assets.js";
+} from "./references.js";
 import { generationEstimate, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import {
@@ -251,15 +251,15 @@ import {
 } from "./upscale-jobs.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import { isMediaUrl, mediaRoot, mediaStorageEnabled, mediaType } from "./media-paths.js";
-import { gatedPath } from "./gated-path.js";
 import {
-  ingestRecords,
-  ingestRunResults,
+  isMediaUrl,
+  mediaRoot,
+  mediaStorageEnabled,
   mediaSubfolder,
-  noteIngested,
-  removeComfyFiles,
-} from "./media-store.js";
+  mediaType,
+} from "./media-paths.js";
+import { gatedPath } from "./gated-path.js";
+import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 import {
   accountForRequest,
@@ -1619,7 +1619,8 @@ function thumbnailCacheControl(req) {
   return req.query.v ? "private, max-age=600, stale-while-revalidate=2592000" : "private, no-cache";
 }
 
-registerReferenceRoutes(app);
+// An upload is searchable at once, like a finished generation.
+registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 
 /**
  * What the deployment decides, for Settings: each value with its source
