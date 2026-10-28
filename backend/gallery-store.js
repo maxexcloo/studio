@@ -2,6 +2,7 @@ import {
   readRuntimeDocument,
   usesRuntimeDatabase,
   writeRuntimeDocument,
+  writeRuntimeText,
 } from "./persistence/runtime.ts";
 import { generationRecord } from "./generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
@@ -13,6 +14,7 @@ import { comfyOutputDir, localOutputFile } from "./comfy.js";
 import { defaultWorkerId } from "./workers.js";
 
 import {
+  jsonTextAsync,
   readJsonFile,
   removeStaleTemporaries,
   writeJsonFile,
@@ -699,8 +701,8 @@ export function hasExistingOutputFile(item) {
 
 /**
  * Saving. A large gallery is tens of megabytes of JSON, so changes are
- * gathered for a moment and written compact and in the background (see
- * writeJsonFileAsync): the server keeps answering while it saves. The file is
+ * gathered for a moment and turned into compact text in the background (see
+ * jsonTextAsync): the server keeps answering while it saves. The file is
  * still replaced whole, with the previous copy kept as .bak, and a save that
  * is due when the server stops is written before it exits.
  */
@@ -752,8 +754,10 @@ export async function flushGallery() {
   const changes = changeCount;
   writing = (
     usesRuntimeDatabase(dataDir)
-      ? Promise.resolve().then(() => {
-          writeRuntimeDocument(dataDir, "gallery", persistableGallery());
+      ? jsonTextAsync(persistableGallery()).then((text) => {
+          // A blocking save (writeGalleryNow) may have landed while the text was made.
+          if (sequence <= committedSequence) return false;
+          writeRuntimeText(dataDir, "gallery", text);
           return true;
         })
       : writeJsonFileAsync(galleryPath, persistableGallery(), {

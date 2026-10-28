@@ -332,6 +332,7 @@ export function MediaTile({
             width={media.width || 1024}
             height={media.height || 1024}
             loading="lazy"
+            decoding="async"
             draggable={false}
             onLoad={(event) => {
               event.currentTarget.dataset.loaded = "";

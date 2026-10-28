@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActionIcon, Anchor, Group, Paper, Stack, Text, Tooltip } from "@mantine/core";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { MessageCircle, X } from "lucide-react";
@@ -78,6 +78,8 @@ export function RunsView({
     getItemKey: (index) => rows[index].key,
     overscan: 2,
     scrollMargin: host.current?.offsetTop || 0,
+    // As in Grid: scrolling renders in React's own time, not inside each scroll event.
+    useFlushSync: false,
   });
   useLayoutEffect(() => virtual.measure(), [width, columns, virtual]);
   useLayoutEffect(() => {
@@ -98,52 +100,59 @@ export function RunsView({
   }, [focusItem, width, virtual]);
 
   /** The panel's tiles fly from (or back to) the stack at its run's place as the panel fades. */
-  function fan(key: string, out: boolean) {
-    const origin = host.current
-      ?.querySelector(`[data-run="${CSS.escape(key)}"]`)
-      ?.getBoundingClientRect();
-    if (!origin || !panel.current || !motionDuration) return Promise.resolve();
-    const timing = {
-      duration: motionDuration * 2,
-      easing: "cubic-bezier(.2, .8, .2, 1)",
-      fill: out ? "backwards" : "forwards",
-    } as const;
-    const shown = [{ opacity: 0 }, { opacity: 1 }];
-    const animations = [panel.current.animate(out ? shown : shown.reverse(), timing)];
-    const tiles = panel.current.querySelectorAll<HTMLElement>(`.${classes.fanned}`);
-    tiles.forEach((tile, index) => {
-      const rect = tile.getBoundingClientRect();
-      const stacked = {
-        transform: `translate(${origin.left - rect.left}px, ${origin.top - rect.top}px) scale(${origin.width / rect.width}) rotate(${index % 2 ? 2 : -2}deg)`,
-        opacity: 0,
-      };
-      const placed = { transform: "none", opacity: 1 };
-      animations.push(
-        tile.animate(out ? [stacked, placed] : [placed, stacked], {
-          ...timing,
-          delay: (out ? index : tiles.length - 1 - index) * 25,
-        }),
-      );
-    });
-    return Promise.all(animations.map((animation) => animation.finished)).then(() => undefined);
-  }
+  const fan = useCallback(
+    (key: string, out: boolean) => {
+      const origin = host.current
+        ?.querySelector(`[data-run="${CSS.escape(key)}"]`)
+        ?.getBoundingClientRect();
+      if (!origin || !panel.current || !motionDuration) return Promise.resolve();
+      const timing = {
+        duration: motionDuration * 2,
+        easing: "cubic-bezier(.2, .8, .2, 1)",
+        fill: out ? "backwards" : "forwards",
+      } as const;
+      const shown = [{ opacity: 0 }, { opacity: 1 }];
+      const animations = [panel.current.animate(out ? shown : shown.reverse(), timing)];
+      const tiles = panel.current.querySelectorAll<HTMLElement>(`.${classes.fanned}`);
+      tiles.forEach((tile, index) => {
+        const rect = tile.getBoundingClientRect();
+        const stacked = {
+          transform: `translate(${origin.left - rect.left}px, ${origin.top - rect.top}px) scale(${origin.width / rect.width}) rotate(${index % 2 ? 2 : -2}deg)`,
+          opacity: 0,
+        };
+        const placed = { transform: "none", opacity: 1 };
+        animations.push(
+          tile.animate(out ? [stacked, placed] : [placed, stacked], {
+            ...timing,
+            delay: (out ? index : tiles.length - 1 - index) * 25,
+          }),
+        );
+      });
+      return Promise.all(animations.map((animation) => animation.finished)).then(() => undefined);
+    },
+    [host, motionDuration],
+  );
   useLayoutEffect(() => {
     if (!expanded || fanning.current !== expanded) return;
     fanning.current = null;
     void fan(expanded, true);
   });
-  async function toggle(run: Run) {
-    if (expanded === run.key) {
-      await fan(run.key, false);
-      setExpanded(null);
-    } else {
-      fanning.current = run.key;
-      setExpanded(run.key);
-    }
-  }
-  function collapse(run: Run) {
-    void toggle(run).then(() => focusTile(host.current, run.items[0].id));
-  }
+  const toggle = useCallback(
+    async (run: Run) => {
+      if (expanded === run.key) {
+        await fan(run.key, false);
+        setExpanded(null);
+      } else {
+        fanning.current = run.key;
+        setExpanded(run.key);
+      }
+    },
+    [expanded, fan],
+  );
+  const collapse = useCallback(
+    (run: Run) => void toggle(run).then(() => focusTile(host.current, run.items[0].id)),
+    [toggle, host],
+  );
 
   return (
     <div
@@ -161,112 +170,169 @@ export function RunsView({
             className={classes.row}
             style={{ transform: `translateY(${placement.start - virtual.options.scrollMargin}px)` }}
           >
-            {"panel" in row ? (
-              <RunPanel
-                ref={panel}
-                run={row.panel}
-                columns={columns}
-                chat={row.panel.items[0].sessionId}
-                chatTitle={chatTitle}
-                detail={detail}
-                onClose={() => collapse(row.panel)}
-              >
-                {row.panel.items.map((item) => (
-                  <MediaTile
-                    key={item.id}
-                    item={item}
-                    selection={selection}
-                    hold={hold}
-                    caption={caption}
-                    detail={detail(item)}
-                    style={{ aspectRatio: `${item.width || 1} / ${item.height || 1}` }}
-                    className={classes.fanned}
-                    onOpen={() => open(item)}
-                    onMenu={() => setMenuItem(item.id)}
-                    onSelectionMenu={onSelectionMenu}
-                    onTryAgain={onTryAgain}
-                    actions={renderActions(item, menuItem === item.id, (opened) =>
-                      setMenuItem(opened ? item.id : null),
-                    )}
-                  />
-                ))}
-              </RunPanel>
-            ) : (
-              <div
-                className={classes.runs}
-                data-stacked={row.runs.some((run) => run.items.length > 1) || undefined}
-                style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-              >
-                {row.runs.map((run) => {
-                  const cover = run.items.find((item) => item.status === "done") || run.items[0];
-                  const several = run.items.length > 1;
-                  const title = mediaTitle(cover);
-                  return (
-                    <div key={run.key} className={classes.run}>
-                      <MediaTile
-                        item={cover}
-                        group={run.items}
-                        label={
-                          selection.selecting
-                            ? `Select Run: ${title}, ${countLabel(run)}`
-                            : several
-                              ? `Run: ${title}, ${countLabel(run)}`
-                              : undefined
-                        }
-                        expanded={several ? expanded === run.key : undefined}
-                        selection={selection}
-                        hold={hold}
-                        caption="none"
-                        className={classes.stack}
-                        style={{ height: cell }}
-                        layers={
-                          several && (
-                            <div data-run={run.key} className={classes.layers} aria-hidden>
-                              {run.items.slice(1, 3).map((item) => {
-                                const media = mediaSource(item);
-                                const source = media.thumbnailUrl || item.preview || media.url;
-                                return (
-                                  <div key={item.id} className={classes.layer}>
-                                    {source && item.type === "image" && (
-                                      <img src={source} alt="" loading="lazy" draggable={false} />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )
-                        }
-                        onOpen={() => (several ? void toggle(run) : open(cover))}
-                        onMenu={several ? undefined : () => setMenuItem(cover.id)}
-                        onSelectionMenu={onSelectionMenu}
-                        onTryAgain={onTryAgain}
-                        actions={
-                          several
-                            ? undefined
-                            : renderActions(cover, menuItem === cover.id, (opened) =>
-                                setMenuItem(opened ? cover.id : null),
-                              )
-                        }
-                      />
-                      <div className={classes.caption}>
-                        <Text size="sm" fw={500} lineClamp={1}>
-                          {title}
-                        </Text>
-                        <Text size="xs" c="dimmed" lineClamp={1}>
-                          {[several && countLabel(run), detail(cover)].filter(Boolean).join(" · ")}
-                        </Text>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <RunsRow
+              row={row}
+              columns={columns}
+              cell={cell}
+              expanded={expanded}
+              menuItem={menuItem}
+              setMenuItem={setMenuItem}
+              toggle={toggle}
+              collapse={collapse}
+              panel={panel}
+              open={open}
+              selection={selection}
+              hold={hold}
+              caption={caption}
+              detail={detail}
+              chatTitle={chatTitle}
+              renderActions={renderActions}
+              onSelectionMenu={onSelectionMenu}
+              onTryAgain={onTryAgain}
+            />
           </div>
         );
       })}
     </div>
   );
 }
+
+/**
+ * One placed row: a row of run stacks, or an open run's panel. Memoised like Grid's cells, so a
+ * scroll renders only the rows entering the window.
+ */
+const RunsRow = memo(function RunsRow({
+  row,
+  columns,
+  cell,
+  expanded,
+  menuItem,
+  setMenuItem,
+  toggle,
+  collapse,
+  panel,
+  open,
+  selection,
+  hold,
+  caption,
+  detail,
+  chatTitle,
+  renderActions,
+  onSelectionMenu,
+  onTryAgain,
+}: Omit<GalleryViewProps, "items" | "focusItem" | "versions"> & {
+  row: Row;
+  columns: number;
+  cell: number;
+  expanded: string | null;
+  menuItem: string | null;
+  setMenuItem: (id: string | null) => void;
+  toggle: (run: Run) => Promise<void>;
+  collapse: (run: Run) => void;
+  panel: React.Ref<HTMLDivElement>;
+  hold: ReturnType<typeof useHoldToSelect>;
+}) {
+  return "panel" in row ? (
+    <RunPanel
+      ref={panel}
+      run={row.panel}
+      columns={columns}
+      chat={row.panel.items[0].sessionId}
+      chatTitle={chatTitle}
+      detail={detail}
+      onClose={() => collapse(row.panel)}
+    >
+      {row.panel.items.map((item) => (
+        <MediaTile
+          key={item.id}
+          item={item}
+          selection={selection}
+          hold={hold}
+          caption={caption}
+          detail={detail(item)}
+          style={{ aspectRatio: `${item.width || 1} / ${item.height || 1}` }}
+          className={classes.fanned}
+          onOpen={() => open(item)}
+          onMenu={() => setMenuItem(item.id)}
+          onSelectionMenu={onSelectionMenu}
+          onTryAgain={onTryAgain}
+          actions={renderActions(item, menuItem === item.id, (opened) =>
+            setMenuItem(opened ? item.id : null),
+          )}
+        />
+      ))}
+    </RunPanel>
+  ) : (
+    <div
+      className={classes.runs}
+      data-stacked={row.runs.some((run) => run.items.length > 1) || undefined}
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+    >
+      {row.runs.map((run) => {
+        const cover = run.items.find((item) => item.status === "done") || run.items[0];
+        const several = run.items.length > 1;
+        const title = mediaTitle(cover);
+        return (
+          <div key={run.key} className={classes.run}>
+            <MediaTile
+              item={cover}
+              group={run.items}
+              label={
+                selection.selecting
+                  ? `Select Run: ${title}, ${countLabel(run)}`
+                  : several
+                    ? `Run: ${title}, ${countLabel(run)}`
+                    : undefined
+              }
+              expanded={several ? expanded === run.key : undefined}
+              selection={selection}
+              hold={hold}
+              caption="none"
+              className={classes.stack}
+              style={{ height: cell }}
+              layers={
+                several && (
+                  <div data-run={run.key} className={classes.layers} aria-hidden>
+                    {run.items.slice(1, 3).map((item) => {
+                      const media = mediaSource(item);
+                      const source = media.thumbnailUrl || item.preview || media.url;
+                      return (
+                        <div key={item.id} className={classes.layer}>
+                          {source && item.type === "image" && (
+                            <img src={source} alt="" loading="lazy" draggable={false} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+              onOpen={() => (several ? void toggle(run) : open(cover))}
+              onMenu={several ? undefined : () => setMenuItem(cover.id)}
+              onSelectionMenu={onSelectionMenu}
+              onTryAgain={onTryAgain}
+              actions={
+                several
+                  ? undefined
+                  : renderActions(cover, menuItem === cover.id, (opened) =>
+                      setMenuItem(opened ? cover.id : null),
+                    )
+              }
+            />
+            <div className={classes.caption}>
+              <Text size="sm" fw={500} lineClamp={1}>
+                {title}
+              </Text>
+              <Text size="xs" c="dimmed" lineClamp={1}>
+                {[several && countLabel(run), detail(cover)].filter(Boolean).join(" · ")}
+              </Text>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+});
 
 function RunPanel({
   ref,

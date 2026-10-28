@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage, useLongPress, useMediaQuery } from "@mantine/hooks";
 import { useMantineTheme } from "@mantine/core";
 import type { MediaItem } from "../../types";
@@ -40,13 +40,14 @@ export function useTileCaptions() {
 
 /**
  * Phone hold-to-select over any tile with `data-media-id`, using Mantine's touch gesture with
- * movement cancellation. `held` marks the tile whose release must not also open it.
+ * movement cancellation. `held` marks the tile whose release must not also open it. The result
+ * stays the same object while `items` and `selection` do, so memoised tiles skip scroll renders.
  */
 export function useHoldToSelect(items: MediaItem[], selection: GallerySelection | undefined) {
   const phone = usePhone();
   const held = useRef<string | null>(null);
-  const handlers = useLongPress(
-    (event) => {
+  const select = useCallback(
+    (event: React.MouseEvent | React.TouchEvent) => {
       if (!phone || !selection) return;
       const element = (event.target as Element).closest<HTMLElement>("[data-media-id]");
       const ids = element?.dataset.mediaGroup?.split(" ") || [element?.dataset.mediaId];
@@ -56,19 +57,23 @@ export function useHoldToSelect(items: MediaItem[], selection: GallerySelection 
       if (!selection.selecting) selection.start();
       selection.toggle(group);
     },
-    {
-      events: ["touch"],
-      cancelOnMove: true,
-      onStart: () => {
-        held.current = null;
-      },
-    },
+    [phone, selection, items],
   );
-  /** True, once, for the click that ends a hold on `id`. */
-  function consumeHold(id: string) {
-    if (held.current !== id) return false;
+  const onStart = useCallback(() => {
     held.current = null;
-    return true;
-  }
-  return { handlers, held, consumeHold };
+  }, []);
+  const handlers = useLongPress(select, { events: ["touch"], cancelOnMove: true, onStart });
+  return useMemo(
+    () => ({
+      handlers,
+      held,
+      /** True, once, for the click that ends a hold on `id`. */
+      consumeHold(id: string) {
+        if (held.current !== id) return false;
+        held.current = null;
+        return true;
+      },
+    }),
+    [handlers],
+  );
 }
