@@ -24,7 +24,9 @@ let zoomAnchor: ZoomAnchor | null = null;
 /** The tile under a viewport point, or the nearest one, as the anchor for a change of columns. */
 function anchorAt(x: number, y: number, columns: number, scale: number): ZoomAnchor | null {
   let best: { tile: HTMLElement; rect: DOMRect; away: number } | null = null;
-  for (const tile of document.querySelectorAll<HTMLElement>("[data-gallery-view] [data-media-id]")) {
+  for (const tile of document.querySelectorAll<HTMLElement>(
+    "[data-gallery-view] [data-media-id]",
+  )) {
     const rect = tile.getBoundingClientRect();
     const away = Math.hypot(
       Math.max(rect.left - x, 0, x - rect.right),

@@ -512,18 +512,14 @@ export async function fixtures(page: Page) {
       });
     if (path === "/api/gallery") {
       galleryRequests.push(url.search);
-      return respond({
-        items: gallery.filter(
-          (i) =>
-            (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
-            (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
-            Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
-            (!url.searchParams.has("chat") ||
-              url.searchParams.getAll("chat").includes(i.sessionId)),
-        ),
-        hasMore: false,
-        nextCursor: "",
-      });
+      const items = gallery.filter(
+        (i) =>
+          (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
+          (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
+          Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
+          (!url.searchParams.has("chat") || url.searchParams.getAll("chat").includes(i.sessionId)),
+      );
+      return respond({ items, hasMore: false, nextCursor: "", totalApprox: items.length });
     }
     if (method === "GET" && path.startsWith("/api/reference-assets/")) {
       const id = decodeURIComponent(path.split("/")[3]);

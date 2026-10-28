@@ -25,9 +25,11 @@ import type { MediaItem, ReferenceAsset, Profile, GenerationInput } from "../../
 import { LoadingState } from "../../ui/LoadingState";
 import { EmptyState } from "../../ui/EmptyState";
 import {
-  GalleryFilters,
+  FilterChips,
+  GalleryFilterPanel,
   appendGalleryFilters,
-  galleryFilterCount,
+  emptyGalleryFilters,
+  useActiveFilters,
 } from "../gallery/GalleryFilters";
 import { referenceDetails, referenceGroup } from "./payload";
 import { useGeneration } from "./GenerationProvider";
@@ -91,13 +93,19 @@ export function ReferencePicker({
   const placement = useReferencePlacement(list);
   const localBrowser = useReferenceBrowser();
   const browser = controlledBrowser || localBrowser;
-  const { target: chosen, query, filters, starred, uploads } = browser.state;
+  const { target: chosen, query, filters } = browser.state;
+  const { uploads } = filters;
   const target = nextReferenceTarget(references, profile, chosen);
   function browse(patch: Partial<ReferenceBrowser["state"]>) {
     if (!("target" in patch)) browser.scroll.current = 0;
     browser.setState((previous) => ({ ...previous, ...patch }));
   }
   const settle = () => browse({ target: null });
+  const activeFilters = useActiveFilters({
+    kind: "image",
+    value: filters,
+    onChange: (filters) => browse({ filters }),
+  });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search] = useDebouncedValue(query, 250);
   const client = useQueryClient();
@@ -162,14 +170,14 @@ export function ReferencePicker({
   }
   // Uploads are gallery images too, behind the gallery's Uploads filter.
   const listing = useInfiniteQuery({
-    queryKey: ["reference-gallery", search, filters, starred, uploads],
+    queryKey: ["reference-gallery", search, filters],
     enabled: opened,
     // Searching and filtering keep the current tiles until the new ones arrive.
     placeholderData: keepPreviousData,
     initialPageParam: "",
     queryFn: ({ pageParam }) =>
       api<{ items: MediaItem[]; hasMore: boolean; nextCursor: string }>(
-        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search, favorites: starred ? "1" : "0", uploads: uploads ? "1" : "0" }), filters)}`,
+        `/api/gallery?${appendGalleryFilters(new URLSearchParams({ limit: "60", cursor: pageParam, type: "image", q: search }), filters)}`,
       ),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
   });
@@ -275,17 +283,18 @@ export function ReferencePicker({
         query={query}
         onQueryChange={(query) => browse({ query })}
         placeholder={uploads ? "Search uploads…" : "Search your generations…"}
-        filterCount={galleryFilterCount(filters, starred, uploads)}
+        filterCount={activeFilters.length}
+        chips={
+          <FilterChips
+            chips={activeFilters}
+            onClear={() => browse({ filters: emptyGalleryFilters })}
+          />
+        }
         filters={
-          <GalleryFilters
-            withinPortal={false}
+          <GalleryFilterPanel
             kind="image"
             value={filters}
             onChange={(filters) => browse({ filters })}
-            starred={starred}
-            onStarredChange={(starred) => browse({ starred })}
-            uploads={uploads}
-            onUploadsChange={(uploads) => browse({ uploads })}
           />
         }
       />

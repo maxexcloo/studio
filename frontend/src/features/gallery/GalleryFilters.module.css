@@ -1,4 +1,4 @@
-/* Search, filters and the normal row replace one another in place. */
+/* Search and the normal row replace one another in place on phones. */
 .mode {
   animation: reveal var(--studio-motion-duration) var(--studio-ease-enter);
 }
@@ -15,12 +15,6 @@
   }
 }
 
-/* The leading controls (search, view or facets) take the row's free width. */
-.lead {
-  flex: 1;
-  min-width: 0;
-}
-
 .search {
   flex: 0 1 18rem;
   min-width: 10rem;
@@ -30,11 +24,12 @@
   flex: 1;
 }
 
-.facets {
+/* The chips take the row's free width and scroll sideways, so filters never change its height. */
+.chips {
   flex: 1;
   min-width: 0;
 }
 
-.clear {
-  flex: none;
+.slider {
+  width: 88px;
 }
