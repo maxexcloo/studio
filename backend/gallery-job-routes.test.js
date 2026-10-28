@@ -7,7 +7,7 @@ import express from "express";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-job-"));
 process.env.STUDIO_DATA_DIR = dir;
-process.env.STUDIO_COMFY_OUTPUT_DIR = dir;
+process.env.STUDIO_MEDIA_DIR = dir;
 const { setGallery } = await import("./gallery-store.js");
 const { registerGalleryReadRoutes } = await import("./gallery-routes.js");
 
@@ -27,7 +27,7 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
     index: 0,
     status: "done",
     type: "image",
-    url: `/comfy/view?filename=${name}`,
+    url: `/comfy/view?filename=${name}&type=media`,
     prompt: "private prompt text",
     ...extra,
   });
@@ -47,7 +47,7 @@ test("exact job results exclude unrelated and deleted outputs and expose prompts
       index: 0,
       status: "done",
       type: "image",
-      url: "/comfy/view?filename=visible.png",
+      url: "/comfy/view?filename=visible.png&type=media",
     },
   ]);
   // MCP asks for the prompt and settings only to run a result again.

@@ -2,7 +2,6 @@ import fs from "node:fs";
 import { isMediaUrl, mediaRoot } from "./media-paths.js";
 import path from "node:path";
 import zlib from "node:zlib";
-import { comfyOutputDir } from "./comfy.js";
 import { isInside } from "./paths.js";
 import { filterVisibleGallery, gallery, outputFileCandidates } from "./gallery-store.js";
 import { recordsForRequest } from "./account-ownership.js";
@@ -125,7 +124,6 @@ function archiveEntries(req = null, ids = null) {
     names.add(name.toLowerCase());
     entries.push({ name, ...source, createdAt: item.createdAt });
   };
-  const base = comfyOutputDir ? path.resolve(comfyOutputDir) : "";
   const sourceGallery = req
     ? recordsForRequest(gallery, req)
     : process.env.STUDIO_MULTI_USER === "1"
@@ -133,13 +131,12 @@ function archiveEntries(req = null, ids = null) {
       : gallery;
   for (const item of filterVisibleGallery(sourceGallery)) {
     if (ids && ![item.id, item.url].some((key) => ids.has(String(key)))) continue;
-    // Studio media lives in its own folder; everything else in ComfyUI's.
-    const itemBase = isMediaUrl(item.url) ? mediaRoot : base;
-    if (item.status !== "done" || !itemBase) continue;
+    // Only Studio media is on this computer.
+    if (item.status !== "done" || !isMediaUrl(item.url)) continue;
     const file = outputFileCandidates(item)
       .map((candidate) => path.resolve(candidate))
       .find((resolved) => {
-        if (!isInside(itemBase, resolved, { orSame: true })) return false;
+        if (!isInside(mediaRoot, resolved, { orSame: true })) return false;
         try {
           return fs.statSync(resolved).isFile();
         } catch {

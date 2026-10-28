@@ -1,14 +1,7 @@
-import fs from "node:fs";
-import path from "node:path";
-import { modelFolders } from "./comfy.js";
-import { isGguf, readGgufHeader } from "./gguf.js";
-import { readSafetensorsHeader } from "./model-families.js";
-
 /**
- * Text encoders and VAEs, recognised the way ComfyUI recognises them: by tensor
- * names and shapes in the safetensors header (comfy/sd.py detect_te_model and
- * VAE.__init__). A remote ComfyUI only gives us file names, so each kind also
- * carries a filename pattern as the fallback.
+ * Text encoders and VAEs. ComfyUI recognises them by tensor names and shapes in
+ * the safetensors header (comfy/sd.py detect_te_model and VAE.__init__); the
+ * worker only gives Studio file names, so each kind carries a filename pattern.
  */
 
 /* ------------------------------------------------------------ Kinds */
@@ -177,45 +170,6 @@ export function vaeLayoutFromHeader(header) {
   return "other";
 }
 
-/* ------------------------------------------------------------ Files */
-
-const headerCache = new Map();
-
-function localFile(kind, subfolders, name) {
-  if (!/\.(safetensors|gguf)$/i.test(name)) return "";
-  const parts = String(name).split(/[\\/]/).filter(Boolean);
-  if (parts.some((part) => part === "..")) return "";
-  for (const dir of modelFolders(kind, subfolders)) {
-    const file = path.join(dir, ...parts);
-    try {
-      if (fs.statSync(file).isFile()) return file;
-    } catch {
-      /* next folder */
-    }
-  }
-  return "";
-}
-
-function cachedHeader(file) {
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return null;
-  }
-  const key = `${file}:${stat.size}:${stat.mtimeMs}`;
-  if (!headerCache.has(key)) {
-    let header = null;
-    try {
-      header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file);
-    } catch {
-      header = null;
-    }
-    headerCache.set(key, header);
-  }
-  return headerCache.get(key);
-}
-
 function isAbliterated(name = "") {
   return /abliterat|uncensor|heretic/i.test(String(name));
 }
@@ -228,15 +182,10 @@ function encoderKindFromName(name = "") {
   return "";
 }
 
-/** What one text encoder file is, and how sure we are ("file" beats "name"). */
+/** What one text encoder file is, by its name. */
 export function classifyEncoder(name) {
-  const file = localFile("text_encoders", ["text_encoders", "clip"], name);
-  const header = file ? cachedHeader(file) : null;
-  const fromHeader = header ? encoderKindFromHeader(header) : "";
-  if (fromHeader && fromHeader !== "other") return { name, kind: fromHeader, via: "file" };
-  const fromName = encoderKindFromName(name);
-  if (fromName) return { name, kind: fromName, via: "name" };
-  return { name, kind: fromHeader === "other" ? "other" : "", via: fromHeader ? "file" : "" };
+  const kind = encoderKindFromName(name);
+  return { name, kind, via: kind ? "name" : "" };
 }
 
 const vaeNameHints = [
@@ -258,31 +207,10 @@ const vaeNameHints = [
   ["sd15", /sd[-_ ]?1|vae[-_]ft|mse|ema/i],
 ];
 
-function vaeKindsForLayout(layout) {
-  return Object.entries(vaeKinds)
-    .filter(([, spec]) => spec.layout === layout)
-    .map(([kind]) => kind);
-}
-
-/**
- * What one VAE file is. With a header we know its layout and only let the name
- * choose within it; without one the name decides alone.
- */
+/** What one VAE file is, by its name. */
 export function classifyVae(name) {
   const base = String(name).split(/[\\/]/).pop() || "";
-  const file = localFile("vae", ["vae"], name);
-  const header = file ? cachedHeader(file) : null;
-  const layout = header ? vaeLayoutFromHeader(header) : "";
-  const hinted = vaeNameHints.filter(([, pattern]) => pattern.test(base)).map(([kind]) => kind);
-  if (layout && layout !== "other" && layout !== "preview") {
-    const within = vaeKindsForLayout(layout);
-    const kind =
-      hinted.find((hint) => within.includes(hint) || vaeKinds[hint].layout === "unknown") || "";
-    // Shapes alone cannot split these pairs, so an unnamed file fits either.
-    return { name, layout, kind, kinds: kind ? [kind] : within, via: "file" };
-  }
-  if (layout === "preview") return { name, layout, kind: "", kinds: [], via: "file" };
-  const kind = hinted[0] || "";
+  const kind = vaeNameHints.find(([, pattern]) => pattern.test(base))?.[0] || "";
   return {
     name,
     layout: kind ? vaeKinds[kind].layout : "",

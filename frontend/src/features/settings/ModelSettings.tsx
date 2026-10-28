@@ -28,7 +28,6 @@ interface Deployment {
     huggingFace: { token: { set: boolean } };
     assistant: { available: boolean; note?: string; model: Setting };
   };
-  storage: Source & { outputs: "studio" | "comfy" };
 }
 const deploymentQuery = {
   queryKey: ["settings-deployment"],
@@ -58,7 +57,7 @@ export function ModelSettings() {
   });
   if (deployment.isPending) return <LoadingState label="Loading Models" />;
   if (deployment.error) return <Alert color="red">{deployment.error.message}</Alert>;
-  const { defaults, catalogue, integrations, storage } = deployment.data;
+  const { defaults, catalogue, integrations } = deployment.data;
   const profileSelect = (kind: "image" | "video", setting: Setting) => {
     const label = kind === "image" ? "Default Image Profile" : "Default Video Profile";
     const options = defaults.profiles.filter((profile) => profile.kind === kind);
@@ -135,12 +134,6 @@ export function ModelSettings() {
             integrations.huggingFace.token.set,
             integrations.huggingFace.token.set ? "Connected" : "Public Only",
           )}
-        </SettingRow>
-        <SettingRow
-          label="Output Storage"
-          description={`${sourceNote(storage)} · ${storage.outputs === "studio" ? "Finished outputs are kept in Studio’s media folder" : "Finished outputs stay in ComfyUI’s output folder"}`}
-        >
-          <Badge color="gray">{storage.outputs === "studio" ? "Studio" : "ComfyUI Folder"}</Badge>
         </SettingRow>
         <SettingRow
           label="Prompt Assistant"

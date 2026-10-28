@@ -14,8 +14,6 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 process.env.STUDIO_DATA_DIR = temporary;
 writeTestWorkflows(temporary);
-process.env.STUDIO_OUTPUT_STORAGE = "studio";
-process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const nativeFetch = globalThis.fetch;
 const NativeWebSocket = globalThis.WebSocket;
 const sockets = new Map();

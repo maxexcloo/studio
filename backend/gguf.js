@@ -1,6 +1,5 @@
 import fs from "node:fs";
-import path from "node:path";
-import { hasNode, modelFolders, optionsFor } from "./comfy.js";
+import { optionsFor } from "./comfy.js";
 
 /**
  * GGUF model files, the way ComfyUI-GGUF (city96) loads them.
@@ -249,34 +248,6 @@ function textEncoderKeys(arch, tensors) {
 }
 
 /* ------------------------------------------------------------ Model lists */
-
-/**
- * GGUF diffusion models ComfyUI can load through ComfyUI-GGUF. Without the
- * pack ComfyUI lists none of them, so a local ComfyUI's model folders are
- * searched instead: those files show up needing the pack, not missing.
- */
-export function ggufModelNames(info) {
-  if (hasNode(info, "UnetLoaderGGUF"))
-    return optionsFor(info, "UnetLoaderGGUF", "unet_name").filter(isGguf);
-  const found = new Set();
-  const walk = (dir, prefix, depth) => {
-    let entries = [];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const name = prefix ? path.join(prefix, entry.name) : entry.name;
-      if (entry.isDirectory() && depth < 3 && !entry.name.startsWith("."))
-        walk(path.join(dir, entry.name), name, depth + 1);
-      else if (entry.isFile() && isGguf(entry.name)) found.add(name);
-    }
-  };
-  for (const dir of modelFolders("diffusion_models", ["diffusion_models", "unet"]))
-    walk(dir, "", 0);
-  return [...found].sort();
-}
 
 /** GGUF text encoders CLIPLoaderGGUF lists (it lists the safetensors ones too; CLIPLoader has those). */
 export function ggufEncoderNames(info) {

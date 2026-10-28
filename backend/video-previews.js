@@ -9,9 +9,8 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { dataDir } from "./gallery-store.js";
-import { comfyUrl } from "./comfy.js";
+import { comfyUrl, localOutputFile } from "./comfy.js";
 import { sendMediaBuffer } from "./media-response.js";
-import { trustedLocalOutput } from "./thumbnails.js";
 import { mediaType } from "./media-paths.js";
 
 const require = createRequire(import.meta.url);
@@ -327,7 +326,7 @@ export async function getFileVideoPoster(file, identity = file) {
 /** An output's still: from the file when it's on this computer, else from its preview. */
 export async function getComfyVideoPoster(filename, subfolder, type) {
   const source = comfySource(filename, subfolder, type);
-  const local = await trustedLocalOutput(filename, subfolder, type);
+  const local = localOutputFile(filename, subfolder, type);
   if (local) return getFileVideoPoster(local, source);
   if (type === mediaType) throw new Error("Source video is unavailable.");
   return getVideoPoster(await getComfyVideoPreview(filename, subfolder, type));
@@ -335,7 +334,7 @@ export async function getComfyVideoPoster(filename, subfolder, type) {
 
 export async function getComfyVideoPreview(filename, subfolder, type) {
   const source = comfySource(filename, subfolder, type);
-  const local = await trustedLocalOutput(filename, subfolder, type);
+  const local = localOutputFile(filename, subfolder, type);
   if (local) return getFileVideoPreview(local, source);
   // Studio media is never fetched from ComfyUI.
   if (type === mediaType) throw new Error("Source video is unavailable.");

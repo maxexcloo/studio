@@ -4,20 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Point ComfyUI and the data folder at a scratch tree before the modules read them.
+// Point the data folder at a scratch tree before the modules read it.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-types-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
-const dirs = Object.fromEntries(
-  ["diffusion_models", "checkpoints", "text_encoders", "vae"].map((name) => {
-    const dir = path.join(scratch, "ComfyUI", "models", name);
-    fs.mkdirSync(dir, { recursive: true });
-    return [name, dir];
-  }),
-);
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel, readSafetensorsHeader } = await import("./model-families.js");
+const { classifyModel } = await import("./model-families.js");
 const { familyFromHeader } = await import("./family-catalog.js");
 const { encoderKindFromHeader, vaeLayoutFromHeader } = await import("./model-components.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
@@ -117,18 +109,6 @@ const vaes = {
   },
 };
 
-function writeSafetensors(file, header) {
-  const json = Buffer.from(JSON.stringify(header));
-  const length = Buffer.alloc(8);
-  length.writeBigUInt64LE(BigInt(json.length));
-  fs.writeFileSync(file, Buffer.concat([length, json]));
-}
-
-function put(folder, name, header) {
-  writeSafetensors(path.join(dirs[folder], name), header);
-  return name;
-}
-
 const list = (values) => ({ input: { required: values } });
 const node = () => list({});
 
@@ -213,18 +193,6 @@ function objectInfo({
 
 /* ------------------------------------------------------------ recognition */
 
-test("safetensors headers are read from disk", () => {
-  const file = put("diffusion_models", "roundtrip.safetensors", {
-    __metadata__: { format: "pt" },
-    ...headers.krea2,
-  });
-  assert.deepEqual(
-    readSafetensorsHeader(path.join(dirs.diffusion_models, file))["txtfusion.projector.weight"]
-      .shape,
-    [3072, 12],
-  );
-});
-
 test("model families come from the weights, in ComfyUI's order", () => {
   const family = (header) => familyFromHeader(header).family;
   assert.equal(family(headers.krea2), "krea2");
@@ -279,17 +247,7 @@ test("text encoders and VAEs are told apart by shape", () => {
   assert.equal(vaeLayoutFromHeader(vaes.wan48), "wan48");
 });
 
-test("the weights win over the filename, and names fill in when files are out of reach", () => {
-  put("diffusion_models", "krea2_but_actually_flux.safetensors", headers.fluxDev);
-  put("diffusion_models", "myRealismMix_v2.safetensors", headers.krea2);
-  assert.equal(classifyModel("unet", "krea2_but_actually_flux.safetensors").family, "flux1");
-  assert.deepEqual(
-    [
-      classifyModel("unet", "myRealismMix_v2.safetensors").family,
-      classifyModel("unet", "myRealismMix_v2.safetensors").via,
-    ],
-    ["krea2", "file"],
-  );
+test("model files are placed by their names", () => {
   assert.equal(
     classifyModel("unet", "remote/flux1-krea-dev.safetensors").family,
     "flux1",
@@ -304,22 +262,6 @@ test("the weights win over the filename, and names fill in when files are out of
   );
   const unknownCheckpoint = classifyModel("checkpoint", "remote/cyberrealisticPony_v8.safetensors");
   assert.deepEqual([unknownCheckpoint.family, unknownCheckpoint.variant.id], ["sdxl", "pony"]);
-});
-
-test("checkpoints report which parts they carry", () => {
-  put("checkpoints", "juggernautXL.safetensors", {
-    ...prefixed("model.diffusion_model.", headers.sdxlUnet),
-    "conditioner.embedders.0.transformer.text_model.x": t([1]),
-    "first_stage_model.decoder.conv_in.weight": t([512, 4, 3, 3]),
-  });
-  put("checkpoints", "zImageRealism_fp8.safetensors", headers.zimage);
-  assert.deepEqual(classifyModel("checkpoint", "juggernautXL.safetensors").bundled, {
-    encoder: true,
-    vae: true,
-    known: true,
-  });
-  const bare = classifyModel("checkpoint", "zImageRealism_fp8.safetensors");
-  assert.deepEqual([bare.family, bare.bundled.encoder, bare.bundled.vae], ["zimage", false, false]);
 });
 
 /* ------------------------------------------------------------ profiles */
@@ -364,12 +306,6 @@ const sanaNodes = (presets) => ({
     batch_size: ["INT", { default: 1, min: 1, max: 4096 }],
   }),
 });
-// Where the ExtraModels loader leaves a preset it has fetched.
-const downloadSanaPreset = (dir, file) => {
-  const target = path.join(scratch, "ComfyUI", "models", "sana", dir, "checkpoints");
-  fs.mkdirSync(target, { recursive: true });
-  fs.writeFileSync(path.join(target, file), "");
-};
 
 test("Sana is recognised from its own and diffusers-style weights", () => {
   const blocks = (prefix, count, extra = {}) => ({
@@ -406,12 +342,6 @@ test("Sana is recognised from its own and diffusers-style weights", () => {
     "sana",
     "not LTX-Video",
   );
-  const local = put(
-    "checkpoints",
-    "mySanaTune.safetensors",
-    blocks("blocks", 60, { "blocks.0.mlp.inverted_conv.conv.weight": t([1, 1, 1, 1]) }),
-  );
-  assert.equal(classifyModel("checkpoint", local).family, "sana");
   assert.equal(classifyModel("checkpoint", "Sana_Sprint_0.6B_1024px.pth").variant.id, "sprint");
 });
 
@@ -488,7 +418,7 @@ test("the four new families are told apart by their weights, as ComfyUI does", (
   assert.equal(vaeLayoutFromHeader({ "student.dconv_encoder.proj_out.weight": t([1, 1]) }), "mage");
 });
 
-test("Qwen-Image 2.1 is read from its weights, and weights nothing knows yet let the name decide", () => {
+test("Qwen-Image 2.1 is read from its weights or its name", () => {
   const qwen21 = {
     "txt_in.text_norm.weight": t([4096]),
     "modulation.1.weight": t([16384, 4096]),
@@ -508,17 +438,6 @@ test("Qwen-Image 2.1 is read from its weights, and weights nothing knows yet let
     },
   };
   assert.equal(familyFromHeader(qwen21).family, "qwen_image_21");
-  put("diffusion_models", "renamed_finetune_v3_int8.safetensors", qwen21);
-  assert.deepEqual(
-    [
-      classifyModel("unet", "renamed_finetune_v3_int8.safetensors").family,
-      classifyModel("unet", "renamed_finetune_v3_int8.safetensors").via,
-    ],
-    ["qwen_image_21", "file"],
-  );
-  const unknown = { "brand_new_block.0.weight": t([1, 1]), "brand_new_block.1.weight": t([1, 1]) };
-  put("diffusion_models", "qwenImage21_future_layout.safetensors", unknown);
-  put("diffusion_models", "mystery_model.safetensors", unknown);
   assert.deepEqual(
     [
       classifyModel("unet", "qwenImage21_future_layout.safetensors").family,
@@ -526,7 +445,6 @@ test("Qwen-Image 2.1 is read from its weights, and weights nothing knows yet let
     ],
     ["qwen_image_21", "name"],
   );
-  assert.equal(classifyModel("unet", "mystery_model.safetensors").family, "other");
 });
 
 /* ------------------------------------------------------------ MOSS-Image */
@@ -547,7 +465,7 @@ const mossTypes = [...newTypes, "moss_image"];
 test("a pack inside a bigger repository is cloned beside its folder and only its folder is copied in", async () => {
   const { packInstallPlan } = await import("./node-install.js");
   const { nodePack } = await import("./node-packs.js");
-  const plan = packInstallPlan(nodePack("moss_image"), "/opt/ComfyUI");
+  const plan = packInstallPlan(nodePack("moss_image"));
   const [command] = plan.commands;
   assert.match(
     command.command,

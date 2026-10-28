@@ -8,7 +8,7 @@ import test from "node:test";
 
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
-process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
+process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const {
   galleryRevisionValue,
@@ -20,7 +20,7 @@ const {
 } = await import("./gallery-store.js");
 
 const url = (filename) =>
-  `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "output" })}`;
+  `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "media" })}`;
 
 test("completed videos use their encoded dimensions instead of requested aspect or resolution", async (context) => {
   let encoder;

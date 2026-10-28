@@ -50,14 +50,6 @@ function fixture(t) {
       url: "https://civitai.com/api/download/models/2",
     },
   });
-  const modelFile = path.join(dir, "comfy", "models", "vae", "ae.safetensors");
-  fs.mkdirSync(path.dirname(modelFile), { recursive: true });
-  fs.writeFileSync(modelFile, "vae");
-  const stat = fs.statSync(modelFile);
-  write("model-hashes.json", {
-    [`${modelFile}|${stat.size}|${stat.mtimeMs}`]: hex("c"),
-    [`${modelFile}|1|1`]: hex("d"),
-  });
   write("config/models.json", [
     {
       path: "models/comfyui/vae/ae.safetensors",
@@ -88,7 +80,6 @@ const snapshot = (dir) =>
       "config/lora-catalogue.json",
       "lora-catalogue.json",
       "model-download-sources.json",
-      "model-hashes.json",
       "config/models.json",
     ].map((name) => [name, fs.readFileSync(path.join(dir, name), "utf8")]),
   );

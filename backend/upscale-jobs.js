@@ -6,7 +6,7 @@ import { recordUpscale, upscaleEstimate } from "./timings.js";
 import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
 import { saveIntoStudioFolder } from "./graphs.js";
-import { ingestRunResults, mediaStorageEnabled, removeComfyFiles } from "./media-store.js";
+import { ingestRunResults, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
 
 export function findUpscaleTarget(id) {
@@ -193,12 +193,9 @@ export async function runUpscaleJob(
           });
         }
         // ComfyUI as a worker: the upscale moves into Studio media beside its source.
-        let comfyCopies = [];
-        if (mediaStorageEnabled) {
-          const moved = await ingestRunResults([{ output }], body.ownerId || "", { strict: true });
-          output = moved.results[0].output;
-          comfyCopies = moved.comfyFiles;
-        }
+        const moved = await ingestRunResults([{ output }], body.ownerId || "", { strict: true });
+        output = moved.results[0].output;
+        const comfyCopies = moved.comfyFiles;
         // Learned from, unless its start was never heard.
         const startAt = clock.startAt();
         if (startAt)

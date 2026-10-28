@@ -4,23 +4,21 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Point ComfyUI and the data folder at a scratch tree before the modules read them.
+// Point the data folder at a scratch tree before the modules read it; the GGUF files go beside it.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gguf-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 const dirs = Object.fromEntries(
-  ["diffusion_models", "checkpoints", "text_encoders", "vae"].map((name) => {
-    const dir = path.join(scratch, "ComfyUI", "models", name);
+  ["diffusion_models", "text_encoders"].map((name) => {
+    const dir = path.join(scratch, name);
     fs.mkdirSync(dir, { recursive: true });
     return [name, dir];
   }),
 );
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { ggufModelNames, readGgufHeader, withGgufLoaders } = await import("./gguf.js");
-const { classifyModel } = await import("./model-families.js");
+const { readGgufHeader, withGgufLoaders } = await import("./gguf.js");
 const { familyFromHeader } = await import("./family-catalog.js");
-const { classifyEncoder, encoderKindFromHeader } = await import("./model-components.js");
+const { encoderKindFromHeader } = await import("./model-components.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 /* ------------------------------------------------------------ A tiny GGUF writer */
@@ -239,25 +237,15 @@ test("GGUF text encoders are recognised under the names ComfyUI-GGUF gives them"
     ),
     "qwen3_4b",
   );
-  assert.deepEqual(classifyEncoder("mystery-encoder.gguf"), {
-    name: "mystery-encoder.gguf",
-    kind: "qwen3_4b",
-    via: "file",
-  });
 });
 
-test("anything that is not a GGUF file is refused, and a model then falls back to its name", () => {
+test("anything that is not a GGUF file is refused", () => {
   const bad = put("diffusion_models", "flux1-dev-broken.gguf", Buffer.from("GGUF\x01\x00\x00\x00"));
   assert.throws(() => readGgufHeader(path.join(dirs.diffusion_models, bad)), /version/);
   const truncated = put("diffusion_models", "cut.gguf", fluxModel.subarray(0, 60));
   assert.throws(
     () => readGgufHeader(path.join(dirs.diffusion_models, truncated)),
     /truncated|too large/,
-  );
-  assert.equal(classifyModel("unet", bad).via, "name");
-  assert.equal(
-    classifyModel("unet", put("diffusion_models", "renamed-finetune.gguf", fluxModel)).via,
-    "file",
   );
 });
 

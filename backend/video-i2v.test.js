@@ -5,15 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-i2v-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
-const dirs = Object.fromEntries(
-  ["diffusion_models", "text_encoders", "vae", "clip_vision"].map((name) => {
-    const dir = path.join(scratch, "ComfyUI", "models", name);
-    fs.mkdirSync(dir, { recursive: true });
-    return [name, dir];
-  }),
-);
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { classifyModel } = await import("./model-families.js");
@@ -22,13 +14,6 @@ const { catalogDownload } = await import("./catalog-downloads.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
-function put(folder, name, header) {
-  const json = Buffer.from(JSON.stringify(header));
-  const length = Buffer.alloc(8);
-  length.writeBigUInt64LE(BigInt(json.length));
-  fs.writeFileSync(path.join(dirs[folder], name), Buffer.concat([length, json]));
-  return name;
-}
 const wanI2v = {
   "head.modulation": t([1, 2, 5120]),
   "head.head.weight": t([64, 5120]),
@@ -75,27 +60,12 @@ function objectInfo({ unets = [], clips = [], vaeFiles = [], vision = [] } = {})
 }
 const classes = (graph) => Object.values(graph).map((node) => node.class_type);
 
-test("Wan 2.2 14B I2V is read from its weights; Wan 2.1 I2V and Fun inpaint stay apart", () => {
+test("Wan 2.2 14B I2V is read from its weights or name, and Wan 2.1 I2V stays apart", () => {
   assert.equal(familyFromHeader(wanI2v).family, "wan22_14b_i2v");
   assert.equal(familyFromHeader({ ...wanI2v, "img_emb.proj.0.bias": t([1]) }).family, "wan_i2v");
-  put("diffusion_models", "wan2.2_fun_inpaint_high_noise_14B_fp8_scaled.safetensors", wanI2v);
-  assert.equal(
-    classifyModel("unet", "wan2.2_fun_inpaint_high_noise_14B_fp8_scaled.safetensors").family,
-    "wan_other",
-  );
   assert.equal(
     classifyModel("unet", "remote/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors").family,
     "wan22_14b_i2v",
-    "out of reach, the name says i2v",
-  );
-  const t2v = put("diffusion_models", "wan2.2_i2v_named_but_t2v_high_noise.safetensors", {
-    "head.modulation": t([1, 2, 5120]),
-    "head.head.weight": t([64, 5120]),
-    "patch_embedding.weight": t([5120, 16, 1, 2, 2]),
-  });
-  assert.equal(
-    classifyModel("unet", t2v).family,
-    "wan22_14b",
-    "readable weights outrank an i2v in the name",
+    "the name says i2v",
   );
 });

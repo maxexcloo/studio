@@ -1,11 +1,7 @@
-import fs from "node:fs";
-import path from "node:path";
-import { comfy, modelFolders } from "./comfy.js";
+import { comfy } from "./comfy.js";
 import { families as modelFamilies } from "./family-catalog.js";
-
 import { enrichLocalLoraInfo, enrichLoraInfo } from "./lora-catalogue.js";
 import { catalogueStore } from "./library-catalogue.js";
-import { readSafetensorsHeader } from "./model-families.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
 const families = {
@@ -15,22 +11,18 @@ const families = {
 };
 
 /**
- * What a LoRA was trained for and how to trigger it, read the same way model
- * files are: the safetensors header first (its key names and shapes give the
- * architecture away), then its metadata (kohya's ss_base_model_version,
- * modelspec), and never the file name alone. Nothing is guessed: a LoRA that
- * says nothing clear stays "unknown" and is never marked as not fitting.
+ * What a LoRA was trained for and how to trigger it, from its metadata
+ * (kohya's ss_base_model_version, modelspec) through ComfyUI's /view_metadata,
+ * and never the file name alone. Nothing is guessed: a LoRA that says nothing
+ * clear stays "unknown" and is never marked as not fitting.
  *
  * families: the model families it fits (a Wan 14B LoRA fits Wan 2.1 and 2.2
  * 14B alike); empty when unknown. triggers: its trigger words. about: its own
  * title, for telling a speed LoRA from a style one.
  */
 
-// file:size:mtime -> info for LoRAs on this computer; name -> info for a remote ComfyUI's.
+// name -> info, as the worker's metadata gave it.
 const cache = new Map();
-const remoteCache = new Map();
-// name -> the latest info either way, for lookups that must not read a file.
-const lastKnown = new Map();
 
 /* ------------------------------------------------------------ Metadata */
 
@@ -251,22 +243,7 @@ export function familiesFromKeys(header) {
   return [];
 }
 
-/* ------------------------------------------------------------ Files */
-
-function localLoraFile(name) {
-  const parts = String(name).split(/[\\/]/).filter(Boolean);
-  if (!parts.length || parts.some((part) => part === "..") || !/\.safetensors$/i.test(name))
-    return "";
-  for (const dir of modelFolders("loras", ["loras"])) {
-    const file = path.join(dir, ...parts);
-    try {
-      if (fs.statSync(file).isFile()) return file;
-    } catch {
-      /* next folder */
-    }
-  }
-  return "";
-}
+/* ------------------------------------------------------------ Description */
 
 const label = (ids) =>
   [...new Set(ids.map((id) => families[id]?.label).filter(Boolean))].join(" / ");
@@ -289,13 +266,8 @@ function withRefinements(ids) {
   return [...all];
 }
 
-function describe(header, metadata) {
-  const fromKeys = familiesFromKeys(header);
-  const fromMeta = familiesFromMetadata(metadata);
-  // The keys are the stronger witness; metadata narrows a key reading that fits several.
-  const narrowed =
-    fromKeys.length && fromMeta.length ? fromKeys.filter((id) => fromMeta.includes(id)) : [];
-  const found = narrowed.length ? narrowed : fromKeys.length ? fromKeys : fromMeta;
+function describe(metadata) {
+  const found = familiesFromMetadata(metadata);
   // The label names what it was made for; the list also holds the models that share its layout.
   const base = label(found);
   const ids = withRefinements(found);
@@ -319,35 +291,14 @@ function describe(header, metadata) {
   };
 }
 
-/** What one LoRA file on this computer is, cached by size and date; null when out of reach. */
+/** What one LoRA is, as far as its metadata has been read; null before that. */
 export function loraInfo(name) {
-  const file = localLoraFile(name);
-  if (!file) return remoteCache.get(name) || null;
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return null;
-  }
-  const key = `${file}:${stat.size}:${stat.mtimeMs}`;
-  if (!cache.has(key)) {
-    let header = null;
-    try {
-      header = readSafetensorsHeader(file);
-    } catch {
-      header = null;
-    }
-    cache.set(key, header ? describe(header, header.__metadata__ || {}) : null);
-  }
-  const info = cache.get(key);
-  if (info) lastKnown.set(name, info);
-  return info;
+  return cache.get(name) || null;
 }
 
 /**
- * Every listed LoRA's info. A ComfyUI on another computer only hands out the
- * metadata block (no tensor names) through /view_metadata, so those are read
- * from metadata alone, a few at a time, and remembered.
+ * Every listed LoRA's info. ComfyUI hands out the metadata block (no tensor
+ * names) through /view_metadata, so each is read a few at a time and remembered.
  */
 export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   const result = {};
@@ -355,8 +306,7 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   for (const name of names) {
     const info = loraInfo(name);
     if (info) result[name] = info;
-    else if (/\.safetensors$/i.test(name) && !remoteCache.has(name) && !localLoraFile(name))
-      remote.push(name);
+    else if (/\.safetensors$/i.test(name)) remote.push(name);
   }
   async function worker() {
     while (remote.length) {
@@ -365,25 +315,16 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
         const metadata = await comfy(`/view_metadata/loras?filename=${encodeURIComponent(name)}`, {
           timeout: 10_000,
         });
-        remoteCache.set(
-          name,
-          describe(null, metadata && typeof metadata === "object" ? metadata : {}),
-        );
+        cache.set(name, describe(metadata && typeof metadata === "object" ? metadata : {}));
       } catch (error) {
         // No metadata block is an answer worth keeping; anything else is tried again next time.
-        if (Number(error?.status) === 404) remoteCache.set(name, describe(null, {}));
+        if (Number(error?.status) === 404) cache.set(name, describe({}));
       }
-      if (remoteCache.has(name)) {
-        result[name] = remoteCache.get(name);
-        lastKnown.set(name, result[name]);
-      }
+      if (cache.has(name)) result[name] = cache.get(name);
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
-  for (const [name, info] of Object.entries(result)) {
-    result[name] = catalogueLoraInfo(name, info);
-    lastKnown.set(name, result[name]);
-  }
+  for (const [name, info] of Object.entries(result)) result[name] = catalogueLoraInfo(name, info);
   return result;
 }
 

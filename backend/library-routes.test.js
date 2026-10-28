@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,11 +6,9 @@ import test from "node:test";
 import express from "express";
 import {
   imageFromUpload,
-  inspectInstalled,
   libraryItems,
   matchImageResource,
   registerLibraryRoutes,
-  removeInstalled,
 } from "./library-routes.js";
 import { createImportStore } from "./library-imports.js";
 import { createCatalogueStore } from "./library-catalogue.js";
@@ -63,34 +60,6 @@ test("installed files join the catalogue, and catalogued files that are not inst
     ["Style", "effect", "Krea 2", ["krea2"], ["wtrclr"], "import", "civitai"],
   );
   assert.equal(style.description.length, 600, "descriptions are cut short for the list");
-});
-
-test("a wanted file is installed by checksum, unverified by name and size, or a conflict", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-inspect-"));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const bytes = Buffer.from("weights");
-  fs.writeFileSync(path.join(dir, "style.safetensors"), bytes);
-  const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  const foldersFor = () => [dir];
-  const want = { file: "style.safetensors", folder: "loras", sha256, bytes: bytes.length };
-  assert.deepEqual(
-    await inspectInstalled(want, { foldersFor }),
-    { status: "installed", unverified: true },
-    "the list never reads a model",
-  );
-  assert.deepEqual(await inspectInstalled(want, { foldersFor, verify: true }), {
-    status: "installed",
-  });
-  assert.deepEqual(
-    await inspectInstalled({ ...want, sha256: "f".repeat(64) }, { foldersFor, verify: true }),
-    { status: "conflict" },
-  );
-  assert.deepEqual(await inspectInstalled({ ...want, file: "other.safetensors" }, { foldersFor }), {
-    status: "missing",
-  });
-  assert.deepEqual(await inspectInstalled({ ...want, folder: "nowhere" }, { foldersFor }), {
-    status: "missing",
-  });
 });
 
 test("an import from chat goes through the same pipeline, records chat as its origin and shows in the history; catalogue edits undo", async (t) => {
@@ -203,36 +172,6 @@ test("an import from chat goes through the same pipeline, records chat as its or
     key: "loras/watercolour-v2.safetensors",
   });
   assert.notEqual(undone.entry.title, "Watercolour FX");
-});
-
-test("an old model file is removed only while it is still the recorded file", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-remove-"));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const bytes = Buffer.from("old weights");
-  fs.writeFileSync(path.join(dir, "old.safetensors"), bytes);
-  const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  const foldersFor = () => [dir];
-  await assert.rejects(
-    removeInstalled(
-      { folder: "loras", file: "old.safetensors", sha256: "f".repeat(64) },
-      { foldersFor },
-    ),
-    /has changed/,
-  );
-  assert.ok(fs.existsSync(path.join(dir, "old.safetensors")));
-  assert.deepEqual(
-    await removeInstalled({ folder: "loras", file: "old.safetensors", sha256 }, { foldersFor }),
-    { removed: true },
-  );
-  assert.equal(fs.existsSync(path.join(dir, "old.safetensors")), false);
-  assert.deepEqual(
-    await removeInstalled({ folder: "loras", file: "old.safetensors", sha256 }, { foldersFor }),
-    { removed: false },
-  );
-  await assert.rejects(
-    removeInstalled({ folder: "nowhere", file: "x.safetensors" }, { foldersFor }),
-    /isn’t a model file/,
-  );
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {

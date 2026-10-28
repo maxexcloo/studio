@@ -21,7 +21,6 @@ test(
     const modelDir = path.join(temporary, "models");
     fs.mkdirSync(dataDir);
     fs.mkdirSync(modelDir);
-    process.env.STUDIO_SEEDVR2_MODEL_DIR = modelDir;
     const { modelFiles, upscalePlan } = await import("./upscale.js");
     for (const name of ["seedvr2_ema_3b_fp8_e4m3fn.safetensors", "ema_vae_fp16.safetensors"]) {
       const fd = fs.openSync(path.join(modelDir, name), "w");
@@ -178,10 +177,6 @@ test(
             { id: "primary", url: comfyUrl, capabilities: ["image", "video", "upscale", "models"] },
           ]),
           STUDIO_DATA_DIR: dataDir,
-          STUDIO_OUTPUT_STORAGE: "studio",
-          STUDIO_SEEDVR2_MODEL_DIR: modelDir,
-          STUDIO_COMFY_OUTPUT_DIR: "",
-          STUDIO_COMFY_INPUT_DIR: "",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });

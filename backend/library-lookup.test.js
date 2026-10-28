@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { civitaiLicence, libraryPlacement, lookupLibrary } from "./library-lookup.js";
@@ -94,7 +93,7 @@ test("a search lists Civitai models with each version’s availability", async (
   });
 });
 
-test("placement says where files live, on the worker or in local folders, and where one file sits", (t) => {
+test("placement says where files live on the worker and where one file sits", () => {
   const inventory = () => ({
     files: [
       { path: "loras/glow.safetensors", size: 10 },
@@ -104,10 +103,7 @@ test("placement says where files live, on the worker or in local folders, and wh
     space: { free: 5 },
     writable: true,
   });
-  const worker = libraryPlacement(
-    { key: "diffusion_models/flux.safetensors" },
-    { remote: true, inventory, foldersFor: () => [] },
-  );
+  const worker = libraryPlacement({ key: "diffusion_models/flux.safetensors" }, { inventory });
   assert.deepEqual(worker, {
     storage: "worker",
     writable: true,
@@ -122,37 +118,15 @@ test("placement says where files live, on the worker or in local folders, and wh
     },
   });
   assert.equal(
-    libraryPlacement(
-      { key: "loras/none.safetensors" },
-      { remote: true, inventory, foldersFor: () => [] },
-    ).file.found,
+    libraryPlacement({ key: "loras/none.safetensors" }, { inventory }).file.found,
     false,
   );
   assert.throws(
-    () =>
-      libraryPlacement(
-        { key: "loras/../secret" },
-        { remote: true, inventory, foldersFor: () => [] },
-      ),
+    () => libraryPlacement({ key: "loras/../secret" }, { inventory }),
     /A key is folder\/file/,
   );
   assert.throws(
-    () =>
-      libraryPlacement({ key: "outputs/a.png" }, { remote: true, inventory, foldersFor: () => [] }),
+    () => libraryPlacement({ key: "outputs/a.png" }, { inventory }),
     /A key is folder\/file/,
   );
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-placement-"));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(dir, "glow.safetensors"), "weights");
-  const local = libraryPlacement(
-    { key: "loras/glow.safetensors" },
-    { remote: false, inventory, foldersFor: (folder) => (folder === "loras" ? [dir] : []) },
-  );
-  assert.deepEqual(local.file, {
-    key: "loras/glow.safetensors",
-    found: true,
-    location: "loras",
-    bytes: 7,
-  });
-  assert.equal(JSON.stringify(local).includes(dir), false, "no server path reaches the chat");
 });

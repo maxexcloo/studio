@@ -6,8 +6,8 @@ import test from "node:test";
 import sharp from "sharp";
 
 // Each test file runs in its own process, so these folders stay here.
-const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
-process.env.STUDIO_COMFY_OUTPUT_DIR = outputDir;
+const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
+process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
 const { parseA1111Parameters, readPngInfo } = await import("./png-text.js");
@@ -47,7 +47,7 @@ test("the text reads the way AUTOMATIC1111 writes it", () => {
   assert.equal(parsed.model, "juggernautXL_v9");
 });
 
-test("a finished PNG in the output folder always carries it", async () => {
+test("a finished PNG in Studio media always carries it", async () => {
   fs.mkdirSync(path.join(outputDir, "studio"), { recursive: true });
   const file = path.join(outputDir, "studio", "image_00001_.png");
   fs.writeFileSync(
@@ -58,7 +58,7 @@ test("a finished PNG in the output folder always carries it", async () => {
   );
   const outputs = [
     {
-      url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "studio", type: "output" })}`,
+      url: `/comfy/view?${new URLSearchParams({ filename: "image_00001_.png", subfolder: "studio", type: "media" })}`,
       filename: "image_00001_.png",
       type: "image",
     },

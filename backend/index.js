@@ -121,7 +121,6 @@ import {
   networkListening,
   demoMode,
   comfy,
-  comfyRecentlyUnreachable,
   inDotFolder,
   localOutputFile,
   outputMediaPattern,
@@ -133,7 +132,6 @@ import {
   optionsFor,
   port,
   root,
-  setComfyFolderPaths,
   setListeningPort,
 } from "./comfy.js";
 import { canAdmin, clientOf } from "./access.js";
@@ -251,13 +249,7 @@ import {
 } from "./upscale-jobs.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import {
-  isMediaUrl,
-  mediaRoot,
-  mediaStorageEnabled,
-  mediaSubfolder,
-  mediaType,
-} from "./media-paths.js";
+import { isMediaUrl, mediaRoot, mediaSubfolder, mediaType } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
 import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
@@ -327,10 +319,7 @@ async function resolveSignedMcpResult(owner, jobId, index) {
   try {
     const backend = item.settings?.comfyBackend || defaultWorkerId();
     // Studio media is read from its folder only, whichever worker made it.
-    const file =
-      type === mediaType || isDefaultBackend(backend)
-        ? localOutputFile(filename, subfolder, type)
-        : null;
+    const file = localOutputFile(filename, subfolder, type);
     if (type === mediaType && !file) return null;
     const bytes = file
       ? await fs.promises.readFile(file)
@@ -468,17 +457,14 @@ function loadComfyContext({ force = false } = {}) {
 
 async function fetchComfyContext(backend) {
   const signal = AbortSignal.timeout(catalogueReadTimeoutMs);
-  const [info, stats, folderPaths] = await Promise.all([
+  const [info, stats] = await Promise.all([
     comfy("/object_info", { signal }),
     comfy("/system_stats", { signal }).catch(() => ({})),
-    // Where ComfyUI keeps models, extra_model_paths.yaml included, so headers can be read there too.
-    comfy("/internal/folder_paths", { signal }).catch(() => ({})),
   ]).catch((error) => {
     contextFailures.set(backend, { error, at: Date.now() });
     throw error;
   });
   contextFailures.delete(backend);
-  setComfyFolderPaths(folderPaths);
   // Model-type detection is synchronous; fetch what it needs from a remote ComfyUI first.
   await primeModelMetadata(
     {
@@ -513,12 +499,12 @@ const recoverRunningJobs = createJobRecovery({
 });
 
 /**
- * With Studio media storage, recovered ComfyUI outputs move into Studio media and
+ * Recovered ComfyUI outputs move into Studio media and
  * leave ComfyUI. ComfyUI's copies go only after the caller has put the records
  * in the gallery and it is on disk.
  */
 async function ingestRecoveredRecords(records, promptIds = []) {
-  if (!mediaStorageEnabled || !records.length) return records;
+  if (!records.length) return records;
   const moved = await ingestRecords(records);
   if (moved.comfyFiles.length) {
     const backend = currentComfyBackend();
@@ -1657,12 +1643,6 @@ app.get("/api/settings/deployment", async (req, res) => {
       huggingFace: { token: hfTokenStatus() },
       assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource }),
     },
-    storage: {
-      outputs: mediaStorageEnabled ? "studio" : "comfy",
-      ...settingSource("STUDIO_OUTPUT_STORAGE"),
-      workerToken: Boolean(process.env.STUDIO_WORKER_TOKEN),
-      multiUser: multiUserEnabled,
-    },
   });
 });
 
@@ -1779,7 +1759,6 @@ const queueAdapter = createGenerationQueueAdapter({
   accountForOwner: accountAccessForId,
   flushGallery: flushGalleryStrict,
   durableSave: async (job) => {
-    if (!mediaStorageEnabled && !mediaLeases.has(job.id)) return;
     const records = gallery.filter(
       (item) =>
         item.jobId === job.id && item.status === "done" && (item.ownerId || "") === job.ownerId,
@@ -3067,43 +3046,27 @@ app.get("/comfy/thumb", async (req, res) => {
  * workflow ComfyUI wrote into it taken out (metadata-strip.js). Buffered, since
  * the file changes; never cached, since the plain one lives at the same address.
  */
-async function sendWithoutSettings(req, res, localFile) {
+async function sendWithoutSettings(req, res) {
   const params = new URLSearchParams(
     Object.entries(req.query)
       .filter(([key]) => key !== "clean")
       .map(([key, value]) => [key, String(value)]),
   );
-  let bytes = null;
-  let type = "";
-  const known = comfyRecentlyUnreachable() ? localFile() : null;
-  if (!known) {
-    try {
-      const response = await fetch(`${comfyUrl}/view?${params}`, {
-        signal: AbortSignal.timeout(120000),
-      });
-      noteComfyReachable();
-      if (!response.ok) {
-        res.status(response.status).json({ ok: false, error: "ComfyUI doesn’t have this file." });
-        return;
-      }
-      bytes = Buffer.from(await response.arrayBuffer());
-      type = response.headers.get("content-type") || "";
-    } catch (error) {
-      noteComfyFetchError(error);
-    }
+  let response;
+  try {
+    response = await fetch(`${comfyUrl}/view?${params}`, { signal: AbortSignal.timeout(120000) });
+    noteComfyReachable();
+  } catch (error) {
+    noteComfyFetchError(error);
+    res.status(502).json({ ok: false, error: "ComfyUI isn’t answering." });
+    return;
   }
-  if (!bytes) {
-    const file = known || localFile();
-    if (!file) {
-      res.status(502).json({
-        ok: false,
-        error: "ComfyUI isn’t answering and the file isn’t in the output folder.",
-      });
-      return;
-    }
-    bytes = fs.readFileSync(file);
-    type = "";
+  if (!response.ok) {
+    res.status(response.status).json({ ok: false, error: "ComfyUI doesn’t have this file." });
+    return;
   }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const type = response.headers.get("content-type") || "";
   res.setHeader("Cache-Control", "private, no-store, max-age=0");
   res.type(type || path.extname(String(req.query.filename || "")) || "application/octet-stream");
   res.send(stripMetadata(bytes).buffer);
@@ -3143,20 +3106,13 @@ app.get("/comfy/*path", async (req, res) => {
     for (const header of ["if-none-match", "if-modified-since", "range", "if-range"]) {
       if (req.headers[header]) conditional[header] = req.headers[header];
     }
-    // ComfyUI is stopped or restarting: outputs still open from the output folder.
-    const localFile = () =>
-      proxyPath === "view"
-        ? localOutputFile(
-            String(req.query.filename || ""),
-            String(req.query.subfolder || ""),
-            String(req.query.type || "output"),
-          )
-        : null;
-    const sendLocal = (file) =>
-      res.sendFile(file, { headers: { "Cache-Control": "private, max-age=0, must-revalidate" } });
     // Studio-owned media is served from its folder only, never forwarded to ComfyUI.
     if (String(req.query.type || "") === mediaType) {
-      const file = localFile();
+      const file = localOutputFile(
+        String(req.query.filename || ""),
+        String(req.query.subfolder || ""),
+        mediaType,
+      );
       if (!file) {
         res.status(404).json({ ok: false, error: "This file is no longer available." });
         return;
@@ -3172,13 +3128,7 @@ app.get("/comfy/*path", async (req, res) => {
       return;
     }
     if (req.query.clean === "1") {
-      await sendWithoutSettings(req, res, localFile);
-      return;
-    }
-    // It just failed to answer: go straight to disk instead of waiting ~2 s for another refusal (Windows).
-    const known = comfyRecentlyUnreachable() ? localFile() : null;
-    if (known) {
-      sendLocal(known);
+      await sendWithoutSettings(req, res);
       return;
     }
     let response;
@@ -3187,10 +3137,7 @@ app.get("/comfy/*path", async (req, res) => {
       noteComfyReachable();
     } catch (error) {
       noteComfyFetchError(error);
-      const file = localFile();
-      if (!file) throw error;
-      sendLocal(file);
-      return;
+      throw error;
     }
     res.status(response.status);
     const etag = response.headers.get("etag");
@@ -3236,7 +3183,7 @@ setTimeout(
   1200,
 );
 // Studio media's thumbnails and posters are built ahead of their first view.
-if (mediaStorageEnabled) startMediaWarmup();
+startMediaWarmup();
 
 // dev.mjs hands the server the Vite proxy's token; Vite serves the page there.
 const dev = Boolean(process.env.STUDIO_DEV_PROXY_TOKEN);

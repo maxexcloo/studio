@@ -25,7 +25,6 @@ const bothWorkers = JSON.stringify([
 process.env.STUDIO_WORKERS = bothWorkers;
 process.env.STUDIO_DATA_DIR = temporary;
 writeTestWorkflows(temporary);
-process.env.STUDIO_COMFY_OUTPUT_DIR = "";
 const { jobs, runJob } = await import("./jobs.js");
 const { comfy } = await import("./comfy.js");
 const store = await import("./gallery-store.js");

@@ -7,12 +7,6 @@ let cached = { files: [], paused: [], space: {}, writable: false };
 let cacheUrl = "";
 let refreshedAt = 0;
 
-export function remoteModelsEnabled() {
-  const mode = process.env.STUDIO_MODEL_STORAGE;
-  if (mode && !["local", "worker"].includes(mode))
-    throw new Error("STUDIO_MODEL_STORAGE must be local or worker.");
-  return mode === "worker";
-}
 export function workerInventory() {
   return cacheUrl && cacheUrl === libraryUrl()
     ? cached
@@ -26,7 +20,7 @@ export function workerCopy(spec) {
 
 async function request(endpoint, init = {}, workerUrl = libraryUrl()) {
   if (!process.env.STUDIO_WORKER_TOKEN)
-    throw new Error("STUDIO_WORKER_TOKEN is required when STUDIO_MODEL_STORAGE=worker.");
+    throw new Error("STUDIO_WORKER_TOKEN is required for the worker model library.");
   if (!workerUrl) throw new Error(noWorkerMessage("models"));
   const headers = new Headers(init.headers);
   headers.set("X-Studio-Worker-Token", process.env.STUDIO_WORKER_TOKEN || "");
@@ -50,7 +44,8 @@ async function request(endpoint, init = {}, workerUrl = libraryUrl()) {
 }
 
 export async function refreshWorkerModels({ force = false, workerUrl = libraryUrl() } = {}) {
-  if (!remoteModelsEnabled()) return null;
+  // Without a worker that takes models nothing is installed yet, and there is nothing to ask.
+  if (!workerUrl) return workerInventory();
   if (!force && cacheUrl === workerUrl && Date.now() - refreshedAt < 5000) return cached;
   const result = await request("", {}, workerUrl);
   cached = result;

@@ -4,17 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-// Point ComfyUI and the data folder at a scratch tree before the modules read them.
+// Point the data folder at a scratch tree before the modules read it.
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-quant-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
-const dirs = Object.fromEntries(
-  ["diffusion_models", "checkpoints", "text_encoders", "vae"].map((name) => {
-    const dir = path.join(scratch, "ComfyUI", "models", name);
-    fs.mkdirSync(dir, { recursive: true });
-    return [name, dir];
-  }),
-);
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { classifyModel } = await import("./model-families.js");
@@ -34,14 +26,6 @@ const flux = {
   "img_in.weight": t([3072, 64]),
   "guidance_in.in_layer.weight": t([3072, 256]),
 };
-
-function put(folder, name, header) {
-  const json = Buffer.from(JSON.stringify(header));
-  const length = Buffer.alloc(8);
-  length.writeBigUInt64LE(BigInt(json.length));
-  fs.writeFileSync(path.join(dirs[folder], name), Buffer.concat([length, json]));
-  return name;
-}
 
 const list = (values) => ({ input: { required: values } });
 const nodes = [

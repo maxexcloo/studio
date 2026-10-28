@@ -5,28 +5,13 @@ import path from "node:path";
 import test from "node:test";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-info-"));
-process.env.STUDIO_COMFY_ROOT = path.join(scratch, "ComfyUI");
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
-const loraDir = path.join(scratch, "ComfyUI", "models", "loras");
-fs.mkdirSync(path.join(loraDir, "sdxl"), { recursive: true });
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const {
-  catalogueLoraInfo,
-  familiesFromKeys,
-  familiesFromMetadata,
-  loraInfo,
-  triggersFromMetadata,
-} = await import("./lora-info.js");
+const { catalogueLoraInfo, familiesFromKeys, familiesFromMetadata, triggersFromMetadata } =
+  await import("./lora-info.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
-function put(name, header) {
-  const json = Buffer.from(JSON.stringify(header));
-  const length = Buffer.alloc(8);
-  length.writeBigUInt64LE(BigInt(json.length));
-  fs.writeFileSync(path.join(loraDir, name), Buffer.concat([length, json]));
-  return name;
-}
 
 test("SD LoRAs are told apart by their cross-attention width", () => {
   const sd = (width) => ({
@@ -127,31 +112,6 @@ test("trigger words come from the trainer's note, else the tags on every image",
   assert.deepEqual(triggersFromMetadata({ ss_tag_frequency: "not json" }), []);
 });
 
-test("a LoRA file is read once, with the keys winning and metadata narrowing", () => {
-  const name = put("sdxl/detail_slider.safetensors", {
-    __metadata__: {
-      ss_base_model_version: "sdxl_base_v1-0",
-      ss_output_name: "detail slider",
-      ss_tag_frequency: JSON.stringify({ a: { detailed: 5 } }),
-    },
-    "lora_unet_input_blocks_4_1_transformer_blocks_0_attn2_to_k.lora_down.weight": t([8, 2048]),
-  });
-  const info = loraInfo(name);
-  assert.deepEqual(info.families, ["sdxl"]);
-  assert.equal(info.base, "SDXL");
-  assert.equal(info.title, "detail slider");
-  assert.deepEqual(info.triggers, ["detailed"]);
-  assert.equal(loraInfo("../escape.safetensors"), null);
-  assert.equal(loraInfo("missing.safetensors"), null);
-});
-
-test("metadata uses the readable title before training output names", () => {
-  const name = put("sdxl/numeric-123.safetensors", {
-    __metadata__: { "modelspec.title": "Watercolour Portrait", ss_output_name: "training_run_123" },
-  });
-  assert.equal(loraInfo(name).title, "Watercolour Portrait");
-});
-
 test("Klein 9B LoKr uses explicit trainer metadata when projection widths are unavailable", () => {
   const header = {
     __metadata__: { ss_base_model_version: "flux2_klein_9b" },
@@ -159,8 +119,7 @@ test("Klein 9B LoKr uses explicit trainer metadata when projection widths are un
     "diffusion_model.double_blocks.0.img_attn.proj.lokr_w2": t([1024, 1024]),
   };
   assert.deepEqual(familiesFromKeys(header), []);
-  const name = put("klein-lokr.safetensors", header);
-  assert.deepEqual(loraInfo(name).families, ["flux2_klein_9b"]);
+  assert.deepEqual(familiesFromMetadata(header.__metadata__), ["flux2_klein_9b"]);
 });
 
 test("MOSS Image Base and SFT metadata share their precise imported model family", () => {

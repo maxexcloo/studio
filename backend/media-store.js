@@ -2,14 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { comfy } from "./comfy.js";
 import { currentComfyBackend } from "./comfy-backends.js";
-import {
-  dataDir,
-  mediaPath,
-  mediaStorageEnabled,
-  mediaSubfolder,
-  mediaType,
-  mediaUrls,
-} from "./media-paths.js";
+import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 
 /*
@@ -215,5 +208,3 @@ export function temporaryInputFiles(body) {
         path.dirname(String(item.comfyName)) === "." ? "" : path.dirname(String(item.comfyName)),
     }));
 }
-
-export { mediaStorageEnabled, mediaType };

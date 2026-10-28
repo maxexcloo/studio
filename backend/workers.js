@@ -10,7 +10,7 @@ import { kubernetesWorkloads } from "./runtime/workloads.ts";
  * workloads in `STUDIO_KUBERNETES_WORKLOADS`.
  */
 
-/** What a worker can be asked to do. `models` receives model downloads (STUDIO_MODEL_STORAGE=worker). */
+/** What a worker can be asked to do. `models` holds the model library and receives downloads. */
 export const workerCapabilities = [
   { id: "image", label: "Image", description: "Image generation, and provider-backed cloud runs." },
   { id: "video", label: "Video", description: "Local video generation." },

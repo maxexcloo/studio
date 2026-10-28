@@ -1,40 +1,28 @@
-import fs from "node:fs";
 import path from "node:path";
-import { comfy, modelFolders } from "./comfy.js";
+import { comfy } from "./comfy.js";
 import { dataDir } from "./gallery-store.js";
 import {
   families,
-  familyFromHeader,
   familyFromName,
   quantFromHeader,
   refinedFamily,
   variantFor,
 } from "./family-catalog.js";
-import { isGguf, readGgufHeader } from "./gguf.js";
 import { readJsonFile } from "./json-store.js";
 
 /**
- * Which family (and variant) a model file belongs to, and which parts an
- * all-in-one checkpoint carries. Filenames lie (fine-tunes get renamed,
- * "flux1-krea-dev" is a Flux model), so the weights are the first witness.
+ * Which family (and variant) a model file belongs to. Studio never reads the
+ * weights themselves: they live on the worker.
  *
  * Resolution order, strongest first:
  *   1. choice   - the user picked "Use as …" for this file
- *   2. file     - tensor keys read from the local file (ComfyUI on this machine)
- *   3. metadata - modelspec fields via ComfyUI's /view_metadata (remote ComfyUI)
- *   4. name     - filename patterns
- *   5. default  - checkpoints whose weights are out of reach fall back to the
- *                 SD family, which loads itself; weights that were read and
- *                 match nothing known ask for their type instead
+ *   2. metadata - modelspec fields via ComfyUI's /view_metadata
+ *   3. name     - filename patterns
+ *   4. default  - SD checkpoints the name cannot place fall back to the SD
+ *                 family, which loads itself
  */
 
 const modelSources = ["unet", "checkpoint"];
-
-// ComfyUI folder kind and its subfolders under models/, per source.
-const sourceFolders = {
-  unet: ["diffusion_models", ["diffusion_models", "unet"]],
-  checkpoint: ["checkpoints", ["checkpoints"]],
-};
 
 // ComfyUI's /view_metadata folder names for the same sources.
 const metadataFolders = { unet: "diffusion_models", checkpoint: "checkpoints" };
@@ -74,89 +62,6 @@ function parseChoice(value, source) {
   return { family: familyId, variant: variantId };
 }
 
-/* ------------------------------------------------------------ Tensor headers */
-
-// Headers of multi-billion-parameter models run to a few MB; anything far past
-// that is not a header worth parsing.
-const maxHeaderBytes = 64 * 1024 * 1024;
-const headerCache = new Map();
-
-export function readSafetensorsHeader(file) {
-  const fd = fs.openSync(file, "r");
-  try {
-    const lengthBytes = Buffer.alloc(8);
-    if (fs.readSync(fd, lengthBytes, 0, 8, 0) < 8) return null;
-    const length = Number(lengthBytes.readBigUInt64LE(0));
-    if (!length || length > maxHeaderBytes) return null;
-    const header = Buffer.alloc(length);
-    let read = 0;
-    while (read < length) {
-      const count = fs.readSync(fd, header, read, length - read, 8 + read);
-      if (!count) return null;
-      read += count;
-    }
-    const parsed = JSON.parse(header.toString("utf8"));
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } finally {
-    fs.closeSync(fd);
-  }
-}
-
-function localModelFile(source, name) {
-  if (!sourceFolders[source] || !/\.(safetensors|gguf)$/i.test(name)) return "";
-  const parts = String(name).split(/[\\/]/).filter(Boolean);
-  if (parts.some((part) => part === "..")) return "";
-  for (const dir of modelFolders(...sourceFolders[source])) {
-    const file = path.join(dir, ...parts);
-    try {
-      if (fs.statSync(file).isFile()) return file;
-    } catch {
-      /* next folder */
-    }
-  }
-  return "";
-}
-
-/** The local header of a model file, cached by size and mtime; null when out of reach. */
-function modelHeader(source, name) {
-  const file = localModelFile(source, name);
-  if (!file) return null;
-  let stat;
-  try {
-    stat = fs.statSync(file);
-  } catch {
-    return null;
-  }
-  const key = `${file}:${stat.size}:${stat.mtimeMs}`;
-  if (!headerCache.has(key)) {
-    let header = null;
-    try {
-      header = isGguf(file) ? readGgufHeader(file) : readSafetensorsHeader(file);
-    } catch {
-      header = null;
-    }
-    headerCache.set(key, header);
-  }
-  return headerCache.get(key);
-}
-
-/**
- * Which parts an all-in-one checkpoint carries, from its tensor prefixes
- * (ComfyUI's text_encoder_key_prefix / vae_key_prefix). null when unreadable.
- */
-function bundledParts(header) {
-  if (!header) return null;
-  const keys = Object.keys(header);
-  const encoder = keys.some(
-    (key) =>
-      key.startsWith("text_encoders.") ||
-      key.startsWith("cond_stage_model.") ||
-      key.startsWith("conditioner.embedders."),
-  );
-  const vae = keys.some((key) => key.startsWith("first_stage_model.") || key.startsWith("vae."));
-  return { encoder, vae };
-}
-
 /* ------------------------------------------------------------ ComfyUI metadata */
 
 // source:name -> __metadata__ block ({} when the file carries none).
@@ -188,9 +93,8 @@ function familyFromMetadata(metadata = {}) {
 }
 
 /**
- * Fetch safetensors metadata for models this machine cannot read directly, so a
- * remote ComfyUI still gets better than filename guesses. Only the __metadata__
- * block comes back (no tensor names), so this is weaker than a local header.
+ * Fetch safetensors metadata for the worker's models, so they get better than
+ * filename guesses. Only the __metadata__ block comes back (no tensor names).
  */
 export async function primeModelMetadata(lists = {}, { concurrency = 6, signal } = {}) {
   const queue = [];
@@ -198,7 +102,6 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6, signal }
     for (const name of lists[source] || []) {
       const key = choiceKey(source, name);
       if (metadataCache.has(key) || !/\.safetensors$/i.test(name)) continue;
-      if (modelHeader(source, name)) continue;
       queue.push({ source, name, key });
     }
   }
@@ -221,13 +124,9 @@ export async function primeModelMetadata(lists = {}, { concurrency = 6, signal }
   await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
 }
 
-/** Which parts a checkpoint carries: its header, or an assumption. */
-function bundledFor(name, header) {
-  const fromHeader = bundledParts(header);
-  if (fromHeader) return { ...fromHeader, known: true };
-  // Unknown until ComfyUI tries: assume all-in-one, which is what checkpoints/ usually holds.
-  return { encoder: true, vae: true, known: false };
-}
+// Which parts a checkpoint carries is unknown until ComfyUI tries: assume all-in-one, which is
+// what checkpoints/ usually holds.
+const assumedBundle = Object.freeze({ encoder: true, vae: true, known: false });
 
 /* ------------------------------------------------------------ Resolution */
 
@@ -235,46 +134,26 @@ function bundledFor(name, header) {
  * Everything Studio knows about one model file:
  *   family   - a key of `families` (runnable), a `knownFamilies` id, or ""
  *   variant  - the variant object within the family
- *   via      - how we know: choice, file, metadata, name, default
+ *   via      - how we know: choice, metadata, name, default
  *   bundled  - { encoder, vae, known } for checkpoints, null for diffusion models
- *   detail   - family-specific facts from the header (e.g. Flux schnell)
  */
 export function classifyModel(source, name) {
   const base = String(name).split(/[\\/]/).pop() || "";
-  const header = modelHeader(source, name);
-  const bundled = source === "checkpoint" ? bundledFor(name, header) : null;
+  const bundled = source === "checkpoint" ? assumedBundle : null;
   // A quantized format rides along whatever family the file is: it decides the loader, not the settings.
-  const quant = quantFromHeader(header, header ? "" : name);
-  const finish = (familyId, via, detail = null, variantId = "") => {
-    // Families the weights cannot tell apart (Wan 2.1 and 2.2 14B, HunyuanVideo 1.5 T2V and I2V) narrow by name; a choice stands as made.
-    const id =
-      via === "choice" ? familyId || "" : refinedFamily(familyId || "", base, Boolean(header));
+  const quant = quantFromHeader(null, name);
+  const finish = (familyId, via, variantId = "") => {
+    // Families the name narrows (Wan 2.1 and 2.2 14B, HunyuanVideo 1.5 T2V and I2V); a choice stands as made.
+    const id = via === "choice" ? familyId || "" : refinedFamily(familyId || "", base, false);
     const family = families[id];
     const variant = family
-      ? (variantId && family.variants.find((item) => item.id === variantId)) ||
-        variantFor(id, base, header, detail)
+      ? (variantId && family.variants.find((item) => item.id === variantId)) || variantFor(id, base)
       : null;
-    return { family: id, variant, via, bundled, detail, header, quant };
+    return { family: id, variant, via, bundled, quant };
   };
 
   const chosen = parseChoice(loadModelChoices()[choiceKey(source, name)], source);
-  if (chosen) return finish(chosen.family, "choice", null, chosen.variant);
-
-  if (header) {
-    const { family, detail } = familyFromHeader(header);
-    if (family && family !== "other") return finish(family, "file", detail);
-    // Weights we cannot place yet (a newer architecture) let its metadata or name decide.
-    if (family === "other" && detail?.unrecognized) {
-      const named =
-        familyFromMetadata(
-          header.__metadata__ || metadataCache.get(choiceKey(source, name)) || {},
-        ) || familyFromName(name, source);
-      if (families[named]?.sources.includes(source)) return finish(named, "name");
-    }
-    // Weights that were read and match nothing Studio knows are not SD: running them as
-    // SDXL would only end in a shape error. The file asks for its type instead.
-    if (family === "other") return finish("other", "file", detail);
-  }
+  if (chosen) return finish(chosen.family, "choice", chosen.variant);
 
   const fromMetadata = familyFromMetadata(metadataCache.get(choiceKey(source, name)) || {});
   if (fromMetadata && families[fromMetadata]?.sources.includes(source))
