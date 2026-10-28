@@ -68,7 +68,7 @@ export function mcpControls(profile) {
   if (slots.length && profile.aspectPolicy === "reference")
     controls.reference_role = {
       options: ["edit", "reference"],
-      note: "Requires reference_asset_ids.",
+      note: "Requires reference_asset_ids. edit (the default) draws at the reference’s proportions, whatever size is asked; reference only guides, and the asked size applies.",
     };
   if (profile.kind === "image") {
     controls.upscale_quality = {

@@ -316,6 +316,7 @@ async function fixture(
   app.get("/api/reference-assets/:id", (req, res) =>
     res.json({ asset: assets.get(req.params.id) }),
   );
+  app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
   app.get("/comfy/view", (req, res) => {
     downloads.push(req.originalUrl);
     res.type("png").send(png);
@@ -2240,8 +2241,16 @@ test("MCP advertises native sizing and submits tiled 2K with an explicit referen
   assert.equal(f.submitted[0].tiledDecode, true);
   assert.equal(f.submitted[0].autoUpscale, null);
   assert.deepEqual([f.submitted[0].width, f.submitted[0].height], [2048, 1152]);
-  await generate(client, { reference_asset_ids: [assetId], reference_role: "edit" });
+  // An edit is framed by its reference, as the composer frames it: the 64×48 reference's 4:3 at
+  // the profile's pixel count, whatever size the call asked for.
+  await generate(client, {
+    height: 1152,
+    reference_asset_ids: [assetId],
+    reference_role: "edit",
+    width: 2048,
+  });
   assert.equal(f.submitted[1].referenceRole, "edit");
+  assert.deepEqual([f.submitted[1].width, f.submitted[1].height], [728, 544]);
   assert.equal(f.submitted[1].tiledDecode, undefined);
   await failure(client, "Generate", {
     profile_id: profile.id,
@@ -4859,7 +4868,6 @@ test("admin tools go through the Library and profile routes with the administrat
       },
     }),
   );
-  f.app.get("/api/reference-assets/:id/media", (_req, res) => res.type("png").send(png));
   const updateState = {
     checkedAt: "2026-10-21T00:00:00.000Z",
     available: 1,
