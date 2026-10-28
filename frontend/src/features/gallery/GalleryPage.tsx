@@ -66,7 +66,7 @@ export function GalleryPage() {
   const [starred, setStarred] = useState(false);
   const [allVersions, setAllVersions] = useLocalStorage({
     key: "studio-gallery-all-versions",
-    defaultValue: false,
+    defaultValue: true,
     getInitialValueInEffect: false,
   });
   const [filters, setFilters] = useState(emptyGalleryFilters);
@@ -164,7 +164,8 @@ export function GalleryPage() {
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
   );
-  // Grid shows each version chain as one tile, its original; Runs and All Versions show all.
+  // Every generation shows by default; turning All Versions off collapses each version chain into
+  // one Grid tile showing its original. Runs always shows all.
   const groups = useVersionGroups(loaded);
   const grouped = view === "grid" && !allVersions;
   const versions = useMemo(

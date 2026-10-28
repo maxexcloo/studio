@@ -1,4 +1,7 @@
-/* The phone editor fills the visible viewport above the keyboard; the text takes all its room. */
+/*
+ * The phone editor is an opaque full-screen surface, so nothing shows through while the keyboard
+ * opens or drops; its body stops above the keyboard and the text takes all the room left.
+ */
 .content {
   display: flex;
   flex-direction: column;
@@ -9,7 +12,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding-bottom: max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
+  padding-bottom: max(
+    calc(var(--keyboard-inset, 0px) + var(--mantine-spacing-md)),
+    env(safe-area-inset-bottom)
+  );
 }
 
 .field {

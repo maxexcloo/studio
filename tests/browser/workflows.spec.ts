@@ -41,10 +41,8 @@ test("Image → Refine → Animate retains one session and can reopen saved work
     page.getByRole("button", { name: "Open video: The bird spreads its wings" }),
   ).toBeVisible();
   await openNav(page, "Images");
-  // The refined image is a version of the first, so Grid shows them as one tile.
-  await expect(
-    page.getByRole("button", { name: /^Open image: .*, Version 1 of 2$/ }),
-  ).toBeVisible();
+  // The refined image is a version of the first; Grid shows both until All Versions is off.
+  await expect(page.getByRole("button", { name: /^Open image: / })).toHaveCount(2);
 });
 
 test("Images and Videos tabs keep an expanding bottom composer while Chat keeps sessions beside the media", async ({
