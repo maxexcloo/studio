@@ -261,7 +261,7 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
   );
 }
 
-/** Details › Caption, Prompt, Model, References, Settings, Output and Timing for one result. */
+/** Details › Caption, Prompt, Model, LoRAs, References, Settings, Output and Timing for one result. */
 export function MediaDetails({ item }: { item: MediaItem }) {
   const url = item.status === "done" ? mediaSource(item).url : "";
   const size = useMediaSize(url);
@@ -304,10 +304,15 @@ export function MediaDetails({ item }: { item: MediaItem }) {
         <WritingThinking writing={item.writing} />
         {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
       </Stack>
-      {(details.profile || !!details.loras.length) && (
+      {details.profile && (
         <Stack gap={6}>
           <Title order={6}>Model</Title>
-          {details.profile && <Text size="sm">{details.profile}</Text>}
+          <Text size="sm">{details.profile}</Text>
+        </Stack>
+      )}
+      {!!details.loras.length && (
+        <Stack gap={6}>
+          <Title order={6}>LoRAs</Title>
           {details.loras.map((lora) => (
             <Group key={lora.name} justify="space-between" wrap="nowrap" gap="xs">
               <Text size="sm" truncate>

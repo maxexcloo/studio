@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -66,7 +66,7 @@ export function GalleryPage() {
   const [starred, setStarred] = useState(false);
   const [allVersions, setAllVersions] = useLocalStorage({
     key: "studio-gallery-all-versions",
-    defaultValue: false,
+    defaultValue: true,
     getInitialValueInEffect: false,
   });
   const [filters, setFilters] = useState(emptyGalleryFilters);
@@ -164,20 +164,36 @@ export function GalleryPage() {
     () => gallery.data?.pages.flatMap((page) => page.items) || [],
     [gallery.data],
   );
-  // Grid shows each version chain as one tile, its latest version; Runs and All Versions show all.
+  // Every generation shows by default; turning All Versions off collapses each version chain into
+  // one Grid tile showing its original. Runs always shows all.
   const groups = useVersionGroups(loaded);
   const grouped = view === "grid" && !allVersions;
   const versions = useMemo(
-    () => (grouped ? new Map(groups.map((group) => [group.at(-1)!.id, group])) : undefined),
+    () => (grouped ? new Map(groups.map((group) => [group[0].id, group])) : undefined),
     [grouped, groups],
   );
   const items = useMemo(
-    () => (versions ? [...versions.values()].map((group) => group.at(-1)!) : loaded),
+    () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
   const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
   const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
+  // Stable, so the views' memoised tiles render only when their own item changes.
+  const openItem = useCallback((item: MediaItem) => {
+    setFocusItem(null);
+    setSelected(item);
+  }, []);
+  const detail = useCallback((item: MediaItem) => mediaDetail(item, profiles), [profiles]);
+  const chatTitle = useCallback(
+    (id: string) => facets.data?.chats.find((chat) => chat.value === id)?.label,
+    [facets.data],
+  );
+  const openSelectionMenu = useCallback((x: number, y: number) => setMenu({ x, y }), []);
+  const tryAgainItem = useCallback(
+    (item: MediaItem) => tryAgain([item.jobId || ""]).then(() => undefined),
+    [tryAgain],
+  );
   const selectionButton = useRef<HTMLButtonElement>(null);
   function doneSelecting() {
     selection.end();
@@ -270,19 +286,14 @@ export function GalleryPage() {
             items={items}
             versions={versions}
             focusItem={focusItem}
-            open={(item) => {
-              setFocusItem(null);
-              setSelected(item);
-            }}
+            open={openItem}
             selection={selection}
             caption={phone ? (captions ? "pinned" : "none") : "hover"}
-            detail={(item) => mediaDetail(item, profiles)}
-            chatTitle={(id) => facets.data?.chats.find((chat) => chat.value === id)?.label}
-            onSelectionMenu={(x, y) => setMenu({ x, y })}
-            onTryAgain={(item) => tryAgain([item.jobId || ""]).then(() => undefined)}
-            renderActions={(item, opened, onOpenedChange) => (
-              <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />
-            )}
+            detail={detail}
+            chatTitle={chatTitle}
+            onSelectionMenu={openSelectionMenu}
+            onTryAgain={tryAgainItem}
+            renderActions={renderTileActions}
           />
         </div>
       ) : (
@@ -325,7 +336,7 @@ export function GalleryPage() {
           items={
             versions
               ? [...versions.values()].map(
-                  (group) => group.find((version) => version.id === selected.id) || group.at(-1)!,
+                  (group) => group.find((version) => version.id === selected.id) || group[0],
                 )
               : items
           }
@@ -336,6 +347,14 @@ export function GalleryPage() {
       )}
     </Stack>
   );
+}
+
+function renderTileActions(
+  item: MediaItem,
+  opened: boolean,
+  onOpenedChange: (opened: boolean) => void,
+) {
+  return <MediaTileActions item={item} opened={opened} onOpenedChange={onOpenedChange} />;
 }
 
 function ViewLabel({ icon, text }: { icon: React.ReactNode; text: string }) {

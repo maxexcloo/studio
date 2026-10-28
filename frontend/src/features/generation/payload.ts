@@ -129,11 +129,25 @@ export function referencePatch(
   profile?: Profile,
 ) {
   const details = referenceDetails(next, input, profile);
+  const before = referenceDetails(previous, input, profile);
+  // The first reference switches the profile to its reference mode, which takes that mode's
+  // settings (a partial denoise, as Edit does); removing the last one restores text-to-image's.
+  const mode = profile?.imageModes?.reference?.defaults ?? {};
+  const switched =
+    !before.length && details.length
+      ? mode
+      : before.length && !details.length
+        ? Object.fromEntries(
+            Object.keys(mode)
+              .filter((key) => key in profile!.defaults)
+              .map((key) => [key, profile!.defaults[key]]),
+          )
+        : {};
   return {
+    ...switched,
     referenceDetails: details,
     referenceAssets: details.map((asset) => ({ assetId: asset.id, slot: asset.slot })),
-    ...(primaryReference(referenceDetails(previous, input, profile), profile)?.id !==
-    primaryReference(details, profile)?.id
+    ...(primaryReference(before, profile)?.id !== primaryReference(details, profile)?.id
       ? { inpaint: undefined }
       : {}),
   };

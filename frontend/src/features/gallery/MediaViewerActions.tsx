@@ -41,6 +41,8 @@ export function MediaViewerActions({
     iterating,
     onApplied,
     onCompare,
+    // Compare shows in menus and the selection bar, not under the open item.
+    omit: ["compare"],
     onCustomAnimation: () => setInstructing(true),
     onDelete,
     onRetried,

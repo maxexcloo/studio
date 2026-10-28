@@ -88,3 +88,22 @@ test("the writer logs timings without prompt text and falls back on failure", as
   assert.match(lines[1], /fell back to the request for fixture after \d+ ms: HTTP 401$/);
   assert.doesNotMatch(lines.join("\n"), /secret/);
 });
+
+test("the writer retries an unusable reply once, reminding the model of the reply's shape", async () => {
+  const bodies = [];
+  const replies = ["", "a cabin at dusk"];
+  const writer = createPromptWriter(settings("http://writer.invalid"), {
+    log: {},
+    fetchImpl: async (_url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return Response.json({ choices: [{ message: { content: replies.shift() } }] });
+    },
+  });
+  const profile = { id: "fixture", label: "Fixture", kind: "image" };
+  assert.deepEqual((await writer.write({ profile, request: "a cabin" })).prompts, [
+    "a cabin at dusk",
+  ]);
+  assert.match(bodies[1].messages[1].content, /Reply with only the prompt\.$/);
+  replies.push("", "");
+  await assert.rejects(writer.write({ profile, request: "a cabin" }), /empty reply/);
+});

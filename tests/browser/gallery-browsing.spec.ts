@@ -125,7 +125,8 @@ test("Search shortcuts follow the active gallery or reference picker and leave p
   else await expect(search).not.toBeFocused();
   await page.keyboard.press("ControlOrMeta+f");
   await expect(search).toBeFocused();
-  await expect(search).toHaveValue("Browse");
+  // Closing the phone's search cleared it.
+  await expect(search).toHaveValue(testInfo.project.use.isMobile ? "" : "Browse");
   await page.keyboard.press("Escape");
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await prompt.click();
@@ -404,7 +405,7 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
   const first = page.getByRole("button", { name: "Open image: Browse Result 0", exact: true });
   await first.focus();
   await page.keyboard.press("Shift+F10");
-  await expect(page.getByRole("menuitem", { name: "Recreate", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Prompt", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
   const status = page.getByRole("group", { name: "Gallery Selection" }).getByRole("status");
@@ -449,7 +450,7 @@ test("Offline views report the API error and support retry", async ({ page }) =>
   await expect(page.getByText("No Images", { exact: true })).toBeVisible();
 });
 
-test("Gallery search preserves the query and status panel stops active and clears failed work", async ({
+test("Gallery search closes cleanly and the status panel stops active and clears failed work", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -474,7 +475,9 @@ test("Gallery search preserves the query and status panel stops active and clear
   const search = await gallerySearch(page);
   await search.fill("birds");
   await search.press("Escape");
-  await expect(await gallerySearch(page)).toHaveValue("birds");
+  // Desktop keeps its box and query; closing the phone's search clears it.
+  const phone = test.info().project.use.isMobile;
+  await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Starred", exact: true }).click();
@@ -559,9 +562,6 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
 }) => {
   const state = await fixtures(page);
   await page.goto("/");
-  const search = await gallerySearch(page);
-  await search.fill("bird");
-  await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Filter By Models", exact: true }).click();
   await page.getByRole("checkbox", { name: "Studio Image", exact: true }).check();
@@ -576,6 +576,10 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
   await page.getByRole("button", { name: "Filter By Aspect Ratio", exact: true }).click();
   await page.getByRole("checkbox", { name: "1:1", exact: true }).check();
   await page.keyboard.press("Escape");
+  // Outside filter mode the search narrows within the filters, shown beside it as removable chips.
+  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  const search = await gallerySearch(page);
+  await search.fill("bird");
   await expect
     .poll(() => {
       const query = new URLSearchParams(state.galleryRequests.at(-1));
@@ -594,16 +598,16 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
       aspect: ["1:1"],
       q: "bird",
     });
-  // Outside filter mode the active filters stay beside the search as removable chips.
-  await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   const chips = page.getByRole("group", { name: "Active Filters", exact: true });
   await expect(chips.getByRole("button")).toHaveCount(5);
   await chips.getByRole("button", { name: "Remove 1:1 Filter", exact: true }).click();
   // Removing one leaves the others and the search.
   await expect(chips.getByRole("button")).toHaveCount(4);
-  const field = await gallerySearch(page);
-  await expect(field).toHaveValue("bird");
-  await field.press("Escape");
+  await expect(search).toHaveValue("bird");
+  // Closing the phone's search clears it; desktop keeps its box and query.
+  const phone = test.info().project.use.isMobile;
+  const expected = phone ? "" : "bird";
+  await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
   await page.getByRole("button", { name: "Clear Filters", exact: true }).click();
   await expect(page.getByRole("button", { name: "Clear Filters", exact: true })).toBeHidden();
@@ -612,10 +616,10 @@ test("Gallery facets submit repeated models together with LoRA, size and aspect 
     .poll(() =>
       state.galleryRequests.some((search) => {
         const query = new URLSearchParams(search);
-        return query.get("q") === "bird" && !query.has("model") && !query.has("lora");
+        return query.get("q") === expected && !query.has("model") && !query.has("lora");
       }),
     )
     .toBe(true);
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
-  await expect(await gallerySearch(page)).toHaveValue("bird");
+  await expect(await gallerySearch(page)).toHaveValue(expected);
 });

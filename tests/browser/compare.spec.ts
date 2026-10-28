@@ -1,14 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import {
-  closeLoras,
-  create,
-  fixtures,
-  image,
-  profiles,
-  serveProfiles,
-  stamp,
-  viewerAction,
-} from "./fixtures";
+import { closeLoras, create, fixtures, image, profiles, serveProfiles, stamp } from "./fixtures";
 
 const compareBy = (dialog: Locator, label: string) =>
   dialog
@@ -132,7 +123,7 @@ test("Compare runs LoRAs on and off, side by side and as a strength sweep with o
     await expect(page.getByText(label, { exact: true })).toBeVisible();
 });
 
-test("Compare from the viewer keeps the result's seed, compares prompts with their negatives and opens variants in the viewer", async ({
+test("Compare from the tile menu keeps the result's seed, compares prompts with their negatives and opens variants in the viewer", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -151,8 +142,10 @@ test("Compare from the viewer keeps the result's seed, compares prompts with the
     settings,
   });
   await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: An amber bird", exact: true }).click();
-  await viewerAction(page, "Compare");
+  await page
+    .getByRole("button", { name: "Open image: An amber bird", exact: true })
+    .click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Compare", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Compare", exact: true });
   await expect(dialog).toContainText("Every variant uses seed 1234567.");
   await compareBy(dialog, "Prompts");

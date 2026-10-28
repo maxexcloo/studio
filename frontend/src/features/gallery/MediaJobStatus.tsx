@@ -91,8 +91,8 @@ export function MediaJobStatus({
         </Alert>
       ) : !job && !loading ? (
         <Text size="sm" c="dimmed" ta="center">
-          No recorded generation is available to retry. Use Recreate in Composer to generate from
-          this item’s saved inputs.
+          No recorded generation is available to retry. Use Prompt to generate from this item’s
+          saved inputs.
         </Text>
       ) : null}
       {job && (

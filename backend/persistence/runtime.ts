@@ -92,11 +92,16 @@ export function readRuntimeDocument(dataDir: string, name: string): unknown {
 }
 
 export function writeRuntimeDocument(dataDir: string, name: string, value: unknown): void {
+  writeRuntimeText(dataDir, name, JSON.stringify(value));
+}
+
+/** Stores a document already turned into JSON text (as jsonTextAsync does for large ones). */
+export function writeRuntimeText(dataDir: string, name: string, text: string): void {
   runtimeDatabase(dataDir)
     .prepare(
       "INSERT INTO studio_documents (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value",
     )
-    .run(name, JSON.stringify(value));
+    .run(name, text);
 }
 
 export function deleteRuntimeDocument(dataDir: string, name: string): void {
