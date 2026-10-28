@@ -8,6 +8,7 @@ import {
 import { combinedProfiles } from "../combined-profiles.js";
 import { dreamOwnership } from "../dream-ownership.js";
 import { uncensoredMarker } from "../uncensored-marker.js";
+import { migrateUploads } from "../uploads.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -32,6 +33,7 @@ else {
   result = {
     runtime: migrateRuntime(dataDir, { apply: values.apply }),
     galleryRows: migrateGalleryRows(dataDir, { apply: values.apply }),
+    uploads: migrateUploads(dataDir, { apply: values.apply }),
     combinedProfiles: combinedProfiles(dataDir, { apply: values.apply }),
     uncensoredMarker: uncensoredMarker(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
@@ -48,6 +50,7 @@ console.log(JSON.stringify(result, null, 2));
 if (
   result.conflicts?.length ||
   result.runtime?.conflicts.length ||
-  result.galleryRows?.conflicts.length
+  result.galleryRows?.conflicts.length ||
+  result.uploads?.conflicts.length
 )
   process.exitCode = 1;

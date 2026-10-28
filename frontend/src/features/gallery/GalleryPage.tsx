@@ -61,11 +61,12 @@ export function GalleryPage() {
   const [captions] = useTileCaptions();
   const [view, setView] = useRemembered<"grid" | "runs">("gallery-view", "grid");
   const [starred, setStarred] = useRemembered("gallery-starred", false);
+  const [uploads, setUploads] = useRemembered("gallery-uploads", false);
   const [allVersions, setAllVersions] = useRemembered("gallery-all-versions", true);
   const [filters, setFilters] = useRemembered("gallery-filters", emptyGalleryFilters);
-  const hasFilters = starred || hasGalleryFilters(filters);
+  const hasFilters = starred || uploads || hasGalleryFilters(filters);
   const [pagingFailed, setPagingFailed] = useState(false);
-  useEffect(() => setPagingFailed(false), [search, kind, starred, filters]);
+  useEffect(() => setPagingFailed(false), [search, kind, starred, filters, uploads]);
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const loadTrigger = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<MediaItem | null>(null);
@@ -96,7 +97,7 @@ export function GalleryPage() {
     }),
   }).data;
   const gallery = useInfiniteQuery({
-    queryKey: ["gallery", search, kind, starred, filters],
+    queryKey: ["gallery", search, kind, starred, filters, uploads],
     initialPageParam: "",
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({
@@ -105,6 +106,7 @@ export function GalleryPage() {
         q: search,
         type: kind,
         favorites: starred ? "1" : "0",
+        uploads: uploads ? "1" : "0",
       });
       appendGalleryFilters(params, filters);
       return api<Page>(`/api/gallery?${params}`);
@@ -169,7 +171,10 @@ export function GalleryPage() {
     () => (versions ? [...versions.values()].map((group) => group[0]) : loaded),
     [versions, loaded],
   );
-  const selection = useGallerySelection(items, JSON.stringify([kind, search, starred, filters]));
+  const selection = useGallerySelection(
+    items,
+    JSON.stringify([kind, search, starred, filters, uploads]),
+  );
   const tryAgain = useTryAgain(loaded);
   const facets = useQuery({ ...galleryFacetsQuery(kind), enabled: view === "runs" });
   // Stable, so the views' memoised tiles render only when their own item changes.
@@ -228,6 +233,8 @@ export function GalleryPage() {
           onChange={setFilters}
           starred={starred}
           onStarredChange={setStarred}
+          uploads={uploads}
+          onUploadsChange={setUploads}
           allVersions={allVersions}
           onAllVersionsChange={view === "grid" ? setAllVersions : undefined}
           leading={

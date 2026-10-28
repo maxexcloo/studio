@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { notifications } from "@mantine/notifications";
 import { api, post } from "../../api";
 import type { GenerationInput, MediaItem, Profile, ReferenceAsset } from "../../types";
 import {
@@ -15,7 +14,6 @@ import {
 import { useGeneration } from "./GenerationProvider";
 
 export const galleryReferenceType = "application/x-studio-gallery-item";
-export const uploadReferenceType = "application/x-studio-reference-upload";
 export const referenceKey = (asset: ReferenceAsset) => `${asset.slot}:${asset.id}`;
 export function referenceLabel(asset: ReferenceAsset, index: number, profile?: Profile) {
   const role = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.label;
@@ -165,7 +163,11 @@ export function useReferencePlacement(list: ReferenceList) {
         })
       ).asset;
     },
-    onSuccess: () => client.invalidateQueries({ queryKey: ["reference-uploads"] }),
+    // An upload is a gallery image, listed under the Uploads filter.
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["reference-gallery"] });
+      await client.invalidateQueries({ queryKey: ["gallery"] });
+    },
   });
   const gallery = useMutation({
     mutationFn: ({ id, type }: Pick<MediaItem, "id" | "type">) =>
@@ -207,18 +209,6 @@ export function useReferencePlacement(list: ReferenceList) {
     uploading: upload.isPending,
     adding: gallery.isPending,
   };
-}
-
-export function useSaveUploadToImages() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) =>
-      post<{ item: MediaItem }>(`/api/reference-assets/${encodeURIComponent(id)}/gallery`),
-    onSuccess: async () => {
-      notifications.show({ message: "Saved to Images" });
-      await client.invalidateQueries({ queryKey: ["gallery"] });
-    },
-  });
 }
 
 /** The composer's paste and drop targets fill the gallery draft's next empty slots. */

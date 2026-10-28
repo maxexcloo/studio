@@ -203,7 +203,7 @@ test("a run that reuses a deleted image's file name still shows when it finishes
 });
 
 test("a finished image is listed at once, before the folder listing catches up", async () => {
-  const { listReferenceAssets } = await import("./reference-assets.js");
+  const finished = () => pageGallery({}).items.filter((item) => item.status === "done").length;
   fs.writeFileSync(path.join(outputDir, "older.png"), "x");
   setGallery([
     {
@@ -218,7 +218,7 @@ test("a finished image is listed at once, before the folder listing catches up",
   await new Promise((resolve) => setTimeout(resolve, 2100));
   const body = { kind: "image", prompt: "a heron", count: 1, createdAt: new Date().toISOString() };
   setGallery([...makePendingItems("job-2", body), ...pageGallery({}).items]);
-  assert.equal(listReferenceAssets({ headers: {} }, { source: "generation" }).items.length, 1);
+  assert.equal(finished(), 1);
   fs.writeFileSync(path.join(outputDir, "fresh.png"), "y");
   await replaceGalleryJob(
     "job-2",
@@ -226,7 +226,7 @@ test("a finished image is listed at once, before the folder listing catches up",
     body,
     new Map(),
   );
-  assert.equal(listReferenceAssets({ headers: {} }, { source: "generation" }).items.length, 2);
+  assert.equal(finished(), 2);
   assert.ok(pageGallery({}).items.some((item) => item.url === url("fresh.png")));
 });
 
@@ -234,7 +234,7 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
   const { loadSharp } = await import("./sharp-loader.js");
   const sharp = await loadSharp();
   if (!sharp) return;
-  const { bytesForReference } = await import("./reference-assets.js");
+  const { bytesForReference } = await import("./references.js");
   const png = (width, height, r) =>
     sharp({ create: { width, height, channels: 3, background: { r, g: 0, b: 0 } } })
       .png()

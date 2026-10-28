@@ -279,17 +279,18 @@ let visibleListBuilds = 0;
 /** How often a page list was built from the whole gallery; the paging test counts it. */
 export const visibleListBuildCount = () => visibleListBuilds;
 
-function visibleItems({ type = "", includeFailed = true, filter = null } = {}) {
+function visibleItems({ type = "", includeFailed = true, uploads = false, filter = null } = {}) {
   refreshFolderListings();
   const trusted = comfyOutputDir ? outputFolderTrusted() : true;
   const key = `${galleryRevision}|${hiddenVersion}|${listingGeneration}|${comfyOutputDir}|${trusted}`;
   if (visibleCache.key !== key) visibleCache = { key, lists: new Map() };
-  const listKey = `${type}|${includeFailed}`;
+  const listKey = `${type}|${includeFailed}|${uploads}`;
   let entry = visibleCache.lists.get(listKey);
   if (!entry) {
     // The gallery is kept sorted, so this sort only confirms the order (linear on sorted input).
     const items = sortGallery(filterVisibleGallery(gallery)).filter((item) => {
       if (type && item.type !== type) return false;
+      if (Boolean(item.uploaded) !== uploads) return false;
       if (!includeFailed && item.status === "error") return false;
       return item.status !== "canceled";
     });
@@ -437,15 +438,17 @@ function afterCursor(item, cursor = "") {
   );
 }
 
+/** A page of the gallery; uploaded images (references.js) are listed only, and alone, with `uploads`. */
 export function pageGallery({
   type = "",
   limit = 200,
   cursor = "",
   includeFailed = true,
+  uploads = false,
   filter = null,
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit || 200)));
-  const entry = visibleItems({ type, includeFailed, filter });
+  const entry = visibleItems({ type, includeFailed, uploads, filter });
   const all = entry.items;
   const start = pageStart(entry, cursor);
   const items = all.slice(start, start + safeLimit);

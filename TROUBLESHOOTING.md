@@ -84,7 +84,7 @@ Inspect the job's error and worker logs. Check that the workflow runs with the s
 
 ## References, Upscaling & Library
 
-References can be selected from the gallery, uploaded or dragged from gallery items into generation controls. Masking and video input require a profile that supports those operations; changing profile can change the available controls.
+References can be selected from the gallery, uploaded or dragged from gallery items into generation controls. Uploads are gallery images too, shown under the gallery's **Uploads** filter. Masking and video input require a profile that supports those operations; changing profile can change the available controls.
 
 Upscaling uses the durable queue. Check the job reason and worker's upscaler models and nodes if it fails. The original result remains available.
 

@@ -7,6 +7,7 @@ import {
   image,
   profiles,
   serveProfiles,
+  showUploads,
   stamp,
 } from "./fixtures";
 import type { Profile } from "../../frontend/src/types";
@@ -40,7 +41,7 @@ async function setup(page: Page) {
   return state;
 }
 
-test("Reference slots fill by tap, targeted drop and paste, and pasted files save to Images", async ({
+test("Reference slots fill by tap, targeted drop and paste, and pasted files list under Uploads", async ({
   page,
   isMobile,
 }) => {
@@ -72,14 +73,16 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files sav
     );
   });
   await expect(page.getByRole("img", { name: "Reference 2 · Style", exact: true })).toBeVisible();
+  // The pasted file is an uploaded gallery image, shown only under the Uploads filter.
+  expect(state.gallery.find((item) => item.id === "upload")?.uploaded).toBe(true);
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await slots.getByRole("button", { name: "Reference 2 · Style", exact: true }).click();
-  await page
-    .getByRole("menu", { name: "Reference 2 · Style", exact: true })
-    .getByRole("menuitem", { name: "Save to Images", exact: true })
-    .click();
-  await expect(page.getByText("Saved to Images", { exact: true })).toBeVisible();
-  expect(state.gallery.some((item) => item.id === "saved-asset-upload")).toBe(true);
+  await expect(picker.getByRole("button", { name: /reference: Alpha$/ })).toBeVisible();
+  await expect(picker.getByRole("button", { name: /reference: Upload/ })).toHaveCount(0);
+  await showUploads(page);
+  await expect(
+    picker.getByRole("button", { name: "Remove reference: Upload 1", exact: true }),
+  ).toBeVisible();
+  await expect(picker.getByRole("button", { name: /reference: Alpha/ })).toHaveCount(0);
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
@@ -226,43 +229,40 @@ test("Reference slots preserve optional End-only inputs and reuse one asset in t
   ]);
 });
 
-test("Owned uploaded references can be reused without another upload", async ({ page }) => {
+test("Owned uploads can be reused from the Uploads filter without another upload", async ({
+  page,
+}) => {
   const state = await fixtures(page);
-  const requests: string[] = [];
-  await page.route("**/api/reference-assets?*", (route) => {
-    requests.push(route.request().url());
-    return route.fulfill({
-      json: {
-        items: [
-          {
-            id: "past-upload",
-            name: "Past Upload",
-            source: "upload",
-            type: "image",
-            url: image,
-            thumbnailUrl: image,
-            width: 1024,
-            height: 1024,
-          },
-        ],
-        hasMore: false,
-        nextCursor: "",
-      },
-    });
+  state.gallery.push({
+    id: "past-upload",
+    uploaded: true,
+    type: "image",
+    status: "done",
+    prompt: "",
+    url: image,
+    thumbnailUrl: image,
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
   });
   await create(page);
   await page
     .getByRole("textbox", { name: "Prompt", exact: true })
     .fill("Reuse an earlier photograph");
   await page.getByRole("button", { name: "Choose References", exact: true }).click();
-  await page.getByText("Uploads", { exact: true }).click();
-  await page.getByRole("button", { name: "Use reference: Reference 1", exact: true }).click();
+  await showUploads(page);
+  await page.getByRole("button", { name: "Use reference: Upload 1", exact: true }).click();
   await closeReferences(page);
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.referenceAssets).toEqual([{ assetId: "past-upload", slot: "image" }]);
-  expect(state.referenceRequests).toHaveLength(0);
-  expect(new URL(requests[0]).searchParams.get("source")).toBe("upload");
+  expect(state.jobs[0].input.referenceAssets).toEqual([
+    { assetId: "asset-past-upload", slot: "image" },
+  ]);
+  expect(state.referenceRequests).toEqual([{ galleryItemId: "past-upload" }]);
+  expect(state.gallery.filter((item) => item.uploaded)).toHaveLength(1);
+  expect(
+    state.galleryRequests.some((search) => new URLSearchParams(search).get("uploads") === "1"),
+  ).toBe(true);
 });
 
 test("An image shared to the installed app opens the composer with it as a reference", async ({

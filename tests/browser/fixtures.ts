@@ -72,7 +72,6 @@ export async function fixtures(page: Page) {
   const messages: any[] = [];
   const chatRequests: any[] = [];
   const referenceRequests: any[] = [];
-  const uploads: any[] = [];
   const galleryRequests: string[] = [];
   const loraLibrary = {
     strengths: {},
@@ -518,6 +517,7 @@ export async function fixtures(page: Page) {
           (i) =>
             (!url.searchParams.get("q") || i.prompt.includes(url.searchParams.get("q"))) &&
             (!url.searchParams.get("type") || i.type === url.searchParams.get("type")) &&
+            Boolean(i.uploaded) === (url.searchParams.get("uploads") === "1") &&
             (!url.searchParams.has("chat") ||
               url.searchParams.getAll("chat").includes(i.sessionId)),
         ),
@@ -553,26 +553,13 @@ export async function fixtures(page: Page) {
         },
       });
     }
-    if (path === "/api/reference-assets" && method === "GET")
-      return respond({ items: uploads, hasMore: false, nextCursor: "" });
+    // An upload is an uploaded gallery image, listed under the gallery's Uploads filter.
     if (path === "/api/reference-assets/upload") {
-      const asset = {
-        id: uploads.length ? `asset-upload-${uploads.length + 1}` : "asset-upload",
-        source: "upload",
-        name: "reference.png",
-        thumbnailUrl: image,
-        url: image,
-        width: 1024,
-        height: 1024,
-      };
-      uploads.unshift(asset);
-      return respond({ asset });
-    }
-    const saved = path.match(/^\/api\/reference-assets\/([^/]+)\/gallery$/);
-    if (saved && method === "POST") {
-      const item = {
-        id: `saved-${saved[1]}`,
-        jobId: `upload-${saved[1]}`,
+      const count = gallery.filter((item) => item.uploaded).length;
+      const id = count ? `upload-${count + 1}` : "upload";
+      gallery.unshift({
+        id,
+        uploaded: true,
         type: "image",
         status: "done",
         prompt: "",
@@ -581,9 +568,18 @@ export async function fixtures(page: Page) {
         width: 1024,
         height: 1024,
         createdAt: nextStamp(),
+      });
+      const asset = {
+        id: `asset-${id}`,
+        source: "upload",
+        galleryItemId: id,
+        name: "reference.png",
+        thumbnailUrl: image,
+        url: image,
+        width: 1024,
+        height: 1024,
       };
-      if (!gallery.some((entry) => entry.id === item.id)) gallery.unshift(item);
-      return respond({ ok: true, item });
+      return respond({ asset }, 201);
     }
     if (path.match(/^\/api\/user-presets\/[^/]+$/) && method === "PATCH") {
       const preset = presets.find((preset) => preset.id === path.split("/")[3]);
@@ -672,7 +668,6 @@ export async function fixtures(page: Page) {
     messages,
     chatRequests,
     referenceRequests,
-    uploads,
     galleryRequests,
     loraLibrary,
     loraOperations,
@@ -816,6 +811,13 @@ export async function withExpertSettings(page: Page, steps: () => Promise<void>)
   await page.getByRole("button", { name: "Expert Settings", exact: true }).click();
   await steps();
   await closePopup(page, "Expert Settings");
+}
+
+/** Turns on the reference picker's Uploads filter, which lists uploaded images. */
+export async function showUploads(page: Page) {
+  const picker = page.getByRole("region", { name: "References", exact: true });
+  await picker.getByRole("button", { name: "Filter Gallery", exact: true }).click();
+  await picker.getByRole("button", { name: "Uploads", exact: true }).click();
 }
 
 /** Closes the References popup, leaving the composer open. */
