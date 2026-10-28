@@ -211,7 +211,7 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   expect(state.jobs).toHaveLength(0);
   await page.getByRole("textbox", { name: "Message", exact: true }).fill("Create a blue bird");
   await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect(page.getByText("Requested an image", { exact: true })).toBeVisible();
+  await expect(page.getByText("New image", { exact: true })).toBeVisible();
   const first = page.getByRole("article", { name: "Iteration 1", exact: true });
   await expect(first.getByText("A blue bird in soft daylight", { exact: true })).toBeVisible();
   await expect(
