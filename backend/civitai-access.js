@@ -1,79 +1,5 @@
-import { Resolver } from "node:dns/promises";
-import https from "node:https";
-import { Readable } from "node:stream";
-
 export function isCivitaiHost(host) {
   return host === "civitai.com" || host === "civitai.red";
-}
-
-/** Use the configured resolver only for Civitai requests; preserve TLS hostname checks. */
-export async function civitaiRequest(
-  url,
-  init = {},
-  {
-    servers = process.env.STUDIO_CIVITAI_DNS_SERVERS,
-    request = https.request,
-    resolver = new Resolver(),
-  } = {},
-) {
-  if (!servers) return fetch(url, init);
-  resolver.setServers(
-    servers
-      .split(",")
-      .map((server) => server.trim())
-      .filter(Boolean),
-  );
-  const lookup = (hostname, options, callback) => {
-    const families = options.family ? [options.family] : [4, 6];
-    Promise.allSettled(
-      families.map(async (family) =>
-        (await (family === 4 ? resolver.resolve4(hostname) : resolver.resolve6(hostname))).map(
-          (address) => ({ address, family }),
-        ),
-      ),
-    ).then((results) => {
-      const addresses = results.flatMap((result) =>
-        result.status === "fulfilled" ? result.value : [],
-      );
-      if (!addresses.length)
-        return callback(
-          results.find((result) => result.status === "rejected")?.reason ||
-            new Error("No Civitai DNS addresses were returned."),
-        );
-      if (options.all) callback(null, addresses);
-      else callback(null, addresses[0].address, addresses[0].family);
-    });
-  };
-  return new Promise((resolve, reject) => {
-    const outgoing = request(
-      url,
-      {
-        agent: false,
-        headers: Object.fromEntries(new Headers(init.headers)),
-        lookup,
-        method: init.method || "GET",
-        signal: init.signal,
-      },
-      (incoming) => {
-        const headers = new Headers();
-        for (const [key, value] of Object.entries(incoming.headers)) {
-          for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value])
-            headers.append(key, item);
-        }
-        const empty = [204, 304].includes(incoming.statusCode);
-        if (empty) incoming.resume();
-        resolve(
-          new Response(empty ? null : Readable.toWeb(incoming), {
-            headers,
-            status: incoming.statusCode,
-            statusText: incoming.statusMessage,
-          }),
-        );
-      },
-    );
-    outgoing.once("error", reject);
-    outgoing.end(init.body);
-  });
 }
 
 /** Whether the deployment set a Civitai API token, never the token itself. */
@@ -96,7 +22,7 @@ export function civitaiAssetUrl(value) {
 export async function civitaiFetch(
   input,
   init = {},
-  { transport = civitaiRequest, token = process.env.CIVITAI_API_TOKEN, media = false } = {},
+  { transport = fetch, token = process.env.CIVITAI_API_TOKEN, media = false } = {},
 ) {
   let url = civitaiAssetUrl(input);
   for (let hop = 0; hop < 6; hop += 1) {
