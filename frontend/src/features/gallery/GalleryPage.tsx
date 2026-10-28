@@ -233,7 +233,6 @@ export function GalleryPage() {
           leading={
             <SegmentedControl
               aria-label="Gallery View"
-              size="sm"
               classNames={{
                 root: classes.view,
                 control: classes.viewControl,

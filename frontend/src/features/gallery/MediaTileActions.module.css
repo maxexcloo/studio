@@ -7,7 +7,7 @@
 .control {
   pointer-events: auto;
   opacity: 0;
-  transition: opacity var(--studio-motion-duration) ease;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
   box-shadow: var(--mantine-shadow-xs);
 }
 

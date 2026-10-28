@@ -581,7 +581,6 @@ function StackEntry({
         {!!info?.triggers?.length && (
           <Group gap={4}>
             <Switch
-              size="xs"
               label="Trigger Words"
               aria-label={`${title} Trigger Words`}
               checked={lora.triggers !== false}
@@ -591,7 +590,7 @@ function StackEntry({
             {info.triggers.map((word) => (
               <Button
                 key={word}
-                size="compact-xs"
+                size="compact-sm"
                 variant="subtle"
                 aria-label={`Copy Trigger Word: ${word}`}
                 onClick={() => void copyText(word, "Trigger Word")}

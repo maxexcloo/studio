@@ -149,11 +149,7 @@ export function LibraryDownloads({ active }: { active: boolean }) {
               header: "Status",
               sortValue: (item) => statusLabel(item.status),
               cell: (item) => (
-                <Badge
-                  miw="max-content"
-                  variant="light"
-                  color={statusColours[item.status] || "gray"}
-                >
+                <Badge miw="max-content" color={statusColours[item.status] || "gray"}>
                   {statusLabel(item.status)}
                 </Badge>
               ),

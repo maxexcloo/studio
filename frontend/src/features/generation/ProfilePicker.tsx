@@ -90,12 +90,17 @@ export function ProfilePicker({
                   </Badge>
                 )}
                 {profile?.aiDrafted && (
-                  <Badge size="xs" variant="light" color="orange">
+                  <Badge size="xs" color="orange">
                     AI-Drafted
                   </Badge>
                 )}
+                {profile?.failing && (
+                  <Badge size="xs" color="red" title="Most of its runs in the last week failed">
+                    Failing
+                  </Badge>
+                )}
                 {status && status.label !== "Ready" && (
-                  <Badge size="xs" variant="light" color={status.color}>
+                  <Badge size="xs" color={status.color}>
                     {status.label}
                   </Badge>
                 )}

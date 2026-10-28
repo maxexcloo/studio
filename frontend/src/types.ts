@@ -22,6 +22,8 @@ export interface Profile {
   uncensored?: boolean;
   /** Drafted by the assistant and not yet approved; only administrators see it. */
   aiDrafted?: boolean;
+  /** Most of its runs in the last week failed (backend stats.js). */
+  failing?: boolean;
   /** Merged profile ids that now resolve to this one; older records may still name them. */
   aliases?: string[];
   /** The backend each merged per-backend id ran on, so reruns of its records keep it. */

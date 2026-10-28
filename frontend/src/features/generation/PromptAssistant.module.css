@@ -7,7 +7,7 @@
 .spinner,
 .stop {
   grid-area: 1 / 1;
-  transition: opacity var(--studio-motion-duration) ease-out;
+  transition: opacity var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
 .stop {

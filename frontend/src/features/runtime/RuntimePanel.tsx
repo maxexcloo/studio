@@ -128,9 +128,7 @@ function ServiceEndpointRow({ label, service }: { label: string; service: Servic
       <Group gap="xs" justify="space-between" wrap="nowrap">
         <Group gap="xs" wrap="nowrap">
           <Text fw={600}>{label}</Text>
-          <Badge variant="light" color={healthColour(service.state)}>
-            {healthLabel(service.state)}
-          </Badge>
+          <Badge color={healthColour(service.state)}>{healthLabel(service.state)}</Badge>
         </Group>
         {endpoint && (
           <Select
@@ -188,9 +186,7 @@ export function RuntimePanel() {
   return (
     <Stack gap="lg" aria-label="Runtime">
       <Group gap="xs">
-        <Badge color="gray" variant="light">
-          {runtime.configured ? "Runtime Configured" : "Observe Only"}
-        </Badge>
+        <Badge color="gray">{runtime.configured ? "Runtime Configured" : "Observe Only"}</Badge>
         <Text size="xs" c="dimmed">
           Automatic Control {runtime.automaticLifecycle ? "On" : "Off"}
         </Text>

@@ -41,9 +41,7 @@ const sourceNote = (setting: Source) =>
       ? "Saved in Studio"
       : "Default";
 const onOff = (on: boolean, label = on ? "On" : "Off") => (
-  <Badge variant="light" color={on ? "green" : "gray"}>
-    {label}
-  </Badge>
+  <Badge color={on ? "green" : "gray"}>{label}</Badge>
 );
 
 /** Settings › Models: default profiles, catalogue switches and integrations. */
@@ -142,9 +140,7 @@ export function ModelSettings() {
           label="Output Storage"
           description={`${sourceNote(storage)} · ${storage.outputs === "studio" ? "Finished outputs are kept in Studio’s media folder" : "Finished outputs stay in ComfyUI’s output folder"}`}
         >
-          <Badge variant="light" color="gray">
-            {storage.outputs === "studio" ? "Studio" : "ComfyUI Folder"}
-          </Badge>
+          <Badge color="gray">{storage.outputs === "studio" ? "Studio" : "ComfyUI Folder"}</Badge>
         </SettingRow>
         <SettingRow
           label="Prompt Assistant"
