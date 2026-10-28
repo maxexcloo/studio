@@ -28,6 +28,8 @@ export interface ChatMessage {
   sessionId: string;
   role: "user" | "assistant";
   content: string;
+  /** The model's reasoning before its reply. */
+  thinking?: string;
   status: "streaming" | "completed" | "cancelled" | "failed";
   createdAt: string;
   references?: string[];
@@ -49,6 +51,7 @@ export interface ChatInput {
 export type ChatEvent =
   | { event: "message"; data: ChatMessage }
   | { event: "delta"; data: { id: string; text: string } }
+  | { event: "thinking"; data: { id: string; text: string } }
   | { event: "done"; data: Record<string, never> }
   | { event: "generation"; data: { job: QueueJob } }
   | { event: "error"; data: { error: string } };

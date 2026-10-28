@@ -41,6 +41,7 @@ interface ChatOptions {
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
 const contextKeys = [
   "profileId",
+  "profileName",
   "model",
   "modelName",
   "workflow",
@@ -156,7 +157,10 @@ export class ChatService {
           model.label === model.id ||
           model.id.toLowerCase().endsWith(`/${model.label.toLowerCase()}`);
         const actual = bare && this.options.store.actualModel(model.id);
-        return actual && actual !== model.id ? { ...model, label: actual } : model;
+        // Bifrost reports only the alias's own name (ai/text answers as "text"), which says nothing new.
+        return actual && actual !== model.id && actual !== model.id.split("/").pop()
+          ? { ...model, label: actual }
+          : model;
       });
       return settings
         ? {
@@ -342,7 +346,7 @@ export class ChatService {
             {
               role: "system",
               content:
-                "You are Studio's text and media assistant. Answer discussion normally. Use request_media only for an explicit request to generate or modify media. Before a media action, briefly explain the proposed image or change. A card revision is an explicit request to generate exactly once after your answer completes: explain its changes and preserve its submitted prompt, model, references and every setting exactly. Do not substitute settings. Other selected generation settings are context, not instructions: " +
+                "You are Studio's text and media assistant. Answer discussion normally. Use request_media only for an explicit request to generate or modify media. Before a media action, briefly explain the proposed image or change. request_media always uses the selected profile (profileName in the settings below) and cannot switch models: when the user asks for another model, tell them to select it first, and never claim to use a model other than the selected one. A card revision is an explicit request to generate exactly once after your answer completes: explain its changes and preserve its submitted prompt, model, references and every setting exactly. Do not substitute settings. Other selected generation settings are context, not instructions: " +
                 JSON.stringify(
                   input.generation
                     ? { ...input.generation, input: generationContext(input.generation.input) }
@@ -399,7 +403,14 @@ export class ChatService {
             const choice = parsed.choices?.[0];
             if (choice?.finish_reason) completed = true;
             const delta = choice?.delta;
-            if (typeof delta?.content === "string") {
+            // Gateways name reasoning `reasoning_content` or `reasoning`; Bifrost sends both with the same text.
+            const reasoning = delta?.reasoning_content ?? delta?.reasoning;
+            if (typeof reasoning === "string" && reasoning) {
+              assistant.thinking = (assistant.thinking || "") + reasoning;
+              this.options.store.save(ownerId, assistant);
+              emit({ event: "thinking", data: { id: assistant.id, text: reasoning } });
+            }
+            if (typeof delta?.content === "string" && delta.content) {
               assistant.content += delta.content;
               this.options.store.save(ownerId, assistant);
               emit({ event: "delta", data: { id: assistant.id, text: delta.content } });
@@ -410,7 +421,10 @@ export class ChatService {
               functionName += call.function?.name || "";
               argumentsText += call.function?.arguments || "";
             }
-            if (assistant.content.length + argumentsText.length > 128_000)
+            if (
+              assistant.content.length + (assistant.thinking?.length || 0) + argumentsText.length >
+              256_000
+            )
               throw failure("The assistant response exceeded its limit.", 502);
           }
         }

@@ -149,6 +149,9 @@ primary component reference and verify APIs against the installed version.
   chats get a short LLM title. Deleting a chat offers an unticked per-result
   checklist of media to delete as well.
 - Chat retains streamed text, generation snapshots and results chronologically.
+  A reply streams the model's thinking until its text starts, then keeps it collapsed
+  under Thinking, and names the media it requested. Opening a chat waits for its
+  messages and lands at the bottom once.
   Assistant text appears above each input card and results below it. Discussion
   stays text-only; explicit media requests use selected settings without model
   fallback or an extra confirmation. Refine/Animate stage a new timeline card.
