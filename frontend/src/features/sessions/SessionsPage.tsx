@@ -106,21 +106,16 @@ function SessionPage() {
   // Each staging (Refine, Animate, Recreate) starts a fresh card form.
   const stagings = useRef(0);
   const stagedKey = useMemo(() => (staged ? ++stagings.current : 0), [staged]);
+  // The chat opens once its jobs and messages are both known, so it lands at the bottom once.
+  const loading = session.isPending || chat.isPending;
   useEffect(() => {
-    if (!feed.current) return;
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        followLatest();
-      });
-    });
+    if (!feed.current || !thread.current) return;
+    // Following inside the observer, before paint, keeps late layout (Markdown, media, the composer) from showing a jump.
+    const observer = new ResizeObserver(followLatest);
     observer.observe(feed.current);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [id, session.isPending]);
+    observer.observe(thread.current);
+    return () => observer.disconnect();
+  }, [id, loading]);
   useLayoutEffect(() => {
     followLatest();
   }, [
@@ -148,7 +143,7 @@ function SessionPage() {
       operation: "image",
     });
   }, [id, session.data, draft.sessionId, setDraft]);
-  if (session.isPending)
+  if (loading)
     return (
       <ChatWorkspace>
         <LoadingState fill label="Loading Chat" />

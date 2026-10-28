@@ -53,6 +53,12 @@ function setup(chunks: string[]) {
 }
 test("text discussion streams and persists without submitting media; history stays account scoped", async () => {
   const fixture = setup([
+    // Bifrost's shape: the same reasoning under both names, then an empty content delta.
+    frame({
+      choices: [
+        { delta: { reasoning: "Define it.", reasoning_content: "Define it.", content: "" } },
+      ],
+    }),
     frame({ choices: [{ delta: { content: "Hello" } }] }),
     "data: [DONE]\n\n",
   ]);
@@ -65,6 +71,8 @@ test("text discussion streams and persists without submitting media; history sta
     (event) => events.push(event),
   );
   assert.equal(fixture.service.messages("alice", fixture.session.id)[1].content, "Hello");
+  assert.equal(fixture.service.messages("alice", fixture.session.id)[1].thinking, "Define it.");
+  assert.equal(events.find((event) => event.event === "thinking")?.data.text, "Define it.");
   assert.equal(
     fixture.db.session("alice", fixture.session.id)?.updatedAt,
     fixture.service.messages("alice", fixture.session.id)[1].createdAt,
