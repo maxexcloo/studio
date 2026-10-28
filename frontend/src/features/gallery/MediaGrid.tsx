@@ -15,7 +15,7 @@ import type { MediaItem } from "../../types";
 import { MediaTile } from "./MediaTile";
 import type { VersionGroup } from "./versions";
 import type { GallerySelection } from "./useGallerySelection";
-import { galleryGap, useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
+import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 
 export interface GalleryViewProps {
   items: MediaItem[];
@@ -66,7 +66,7 @@ export function MediaGrid({
   onTryAgain,
   versions,
 }: GalleryViewProps) {
-  const { columns, host, width, cell } = useGalleryLayout();
+  const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
   // The version each tile shows while flipping, by the tile's original.
   const [shown, setShown] = useState<Record<string, number>>({});
   const pendingFocus = useRef<string | null>(null);
@@ -79,7 +79,7 @@ export function MediaGrid({
   const virtual = useWindowVirtualizer({
     count: width ? items.length : 0,
     lanes: columns,
-    gap: galleryGap,
+    gap,
     estimateSize: (index) => (cell * (items[index].height || 1024)) / (items[index].width || 1024),
     getItemKey: (index) => items[index].id,
     overscan: 2,
@@ -101,7 +101,16 @@ export function MediaGrid({
     },
     [items, virtual, host],
   );
-  useLayoutEffect(() => virtual.measure(), [width, columns, dimensions, virtual]);
+  useLayoutEffect(() => {
+    virtual.measure();
+    anchor((id) => {
+      const index = items.findIndex(
+        (item) => item.id === id || versions?.get(item.id)?.some((version) => version.id === id),
+      );
+      virtual.getTotalSize();
+      return virtual.measurementsCache[index];
+    });
+  }, [width, columns, dimensions, virtual]);
   useLayoutEffect(() => {
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
       pendingFocus.current = null;
@@ -117,8 +126,9 @@ export function MediaGrid({
   return (
     <div
       ref={host}
+      data-gallery-view
       {...hold.handlers}
-      style={{ height: virtual.getTotalSize(), position: "relative" }}
+      style={{ height: virtual.getTotalSize(), position: "relative", touchAction: "pan-x pan-y" }}
     >
       {virtual.getVirtualItems().map((placement) => {
         const original = items[placement.index];
@@ -127,7 +137,7 @@ export function MediaGrid({
             key={original.id}
             original={original}
             index={placement.index}
-            left={placement.lane * (cell + galleryGap)}
+            left={placement.lane * (cell + gap)}
             top={placement.start - virtual.options.scrollMargin}
             width={cell}
             height={placement.size}
