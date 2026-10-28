@@ -198,13 +198,12 @@ export function GenerationForm({
         draft.presetId,
         draft.operation,
       ])}
-      presets={(close, inline) => (
+      presets={(close) => (
         <PresetPicker
           input={input}
           references={draft.references}
           profile={profile}
           selection={draft}
-          onDone={inline ? close : undefined}
           onSelectionChange={(selection) => setDraft((value) => ({ ...value, ...selection }))}
           onLoad={(preset) => {
             setDraft((value) => ({

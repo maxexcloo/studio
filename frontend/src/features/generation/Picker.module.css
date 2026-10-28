@@ -194,12 +194,6 @@
   object-fit: cover;
 }
 
-.footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mantine-spacing-sm);
-}
-
 /* Saved stacks and presets: one row each, its menu at the end. */
 .saved {
   display: flex;

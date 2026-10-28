@@ -89,7 +89,7 @@ test("Reference slots fill by tap, targeted drop and paste, and pasted files sav
   ]);
 });
 
-test("Escape closes only the innermost reference layer; phones confirm at the safe bottom", async ({
+test("Escape closes only the innermost reference layer; selection applies at once", async ({
   page,
   isMobile,
 }) => {
@@ -97,18 +97,14 @@ test("Escape closes only the innermost reference layer; phones confirm at the sa
   const chip = page.getByRole("button", { name: "Choose References", exact: true });
   await chip.click();
   const picker = page.getByRole("region", { name: "References", exact: true });
-  const done = picker.getByRole("button", { name: "Use References", exact: true });
   await picker.getByRole("button", { name: "Use reference: Alpha", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Use References", exact: true })).toHaveCount(0);
   if (isMobile) {
-    const box = (await done.boundingBox())!;
-    expect(box.y + box.height).toBeGreaterThan(page.viewportSize()!.height - 48);
-    await picker.getByRole("button", { name: "Back", exact: true }).click();
+    await page.getByRole("button", { name: "Close References", exact: true }).click();
     await expect(picker).toBeHidden();
     await expect(page.getByRole("img", { name: "Reference 1 · Start", exact: true })).toBeVisible();
     return;
   }
-  await expect(done).toHaveCount(0);
-  await expect(picker.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
   await picker.getByRole("button", { name: "Reference 1 · Start", exact: true }).click();
   const menu = page.getByRole("menu", { name: "Reference 1 · Start", exact: true });
   await expect(menu).toBeVisible();
@@ -125,9 +121,7 @@ test("Escape closes only the innermost reference layer; phones confirm at the sa
   await picker.getByRole("button", { name: "Filter By Size", exact: true }).press("Escape");
   await expect(picker).toBeHidden();
   await expect(chip).toBeFocused();
-  await expect(
-    page.getByRole("region", { name: "Generation Controls", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Generate", exact: true })).toBeVisible();
 });
 
 test("The compact composer expands on interaction and keeps picked or dragged references", async ({

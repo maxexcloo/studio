@@ -3,12 +3,10 @@ import {
   Button,
   Checkbox,
   NumberInput,
-  Popover,
   Select,
   SimpleGrid,
   Stack,
   Text,
-  Textarea,
   TextInput,
   Tooltip,
 } from "@mantine/core";
@@ -17,9 +15,7 @@ import type { GenerationInput, Profile } from "../../types";
 import { iconChipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
 import { controlRange, stepsRange } from "./payload";
-import { PromptHistory } from "./PromptHistory";
-import { PanelHeader, PickerFooter } from "./Picker";
-import { usePhone } from "../../ui/usePhone";
+import { ChipPopup } from "./Picker";
 
 const selections = [
   { options: "samplers", field: "sampler", label: "Sampler" },
@@ -37,18 +33,14 @@ export function ExpertSettings({
   onChange,
   opened,
   onOpenedChange,
-  inline = false,
 }: {
   input: GenerationInput;
   profile?: Profile;
   onChange: (patch: Partial<GenerationInput>) => void;
   opened: boolean;
   onOpenedChange: (opened: boolean) => void;
-  /** Phones show the settings in place of the form instead of a popover. */
-  inline?: boolean;
 }) {
   const { models } = useGeneration();
-  const phone = usePhone();
   const workers = models.data?.workers || [];
   const workerIds = profile?.workerIds || [];
   const worker = workers.find((worker) => worker.id === (input.backendId || workerIds[0]));
@@ -84,26 +76,6 @@ export function ExpertSettings({
   const seconds = input.fps > 0 ? `${Number((input.frames / input.fps).toFixed(1))} s` : undefined;
   const content = (
     <Stack gap="sm">
-      {capabilities.negativePrompt !== false && (
-        <Textarea
-          label="Negative Prompt"
-          rightSection={
-            <PromptHistory
-              kind="negative"
-              value={input.negative}
-              withinPortal={false}
-              onPick={(negative) => onChange({ negative })}
-            />
-          }
-          rightSectionPointerEvents="all"
-          rightSectionProps={{ style: { alignItems: "flex-start", paddingTop: 4 } }}
-          autosize
-          minRows={2}
-          maxRows={5}
-          value={input.negative}
-          onChange={(event) => onChange({ negative: event.currentTarget.value })}
-        />
-      )}
       <SimpleGrid cols={2} spacing="xs">
         {number("steps", "Steps", stepsRange(profile))}
         {number("cfg", "Guidance", controlRange(profile, "cfg", { min: 0, max: 30, step: 0.5 }))}
@@ -263,47 +235,26 @@ export function ExpertSettings({
       )}
     </Stack>
   );
-  if (inline)
-    return (
-      <Stack gap="md" flex={1} role="region" aria-label="Expert Settings" data-composer-layer>
-        <PanelHeader title="Expert Settings" onBack={() => onOpenedChange(false)} />
-        {content}
-        <PickerFooter done={{ label: "Done", onClick: () => onOpenedChange(false) }} />
-      </Stack>
-    );
-  const trigger = (
-    <Button
-      {...iconChipProps}
-      aria-label="Expert Settings"
-      aria-expanded={opened}
-      onClick={() => onOpenedChange(!opened)}
-    >
-      <SlidersHorizontal size={16} />
-    </Button>
-  );
-  if (phone) return trigger;
   return (
-    <Popover
-      opened={opened}
-      onChange={onOpenedChange}
+    <ChipPopup
+      title="Expert Settings"
+      tooltip
       position="top"
       width={380}
-      trapFocus
-      returnFocus
+      opened={opened}
+      onOpenedChange={onOpenedChange}
+      target={
+        <Button
+          {...iconChipProps}
+          aria-label="Expert Settings"
+          aria-expanded={opened}
+          onClick={() => onOpenedChange(!opened)}
+        >
+          <SlidersHorizontal size={16} />
+        </Button>
+      }
     >
-      <Tooltip label="Expert Settings" disabled={opened}>
-        <Popover.Target>{trigger}</Popover.Target>
-      </Tooltip>
-      <Popover.Dropdown
-        data-composer-layer
-        aria-label="Expert Settings"
-        onFocusCapture={(event) => {
-          // Escape in a nested picker closes only that picker.
-          (event.target as HTMLElement).setAttribute("data-mantine-stop-propagation", "true");
-        }}
-      >
-        {content}
-      </Popover.Dropdown>
-    </Popover>
+      {content}
+    </ChipPopup>
   );
 }

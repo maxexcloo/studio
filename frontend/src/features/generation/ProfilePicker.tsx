@@ -1,4 +1,4 @@
-import { Badge, Button, ColorSwatch, ComboboxPopover, Group, Text } from "@mantine/core";
+import { Badge, Button, ColorSwatch, ComboboxPopover, Group, Stack, Text } from "@mantine/core";
 import { ChevronDown } from "lucide-react";
 import { inputForProfile, useGeneration } from "./GenerationProvider";
 import type { GenerationInput, Models, Profile } from "../../types";
@@ -50,8 +50,10 @@ export function ProfilePicker({
     ...new Set(available.map((profile) => modelFamilyLabel(profile.family, profile.familyName))),
   ].sort((a, b) => a.localeCompare(b));
   const readiness = selected && profileReadiness(selected, workers);
-  // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the profile's.
+  // A combined profile's run uses the input's backend (a rerun keeps the one that ran), else the
+  // profile's; with several to choose from, the Backend chip shows it instead.
   const selectedBackend = selected?.backend && (input.profileBackend || selected.backend);
+  const backendBadge = selectedBackend && (selected.backendOptions?.length || 0) < 2;
   return (
     <ComboboxPopover
       searchable
@@ -76,9 +78,16 @@ export function ProfilePicker({
         const status = profile && profileReadiness(profile, workers);
         return (
           <Group justify="space-between" wrap="nowrap" gap="xs" w="100%">
-            <Text size="sm" fw={checked ? 600 : undefined} lineClamp={2} title={option.label}>
-              {option.label}
-            </Text>
+            <Stack gap={0} miw={0}>
+              <Text size="sm" fw={checked ? 600 : 500} truncate title={option.label}>
+                {option.label}
+              </Text>
+              {profile?.description && (
+                <Text size="xs" c="dimmed" truncate title={profile.description}>
+                  {profile.description}
+                </Text>
+              )}
+            </Stack>
             <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
               {profile?.backend && (
                 <Badge size="xs" variant="default" title={profile.readyReason}>
@@ -140,7 +149,7 @@ export function ProfilePicker({
           }
         >
           <span className={classes.label}>{selectedLabel || "Choose a Profile"}</span>
-          {selectedBackend && (
+          {backendBadge && (
             <Badge size="xs" variant="default" ml={6}>
               {backendLabel(selectedBackend)}
             </Badge>

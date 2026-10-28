@@ -197,9 +197,9 @@ test("Exact Repeat and Recreate keep the backend a combined profile ran on", asy
   });
   await viewerAction(page, "Recreate");
   await expect(viewer).toBeHidden();
-  // The picker shows the backend this draft runs on, not the profile's current one.
+  // The Backend chip shows the backend this draft runs on, not the profile's current one.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
-  await expect(page.getByRole("combobox", { name: "Profile", exact: true })).toContainText(
+  await expect(page.getByRole("combobox", { name: "Backend", exact: true })).toContainText(
     "Radiance",
   );
 });

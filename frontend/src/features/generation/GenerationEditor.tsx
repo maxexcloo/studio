@@ -17,10 +17,8 @@ import type { GenerationInput, MediaKind, Profile, ReferenceAsset } from "../../
 import { LoadingState } from "../../ui/LoadingState";
 import { defaultProfile, useGeneration } from "./GenerationProvider";
 import { GenerationInputControls } from "./GenerationInputControls";
-import { ExpertSettings } from "./ExpertSettings";
 import { chipProps } from "./chip";
-import { LoraPicker, useLoraPicker } from "./LoraPicker";
-import { PanelHeader } from "./Picker";
+import { useLoraPicker } from "./LoraPicker";
 import { primaryReference, referenceDetails } from "./payload";
 import { usePromptAssistant } from "./PromptAssistant";
 import { usePromptIdeas } from "./PromptIdeas";
@@ -138,12 +136,12 @@ export function GenerationEditor({
   blockedReason?: string;
   error?: unknown;
   assistantScope: string;
-  /** The Presets picker; `close` dismisses it after a preset loads, `inline` on phones. */
-  presets?: (close: () => void, inline: boolean) => ReactNode;
+  /** The Presets picker; `close` dismisses it after a preset loads. */
+  presets?: (close: () => void) => ReactNode;
   onCompare?: () => void;
   /** Lets the surrounding focus trap start in the prompt. */
   autoFocusPrompt?: boolean;
-  /** Focuses the prompt on mount and again after a phone inline picker closes. */
+  /** Focuses the prompt on mount. */
   focusPrompt?: boolean;
   /** Fills a phone Drawer that owns scrolling, keeping the actions at its safe bottom. */
   fill?: boolean;
@@ -180,17 +178,16 @@ export function GenerationEditor({
     className: classes.promptIdeas,
     stacked: fill,
   });
-  const inlineOpen = phone && (referenceOpen || loraPicker.opened || expertOpen || presetsOpen);
   const placedCaret = useRef(false);
   useLayoutEffect(() => {
     const element = prompt.current;
-    if (!focusPrompt || inlineOpen || !element) return;
+    if (!focusPrompt || !element) return;
     element.focus({ preventScroll: true });
     element.scrollIntoView({ block: "nearest", behavior: "instant" });
     // Typing begun in the collapsed prompt carries on at the end.
     if (!placedCaret.current) element.setSelectionRange(element.value.length, element.value.length);
     placedCaret.current = true;
-  }, [focusPrompt, inlineOpen, models.isPending]);
+  }, [focusPrompt, models.isPending]);
   if (models.isPending) return <LoadingState label="Loading Profiles" />;
   const details = referenceDetails(references, input, profile);
   const primary = primaryReference(details, profile);
@@ -202,11 +199,9 @@ export function GenerationEditor({
   const inpaint = input.inpaint as
     | { assetId?: string; mask?: string; strength?: number; feather?: number }
     | undefined;
-  const referencePicker = (inline: boolean) => (
+  const referencePicker = (
     <ReferencePicker
-      inline={inline}
-      embedded={!inline}
-      opened={inline || referenceOpen}
+      opened={referenceOpen}
       browser={referenceBrowser}
       onOpenedChange={setReferenceOpen}
       profile={profile}
@@ -216,18 +211,6 @@ export function GenerationEditor({
     />
   );
   const expert = { opened: expertOpen, onOpenedChange: setExpertOpen };
-  const inlinePanel = !phone ? null : loraPicker.opened ? (
-    <LoraPicker inline value={input} onChange={onChange} picker={loraPicker} />
-  ) : referenceOpen ? (
-    referencePicker(true)
-  ) : expertOpen ? (
-    <ExpertSettings inline input={input} profile={profile} onChange={onChange} {...expert} />
-  ) : presetsOpen && presets ? (
-    <Stack gap="sm" flex={1} role="region" aria-label="Presets" data-composer-layer>
-      <PanelHeader title="Presets" onBack={() => setPresetsOpen(false)} />
-      {presets(() => setPresetsOpen(false), true)}
-    </Stack>
-  ) : null;
   const mask = primary && profile?.capabilities?.inpaint && (
     <Button.Group>
       <Button {...chipProps} leftSection={<Brush size={15} />} onClick={() => setMaskOpen(true)}>
@@ -247,12 +230,10 @@ export function GenerationEditor({
   );
   return (
     <>
-      {inlinePanel}
       <form
         data-generation-editor
         data-fill={fill || undefined}
         className={classes.editor}
-        style={{ display: inlinePanel ? "none" : undefined }}
         onKeyDown={(event) => submitShortcut(event, !!blockedReason || pending)}
         onSubmit={(event) => {
           event.preventDefault();
@@ -307,20 +288,40 @@ export function GenerationEditor({
             />
             {offerIdeas && ideas.ideas}
           </div>
+          {profile && profile.capabilities.negativePrompt !== false && (
+            <Textarea
+              aria-label="Negative Prompt"
+              placeholder="Negative prompt: what to leave out…"
+              size="sm"
+              autosize
+              minRows={1}
+              maxRows={4}
+              rightSection={
+                <PromptHistory
+                  kind="negative"
+                  value={input.negative}
+                  onPick={(negative) => onChange({ negative })}
+                />
+              }
+              rightSectionPointerEvents="all"
+              value={input.negative}
+              onChange={(event) => onChange({ negative: event.currentTarget.value })}
+            />
+          )}
           {assistant.suggestions}
           <GenerationInputControls
             loraPicker={loraPicker}
             input={input}
             profile={profile}
             onChange={onChange}
-            references={supportsReferences ? referencePicker(false) : undefined}
+            references={supportsReferences ? referencePicker : undefined}
             hasReferences={!!details.length}
             mask={mask}
             presets={
               presets && {
                 opened: presetsOpen,
                 onOpenedChange: setPresetsOpen,
-                content: !phone && presets(() => setPresetsOpen(false), false),
+                content: presets(() => setPresetsOpen(false)),
               }
             }
             expert={expert}

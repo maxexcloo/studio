@@ -3,10 +3,8 @@ import {
   ActionIcon,
   Alert,
   Button,
-  Box,
   Combobox,
   Group,
-  Popover,
   ScrollArea,
   Stack,
   Switch,
@@ -27,7 +25,7 @@ import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { SearchInput } from "../../ui/SearchInput";
-import { PickerFooter } from "./Picker";
+import { ChipPopup, PickerFooter } from "./Picker";
 
 type PromptKind = "positive" | "negative";
 interface PromptEntry {
@@ -128,13 +126,10 @@ export function PromptHistory({
   kind,
   value,
   onPick,
-  withinPortal = true,
 }: {
   kind: PromptKind;
   value: string;
   onPick: (text: string) => void;
-  /** False inside another popover, so picking keeps that popover open. */
-  withinPortal?: boolean;
 }) {
   const account = useAccount();
   const admin = useIsAdmin();
@@ -179,156 +174,141 @@ export function PromptHistory({
   }, [opened, optionsKey]);
   if (!allowed) return null;
   return (
-    <Popover
-      opened={opened}
-      onChange={setOpened}
-      width={500}
+    <ChipPopup
+      title={title}
+      tooltip
       position="top-end"
-      shadow="md"
-      withinPortal={withinPortal}
-      trapFocus
-      returnFocus
+      width={500}
+      opened={opened}
+      onOpenedChange={setOpened}
+      target={
+        <ActionIcon
+          aria-label={title}
+          aria-expanded={opened}
+          variant="subtle"
+          color="gray"
+          onClick={() => setOpened(!opened)}
+        >
+          <History size={16} />
+        </ActionIcon>
+      }
+      headerEnd={
+        <Switch
+          // Remounts once loaded so the saved state appears without the thumb sliding.
+          key={keep.history.data ? "loaded" : "loading"}
+          label="Save Recent Prompts"
+          labelPosition="left"
+          checked={keep.history.data?.enabled ?? false}
+          disabled={!keep.history.data}
+          onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
+        />
+      }
     >
-      <Popover.Target>
-        <Box component="span" style={{ display: "inline-flex" }}>
-          <Tooltip label={title}>
-            <ActionIcon
-              aria-label={title}
-              aria-expanded={opened}
-              variant="subtle"
-              color="gray"
-              onClick={() => setOpened((previous) => !previous)}
-            >
-              <History size={16} />
-            </ActionIcon>
-          </Tooltip>
-        </Box>
-      </Popover.Target>
-      <Popover.Dropdown
-        data-composer-layer
-        aria-labelledby=""
-        aria-label={title}
-        maw="calc(100vw - 24px)"
-        onFocusCapture={(event) =>
-          (event.target as HTMLElement).setAttribute("data-mantine-stop-propagation", "true")
-        }
-        onKeyDown={(event) => {
-          if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-            event.preventDefault();
-            if (value.trim() && !currentPinned) pin(value, true);
-          }
+      <Combobox
+        store={combobox}
+        onOptionSubmit={(text) => {
+          onPick(text);
+          setOpened(false);
         }}
       >
-        <Combobox
-          store={combobox}
-          onOptionSubmit={(text) => {
-            onPick(text);
-            setOpened(false);
+        <Stack
+          gap="sm"
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+              event.preventDefault();
+              if (value.trim() && !currentPinned) pin(value, true);
+            }
           }}
         >
-          <Stack gap="sm">
-            <Group justify="space-between" wrap="nowrap">
-              <Text fw={500}>{title}</Text>
-              <Switch
-                // Remounts once loaded so the saved state appears without the thumb sliding.
-                key={keep.history.data ? "loaded" : "loading"}
-                label="Save Recent Prompts"
-                labelPosition="left"
-                checked={keep.history.data?.enabled ?? false}
-                disabled={!keep.history.data}
-                onChange={(event) => keep.change.mutate(event.currentTarget.checked)}
-              />
-            </Group>
-            <Combobox.EventsTarget>
-              <SearchInput
-                aria-label="Search Prompt History"
-                placeholder="Search prompts…"
-                value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                onClear={() => setQuery("")}
-                data-autofocus
-              />
-            </Combobox.EventsTarget>
-            {history.isPending ? (
-              <LoadingState label="Loading Prompt History" fill />
-            ) : history.error ? (
-              <Alert color="red">{history.error.message}</Alert>
-            ) : (
-              <>
-                <ScrollArea.Autosize mah="min(45dvh, 400px)">
-                  <Combobox.Options aria-label={title}>
-                    {visible.map((entry) => (
-                      <Group key={entry.text} gap={4} wrap="nowrap">
-                        <Combobox.Option
-                          value={entry.text}
-                          py="xs"
-                          px="xs"
-                          flex={1}
-                          miw={0}
-                          aria-label={`Use Prompt: ${entry.text}`}
+          <Combobox.EventsTarget>
+            <SearchInput
+              aria-label="Search Prompt History"
+              placeholder="Search prompts…"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              onClear={() => setQuery("")}
+              data-autofocus
+            />
+          </Combobox.EventsTarget>
+          {history.isPending ? (
+            <LoadingState label="Loading Prompt History" fill />
+          ) : history.error ? (
+            <Alert color="red">{history.error.message}</Alert>
+          ) : (
+            <>
+              <ScrollArea.Autosize mah="min(45dvh, 400px)">
+                <Combobox.Options aria-label={title}>
+                  {visible.map((entry) => (
+                    <Group key={entry.text} gap={4} wrap="nowrap">
+                      <Combobox.Option
+                        value={entry.text}
+                        py="xs"
+                        px="xs"
+                        flex={1}
+                        miw={0}
+                        aria-label={`Use Prompt: ${entry.text}`}
+                      >
+                        <Text size="sm" lineClamp={3}>
+                          {entry.text}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {entry.pinned ? "Pinned · " : ""}
+                          {entry.uses} {entry.uses === 1 ? "Use" : "Uses"}
+                        </Text>
+                      </Combobox.Option>
+                      <Tooltip label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}>
+                        <ActionIcon
+                          aria-label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}
+                          variant={entry.pinned ? "light" : "subtle"}
+                          color={entry.pinned ? undefined : "gray"}
+                          onClick={() => pin(entry.text, !entry.pinned)}
                         >
-                          <Text size="sm" lineClamp={3}>
-                            {entry.text}
-                          </Text>
-                          <Text size="xs" c="dimmed">
-                            {entry.pinned ? "Pinned · " : ""}
-                            {entry.uses} {entry.uses === 1 ? "Use" : "Uses"}
-                          </Text>
-                        </Combobox.Option>
-                        <Tooltip label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}>
-                          <ActionIcon
-                            aria-label={entry.pinned ? "Unpin Prompt" : "Pin Prompt"}
-                            variant={entry.pinned ? "light" : "subtle"}
-                            color={entry.pinned ? undefined : "gray"}
-                            onClick={() => pin(entry.text, !entry.pinned)}
-                          >
-                            {entry.pinned ? <PinOff size={16} /> : <Pin size={16} />}
-                          </ActionIcon>
-                        </Tooltip>
-                        <Tooltip label="Forget Prompt">
-                          <ActionIcon
-                            aria-label="Forget Prompt"
-                            color="gray"
-                            variant="subtle"
-                            onClick={() => edit.mutate({ action: "forget", text: entry.text })}
-                          >
-                            <Trash2 size={16} />
-                          </ActionIcon>
-                        </Tooltip>
-                      </Group>
-                    ))}
-                    {!filtered.length && (
-                      <EmptyState fill>
-                        {query.trim() ? "No Matching Prompts" : "No Saved Prompts"}
-                      </EmptyState>
-                    )}
-                  </Combobox.Options>
-                </ScrollArea.Autosize>
-                <PickerFooter
-                  start={
-                    <Button
-                      variant="default"
-                      disabled={!value.trim() || currentPinned}
-                      onClick={() => pin(value, true)}
-                    >
-                      Pin Current Prompt
-                    </Button>
-                  }
-                  end={
-                    <Button
-                      variant="default"
-                      disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
-                      onClick={() => edit.mutate({ action: "clear" })}
-                    >
-                      Clear Recent
-                    </Button>
-                  }
-                />
-              </>
-            )}
-          </Stack>
-        </Combobox>
-      </Popover.Dropdown>
-    </Popover>
+                          {entry.pinned ? <PinOff size={16} /> : <Pin size={16} />}
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Forget Prompt">
+                        <ActionIcon
+                          aria-label="Forget Prompt"
+                          color="gray"
+                          variant="subtle"
+                          onClick={() => edit.mutate({ action: "forget", text: entry.text })}
+                        >
+                          <Trash2 size={16} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  ))}
+                  {!filtered.length && (
+                    <EmptyState fill>
+                      {query.trim() ? "No Matching Prompts" : "No Saved Prompts"}
+                    </EmptyState>
+                  )}
+                </Combobox.Options>
+              </ScrollArea.Autosize>
+              <PickerFooter
+                start={
+                  <Button
+                    variant="default"
+                    disabled={!value.trim() || currentPinned}
+                    onClick={() => pin(value, true)}
+                  >
+                    Pin Current Prompt
+                  </Button>
+                }
+                end={
+                  <Button
+                    variant="default"
+                    disabled={!history.data?.prompts.some((entry) => !entry.pinned)}
+                    onClick={() => edit.mutate({ action: "clear" })}
+                  >
+                    Clear Recent
+                  </Button>
+                }
+              />
+            </>
+          )}
+        </Stack>
+      </Combobox>
+    </ChipPopup>
   );
 }

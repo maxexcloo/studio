@@ -24,7 +24,7 @@ const nestedLayers =
 export function escapePanel(event: KeyboardEvent<HTMLElement>, close: () => void) {
   if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing) return;
   const layer = (event.target as Element).closest(nestedLayers);
-  if (layer && layer !== event.currentTarget.closest(".mantine-Popover-dropdown")) return;
+  if (layer && !layer.hasAttribute("data-chip-popup")) return;
   event.preventDefault();
   event.stopPropagation();
   close();
