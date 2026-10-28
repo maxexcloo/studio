@@ -951,6 +951,12 @@ export async function serveDream(
         },
       });
     }
+    const answered = /^\/api\/dream\/pairs\/([^/]+)\/answer$/.exec(path);
+    if (answered) {
+      const pairId = decodeURIComponent(answered[1]);
+      state.unseen = state.unseen.filter((item) => item.dream?.pair?.id !== pairId);
+      return route.fulfill({ json: { items: [] } });
+    }
     const [, , , rawId, verdict] = path.split("/");
     const item = [...state.unseen, ...state.discarded].find(
       (entry) => entry.id === decodeURIComponent(rawId),
