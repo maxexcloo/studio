@@ -1,37 +1,48 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Badge, Button, Group, Scroller, Stack, Tooltip } from "@mantine/core";
-import { useHotkeys } from "@mantine/hooks";
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import {
-  Boxes,
-  GalleryVertical,
-  Layers,
-  MessageCircle,
-  Ratio,
-  RotateCw,
-  Ruler,
-  Search,
-  SlidersHorizontal,
-  Star,
-  Upload,
-  X,
-} from "lucide-react";
+  Badge,
+  Button,
+  Group,
+  Input,
+  MultiSelect,
+  Scroller,
+  SegmentedControl,
+  Stack,
+  Tooltip,
+} from "@mantine/core";
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import { ChevronDown, RotateCw, SlidersHorizontal, Star, Upload, X } from "lucide-react";
 import { api } from "../../api";
-import { SearchInput } from "../../ui/SearchInput";
 import { usePhone } from "../../ui/usePhone";
 import type { MediaKind } from "../../types";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { chipProps, iconChipProps } from "../generation/chip";
 import { loraInfoQuery } from "../generation/LoraPicker";
-import { GalleryFilterPicker, type GalleryFilterOption } from "./GalleryFilterPicker";
 import classes from "./GalleryFilters.module.css";
 
-export interface GalleryFilterValues {
-  model: string[];
-  lora: string[];
-  size: string[];
-  aspect: string[];
-  chat: string[];
+export interface GalleryFilterOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+const facets = ["model", "lora", "size", "aspect", "chat"] as const;
+type Facet = (typeof facets)[number];
+export type GalleryDate = "" | "day" | "week" | "month" | "year";
+const dates: { value: GalleryDate; label: string; chip: string; days: number }[] = [
+  { value: "", label: "Any", chip: "", days: 0 },
+  { value: "day", label: "Today", chip: "Today", days: 0 },
+  { value: "week", label: "Week", chip: "Past Week", days: 7 },
+  { value: "month", label: "Month", chip: "Past Month", days: 30 },
+  { value: "year", label: "Year", chip: "Past Year", days: 365 },
+];
+
+/** Every gallery filter: the facets (any value matches), a date range, Starred and Uploads. */
+export interface GalleryFilterValues extends Record<Facet, string[]> {
+  date: GalleryDate;
+  starred: boolean;
+  /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
+  uploads: boolean;
 }
 export const emptyGalleryFilters: GalleryFilterValues = {
   model: [],
@@ -39,14 +50,26 @@ export const emptyGalleryFilters: GalleryFilterValues = {
   size: [],
   aspect: [],
   chat: [],
+  date: "",
+  starred: false,
+  uploads: false,
 };
-export const hasGalleryFilters = (filters: GalleryFilterValues) =>
-  Object.values(filters).some((values) => values.length > 0);
+
+/** The gallery request's filter parameters. */
 export function appendGalleryFilters(params: URLSearchParams, filters: GalleryFilterValues) {
-  for (const [key, values] of Object.entries(filters))
-    for (const value of values) params.append(key, value);
+  for (const key of facets) for (const value of filters[key]) params.append(key, value);
+  params.set("favorites", filters.starred ? "1" : "0");
+  params.set("uploads", filters.uploads ? "1" : "0");
+  const date = dates.find((option) => option.value === filters.date);
+  if (date?.value) {
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - date.days);
+    params.set("since", since.toISOString());
+  }
   return params;
 }
+
 export const galleryFacetsQuery = (kind?: MediaKind) =>
   queryOptions({
     queryKey: ["gallery-filters", kind || ""],
@@ -59,197 +82,6 @@ export const galleryFacetsQuery = (kind?: MediaKind) =>
         chats: GalleryFilterOption[];
       }>(`/api/gallery/filters?type=${kind || ""}`),
   });
-
-/** How many filters are on, Starred and Uploads included, for a filter action's badge. */
-export const galleryFilterCount = (
-  filters: GalleryFilterValues,
-  starred: boolean,
-  uploads: boolean,
-) =>
-  Number(starred) +
-  Number(uploads) +
-  Object.values(filters).reduce((count, values) => count + values.length, 0);
-
-/** The gallery and reference picker share facets, labels and selection behaviour. */
-interface GalleryFiltersProps {
-  kind?: MediaKind;
-  value: GalleryFilterValues;
-  onChange: (value: GalleryFilterValues) => void;
-  starred: boolean;
-  onStarredChange: (value: boolean) => void;
-  /** Uploaded images instead of generations: the gallery leaves uploads out until this is on. */
-  uploads: boolean;
-  onUploadsChange: (value: boolean) => void;
-  withinPortal?: boolean;
-  /** Grid's versions: on (the default) shows each one; off collapses a chain into one tile. */
-  allVersions?: boolean;
-  onAllVersionsChange?: (value: boolean) => void;
-}
-/**
- * Normal, search and filter modes share one toolbar row. Desktop keeps the search box in the row;
- * phones open it from an icon into the full row. Search narrows within the active filters, which
- * show beside it as removable chips. The Filter chip swaps the leading controls for a row of
- * labelled facets that apply as they change; Filter again ends it.
- */
-export function GalleryFilterToolbar({
-  query,
-  onQueryChange,
-  leading,
-  actions,
-  ...props
-}: GalleryFiltersProps & {
-  query: string;
-  onQueryChange: (value: string) => void;
-  leading?: ReactNode;
-  actions?: ReactNode;
-}) {
-  const phone = usePhone();
-  const [mode, setMode] = useState<"normal" | "search" | "filters">("normal");
-  const searchOpen = mode === "search";
-  // A search set from elsewhere (a caption tag) opens the phone's field so it shows what is
-  // filtered; desktop always shows its box.
-  useEffect(() => {
-    if (query && phone) setMode((current) => (current === "normal" ? "search" : current));
-  }, [query, phone]);
-  const selectedCount = galleryFilterCount(props.value, props.starred, props.uploads);
-  const toolbar = useRef<HTMLDivElement>(null);
-  const searchInput = useRef<HTMLInputElement>(null);
-  const searchButton = useRef<HTMLButtonElement>(null);
-  const filtersButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (searchOpen) searchInput.current?.focus();
-  }, [searchOpen]);
-  function openSearch(event: KeyboardEvent) {
-    if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || !toolbar.current)
-      return;
-    const selector =
-      '[role="dialog"], [role="alertdialog"], .mantine-Popover-dropdown, .mantine-Combobox-dropdown';
-    const owner = toolbar.current.closest(selector);
-    const layers = [...document.querySelectorAll<HTMLElement>(selector)].filter(
-      (layer) => layer.getClientRects().length && !layer.closest("[inert]"),
-    );
-    if (owner ? !owner.contains(event.target as Node) : layers.length) return;
-    event.preventDefault();
-    if (phone && !searchOpen) setMode("search");
-    else {
-      setMode((current) => (current === "filters" ? "normal" : current));
-      requestAnimationFrame(() => searchInput.current?.focus());
-    }
-  }
-  useHotkeys([
-    ["/", openSearch, { preventDefault: false }],
-    ["mod+f", openSearch, { preventDefault: false }],
-  ]);
-  function dismiss() {
-    const trigger = mode === "filters" ? filtersButton : searchButton;
-    // Closing the phone's search ends it, so no hidden query keeps narrowing the gallery.
-    if (mode === "search") onQueryChange("");
-    setMode("normal");
-    requestAnimationFrame(() => trigger.current?.focus());
-  }
-  const search = (
-    <SearchInput
-      ref={searchInput}
-      aria-label="Search Gallery"
-      placeholder="Search your generations…"
-      size="sm"
-      radius="xl"
-      value={query}
-      onChange={(event) => onQueryChange(event.currentTarget.value)}
-      onClear={() => onQueryChange("")}
-      onClose={phone ? dismiss : undefined}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (phone) dismiss();
-        else event.currentTarget.blur();
-      }}
-      className={phone ? classes.searchOpen : classes.search}
-    />
-  );
-  const filtering = mode === "filters";
-  const row = searchOpen ? (
-    <Group key="search" ref={toolbar} mih={44} wrap="nowrap" className={classes.mode}>
-      {search}
-    </Group>
-  ) : (
-    <Group ref={toolbar} gap="xs" mih={44} wrap="nowrap">
-      {filtering ? (
-        <Group key="filters" gap={6} wrap="nowrap" className={`${classes.mode} ${classes.lead}`}>
-          {phone || search}
-          <GalleryFilters {...props} />
-        </Group>
-      ) : (
-        <Group key="normal" gap="xs" wrap="nowrap" className={`${classes.mode} ${classes.lead}`}>
-          {phone ? (
-            <Tooltip label="Search Gallery" disabled={phone}>
-              <Button
-                {...iconChipProps}
-                ref={searchButton}
-                aria-label="Search Gallery"
-                aria-expanded={false}
-                variant={query ? "light" : "default"}
-                onClick={() => setMode("search")}
-              >
-                <Search size={16} />
-              </Button>
-            </Tooltip>
-          ) : (
-            search
-          )}
-          {phone || <ActiveFilterChips {...props} />}
-          {leading}
-        </Group>
-      )}
-      <Group gap="xs" ml="auto" wrap="nowrap">
-        <Tooltip label="Gallery Filters" disabled={!phone}>
-          <Button
-            {...(phone ? iconChipProps : chipProps)}
-            ref={filtersButton}
-            aria-label="Gallery Filters"
-            aria-expanded={filtering}
-            variant={selectedCount || filtering ? "light" : "default"}
-            leftSection={phone ? undefined : <SlidersHorizontal size={15} />}
-            rightSection={
-              selectedCount > 0 && !phone ? (
-                <Badge size="xs" circle aria-hidden>
-                  {selectedCount}
-                </Badge>
-              ) : undefined
-            }
-            pos="relative"
-            onClick={() => (filtering ? dismiss() : setMode("filters"))}
-          >
-            {phone ? <SlidersHorizontal size={16} /> : "Filter"}
-            {phone && selectedCount > 0 && (
-              <Badge
-                size="xs"
-                circle
-                variant="filled"
-                pos="absolute"
-                top={-2}
-                right={-2}
-                aria-hidden
-              >
-                {selectedCount}
-              </Badge>
-            )}
-          </Button>
-        </Tooltip>
-        {actions}
-      </Group>
-    </Group>
-  );
-  // Phones have no room in the row, so the active filters follow on a row of their own.
-  if (!phone || filtering) return row;
-  return (
-    <Stack gap={0}>
-      {row}
-      <ActiveFilterChips {...props} />
-    </Stack>
-  );
-}
 
 /** Each facet's options with readable labels, selected values included. */
 function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues) {
@@ -282,142 +114,33 @@ function useFacetOptions(kind: MediaKind | undefined, value: GalleryFilterValues
       size: facets.data?.sizes || [],
       aspect: facets.data?.aspects || [],
       chat: facets.data?.chats || [],
-    } satisfies Record<keyof GalleryFilterValues, GalleryFilterOption[]>,
+    } satisfies Record<Facet, GalleryFilterOption[]>,
   };
 }
 
-/** The facets as a row, for the gallery toolbar's filter mode and the reference picker. */
-export function GalleryFilters({
-  kind,
-  value,
-  onChange,
-  starred,
-  onStarredChange,
-  uploads,
-  onUploadsChange,
-  withinPortal,
-  allVersions,
-  onAllVersionsChange,
-}: GalleryFiltersProps) {
-  const { facets, options } = useFacetOptions(kind, value);
-  const picker = (
-    key: keyof GalleryFilterValues,
-    label: string,
-    icon: typeof Boxes,
-    choices: GalleryFilterOption[],
-    searchable = false,
-  ) => (
-    <GalleryFilterPicker
-      label={label}
-      withinPortal={withinPortal}
-      icon={icon}
-      options={choices}
-      value={value[key]}
-      onChange={(next) => onChange({ ...value, [key]: next })}
-      searchable={searchable}
-    />
-  );
-  const active = starred || uploads || hasGalleryFilters(value);
-  return (
-    <>
-      <Scroller
-        className={classes.facets}
-        edgeGradientColor="var(--mantine-color-body)"
-        controlSize={28}
-      >
-        <Group gap={6} wrap="nowrap" py={4}>
-          {facets.error && (
-            <Tooltip label={facets.error.message}>
-              <Button
-                {...chipProps}
-                color="red"
-                variant="light"
-                leftSection={<RotateCw size={15} />}
-                loading={facets.isFetching}
-                onClick={() => void facets.refetch()}
-              >
-                Couldn’t Load Filters
-              </Button>
-            </Tooltip>
-          )}
-          <Button
-            {...chipProps}
-            aria-label="Starred"
-            aria-pressed={starred}
-            variant={starred ? "light" : "default"}
-            leftSection={<Star size={15} fill={starred ? "currentColor" : "none"} />}
-            onClick={() => onStarredChange(!starred)}
-          >
-            Starred
-          </Button>
-          <Button
-            {...chipProps}
-            aria-label="Uploads"
-            aria-pressed={uploads}
-            variant={uploads ? "light" : "default"}
-            leftSection={<Upload size={15} />}
-            onClick={() => onUploadsChange(!uploads)}
-          >
-            Uploads
-          </Button>
-          {onAllVersionsChange && (
-            <Button
-              {...chipProps}
-              aria-label="All Versions"
-              aria-pressed={Boolean(allVersions)}
-              variant={allVersions ? "light" : "default"}
-              leftSection={<GalleryVertical size={15} />}
-              onClick={() => onAllVersionsChange(!allVersions)}
-            >
-              All Versions
-            </Button>
-          )}
-          {picker("model", "Models", Boxes, options.model, true)}
-          {picker("lora", "LoRAs", Layers, options.lora, true)}
-          {picker("size", "Size", Ruler, options.size)}
-          {picker("aspect", "Aspect Ratio", Ratio, options.aspect)}
-          {picker("chat", "Chats", MessageCircle, options.chat, true)}
-        </Group>
-      </Scroller>
-      {active && (
-        <Button
-          {...chipProps}
-          aria-label="Clear Filters"
-          variant="subtle"
-          color="gray"
-          className={`${chipProps.className} ${classes.clear}`}
-          onClick={() => {
-            onStarredChange(false);
-            onUploadsChange(false);
-            onChange(emptyGalleryFilters);
-          }}
-        >
-          Clear
-        </Button>
-      )}
-    </>
-  );
+interface FilterProps {
+  kind?: MediaKind;
+  value: GalleryFilterValues;
+  onChange: (value: GalleryFilterValues) => void;
 }
 
-/** The active filters as removable chips beside the search, which narrows within them. */
-function ActiveFilterChips({
-  kind,
-  value,
-  onChange,
-  starred,
-  onStarredChange,
-  uploads,
-  onUploadsChange,
-}: GalleryFiltersProps) {
+/** The active filters as removable chips, one per value, plus any `extra` view choices. */
+export function useActiveFilters(
+  { kind, value, onChange }: FilterProps,
+  extra: { key: string; label: string; remove: () => void }[] = [],
+) {
   const { options } = useFacetOptions(kind, value);
-  const chips = [
-    ...(starred
-      ? [{ key: "starred", label: "Starred", remove: () => onStarredChange(false) }]
+  const date = dates.find((option) => option.value === value.date)?.chip;
+  return [
+    ...(value.starred
+      ? [{ key: "starred", label: "Starred", remove: () => onChange({ ...value, starred: false }) }]
       : []),
-    ...(uploads
-      ? [{ key: "uploads", label: "Uploads", remove: () => onUploadsChange(false) }]
+    ...(value.uploads
+      ? [{ key: "uploads", label: "Uploads", remove: () => onChange({ ...value, uploads: false }) }]
       : []),
-    ...(Object.keys(value) as (keyof GalleryFilterValues)[]).flatMap((facet) =>
+    ...(date ? [{ key: "date", label: date, remove: () => onChange({ ...value, date: "" }) }] : []),
+    ...extra,
+    ...facets.flatMap((facet) =>
       value[facet].map((selected) => ({
         key: `${facet}:${selected}`,
         label: options[facet].find((option) => option.value === selected)?.label || selected,
@@ -426,10 +149,22 @@ function ActiveFilterChips({
       })),
     ),
   ];
-  if (!chips.length) return null;
+}
+
+/**
+ * Every image list's toolbar shares these parts: the active filters as removable chips with
+ * Clear All, and one Filter ▾ chip that opens the filters.
+ */
+export function FilterChips({
+  chips,
+  onClear,
+}: {
+  chips: { key: string; label: string; remove: () => void }[];
+  onClear: () => void;
+}) {
   return (
     <Scroller
-      className={classes.facets}
+      className={classes.chips}
       edgeGradientColor="var(--mantine-color-body)"
       controlSize={28}
     >
@@ -446,7 +181,168 @@ function ActiveFilterChips({
             {chip.label}
           </Button>
         ))}
+        {chips.length > 1 && (
+          <Button
+            {...chipProps}
+
+            variant="subtle"
+            color="gray"
+            onClick={onClear}
+          >
+            Clear All
+          </Button>
+        )}
       </Group>
     </Scroller>
+  );
+}
+
+export function FilterButton({
+  label,
+  count,
+  opened,
+  onClick,
+  ref,
+}: {
+  label: string;
+  count: number;
+  opened: boolean;
+  onClick: () => void;
+  ref?: React.Ref<HTMLButtonElement>;
+}) {
+  const phone = usePhone();
+  return (
+    <Tooltip label={label} disabled={!phone || opened}>
+      <Button
+        {...(phone ? iconChipProps : chipProps)}
+        ref={ref}
+        aria-label={label}
+        aria-expanded={opened}
+        variant={count || opened ? "light" : "default"}
+        leftSection={phone ? undefined : <SlidersHorizontal size={15} />}
+        rightSection={phone ? undefined : <ChevronDown size={14} />}
+        pos="relative"
+        style={{ overflow: "visible" }}
+        onClick={onClick}
+      >
+        {phone ? <SlidersHorizontal size={16} /> : "Filter"}
+        {count > 0 && (
+          <Badge size="xs" circle variant="filled" pos="absolute" top={-4} right={-4} aria-hidden>
+            {count}
+          </Badge>
+        )}
+      </Button>
+    </Tooltip>
+  );
+}
+
+/**
+ * The filters, shared by the gallery's Filter popup and the reference picker: toggles first
+ * (with `children`, such as the gallery's view choices), then the date and each facet. Choices
+ * apply at once.
+ */
+export function GalleryFilterPanel({
+  kind,
+  value,
+  onChange,
+  children,
+}: FilterProps & { children?: ReactNode }) {
+  const { facets, options } = useFacetOptions(kind, value);
+  const toggle = (key: "starred" | "uploads", label: string, icon: ReactNode) => (
+    <Button
+      {...chipProps}
+      aria-label={label}
+      aria-pressed={value[key]}
+      variant={value[key] ? "light" : "default"}
+      leftSection={icon}
+      onClick={() => onChange({ ...value, [key]: !value[key] })}
+    >
+      {label}
+    </Button>
+  );
+  const many = (key: "model" | "lora" | "chat", label: string) => (
+    <MultiSelect
+      size="sm"
+      label={label}
+      placeholder={value[key].length ? undefined : "Any"}
+      data={options[key]}
+      value={value[key]}
+      onChange={(next) => onChange({ ...value, [key]: next })}
+      searchable
+      clearable
+      nothingFoundMessage="No Matches"
+      rightSection={value[key].length ? undefined : <ChevronDown size={14} />}
+      rightSectionPointerEvents="none"
+      comboboxProps={{ withinPortal: false }}
+    />
+  );
+  const choices = (key: "size" | "aspect", label: string) => (
+    <Input.Wrapper label={label}>
+      <Group gap={6} mt={4}>
+        {options[key].map((option) => {
+          const on = value[key].includes(option.value);
+          return (
+            <Button
+              key={option.value}
+              {...chipProps}
+              aria-pressed={on}
+              title={option.description}
+              variant={on ? "light" : "default"}
+              onClick={() =>
+                onChange({
+                  ...value,
+                  [key]: on
+                    ? value[key].filter((item) => item !== option.value)
+                    : [...value[key], option.value],
+                })
+              }
+            >
+              {option.label}
+            </Button>
+          );
+        })}
+      </Group>
+    </Input.Wrapper>
+  );
+  return (
+    <Stack gap="sm">
+      {facets.error && (
+        <Button
+          {...chipProps}
+          color="red"
+          variant="light"
+          leftSection={<RotateCw size={15} />}
+          loading={facets.isFetching}
+          onClick={() => void facets.refetch()}
+        >
+          Couldn’t Load Filters
+        </Button>
+      )}
+      {children}
+      <Group gap={6}>
+        {toggle(
+          "starred",
+          "Starred",
+          <Star size={15} fill={value.starred ? "currentColor" : "none"} />,
+        )}
+        {toggle("uploads", "Uploads", <Upload size={15} />)}
+      </Group>
+      <Input.Wrapper label="Date">
+        <SegmentedControl
+          aria-label="Date"
+          fullWidth
+          size="xs"
+          mt={4}
+          value={value.date}
+          onChange={(date) => onChange({ ...value, date: date as GalleryDate })}
+          data={dates.map(({ value, label }) => ({ value, label }))}
+        />
+      </Input.Wrapper>
+      {many("model", "Models")}
+      {many("lora", "LoRAs")}
+      {options.size.length > 0 && choices("size", "Size")}
+      {options.aspect.length > 0 && choices("aspect", "Aspect Ratio")}
+      {options.chat.length > 0 && many("chat", "Chats")}
+    </Stack>
   );
 }

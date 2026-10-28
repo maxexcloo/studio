@@ -10,7 +10,7 @@ import { focusTile, type GalleryViewProps } from "./MediaGrid";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import { MediaTile } from "./MediaTile";
-import { galleryGap, useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
+import { useGalleryLayout, useHoldToSelect } from "./useGalleryLayout";
 import classes from "./RunsView.module.css";
 
 interface Run {
@@ -48,7 +48,7 @@ export function RunsView({
   onSelectionMenu,
   onTryAgain,
 }: GalleryViewProps) {
-  const { columns, host, width, cell } = useGalleryLayout();
+  const { columns, host, width, cell, gap, anchor } = useGalleryLayout();
   const motionDuration = useMotionDuration();
   const hold = useHoldToSelect(items, selection);
   const runs = useMemo(() => groupRuns(items), [items]);
@@ -69,11 +69,11 @@ export function RunsView({
   }, [runs, columns, expanded]);
   const virtual = useWindowVirtualizer({
     count: width ? rows.length : 0,
-    gap: galleryGap * 2,
+    gap: gap * 2,
     estimateSize: (index) => {
       const row = rows[index];
       return "panel" in row
-        ? 56 + Math.ceil(row.panel.items.length / columns) * (cell + galleryGap)
+        ? 56 + Math.ceil(row.panel.items.length / columns) * (cell + gap)
         : cell + 56;
     },
     getItemKey: (index) => rows[index].key,
@@ -82,7 +82,17 @@ export function RunsView({
     // As in Grid: scrolling renders in React's own time, not inside each scroll event.
     useFlushSync: false,
   });
-  useLayoutEffect(() => virtual.measure(), [width, columns, virtual]);
+  useLayoutEffect(() => {
+    virtual.measure();
+    // A zoom holds the row of the run under the fingers or pointer in place.
+    anchor((id) => {
+      const index = rows.findIndex(
+        (row) => "runs" in row && row.runs.some((run) => run.items.some((item) => item.id === id)),
+      );
+      virtual.getTotalSize();
+      return virtual.measurementsCache[index];
+    });
+  }, [width, columns, virtual]);
   useLayoutEffect(() => {
     if (pendingFocus.current && focusTile(host.current, pendingFocus.current))
       pendingFocus.current = null;
@@ -158,8 +168,14 @@ export function RunsView({
   return (
     <div
       ref={host}
+      data-gallery-view
       {...hold.handlers}
-      style={{ height: virtual.getTotalSize(), position: "relative" }}
+      style={{
+        height: virtual.getTotalSize(),
+        position: "relative",
+        touchAction: "pan-x pan-y",
+        ["--gallery-gap" as string]: `${gap}px`,
+      }}
     >
       {virtual.getVirtualItems().map((placement) => {
         const row = rows[placement.index];

@@ -11,6 +11,7 @@ import {
   galleryRevisionValue,
 } from "./gallery-store.js";
 import { galleryFilter, setGalleryFavorites } from "./gallery-store.js";
+import { galleryTime } from "./gallery-order.js";
 import { jobs } from "./jobs.js";
 import { exportFilename, sendGalleryExport } from "./gallery-export.js";
 import {
@@ -170,6 +171,8 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
     const chats = jobChats(req);
     const chatIds = many(req.query.chat);
     const search = await searchFilter(req);
+    // `since` (an ISO date) keeps items made from then on; work still generating always shows.
+    const since = req.query.since ? Date.parse(String(req.query.since)) : 0;
     const page = pageGallery({
       type,
       limit: limit || 200,
@@ -179,6 +182,7 @@ export function registerGalleryReadRoutes(app, { jobChats, near }) {
       filter: (item) =>
         recordBelongsToRequest(item, req) &&
         (!chatIds.length || chatIds.includes(chats.get(item.jobId)?.id)) &&
+        (!since || item.status === "pending" || galleryTime(item) >= since) &&
         (!search || search(item)),
     });
     // Next steps are asked for in the viewer (`/api/suggestions`), not carried in every page.
