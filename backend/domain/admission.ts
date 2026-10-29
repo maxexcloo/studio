@@ -21,7 +21,7 @@ interface AdmissionOptions {
   store: RewriteStore;
   queue: GenerationQueue;
   validate(input: GenerationInput, account?: GenerationAccount): Promise<DomainResponse>;
-  resourceFor(input: GenerationInput): Promise<string>;
+  resourceFor(input: GenerationInput, priority?: number): Promise<string>;
   pendingItems(id: string, input: GenerationInput): QueueMedia[];
   revision(): number;
   /** Hears each newly queued job, for the taste profile; must not throw. */
@@ -82,7 +82,7 @@ export function createGenerationAdmission(options: AdmissionOptions) {
             input,
             scope?.operation || (input.kind === "video" ? "animate" : "image"),
             scope?.parentJobId,
-            await options.resourceFor(input),
+            await options.resourceFor(input, origin?.priority),
             clientId || undefined,
             {
               ...origin,
