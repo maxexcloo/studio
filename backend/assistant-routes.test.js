@@ -23,7 +23,7 @@ const { builtInAccessProfile, effectiveAccountAccess } = await import("./account
 const environment = {
   STUDIO_PROMPT_WRITER_URL: "http://litellm.invalid:4000",
   STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
 };
 const plain = { id: "custom:plain", label: "Plain Image", kind: "image", family: "krea2" };
 const uncensored = {
@@ -53,7 +53,7 @@ const encoder = new TextEncoder();
 const calls = [];
 const fetchImpl = async (url, options = {}) => {
   if (url.endsWith("/v1/models"))
-    return Response.json({ data: [{ id: "cloud/text" }, { id: "local/text" }] });
+    return Response.json({ data: [{ id: "cloud/auto" }, { id: "local/auto" }] });
   const body = JSON.parse(options.body);
   calls.push(body);
   if (body.stream)
@@ -237,7 +237,7 @@ test("Spicy needs Uncensored Models, whatever the profile, and runs on the assis
     "spicy",
   );
   assert.equal(spicy.status, 200, "an unmarked profile is fine with Uncensored Models");
-  assert.equal(calls.at(-1).model, "cloud/text");
+  assert.equal(calls.at(-1).model, "cloud/auto");
 });
 
 test("negatives for anyone with the assistant; LoRA suggestions need LoRAs; drafts are for administrators", async () => {
@@ -272,7 +272,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
       integration.model.effective,
       integration.model.vision,
     ],
-    [true, "cloud/off", ["cloud/text", "local/text"], "cloud/text", true],
+    [true, "cloud/auto", ["cloud/auto", "local/auto"], "cloud/auto", true],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,
@@ -306,13 +306,13 @@ test("a generation records the preset, model, source and only the chosen LoRAs i
     assistantRecord(
       {
         preset: "enhance",
-        model: "cloud/text",
+        model: "cloud/auto",
         source: "ui",
         lorasSuggested: ["a.safetensors", "b.safetensors", "c.safetensors", "a.safetensors"],
       },
       stack,
     ),
-    { preset: "enhance", model: "cloud/text", source: "ui", lorasSuggested: ["a.safetensors"] },
+    { preset: "enhance", model: "cloud/auto", source: "ui", lorasSuggested: ["a.safetensors"] },
   );
   assert.deepEqual(assistantRecord({ preset: "cinematic", source: "chat", model: "bad\nmodel" }), {
     preset: "cinematic",
