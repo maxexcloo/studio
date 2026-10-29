@@ -18,6 +18,8 @@ export interface QueueAdapter {
   saveOutputs(job: OwnedJob): Promise<JobObservation | void>;
   eligible?(job: OwnedJob): Promise<string | undefined>;
   settled?(job: OwnedJob): Promise<void>;
+  /** Other resources that could run this queued job now, best first (an idle worker takes it). */
+  alternatives?(job: OwnedJob): string[];
 }
 
 /** What the writing stage streams into the item's progress while the prompt is written. */
@@ -290,6 +292,7 @@ export class GenerationQueue {
     );
     const rank = (job: OwnedJob) =>
       job.queueSet && startedSets.has(job.queueSet) ? -1 : (job.priority ?? queuePriority.manual);
+    this.rebalance(all, occupied, rank);
     const groups = new Map<string, OwnedJob[]>();
     for (const job of all.filter(
       (item) => ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id),
@@ -395,6 +398,55 @@ export class GenerationQueue {
         }
       }),
     );
+  }
+
+  /**
+   * A job waiting behind another job on a busy worker moves to an idle one that can run it, one per
+   * idle worker, higher tiers first. Background work moves only while no manual work waits, so the
+   * worker manual work prefers stays free for it; a job never moves behind higher-ranked work.
+   * Updates `all` in place.
+   */
+  private rebalance(all: OwnedJob[], occupied: Set<string>, rank: (job: OwnedJob) => number) {
+    if (!this.adapter.alternatives) return;
+    const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
+    const pending = (job: OwnedJob) =>
+      ["queued", "waiting"].includes(job.status) && !this.acceptedIds.has(job.id);
+    const manualWaits = all.some(
+      (job) => (pending(job) || job.status === "writing") && tier(job) === queuePriority.manual,
+    );
+    const taken = new Set<string>();
+    const stuck = all
+      .map((job, index) => ({ job, index }))
+      .filter(
+        ({ job }) =>
+          pending(job) &&
+          occupied.has(job.resource) &&
+          !this.scheduling.has(job.resource) &&
+          (tier(job) === queuePriority.manual || !manualWaits),
+      )
+      .sort((a, b) => tier(a.job) - tier(b.job));
+    for (const { job, index } of stuck) {
+      const target = this.adapter
+        .alternatives(job)
+        .find(
+          (resource) =>
+            resource !== job.resource &&
+            !taken.has(resource) &&
+            !occupied.has(resource) &&
+            !this.scheduling.has(resource) &&
+            !all.some(
+              (other) => other.resource === resource && pending(other) && rank(other) < rank(job),
+            ),
+        );
+      if (!target) continue;
+      taken.add(target);
+      all[index] = this.store.save({
+        ...job,
+        resource: target,
+        backend: target.startsWith("worker:") ? target.slice("worker:".length) : job.backend,
+        reason: "",
+      });
+    }
   }
 
   async cancel(ownerId: string, id: string): Promise<OwnedJob | undefined> {

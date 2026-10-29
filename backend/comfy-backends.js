@@ -77,6 +77,18 @@ export function routeJob(capability, { profileId = "", prefers = [] } = {}) {
   });
 }
 
+/**
+ * The workers that could take a queued job now: capable, not known to be down and not known to
+ * lack its profile, in list order.
+ */
+export const readyWorkers = (capability, profileId = "") =>
+  listWorkers().filter(
+    (worker) =>
+      worker.capabilities.includes(capability) &&
+      workerReachable(worker.id) !== false &&
+      !(profileId && inventories.has(worker.id) && !inventories.get(worker.id).has(profileId)),
+  );
+
 /** routeJob for a profile, or an error that says plainly why nothing can run it. */
 export function routeProfile(profile, options = {}) {
   const capability = capabilityForProfile(profile);
