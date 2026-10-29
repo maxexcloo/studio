@@ -103,10 +103,19 @@ test(
     chosen.setDown(true);
     other.setDown(true);
     // The chosen worker's deployment is stopped, and its pod cannot get a GPU until allowed.
-    const kube = fakeKubernetes([{ namespace: "comfyui", name: "chosen" }], {
-      tickOnRead: true,
-      onChange: (_name, ready) => chosen.setDown(!ready),
-    });
+    const kube = fakeKubernetes(
+      [
+        {
+          namespace: "comfyui",
+          name: "chosen",
+          workload: { kind: "image", pool: "gpu", gpus: 1, url: chosen.url },
+        },
+      ],
+      {
+        tickOnRead: true,
+        onChange: (_name, ready) => chosen.setDown(!ready),
+      },
+    );
     const deployment = kube.deployments.get("comfyui/chosen")!;
     deployment.unschedulable = "0/1 nodes are available: 1 cannot allocate all claims.";
     const starts = () => kube.log.filter((entry) => entry === "scale comfyui/chosen 1").length;
@@ -132,16 +141,7 @@ test(
           STUDIO_RUNTIME_AUTOMATIC: "1",
           STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
           STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
-          STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
-            chosen: {
-              kind: "image",
-              namespace: "comfyui",
-              deployment: "chosen",
-              pool: "gpu",
-              gpus: 1,
-              url: chosen.url,
-            },
-          }),
+          STUDIO_KUBERNETES_NAMESPACES: "comfyui",
           STUDIO_WORKERS: JSON.stringify([
             { id: "chosen", name: "Chosen Worker", url: chosen.url, capabilities: ["image"] },
             { id: "other", name: "Other Worker", url: other.url, capabilities: ["image"] },

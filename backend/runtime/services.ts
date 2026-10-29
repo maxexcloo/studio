@@ -49,7 +49,7 @@ function directAddress(value: string, path: string) {
 }
 
 /**
- * The local text route while a text workload is scaled up: the first one's Bifrost `model`, such as
+ * The local text route while a text workload is scaled up: STUDIO_LOCAL_TEXT_MODEL, such as
  * `local/auto`, and whether it reads images (every running one sets `vision: true`). Null when none runs or the cluster can't be asked. Cached briefly, so a switch
  * shows soon.
  */
@@ -109,23 +109,19 @@ export function createServicesObserver({
 }: Options) {
   const cache = new Map<string, { until: number; result: Promise<Probe> }>();
   const managed = controller?.workloads ?? [];
-  function probe(endpoint: string, kind: ServiceKind, apiKeyEnv?: string): Promise<Probe> {
+  function probe(endpoint: string, kind: ServiceKind): Promise<Probe> {
     for (const [key, entry] of cache) if (entry.until <= now()) cache.delete(key);
-    const key = `${kind}:${endpoint}:${apiKeyEnv || ""}`;
+    const key = `${kind}:${endpoint}`;
     const previous = cache.get(key);
     if (previous && previous.until > now()) return previous.result;
     const result = (async (): Promise<Probe> => {
       const checkedAt = new Date(now()).toISOString();
-      if (apiKeyEnv && !environment[apiKeyEnv])
-        return {
-          state: "unknown",
-          reason: "The direct health credential is not configured.",
-          checkedAt,
-        };
+      // Text runtimes take the key the text workloads share; media workers take none.
+      const credential = kind === "text" ? environment.STUDIO_TEXT_KEY : undefined;
       try {
         const response = await fetchImpl(endpoint, {
           method: "GET",
-          headers: apiKeyEnv ? { Authorization: `Bearer ${environment[apiKeyEnv]}` } : {},
+          headers: credential ? { Authorization: `Bearer ${credential}` } : {},
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         });
@@ -208,7 +204,6 @@ export function createServicesObserver({
                   label: workload.label,
                   url: workload.url,
                   workloads: [workload.id],
-                  apiKeyEnv: workload.apiKeyEnv,
                 }))
             : workers()
                 .filter((worker) => worker.capabilities.includes(kind))
@@ -220,11 +215,10 @@ export function createServicesObserver({
                     label: worker.name,
                     url: worker.url,
                     ...(matches.length ? { workloads: matches.map((item) => item.id) } : {}),
-                    apiKeyEnv: matches[0]?.apiKeyEnv,
                   };
                 });
         const endpoints = await Promise.all(
-          targets.map(async ({ url, apiKeyEnv, ...target }): Promise<ServiceEndpoint> => {
+          targets.map(async ({ url, ...target }): Promise<ServiceEndpoint> => {
             let endpoint: string | undefined;
             try {
               endpoint = url
@@ -249,7 +243,7 @@ export function createServicesObserver({
                   checkedAt: new Date(now()).toISOString(),
                 }
               : endpoint
-                ? { ...(await probe(endpoint, kind, apiKeyEnv)) }
+                ? { ...(await probe(endpoint, kind)) }
                 : {
                     state: "unknown",
                     reason: "No direct runtime health endpoint is configured for this workload.",

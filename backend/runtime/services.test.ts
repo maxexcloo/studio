@@ -223,6 +223,18 @@ test(
     worker.listen(0, "127.0.0.1");
     await once(worker, "listening");
     const workerUrl = `http://127.0.0.1:${(worker.address() as AddressInfo).port}`;
+    // A running text workload is not parked, so its health is probed as usual.
+    const kube = fakeKubernetes([
+      {
+        namespace: "text",
+        name: "text",
+        replicas: 1,
+        workload: { kind: "text", pool: "gpu", gpus: 1, url: workerUrl },
+      },
+    ]);
+    const kubernetes = createServer(kube.handle);
+    kubernetes.listen(0, "127.0.0.1");
+    await once(kubernetes, "listening");
     const server = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
       env: {
         PATH: process.env.PATH,
@@ -231,19 +243,10 @@ test(
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: join(directory, "data"),
         STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
-        // An unreachable Kubernetes API leaves nothing parked, so health is probed as usual.
-        STUDIO_KUBERNETES_URL: "http://kubernetes.invalid",
-        STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
-          text: {
-            kind: "text",
-            namespace: "text",
-            deployment: "text",
-            pool: "gpu",
-            gpus: 1,
-            url: workerUrl,
-            model: "local/text",
-          },
-        }),
+        STUDIO_KUBERNETES_NAMESPACES: "text",
+        STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(kubernetes.address() as AddressInfo).port}`,
+        STUDIO_LOCAL_TEXT_MODEL: "local/auto",
+        STUDIO_TEXT_KEY: "fixture-text",
         STUDIO_WORKERS: "[]",
         STUDIO_DEMO: "1",
         STUDIO_MULTI_USER: "1",
@@ -258,8 +261,10 @@ test(
       const stopped = server.exitCode === null ? once(server, "exit") : undefined;
       server.kill("SIGTERM");
       await stopped;
-      worker.closeAllConnections();
-      await new Promise<void>((resolve) => worker.close(() => resolve()));
+      for (const server of [worker, kubernetes]) {
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
       rmSync(directory, { recursive: true, force: true });
     });
     const [ready] = await Promise.race([

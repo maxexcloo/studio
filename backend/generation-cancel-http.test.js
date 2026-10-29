@@ -48,9 +48,15 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
     outputFiles: new Map([["own.png", png]]),
   });
   // Media and text share the one GPU; media starts running.
+  const gpu = { pool: "gpu", gpus: 1 };
   const kube = fakeKubernetes(
     [
-      { namespace: "gpu", name: "media", replicas: 1 },
+      {
+        namespace: "gpu",
+        name: "media",
+        replicas: 1,
+        workload: { ...gpu, kind: "image", url: worker.url },
+      },
       { namespace: "gpu", name: "text" },
     ],
     { tickOnRead: true },
@@ -66,18 +72,11 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   });
   text.listen(0, "127.0.0.1");
   await once(text, "listening");
-  const gpu = { namespace: "gpu", pool: "gpu", gpus: 1 };
-  const workloads = JSON.stringify({
-    media: { ...gpu, kind: "image", deployment: "media", url: worker.url },
-    text: {
-      ...gpu,
-      kind: "text",
-      deployment: "text",
-      url: `http://127.0.0.1:${text.address().port}`,
-      apiKeyEnv: "STUDIO_FIXTURE_TEXT_KEY",
-      model: "local/text",
-    },
-  });
+  kube.deployments.get("gpu/text").workload = {
+    ...gpu,
+    kind: "text",
+    url: `http://127.0.0.1:${text.address().port}`,
+  };
   const launch = () =>
     fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
       env: {
@@ -91,9 +90,10 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         ]),
         STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
-        STUDIO_KUBERNETES_WORKLOADS: workloads,
+        STUDIO_KUBERNETES_NAMESPACES: "gpu",
+        STUDIO_LOCAL_TEXT_MODEL: "local/auto",
         STUDIO_RUNTIME_AUTOMATIC: "1",
-        STUDIO_FIXTURE_TEXT_KEY: "fixture-text",
+        STUDIO_TEXT_KEY: "fixture-text",
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     });
