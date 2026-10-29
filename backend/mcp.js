@@ -81,10 +81,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = (writing) =>
-  `Studio makes images and videos. Write Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them as written${
-    writing ? "; request alone has Studio write them up (slower), only for a short idea" : ""
-  }. count is images per prompt. Make one Generate call per set, one after another. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -131,7 +128,7 @@ const promptListText = z.string().transform((text) => {
 });
 // A prompting guide and a LoRA library are long; chat gets their essentials (lora_query finds the rest).
 const maxGuideCharacters = 1200;
-// Models shows a guide's gist; Generate's prompt writer applies the whole guide.
+// Models shows a guide's gist; a model's first Generate sends the whole guide for the chat to write to.
 const maxShownGuideCharacters = 500;
 const maxListedLoras = 30;
 /** A profile guide's essentials as one capped paragraph: summary, rules and pitfalls, without sources or examples. */
@@ -240,9 +237,9 @@ export function registerMcpRoutes(
       : null;
   // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
   const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
-  // Optional: with a writer, Studio writes each prompt from the request; a partial setting fails at start.
+  // Optional: with a writer, Generate picks a model by the request and Reuse writes changes; a partial setting fails at start.
   const writer = createPromptWriter(environment, { fetchImpl, localText });
-  const instructions = mediaInstructions(Boolean(writer));
+  const instructions = mediaInstructions;
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
   const chatAssistant = createChatAssistantMemory({
@@ -656,32 +653,6 @@ export function registerMcpRoutes(
         throw error;
       }
     };
-    /**
-     * A preview's prompts for a target profile, written from the request, or the fallback when writing
-     * is off or fails. Queued work writes its prompts in the queue instead (prompt-stage.js).
-     */
-    const write = async (
-      profile,
-      { request, count, references = 0, role = "", suggest = false, fallback, signal },
-    ) => {
-      if (!writer) return { prompts: fallback, source: "request" };
-      const guided =
-        references && profile.imageModes?.reference
-          ? { ...profile, ...profile.imageModes.reference }
-          : profile;
-      return writer.write({
-        profile,
-        guide: prompting(guided, true),
-        request,
-        count,
-        references,
-        role,
-        suggest,
-        taste: taste(owner),
-        fallback,
-        signal,
-      });
-    };
     /** Sets a plan's prompts from what was written: one each, or the fallback with the requested count. */
     const usePrompts = (args, written, count) => {
       if (written.source === "studio") Object.assign(args, { prompts: written.prompts, count: 1 });
@@ -904,7 +875,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts and the user's words as request, which picks the model${writer ? "; request alone or apply_guide has Studio write prompts (slower)" : ""}. Several images ("six photos" is count 6) take one call; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts${writer ? " and concept suggestions" : ""} without queuing, for "suggest first". Put a model the user names (Krea, FLUX.3) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request, which picks the model. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Krea, FLUX.3) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
         {
           request: z
             .string()
@@ -917,8 +888,7 @@ export function registerMcpRoutes(
           prompts: z
             .union([promptList, promptListText.pipe(promptList)])
             .optional()
-            .describe("Run as written, one image each."),
-          apply_guide: z.boolean().optional(),
+            .describe("Run as written; count images each."),
           preview: z.boolean().optional(),
           count: jobCount.optional().describe("Images per prompt; default 1."),
           kind: z.enum(["image", "video"]).optional(),
@@ -987,15 +957,14 @@ export function registerMcpRoutes(
           tier: wanted,
           aspect,
           request,
-          apply_guide,
           preview,
           profile_ids,
           each_profile,
           ...args
         } = structuredClone(input);
-        if (!request && !args.prompts)
+        if (!args.prompts)
           throw new Error(
-            "Pass request with the user's words, or prompts to run as written, then call Generate again.",
+            "Write the finished prompts yourself, following the model's prompting guide, and pass them as prompts (with the user's words as request), then call Generate again.",
           );
         if ([args.profile_id, profile_ids, each_profile].filter(Boolean).length > 1)
           throw new Error(
@@ -1007,11 +976,10 @@ export function registerMcpRoutes(
             "LoRAs belong to one model: pass them with profile_id, or leave loras out for several models.",
           );
         // Instructions sent as an exact prompt would run literally, and their number of images would be lost.
-        if (!apply_guide)
-          for (const prompt of args.prompts || []) {
-            const instructed = exactPromptInstructions(prompt);
-            if (instructed) throw new Error(instructed);
-          }
+        for (const prompt of args.prompts) {
+          const instructed = exactPromptInstructions(prompt);
+          if (instructed) throw new Error(instructed);
+        }
         // "count: 4" beside four prompts means one image each, not sixteen.
         if (
           args.count > 1 &&
@@ -1084,13 +1052,11 @@ export function registerMcpRoutes(
         const previewKey = `${refs || owner}\n${stableJson({ ...input, preview: undefined })}`;
         const previewed = previews.get(previewKey);
         if (!preview) previews.delete(previewKey);
-        const role = references ? args.reference_role || "reference" : "";
-        // Every model's prompts are written at once, each with its own guide.
         const plans =
           !preview && previewed && Date.now() - previewed.at < previewMs
             ? previewed.plans
             : await Promise.all(
-                targets.map(async ({ profile, note }, index) => {
+                targets.map(async ({ profile, note }) => {
                   const sized = mcpSize(profile, { aspect });
                   if (sized && (args.width !== undefined || args.height !== undefined))
                     throw new Error("Pass aspect or width and height, not both.");
@@ -1100,58 +1066,12 @@ export function registerMcpRoutes(
                     profile_id: profile.id,
                     ...(profile.namedBackend ? { profile_backend: profile.namedBackend } : {}),
                   };
-                  const suggest = Boolean(preview && index === 0);
-                  let source = "exact";
-                  let suggestions = [];
-                  if (!preview && writer && (!args.prompts || apply_guide)) {
-                    // Each job writes its own prompt as its queue item's first stage (prompt-stage.js).
-                    Object.assign(plan, { prompts: args.prompts || [request], write: { role } });
-                    source = "studio";
-                  } else if (!args.prompts) {
-                    const written = await write(profile, {
-                      request,
-                      count,
-                      references,
-                      role,
-                      suggest,
-                      fallback: [request],
-                      signal,
-                    });
-                    suggestions = written.suggestions || [];
-                    source = usePrompts(plan, written, count);
-                  } else if (apply_guide) {
-                    const written = await Promise.all(
-                      args.prompts.map((prompt, position) =>
-                        write(profile, {
-                          request: prompt,
-                          count,
-                          references,
-                          role,
-                          suggest: suggest && position === 0,
-                          fallback: [prompt],
-                          signal,
-                        }),
-                      ),
-                    );
-                    suggestions = written[0].suggestions || [];
-                    source = written.some((item) => item.source === "studio")
-                      ? "studio"
-                      : "request";
-                    // Each prompt becomes count prompts, written or repeated, so every image is one job.
-                    plan.prompts = written.flatMap((item) =>
-                      item.source === "studio"
-                        ? item.prompts
-                        : Array.from({ length: count }, () => item.prompts[0]),
-                    );
-                    plan.count = 1;
-                  }
-                  return { profile, note, plan, source, suggestions };
+                  return { profile, note, plan, source: "exact" };
                 }),
               );
         if (preview) {
           if (previews.size >= 256) previews.delete(previews.keys().next().value);
           previews.set(previewKey, { at: Date.now(), plans });
-          const suggestions = plans.flatMap((item) => item.suggestions);
           const lines = plans.map(
             ({ profile, plan }) =>
               `${profile.label || profile.id}: ${[...new Set(plan.prompts)].map(shortPrompt).join(" | ")}`,
@@ -1160,26 +1080,21 @@ export function registerMcpRoutes(
             content: [
               {
                 type: "text",
-                text: `Preview only; nothing is queued. Show the user these${suggestions.length ? " suggestions and" : ""} prompts and wait. To queue exactly these prompts, call Generate again with the same arguments without preview; for changes, call it with a revised request.\n\n${suggestions.length ? `Suggestions:\n${suggestions.map((item) => `- ${item}`).join("\n")}\n\n` : ""}${lines.join("\n")}`,
+                text: `Preview only; nothing is queued. Show the user these prompts and wait. To queue exactly these prompts, call Generate again with the same arguments without preview; for changes, call it with revised prompts.\n\n${lines.join("\n")}`,
               },
             ],
           };
         }
         // Request and prompts together: the prompts run, and the request stays on the record for Reuse.
         const recordOf = ({ source, plan }) => {
-          const base = request || (apply_guide && args.prompts.length === 1 ? args.prompts[0] : "");
           const assistant = actor.assistant
             ? chatAssistant.record(owner, plan.prompts || [], plan.loras || [])
             : null;
           return {
-            ...(base ? { request: base, styled: source !== "exact" } : {}),
+            ...(request ? { request, styled: source !== "exact" } : {}),
             ...(assistant ? { assistant } : {}),
           };
         };
-        const contextNote =
-          request && args.prompts
-            ? "The prompts ran as given; the request is kept as context. "
-            : "";
         if (several) {
           // One set per model, queued in order so each model loads once; links come back at once.
           // Every set shares one seed, so image N of each model is a like-for-like comparison.
@@ -1195,7 +1110,7 @@ export function registerMcpRoutes(
                 })
               ).queued,
             });
-          return respondSets(sets, contextNote, signal, await comparisonOf(sets));
+          return respondSets(sets, "", signal, await comparisonOf(sets));
         }
         const [{ profile, note: tierNote, plan, source }] = plans;
         // A face is small in a full-body or wide shot of a person, so the final prompt turns face detail on unless the caller chose.
@@ -1218,7 +1133,7 @@ export function registerMcpRoutes(
           signal,
           submission.guide,
           source,
-          `${contextNote}${tierNote || ""}${faceNote}`,
+          `${tierNote || ""}${faceNote}`,
         );
       };
       tool(

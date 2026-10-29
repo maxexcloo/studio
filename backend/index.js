@@ -1468,10 +1468,9 @@ const tasteWriter = (ownerId) => {
     ? null
     : assistantEngine;
 };
-const textOnline = async () =>
-  !["offline", "parked"].includes(
-    (await observeServices({ allowed: ["text"] })).services.text?.state,
-  );
+// Text takes the cloud route whenever no local text worker runs (assistant.js), so a configured
+// gateway is always reachable; a stopped or parked local worker never makes text unavailable.
+const textOnline = async () => Boolean(assistantEngine);
 const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
 // Signals name a merged profile by the id it goes by now (profile-merge.js).
 const taste = {
@@ -2143,9 +2142,12 @@ const dream = createDream({
     };
   },
   online: async (kind) => {
-    const { services } = await observeServices({ allowed: ["text", kind] });
+    const { services } = await observeServices({ allowed: [kind] });
     const reach = (state) => (["offline", "parked"].includes(state) ? state : "online");
-    return { text: reach(services.text?.state), media: reach(services[kind]?.state) };
+    return {
+      text: (await textOnline()) ? "online" : "offline",
+      media: reach(services[kind]?.state),
+    };
   },
   textBusy,
   writer: assistantEngine,
