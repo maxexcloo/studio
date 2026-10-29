@@ -13,8 +13,8 @@ directories and the GPU placement in the deployment.
 Studio starts and stops workers by scaling their Kubernetes deployments between 0
 and 1 replicas; see
 [runtime control](../CONFIGURATION.md#queue-sessions--runtime-control) for
-`STUDIO_KUBERNETES_WORKLOADS` and the service account role it needs. Workers that
-are not listed stay unmanaged. Media output saving retains admission until
+the labels and annotations a deployment needs and the service account role.
+Workers without them stay unmanaged. Media output saving retains admission until
 finished, so a switch waits for it. Idle workers stay warm.
 
 Configure `STUDIO_BIFROST_URL` when used; Studio refuses to target that gateway

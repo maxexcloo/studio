@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { kubernetesWorkloads } from "./runtime/workloads.ts";
 
 /**
  * Studio's ComfyUI workers: none, one or many, each with a stable id, a name,
@@ -7,7 +6,7 @@ import { kubernetesWorkloads } from "./runtime/workloads.ts";
  * its one `comfyUrl`, which follows the default worker (comfy.js).
  *
  * The deployment defines them: `STUDIO_WORKERS` (a JSON list), else the media
- * workloads in `STUDIO_KUBERNETES_WORKLOADS`.
+ * workloads Studio found in Kubernetes (runtime/workloads.ts).
  */
 
 /** What a worker can be asked to do. `models` holds the model library and receives downloads. */
@@ -117,8 +116,10 @@ function defaultName(capabilities) {
   return "Worker";
 }
 
+let workloads = [];
+
 /** The deployment's workers, from `STUDIO_WORKERS`, else from the Kubernetes workloads. */
-export function deploymentWorkers(environment = process.env) {
+export function deploymentWorkers(environment = process.env, kubernetes = workloads) {
   const text = String(environment.STUDIO_WORKERS || "").trim();
   if (text) {
     let parsed;
@@ -134,16 +135,11 @@ export function deploymentWorkers(environment = process.env) {
     if (parsed.length > maxWorkers)
       throw new WorkerConfigError(`STUDIO_WORKERS lists more than ${maxWorkers} workers.`);
     const taken = new Set();
-    return {
-      variable: "STUDIO_WORKERS",
-      workers: parsed.map((raw, index) =>
-        normalizeWorker(raw, { taken, where: `STUDIO_WORKERS item ${index + 1}` }),
-      ),
-    };
+    return parsed.map((raw, index) =>
+      normalizeWorker(raw, { taken, where: `STUDIO_WORKERS item ${index + 1}` }),
+    );
   }
-  if (environment.STUDIO_KUBERNETES_WORKLOADS)
-    return { variable: "STUDIO_KUBERNETES_WORKLOADS", workers: workloadWorkers(environment) };
-  return { variable: "", workers: [] };
+  return workloadWorkers(kubernetes);
 }
 
 /**
@@ -151,15 +147,15 @@ export function deploymentWorkers(environment = process.env) {
  * deployments at that address share: its id is the `worker` they give, else the first one's id, and
  * it runs their `capabilities`, else their kinds.
  */
-function workloadWorkers(environment) {
+function workloadWorkers(kubernetes) {
   const groups = new Map();
-  for (const workload of kubernetesWorkloads(environment).workloads) {
+  for (const workload of kubernetes) {
     if (workload.kind === "text") continue;
     const url = normalizeWorkerUrl(workload.url);
     const group = groups.get(url) || { first: workload.id, id: "", capabilities: [] };
     if (workload.worker && group.id && workload.worker !== group.id)
       throw new WorkerConfigError(
-        `STUDIO_KUBERNETES_WORKLOADS: ${workload.id} names worker ${workload.worker}, but its address's worker is ${group.id}.`,
+        `Deployment ${workload.namespace}/${workload.id} names worker ${workload.worker}, but its address's worker is ${group.id}.`,
       );
     group.id ||= workload.worker || "";
     group.capabilities.push(...(workload.capabilities || [workload.kind]));
@@ -169,7 +165,7 @@ function workloadWorkers(environment) {
   return [...groups].map(([url, group]) =>
     normalizeWorker(
       { id: group.id || group.first, url, capabilities: group.capabilities },
-      { taken, where: `STUDIO_KUBERNETES_WORKLOADS: ${group.first}` },
+      { taken, where: `Deployment ${group.first}` },
     ),
   );
 }
@@ -177,18 +173,16 @@ function workloadWorkers(environment) {
 let cache = null;
 const listeners = new Set();
 
-function state() {
+/** Every worker in list order. */
+export function listWorkers() {
   if (!cache) cache = deploymentWorkers();
   return cache;
 }
-
-/** Every worker in list order. */
-export const listWorkers = () => state().workers;
-export const workerById = (id) => state().workers.find((worker) => worker.id === id) || null;
+export const workerById = (id) => listWorkers().find((worker) => worker.id === id) || null;
 export const workerHas = (id, capability) =>
   Boolean(workerById(id)?.capabilities.includes(capability));
 const workersWith = (capability) =>
-  state().workers.filter((worker) => worker.capabilities.includes(capability));
+  listWorkers().filter((worker) => worker.capabilities.includes(capability));
 
 /**
  * The worker the single `comfyUrl` follows: the first that runs images,
@@ -196,7 +190,7 @@ const workersWith = (capability) =>
  * restarts with their progress) belong to it.
  */
 export function defaultWorker() {
-  const workers = state().workers;
+  const workers = listWorkers();
   return workers.find((worker) => worker.capabilities.includes("image")) || workers[0] || null;
 }
 export const defaultWorkerId = () => defaultWorker()?.id || "";
@@ -222,6 +216,12 @@ function changed() {
       /* one listener never blocks another */
     }
   }
+}
+
+/** The workloads Studio found at start (runtime/bootstrap.ts), whose media addresses are workers. */
+export function useWorkloadWorkers(list) {
+  workloads = list;
+  changed();
 }
 
 /** Reads the configuration again (tests). */

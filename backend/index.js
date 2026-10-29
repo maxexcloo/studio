@@ -112,6 +112,7 @@ import {
   defaultWorkerId,
   listWorkers,
   noWorkerMessage,
+  useWorkloadWorkers,
   workerById,
 } from "./workers.js";
 import fs from "node:fs";
@@ -367,7 +368,8 @@ for (const [name, migrate] of [
   }
 }
 // GPU deployments Studio scales (runtime/bootstrap.ts); the control MCP tools and Settings › Workers drive it.
-const runtime = loadRuntime(process.env, { dataDir });
+const runtime = await loadRuntime(process.env, { dataDir });
+if (runtime) useWorkloadWorkers(runtime.controller.workloads);
 // The local text route while a local text workload runs; without a runtime, text takes the cloud route.
 const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
 const mcp = registerMcpRoutes(app, {
@@ -3319,7 +3321,7 @@ const serverStartup = startServers(app, {
       if (!listWorkers().length) {
         if (!demoMode)
           console.log(
-            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_WORKLOADS.\n",
+            "    No workers are set up yet. Set STUDIO_WORKERS or STUDIO_KUBERNETES_NAMESPACES.\n",
           );
         return;
       }

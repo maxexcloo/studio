@@ -8,8 +8,9 @@ import type {
 } from "../../shared/runtime.ts";
 import type { DeploymentState } from "./kubernetes.ts";
 
-/** One Kubernetes deployment Studio may scale between 0 and 1 replicas. */
+/** One Kubernetes deployment Studio may scale between 0 and 1 replicas (runtime/workloads.ts). */
 export interface Workload {
+  /** The deployment's name. */
   id: string;
   label: string;
   kind: ServiceKind;
@@ -19,8 +20,7 @@ export interface Workload {
   pool: string;
   gpus: number;
   url: string;
-  apiKeyEnv?: string;
-  /** Text: the Bifrost model ID this deployment serves; its prefix (`local/`) is the local route. */
+  /** Text: the gateway model every text workload serves (STUDIO_LOCAL_TEXT_MODEL). */
   model?: string;
   /** Text: whether it reads images. */
   vision?: boolean;

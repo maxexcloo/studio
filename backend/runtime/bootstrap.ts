@@ -8,12 +8,12 @@ import {
   type KubernetesRequest,
 } from "./kubernetes.ts";
 import { createRuntimeRouter } from "./routes.ts";
-import { kubernetesWorkloads } from "./workloads.ts";
+import { discoverWorkloads } from "./workloads.ts";
 
 type Environment = Record<string, string | undefined>;
 
-/** Studio scales the configured GPU deployments on the cluster it runs in. */
-export function loadRuntime(
+/** Studio scales the GPU deployments it finds at start on the cluster it runs in. */
+export async function loadRuntime(
   environment: Environment = process.env,
   {
     dataDir,
@@ -25,16 +25,16 @@ export function loadRuntime(
     request?: KubernetesRequest;
   } = {},
 ) {
-  if (!environment.STUDIO_KUBERNETES_WORKLOADS) return undefined;
-  const { pools, workloads } = kubernetesWorkloads(environment);
+  if (!environment.STUDIO_KUBERNETES_NAMESPACES) return undefined;
+  const send =
+    request ??
+    (environment.STUDIO_KUBERNETES_URL
+      ? urlRequest(environment.STUDIO_KUBERNETES_URL, fetchImpl)
+      : inClusterRequest(environment));
+  const { pools, workloads } = await discoverWorkloads(environment, send);
   if (!workloads.length) return undefined;
   const automatic = environment.STUDIO_RUNTIME_AUTOMATIC === "1";
-  const engine = new KubernetesEngine(
-    request ??
-      (environment.STUDIO_KUBERNETES_URL
-        ? urlRequest(environment.STUDIO_KUBERNETES_URL, fetchImpl)
-        : inClusterRequest(environment)),
-  );
+  const engine = new KubernetesEngine(send);
   const name = "runtime-operations";
   const controller = new RuntimeController({
     engine,
@@ -64,7 +64,7 @@ export function loadRuntime(
 /** Mount after account middleware with the existing administrator requirement. */
 export function registerRuntimeStatus(
   app: Express,
-  runtime: ReturnType<typeof loadRuntime>,
+  runtime: Awaited<ReturnType<typeof loadRuntime>>,
   requireAdmin: RequestHandler,
   requestedBy: (request: Parameters<RequestHandler>[0]) => string,
 ) {

@@ -204,7 +204,7 @@ export function registerMcpRoutes(
   if (!mediaKey && !controlKey && !accountMode) return null;
   if (controlKey && (!runtime || equal(controlKey, mediaKey)))
     throw new Error(
-      "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_WORKLOADS) and a key separate from STUDIO_MCP_API_KEY.",
+      "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_NAMESPACES) and a key separate from STUDIO_MCP_API_KEY.",
     );
   const publicUrl =
     environment.STUDIO_MCP_PUBLIC_URL?.replace(/\/+$/, "") ||

@@ -31,7 +31,7 @@ export function inClusterRequest(
   const host = environment.KUBERNETES_SERVICE_HOST;
   if (!host || !existsSync(`${directory}/token`))
     throw new Error(
-      "STUDIO_KUBERNETES_WORKLOADS needs Studio's in-cluster service account token (automountServiceAccountToken) or STUDIO_KUBERNETES_URL.",
+      "STUDIO_KUBERNETES_NAMESPACES needs Studio's in-cluster service account token (automountServiceAccountToken) or STUDIO_KUBERNETES_URL.",
     );
   const ca = readFileSync(`${directory}/ca.crt`);
   return (method, path, body) =>
@@ -127,7 +127,7 @@ function podReason(pod: Pod) {
   return pod.status?.phase === "Running" ? "Loading." : "Starting.";
 }
 
-/** Reads and scales only the configured deployments; Studio never discovers or adopts others. */
+/** Reads and scales only the workloads Studio found at start (runtime/workloads.ts). */
 export class KubernetesEngine {
   private request: KubernetesRequest;
 
