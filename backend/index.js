@@ -102,6 +102,7 @@ import {
   mergeWorkerModels,
   noteWorkerProfiles,
   profileOnBackendKey,
+  readyWorkers,
   routeJob,
   workerAvailability,
   withComfyBackend,
@@ -1709,7 +1710,9 @@ const generationRoutes = registerGenerationRoutes(app, {
 
 // This runtime owns only the IDs persisted in its own SQLite queue and gallery.
 const mediaLeases = new Map();
-async function queueResourceFor(input) {
+// Manual work goes to the first worker that can run it; background work (MCP, Dream, finishing)
+// prefers a worker that also runs video, keeping the first free for manual work.
+async function queueResourceFor(input, priority = queuePriority.manual) {
   if (directCloud?.isProfile(input)) return "provider:cliproxyapi";
   const models = await mediaModels(false)
     .then((result) => result.models)
@@ -1722,9 +1725,12 @@ async function queueResourceFor(input) {
       : "image";
   const worker = routeJob(capability, {
     profileId: profileOnBackendKey(input.profileId, input.profileBackend),
+    prefers: priority > queuePriority.manual ? ["video"] : [],
   });
-  // Only a worker that can run the job holds it (generation-routes.js ignores any other pin).
+  // Only a worker that can run the job holds it (generation-routes.js ignores any other pin);
+  // background work goes where it is routed, whatever worker its source input names.
   const backend =
+    priority === queuePriority.manual &&
     typeof input.backendId === "string" &&
     workerById(input.backendId)?.capabilities.includes(capability)
       ? input.backendId
@@ -1945,6 +1951,15 @@ const generationQueue = new GenerationQueue(
   rewriteStore,
   {
     ...generationAdapter,
+    // A local generation may move to another idle worker that runs it: the forms fill in a
+    // worker by default, so it is where the job starts rather than a pin.
+    alternatives: (job) =>
+      job.resource.startsWith("worker:") && job.operation !== "upscale"
+        ? readyWorkers(
+            job.input.kind === "video" ? "video" : "image",
+            profileOnBackendKey(job.input.profileId, job.input.profileBackend),
+          ).map((worker) => `worker:${worker.id}`)
+        : [],
     settled: async (job) => {
       await generationAdapter.settled(job);
       if (job.status !== "completed") return;

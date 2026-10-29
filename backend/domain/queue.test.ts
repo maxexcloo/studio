@@ -195,6 +195,57 @@ test("manual requests run before queued MCP work, FIFO within each tier", async 
   }
 });
 
+test("an idle worker takes waiting work, but background work only while no manual work waits", async () => {
+  const queue = fixture();
+  const { store, observations } = queue;
+  queue.adapter.alternatives = () => ["worker:primary", "worker:video"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string, origin = {}) =>
+      store.enqueue("alice", session.id, {}, "image", undefined, resource, undefined, origin).id;
+    const [manual1, manual2] = [enqueue("worker:primary"), enqueue("worker:primary")];
+    const [mcp1, mcp2] = [enqueue("worker:video", mcp("a")), enqueue("worker:video", mcp("b"))];
+    const where = (id: string) => store.job("alice", id)!;
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [manual1, mcp1]);
+    // The video worker frees up: the waiting manual job moves there ahead of the MCP job.
+    observations.set(mcp1, { status: "completed" });
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [manual1, mcp1, manual2]);
+    assert.equal(where(manual2).backend, "video");
+    assert.equal(where(mcp2).status, "waiting");
+    // The primary worker frees up with no manual work waiting: it takes the MCP job.
+    observations.set(manual1, { status: "completed" });
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [manual1, mcp1, manual2, mcp2]);
+    assert.equal(where(mcp2).resource, "worker:primary");
+  } finally {
+    store.close();
+  }
+});
+
+test("an idle worker takes waiting manual work before background work", async () => {
+  const queue = fixture();
+  const { store, observations } = queue;
+  queue.adapter.alternatives = () => ["worker:primary", "worker:video"];
+  try {
+    const session = store.createSession("alice");
+    const enqueue = (resource: string, origin = {}) =>
+      store.enqueue("alice", session.id, {}, "image", undefined, resource, undefined, origin).id;
+    const manual1 = enqueue("worker:primary");
+    const [mcp1, mcp2] = [enqueue("worker:video", mcp("a")), enqueue("worker:video", mcp("b"))];
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [manual1, mcp1]);
+    const manual2 = enqueue("worker:video");
+    observations.set(manual1, { status: "completed" });
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [manual1, mcp1, manual2]);
+    assert.equal(store.job("alice", mcp2)!.resource, "worker:video");
+  } finally {
+    store.close();
+  }
+});
+
 test("a started MCP set stays contiguous and its order survives restart", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-queue-"));
   const filename = path.join(dir, "studio.sqlite");

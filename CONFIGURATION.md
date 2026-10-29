@@ -44,7 +44,7 @@ On Kubernetes, leave `STUDIO_WORKERS` unset: the image and video workloads in
 workers, one per address. When `STUDIO_WORKERS` is set, it lists the workers
 instead. Without either, Studio starts with no workers.
 
-**Routing:** queued work pins its selected worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for [Animate](#cloud-models), which never waits on a stopped video worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
+**Routing:** manual work starts on the first worker that runs it; MCP, Dream and finishing work prefer a worker that also runs video. A job waiting behind busy work moves to an idle worker that runs its profile, manual work first; background work moves only while no manual work waits. Otherwise queued work keeps its worker and waits while it is offline. A user may explicitly permit fallback to another worker advertising the same profile. Studio never substitutes an unavailable model or switches to a cloud provider implicitly, except for [Animate](#cloud-models), which never waits on a stopped video worker. Worker capability checks apply before submission. Which GPU workloads run is [runtime control](#queue-sessions--runtime-control).
 
 ## Cloud Models
 
