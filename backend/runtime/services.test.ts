@@ -6,7 +6,7 @@ import test from "node:test";
 import { RuntimeController, type Workload } from "./controller.ts";
 import { createServicesObserver, createLocalText, parkedWorkers } from "./services.ts";
 import { KubernetesEngine } from "./kubernetes.ts";
-import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 import { fork } from "node:child_process";
 import { once } from "node:events";
 import { createServer } from "node:http";
@@ -236,6 +236,7 @@ test(
     kubernetes.listen(0, "127.0.0.1");
     await once(kubernetes, "listening");
     const server = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
+      execArgv: [...process.execArgv, ...clusterDns],
       env: {
         PATH: process.env.PATH,
         PORT: "0",
@@ -300,7 +301,10 @@ test(
       "unknown",
       "demo placeholders are not evidence of worker health",
     );
-    assert.equal(admin.services.text?.endpoints[0].endpoint, `${workerUrl}/health`);
+    assert.equal(
+      admin.services.text?.endpoints[0].endpoint,
+      `${serviceUrl("text", "text", workerUrl)}/health`,
+    );
     assert.equal(admin.runtime.configured, true);
     const profile = async (promptAssistant: boolean) => {
       cookie = administratorCookie;

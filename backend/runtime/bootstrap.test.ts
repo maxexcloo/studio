@@ -16,7 +16,7 @@ const environment = (extra = {}) => ({
   STUDIO_TEXT_KEY: "fixture-text",
   ...extra,
 });
-const image = { kind: "image", pool: "gpu", gpus: 1, url: "http://10.43.0.10:8188" };
+const image = { kind: "image", pool: "gpu", gpus: 1, url: "http://127.0.0.1:8188" };
 
 /** Two namespaces shaped like the app-template releases: one Service can select several deployments. */
 function cluster(change: (items: Record<string, any>) => void = () => {}) {
@@ -39,14 +39,9 @@ function cluster(change: (items: Record<string, any>) => void = () => {}) {
       },
     },
   });
-  const service = (
-    name: string,
-    selector: Record<string, string>,
-    clusterIP: string,
-    port: number,
-  ) => ({
+  const service = (name: string, selector: Record<string, string>, port: number) => ({
     metadata: { name },
-    spec: { selector, clusterIP, ports: [{ name: "http", port }] },
+    spec: { selector, ports: [{ name: "http", port }] },
   });
   const templates = [1, 2].map((count) => ({
     metadata: { name: `gpu-${count}` },
@@ -73,9 +68,7 @@ function cluster(change: (items: Record<string, any>) => void = () => {}) {
         },
       ),
     ],
-    "comfyui/services": [
-      service("comfyui", { "app.kubernetes.io/name": "comfyui" }, "10.43.0.10", 8188),
-    ],
+    "comfyui/services": [service("comfyui", { "app.kubernetes.io/name": "comfyui" }, 8188)],
     "comfyui/resourceclaimtemplates": templates,
     "text/deployments": [
       deployment(
@@ -95,8 +88,8 @@ function cluster(change: (items: Record<string, any>) => void = () => {}) {
       ),
     ],
     "text/services": [
-      service("gemma", { "text.excloo.dev/model": "gemma" }, "10.43.0.20", 8000),
-      service("maya", { "text.excloo.dev/model": "maya" }, "10.43.0.21", 8000),
+      service("gemma", { "text.excloo.dev/model": "gemma" }, 8000),
+      service("maya", { "text.excloo.dev/model": "maya" }, 8000),
     ],
     "text/resourceclaimtemplates": templates,
   };
@@ -120,7 +113,7 @@ test("workloads come from the labelled deployments, their claims and the Service
       deployment: "comfyui",
       pool: "gpu",
       gpus: 1,
-      url: "http://10.43.0.10:8188",
+      url: "http://comfyui.comfyui.svc.cluster.local:8188",
       worker: "primary",
       capabilities: ["image", "upscale", "models"],
     },
@@ -132,7 +125,7 @@ test("workloads come from the labelled deployments, their claims and the Service
       deployment: "text-gemma",
       pool: "gaming",
       gpus: 1,
-      url: "http://10.43.0.20:8000",
+      url: "http://gemma.text.svc.cluster.local:8000",
       model: "local/auto",
       vision: true,
     },
@@ -144,7 +137,7 @@ test("workloads come from the labelled deployments, their claims and the Service
       deployment: "text-gemma-tp2",
       pool: "gpu",
       gpus: 2,
-      url: "http://10.43.0.20:8000",
+      url: "http://gemma.text.svc.cluster.local:8000",
       model: "local/auto",
     },
   ]);
@@ -180,7 +173,6 @@ test("without namespaces there is no runtime; what can't be derived stops Studio
           metadata: { name: "all" },
           spec: {
             selector: { "text.excloo.dev/model": "gemma" },
-            clusterIP: "10.43.0.30",
             ports: [{ port: 80 }],
           },
         }),

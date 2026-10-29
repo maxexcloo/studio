@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
-import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
+import { clusterDns, fakeKubernetes, serviceUrl } from "./fixtures/fake-kubernetes.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
@@ -79,6 +79,7 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
   };
   const launch = () =>
     fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
+      execArgv: [...process.execArgv, ...clusterDns],
       env: {
         PATH: process.env.PATH,
         PORT: "0",
@@ -86,7 +87,12 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_DATA_DIR: path.join(directory, "runtime"),
         STUDIO_WORKERS: JSON.stringify([
-          { id: "chosen", name: "Chosen", url: worker.url, capabilities: ["image"] },
+          {
+            id: "chosen",
+            name: "Chosen",
+            url: serviceUrl("gpu", "media", worker.url),
+            capabilities: ["image"],
+          },
         ]),
         STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,

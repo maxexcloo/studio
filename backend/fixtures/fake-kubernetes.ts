@@ -1,5 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { fileURLToPath } from "node:url";
 import type { KubernetesRequest } from "../runtime/kubernetes.ts";
+
+/** The address Studio derives for a fake workload's Service: its name, namespace and `url`'s port. */
+export const serviceUrl = (namespace: string, name: string, url: string) =>
+  `http://${name}.${namespace}.svc.cluster.local:${new URL(url).port}`;
+/** Node options for a forked Studio that resolve those addresses to this machine (cluster-dns.ts). */
+export const clusterDns = ["--import", fileURLToPath(new URL("./cluster-dns.ts", import.meta.url))];
 
 interface Pod {
   name: string;
@@ -26,8 +33,8 @@ interface Deployment {
 
 /**
  * A fake Kubernetes API for the deployments and pods Studio reads and the scale subresource it
- * patches. Deployments given a `workload` are listed for discovery with a Service at its `url` and
- * a `gpu-<count>` claim template. Time moves in ticks: a tick removes terminating pods, readies pending ones and creates
+ * patches. Deployments given a `workload` are listed for discovery with a Service on its `url`'s
+ * port (serviceUrl) and a `gpu-<count>` claim template. Time moves in ticks: a tick removes terminating pods, readies pending ones and creates
  * pods for missing replicas. `log` records every scale and every pod that went away, in order.
  */
 export function fakeKubernetes(
@@ -136,7 +143,6 @@ export function fakeKubernetes(
     );
     const items = listed.map(({ name, workload }) => {
       const { kind, pool, gpus, url, annotations } = workload!;
-      const address = new URL(url);
       return {
         deployments: {
           metadata: { name, labels: { "studio.excloo.dev/kind": kind }, annotations },
@@ -154,8 +160,7 @@ export function fakeKubernetes(
           metadata: { name },
           spec: {
             selector: { app: name },
-            clusterIP: address.hostname,
-            ports: [{ port: Number(address.port) }],
+            ports: [{ port: Number(new URL(url).port) }],
           },
         },
         resourceclaimtemplates: {

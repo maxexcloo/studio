@@ -119,8 +119,8 @@ function workload(
   if (selecting.length !== 1)
     throw problem(`needs one Service selecting its pods, not ${selecting.length}`);
   const [service] = selecting;
-  if (!service.spec.ports?.length || !service.spec.clusterIP || service.spec.clusterIP === "None")
-    throw problem(`needs Service ${service.metadata.name} to have a cluster IP and a port`);
+  if (!service.spec.ports?.length)
+    throw problem(`needs Service ${service.metadata.name} to have a port`);
   const capabilities = annotation("capabilities")
     ?.split(",")
     .map((item) => item.trim())
@@ -133,7 +133,7 @@ function workload(
     deployment: id,
     pool,
     gpus,
-    url: `http://${service.spec.clusterIP}:${service.spec.ports[0].port}`,
+    url: `http://${service.metadata.name}.${namespace}.svc.cluster.local:${service.spec.ports[0].port}`,
     ...(kind === "text"
       ? {
           model: required(environment, "STUDIO_LOCAL_TEXT_MODEL"),

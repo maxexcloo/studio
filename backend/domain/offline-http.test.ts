@@ -10,7 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import type { QueueJob } from "../../shared/queue.ts";
-import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
 test(
@@ -127,6 +127,7 @@ test(
       cookie = "";
     async function start() {
       child = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
+        execArgv: [...process.execArgv, ...clusterDns],
         env: {
           ...process.env,
           PORT: "0",
@@ -143,7 +144,12 @@ test(
           STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
           STUDIO_KUBERNETES_NAMESPACES: "comfyui",
           STUDIO_WORKERS: JSON.stringify([
-            { id: "chosen", name: "Chosen Worker", url: chosen.url, capabilities: ["image"] },
+            {
+              id: "chosen",
+              name: "Chosen Worker",
+              url: serviceUrl("comfyui", "chosen", chosen.url),
+              capabilities: ["image"],
+            },
             { id: "other", name: "Other Worker", url: other.url, capabilities: ["image"] },
           ]),
         },
