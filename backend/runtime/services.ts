@@ -49,9 +49,8 @@ function directAddress(value: string, path: string) {
 }
 
 /**
- * The local text route while a text workload is scaled up: the Bifrost prefix of the first one's
- * `model` (`local/` from `local/gemma`), and whether it reads images (every running one sets
- * `vision: true`). Null when none runs or the cluster can't be asked. Cached briefly, so a switch
+ * The local text route while a text workload is scaled up: the first one's Bifrost `model`, such as
+ * `local/auto`, and whether it reads images (every running one sets `vision: true`). Null when none runs or the cluster can't be asked. Cached briefly, so a switch
  * shows soon.
  */
 export function createLocalText({
@@ -60,7 +59,7 @@ export function createLocalText({
   cacheMs = 30_000,
 }: Pick<Options, "now" | "cacheMs"> & { controller: RuntimeController }) {
   let cached:
-    | { until: number; result: Promise<{ prefix: string; vision: boolean } | null> }
+    | { until: number; result: Promise<{ model: string; vision: boolean } | null> }
     | undefined;
   return () => {
     if (cached && cached.until > now()) return cached.result;
@@ -69,7 +68,7 @@ export function createLocalText({
       .then(([first, ...rest]) =>
         first
           ? {
-              prefix: first.model!.slice(0, first.model!.lastIndexOf("/") + 1),
+              model: first.model!,
               vision: [first, ...rest].every((workload) => workload.vision === true),
             }
           : null,

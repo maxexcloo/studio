@@ -4123,7 +4123,7 @@ test('replies label links Result N with one All Results page, and Result "all" s
 const writerEnvironment = {
   STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid:4000",
   STUDIO_PROMPT_WRITER_KEY: "fixture-writer-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
 };
 /** The writer calls that wrote prompts, without model picks. */
 const written = (f) =>

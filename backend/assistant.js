@@ -5,10 +5,11 @@
  * (prompt-writer.js) and later the MCP assistant and admin tools, so they cannot drift apart.
  *
  * It uses the prompt writer's gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY) and asks Bifrost
- * for a route and reasoning level by name (`model()`): the local route while a local text workload
- * runs, otherwise STUDIO_PROMPT_WRITER_MODEL's cloud route. STUDIO_ASSISTANT_MODEL, when an
- * administrator sets it, replaces both for everything but MCP Generate's writer. Settings are read
- * on every call, so a model chosen in Settings applies at once.
+ * for a model (`model()`): the running local text workload's model, otherwise
+ * STUDIO_PROMPT_WRITER_MODEL. Structured calls turn reasoning off with `reasoning_effort`
+ * (`reasoningEfforts`). STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and
+ * its effort for everything but MCP Generate's writer. Settings are read on every call, so a model
+ * chosen in Settings applies at once.
  *
  * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
@@ -33,23 +34,23 @@ const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
 export const maxPromptCharacters = 4000;
 const titleInstructions =
   "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
-// The Bifrost reasoning level each call asks for: `off` where it wants a structured (JSON) answer,
-// `text` where it writes prose.
-export const textLevels = {
-  animate: "text",
-  caption: "off",
-  describe: "off",
-  dream: "off",
-  guide: "off",
-  loras: "off",
-  negative: "text",
-  pick: "off",
-  profile: "off",
-  rewrite: "text",
-  suggestions: "off",
-  taste: "text",
-  title: "text",
-  writer: "off",
+// The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer, and
+// null (the model's default) where it writes prose.
+export const reasoningEfforts = {
+  animate: null,
+  caption: "none",
+  describe: "none",
+  dream: "none",
+  guide: "none",
+  loras: "none",
+  negative: null,
+  pick: "none",
+  profile: "none",
+  rewrite: null,
+  suggestions: "none",
+  taste: null,
+  title: null,
+  writer: "none",
 };
 const maxCandidates = 20;
 const maxExamples = 6;
@@ -67,7 +68,7 @@ export class AssistantError extends Error {
 }
 
 /**
- * The gateway endpoint, key and cloud route prefix (STUDIO_PROMPT_WRITER_MODEL, such as `cloud/`), or
+ * The gateway endpoint, key and cloud model (STUDIO_PROMPT_WRITER_MODEL, such as `cloud/auto`), or
  * null when unset; a partial setting fails by name.
  */
 export function gatewaySettings(environment = process.env) {
@@ -79,10 +80,6 @@ export function gatewaySettings(environment = process.env) {
   if (missing.length)
     throw new Error(
       `Prompt writing needs ${missing.join(", ")}; set all three of ${gatewayKeys.join(", ")} or none.`,
-    );
-  if (!values.STUDIO_PROMPT_WRITER_MODEL.endsWith("/"))
-    throw new Error(
-      "STUDIO_PROMPT_WRITER_MODEL must be a route prefix ending in /, such as cloud/.",
     );
   return {
     ...gatewayAddress(values.STUDIO_PROMPT_WRITER_URL, "STUDIO_PROMPT_WRITER_URL"),
@@ -452,7 +449,7 @@ export function createAssistant(
     log = console,
     now = Date.now,
     resolveSettings = () => assistantSettings(environment),
-    // The running local text model's route (runtime/services.ts); none without a runtime.
+    // The running local text model (runtime/services.ts); none without a runtime.
     localText = async () => null,
   } = {},
 ) {
@@ -467,14 +464,15 @@ export function createAssistant(
 
   /** Local while a local text workload runs (reading images as it says), otherwise the cloud, which always does. */
   async function route() {
-    return (await localText()) || { prefix: settings().cloud, vision: true };
+    return (await localText()) || { model: settings().cloud, vision: true };
   }
 
-  /** The Bifrost model a call asks for: its route and `textLevels` level, or the administrator's choice. */
+  /** The administrator's model for a call, or empty; MCP Generate's writer never takes it. */
+  const chosenFor = (call) => (call === "writer" ? "" : settings().chosen);
+
+  /** The Bifrost model a call asks for: the administrator's choice, otherwise the route's. */
   async function modelFor(call) {
-    const { chosen } = settings();
-    if (chosen && call !== "writer") return chosen;
-    return `${(await route()).prefix}${textLevels[call]}`;
+    return chosenFor(call) || (await route()).model;
   }
 
   /** Whether the route the calls take reads images. */
@@ -546,10 +544,13 @@ export function createAssistant(
    * One chat completion. With `onDelta` or `onThinking`, it streams: visible text (reasoning
    * stripped) goes to `onDelta` and reasoning (`reasoning_content` deltas and `<think>` blocks) to
    * `onThinking` as they arrive; a gateway that answers without streaming hands over each at once.
-   * Resolves to { text, thinking, model, ms } with the final, reasoning-free text; throws AssistantError.
+   * `call` names the call type, whose `reasoningEfforts` entry it sends unless the administrator's
+   * model answers it. Resolves to { text, thinking, model, ms } with the final, reasoning-free text;
+   * throws AssistantError.
    */
   async function chat({
     model,
+    call,
     messages,
     temperature = 0.7,
     // Reasoning models spend part of this on thinking before the reply.
@@ -573,8 +574,15 @@ export function createAssistant(
       onThinking?.(text);
     };
     const timer = AbortSignal.timeout(ms ?? timeoutMs);
-    // The model name carries the reasoning level (`textLevels`); Bifrost applies it.
-    const body = { model, messages, temperature, max_tokens: maxTokens, stream };
+    const effort = call && !chosenFor(call) ? reasoningEfforts[call] : null;
+    const body = {
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      stream,
+      ...(effort ? { reasoning_effort: effort } : {}),
+    };
     let response;
     try {
       response = await fetchImpl(endpoint, {
@@ -717,6 +725,7 @@ export function createAssistant(
     const base = { preset: preset.id, model, vision, referencesRead: vision && images.length > 0 };
     try {
       const reply = await chat({
+        call: "rewrite",
         model,
         messages: [
           { role: "system", content: system },
@@ -774,6 +783,7 @@ export function createAssistant(
       .join("\n");
     try {
       const reply = await chat({
+        call: "negative",
         model,
         messages: [
           { role: "system", content: system },
@@ -834,6 +844,7 @@ export function createAssistant(
     const byName = new Map(candidates.map((item) => [item.name, item]));
     try {
       const reply = await chat({
+        call: "loras",
         model,
         messages: [
           { role: "system", content: system },
@@ -918,6 +929,7 @@ export function createAssistant(
     try {
       const text = vision ? "Describe this image." : `Description: ${one(hint, 2000)}`;
       const reply = await chat({
+        call: "describe",
         model,
         messages: [
           { role: "system", content: system },
@@ -961,6 +973,7 @@ export function createAssistant(
   async function caption({ image, signal } = {}) {
     const model = await modelFor("caption");
     const reply = await chat({
+      call: "caption",
       model,
       messages: [
         { role: "system", content: captionInstructions },
@@ -990,6 +1003,7 @@ export function createAssistant(
   async function title({ prompt, signal } = {}) {
     const model = await modelFor("title");
     const reply = await chat({
+      call: "title",
       model,
       messages: [
         { role: "system", content: titleInstructions },
@@ -1027,6 +1041,7 @@ export function createAssistant(
       .join("\n");
     try {
       const reply = await chat({
+        call: "guide",
         model,
         messages: [
           { role: "system", content: system },
@@ -1073,6 +1088,7 @@ export function createAssistant(
         'From the model page below, reply with JSON only: {"name": "...", "description": "one sentence", "uncensored": true|false|null, "steps": n|null, "cfg": n|null, "sampler": "..."|null, "scheduler": "..."|null}. Use only what the page states.';
       try {
         const reply = await chat({
+          call: "profile",
           model: await modelFor("profile"),
           messages: [
             { role: "system", content: system },

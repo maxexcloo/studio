@@ -344,7 +344,7 @@ test("the local text route follows the running text workloads, briefly cached", 
     pool: "gpu",
     gpus: 1,
     url: `http://${id}.invalid:8000`,
-    model: `local/${id}`,
+    model: "local/auto",
     ...(vision ? { vision } : {}),
   });
   const kube = fakeKubernetes([
@@ -367,12 +367,12 @@ test("the local text route follows the running text workloads, briefly cached", 
   await scale("radiance", 1);
   assert.equal(await local(), null, "the answer is cached");
   time += 30_000;
-  assert.deepEqual(await local(), { prefix: "local/", vision: true });
+  assert.deepEqual(await local(), { model: "local/auto", vision: true });
   await scale("maya", 1);
   time += 30_000;
   assert.deepEqual(
     await local(),
-    { prefix: "local/", vision: false },
+    { model: "local/auto", vision: false },
     "a text-only one may answer",
   );
   kube.denied.add("text");
