@@ -93,6 +93,8 @@ interface DreamWriter {
   model(call: string): Promise<string>;
   chat(request: {
     model: string;
+    /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
+    call: string;
     messages: { role: "system" | "user"; content: string }[];
     temperature?: number;
     maxTokens?: number;
@@ -466,6 +468,7 @@ export function createDream(options: {
           },
         ];
     const { text, thinking = "" } = await writer.chat({
+      call: "dream",
       model,
       messages,
       temperature: 1,

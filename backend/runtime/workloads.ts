@@ -50,7 +50,7 @@ export function kubernetesWorkloads(environment: Environment) {
     )
       throw problem("must point directly to its worker, not Bifrost");
     if (record.kind === "text" && !record.model?.includes("/"))
-      throw problem("needs the Bifrost model it serves, such as local/gemma");
+      throw problem("needs the Bifrost model it serves, such as local/auto");
     if (record.apiKeyEnv) required(environment, record.apiKeyEnv);
     return {
       id,

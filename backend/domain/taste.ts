@@ -51,10 +51,12 @@ export interface TasteRecord {
 /** The assistant gateway's chat (assistant.js), which returns its reply without reasoning. */
 export interface TasteWriter<Content = string> {
   settings(): unknown;
-  /** The Bifrost model for a call type (assistant.js `textLevels`). */
+  /** The Bifrost model for a call type (assistant.js `modelFor`). */
   model(call: string): Promise<string>;
   chat(request: {
     model: string;
+    /** The call type, which sets its `reasoning_effort` (assistant.js `reasoningEfforts`). */
+    call: string;
     messages: { role: "system" | "user"; content: Content }[];
     temperature?: number;
     maxTokens?: number;
@@ -224,6 +226,7 @@ export function createTaste({
     let text: string;
     try {
       ({ text } = await model.chat({
+        call: "taste",
         model: await model.model("taste"),
         messages: [
           { role: "system", content: instructions },

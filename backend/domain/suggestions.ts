@@ -157,6 +157,7 @@ export function createSuggestions({
     let text: string;
     try {
       ({ text } = await model.chat({
+        call: "suggestions",
         model: await model.model("suggestions"),
         messages: [
           { role: "system", content: system },
