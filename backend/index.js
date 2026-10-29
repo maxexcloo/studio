@@ -2362,6 +2362,28 @@ const sessionChat = new ChatService({
         };
       });
   },
+  // The account's local profiles a Chat request may name, each with its defaults as MCP generation applies them.
+  profiles: async (ownerId) => {
+    const account = ownerId ? accountAccessForId(ownerId) : undefined;
+    const models = modelsForAccount(await catalogueModels(), { studioAccount: account });
+    return (models.profiles || [])
+      .filter((profile) => !isCloudProfile(profile) && profile.ready !== false)
+      .map((profile) => ({
+        id: profile.id,
+        label: profile.label || profile.id,
+        family: profile.family || "",
+        kind: profile.kind || "image",
+        input: {
+          ...profile.defaults,
+          autoUpscale: null,
+          kind: profile.kind || "image",
+          profileId: profile.id,
+          ...(profile.backend ? { profileBackend: profile.backend } : {}),
+          model: profile.model,
+          workflow: profile.workflow,
+        },
+      }));
+  },
   models: async (ownerId) => {
     const settings = chatSettings();
     if (!settings) return [];

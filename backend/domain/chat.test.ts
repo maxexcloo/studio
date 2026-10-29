@@ -3,7 +3,7 @@ import test from "node:test";
 import { RewriteStore } from "./store.ts";
 import { ChatStore } from "./chat-store.ts";
 import { ChatService } from "./chat.ts";
-import type { ChatEvent } from "../../shared/chat.ts";
+import type { ChatDraft, ChatEvent } from "../../shared/chat.ts";
 import type { QueueJob } from "../../shared/queue.ts";
 import fs from "node:fs";
 import os from "node:os";
@@ -249,6 +249,58 @@ test("request_media keeps selected LoRAs and adds the ones the user named for th
   fixture.db.close();
 });
 
+test("request_media uses the profile the user named, else the selected one with a note", async () => {
+  const call = (index: number, profile: string) => ({
+    index,
+    function: {
+      name: "request_media",
+      arguments: JSON.stringify({ operation: "image", prompt: "a fox", profile }),
+    },
+  });
+  const fixture = setup([
+    frame({ choices: [{ delta: { tool_calls: [call(0, "kromafine turbo"), call(1, "nope")] } }] }),
+    "data: [DONE]\n\n",
+  ]);
+  const profile = (id: string, label: string) => ({
+    id,
+    label,
+    family: "kromafine",
+    kind: "image",
+    input: { profileId: id, model: `${id}.safetensors`, steps: 8 },
+  });
+  fixture.service.options.profiles = async () => [
+    profile("kromafine", "Kromafine"),
+    profile("kromafine-turbo", "Kromafine Turbo"),
+  ];
+  const reference = { assetId: "ref", slot: "reference" };
+  await fixture.service.stream(
+    "alice",
+    fixture.session.id,
+    {
+      content: "use kromafine turbo for a fox",
+      generation: {
+        operation: "image",
+        input: { profileId: "fibo-edit-turbo", steps: 4, referenceAssets: [reference] },
+      },
+    },
+    () => {},
+  );
+  const [first, second] = fixture.admissions as { draft: ChatDraft }[];
+  assert.deepEqual(first.draft.input, {
+    profileId: "kromafine-turbo",
+    model: "kromafine-turbo.safetensors",
+    steps: 8,
+    referenceAssets: [reference],
+    prompt: "a fox",
+  });
+  assert.equal(second.draft.input.profileId, "fibo-edit-turbo");
+  assert.match(
+    fixture.service.messages("alice", fixture.session.id)[1].content,
+    /No available profile matches "nope"/,
+  );
+  assert.match(JSON.stringify(fixture.requests[0]), /Kromafine Turbo/);
+  fixture.db.close();
+});
 test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
   const fixture = setup([
     frame({
