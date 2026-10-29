@@ -10,7 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import type { QueueJob } from "../../shared/queue.ts";
-import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
 test(
@@ -103,10 +103,19 @@ test(
     chosen.setDown(true);
     other.setDown(true);
     // The chosen worker's deployment is stopped, and its pod cannot get a GPU until allowed.
-    const kube = fakeKubernetes([{ namespace: "comfyui", name: "chosen" }], {
-      tickOnRead: true,
-      onChange: (_name, ready) => chosen.setDown(!ready),
-    });
+    const kube = fakeKubernetes(
+      [
+        {
+          namespace: "comfyui",
+          name: "chosen",
+          workload: { kind: "image", pool: "gpu", gpus: 1, url: chosen.url },
+        },
+      ],
+      {
+        tickOnRead: true,
+        onChange: (_name, ready) => chosen.setDown(!ready),
+      },
+    );
     const deployment = kube.deployments.get("comfyui/chosen")!;
     deployment.unschedulable = "0/1 nodes are available: 1 cannot allocate all claims.";
     const starts = () => kube.log.filter((entry) => entry === "scale comfyui/chosen 1").length;
@@ -118,6 +127,7 @@ test(
       cookie = "";
     async function start() {
       child = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
+        execArgv: [...process.execArgv, ...clusterDns],
         env: {
           ...process.env,
           PORT: "0",
@@ -132,18 +142,14 @@ test(
           STUDIO_RUNTIME_AUTOMATIC: "1",
           STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
           STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
-          STUDIO_KUBERNETES_WORKLOADS: JSON.stringify({
-            chosen: {
-              kind: "image",
-              namespace: "comfyui",
-              deployment: "chosen",
-              pool: "gpu",
-              gpus: 1,
-              url: chosen.url,
-            },
-          }),
+          STUDIO_KUBERNETES_NAMESPACES: "comfyui",
           STUDIO_WORKERS: JSON.stringify([
-            { id: "chosen", name: "Chosen Worker", url: chosen.url, capabilities: ["image"] },
+            {
+              id: "chosen",
+              name: "Chosen Worker",
+              url: serviceUrl("comfyui", "chosen", chosen.url),
+              capabilities: ["image"],
+            },
             { id: "other", name: "Other Worker", url: other.url, capabilities: ["image"] },
           ]),
         },
