@@ -858,7 +858,10 @@ test("media and administrator credentials discover only their own friendly tools
   );
   assert.match(media.getInstructions(), /Reply briefly as each result says/);
   assert.match(media.getInstructions(), /Studio runs them exactly as written/);
-  assert.match(media.getInstructions(), /"N sets of K" is N distinct prompts with count K in one call/);
+  assert.match(
+    media.getInstructions(),
+    /"N sets of K" is N distinct prompts with count K in one call/,
+  );
   assert.match(
     media.getInstructions(),
     /call Reuse with its ref and your revised prompt or the change as request/,
