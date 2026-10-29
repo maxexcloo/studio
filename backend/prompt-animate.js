@@ -57,6 +57,7 @@ export async function writeAnimatePrompt({
 }) {
   const model = await engine.model("animate");
   const reply = await engine.chat({
+    call: "animate",
     model,
     messages: [
       {

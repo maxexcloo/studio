@@ -6,7 +6,7 @@ import { createPromptWriter, parseWrittenPrompts, writerGuide } from "./prompt-w
 const settings = (url) => ({
   STUDIO_PROMPT_WRITER_URL: url,
   STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/",
+  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
 });
 
 test("prompt writer settings are all or nothing and name an OpenAI-compatible endpoint", () => {

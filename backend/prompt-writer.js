@@ -172,6 +172,7 @@ export function createPromptWriter(
       for (let attempt = 0; attempt < 2; attempt += 1)
         try {
           const reply = await engine.chat({
+            call: "writer",
             model,
             messages: [
               { role: "system", content: system },
@@ -220,6 +221,7 @@ export function createPromptWriter(
         `- ${profile.id}: ${profile.label || profile.id}${profile.id === preferred?.id ? " (default)" : ""}. ${clean(profile.description).slice(0, 300)}${profile.prompting?.summary ? ` Prompting: ${clean(profile.prompting.summary).slice(0, 200)}` : ""}`;
       try {
         const reply = await engine.chat({
+          call: "pick",
           model: await engine.model("pick"),
           messages: [
             {
