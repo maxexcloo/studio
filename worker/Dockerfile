@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/stilldeadcode/radiance:1.15.0 AS radiance
+FROM docker.io/stilldeadcode/radiance:1.15.1 AS radiance
 FROM docker.io/yanwk/comfyui-boot:rocm-20261027
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
