@@ -312,6 +312,8 @@ export class ChatService {
               model: model.id,
               stream: false,
               max_tokens: 24,
+              // A reasoning model would spend these few tokens thinking and return no title.
+              reasoning_effort: "none",
               messages: [
                 {
                   role: "system",
