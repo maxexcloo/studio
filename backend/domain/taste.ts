@@ -242,7 +242,8 @@ export function createTaste({
           },
         ],
         temperature: 0.3,
-        maxTokens: 700,
+        // Reasoning models spend part of this on thinking before the profile.
+        maxTokens: 2000,
         timeout: 60_000,
       }));
     } catch (error) {
