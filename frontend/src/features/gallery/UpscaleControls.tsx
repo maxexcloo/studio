@@ -1,19 +1,15 @@
 import { useState } from "react";
 import {
-  ActionIcon,
   Alert,
   Button,
   FocusTrap,
   Loader,
   Modal,
-  Popover,
   Select,
   Stack,
   Switch,
   Text,
-  Tooltip,
 } from "@mantine/core";
-import { ImageUpscale } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   UpscaleQuality,
@@ -23,17 +19,18 @@ import type {
 } from "../../../../shared/upscale";
 import { api, post } from "../../api";
 import type { MediaItem } from "../../types";
-import { useActionIconProps, type Action } from "./ActionBar";
+
+const statusQuery = (quality: UpscaleQuality) => ({
+  queryKey: ["upscale-status", quality],
+  queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
+});
 
 function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void }) {
   const [quality, setQuality] = useState<UpscaleQuality>("balanced");
   const [target, setTarget] = useState("0");
   const [faceDetail, setFaceDetail] = useState(false);
   const cache = useQueryClient();
-  const status = useQuery({
-    queryKey: ["upscale-status", quality],
-    queryFn: () => api<UpscaleStatus>(`/api/upscale/status?quality=${quality}`),
-  });
+  const status = useQuery(statusQuery(quality));
   const upscale = useMutation({
     meta: { inlineError: true },
     mutationFn: () =>
@@ -141,45 +138,38 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
 }
 export const upscaling = (item: MediaItem) =>
   ["queued", "running"].includes(item.upscale?.status || "");
-/**
- * The viewer's Upscale action and its settings popover, styled as an action bar icon. `options`
- * (Show Upscale, Compare Upscale) show as switches above the form.
- */
-export function UpscaleControls({ item, options = [] }: { item: MediaItem; options?: Action[] }) {
-  const [opened, setOpened] = useState(false);
-  const iconProps = useActionIconProps();
-  const busy = upscaling(item);
-  return (
-    <Popover opened={opened} onChange={setOpened} position="top" width={300} trapFocus>
-      <Tooltip label={busy ? "Upscaling…" : "Upscale"} disabled={opened}>
-        <Popover.Target>
-          <ActionIcon
-            {...iconProps}
-            aria-label="Upscale"
-            loading={busy}
-            onClick={() => setOpened((value) => !value)}
-          >
-            <ImageUpscale size={18} />
-          </ActionIcon>
-        </Popover.Target>
-      </Tooltip>
-      <Popover.Dropdown>
-        <Stack gap="sm">
-          <Text fw={600}>Upscale</Text>
-          {options.map((option) => (
-            <Switch
-              key={option.id}
-              label={option.label}
-              checked={Boolean(option.checked)}
-              disabled={option.disabled}
-              onChange={() => option.onClick?.()}
-            />
-          ))}
-          <UpscaleForm item={item} onQueued={() => setOpened(false)} />
-        </Stack>
-      </Popover.Dropdown>
-    </Popover>
-  );
+/** Upscale's one-click runs at the automatic size, and whether Face Detail can join them. */
+export function useQuickUpscale(item: MediaItem, enabled: boolean) {
+  const cache = useQueryClient();
+  const status = useQuery({
+    ...statusQuery("balanced"),
+    enabled: enabled && item.type === "image",
+  });
+  const queue = useMutation({
+    mutationFn: ({ quality, faceDetail }: { quality: UpscaleQuality; faceDetail: boolean }) =>
+      post<UpscaleResponse>("/api/upscale", {
+        galleryItemId: item.id,
+        quality,
+        target: 0,
+        faceDetail,
+      } satisfies UpscaleRequest),
+    onSuccess: () =>
+      void Promise.all(
+        ["gallery", "queue", "session", "sessions"].map((key) =>
+          cache.invalidateQueries({ queryKey: [key] }),
+        ),
+      ),
+  });
+  const face = status.data?.faceDetail;
+  const faceDetail = Boolean(face?.nodesInstalled && face.detectors.length);
+  return {
+    queue,
+    faceDetail,
+    faceNote:
+      face && !faceDetail
+        ? "Face Detail needs the worker’s face detector and Impact Pack nodes."
+        : "",
+  };
 }
 /** The same settings for the Upscale item in tile and Chat result menus. */
 export function UpscaleDialog({
