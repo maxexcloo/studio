@@ -5,6 +5,8 @@ import path from "node:path";
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
 import { hostAllowed } from "./request-guard.js";
 import {
@@ -44,6 +46,7 @@ import {
   withinFamily,
 } from "./mcp-tiers.js";
 import { createPromptWriter } from "./prompt-writer.js";
+import { animateThemes } from "./prompt-animate.js";
 import { gatewaySettings } from "./assistant.js";
 import { mayUseFeature } from "./account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
@@ -81,7 +84,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -201,7 +204,8 @@ export function registerMcpRoutes(
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
   const controlKey = environment.CONTROL_MCP_API_KEY;
-  if (!mediaKey && !controlKey && !accountMode) return null;
+  // Without a key or accounts nothing is served at /mcp, but Studio Chat still runs the tools in process.
+  const served = Boolean(mediaKey || controlKey || accountMode);
   if (controlKey && (!runtime || equal(controlKey, mediaKey)))
     throw new Error(
       "CONTROL_MCP_API_KEY needs Studio runtime control (STUDIO_KUBERNETES_NAMESPACES) and a key separate from STUDIO_MCP_API_KEY.",
@@ -220,21 +224,18 @@ export function registerMcpRoutes(
     throw new Error(
       "STUDIO_MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
     );
-  const media =
-    mediaKey || accountMode
-      ? new McpMedia({
-          dataDir,
-          baseUrl,
-          publicUrl: environment.STUDIO_MCP_PUBLIC_URL
-            ? publicUrl
-            : () => (typeof baseUrl === "function" ? baseUrl() : baseUrl),
-          signingKey: environment.STUDIO_MCP_SIGNING_KEY,
-          fetchImpl,
-          resolveSignedResult,
-          domainRequest,
-          cloudVideoFailures,
-        })
-      : null;
+  const media = new McpMedia({
+    dataDir,
+    baseUrl,
+    publicUrl: environment.STUDIO_MCP_PUBLIC_URL
+      ? publicUrl
+      : () => (typeof baseUrl === "function" ? baseUrl() : baseUrl),
+    signingKey: environment.STUDIO_MCP_SIGNING_KEY,
+    fetchImpl,
+    resolveSignedResult,
+    domainRequest,
+    cloudVideoFailures,
+  });
   // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
   const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
   // Optional: with a writer, Generate picks a model by the request and Reuse writes changes; a partial setting fails at start.
@@ -246,12 +247,11 @@ export function registerMcpRoutes(
     file: dataDir ? path.join(dataDir, "mcp-assistant.json") : "",
   });
   // The studio's rescan or any model change refreshes MCP's per-owner catalogue cache.
-  if (media)
-    app.use("/api/models", (req, _res, next) => {
-      if (req.method !== "GET" ? true : req.path === "/" && req.query.cached !== "1")
-        media.invalidateProfiles();
-      next();
-    });
+  app.use("/api/models", (req, _res, next) => {
+    if (req.method !== "GET" ? true : req.path === "/" && req.query.cached !== "1")
+      media.invalidateProfiles();
+    next();
+  });
   const reviewedGuides = new Map();
   // Generate calls of the dedupe window by conversation and arguments (Generate dedupes repeats).
   const recentGenerates = new Map();
@@ -418,8 +418,11 @@ export function registerMcpRoutes(
         signal,
       });
       const expected = endsAt === null ? null : Math.max(0, endsAt - Date.now());
+      // Studio Chat shows the set as a card that follows it, so its turn never waits.
       const seconds =
-        expected !== null && expected <= imageWaitSeconds * 1000 ? imageWaitSeconds : 0;
+        !actor.session && expected !== null && expected <= imageWaitSeconds * 1000
+          ? imageWaitSeconds
+          : 0;
       // A set that outlasted its wait has no ETA left worth giving.
       const left = seconds ? 0 : expected;
       const markdown = await media.settle(owner, submission, seconds, { scope: refs, signal });
@@ -644,7 +647,7 @@ export function registerMcpRoutes(
       try {
         const queued = await media.queue(owner, args, refs, {
           ...record,
-          ...(conversation ? { conversation } : {}),
+          ...(actor.session ? { session: actor.session } : conversation ? { conversation } : {}),
         });
         return { queued, guide: fresh ? compactGuide(prompting(profile, true)) : "" };
       } catch (error) {
@@ -1264,23 +1267,25 @@ export function registerMcpRoutes(
         },
         { destructiveHint: true },
       );
-      tool(
-        server,
-        "Upload",
-        "Upload Reference",
-        "Upload a PNG, JPEG or WebP reference image (base64, at most 20 MB) for Generate.",
-        {
-          content_base64: z.string().min(1).max(28000000),
-          filename: z.string().default("reference.png"),
-        },
-        async ({ content_base64, filename }) =>
-          mcpJson(await media.upload(owner, content_base64, filename)),
-      );
+      // Studio Chat attaches its references itself; a model cannot send an image's bytes.
+      if (!actor.session)
+        tool(
+          server,
+          "Upload",
+          "Upload Reference",
+          "Upload a PNG, JPEG or WebP reference image (base64, at most 20 MB) for Generate.",
+          {
+            content_base64: z.string().min(1).max(28000000),
+            filename: z.string().default("reference.png"),
+          },
+          async ({ content_base64, filename }) =>
+            mcpJson(await media.upload(owner, content_base64, filename)),
+        );
       tool(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt replaces its prompt (fastest), request changes it in words, preserve_seed keeps its seed. mode animate makes an image a video. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt replaces its prompt (fastest), request changes it in words, preserve_seed keeps its seed. mode animate makes an image a video or extends a video; theme has Studio write the motion. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
         {
           ...output,
           job_id: z
@@ -1295,6 +1300,7 @@ export function registerMcpRoutes(
           profile_id: z.string().min(1).optional(),
           preserve_seed: z.boolean().default(false),
           count: jobCount.default(1),
+          theme: z.enum(Object.keys(animateThemes)).optional(),
         },
         async (
           {
@@ -1307,10 +1313,16 @@ export function registerMcpRoutes(
             request,
             prompt,
             count,
+            theme,
           },
           signal,
         ) => {
           const id = resolve(job_id);
+          const animating = mode === "animate";
+          if (theme && (!animating || prompt))
+            throw new Error("theme is for mode animate without prompt. Call Reuse again.");
+          if (theme === "custom" && !request)
+            throw new Error("theme custom needs request: what should happen. Call Reuse again.");
           if (mode === "reference") {
             if (wanted || prompt || request || profile_id || preserve_seed || count > 1)
               throw new Error(
@@ -1333,24 +1345,22 @@ export function registerMcpRoutes(
             );
           const item = await media.source(owner, id, output_index);
           const own = item.type === "video" ? "video" : "image";
-          if (mode === "animate" && own === "video")
-            throw new Error("This result is already a video; call Reuse with mode again instead.");
-          const kind = mode === "animate" ? "video" : own;
-          if (preserve_seed && (kind !== own || wanted || profile_id))
+          const kind = animating ? "video" : own;
+          if (preserve_seed && (animating || wanted || profile_id))
             throw new Error(
               "preserve_seed is for a same-model revision, not animation or a model/tier change. Call Reuse again without preserve_seed.",
             );
           let plan;
           // Animating may name the video model ("grok imagine") in profile_id; naming a cloud profile asks for the cloud.
           const named =
-            kind !== own && profile_id
+            animating && profile_id
               ? namedInTier(await media.profiles("video", owner), profile_id, wanted)
               : null;
           const cloud =
             asksForCloud(request) ||
             asksForCloud(prompt) ||
             Boolean(named && isCloudProfile(named.profile));
-          if (kind !== own)
+          if (animating)
             plan = await media.animate(owner, id, output_index, item, {
               tier: wanted,
               count,
@@ -1371,7 +1381,7 @@ export function registerMcpRoutes(
           const recorded = media.promptRecord(id);
           const base = recorded?.request || item.prompt;
           const changes = [...(recorded?.changes || []), ...(request ? [request] : [])].slice(-8);
-          const moved = kind !== own || Boolean(wanted || profile_id);
+          const moved = animating || Boolean(wanted || profile_id);
           if (preserve_seed) {
             const seed = String(item.settings?.seed ?? "");
             if (!/^\d+$/.test(seed))
@@ -1385,14 +1395,18 @@ export function registerMcpRoutes(
           }
           let source = "exact";
           if (prompt) usePrompts(plan.args, { prompts: [prompt], source: "exact" }, count);
-          else if (request || (moved && writer)) {
+          else if (theme) {
+            // The viewer's Animate themes: the queue item writes the motion prompt (prompt-animate.js).
+            const write = { animate: { theme, instruction: request || "", source: item.prompt } };
+            Object.assign(plan.args, { prompts: [""], write, count });
+            source = "studio";
+          } else if (request || (moved && writer)) {
             const references = plan.args.reference_asset_ids?.length || 0;
-            const role =
-              kind !== own
-                ? "first-frame"
-                : references
-                  ? item.settings?.referenceRole || "reference"
-                  : "";
+            const role = animating
+              ? "first-frame"
+              : references
+                ? item.settings?.referenceRole || "reference"
+                : "";
             if (writer) {
               // Each job writes its own prompt as its queue item's first stage (prompt-stage.js).
               Object.assign(plan.args, { prompts: [base], write: { changes, role }, count });
@@ -1417,6 +1431,7 @@ export function registerMcpRoutes(
               ? { request: prompt }
               : { request: base, changes, styled: source !== "exact" }),
             ...(carried ? { assistant: carried } : {}),
+            parent: id,
           });
           const dropped = plan.droppedLoras?.length
             ? `Left out ${plan.droppedLoras.length === 1 ? "a LoRA" : `${plan.droppedLoras.length} LoRAs`} made for another model (${plan.droppedLoras.join(", ")}); tell the user. `
@@ -1594,23 +1609,25 @@ export function registerMcpRoutes(
       })
       .status(204)
       .end();
-  // A client probing for OAuth (the MCP auth spec's discovery) gets a plain miss, never the app page.
-  for (const route of [
-    "/.well-known/oauth-authorization-server",
-    "/.well-known/oauth-protected-resource",
-  ])
-    app.all(route, (_req, res) =>
-      res
-        .status(404)
-        .json({ error: "Studio MCP takes a bearer credential; there is no OAuth here." }),
-    );
-  // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
-  for (const route of ["/mcp", "/mcp/:token"]) {
-    app.options(route, preflight);
-    app.post(route, guard, express.json({ limit: "30mb" }), handle);
-    app.all(route, guard, (_req, res) =>
-      res.status(405).set("Allow", "POST").json({ error: "Use Streamable HTTP POST for MCP." }),
-    );
+  if (served) {
+    // A client probing for OAuth (the MCP auth spec's discovery) gets a plain miss, never the app page.
+    for (const route of [
+      "/.well-known/oauth-authorization-server",
+      "/.well-known/oauth-protected-resource",
+    ])
+      app.all(route, (_req, res) =>
+        res
+          .status(404)
+          .json({ error: "Studio MCP takes a bearer credential; there is no OAuth here." }),
+      );
+    // The same endpoint at /mcp/<token> is a full MCP URL of its own, for clients that can send no headers.
+    for (const route of ["/mcp", "/mcp/:token"]) {
+      app.options(route, preflight);
+      app.post(route, guard, express.json({ limit: "30mb" }), handle);
+      app.all(route, guard, (_req, res) =>
+        res.status(405).set("Allow", "POST").json({ error: "Use Streamable HTTP POST for MCP." }),
+      );
+    }
   }
   // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, "exports") : "";
@@ -1624,7 +1641,7 @@ export function registerMcpRoutes(
       expiresAt,
     };
   }
-  if (media && exportsDir)
+  if (exportsDir)
     app.get("/mcp/exports/:token", (req, res) => {
       try {
         if (
@@ -1652,54 +1669,85 @@ export function registerMcpRoutes(
         res.status(404).json({ error: "The export link is invalid, unavailable or expired." });
       }
     });
-  if (media)
-    app.get("/mcp/results/:token", async (req, res) => {
-      try {
-        if (
-          !allowedHost(req) &&
-          req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase()
-        )
-          throw new Error("Invalid host.");
-        const claims = media.claims(req.params.token);
-        if (claims.page || claims.all) {
-          // Account mode reads as the signed owner through MCP's loopback credential; the studio rechecks that account's access.
-          const credential = accountMode ? internalCredential(claims.owner) : undefined;
-          const html = claims.all
-            ? await media.allPage(claims, credential)
-            : await media.page(claims, credential);
-          if (!html) throw new Error("Unavailable.");
-          return res
-            .set({
-              "Cache-Control": "private, no-store",
-              "Referrer-Policy": "no-referrer",
-              "X-Content-Type-Options": "nosniff",
-              "Content-Security-Policy":
-                "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-              "Content-Type": "text/html; charset=utf-8",
-            })
-            .send(html);
-        }
-        const read = (jobId, index) =>
-          accountMode
-            ? media.signedResult(claims.owner, jobId, index)
-            : media.download(claims.owner, jobId, index);
-        const result = claims.sheet
-          ? await media.sheet(claims.sheet, read)
-          : claims.preview
-            ? await media.previewOf(await read(claims.jobId, claims.index))
-            : await read(claims.jobId, claims.index);
-        res
+  app.get("/mcp/results/:token", async (req, res) => {
+    try {
+      if (!allowedHost(req) && req.headers.host?.toLowerCase() !== parsedPublic.host.toLowerCase())
+        throw new Error("Invalid host.");
+      const claims = media.claims(req.params.token);
+      if (claims.page || claims.all) {
+        // Account mode reads as the signed owner through MCP's loopback credential; the studio rechecks that account's access.
+        const credential = accountMode ? internalCredential(claims.owner) : undefined;
+        const html = claims.all
+          ? await media.allPage(claims, credential)
+          : await media.page(claims, credential);
+        if (!html) throw new Error("Unavailable.");
+        return res
           .set({
             "Cache-Control": "private, no-store",
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": "inline",
-            "Content-Type": result.mime,
+            "Content-Security-Policy":
+              "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+            "Content-Type": "text/html; charset=utf-8",
           })
-          .send(result.content);
-      } catch {
-        res.status(404).json({ error: "The result link is invalid, unavailable or expired." });
+          .send(html);
       }
+      const read = (jobId, index) =>
+        accountMode
+          ? media.signedResult(claims.owner, jobId, index)
+          : media.download(claims.owner, jobId, index);
+      const result = claims.sheet
+        ? await media.sheet(claims.sheet, read)
+        : claims.preview
+          ? await media.previewOf(await read(claims.jobId, claims.index))
+          : await read(claims.jobId, claims.index);
+      res
+        .set({
+          "Cache-Control": "private, no-store",
+          "Referrer-Policy": "no-referrer",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Disposition": "inline",
+          "Content-Type": result.mime,
+        })
+        .send(result.content);
+    } catch {
+      res.status(404).json({ error: "The result link is invalid, unavailable or expired." });
+    }
+  });
+  /**
+   * Studio Chat's agent for one chat: the same server, instructions and tools an MCP client gets,
+   * connected in process. Its work joins the chat (`session`), the chat's earlier results get refs
+   * ("result 1") in order and its references become the owner's, so tools can use them.
+   */
+  async function agent({ owner, account, session, jobs = [], assets = [] }) {
+    if (account) media.credentials.set(owner, internalCredential(owner));
+    const conversation = `studio-chat:${session}`;
+    const refs = media.referenceScope(owner, conversation);
+    media.adopt(owner, refs, { jobs, assets });
+    const server = create({
+      scope: "media",
+      owner,
+      conversation,
+      refs,
+      session,
+      assistant: assistantGateway && (!account || mayUseFeature(account, "promptAssistant")),
+      // As for a chat gateway's linked account: administrators while Chat Gateway Admin Tools is on.
+      admin: adminScope({ account, gateway: true, gatewayAdminTools }),
     });
-  return { endWaits: () => media.endWaits() };
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "Studio Chat", version: "1.0.0" });
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const { tools } = await client.listTools();
+    return {
+      instructions: client.getInstructions() || "",
+      tools,
+      refOf: (jobId) => media.refOf(owner, refs, jobId),
+      // Prompt writing and Studio's estimate run inside a call, so it may take minutes.
+      call: (name, args, signal) =>
+        client.callTool({ name, arguments: args }, undefined, { signal, timeout: 10 * 60_000 }),
+      close: () => client.close(),
+    };
+  }
+  return { agent, endWaits: () => media.endWaits() };
 }

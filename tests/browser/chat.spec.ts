@@ -211,7 +211,12 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   expect(state.jobs).toHaveLength(0);
   await page.getByRole("textbox", { name: "Message", exact: true }).fill("Create a blue bird");
   await page.getByRole("button", { name: "Send Message", exact: true }).click();
-  await expect(page.getByText("New image", { exact: true })).toBeVisible();
+  // The reply's tool trail names what it made and opens to what the tool answered.
+  const step = page.getByRole("button", { name: /^New image/ });
+  await step.click();
+  await expect(
+    page.getByText("Queued on Test Image. Chose Test Image, the default."),
+  ).toBeVisible();
   const first = page.getByRole("article", { name: "Iteration 1", exact: true });
   await expect(first.getByText("A blue bird in soft daylight", { exact: true })).toBeVisible();
   await expect(

@@ -2358,50 +2358,31 @@ const sessionChat = new ChatService({
   // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
   taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
   session: (ownerId, id) => rewriteStore.session(ownerId, id),
-  // The LoRAs made for the selected profile's family, as the LoRA picker recommends them.
-  loras: async (ownerId, input) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (!lorasEnabled || (account && !mayUseFeature(account, "loras"))) return [];
-    const profile = await chatProfile(input);
-    if (!profile?.capabilities?.lora) return [];
-    const { info } = await loadComfyContext();
-    const infos = await loraInfos(optionsFor(info, "LoraLoader", "lora_name"));
-    return Object.entries(infos)
-      .filter(
-        ([, item]) =>
-          !["acceleration", "supporting"].includes(item?.role) &&
-          loraCompatibility(item, profile) === "fits",
-      )
-      .map(([name, item]) => {
-        const range = strengthRange(item);
-        return {
-          name,
-          title: loraName(name, item),
-          strength: range?.default ?? Math.min(Math.max(1, range?.min ?? 1), range?.max ?? 1),
-        };
-      });
-  },
-  // The account's local profiles a Chat request may name, each with its defaults as MCP generation applies them.
-  profiles: async (ownerId) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    const models = modelsForAccount(await catalogueModels(), { studioAccount: account });
-    return (models.profiles || [])
-      .filter((profile) => !isCloudProfile(profile) && profile.ready !== false)
-      .map((profile) => ({
-        id: profile.id,
-        label: profile.label || profile.id,
-        family: profile.family || "",
-        kind: profile.kind || "image",
-        input: {
-          ...profile.defaults,
-          autoUpscale: null,
-          kind: profile.kind || "image",
-          profileId: profile.id,
-          ...(profile.backend ? { profileBackend: profile.backend } : {}),
-          model: profile.model,
-          workflow: profile.workflow,
-        },
-      }));
+  // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
+  agent: (ownerId, sessionId, owned) =>
+    mcp.agent({
+      owner: ownerId,
+      account: ownerId ? accountAccessForId(ownerId) : undefined,
+      session: sessionId,
+      ...owned,
+    }),
+  results: (ownerId, sessionId) =>
+    rewriteStore.jobs(ownerId, sessionId).map((job) => ({
+      id: job.id,
+      status: job.status,
+      kind: job.input.kind,
+      profile: job.input.profileId,
+      prompt: job.input.prompt,
+    })),
+  // A text workload's model reads images as its workloads say; Bifrost's cloud models all do.
+  vision: async (modelId) => {
+    const served = (runtime?.controller.workloads || []).filter(
+      (item) =>
+        item.kind === "text" &&
+        item.model &&
+        modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1)),
+    );
+    return served.length ? served.every((item) => item.vision === true) : true;
   },
   models: async (ownerId) => {
     const settings = chatSettings();
@@ -2488,110 +2469,28 @@ const sessionChat = new ChatService({
       });
     return `data:${image.mime};base64,${image.data}`;
   },
-  admit: async ({ ownerId, sessionId, turnId, draft, revision }) => {
+  // A card revision, already checked by `revision`, runs exactly as submitted.
+  admit: async ({ ownerId, sessionId, turnId, draft }) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     if (ownerId && (!account?.authenticated || !mayUseFeature(account, "promptAssistant")))
       throw Object.assign(new Error("The prompt assistant is off for this account."), {
         status: 403,
       });
-    // Without a video model chosen in Chat's composer, Animate's own rule picks one (animate-profile.js).
-    const choosing =
-      draft.operation === "animate" &&
-      !revision &&
-      (await chatProfile(draft.input))?.kind !== "video";
-    let profile = choosing ? null : await selectedChatMediaProfile(draft.input, draft.operation);
-    let note = "";
-    const kind = draft.operation === "animate" ? "video" : "image";
-    let input = {
-      ...draft.input,
-      kind,
-      clientJobId: turnId,
-      allowFallback: draft.input.allowFallback === true,
-    };
-    let parentJobId = draft.parentJobId;
-    if (draft.operation !== "image") {
-      const parent = parentJobId
-        ? rewriteStore.job(ownerId, parentJobId)
-        : rewriteStore
-            .jobs(ownerId, sessionId)
-            .filter((job) => job.status === "completed" && job.outputs.length)
-            .at(-1);
-      if (parentJobId && !parent) throw new Error("Parent generation must belong to this chat.");
-      if (parent && parent.sessionId !== sessionId)
-        throw new Error("Parent generation must belong to this chat.");
-      parentJobId = parent?.id;
-      const references = Array.isArray(input.referenceAssets) ? input.referenceAssets : [];
-      const inheritedPrimary = parent?.input.referenceAssets?.[0]?.assetId;
-      const replaceInherited = Boolean(
-        inheritedPrimary && references[0]?.assetId === inheritedPrimary,
-      );
-      const inherit = !revision && (!references.length || replaceInherited);
-      let source;
-      if (inherit) {
-        if (parent && parent.status !== "completed")
-          throw new Error(
-            "The selected result is still rendering. Wait for it to finish before refining it.",
-          );
-        source =
-          parent &&
-          gallery.find(
-            (item) =>
-              (item.ownerId || "") === ownerId &&
-              item.status === "done" &&
-              (item.jobId === parent.id || item.upscale?.jobId === parent.id),
-          );
-        if (!source)
-          throw new Error(
-            "Choose an image result or attach a reference before asking Chat to refine or animate it.",
-          );
-      }
-      if (choosing) {
-        const choice = await animateChoice(account, {
-          width: source?.width,
-          height: source?.height,
-        });
-        profile = choice.profile;
-        note = choice.note;
-        // The composer's image settings belong to its image model, not the chosen video profile.
-        input = {
-          kind,
-          clientJobId: turnId,
-          allowFallback: input.allowFallback,
-          prompt: input.prompt,
-          profileId: profile.id,
-          model: profile.model,
-          workflow: profile.workflow,
-          referenceAssets: references,
-          ...choice.size,
-        };
-      }
-      if (inherit) {
-        const asset = referenceAssetForAccount(account, source.id, {
-          frame: source.type === "video" ? "last" : "",
-        });
-        input.referenceAssets = [
-          {
-            assetId: asset.id,
-            source: asset.source,
-            slot: profile.mediaInputs?.[0]?.id || "reference",
-          },
-          ...references.slice(replaceInherited ? 1 : 0),
-        ];
-        input.referenceRole = "edit";
-      }
-      if (revision && !references.length)
-        throw new Error("Choose a reference image before submitting a refinement or animation.");
-    }
-    const result = await admitGeneration(input, account || undefined, {
-      sessionId,
-      operation: draft.operation,
-      parentJobId,
-    });
+    const result = await admitGeneration(
+      {
+        ...draft.input,
+        kind: draft.operation === "animate" ? "video" : "image",
+        clientJobId: turnId,
+        allowFallback: draft.input.allowFallback === true,
+      },
+      account || undefined,
+      { sessionId, operation: draft.operation, parentJobId: draft.parentJobId },
+    );
     if (result.status >= 400)
       throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
         status: result.status,
       });
-    return { job: publicJob(rewriteStore.job(ownerId, result.payload.jobId)), note };
+    return { job: publicJob(rewriteStore.job(ownerId, result.payload.jobId)) };
   },
 });
 app.use(
@@ -2626,8 +2525,28 @@ async function mcpGenerationRequest(method, route, input, owner) {
       decodeURIComponent(galleryMatch[1]),
       url.searchParams.get("settings") === "1",
     );
+  const { queueSet, studioSession, ...body } = input || {};
+  // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
+  if (studioSession) {
+    const parent = studioSession.parent && rewriteStore.job(owner, studioSession.parent);
+    const parentJobId = parent?.sessionId === studioSession.id ? parent.id : undefined;
+    return admitGeneration(
+      body,
+      account,
+      {
+        sessionId: studioSession.id,
+        operation:
+          body.kind === "video"
+            ? "animate"
+            : parentJobId && body.referenceAssets?.length
+              ? "refine"
+              : "image",
+        parentJobId,
+      },
+      { priority: queuePriority.manual, queueSet },
+    );
+  }
   // External chat work queues after manual Studio requests; its set keeps it together once started.
-  const { queueSet, ...body } = input || {};
   return admitGeneration(body, account, undefined, { priority: queuePriority.mcp, queueSet });
 }
 generationQueue.start();

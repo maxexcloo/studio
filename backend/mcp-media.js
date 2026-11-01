@@ -566,6 +566,15 @@ export class McpMedia {
       ...controls,
       ...(record.assistant ? { assistant: record.assistant } : {}),
       ...(record.conversation ? { chat: { conversationId: record.conversation } } : {}),
+      // Studio Chat's work joins its chat, made from `parent` when it reuses one of its results.
+      ...(record.session
+        ? {
+            studioSession: {
+              id: record.session,
+              ...(record.parent ? { parent: record.parent } : {}),
+            },
+          }
+        : {}),
       kind: profile.kind,
       profileId: profile_id,
       // A combined profile runs on the backend a call or record named while it has it, else its current one.
@@ -612,16 +621,19 @@ export class McpMedia {
     const preparedPrompts = write ? prompts : prompts.map(styled);
     // The writing stage adds the tag line once the prompt is written (prompt-stage.js).
     const writing = (request, index) =>
-      write && {
-        kind: "request",
-        request,
-        changes: write.changes || [],
-        role: write.role || "",
-        references: reference_asset_ids.length,
-        index,
-        of: runs,
-        ...(record.styled ? { loraTags: true } : {}),
-      };
+      write &&
+      (write.animate
+        ? { kind: "animate", ...write.animate }
+        : {
+            kind: "request",
+            request,
+            changes: write.changes || [],
+            role: write.role || "",
+            references: reference_asset_ids.length,
+            index,
+            of: runs,
+            ...(record.styled ? { loraTags: true } : {}),
+          });
     // How long the set should take, asked alongside submission; it never holds up or fails the set.
     const estimate = this.runEstimate(
       owner,
@@ -859,6 +871,22 @@ export class McpMedia {
       ref: `result ${this.reference(owner, scope, jobId)}`,
       link: this.pageUrl(owner, jobId),
     };
+  }
+  /**
+   * Gives an account's own Studio jobs and references (Studio Chat's) to it here, so tools take
+   * them, and numbers the jobs in this scope in their order; anything another owner has is left.
+   */
+  adopt(owner, scope, { jobs = [], assets = [] }) {
+    for (const id of jobs) {
+      if (Object.hasOwn(this.state.jobs, id) && this.state.jobs[id] !== owner) continue;
+      this.state.jobs[id] = owner;
+      this.reference(owner, scope, id);
+    }
+    for (const id of assets)
+      this.state.assets[id] = [
+        ...new Set([...(this.state.assets[id] ? [this.state.assets[id]].flat() : []), owner]),
+      ];
+    this.save();
   }
   /** Accepts a job ID or a reference such as "result 3" from this conversation. */
   resolve(owner, scope, value) {
@@ -1237,7 +1265,7 @@ export class McpMedia {
       Object.assign(args, mcpSize(profile, { aspect: `${item.width}:${item.height}` }));
     return { profile, args };
   }
-  /** Generate arguments that animate a finished image from its first frame with the chosen video profile. */
+  /** Generate arguments that animate a finished image from its first frame, or extend a video from its last, with the chosen video profile. */
   async animate(
     owner,
     jobId,
@@ -1245,12 +1273,32 @@ export class McpMedia {
     item,
     { tier, prompt, count = 1, cloud = false, profile: named = null, note: namedNote = "" } = {},
   ) {
-    const output = await this.download(owner, jobId, index);
-    if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
-      throw new Error("Only image results can be animated.");
-    const { width, height } = await sharp(output.content, {
-      limitInputPixels: 80000000,
-    }).metadata();
+    let width, height, frame;
+    if (item.type === "video") {
+      // Extend: the video's last frame, as the viewer's Extend takes it.
+      ({ width, height } = item);
+      ({ asset: frame } = await this.request(
+        "POST",
+        "/api/reference-assets/from-gallery",
+        { galleryItemId: item.id, frame: "last" },
+        owner,
+      ));
+      if (!frame?.id || !(width > 0 && height > 0))
+        throw new Error("Studio could not take this video's last frame.");
+      this.adopt(owner, "", { assets: [frame.id] });
+    } else {
+      const output = await this.download(owner, jobId, index);
+      if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
+        throw new Error("Only image results can be animated.");
+      ({ width, height } = await sharp(output.content, {
+        limitInputPixels: 80000000,
+      }).metadata());
+      ({ asset: frame } = await this.upload(
+        owner,
+        output.content.toString("base64"),
+        `first-frame.${output.mime.split("/")[1]}`,
+      ));
+    }
     // A named profile picks the video model outright; otherwise Animate's own rule does, as in the app.
     let base = named;
     let note = namedNote;
@@ -1270,17 +1318,12 @@ export class McpMedia {
       throw new Error(
         `${base.label || base.id} takes no starting image, so it cannot animate this result. Pass tier instead, or a profile_id that takes one.`,
       );
-    const { asset } = await this.upload(
-      owner,
-      output.content.toString("base64"),
-      `first-frame.${output.mime.split("/")[1]}`,
-    );
     const profile = { ...base, ...base.imageModes?.reference };
     const args = {
       profile_id: base.id,
       prompts: [prompt || item.prompt],
       count,
-      reference_asset_ids: [asset.id],
+      reference_asset_ids: [frame.id],
     };
     const controls = mcpControls(profile);
     const size = controls.width && controls.height ? frameSize(base, width, height) : null;
