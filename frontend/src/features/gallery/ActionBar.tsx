@@ -12,7 +12,7 @@ export interface Action {
   icon: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
-  /** An on/off option (Show Upscale): a checked menu item, or a switch in a bar's own control. */
+  /** An on/off option (Show Upscale): a checked menu item. */
   checked?: boolean;
   color?: "red";
   disabled?: boolean;
@@ -29,14 +29,12 @@ export interface Action {
   menu?: ActionGroups;
   /** A line above the options, such as the model Animate runs on. */
   note?: string;
-  /** The bar's own control, for an action with a form of its own (Upscale). */
-  control?: ReactNode;
 }
 /** Groups are separated by dividers, in menus and bars alike. */
 export type ActionGroups = Action[][];
 
-/** Bar icon props, shared with custom controls (Upscale); phones keep 40px targets. */
-export function useActionIconProps() {
+/** Bar icon props; phones keep 40px targets. */
+function useActionIconProps() {
   const phone = usePhone();
   return {
     className: classes.action,
@@ -103,7 +101,6 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
   const iconProps = useActionIconProps();
   // A tooltip must not linger behind the menu its control opened.
   const [opened, setOpened] = useState(false);
-  if (action.control) return action.control;
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
   const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const props = {
