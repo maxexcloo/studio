@@ -49,8 +49,8 @@ jobs:
           path: dist
           retention-days: 1
 
-  # Pull requests run Check only; the browser suite and image build run on main, where they gate
-  # publishing and the release.
+  # Pull requests run Check only; the browser suite and image build run on main, side by side, and
+  # both gate the release.
   browser:
     name: Browser
     needs: check
@@ -60,7 +60,7 @@ jobs:
       # Every shard reports its failures; one failing shard doesn't hide the others'.
       fail-fast: false
       matrix:
-        shard: [1/4, 2/4, 3/4, 4/4]
+        shard: [1/8, 2/8, 3/8, 4/8, 5/8, 6/8, 7/8, 8/8]
     container:
       image: ${{ needs.check.outputs.browser-image }}
       options: --init --ipc=host
@@ -89,9 +89,11 @@ jobs:
           path: test-results
           retention-days: 7
 
+  # Publishes only the sha-<commit> candidate; Release tags it latest and versioned once Browser passes.
   image:
     name: Image
-    needs: [browser, check]
+    needs: check
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -114,9 +116,7 @@ jobs:
           flavor: latest=false
           images: ${{ env.IMAGE_NAME }}
           labels: org.opencontainers.image.licenses=MIT
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long,enable={{is_default_branch}}
+          tags: type=sha,format=long,enable={{is_default_branch}}
       - name: Build Image For Verification
         uses: docker/build-push-action@v7
         with:
@@ -165,7 +165,7 @@ jobs:
 
   release:
     name: Release
-    needs: image
+    needs: [browser, image]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -216,6 +216,7 @@ jobs:
           for image in "$IMAGE_NAME:sha-$GITHUB_SHA" "$worker"; do
             docker buildx imagetools create --tag "${image%%:*}:$VERSION" "$image"
           done
+          docker buildx imagetools create --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
       - name: Publish Release
         if: steps.version.outputs.version
         env:
