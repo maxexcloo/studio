@@ -174,11 +174,14 @@ primary component reference and verify APIs against the installed version.
   checklist of media to delete as well.
 - Chat retains streamed text, generation snapshots and results chronologically.
   A reply streams the model's thinking until its text starts, then keeps it collapsed
-  under Thinking, and names the media it requested. Opening a chat waits for its
-  messages and lands at the bottom once.
+  under Thinking. Its tool trail sits above its text, one quiet row per call
+  naming what it made or used ("New images (3) on …", "Editing Result 2"), with a
+  running, done or failed mark, opening to what the tool answered. Opening a chat
+  waits for its messages and lands at the bottom once.
   Assistant text appears above each input card and results below it. Discussion
-  stays text-only; explicit media requests use selected settings without model
-  fallback or an extra confirmation. Refine/Animate stage a new timeline card.
+  stays text-only; media requests run without an extra confirmation, the
+  selected settings filling only what the request leaves open. Refine/Animate
+  stage a new timeline card.
 - Editing and submitting an old card sends a structured Chat revision with its
   source job and full normalised input. The assistant sees the changed prompt,
   references, settings and LoRAs; successful admission creates a new iteration

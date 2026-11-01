@@ -1,6 +1,7 @@
-import { Alert, Group, Loader, Paper, Stack, Text } from "@mantine/core";
-import { Pencil, Wand } from "lucide-react";
-import type { ChatMessage } from "../../../../shared/chat";
+import { Alert, Button, Collapse, Group, Loader, Paper, Stack, Text } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { Check, ChevronDown, ChevronRight, Pencil, Wand, X } from "lucide-react";
+import type { ChatMessage, ChatStep } from "../../../../shared/chat";
 import { WritingStream, WritingThinking } from "../generation/PromptWriting";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GenerationCard } from "./GenerationCard";
@@ -11,6 +12,69 @@ function requestLine(operation: string, source?: number) {
   if (operation === "refine")
     return source ? `Editing iteration ${source}` : "Editing the latest image";
   return operation === "animate" ? "Animation" : "New image";
+}
+
+const titled = (value: unknown) => {
+  const text = String(value ?? "");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+/** A tool call as the trail names it: what it made or looked at, such as "New images (3)". */
+function stepLabel({ tool, input }: ChatStep) {
+  const ref = titled(input.job_id);
+  if (tool === "Generate") {
+    const prompts = Array.isArray(input.prompts) ? input.prompts.length : 1;
+    const count = prompts * (Number(input.count) || 1);
+    const what = input.kind === "video" ? "video" : "image";
+    const model = input.profile_id ? ` on ${input.profile_id}` : "";
+    return `New ${count > 1 ? `${what}s (${count})` : what}${model}${input.preview ? " (preview)" : ""}`;
+  }
+  if (tool === "Reuse")
+    return input.mode === "animate"
+      ? `Animating ${ref}${input.theme ? ` (${titled(input.theme)})` : ""}`
+      : input.mode === "reference"
+        ? `Using ${ref} as a reference`
+        : `Editing ${ref}`;
+  if (tool === "Models")
+    return input.profile_id ? `Reading ${input.profile_id}` : "Looking up models";
+  if (["Status", "Result"].includes(tool)) return `Checking ${ref}`;
+  if (tool === "Review") return `Reviewing ${ref}`;
+  if (tool === "Cancel") return `Cancelling ${ref}`;
+  return tool;
+}
+
+/** One tool call: its label and state, with what the tool answered under it once opened. */
+function Step({ step }: { step: ChatStep }) {
+  const [opened, { toggle }] = useDisclosure(false);
+  const Chevron = opened ? ChevronDown : ChevronRight;
+  const State =
+    step.status === "running" ? null : step.status === "failed" ? X : step.output ? Check : null;
+  return (
+    <Stack gap={2}>
+      <Button
+        variant="subtle"
+        color={step.status === "failed" ? "red" : "gray"}
+        size="compact-sm"
+        leftSection={<Chevron size={14} />}
+        rightSection={
+          step.status === "running" ? (
+            <Loader size={12} aria-label="Running" />
+          ) : (
+            State && <State size={14} aria-label={step.status === "failed" ? "Failed" : "Done"} />
+          )
+        }
+        aria-expanded={opened}
+        onClick={toggle}
+        style={{ alignSelf: "start" }}
+      >
+        {stepLabel(step)}
+      </Button>
+      <Collapse expanded={opened}>
+        <Text size="xs" c="dimmed" style={{ whiteSpace: "pre-wrap" }} pl="lg">
+          {step.output || "Running…"}
+        </Text>
+      </Collapse>
+    </Stack>
+  );
 }
 
 /**
@@ -56,6 +120,13 @@ export function ChatTurn({
         ) : (
           <WritingThinking writing={{ kind: "chat", thinking: message.thinking }} />
         ))}
+      {!!message.steps?.length && (
+        <Stack gap={0} aria-label="Tools">
+          {message.steps.map((step) => (
+            <Step key={step.id} step={step} />
+          ))}
+        </Stack>
+      )}
       {message.content && <AssistantMarkdown content={message.content} />}
       {message.draft && (
         <Group gap={6} c="dimmed">

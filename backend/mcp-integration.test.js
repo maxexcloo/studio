@@ -286,6 +286,7 @@ async function fixture(
         : (job.gallery ??
           (job.status === "done"
             ? job.outputs.map((output, index) => ({
+                id: `${job.id}-${index}`,
                 jobId: job.id,
                 index,
                 status: "done",
@@ -309,6 +310,15 @@ async function fixture(
     };
     assets.set(asset.id, asset);
     res.json({ asset });
+  });
+  // Extend's last frame of a gallery video.
+  app.post("/api/reference-assets/from-gallery", express.json(), (req, res) => {
+    const asset = {
+      id: `fixture-frame-${req.body.galleryItemId}-${req.body.frame}`,
+      source: "gallery",
+    };
+    assets.set(asset.id, asset);
+    res.json({ ok: true, asset });
   });
   app.get("/api/reference-assets", (_req, res) =>
     res.json({ items: [...assets.values()], hasMore: false }),
@@ -900,7 +910,8 @@ test("media and administrator credentials discover only their own friendly tools
   );
   // Review adds one read-only image tool and the requested-review rule; ordinary results remain text-only.
   assert.ok(
-    JSON.stringify(tools).length + media.getInstructions().length < 9700,
+    // Raised from 9,700 for the agent rules every client shares (choosing, variations, Animate themes).
+    JSON.stringify(tools).length + media.getInstructions().length < 10200,
     `media tool schemas and instructions exceed their context budget: ${JSON.stringify(tools).length + media.getInstructions().length}`,
   );
   await failure(admin, "Generate", { profile_id: imageProfile.id, prompts: ["A landscape"] });
@@ -3285,11 +3296,19 @@ test("Reuse animates an image from its first frame with the default first-frame 
   data(await call(client, "Reuse", { job_id: "result 1", mode: "animate", tier: "quality" }));
   assert.equal(f.submitted.at(-1).profileId, "fl-quality");
   assert.equal(f.submitted.at(-1).prompt, "A heron", "the image prompt by default");
-  // A video cannot be animated again, and another tier needs a profile in it.
+  // A video extends from its last frame; a theme has the queue item write the motion prompt.
   finish(f, "mp4");
-  const twice = await call(client, "Reuse", { job_id: "result 2", mode: "animate" });
-  assert.equal(twice.isError, true);
-  assert.match(texts(twice), /already a video; call Reuse with mode again instead/);
+  data(await call(client, "Reuse", { job_id: "result 2", mode: "animate", theme: "cinematic" }));
+  const extended = f.submitted.at(-1);
+  assert.equal(extended.kind, "video");
+  assert.match(extended.referenceAssets[0].assetId, /^fixture-frame-.+-0-last$/);
+  assert.deepEqual(extended.writing, {
+    kind: "animate",
+    theme: "cinematic",
+    instruction: "",
+    source: "The heron takes flight",
+  });
+  // Another tier needs a profile in it.
   const otherTier = await call(client, "Reuse", {
     job_id: "result 1",
     tier: "fast",

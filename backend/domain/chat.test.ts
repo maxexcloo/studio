@@ -3,7 +3,7 @@ import test from "node:test";
 import { RewriteStore } from "./store.ts";
 import { ChatStore } from "./chat-store.ts";
 import { ChatService } from "./chat.ts";
-import type { ChatDraft, ChatEvent } from "../../shared/chat.ts";
+import type { ChatEvent } from "../../shared/chat.ts";
 import type { QueueJob } from "../../shared/queue.ts";
 import fs from "node:fs";
 import os from "node:os";
@@ -85,302 +85,230 @@ test("text discussion streams and persists without submitting media; history sta
   );
   fixture.db.close();
 });
-test("explicit media tool preserves selected settings and records stable admission identity", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: '{"operation":"refine","prompt":"blue teapot"}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  const events: ChatEvent[] = [];
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "Make it blue",
-      generation: {
-        operation: "refine",
-        input: { profileId: "chosen", seed: 42, allowFallback: false },
-        parentJobId: "parent",
-      },
-    },
-    (event) => events.push(event),
-  );
-  const message = fixture.service.messages("alice", fixture.session.id)[1];
-  assert.deepEqual(message.draft?.input, {
-    profileId: "chosen",
-    seed: 42,
-    allowFallback: false,
-    prompt: "blue teapot",
-  });
-  assert.equal(message.jobId, message.id);
-  assert.equal(events.filter((event) => event.event === "generation").length, 1);
-  assert.equal(fixture.admissions.length, 1);
-  fixture.db.close();
-});
-
-test("request_media applies the number of images the user asked for", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: '{"operation":"image","prompt":"teapots","count":4}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "Make four teapots",
-      generation: { operation: "image", input: { profileId: "chosen", count: 1 } },
-    },
-    () => {},
-  );
-  assert.equal(fixture.service.messages("alice", fixture.session.id)[1].draft?.input.count, 4);
-  fixture.db.close();
-});
-
-test("several request_media calls in one turn start one generation each", async () => {
-  const call = (index: number, prompt: string) => ({
-    index,
-    function: {
-      name: "request_media",
-      arguments: JSON.stringify({ operation: "image", prompt }),
-    },
-  });
-  const fixture = setup([
-    frame({ choices: [{ delta: { tool_calls: [call(0, "at the beach")] } }] }),
-    frame({ choices: [{ delta: { tool_calls: [call(1, "in a cafe")] } }] }),
-    frame({ choices: [{ delta: { tool_calls: [call(2, "at a gym")] } }] }),
-    "data: [DONE]\n\n",
-  ]);
-  const events: ChatEvent[] = [];
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "A few variations in different settings",
-      generation: { operation: "image", input: { profileId: "chosen" } },
-    },
-    (event) => events.push(event),
-  );
-  const prompts = (fixture.admissions as { draft: { input: { prompt: string } } }[]).map(
-    (request) => request.draft.input.prompt,
-  );
-  assert.deepEqual(prompts, ["at the beach", "in a cafe", "at a gym"]);
-  assert.equal(events.filter((event) => event.event === "generation").length, 3);
-  const reply = fixture.service.messages("alice", fixture.session.id)[1];
-  assert.equal(reply.status, "completed");
-  assert.equal(reply.draft?.input.prompt, "at the beach");
-  fixture.db.close();
-});
-
-test("request_media keeps selected LoRAs and adds the ones the user named for this family", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: JSON.stringify({
-                    operation: "image",
-                    prompt: "film portrait",
-                    loras: ["grain", "Unknown Style"],
-                  }),
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  fixture.service.options.loras = async () => [
-    { name: "styles/grainscape_krea2.safetensors", title: "Grainscape", strength: 0.8 },
-    { name: "ass_v2.safetensors", title: "Ass V2", strength: 1 },
-  ];
-  const selected = { name: "ass_v2.safetensors", strength: 0.6, enabled: true };
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "Use the grain LoRA",
-      generation: { operation: "image", input: { profileId: "chosen", loras: [selected] } },
-    },
-    () => {},
-  );
-  assert.deepEqual(fixture.service.messages("alice", fixture.session.id)[1].draft?.input.loras, [
-    selected,
-    { name: "styles/grainscape_krea2.safetensors", strength: 0.8, enabled: true },
-  ]);
-  assert.match(JSON.stringify(fixture.requests[0]), /Grainscape/);
-  fixture.db.close();
-});
-
-test("request_media uses the profile the user named, else the selected one with a note", async () => {
-  const call = (index: number, profile: string) => ({
-    index,
-    function: {
-      name: "request_media",
-      arguments: JSON.stringify({ operation: "image", prompt: "a fox", profile }),
-    },
-  });
-  const fixture = setup([
-    frame({ choices: [{ delta: { tool_calls: [call(0, "kromafine turbo"), call(1, "nope")] } }] }),
-    "data: [DONE]\n\n",
-  ]);
-  const profile = (id: string, label: string) => ({
-    id,
-    label,
-    family: "kromafine",
-    kind: "image",
-    input: { profileId: id, model: `${id}.safetensors`, steps: 8 },
-  });
-  fixture.service.options.profiles = async () => [
-    profile("kromafine", "Kromafine"),
-    profile("kromafine-turbo", "Kromafine Turbo"),
-  ];
-  const reference = { assetId: "ref", slot: "reference" };
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "use kromafine turbo for a fox",
-      generation: {
-        operation: "image",
-        input: { profileId: "fibo-edit-turbo", steps: 4, referenceAssets: [reference] },
-      },
-    },
-    () => {},
-  );
-  const [first, second] = fixture.admissions as { draft: ChatDraft }[];
-  assert.deepEqual(first.draft.input, {
-    profileId: "kromafine-turbo",
-    model: "kromafine-turbo.safetensors",
-    steps: 8,
-    referenceAssets: [reference],
-    prompt: "a fox",
-  });
-  assert.equal(second.draft.input.profileId, "fibo-edit-turbo");
-  assert.match(
-    fixture.service.messages("alice", fixture.session.id)[1].content,
-    /No available profile matches "nope"/,
-  );
-  assert.match(JSON.stringify(fixture.requests[0]), /Kromafine Turbo/);
-  fixture.db.close();
-});
-test("all ten selected reference identities reach vision, media admission and later conversation context", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            content: "Using all ten references.",
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: '{"operation":"image","prompt":"Combine the references"}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  const references = Array.from({ length: 10 }, (_, index) => ({
-    assetId: `owned-${index + 1}`,
-    slot: "images",
-  }));
-  const resolved: string[] = [];
-  fixture.service.options.reference = async (owner, id) => {
-    assert.equal(owner, "alice");
-    resolved.push(id);
-    return "data:image/png;base64,fixture";
-  };
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "Combine all ten references",
-      references: references.map((reference) => reference.assetId),
-      generation: {
-        operation: "image",
-        input: { profileId: "ten-reference-profile", referenceAssets: references },
-      },
-    },
-    () => {},
-  );
-  assert.deepEqual(
-    resolved,
-    references.map((reference) => reference.assetId),
-  );
-  const first = fixture.requests[0].messages as { role: string; content: any }[];
-  assert.equal(first.at(-1)!.content.filter((part: any) => part.type === "image_url").length, 10);
-  for (const reference of references)
-    assert.ok(first[0].content.includes(JSON.stringify(reference)));
-  assert.deepEqual(
-    fixture.service.messages("alice", fixture.session.id)[1].draft!.input.referenceAssets,
-    references,
-  );
+/** Gateway answers in turn, one per model call; the last repeats. */
+function rounds(fixture: ReturnType<typeof setup>, answers: string[][]) {
+  let index = 0;
   fixture.service.options.fetchImpl = async (_url, options) => {
-    fixture.requests.push(JSON.parse(String(options?.body)));
-    return new Response(
-      frame({ choices: [{ delta: { content: "The references work together." } }] }) +
-        "data: [DONE]\n\n",
-    );
+    const body = JSON.parse(String(options?.body));
+    fixture.requests.push(body);
+    if (!body.stream)
+      return Response.json({ choices: [{ message: { content: "Teapot Session" } }] });
+    const answer = answers[Math.min(index++, answers.length - 1)];
+    return new Response(answer.join(""));
   };
+}
+const toolCall = (index: number, id: string, name: string, args: unknown) => ({
+  index,
+  id,
+  function: { name, arguments: JSON.stringify(args) },
+});
+/** A stand-in for mcp.js `agent`: its tools answer from `answers` and record each call. */
+function fakeAgent(fixture: ReturnType<typeof setup>, answers: Record<string, unknown> = {}) {
+  const calls: [string, Record<string, unknown>][] = [];
+  const owned: { jobs: string[]; assets: string[] }[] = [];
+  fixture.service.options.agent = async (_owner, _session, value) => {
+    owned.push(value);
+    return {
+      instructions: "Studio makes images and videos.",
+      tools: ["Models", "Generate", "Reuse"].map((name) => ({
+        name,
+        description: `${name} tool`,
+        inputSchema: { type: "object" },
+      })),
+      refOf: (id) => `result ${value.jobs.indexOf(id) + 1}`,
+      call: async (name, args) => {
+        calls.push([name, args]);
+        if (name === "Reuse")
+          return { isError: true, content: [{ type: "text", text: "No such result." }] };
+        return (
+          (answers[name] as never) || { content: [{ type: "text", text: `${name} answered.` }] }
+        );
+      },
+      close: async () => {},
+    };
+  };
+  return { calls, owned };
+}
+
+test("the agent calls Studio's tools in steps, reads each answer and keeps its trail in context", async () => {
+  const fixture = setup([]);
+  rounds(fixture, [
+    [
+      frame({
+        choices: [
+          {
+            delta: {
+              content: "Checking Krea first.",
+              tool_calls: [toolCall(0, "call-models", "Models", { profile_id: "krea" })],
+            },
+          },
+        ],
+      }),
+      "data: [DONE]\n\n",
+    ],
+    [
+      frame({
+        choices: [
+          {
+            delta: {
+              tool_calls: [
+                toolCall(0, "call-generate", "Generate", { prompts: ["a teapot"], count: 3 }),
+                toolCall(1, "call-reuse", "Reuse", { job_id: "result 9" }),
+                toolCall(2, "call-lost", "Upscale", {}),
+              ],
+            },
+          },
+        ],
+      }),
+      "data: [DONE]\n\n",
+    ],
+    [frame({ choices: [{ delta: { content: "Three teapots on Krea." } }] }), "data: [DONE]\n\n"],
+  ]);
+  const agent = fakeAgent(fixture, {
+    Generate: {
+      content: [{ type: "text", text: "Queued on Krea." }],
+      structuredContent: { jobs: [{ job_id: "job-a" }, { job_id: "job-b" }, { job_id: "job-c" }] },
+    },
+  });
+  fixture.service.options.results = () => [
+    { id: "earlier", status: "completed", kind: "image", prompt: "a cup" },
+  ];
+  const events: ChatEvent[] = [];
   await fixture.service.stream(
     "alice",
     fixture.session.id,
-    { content: "Explain the composition" },
-    () => {},
+    {
+      content: "Three teapots on Krea",
+      generation: { operation: "image", input: { profileId: "selected", count: 1 } },
+    },
+    (event) => events.push(event),
   );
-  // The first reply also asked for a title; only streamed requests carry the conversation.
-  const later = fixture.requests.filter((request) => request.stream)[1].messages as {
+  assert.deepEqual(agent.calls, [
+    ["Models", { profile_id: "krea" }],
+    ["Generate", { prompts: ["a teapot"], count: 3 }],
+    ["Reuse", { job_id: "result 9" }],
+  ]);
+  assert.deepEqual(agent.owned[0].jobs, ["earlier"]);
+  const reply = fixture.service.messages("alice", fixture.session.id)[1];
+  assert.equal(reply.content, "Checking Krea first.\n\nThree teapots on Krea.");
+  assert.equal(reply.jobId, "job-a");
+  assert.deepEqual(
+    reply.steps?.map(({ tool, status }) => [tool, status]),
+    [
+      ["Models", "completed"],
+      ["Generate", "completed"],
+      ["Reuse", "failed"],
+      ["Upscale", "failed"],
+    ],
+  );
+  assert.deepEqual(
+    events.flatMap((event) => (event.event === "generation" ? event.data.jobIds : [])),
+    ["job-a", "job-b", "job-c"],
+  );
+  const streamed = fixture.requests.filter((request) => request.stream);
+  assert.equal(streamed.length, 3);
+  const system = (streamed[0].messages as { content: string }[])[0].content;
+  assert.match(system, /^Studio makes images and videos\.\n\nYou are Studio Chat/);
+  assert.match(system, /only a fallback .*"profileId":"selected"/);
+  assert.match(system, /"job_id":"earlier","ref":"result 1"/);
+  assert.deepEqual(
+    (streamed[0].tools as { function: { name: string } }[]).map((tool) => tool.function.name),
+    ["Models", "Generate", "Reuse"],
+  );
+  // The last call reads every tool answer, failures included.
+  const last = streamed[2].messages as { role: string; content: string; tool_call_id?: string }[];
+  assert.deepEqual(
+    last.filter((message) => message.role === "tool").map((message) => message.content),
+    ["Models answered.", "Queued on Krea.", "No such result.", "There is no Upscale tool."],
+  );
+  // A later turn sees this reply's tool calls and answers before its text.
+  rounds(fixture, [[frame({ choices: [{ delta: { content: "Sure." } }] }), "data: [DONE]\n\n"]]);
+  await fixture.service.stream("alice", fixture.session.id, { content: "Thanks" }, () => {});
+  const later = fixture.requests.at(-1)!.messages as {
+    role: string;
+    tool_calls?: { id: string }[];
+  }[];
+  assert.deepEqual(
+    later.map((message) => message.role),
+    ["system", "user", "assistant", "tool", "tool", "tool", "tool", "assistant", "user"],
+  );
+  assert.equal(later[2].tool_calls?.length, 4);
+  fixture.db.close();
+});
+
+test("a reply's tool rounds are bounded: the last call answers without tools", async () => {
+  const fixture = setup([]);
+  rounds(fixture, [
+    [
+      frame({ choices: [{ delta: { tool_calls: [toolCall(0, "", "Models", {})] } }] }),
+      "data: [DONE]\n\n",
+    ],
+  ]);
+  const agent = fakeAgent(fixture);
+  await fixture.service.stream("alice", fixture.session.id, { content: "Keep looking" }, () => {});
+  const streamed = fixture.requests.filter((request) => request.stream);
+  assert.equal(streamed.length, 8);
+  assert.equal(agent.calls.length, 7);
+  assert.equal(streamed.at(-1)!.tool_choice, "none");
+  assert.equal(fixture.service.messages("alice", fixture.session.id)[1].status, "completed");
+  fixture.db.close();
+});
+
+test("attached references reach a model that reads images, and every model and the agent by ID", async () => {
+  for (const vision of [true, false]) {
+    const fixture = setup([
+      frame({ choices: [{ delta: { content: "Got them." } }] }),
+      "data: [DONE]\n\n",
+    ]);
+    const agent = fakeAgent(fixture);
+    const resolved: string[] = [];
+    fixture.service.options.vision = async () => vision;
+    fixture.service.options.reference = async (owner, id) => {
+      assert.equal(owner, "alice");
+      resolved.push(id);
+      return "data:image/png;base64,fixture";
+    };
+    const references = Array.from({ length: 10 }, (_, index) => `owned-${index + 1}`);
+    await fixture.service.stream(
+      "alice",
+      fixture.session.id,
+      { content: "Combine all ten references", references },
+      () => {},
+    );
+    assert.deepEqual(resolved, references, "each is checked as the owner's");
+    assert.deepEqual(agent.owned[0].assets, references);
+    const messages = fixture.requests[0].messages as { role: string; content: any }[];
+    const user = messages.at(-1)!.content;
+    assert.equal(
+      vision ? user.filter((part: any) => part.type === "image_url").length : 0,
+      vision ? 10 : 0,
+    );
+    assert.ok((vision ? user[0].text : user).includes(JSON.stringify(references)));
+    assert.equal(/can't see the attached images/.test(messages[0].content), !vision);
+    fixture.db.close();
+  }
+});
+
+test("a failed reply stays in the model's context with why it failed", async () => {
+  const fixture = setup([frame({ choices: [{ delta: { content: "Partial answer" } }] })]);
+  await assert.rejects(
+    fixture.service.stream("alice", fixture.session.id, { content: "hello" }, () => {}),
+    /disconnected/,
+  );
+  rounds(fixture, [[frame({ choices: [{ delta: { content: "Again." } }] }), "data: [DONE]\n\n"]]);
+  await fixture.service.stream("alice", fixture.session.id, { content: "Try again" }, () => {});
+  const later = fixture.requests.filter((request) => request.stream).at(-1)!.messages as {
     role: string;
     content: string;
   }[];
-  const previous = later.find((message) => message.role === "assistant")!.content;
-  for (const reference of references) assert.ok(previous.includes(JSON.stringify(reference)));
-  assert.equal(fixture.admissions.length, 1, "discussion does not create a second generation");
+  const failed = later.find((message) => message.role === "assistant")!;
+  assert.match(
+    failed.content,
+    /^Partial answer\n\nStudio context \(data\): .*"failed":"The text gateway disconnected/,
+  );
   fixture.db.close();
 });
+
 test("truncated gateway response keeps partial text failed and never submits an incomplete action", async () => {
   const fixture = setup([frame({ choices: [{ delta: { content: "Partial answer" } }] })]);
   await assert.rejects(
@@ -506,86 +434,6 @@ test("restart retains prepared action and partial text without resubmitting a ge
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
-test("media admission rejection leaves selected settings and a recoverable inline action error", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: '{"operation":"animate","prompt":"slow pan"}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  fixture.service.options.admit = async () => {
-    throw new Error("Choose a video model to animate.");
-  };
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    {
-      content: "Animate this",
-      generation: { operation: "image", input: { profileId: "image-selected" } },
-    },
-    () => {},
-  );
-  const message = fixture.service.messages("alice", fixture.session.id)[1];
-  assert.equal(message.actionError, "Choose a video model to animate.");
-  assert.equal(message.draft?.input.profileId, "image-selected");
-  assert.equal(message.status, "completed");
-  assert.ok(message.content);
-  assert.equal(message.jobId, undefined);
-  fixture.db.close();
-});
-test("an admission note, such as Animate going to Grok, joins the reply", async () => {
-  const fixture = setup([
-    frame({
-      choices: [
-        {
-          delta: {
-            tool_calls: [
-              {
-                index: 0,
-                function: {
-                  name: "request_media",
-                  arguments: '{"operation":"animate","prompt":"slow pan"}',
-                },
-              },
-            ],
-          },
-        },
-      ],
-    }),
-    "data: [DONE]\n\n",
-  ]);
-  const note = "Local video isn't running, so this runs on Grok Video.";
-  fixture.service.options.admit = async (request) => ({
-    job: { id: request.turnId, input: request.draft.input } as QueueJob,
-    note,
-  });
-  const events: ChatEvent[] = [];
-  await fixture.service.stream(
-    "alice",
-    fixture.session.id,
-    { content: "Animate this", generation: { operation: "image", input: {} } },
-    (event) => events.push(event),
-  );
-  const message = fixture.service.messages("alice", fixture.session.id)[1];
-  assert.equal(message.content, `I'll animate the selected image with these settings.\n\n${note}`);
-  assert.ok(events.some((event) => event.event === "delta" && event.data.text.endsWith(note)));
-  fixture.db.close();
-});
-
 test("HTTP Chat applies assistant policy, hides another account's session and delivers SSE", async () => {
   const fixture = setup([
     frame({ choices: [{ delta: { content: "Text reply" } }] }),
