@@ -1564,6 +1564,10 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   const f = await fixture(t);
   const client = await f.client();
   await failure(client, "Upload", { content_base64: "not-an-image", filename: "reference.png" });
+  const speck = await sharp({ create: { width: 2, height: 2, channels: 3, background: "#000" } })
+    .png()
+    .toBuffer();
+  await failure(client, "Upload", { content_base64: speck.toString("base64") });
   assert.equal(f.assets.size, 0);
   const id = jobId(await generate(client));
   const before = f.requests.length;

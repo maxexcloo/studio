@@ -1395,6 +1395,11 @@ export class McpMedia {
     }
     if (!["png", "jpeg", "webp"].includes(metadata.format))
       throw new Error("Use a PNG, JPEG or WebP reference image.");
+    // A chat model without the image's bytes tends to send a made-up few-pixel image, which a model's encoder rejects.
+    if (Math.min(metadata.width, metadata.height) < 32)
+      throw new Error(
+        "This image is only a few pixels, so it is not the real picture. For a Studio result, call Reuse with mode reference and its ref; otherwise upload the user's actual image.",
+      );
     const form = new FormData();
     form.append(
       "image",
