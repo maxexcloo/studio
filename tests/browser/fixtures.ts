@@ -743,9 +743,8 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
 
 /** Turns on Compare Upscale in the viewer's Upscale options, then closes them. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Upscale");
-  await page.getByRole("switch", { name: "Compare Upscale", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Upscale Options");
+  await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
 /** Runs a viewer action from its bar, which phones scroll sideways. */

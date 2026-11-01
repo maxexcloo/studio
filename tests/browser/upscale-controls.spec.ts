@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { fixtures, image, stamp, upscaleCapabilities } from "./fixtures";
+import { expect, test, type Page } from "@playwright/test";
+import { fixtures, image, stamp, upscaleCapabilities, viewerAction } from "./fixtures";
 import type { UpscaleRequest } from "../../shared/upscale";
 
 const source = {
@@ -19,6 +19,69 @@ const source = {
     vae: "vae.safetensors",
   },
 };
+/** Upscale's ▾ › Upscale Options…, the form with quality, size and Face Detail. */
+async function upscaleOptions(page: Page) {
+  await viewerAction(page, "Upscale Options");
+  await page.getByRole("menuitem", { name: "Upscale Options…", exact: true }).click();
+}
+
+test("Upscale queues Balanced in one click and its menu runs a quality or Face Detail directly", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({ ...source });
+  const submitted: UpscaleRequest[] = [];
+  await page.route("**/api/upscale", (route) => {
+    submitted.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: { ok: true, jobId: `upscale-${submitted.length}`, revision: 1, plan: {} },
+    });
+  });
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
+  await viewerAction(page, "Upscale");
+  await expect.poll(() => submitted.length).toBe(1);
+  expect(submitted[0]).toEqual({
+    galleryItemId: source.id,
+    quality: "balanced",
+    target: 0,
+    faceDetail: false,
+  });
+  await viewerAction(page, "Upscale Options");
+  await page.getByRole("menuitem", { name: "High", exact: true }).click();
+  await expect.poll(() => submitted.length).toBe(2);
+  expect(submitted[1]).toMatchObject({ quality: "high", faceDetail: false });
+  await viewerAction(page, "Upscale Options");
+  await page.getByRole("menuitem", { name: "Balanced with Face Detail", exact: true }).click();
+  await expect.poll(() => submitted.length).toBe(3);
+  expect(submitted[2]).toMatchObject({ quality: "balanced", faceDetail: true });
+});
+
+test("Upscale lists Face Detail and says why when the worker can't run it", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({ ...source });
+  await page.route("**/api/upscale/status*", (route) =>
+    route.fulfill({
+      json: {
+        ...upscaleCapabilities,
+        quality: "balanced",
+        faceDetail: { nodesInstalled: true, missingNodes: [], detectors: [], samModels: [] },
+      },
+    }),
+  );
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
+  await viewerAction(page, "Upscale Options");
+  await expect(
+    page.getByRole("menuitem", { name: "Balanced with Face Detail", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("Face Detail needs the worker’s face detector and Impact Pack nodes.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+});
+
 test("Upscale quality, 2K/4K size and face detail reach one submission while pending", async ({
   page,
 }) => {
@@ -59,7 +122,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-    await page.getByRole("button", { name: "Upscale", exact: true }).click();
+    await upscaleOptions(page);
     await page.getByRole("combobox", { name: "Upscale Quality", exact: true }).click();
     await page.getByRole("option", { name: "High", exact: true }).click();
     await page.getByRole("combobox", { name: /^Upscale Size/ }).click();
@@ -83,7 +146,7 @@ test("Upscale quality, 2K/4K size and face detail reach one submission while pen
     expect(submitted).toHaveLength(1);
     release();
     await expect(queue).toBeHidden();
-    await page.getByRole("button", { name: "Upscale", exact: true }).click();
+    await upscaleOptions(page);
     await page.getByRole("combobox", { name: "Upscale Quality", exact: true }).click();
     await page.getByRole("option", { name: "Fast", exact: true }).click();
     await page.getByRole("combobox", { name: /^Upscale Size/ }).click();
@@ -135,7 +198,7 @@ test("Offline workers and unavailable upscale models explain why submission is d
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await page.getByRole("button", { name: "Upscale", exact: true }).click();
+  await upscaleOptions(page);
   await expect(page.getByRole("alert")).toContainText("The selected upscale worker is offline.");
   const queue = page.getByRole("button", { name: "Queue Upscale", exact: true });
   await expect(queue).toBeDisabled();

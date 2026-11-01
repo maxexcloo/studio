@@ -19,6 +19,7 @@ import {
   Play,
   Repeat,
   RotateCw,
+  ScanFace,
   Share,
   Shuffle,
   SlidersHorizontal,
@@ -44,7 +45,7 @@ import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
-import { upscaling } from "./UpscaleControls";
+import { upscaling, useQuickUpscale } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
@@ -271,6 +272,10 @@ export function useMediaActions(
     .filter(Boolean)
     .join(" ");
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
+  const quick = useQuickUpscale(item, ready && mayUpscale);
+  const upscaleBusy = upscaling(item) || quick.queue.isPending;
+  const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
+    quick.queue.mutate({ quality, faceDetail });
   const copyDetails = () => void copyText(settingsText(), "Details");
   const actions = [
     retry,
@@ -379,21 +384,55 @@ export function useMediaActions(
     ready &&
       mayUpscale &&
       itemAction("upscale", {
+        // With an upscale, the click switches between it and the original; otherwise it runs Balanced.
         label: upscaling(item) ? "Upscaling…" : "Upscale",
-        disabled: upscaling(item) && !upscaled,
-        onClick: onUpscale,
-        menu: upscaled
-          ? [
-              [
-                {
-                  id: "upscale-new",
-                  label: "New Upscale…",
+        pressed: upscaled && Boolean(item.upscaleActive),
+        loading: upscaleBusy && !upscaled,
+        disabled: upscaled ? version.isPending : upscaleBusy,
+        onClick: upscaled
+          ? () => version.mutate(!item.upscaleActive)
+          : () => queueUpscale("balanced"),
+        note: quick.faceNote || undefined,
+        menu: [
+          [
+            ...(upscaled
+              ? [
+                  {
+                    id: "upscale-again",
+                    label: "Regenerate Upscale",
+                    icon: RotateCw,
+                    disabled: upscaleBusy,
+                    onClick: () => queueUpscale("balanced"),
+                  },
+                ]
+              : (["fast", "balanced", "high"] as const).map((quality) => ({
+                  id: `upscale-${quality}`,
+                  label: quality[0].toUpperCase() + quality.slice(1),
                   icon: ImageUpscale,
-                  disabled: upscaling(item),
-                  onClick: onUpscale,
-                },
-              ],
-              [
+                  disabled: upscaleBusy,
+                  onClick: () => queueUpscale(quality),
+                }))),
+            ...(image
+              ? [
+                  {
+                    id: "upscale-face",
+                    label: upscaled ? "Regenerate with Face Detail" : "Balanced with Face Detail",
+                    icon: ScanFace,
+                    disabled: upscaleBusy || !quick.faceDetail,
+                    onClick: () => queueUpscale("balanced", true),
+                  },
+                ]
+              : []),
+            {
+              id: "upscale-options",
+              label: "Upscale Options…",
+              icon: SlidersHorizontal,
+              disabled: upscaleBusy,
+              onClick: onUpscale,
+            },
+          ],
+          upscaled
+            ? [
                 {
                   id: "show-upscale",
                   label: "Show Upscale",
@@ -414,9 +453,9 @@ export function useMediaActions(
                       },
                     ]
                   : []),
-              ],
-            ]
-          : undefined,
+              ]
+            : [],
+        ],
       }),
     itemAction("copy", {
       onClick: copyDetails,

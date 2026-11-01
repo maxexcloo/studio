@@ -63,28 +63,38 @@ for (const kind of ["image", "video"] as const) {
     await expect(media).toHaveAttribute("src", originalUrl);
     await expect(download).toHaveAttribute("href", originalUrl);
     await expect(download).toHaveAttribute("download", `source.${originalExtension}`);
-    await viewerAction(page, "Upscale");
-    const version = page.getByRole("switch", { name: "Show Upscale", exact: true });
-    await expect(version).not.toBeChecked();
+    // With an upscale, Upscale's click switches between it and the original.
+    const version = page
+      .getByRole("dialog", { name: "Generation", exact: true })
+      .getByRole("button", { name: "Upscale", exact: true });
+    await expect(version).toHaveAttribute("aria-pressed", "false");
     await version.click();
-    await expect(version).toBeChecked();
+    await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => toggles.length).toBe(1);
     expect(toggles[0]).toEqual({ galleryItemId: item.id, active: true });
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
     await expect(download).toHaveAttribute("download", `source.${upscaleExtension}`);
-    // Upscale's options compare an image's upscale with its original.
-    const compare = page.getByRole("switch", { name: "Compare Upscale", exact: true });
+    // Its options regenerate it and compare an image's upscale with its original.
+    await viewerAction(page, "Upscale Options");
+    await expect(
+      page.getByRole("menuitem", { name: "Regenerate Upscale", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Show Upscale", exact: true })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    const compare = page.getByRole("menuitem", { name: "Compare Upscale", exact: true });
     if (kind === "image") await expect(compare).toBeVisible();
     else await expect(compare).toHaveCount(0);
+    await page.keyboard.press("Escape");
     await page.reload();
     await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
-    await viewerAction(page, "Upscale");
-    await expect(version).toBeChecked();
+    await expect(version).toHaveAttribute("aria-pressed", "true");
     await expect(media).toHaveAttribute("src", upscaleUrl);
     await expect(download).toHaveAttribute("href", upscaleUrl);
     await version.click();
-    await expect(version).not.toBeChecked();
+    await expect(version).toHaveAttribute("aria-pressed", "false");
     await expect.poll(() => toggles.length).toBe(2);
     expect(toggles[1]).toEqual({ galleryItemId: item.id, active: false });
     await expect(media).toHaveAttribute("src", originalUrl);
@@ -92,8 +102,7 @@ for (const kind of ["image", "video"] as const) {
     await expect(download).toHaveAttribute("download", `source.${originalExtension}`);
     await page.reload();
     await page.getByRole("button", { name: `Open ${kind}: ${prompt}`, exact: true }).click();
-    await viewerAction(page, "Upscale");
-    await expect(version).not.toBeChecked();
+    await expect(version).toHaveAttribute("aria-pressed", "false");
     await expect(media).toHaveAttribute("src", originalUrl);
   });
 }

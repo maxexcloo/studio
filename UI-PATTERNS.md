@@ -326,8 +326,7 @@ primary component reference and verify APIs against the installed version.
   (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
   shared item actions, sized to them; Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
-  Models, Custom Animation, Animate in Composer) and Upscale its settings with
-  Show Upscale and Compare Upscale. Details lists
+  Models, Custom Animation, Animate in Composer). Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
@@ -370,8 +369,11 @@ primary component reference and verify APIs against the installed version.
   and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
   Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
   Reference; Animate ›
-  themes, Custom Animation, Animate in Composer (Extend for videos); Upscale ›
-  Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
+  themes, Custom Animation, Animate in Composer (Extend for videos); Upscale (queues Balanced at
+  automatic size; with an upscale, switches between it and the original) ›
+  Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
+  Detail (listed even when the worker can't run it, saying why), Upscale
+  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out
