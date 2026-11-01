@@ -2412,8 +2412,11 @@ const sessionChat = new ChatService({
     const models = ((await chatGateway?.listModelDetails()) || []).filter((model) =>
       chatModelAllowed(model.id, settings.patterns),
     );
-    const workloads = runtime?.controller.workloads || [];
-    if (!models.some((model) => workloads.some((item) => item.model === model.id))) return models;
+    const workloads = (runtime?.controller.workloads || []).filter(
+      (item) =>
+        item.kind === "text" && item.model && chatModelAllowed(item.model, settings.patterns),
+    );
+    if (!workloads.length) return models;
     // Only administrators may start a stopped model, as in Settings › Workers.
     const admin = !multiUserEnabled || account?.role === "administrator";
     const phases = admin
