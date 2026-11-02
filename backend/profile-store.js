@@ -477,16 +477,34 @@ export function createGuideStore({
     store.packs = isObject(store.packs) ? { ...store.packs } : {};
     let added = 0;
     let bindings = false;
+    // A profile replaced by another (Combine Backends) keeps no binding, so the seed can't restore
+    // the ones migrate-runtime removed (combined-profiles.js).
+    let replaced = {};
+    try {
+      replaced = readJsonFile(path.join(dataDir, "workflows", ".studio-aliases.json")) || {};
+    } catch {
+      /* none */
+    }
+    const current = (name) =>
+      !(name.startsWith("custom:") && Object.hasOwn(replaced, name.slice(7)));
     if (seed) {
       for (const key of sections) {
         if (seed[key] === undefined) continue;
         if (store[key] === undefined) {
-          store[key] = structuredClone(seed[key]);
+          store[key] =
+            bindingSections.includes(key) && isObject(seed[key])
+              ? Object.fromEntries(
+                  Object.entries(structuredClone(seed[key])).filter(([name]) => current(name)),
+                )
+              : structuredClone(seed[key]);
           bindings = true;
           continue;
         }
         if (!isObject(seed[key]) || !isObject(store[key])) continue;
-        const missing = Object.keys(seed[key]).filter((name) => !Object.hasOwn(store[key], name));
+        const missing = Object.keys(seed[key]).filter(
+          (name) =>
+            !Object.hasOwn(store[key], name) && (!bindingSections.includes(key) || current(name)),
+        );
         if (!missing.length) continue;
         store[key] = {
           ...store[key],
