@@ -267,12 +267,11 @@ test("Settings rows: gateway models, vision and validated model names", async ()
   assert.deepEqual(
     [
       integration.available,
-      integration.writerModel,
       integration.models,
       integration.model.effective,
       integration.model.vision,
     ],
-    [true, "cloud/auto", ["cloud/auto", "local/auto"], "cloud/auto", true],
+    [true, ["cloud/auto", "local/auto"], "cloud/auto", true],
   );
   assert.equal(
     (await assistantIntegration({ environment: {}, engine: null, source })).available,

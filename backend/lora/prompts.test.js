@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loraPromptMetadata } from "./catalogue.js";
-import {
-  loraPromptStyle,
-  negativeUnused,
-  recommendedNegative,
-  relevantTags,
-  withLoraTags,
-  withLoraTriggers,
-} from "./prompts.js";
+import { negativeUnused, recommendedNegative, withLoraTriggers } from "./prompts.js";
 
 test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negative", () => {
   assert.deepEqual(
@@ -24,8 +17,6 @@ test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negati
     },
   );
   assert.deepEqual(loraPromptMetadata({ promptStyle: "poetic", tags: [] }), {});
-  assert.equal(loraPromptStyle({}), "natural");
-  assert.equal(loraPromptStyle({ promptStyle: "tags" }), "tags");
 });
 
 test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, unless already said", () => {
@@ -52,25 +43,6 @@ test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, 
     "glowfx, ohwx, a harbour at dusk",
   );
   assert.equal(withLoraTriggers("A harbour", [], infos), "A harbour");
-});
-
-test("tag-trained LoRAs add one short line of the tags that fit the request; natural ones add none", () => {
-  const infos = {
-    tags: { promptStyle: "tags", tags: ["film grain", "portrait", "neon sign", "rain"] },
-    natural: { tags: ["ignored"] },
-    mixed: { promptStyle: "mixed", tags: ["rain", "bokeh"] },
-  };
-  assert.deepEqual(relevantTags(infos.tags, "a rainy portrait", ""), ["portrait"]);
-  assert.deepEqual(relevantTags(infos.tags, "a cat", ""), ["film grain", "portrait", "neon sign"]);
-  assert.equal(
-    withLoraTags(
-      "A woman under a neon sign in the rain",
-      [{ name: "tags" }, { name: "natural" }, { name: "mixed" }],
-      infos,
-      "neon rain portrait",
-    ),
-    "A woman under a neon sign in the rain\nportrait",
-  );
 });
 
 test("a recommended negative fills above cfg 1 with the LoRAs’ own; optional and none never do", () => {

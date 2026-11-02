@@ -82,7 +82,6 @@ import {
   registerAssistantRoutes,
 } from "./assistant-routes.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
-import { createPromptWriter } from "./prompt-writer.js";
 import { animateProfile } from "./animate-profile.js";
 import {
   canonicalProfileId,
@@ -382,7 +381,6 @@ if (runtime) useWorkloadWorkers(runtime.controller.workloads);
 // The local text route while a local text workload runs; without a runtime, text takes the cloud route.
 const localText = runtime ? createLocalText({ controller: runtime.controller }) : undefined;
 const mcp = registerMcpRoutes(app, {
-  localText,
   dataDir,
   runtime: runtime?.controller,
   gatewayAdminTools,
@@ -400,10 +398,6 @@ const mcp = registerMcpRoutes(app, {
       .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
       .filter((job) => job.input.kind === "video")
       .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
-  taste: (owner) => {
-    const ownerId = multiUserEnabled ? owner : "";
-    return taste.writable(ownerId) ? taste.read(ownerId).summary : "";
-  },
 });
 app.use(express.json({ limit: "25mb" }));
 const cloudProvider = configuredCliProxy();
@@ -1954,16 +1948,13 @@ const upscaleQueueAdapter = createUpscaleQueueAdapter({
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
-  writer: createPromptWriter(process.env, { localText }),
   account: (ownerId) => {
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     return ownerId && !account?.authenticated ? null : account;
   },
   profiles: (account) => assistantProfiles({ studioAccount: account }),
   guide: assistantGuide,
-  loraInfos: (names) => (lorasEnabled ? loraInfos(names) : Promise.resolve({})),
   dream: () => dream,
-  taste: (ownerId) => (taste.writable(ownerId) ? taste.read(ownerId).summary : ""),
 });
 const generationAdapter = withUpscaleAdapter(
   directCloudAdapter ? routeQueueAdapters(queueAdapter, directCloudAdapter) : queueAdapter,

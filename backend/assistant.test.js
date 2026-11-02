@@ -6,10 +6,12 @@ import {
   createAssistant,
   createThinkFilter,
   draftedProfile,
+  gatewaySettings,
   preFilterLoras,
   readServerSentEvents,
   stripThinking,
   validDraftGuide,
+  writerGuide,
 } from "./assistant.js";
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
@@ -48,7 +50,7 @@ function fakeGateway(reply, { models = ["cloud/auto", "cloud/vision", "local/aut
   return { fetchImpl, calls };
 }
 
-test("settings reuse the prompt writer gateway, whose model is the cloud model", async () => {
+test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(assistantSettings({}), null);
   assert.throws(
     () => assistantSettings({ STUDIO_PROMPT_WRITER_URL: "http://x.invalid" }),
@@ -64,25 +66,58 @@ test("settings reuse the prompt writer gateway, whose model is the cloud model",
       "",
     ],
   );
-  // Local while a local text workload runs, else cloud; the administrator's model skips the writer.
+  // Local while a local text workload runs, else cloud; the administrator's model replaces both.
   const environment = gateway();
   let local = null;
   const engine = createAssistant(environment, { localText: async () => local });
   assert.deepEqual(
-    [await engine.model("writer"), await engine.model("rewrite"), await engine.supportsVision()],
-    ["cloud/auto", "cloud/auto", true],
+    [await engine.model("rewrite"), await engine.supportsVision()],
+    ["cloud/auto", true],
   );
   local = { model: "local/auto", vision: false };
   assert.deepEqual(
-    [await engine.model("writer"), await engine.model("title"), await engine.supportsVision()],
-    ["local/auto", "local/auto", false],
+    [await engine.model("title"), await engine.supportsVision()],
+    ["local/auto", false],
   );
   environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
-  assert.deepEqual(
-    [await engine.model("writer"), await engine.model("rewrite")],
-    ["local/auto", "cloud/vision"],
-  );
+  assert.equal(await engine.model("rewrite"), "cloud/vision");
   assert.equal(createAssistant({}), null);
+});
+
+test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
+  assert.equal(gatewaySettings({}), null);
+  assert.throws(
+    () => gatewaySettings({ STUDIO_PROMPT_WRITER_KEY: "fixture-key" }),
+    /needs STUDIO_PROMPT_WRITER_URL, STUDIO_PROMPT_WRITER_MODEL/,
+  );
+  const at = (url) => gateway({ STUDIO_PROMPT_WRITER_URL: url });
+  assert.throws(() => gatewaySettings(at("ftp://gateway.invalid")), /absolute HTTP\(S\) URL/);
+  assert.throws(
+    () => gatewaySettings(at("http://user:secret@gateway.invalid")),
+    /without credentials/,
+  );
+  for (const [url, endpoint] of [
+    ["http://litellm.invalid:4000", "http://litellm.invalid:4000/v1/chat/completions"],
+    ["http://litellm.invalid:4000/v1/", "http://litellm.invalid:4000/v1/chat/completions"],
+    [
+      "https://gateway.invalid/api/v1/chat/completions",
+      "https://gateway.invalid/api/v1/chat/completions",
+    ],
+  ])
+    assert.equal(gatewaySettings(at(url)).endpoint, endpoint);
+});
+
+test("the writer guide drops sources, review dates and sampling at every level", () => {
+  const guide = JSON.parse(
+    writerGuide({
+      summary: "S",
+      sources: ["x"],
+      reviewed_on: "d",
+      sampling: { steps: 8 },
+      mode: { id: "m", rules: ["R"], sources: ["y"] },
+    }),
+  );
+  assert.deepEqual(guide, { summary: "S", mode: { id: "m", rules: ["R"] } });
 });
 
 test("think blocks are stripped from whole replies and from streams split anywhere", () => {
@@ -564,9 +599,9 @@ test("chat turns reasoning off for structured calls unless the administrator cho
     await engine.chat({ model: await engine.model(call), call, messages: [] });
     return seen.calls.at(-1).body.reasoning_effort;
   };
-  assert.deepEqual([await effort("writer"), await effort("rewrite")], ["none", undefined]);
+  assert.deepEqual([await effort("describe"), await effort("rewrite")], ["none", undefined]);
   environment.STUDIO_ASSISTANT_MODEL = "cloud/vision";
-  assert.deepEqual([await effort("writer"), await effort("caption")], ["none", undefined]);
+  assert.deepEqual([await effort("describe"), await effort("caption")], [undefined, undefined]);
 });
 
 test("chat names a reply the token limit cut off", async () => {

@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The prompt assistant engine: one OpenAI-compatible adapter behind every assistant
- * operation, shared by the Studio UI routes (assistant-routes.js), MCP Generate's prompt writer
- * (prompt-writer.js) and later the MCP assistant and admin tools, so they cannot drift apart.
+ * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
+ * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
  *
- * It uses the prompt writer's gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY) and asks Bifrost
- * for a model (`model()`): the running local text workload's model, otherwise
- * STUDIO_PROMPT_WRITER_MODEL. Structured calls turn reasoning off with `reasoning_effort`
- * (`reasoningEfforts`). STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and
- * its effort for everything but MCP Generate's writer. Settings are read on every call, so a model
- * chosen in Settings applies at once.
+ * It uses the gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY) and asks Bifrost for a model
+ * (`model()`): the running local text workload's model, otherwise STUDIO_PROMPT_WRITER_MODEL.
+ * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
+ * STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and its effort.
+ * Settings are read on every call, so a model chosen in Settings applies at once.
  *
  * Every call has a timeout, strips `<think>` reasoning, and never logs prompt text. Each operation
  * has a deterministic fallback for when the model fails: the original prompt, the guide's negative,
@@ -44,13 +43,11 @@ export const reasoningEfforts = {
   guide: "none",
   loras: "none",
   negative: null,
-  pick: "none",
   profile: "none",
   rewrite: null,
   suggestions: "none",
   taste: null,
   title: null,
-  writer: "none",
 };
 const maxCandidates = 20;
 const maxExamples = 6;
@@ -467,12 +464,9 @@ export function createAssistant(
     return (await localText()) || { model: settings().cloud, vision: true };
   }
 
-  /** The administrator's model for a call, or empty; MCP Generate's writer never takes it. */
-  const chosenFor = (call) => (call === "writer" ? "" : settings().chosen);
-
-  /** The Bifrost model a call asks for: the administrator's choice, otherwise the route's. */
-  async function modelFor(call) {
-    return chosenFor(call) || (await route()).model;
+  /** The Bifrost model calls ask for: the administrator's choice, otherwise the route's. */
+  async function modelFor() {
+    return settings().chosen || (await route()).model;
   }
 
   /** Whether the route the calls take reads images. */
@@ -574,7 +568,7 @@ export function createAssistant(
       onThinking?.(text);
     };
     const timer = AbortSignal.timeout(ms ?? timeoutMs);
-    const effort = call && !chosenFor(call) ? reasoningEfforts[call] : null;
+    const effort = call && !settings().chosen ? reasoningEfforts[call] : null;
     const body = {
       model,
       messages,
