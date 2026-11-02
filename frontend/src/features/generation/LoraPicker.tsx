@@ -383,7 +383,6 @@ function LoraControls({
       onTabChange={picker.setTab}
       query={picker.query}
       onQueryChange={picker.setQuery}
-      placeholder={picker.tab === "stacks" ? "Search stacks…" : "Search LoRAs…"}
       actions={
         picker.tab === "stacks" && <SortMenu value={picker.sort} onChange={picker.setSort} />
       }
