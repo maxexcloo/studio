@@ -3,7 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { RewriteStore } from "./domain/store.ts";
+import { openDatabase } from "./persistence/runtime.ts";
+import { Store } from "./domain/store.ts";
 import { versionSources } from "./version-sources.js";
 import { isVersion, versionPromptOverlap } from "../shared/versions.ts";
 
@@ -25,7 +26,7 @@ test("a run from a result's settings is a version only with the same profile and
 test("versions regroup by recorded source after a dry run, with a backup, once", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-version-sources-"));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
-  const store = new RewriteStore(path.join(dataDir, "studio.sqlite"));
+  const store = new Store(openDatabase(path.join(dataDir, "studio.sqlite")));
   const session = store.createSession("", "Chat", {});
   const enqueue = (input, operation = "image", parent) =>
     store.enqueue("", session.id, input, operation, parent);
@@ -53,7 +54,7 @@ test("versions regroup by recorded source after a dry run, with a backup, once",
   const result = versionSources(dataDir, { apply: true });
   const backup = JSON.parse(fs.readFileSync(path.join(result.backup, "studio_queue.json"), "utf8"));
   assert.equal(backup.length, 2);
-  const after = new RewriteStore(path.join(dataDir, "studio.sqlite"));
+  const after = new Store(openDatabase(path.join(dataDir, "studio.sqlite")));
   assert.equal(after.job("", edit.id).parentItemId, "fox");
   after.db.close();
   assert.deepEqual(versionSources(dataDir).recorded, []);

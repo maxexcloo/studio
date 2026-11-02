@@ -1,7 +1,7 @@
 import type { QueueMedia } from "../../shared/queue.ts";
 import { CliProxyMedia, type CloudRequest } from "../providers/cliproxy.ts";
 import type { JobObservation, QueueAdapter } from "./queue.ts";
-import { RewriteStore, type OwnedJob } from "./store.ts";
+import { Store, type OwnedJob } from "./store.ts";
 
 interface ProviderRecord {
   state: "submitting" | "running" | "saved" | "failed" | "cancelled";
@@ -11,7 +11,7 @@ interface ProviderRecord {
   reason?: string;
 }
 interface CloudAdapterOptions {
-  store: RewriteStore;
+  store: Store;
   provider: CliProxyMedia;
   resolve(job: OwnedJob): Promise<CloudRequest>;
   saveMedia(
