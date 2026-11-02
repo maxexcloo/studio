@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from "react";
 import {
   ActionIcon,
   Badge,
@@ -88,7 +88,17 @@ function playVideo(media: HTMLVideoElement | null) {
 }
 
 /** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
-function ViewerVideo({ src, width, height }: { src: string; width?: number; height?: number }) {
+function ViewerVideo({
+  src,
+  width,
+  height,
+  swipe,
+}: {
+  src: string;
+  width?: number;
+  height?: number;
+  swipe: ReturnType<typeof useTouchSwipe>;
+}) {
   const [controls, setControls] = useState(false);
   const hide = useRef(0);
   useEffect(() => () => clearTimeout(hide.current), []);
@@ -104,14 +114,40 @@ function ViewerVideo({ src, width, height }: { src: string; width?: number; heig
       width={width}
       height={height}
       controls={controls}
+      // Generated clips are short, so they repeat like a live photo.
+      loop
       playsInline
       className={classes.video}
       onPointerMove={reveal}
-      onPointerDown={reveal}
+      onPointerDown={(event) => {
+        reveal();
+        swipe.onPointerDown(event);
+      }}
+      onPointerUp={swipe.onPointerUp}
       onFocus={reveal}
       onClick={(event) => event.stopPropagation()}
     />
   );
+}
+
+/** Touch swipes over media that has no zoom of its own: running work and videos. */
+function useTouchSwipe(swipe: (direction: SwipeDirection) => void) {
+  const start = useRef<{ id: number; x: number; y: number } | null>(null);
+  return {
+    onPointerDown(event: PointerEvent) {
+      start.current =
+        event.pointerType === "touch"
+          ? { id: event.pointerId, x: event.clientX, y: event.clientY }
+          : null;
+    },
+    onPointerUp(event: PointerEvent) {
+      const from = start.current;
+      start.current = null;
+      if (from?.id !== event.pointerId) return;
+      const direction = swipeDirection(event.clientX - from.x, event.clientY - from.y);
+      if (direction) swipe(direction);
+    },
+  };
 }
 
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
@@ -240,8 +276,8 @@ export function MediaViewer({
       if (next) setArrival({ id: next.id, from: direction === "left" ? "next" : "previous" });
     }
   }
-  // Running, failed and cancelled work takes the same touch swipes as a picture at Fit.
-  const statusSwipe = useRef<{ id: number; x: number; y: number } | null>(null);
+  // Running, failed and cancelled work and videos take the same touch swipes as a picture at Fit.
+  const touchSwipe = useTouchSwipe(swipe);
   return (
     <>
       <Modal
@@ -396,25 +432,7 @@ export function MediaViewer({
                 </Group>
               )}
               {!item.url ? (
-                <div
-                  className={classes.status}
-                  onPointerDown={(event) => {
-                    statusSwipe.current =
-                      event.pointerType === "touch"
-                        ? { id: event.pointerId, x: event.clientX, y: event.clientY }
-                        : null;
-                  }}
-                  onPointerUp={(event) => {
-                    const start = statusSwipe.current;
-                    statusSwipe.current = null;
-                    if (start?.id !== event.pointerId) return;
-                    const direction = swipeDirection(
-                      event.clientX - start.x,
-                      event.clientY - start.y,
-                    );
-                    if (direction) swipe(direction);
-                  }}
-                >
+                <div className={classes.status} {...touchSwipe}>
                   <MediaJobStatus item={item} onRetried={setReplacement} />
                 </div>
               ) : item.type === "video" ? (
@@ -423,6 +441,7 @@ export function MediaViewer({
                   src={source.url}
                   width={source.width}
                   height={source.height}
+                  swipe={touchSwipe}
                 />
               ) : compare && item.upscale?.url ? (
                 <div className={classes.comparison}>

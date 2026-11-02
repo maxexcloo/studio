@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { Profile } from "../../frontend/src/types";
 import {
   closeLoras,
@@ -573,7 +573,7 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
   await expect(viewer).toBeHidden();
 });
 
-test("Work still generating takes the same swipes as a finished image", async ({
+test("Work still generating and videos take the same swipes as a picture", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -585,39 +585,54 @@ test("Work still generating takes the same swipes as a finished image", async ({
     {
       id: "live",
       jobId: "live-job",
-      type: "image",
+      type: "video",
       status: "pending",
       prompt: "A live study",
       createdAt: stamp,
     },
     {
-      id: "done",
-      type: "image",
+      id: "clip",
+      type: "video",
       status: "done",
-      url: image,
-      thumbnailUrl: image,
-      prompt: "A finished study",
-      width: 1024,
-      height: 1024,
+      url: "/test-media/clip.mp4",
+      prompt: "A rolling wave",
+      width: 1280,
+      height: 720,
+      createdAt: stamp,
+    },
+    {
+      id: "clip-2",
+      type: "video",
+      status: "done",
+      url: "/test-media/clip-2.mp4",
+      prompt: "A breaking wave",
+      width: 1280,
+      height: 720,
       createdAt: stamp,
     },
   );
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: A live study", exact: true }).click();
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A live study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
   await expect(status).toBeVisible();
   const touch = await page.context().newCDPSession(page);
-  const box = (await status.boundingBox())!;
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-  await touch.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [{ x: x - 150, y }],
-  });
-  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await expect(viewer.getByRole("img", { name: "A finished study", exact: true })).toBeVisible();
+  async function swipeLeft(target: Locator) {
+    const box = (await target.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - 150, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  }
+  await swipeLeft(status);
+  const video = viewer.locator("video");
+  await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
+  await swipeLeft(video);
+  await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
