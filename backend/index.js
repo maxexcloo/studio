@@ -73,7 +73,7 @@ import { seedSamples } from "./profile-seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
-import { familyFromName } from "./family-catalog.js";
+import { families, familyFromName } from "./family-catalog.js";
 import {
   assistantIntegration,
   assistantSettingKeys,
@@ -1010,15 +1010,26 @@ function accountMayUseLoras(req) {
   return !req.studioAccount || mayUseFeature(req.studioAccount, "loras");
 }
 
+// Every family's display name, from the catalogue that defines the family.
+const familyLabels = Object.fromEntries(
+  Object.entries(families).map(([id, family]) => [id, family.label]),
+);
+
 app.get("/api/models", async (req, res) => {
   try {
     // MCP submissions reuse backend metadata; the studio’s rescan stays fresh.
     const { models } = await mediaModels(req.query.cached !== "1");
-    res.json(withFailing(withProfileAliases(withLibrary(modelsForAccount(models, req), req))));
+    res.json({
+      ...withFailing(withProfileAliases(withLibrary(modelsForAccount(models, req), req))),
+      familyLabels,
+    });
   } catch {
-    res.json(
-      withFailing(withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req))),
-    );
+    res.json({
+      ...withFailing(
+        withProfileAliases(withLibrary(modelsForAccount(unavailableModels(), req), req)),
+      ),
+      familyLabels,
+    });
   }
 });
 

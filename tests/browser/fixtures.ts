@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+/** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
+const familyLabels = { flux1: "Flux.1", sdxl: "SDXL" };
+
 export const stamp = "2026-10-23T00:00:00.000Z";
 /** A ready upscale worker with face detail. */
 export const upscaleCapabilities = {
@@ -207,7 +210,7 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
     if (path === "/api/models")
-      return respond({ profiles, features: { library: true, presets: true } });
+      return respond({ profiles, features: { library: true, presets: true }, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running: Animate takes the local video profile.
     if (path === "/api/animate/profile")
@@ -680,7 +683,7 @@ export async function serveProfiles(
   features?: { library: boolean; presets: boolean },
 ) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles, features } }),
+    route.fulfill({ json: { profiles, features, familyLabels } }),
   );
 }
 
