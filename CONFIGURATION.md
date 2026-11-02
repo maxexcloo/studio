@@ -1,6 +1,6 @@
 # Configuration
 
-Copy `.env.example` to `.env` when you need different ports or paths.
+Set different ports or paths in `.env` in the project folder, such as:
 
 ```bash
 HOST=127.0.0.1
