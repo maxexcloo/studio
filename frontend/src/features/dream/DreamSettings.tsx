@@ -1,17 +1,9 @@
 import { useState } from "react";
-import {
-  ActionIcon,
-  Alert,
-  Drawer,
-  NumberInput,
-  Popover,
-  Stack,
-  Switch,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Alert, Drawer, Popover, Stack, Switch, Tooltip } from "@mantine/core";
 import { Settings2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
+import { NumberSetting } from "../../ui/NumberSetting";
 import { usePhone } from "../../ui/usePhone";
 import { dreamQuery, type Dream, type DreamSettings } from "./queries";
 
@@ -33,47 +25,6 @@ export function useDreamSettings() {
   });
 }
 
-function Limit({
-  label,
-  description,
-  value,
-  min,
-  max,
-  disabled,
-  onSave,
-}: {
-  label: string;
-  description?: string;
-  value: number;
-  min: number;
-  max: number;
-  disabled?: boolean;
-  onSave: (value: number) => void;
-}) {
-  const [draft, setDraft] = useState<string | number>(value);
-  const commit = () => {
-    const next = Number(draft);
-    if (Number.isInteger(next) && next >= min && next <= max && next !== value) onSave(next);
-    else setDraft(value);
-  };
-  return (
-    <NumberInput
-      label={label}
-      description={description}
-      value={draft}
-      min={min}
-      max={max}
-      size="sm"
-      allowDecimal={false}
-      clampBehavior="strict"
-      disabled={disabled}
-      onChange={setDraft}
-      onBlur={commit}
-      onKeyDown={(event) => event.key === "Enter" && commit()}
-    />
-  );
-}
-
 function SettingsForm({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   const { settings } = dream;
@@ -92,7 +43,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         disabled={!settings.enabled}
         onChange={(event) => save.mutate({ paused: event.currentTarget.checked })}
       />
-      <Limit
+      <NumberSetting
         label="Unseen Buffer"
         description="Dream waits once this many results are unseen."
         value={settings.buffer}
@@ -100,7 +51,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         max={50}
         onSave={(buffer) => save.mutate({ buffer })}
       />
-      <Limit
+      <NumberSetting
         label="Images per Day"
         value={settings.dailyImages}
         min={0}
@@ -113,7 +64,7 @@ function SettingsForm({ dream }: { dream: Dream }) {
         checked={settings.videos}
         onChange={(event) => save.mutate({ videos: event.currentTarget.checked })}
       />
-      <Limit
+      <NumberSetting
         label="Videos per Day"
         value={settings.dailyVideos}
         min={0}

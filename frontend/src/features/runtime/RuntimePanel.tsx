@@ -257,12 +257,7 @@ export function RuntimePanel() {
   const { runtime } = status.data;
   return (
     <Stack gap="lg" aria-label="Runtime">
-      <Group gap="xs">
-        <Badge color="gray">{runtime.configured ? "Runtime Configured" : "Observe Only"}</Badge>
-        <Text size="xs" c="dimmed">
-          Automatic Control {runtime.automaticLifecycle ? "On" : "Off"}
-        </Text>
-      </Group>
+      <Badge color="gray">{runtime.configured ? "Runtime Configured" : "Observe Only"}</Badge>
       {!runtime.configured && (
         <Text size="sm" c="dimmed">
           {runtime.reason}

@@ -309,7 +309,7 @@ test("Status summarises service health and opens Workers over the current page",
   await images.click();
   await page.getByRole("option", { name: /Image Worker/ }).click();
   await expect(settings.getByText("Fixture GPU", { exact: false })).toBeVisible();
-  await expect(settings.getByText("Automatic Control Off", { exact: true })).toBeVisible();
+  await expect(settings.getByText("Observe Only", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/chat$/);
   await expectNoChatOpen(page);
@@ -344,7 +344,7 @@ test("Workers switch GPU workloads only through a reviewed preview", async ({ pa
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        automaticLifecycle: false,
+        settings: { automatic: false, parkIdleMinutes: 0 },
         pools: [{ id: "gpu", capacity: 2, used: 2 }],
         history: [
           {
@@ -447,7 +447,12 @@ test("A parked service reads as parked, and administrators start it from Status"
   );
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
-      json: { automaticLifecycle: false, pools: [], history: [], workloads: [] },
+      json: {
+        settings: { automatic: false, parkIdleMinutes: 0 },
+        pools: [],
+        history: [],
+        workloads: [],
+      },
     }),
   );
   const previews: unknown[] = [];

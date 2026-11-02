@@ -17,7 +17,6 @@ const environment = {
   STUDIO_ENV_FILE: path.join(dataDir, ".env"),
   STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
   STUDIO_DEV_PROXY_TOKEN: crypto.randomBytes(32).toString("base64url"),
-  STUDIO_RUNTIME_AUTOMATIC: "0",
   STUDIO_MULTI_USER: "0",
 };
 if (values.demo) environment.STUDIO_DEMO = "1";
