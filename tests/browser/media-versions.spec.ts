@@ -7,7 +7,7 @@ for (const kind of ["image", "video"] as const) {
   }, testInfo) => {
     test.skip(
       Boolean(testInfo.project.use.isMobile),
-      "Phones reach Download and Show Upscale under More (viewer-transitions); the versions are the same.",
+      "Phones list Download under More; the versions and Upscale toggle are the same.",
     );
     const state = await fixtures(page);
     // Native sharing replaces the row's Download on phones; this checks the downloaded version.

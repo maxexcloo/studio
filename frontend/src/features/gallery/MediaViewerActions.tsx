@@ -9,7 +9,7 @@ import type { Iteration } from "./useMediaAction";
 import classes from "./MediaViewer.module.css";
 
 // Phones keep these on the bar, in this order; the rest open from More.
-const phonePrimary = ["retry", "stop", "edit", "animate", "prompt"];
+const phonePrimary = ["retry", "stop", "edit", "animate", "prompt", "upscale"];
 
 /** The viewer's action bar: the shared item actions. */
 export function MediaViewerActions({
