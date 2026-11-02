@@ -34,6 +34,7 @@ export function verifiedBackup(
     const copy = path.join(backup, file.source);
     if (digest(file.bytes) !== file.hash)
       throw new Error(`Backup verification failed: ${file.source}`);
+    fs.mkdirSync(path.dirname(copy), { recursive: true, mode: 0o700 });
     fs.writeFileSync(copy, file.bytes, { mode: 0o600, flag: "wx" });
     if (digest(fs.readFileSync(copy)) !== file.hash)
       throw new Error(`Backup verification failed: ${file.source}`);
@@ -227,7 +228,8 @@ export function migrateGalleryRows(dataDir: string, { apply = false } = {}) {
 
 /**
  * Restores only into a separate empty directory, so a rehearsal cannot overwrite live state. The
- * uploads step's backup (uploads.js) restores the whole reference store it moved aside.
+ * uploads step's backup (uploads.js) restores the whole reference store it moved aside, and the
+ * profile prompting step's (profile/prompting-migration.js) the profile files it rewrote.
  */
 export function restoreRuntimeBackup(backup: string, destination: string) {
   if (fs.existsSync(destination) && fs.readdirSync(destination).length)
@@ -236,8 +238,11 @@ export function restoreRuntimeBackup(backup: string, destination: string) {
   fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
   for (const mapping of manifest.mappings) {
     const store = mapping.source === "reference-assets/index.json";
-    if (!store && !documents.some((name) => mapping.source === `${name}.json`))
+    const profile = /^workflows\/[a-z0-9][a-z0-9._-]*\.json$/.test(mapping.source);
+    if (!store && !profile && !documents.some((name) => mapping.source === `${name}.json`))
       throw new Error("Unsupported backup mapping");
+    if (profile)
+      fs.mkdirSync(path.join(destination, "workflows"), { recursive: true, mode: 0o700 });
     const source = path.join(backup, mapping.source);
     const bytes = fs.readFileSync(source);
     if (digest(bytes) !== mapping.hash)

@@ -220,8 +220,11 @@ export function registerMcpRoutes(
     throw new Error(
       "STUDIO_MCP_PUBLIC_URL must be an absolute HTTP(S) base URL without credentials, query or fragment.",
     );
+  // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
+  const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
   const media = new McpMedia({
     dataDir,
+    prompting,
     baseUrl,
     publicUrl: environment.STUDIO_MCP_PUBLIC_URL
       ? publicUrl
@@ -232,8 +235,6 @@ export function registerMcpRoutes(
     domainRequest,
     cloudVideoFailures,
   });
-  // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
-  const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
   const instructions = mediaInstructions;
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
@@ -628,7 +629,7 @@ export function registerMcpRoutes(
           ...record,
           ...(actor.session ? { session: actor.session } : conversation ? { conversation } : {}),
         });
-        return { queued, guide: fresh ? compactGuide(prompting(profile, true)) : "" };
+        return { queued, guide: fresh ? compactGuide(profile.prompting) : "" };
       } catch (error) {
         // A refused submission delivered no guide, so the next attempt carries it.
         if (fresh) reviewedGuides.delete(guideKey(refs, profile.id));
@@ -798,8 +799,8 @@ export function registerMcpRoutes(
             );
           const { loras, total } = mcpLoras(profile, infos, { ratings });
           const guide = full_guide
-            ? prompting(profile, true)
-            : compactGuide(prompting(profile, true), maxShownGuideCharacters);
+            ? profile.prompting
+            : compactGuide(profile.prompting, maxShownGuideCharacters);
           const detail = {
             ...Object.fromEntries(
               [

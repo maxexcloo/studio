@@ -229,14 +229,17 @@ test("a profile’s guide view, guide edits, guide versions, revert and approve"
     baseHash: versions.body.hash,
   });
   assert.deepEqual([reverted.body.pack.summary, reverted.body.meta.version], ["Edited.", 4]);
-  // Guidance in the profile's own JSON wins, and is shown as such.
-  const text = profile("Owned", { prompting: { id: "own", summary: "Own guidance." } }).replace(
+  // A profile's own prompting fields are shown with the pack they go over.
+  const text = profile("Owned", { prompting: { summary: "Own guidance." } }).replace(
     '"krea-test"',
     '"owned"',
   );
   fs.writeFileSync(path.join(userWorkflowsDir, "owned.json"), text);
   const owned = await call("GET", "/api/profiles/editable/owned/guide");
-  assert.deepEqual([owned.body.source, owned.body.owned.summary], ["owned", "Own guidance."]);
+  assert.deepEqual(
+    [owned.body.packId, owned.body.source, owned.body.own],
+    ["krea2", "family", { summary: "Own guidance." }],
+  );
   fs.rmSync(path.join(userWorkflowsDir, "owned.json"));
 });
 
