@@ -4,6 +4,7 @@
   height: 100%;
   overflow: hidden;
   touch-action: none;
+  transition: transform var(--studio-motion-duration) var(--studio-ease-enter);
 }
 .picture {
   display: block;
@@ -38,4 +39,21 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+/* A picture reached by swiping arrives from the edge it was pulled in from. */
+.zoom[data-arrive="next"] {
+  animation: arrive-next var(--studio-motion-duration) var(--studio-ease-enter);
+}
+.zoom[data-arrive="previous"] {
+  animation: arrive-previous var(--studio-motion-duration) var(--studio-ease-enter);
+}
+@keyframes arrive-next {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes arrive-previous {
+  from {
+    transform: translateX(-100%);
+  }
 }
