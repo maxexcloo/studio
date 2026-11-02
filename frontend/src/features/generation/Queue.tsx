@@ -25,14 +25,14 @@ import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
 import { WritingStream } from "./PromptWriting";
-export const terminal = new Set(["completed", "failed", "cancelled"]);
+import { terminalStatuses } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
   queryFn: () => api<{ jobs: QueueJob[] }>("/api/queue"),
   // Idle queues don't poll: every in-app submit (composer, viewer, Chat stream) invalidates this
   // query, and work started elsewhere (another tab, MCP) appears on window focus.
   refetchInterval: (query) =>
-    query.state.data?.jobs.some((job) => !terminal.has(job.status)) ? 1500 : false,
+    query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status)) ? 1500 : false,
 });
 export function useQueue() {
   return useQuery(queueQuery);
@@ -84,7 +84,7 @@ export function useQueueAction(jobId?: string) {
 }
 export function QueueJobAction({ job, compact = false }: { job: QueueJob; compact?: boolean }) {
   const action = useQueueAction(job.id);
-  if (terminal.has(job.status) && job.status !== "failed") return null;
+  if (terminalStatuses.has(job.status) && job.status !== "failed") return null;
   const retry = job.status === "failed";
   const label = retry ? "Retry" : "Stop";
   const onClick = () => action.mutate({ id: job.id, action: retry ? "retry" : "cancel" });
@@ -152,7 +152,7 @@ function QueueRow({ job }: { job: QueueJob }) {
         </Text>
         {job.status === "writing" && <WritingStream progress={progress} />}
       </Stack>
-      {!terminal.has(job.status) &&
+      {!terminalStatuses.has(job.status) &&
         (percent ? (
           <RingProgress
             size={28}
@@ -211,7 +211,7 @@ export function Queue() {
   if (!jobs.length) return <EmptyState fill>Empty Queue</EmptyState>;
   const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
     jobs.some((job) =>
-      key === "cancel-all" ? !terminal.has(job.status) : job.status === "failed",
+      key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
     ),
   );
   return (

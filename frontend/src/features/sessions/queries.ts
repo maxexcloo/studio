@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "../../api";
 import type { QueueJob, Session } from "../../types";
-import { terminal } from "../generation/Queue";
+import { terminalStatuses } from "../../../../shared/queue";
 
 /** A new chat whose generated title may still arrive (titling runs after its first reply). */
 const awaitingTitle = (session: Session) =>
@@ -20,7 +20,7 @@ export const sessionQuery = (id: string) =>
     queryKey: ["session", id],
     queryFn: () => api<{ session: Session; jobs: QueueJob[] }>(`/api/sessions/${id}`),
     refetchInterval: (query) =>
-      query.state.data?.jobs.some((job) => !terminal.has(job.status))
+      query.state.data?.jobs.some((job) => !terminalStatuses.has(job.status))
         ? 1500
         : query.state.data?.session.mcp
           ? 5000

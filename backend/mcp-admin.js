@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { mcpJson } from "./mcp-media.js";
 import { lineDiff } from "./line-diff.js";
+import { imageMimes } from "./reference-names.js";
 
 export const adminToolNames = Object.freeze([
   "Library",
@@ -343,8 +344,7 @@ export function registerAdminTools({ tool, server, media, owner, resolve, signEx
         } else {
           const jobId = resolve(job_id);
           const result = await media.download(owner, jobId, output_index);
-          if (!["image/png", "image/jpeg", "image/webp"].includes(result.mime))
-            throw new Error("Only images can be imported.");
+          if (!imageMimes.includes(result.mime)) throw new Error("Only images can be imported.");
           image = dataUrl(result.content, result.mime);
           name = `result-${jobId}`;
         }
