@@ -27,7 +27,7 @@ function gcd(a: number, b: number): number {
   return b ? gcd(b, a % b) : a;
 }
 /** The accepted video aspect ratio closest to a width and height, such as a first frame's. */
-function videoAspect(width: number, height: number): string {
+export function videoAspect(width: number, height: number): string {
   const distance = (aspect: string) => {
     const [w, h] = aspect.split(":").map(Number);
     return Math.abs(Math.log(width / height) - Math.log(w / h));
