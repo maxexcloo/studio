@@ -54,9 +54,17 @@ export function TrimVideoDialog({ item, onClose }: { item: MediaItem; onClose: (
             preload="metadata"
             style={{ width: "100%", maxHeight: "50vh", borderRadius: "var(--mantine-radius-md)" }}
             onLoadedMetadata={(event) => {
-              const ms = Math.round(event.currentTarget.duration * 1000);
+              const video = event.currentTarget;
+              // A WebM without a stored length reads as Infinity until the browser seeks to its end.
+              if (video.duration === Infinity) video.currentTime = Number.MAX_SAFE_INTEGER;
+            }}
+            onDurationChange={(event) => {
+              const video = event.currentTarget;
+              if (!Number.isFinite(video.duration) || duration) return;
+              const ms = Math.round(video.duration * 1000);
               setDuration(ms);
               setRange([0, ms]);
+              video.currentTime = 0;
             }}
           />
           <RangeSlider
