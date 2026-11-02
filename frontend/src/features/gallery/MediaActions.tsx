@@ -85,15 +85,15 @@ const definitions = {
 };
 export type ItemActionId = keyof typeof definitions;
 /**
- * The sections: Chat and Prompt first, the rest alphabetical within each. Compare shows only in
- * menus and the selection bar; Share takes Download's place where phones share.
+ * The sections: Chat and Prompt first, Star then Delete last, the rest alphabetical within each.
+ * Compare shows only in menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
   ["chat", "prompt"],
   ["animate", "edit", "retry", "stop"],
   ["compare", "upscale"],
   ["copy", "download", "share"],
-  ["delete", "star"],
+  ["star", "delete"],
 ];
 
 /** An item action with its shared label and icon. */
@@ -158,7 +158,7 @@ function useSaveFrame(item: MediaItem): Action {
     mutationFn: () =>
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
-      notifications.show({ message: "Frame saved as an image in Uploads." });
+      notifications.show({ message: "Frame saved to Uploads." });
       void cache.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
@@ -301,7 +301,7 @@ export function useMediaActions(
   const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
-  // Animate names the model that will run, or why none can, before anything queues.
+  // Animate says why no model can run before anything queues.
   const animation = useQuery({ ...animateProfileQuery(item), enabled: image });
   const cache = useQueryClient();
   const version = useMutation({
@@ -317,11 +317,7 @@ export function useMediaActions(
     (theme) => theme !== "spicy" || assistant.data?.spicy,
   );
   const animateNote = [
-    animation.error
-      ? animation.error.message
-      : animation.data
-        ? animation.data.note || `Runs on ${animation.data.label}.`
-        : "Choosing a video model…",
+    animation.error?.message,
     assistant.data && !assistant.data.available ? "Motion themes need the prompt assistant." : "",
   ]
     .filter(Boolean)
@@ -384,20 +380,6 @@ export function useMediaActions(
       itemAction("edit", {
         disabled: action.isPending,
         onClick: () => action.mutate("refine"),
-        menu: reference
-          ? [
-              [
-                {
-                  id: "edit-image",
-                  label: "Edit Image",
-                  icon: Pencil,
-                  disabled: action.isPending,
-                  onClick: () => action.mutate("refine"),
-                },
-              ],
-              [reference],
-            ]
-          : undefined,
       }),
     // A video's edits each save a new version; the original stays.
     ready &&
@@ -458,22 +440,23 @@ export function useMediaActions(
             [
               {
                 id: "prompt-composer",
-                label: "Open in Composer",
+                label: "Edit",
                 icon: SlidersHorizontal,
                 disabled: action.isPending,
                 onClick: () => action.mutate("image"),
               },
+              ...(image && reference ? [reference] : []),
             ],
             [
               {
                 id: "new-seed",
-                label: "Run Again (New Seed)",
+                label: "Run Again",
                 icon: Shuffle,
                 onClick: () => run({ kind: "regenerate" }),
               },
               {
                 id: "exact-repeat",
-                label: "Exact Repeat",
+                label: "Run Again (Same Seed)",
                 icon: Repeat,
                 onClick: () => run({ kind: "repeat" }),
               },

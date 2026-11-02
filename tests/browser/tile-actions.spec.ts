@@ -95,7 +95,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
   // The viewer's sections and order, plus Compare: Chat, Prompt | Animate, Edit | Compare,
-  // Upscale | Copy, Download | Delete, Star.
+  // Upscale | Copy, Download | Star, Delete.
   await expect(page.getByRole("menuitem")).toContainText([
     "Chat",
     "Prompt",
@@ -105,8 +105,8 @@ test("The same tile menu opens by context click and More, with keyboard navigati
     "Upscale",
     "Copy",
     /^(Download|Share Image|Prepare Share)$/,
-    "Delete",
     "Star",
+    "Delete",
   ]);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
@@ -132,12 +132,8 @@ for (const operation of ["Edit", "Animate"] as const) {
     const state = await galleryFixture(page);
     await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
     await page.getByRole("menuitem", { name: operation, exact: true }).click();
-    await page
-      .getByRole("menuitem", {
-        name: operation === "Animate" ? "Animate in Composer" : "Edit Image",
-        exact: true,
-      })
-      .click();
+    if (operation === "Animate")
+      await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
     await expect.poll(() => state.referenceRequests.length).toBe(1);
     expect(state.referenceRequests[0]).toEqual({ galleryItemId: "tile-bird" });
     // An Animate draft opens the Videos composer, an Edit draft stays in Images.
@@ -175,7 +171,6 @@ test("Edit submits the image with the profile's reference-mode settings", async 
   await page.reload();
   await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
   await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit Image", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await expandComposer(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
@@ -206,7 +201,7 @@ test("A reference placed by hand applies the profile's reference-mode settings",
   ]);
   await page.reload();
   await page.getByRole("button", { name: "More Actions for A copper bird", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
   await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
   await expect.poll(() => state.referenceRequests.length).toBe(1);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A copper bird in snow");
@@ -286,12 +281,12 @@ for (const surface of ["tile", "viewer"]) {
     await page.keyboard.press("Escape");
     if (surface === "viewer") {
       await page.getByRole("button", { name: "Open image: A copper bird", exact: true }).click();
-      await viewerAction(page, "Edit Options");
+      await viewerAction(page, "Prompt Options");
     } else {
       await page
         .getByRole("button", { name: "More Actions for A copper bird", exact: true })
         .click();
-      await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Prompt", exact: true }).click();
     }
     await page.getByRole("menuitem", { name: "Use as Reference", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
