@@ -27,7 +27,7 @@ mise run test:browser
 
 ## Running Studio
 
-The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Every verified `main` commit publishes both under a `YYYY.M.D.N` version with a [GitHub release](https://github.com/maxexcloo/studio/releases). Deploy an exact version.
+The application image is `ghcr.io/maxexcloo/studio`; GPU runtimes use `ghcr.io/maxexcloo/studio-worker`. Every verified `main` commit publishes the application under a `YYYY.M.D.N` version with a [GitHub release](https://github.com/maxexcloo/studio/releases); the worker gets that version only when it changed since the previous release, so deploying an app-only release leaves the GPU workers running. Deploy exact versions.
 
 Mount a writable Studio data directory for media and editable definitions; it is the only source of live profiles, guides and catalogue data. Configure worker URLs and server-side credentials as described in [Configuration](CONFIGURATION.md). See [worker operations](worker/README.md) and [profiles](backend/samples/README.md).
 
