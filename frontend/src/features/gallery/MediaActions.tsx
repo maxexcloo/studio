@@ -12,6 +12,7 @@ import {
   Film,
   ImageDown,
   Flame,
+  Gem,
   ImagePlus,
   ImageUpscale,
   ListChecks,
@@ -20,6 +21,7 @@ import {
   Pencil,
   PenLine,
   Play,
+  Rabbit,
   Repeat,
   Rewind,
   RotateCw,
@@ -38,7 +40,7 @@ import {
   Zap,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
 import type { MediaItem } from "../../types";
@@ -59,6 +61,7 @@ import {
   animateProfileQuery,
   animateThemes,
   mediaDraft,
+  useAnimateTier,
   useMediaAction,
   useMediaIteration,
   type AnimateTheme,
@@ -302,7 +305,13 @@ export function useMediaActions(
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
   // Animate says why no model can run before anything queues.
-  const animation = useQuery({ ...animateProfileQuery(item), enabled: image });
+  const [tier, setTier] = useAnimateTier();
+  // The menu keeps its choice while a switch between Fast and Quality loads.
+  const animation = useQuery({
+    ...animateProfileQuery(item, tier),
+    enabled: image,
+    placeholderData: keepPreviousData,
+  });
   const cache = useQueryClient();
   const version = useMutation({
     mutationFn: (active: boolean) =>
@@ -345,6 +354,15 @@ export function useMediaActions(
         loading: running === "animate" || action.isPending,
         note: animateNote,
         menu: [
+          // Fast or Quality picks the video model for the themes and the composer below.
+          (animation.data?.tiers ?? []).map((option) => ({
+            id: `animate-${option}`,
+            label: option === "fast" ? "Fast" : "Quality",
+            icon: option === "fast" ? Rabbit : Gem,
+            checked: option === tier,
+            keepOpen: true,
+            onClick: () => setTier(option),
+          })),
           themeItems(!animation.data),
           [
             {
