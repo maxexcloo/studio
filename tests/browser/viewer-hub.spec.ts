@@ -156,6 +156,24 @@ test("Run Again and Prompt draw a new seed; only Exact Repeat keeps it", async (
   await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
 });
 
+test("One key runs a viewer action: R runs again, P opens the composer", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no keyboard shortcuts.");
+  const { state, viewer } = await seed(page);
+  // The keys act through the bar's own actions, so wait for it.
+  await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  await viewer.getByRole("img", { name: "An amber bird", exact: true }).focus();
+  await page.keyboard.press("r");
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
+  await page.keyboard.press("p");
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird",
+  );
+});
+
 /** A profile with a ComfyUI and a Radiance backend that runs on `backend`, defining `defined`. */
 const combined = (backend: string, defined = ["comfyui", "radiance"]) => ({
   ...profiles[0],
@@ -531,6 +549,15 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");
+  // Opened, it also downloads as a GIF.
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await viewerAction(page, "Download Options");
+  const gif = page.getByRole("menuitem", { name: "Download as GIF", exact: true });
+  await expect(gif).toHaveAttribute(
+    "href",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
+  );
+  await expect(gif).toHaveAttribute("download", /\.gif$/);
 });
 
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
@@ -807,7 +834,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
 
 test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile settings", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "legacy-item",
@@ -831,6 +858,12 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await viewerAction(page, "Prompt");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  // Phones open the prompt in its own editor, which Done closes.
+  if (testInfo.project.use.isMobile)
+    await page
+      .getByRole("dialog", { name: "Prompt", exact: true })
+      .getByRole("button", { name: "Done", exact: true })
+      .click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
   await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();

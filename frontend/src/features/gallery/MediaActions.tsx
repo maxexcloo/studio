@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   FastForward,
+  Film,
   ImageDown,
   Flame,
   ImagePlus,
@@ -45,6 +46,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
+import { gifDownload } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { upscaling, useQuickUpscale } from "./UpscaleControls";
@@ -285,6 +287,7 @@ export function useMediaActions(
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
+  const gif = ready ? gifDownload(item) : null;
   const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
@@ -529,7 +532,12 @@ export function useMediaActions(
             keepOpen: !transfer.shareReady,
             onClick: () => void transfer.share(),
           })
-        : itemAction("download", { link: transfer.download })),
+        : itemAction("download", {
+            link: transfer.download,
+            menu: gif
+              ? [[{ id: "download-gif", label: "Download as GIF", icon: Film, link: gif }]]
+              : undefined,
+          })),
     itemAction("delete", { onClick: onDelete }),
     ready &&
       itemAction("star", {

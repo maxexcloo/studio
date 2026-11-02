@@ -108,18 +108,19 @@ test("an Extend is saved joined onto the video it continued", async (context) =>
     ]);
   clip("source-clip.mp4", "red");
   clip("extension-clip.mp4", "blue");
-  const source = {
-    id: "source-clip",
-    jobId: "source-job",
-    type: "video",
-    status: "done",
-    url: url("source-clip.mp4"),
-    createdAt: new Date().toISOString(),
-  };
+  // The source finishes as a run of its own, as it would have before being extended.
+  const sourceBody = { kind: "video", prompt: "A wave" };
+  setGallery(makePendingItems("source-job", sourceBody));
+  const [source] = await replaceGalleryJob(
+    "source-job",
+    [{ url: url("source-clip.mp4"), filename: "source-clip.mp4", type: "video" }],
+    sourceBody,
+    new Map(),
+  );
   const body = {
     kind: "video",
     prompt: "The wave rolls on",
-    referenceAssets: [{ assetId: "source-clip:last-frame", slot: "start" }],
+    referenceAssets: [{ assetId: `${source.id}:last-frame`, slot: "start" }],
   };
   setGallery([source, ...makePendingItems("extend-job", body)]);
   const [completed] = await replaceGalleryJob(

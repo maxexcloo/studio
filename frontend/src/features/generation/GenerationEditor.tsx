@@ -264,6 +264,7 @@ export function GenerationEditor({
             edit={editPrompt}
             fill={fill}
             ideas={offerIdeas}
+            submit={{ label, disabled: !!blockedReason || pending, onSubmit }}
           />
           <GenerationInputControls
             loraPicker={loraPicker}

@@ -207,3 +207,29 @@ test(
     assert.ok(Math.abs((await previews.probeVideo(partial)).durationMs - 1440) < 120);
   },
 );
+
+test("a Studio video downloads as a looping GIF", { skip: !available }, async () => {
+  const { mediaPath } = await import("./media-paths.js");
+  const file = mediaPath("gif-source.mp4", "");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  execFileSync(encoder, [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=green:size=640x360:rate=24:duration=1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    file,
+  ]);
+  const { mediaType } = await import("./media-paths.js");
+  const gif = await previews.getComfyVideoGif("gif-source.mp4", "", mediaType);
+  assert.equal(gif.subarray(0, 6).toString(), "GIF89a");
+  // Its logical screen is at most 480 pixels wide.
+  assert.equal(gif.readUInt16LE(6), 480);
+});

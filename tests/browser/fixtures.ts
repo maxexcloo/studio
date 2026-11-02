@@ -734,8 +734,11 @@ export async function openTheme(page: Page) {
 /** The gallery search box: in the toolbar on desktop, opened from its icon on phones. */
 export async function gallerySearch(scope: Page | Locator) {
   const open = scope.getByRole("button", { name: "Search Gallery", exact: true });
+  const box = scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+  // Phones show a button that opens the box; wait until the page shows either.
+  await expect(open.or(box).first()).toBeVisible();
   if (await open.isVisible()) await open.click();
-  return scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+  return box;
 }
 
 /** A labelled action in the gallery selection bar. */
