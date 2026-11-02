@@ -21,3 +21,25 @@
   padding-bottom: var(--mantine-spacing-md);
   touch-action: pan-y;
 }
+/* The status block sits above a link covering it; its own buttons (Start) stay on top. */
+.status {
+  position: relative;
+  margin-top: var(--mantine-spacing-xs);
+  padding: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-md);
+}
+.status:has(.statusLink:hover) {
+  background: var(--mantine-color-default-hover);
+}
+.status button {
+  position: relative;
+  z-index: 1;
+}
+.statusLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.statusLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+}
