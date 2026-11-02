@@ -317,6 +317,62 @@ export async function joinClips(source, extension, output, at = "last") {
   return output;
 }
 
+const seconds = (ms) => (Number(ms) / 1000).toFixed(3);
+/**
+ * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
+ * `trim` keeps `start` to `end` milliseconds.
+ */
+const videoEdits = {
+  trim: ({ start, end }) => ({
+    video: `trim=start=${seconds(start)}:end=${seconds(end)},setpts=PTS-STARTPTS`,
+    audio: `atrim=start=${seconds(start)}:end=${seconds(end)},asetpts=PTS-STARTPTS`,
+  }),
+};
+export const videoEditKinds = Object.keys(videoEdits);
+
+/** A video edit (`videoEdits`) of `source` written to `output`, keeping its sound where the edit allows. */
+export async function editClip(source, output, edit) {
+  const clip = await probeVideo(source);
+  if (!clip) throw new Error("The video couldn’t be read.");
+  const { video, audio } = videoEdits[edit.kind](edit, clip);
+  const sound = clip.audio && audio;
+  const graph = [`[0:v]${video},format=yuv420p[v]`, ...(sound ? [`[0:a]${audio}[a]`] : [])];
+  const { code, stderr, timedOut } = await queued(() =>
+    run(
+      [
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source,
+        "-filter_complex",
+        graph.join(";"),
+        "-map",
+        "[v]",
+        ...(sound ? ["-map", "[a]", "-c:a", "aac"] : ["-an"]),
+        "-c:v",
+        "libx264",
+        "-threads",
+        "2",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-movflags",
+        "+faststart",
+        output,
+      ],
+      { timeout: 600_000, low: true },
+    ),
+  );
+  if (code !== 0 || timedOut) {
+    // ffmpeg's report names server paths, so it goes to the log, not the person.
+    if (!timedOut) console.warn(`[Studio] A video edit failed: ${stderr.slice(0, 500)}`);
+    throw new Error(timedOut ? "Editing the video timed out." : "The video couldn’t be edited.");
+  }
+  return output;
+}
+
 /** A Studio video as a looping GIF to share: its first 15 seconds at 12 FPS, 480 pixels wide. */
 export async function getComfyVideoGif(filename, subfolder, type) {
   const local = localOutputFile(filename, subfolder, type);

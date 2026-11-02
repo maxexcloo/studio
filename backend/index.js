@@ -219,6 +219,7 @@ import {
   workflowSummaries,
 } from "./workflow-catalog.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
+import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 
 import {
   applyLoraOps,
@@ -1630,6 +1631,7 @@ function thumbnailCacheControl(req) {
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
+registerVideoEditRoutes(app, { store: rewriteStore });
 
 /**
  * What the deployment decides, for Settings: each value with its source

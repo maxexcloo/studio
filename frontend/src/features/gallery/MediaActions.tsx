@@ -23,6 +23,7 @@ import {
   Repeat,
   RotateCw,
   ScanFace,
+  Scissors,
   Share,
   Shuffle,
   SlidersHorizontal,
@@ -249,6 +250,7 @@ export interface MediaActionOptions {
   onCustomAnimation: () => void;
   onDelete: () => void;
   onRetried?: (jobId: string) => void;
+  onTrim: () => void;
   onUpscale?: () => void;
   onVersionChange?: (id: string, active: boolean) => void;
 }
@@ -271,6 +273,7 @@ export function useMediaActions(
     onCustomAnimation,
     onDelete,
     onRetried,
+    onTrim,
     onUpscale,
     onVersionChange,
   }: MediaActionOptions,
@@ -390,6 +393,13 @@ export function useMediaActions(
               [reference],
             ]
           : undefined,
+      }),
+    // A video's edits each save a new version; the original stays.
+    ready &&
+      item.type === "video" &&
+      itemAction("edit", {
+        note: "Each edit is saved as a new version.",
+        menu: [[{ id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim }]],
       }),
     ready &&
       itemAction("chat", {

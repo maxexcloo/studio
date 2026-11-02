@@ -258,6 +258,42 @@ export class RewriteStore {
     return job;
   }
 
+  /**
+   * A job finished outside the queue (a video edit, gallery/video-edits.js), recorded so its result
+   * joins the versions of the one it was made from. It is never scheduled.
+   */
+  recordFinished(
+    ownerId: string,
+    sessionId: string,
+    input: GenerationInput,
+    origin: { parentJobId?: string; parentItemId?: string; outputs: QueueJob["outputs"] },
+  ): OwnedJob {
+    const stamp = now();
+    const id = randomUUID();
+    const job: OwnedJob = {
+      id,
+      jobId: id,
+      ownerId,
+      resource: "studio",
+      sessionId,
+      ...(origin.parentJobId
+        ? { parentJobId: origin.parentJobId, parentItemId: origin.parentItemId }
+        : {}),
+      operation: "animate",
+      status: "completed",
+      reason: "",
+      input: { ...input, clientJobId: id },
+      items: [],
+      outputs: origin.outputs,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    this.db
+      .prepare("INSERT INTO studio_queue VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, ownerId, sessionId, stamp, job.status, JSON.stringify(job));
+    return job;
+  }
+
   jobs(ownerId?: string, sessionId?: string): OwnedJob[] {
     const clauses: string[] = [];
     const values: string[] = [];

@@ -8,6 +8,7 @@ import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
 import { UpscaleDialog } from "./UpscaleControls";
+import { TrimVideoDialog } from "./videoEdits";
 import classes from "./MediaTileActions.module.css";
 
 /** Star, Download and More over a gallery tile or Chat result; the More menu doubles as its context menu. */
@@ -27,6 +28,7 @@ export function MediaTileActions({
   const [deleting, setDeleting] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
   const [animating, setAnimating] = useState(false);
+  const [trimming, setTrimming] = useState(false);
   const favorite = useMediaFavorite(item);
   const transfer = useMediaTransfer(item, opened);
   const name = mediaTitle(item);
@@ -88,6 +90,7 @@ export function MediaTileActions({
                 onApplied={() => onOpenedChange(false)}
                 onCustomAnimation={() => setAnimating(true)}
                 onDelete={() => setDeleting(true)}
+                onTrim={() => setTrimming(true)}
                 onUpscale={() => setUpscaling(true)}
               />
             )}
@@ -111,6 +114,7 @@ export function MediaTileActions({
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
+      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>
   );
 }
