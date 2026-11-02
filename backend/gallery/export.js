@@ -6,20 +6,6 @@ import { isInside } from "../paths.js";
 import { filterVisibleGallery, gallery, outputFileCandidates } from "./store.js";
 import { recordsForRequest } from "../account-ownership.js";
 
-const crcTable = Uint32Array.from({ length: 256 }, (_, index) => {
-  let value = index;
-  for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? (value >>> 1) ^ 0xedb88320 : value >>> 1;
-  return value >>> 0;
-});
-
-/** CRC-32 of `buffer`, continuing from `previous`: zlib's native one where Node has it (20.15+, 22.2+). */
-function crc32(buffer, previous = 0) {
-  if (typeof zlib.crc32 === "function") return zlib.crc32(buffer, previous);
-  let value = (previous ^ 0xffffffff) >>> 0;
-  for (const byte of buffer) value = crcTable[(value ^ byte) & 0xff] ^ (value >>> 8);
-  return (value ^ 0xffffffff) >>> 0;
-}
-
 function dosTime(value) {
   const date = value instanceof Date ? value : new Date();
   const year = Math.max(1980, date.getFullYear());
@@ -155,7 +141,7 @@ async function measure(file) {
   try {
     for await (const chunk of fs.createReadStream(file)) {
       size += chunk.length;
-      checksum = crc32(chunk, checksum);
+      checksum = zlib.crc32(chunk, checksum);
     }
   } catch {
     return null;
@@ -183,7 +169,7 @@ export function zipBuffer(entries) {
     const headers = zipHeaders(
       entry.name,
       body.length,
-      crc32(body),
+      zlib.crc32(body),
       offset,
       dosTime(entry.date || new Date()),
     );
@@ -235,7 +221,7 @@ export async function sendGalleryExport(res, { req = null, ids = null } = {}) {
       } catch {
         continue;
       }
-      if (body) measured = { size: body.length, checksum: crc32(body) };
+      if (body) measured = { size: body.length, checksum: zlib.crc32(body) };
       if (!measured || measured.size >= MAX32) continue;
       const headers = zipHeaders(
         entry.name,

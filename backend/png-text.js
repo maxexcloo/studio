@@ -13,25 +13,6 @@ const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 // A text chunk bigger than this is not a prompt; skip it rather than load it.
 const maxTextChunk = 4 * 1024 * 1024;
 
-const crcTable = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n += 1) {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(...buffers) {
-  let crc = 0xffffffff;
-  for (const buffer of buffers) {
-    for (let index = 0; index < buffer.length; index += 1)
-      crc = crcTable[(crc ^ buffer[index]) & 0xff] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
 function isPng(buffer) {
   return Buffer.isBuffer(buffer) && buffer.length >= 8 && buffer.subarray(0, 8).equals(signature);
 }
@@ -113,7 +94,7 @@ function chunk(type, data) {
   head.writeUInt32BE(data.length, 0);
   head.write(type, 4, "latin1");
   const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(head.subarray(4, 8), data), 0);
+  crc.writeUInt32BE(zlib.crc32(data, zlib.crc32(head.subarray(4, 8))), 0);
   return Buffer.concat([head, data, crc]);
 }
 
