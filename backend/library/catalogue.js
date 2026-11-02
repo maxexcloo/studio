@@ -106,7 +106,6 @@ function rawFromEdit(edit = {}) {
     "note",
     "guidance",
     "role",
-    "promptStyle",
     "negative",
     "uncensored",
     "type",
@@ -142,7 +141,6 @@ const editableFields = new Set([
   "role",
   "triggers",
   "strength",
-  "promptStyle",
   "tags",
   "negative",
   "description",
@@ -199,11 +197,6 @@ function cleanCataloguePatch(patch, { provenance = false } = {}) {
         if (!["effect", "acceleration", "supporting"].includes(value))
           throw new Error("role must be effect, acceleration or supporting.");
         clean.role = value;
-        break;
-      case "promptStyle":
-        if (!["tags", "natural", "mixed"].includes(value))
-          throw new Error("promptStyle must be tags, natural or mixed.");
-        clean.promptStyle = value;
         break;
       case "strength": {
         if (!isObject(value)) throw new Error("strength is {default, min, max}.");
@@ -329,6 +322,8 @@ export function createCatalogueStore({
     } catch {
       state = empty();
     }
+    // Entries derive from the layers and edits, so a saved field Studio no longer keeps drops out.
+    rebuild(state);
     return state;
   }
 
@@ -343,7 +338,10 @@ export function createCatalogueStore({
         if (!safeKey(folder, name) || !isObject(fields)) continue;
         // A backup fills missing entries; an existing Studio entry remains authoritative.
         if (current.entries[key] && !current.layers.definitions[key]) continue;
-        layer[key] = cleanCataloguePatch(fields);
+        // An export may carry fields Studio no longer keeps; they are dropped.
+        layer[key] = cleanCataloguePatch(
+          Object.fromEntries(Object.entries(fields).filter(([field]) => editableFields.has(field))),
+        );
       }
     } else if (name === "seed" || name === "admin") {
       if (!isObject(value)) return null;
@@ -458,9 +456,6 @@ export function createCatalogueStore({
                 .map((part) => [part, range[part]]),
             )
           : {}),
-      ...(pick("promptStyle", local.promptStyle)
-        ? { promptStyle: pick("promptStyle", local.promptStyle) }
-        : {}),
       ...((fields.tags || list(local.tags, 10, 80)).length
         ? { tags: fields.tags || list(local.tags, 10, 80) }
         : {}),

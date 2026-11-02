@@ -25,7 +25,6 @@ function fixture(t) {
       note: "Strength 0.7",
       sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
       tags: ["a", "b"],
-      promptStyle: "tags",
     },
     "seed-only.safetensors": { title: "Seed Only", baseModel: "Krea 2" },
   });
@@ -251,7 +250,6 @@ test("the LoRA view keeps the older shapes, with Studio’s edits applied", (t) 
     note: "Strength 0.7",
     sourceUrl: "https://civitai.red/models/1",
     tags: ["a", "b"],
-    promptStyle: "tags",
     strengthRange: { min: 0, max: 1, step: 0.05, default: 0.5 },
   });
   assert.equal(catalogue["seed-only.safetensors"].title, "Seed Only");

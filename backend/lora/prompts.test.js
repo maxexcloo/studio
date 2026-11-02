@@ -3,20 +3,18 @@ import test from "node:test";
 import { loraPromptMetadata } from "./catalogue.js";
 import { negativeUnused, recommendedNegative, withLoraTriggers } from "./prompts.js";
 
-test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negative", () => {
+test("the catalogue keeps up to ten LoRA tags and its own negative", () => {
   assert.deepEqual(
     loraPromptMetadata({
-      promptStyle: "mixed",
       tags: [" a ", "", 3, ...Array.from({ length: 12 }, (_, i) => `t${i}`)],
       negative: " smudge ",
     }),
     {
-      promptStyle: "mixed",
       tags: ["a", "t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"],
       negative: "smudge",
     },
   );
-  assert.deepEqual(loraPromptMetadata({ promptStyle: "poetic", tags: [] }), {});
+  assert.deepEqual(loraPromptMetadata({ tags: [] }), {});
 });
 
 test("enabled LoRAs’ trigger words lead the prompt in stack order, once each, unless already said", () => {
