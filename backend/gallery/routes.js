@@ -9,20 +9,20 @@ import {
   cleanupGalleryState,
   pageGallery,
   galleryRevisionValue,
-} from "./gallery-store.js";
-import { galleryFilter, setGalleryFavorites } from "./gallery-store.js";
-import { galleryTime } from "./gallery-order.js";
-import { jobs } from "./jobs.js";
-import { exportFilename, sendGalleryExport } from "./gallery-export.js";
+} from "./store.js";
+import { galleryFilter, setGalleryFavorites } from "./store.js";
+import { galleryTime } from "./order.js";
+import { jobs } from "../jobs.js";
+import { exportFilename, sendGalleryExport } from "./export.js";
 import {
   recordBelongsToRequest,
   recordBelongsToAccount,
   recordsForRequest,
-} from "./account-ownership.js";
-import { mayUseFeature } from "./account-policy.js";
-import { galleryAspects, gallerySizeBands, otherAspect } from "./gallery-filters.js";
-import { canonicalProfileId } from "./profile/store.js";
-import { requireAdmin } from "./route-access.js";
+} from "../account-ownership.js";
+import { mayUseFeature } from "../account-policy.js";
+import { galleryAspects, gallerySizeBands, otherAspect } from "./filters.js";
+import { canonicalProfileId } from "../profile/store.js";
+import { requireAdmin } from "../route-access.js";
 
 function requireGalleryAccess(req, res) {
   if (!req.studioAccount || mayUseFeature(req.studioAccount, "gallery")) return true;

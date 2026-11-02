@@ -9,7 +9,7 @@ import { hasMigration, runtimeDatabase, withOfflineDatabase } from "./persistenc
 
 /**
  * An uploaded image is a gallery image marked `uploaded`, owned by the uploader and kept in their
- * media folder. Uploads stay out of the gallery until its Uploads filter is on (gallery-store.js
+ * media folder. Uploads stay out of the gallery until its Uploads filter is on (gallery/store.js
  * pageGallery), and Dream never takes them (domain/dream.ts). The item's id is the upload's own,
  * so a reference saved with that id keeps resolving. Both a new upload (references.js) and the
  * migrate-runtime step below build the record here.

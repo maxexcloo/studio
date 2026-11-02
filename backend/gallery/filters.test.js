@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { matchesGalleryFilters } from "./gallery-filters.js";
+import { matchesGalleryFilters } from "./filters.js";
 
 const item = {
   model: "flux.safetensors",
@@ -42,7 +42,7 @@ test("pending jobs remain visible while filtering completed media", () => {
 });
 
 test("size bands follow the long edge without overlap, and aspect ratios snap within 4%", async () => {
-  const { aspectOf, matchesGalleryFilters, sizeBandOf } = await import("./gallery-filters.js");
+  const { aspectOf, matchesGalleryFilters, sizeBandOf } = await import("./filters.js");
   const item = (width, height, extra = {}) => ({ status: "done", width, height, ...extra });
   assert.deepEqual(
     [1024, 1025, 1536, 1537, 2048, 2049].map((edge) => sizeBandOf(item(edge, 512))),
@@ -74,7 +74,7 @@ test("size bands follow the long edge without overlap, and aspect ratios snap wi
 });
 
 test("a filter with several values matches any of them, and filters still combine", async () => {
-  const { filterValues, hasGalleryFilters } = await import("./gallery-filters.js");
+  const { filterValues, hasGalleryFilters } = await import("./filters.js");
   assert.equal(matchesGalleryFilters(item, { model: ["sdxl", "flux"] }), true);
   assert.equal(matchesGalleryFilters(item, { model: ["sdxl", "wan"] }), false);
   assert.equal(

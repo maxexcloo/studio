@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { compareGalleryItems } from "./gallery-order.js";
+import { compareGalleryItems } from "./order.js";
 
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-order-"));
 process.env.STUDIO_DATA_DIR = scratch;
-const { pageGallery, setGallery, sortGallery } = await import("./gallery-store.js");
+const { pageGallery, setGallery, sortGallery } = await import("./store.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const item = (id, createdAt, extra = {}) => ({

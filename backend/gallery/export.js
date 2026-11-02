@@ -1,10 +1,10 @@
 import fs from "node:fs";
-import { isMediaUrl, mediaRoot } from "./media-paths.js";
+import { isMediaUrl, mediaRoot } from "../media-paths.js";
 import path from "node:path";
 import zlib from "node:zlib";
-import { isInside } from "./paths.js";
-import { filterVisibleGallery, gallery, outputFileCandidates } from "./gallery-store.js";
-import { recordsForRequest } from "./account-ownership.js";
+import { isInside } from "../paths.js";
+import { filterVisibleGallery, gallery, outputFileCandidates } from "./store.js";
+import { recordsForRequest } from "../account-ownership.js";
 
 const crcTable = Uint32Array.from({ length: 256 }, (_, index) => {
   let value = index;

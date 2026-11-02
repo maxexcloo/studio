@@ -22,7 +22,7 @@ import {
   galleryRevisionValue,
   storedChatRecord,
   storedWritingRecord,
-} from "./gallery-store.js";
+} from "./gallery/store.js";
 import { recordPrompt } from "./prompt-history.js";
 import { jobs, runJob, runMockJob } from "./jobs.js";
 import { getCustomWorkflow } from "./custom-workflows.js";

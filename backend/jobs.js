@@ -4,7 +4,7 @@ import {
   removeComfyFiles,
   temporaryInputFiles,
 } from "./media-store.js";
-import { flushGalleryStrict } from "./gallery-store.js";
+import { flushGalleryStrict } from "./gallery/store.js";
 import { withComfyBackend } from "./comfy/backends.js";
 import { defaultWorkerId } from "./workers.js";
 import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
@@ -19,7 +19,7 @@ import {
   replaceGalleryJob,
   updateGalleryJob,
   updateGalleryJobPreviews,
-} from "./gallery-store.js";
+} from "./gallery/store.js";
 import { forgetComfyRun } from "./comfy/traces.js";
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
 import { writeCivitaiParameters } from "./civitai/civitai.js";

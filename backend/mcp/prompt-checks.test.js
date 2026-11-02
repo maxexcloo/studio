@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { exactPromptInstructions, fullBodyPerson } from "./mcp-prompt-checks.js";
+import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
 
 test("a full-body or wide shot of a person counts; portraits and empty scenes do not", () => {
   for (const prompt of [

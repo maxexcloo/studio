@@ -10,7 +10,7 @@ import {
   gallery,
   importedImageFile,
   setGallery,
-} from "./gallery-store.js";
+} from "./gallery/store.js";
 import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { presetsEnabled } from "./features.js";

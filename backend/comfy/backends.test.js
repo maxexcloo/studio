@@ -27,7 +27,7 @@ process.env.STUDIO_DATA_DIR = temporary;
 writeTestWorkflows(temporary);
 const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
-const store = await import("../gallery-store.js");
+const store = await import("../gallery/store.js");
 const { cancelPrompt } = await import("./queue.js");
 
 test.after(async () => {
