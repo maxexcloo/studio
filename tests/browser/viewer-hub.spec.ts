@@ -156,6 +156,24 @@ test("Run Again and Prompt draw a new seed; only Exact Repeat keeps it", async (
   await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
 });
 
+test("One key runs a viewer action: R runs again, P opens the composer", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no keyboard shortcuts.");
+  const { state, viewer } = await seed(page);
+  // The keys act through the bar's own actions, so wait for it.
+  await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  await viewer.getByRole("img", { name: "An amber bird", exact: true }).focus();
+  await page.keyboard.press("r");
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
+  await page.keyboard.press("p");
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird",
+  );
+});
+
 /** A profile with a ComfyUI and a Radiance backend that runs on `backend`, defining `defined`. */
 const combined = (backend: string, defined = ["comfyui", "radiance"]) => ({
   ...profiles[0],
