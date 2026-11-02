@@ -8,7 +8,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import { hostAllowed } from "./request-guard.js";
+import { hostAllowed } from "../request-guard.js";
 import {
   closest,
   listedControls,
@@ -16,7 +16,7 @@ import {
   mcpGenerationCount,
   mcpLoras,
   mcpSize,
-} from "./mcp-controls.js";
+} from "./controls.js";
 import {
   McpMedia,
   assertJobCount,
@@ -24,9 +24,9 @@ import {
   mcpJson,
   mcpOutputPath,
   replyRule,
-} from "./mcp-media.js";
-import { exactPromptInstructions, fullBodyPerson } from "./mcp-prompt-checks.js";
-import { canonicalProfileId, livePrompting } from "./profile/store.js";
+} from "./media.js";
+import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
+import { canonicalProfileId, livePrompting } from "../profile/store.js";
 import {
   asksForCloud,
   familyMatches,
@@ -44,15 +44,15 @@ import {
   searchProfiles,
   tierOf,
   withinFamily,
-} from "./mcp-tiers.js";
-import { createPromptWriter } from "./prompt-writer.js";
-import { animateThemes } from "./prompt-animate.js";
-import { gatewaySettings } from "./assistant.js";
-import { mayUseFeature } from "./account-policy.js";
-import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
-import { adminInstructions, registerAdminTools } from "./mcp-admin.js";
+} from "./tiers.js";
+import { createPromptWriter } from "../prompt-writer.js";
+import { animateThemes } from "../prompt-animate.js";
+import { gatewaySettings } from "../assistant.js";
+import { mayUseFeature } from "../account-policy.js";
+import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
+import { adminInstructions, registerAdminTools } from "./admin.js";
 import fs from "node:fs";
-import { imageMimes } from "./reference-names.js";
+import { imageMimes } from "../reference-names.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;

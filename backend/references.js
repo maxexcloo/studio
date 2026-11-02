@@ -10,7 +10,7 @@ import {
   filterVisibleGallery,
   gallery,
   galleryKey,
-} from "./gallery-store.js";
+} from "./gallery/store.js";
 
 import { extractFrame } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";

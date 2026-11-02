@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Checks Generate applies to prompt text: a full-body person gets face detail, and exact prompts must not carry instructions.
-import { maxJobsPerCall } from "./mcp-media.js";
+import { maxJobsPerCall } from "./media.js";
 
 const numberWords = {
   one: 1,

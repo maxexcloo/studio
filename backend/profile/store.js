@@ -31,7 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
-import { loadMcpPrompting } from "../mcp-prompting.js";
+import { loadMcpPrompting } from "../mcp/prompting.js";
 
 const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
 const validId = (id) =>

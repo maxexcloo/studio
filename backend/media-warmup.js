@@ -1,6 +1,6 @@
 import { yieldToEventLoop } from "./json-store.js";
 import { mediaType, videoPattern } from "./media-paths.js";
-import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery-store.js";
+import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery/store.js";
 import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
 import {
   encoderIdle,

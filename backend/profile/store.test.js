@@ -15,7 +15,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const { createGuideStore, createProfileStore, hashOf, livePrompting } = await import("./store.js");
 const editor = await import("./editor.js");
-const { loadMcpPrompting } = await import("../mcp-prompting.js");
+const { loadMcpPrompting } = await import("../mcp/prompting.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 const quiet = { info: () => {}, warn: () => {} };

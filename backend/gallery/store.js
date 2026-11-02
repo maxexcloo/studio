@@ -5,21 +5,21 @@ import {
   usesRuntimeDatabase,
   writeRuntimeDocument,
   writeRuntimeText,
-} from "./persistence/runtime.ts";
+} from "../persistence/runtime.ts";
 import {
   galleryKey,
   galleryRowsMigration,
   readGalleryRows,
   writeGalleryRows,
-} from "./persistence/gallery-rows.ts";
-import { generationRecord } from "./generation-record.js";
-import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
-import { mediaFile, mediaParams, mediaPath, mediaUrls, videoPattern } from "./media-paths.js";
+} from "../persistence/gallery-rows.ts";
+import { generationRecord } from "../generation-record.js";
+import { hasGalleryFilters, matchesGalleryFilters } from "./filters.js";
+import { mediaFile, mediaParams, mediaPath, mediaUrls, videoPattern } from "../media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { localOutputFile } from "./comfy/comfy.js";
-import { defaultWorkerId } from "./workers.js";
+import { localOutputFile } from "../comfy/comfy.js";
+import { defaultWorkerId } from "../workers.js";
 
 import {
   jsonTextAsync,
@@ -27,17 +27,12 @@ import {
   removeStaleTemporaries,
   writeJsonFile,
   writeJsonFileAsync,
-} from "./json-store.js";
-import {
-  compareGalleryItems,
-  compareGalleryKeys,
-  galleryOrderKey,
-  galleryTime,
-} from "./gallery-order.js";
-import { currentDataDir } from "./data-dir.js";
-import { recordBelongsToAccount } from "./account-ownership.js";
-import { hasReferenceImage } from "./workflow-modes.js";
-import { replyTitle } from "../shared/titles.ts";
+} from "../json-store.js";
+import { compareGalleryItems, compareGalleryKeys, galleryOrderKey, galleryTime } from "./order.js";
+import { currentDataDir } from "../data-dir.js";
+import { recordBelongsToAccount } from "../account-ownership.js";
+import { hasReferenceImage } from "../workflow-modes.js";
+import { replyTitle } from "../../shared/titles.ts";
 
 export const dataDir = currentDataDir();
 export const galleryPath = path.join(dataDir, "gallery.json");
@@ -1214,11 +1209,11 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
           params.get("type") || "output",
         );
         if (file) {
-          const { joinClips, probeVideo } = await import("./video-previews.js");
+          const { joinClips, probeVideo } = await import("../video-previews.js");
           // An Extend (a run started from a video's frame) is kept joined onto that video. Only the
           // first reference is what the run was made from (shared/versions.ts). The extension's own
           // file stays, so a retried save or a provider's recorded output still finds it.
-          const { frameSourceFile } = await import("./references.js");
+          const { frameSourceFile } = await import("../references.js");
           const from =
             status === "done" && frameSourceFile(body.referenceAssets?.[0]?.assetId, ownerId);
           if (from && from.at !== 0) {

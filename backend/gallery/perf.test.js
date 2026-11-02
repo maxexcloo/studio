@@ -8,7 +8,7 @@ import test from "node:test";
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
-const store = await import("./gallery-store.js");
+const store = await import("./store.js");
 const {
   filterVisibleGallery,
   flushGallery,
@@ -20,7 +20,7 @@ const {
   saveGallery,
   setGallery,
   updateGalleryJob,
-} = await import("./gallery-store.js");
+} = await import("./store.js");
 
 const output = (name, subfolder = "") => ({
   id: name,
@@ -182,8 +182,8 @@ test("a save still waiting when the server stops is written before it exits", as
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-exit-"));
   t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
   const script = [
-    `const store = await import(${JSON.stringify(new URL("./gallery-store.js", import.meta.url).href)});`,
-    `const { installShutdown } = await import(${JSON.stringify(new URL("./shutdown.js", import.meta.url).href)});`,
+    `const store = await import(${JSON.stringify(new URL("./store.js", import.meta.url).href)});`,
+    `const { installShutdown } = await import(${JSON.stringify(new URL("../shutdown.js", import.meta.url).href)});`,
     "installShutdown({ flush: store.flushPendingGallery });",
     "store.setGallery([{ id: 'kept', status: 'done', type: 'image', createdAt: new Date().toISOString() }]);",
     "process.exit(0);",

@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { McpMedia } from "./mcp-media.js";
-import { createGenerationAdmission } from "./domain/admission.ts";
-import { GenerationQueue } from "./domain/queue.ts";
-import { RewriteStore } from "./domain/store.ts";
+import { McpMedia } from "./media.js";
+import { createGenerationAdmission } from "../domain/admission.ts";
+import { GenerationQueue } from "../domain/queue.ts";
+import { RewriteStore } from "../domain/store.ts";
 
 test("MCP generation uses shared durable admission and owned reads without HTTP", async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-mcp-domain-"));
