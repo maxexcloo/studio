@@ -32,8 +32,9 @@ function fixture(
   running: string[],
   {
     automaticLifecycle = false,
+    parkIdleAfterMs = 0,
     store,
-  }: { automaticLifecycle?: boolean; store?: RuntimeStore } = {},
+  }: { automaticLifecycle?: boolean; parkIdleAfterMs?: number; store?: RuntimeStore } = {},
 ) {
   const kube = fakeKubernetes(
     workloads.map((item) => ({
@@ -48,6 +49,7 @@ function fixture(
     workloads,
     pools: { gpu: 2, gaming: 1 },
     automaticLifecycle,
+    parkIdleAfterMs,
     ...(store ? { store } : {}),
     now: () => clock,
     // Each poll lets the fake cluster move one step and the test act in between.
@@ -58,7 +60,7 @@ function fixture(
     },
     timeouts: { drain: 60 * 60_000, stop: 60_000, start: 60_000 },
   });
-  return { kube, controller };
+  return { kube, controller, advance: (ms: number) => void (clock += ms) };
 }
 
 test("status reports phases, GPU use and why a pod is not ready", async () => {
@@ -343,4 +345,41 @@ test("history survives a restart and a change cut short is marked interrupted", 
   assert.deepEqual(recorded.target, ["text"]);
   lease.release();
   await first.controller.settled;
+});
+
+test("automatic control parks media idle for its set time, never text or busy work", async () => {
+  const { kube, controller, advance } = fixture(["image", "text"], {
+    automaticLifecycle: true,
+    parkIdleAfterMs: 15 * 60_000,
+  });
+  // First seen running counts as used then.
+  await controller.parkIdle();
+  advance(10 * 60_000);
+  await controller.parkIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log, []);
+  // Work in progress keeps it running however long it takes.
+  const lease = controller.retain("image");
+  advance(20 * 60_000);
+  await controller.parkIdle();
+  assert.deepEqual(kube.log, []);
+  lease.release();
+  advance(15 * 60_000);
+  await controller.parkIdle();
+  await controller.settled;
+  assert.deepEqual(kube.log, ["scale comfyui/image 0", "gone comfyui/image"]);
+  const status = await controller.observe();
+  assert.match(status.history[0].requestedBy, /parking Image after 15 minutes without work/);
+  assert.equal(kube.deployments.get("text/text")!.replicas, 1);
+});
+
+test("idle parking stays off without automatic control or a set time", async () => {
+  for (const options of [{ parkIdleAfterMs: 60_000 }, { automaticLifecycle: true }]) {
+    const { kube, controller, advance } = fixture(["image"], options);
+    await controller.parkIdle();
+    advance(60 * 60_000);
+    await controller.parkIdle();
+    await controller.settled;
+    assert.deepEqual(kube.log, []);
+  }
 });

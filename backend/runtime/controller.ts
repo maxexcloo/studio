@@ -68,6 +68,8 @@ interface Options {
   /** GPUs per node pool. */
   pools: Record<string, number>;
   automaticLifecycle?: boolean;
+  /** With automatic control, park a media workload after this long without work; 0 never. */
+  parkIdleAfterMs?: number;
   store?: RuntimeStore;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -101,9 +103,12 @@ export class RuntimeController {
   readonly workloads: Workload[];
   readonly pools: Record<string, number>;
   readonly automaticLifecycle: boolean;
+  readonly parkIdleAfterMs: number;
   /** Settles when the running operation finishes; for tests and shutdown. */
   settled: Promise<void> = Promise.resolve();
   private active = new Map<string, number>();
+  /** When each workload last finished or took work, for parking idle ones. */
+  private lastUsed = new Map<string, number>();
   private stopping = new Set<string>();
   private current?: RuntimeOperation;
   private claimed = false;
@@ -120,6 +125,7 @@ export class RuntimeController {
     workloads,
     pools,
     automaticLifecycle = false,
+    parkIdleAfterMs = 0,
     store = memoryStore(),
     now = Date.now,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -130,6 +136,7 @@ export class RuntimeController {
     this.workloads = workloads;
     this.pools = pools;
     this.automaticLifecycle = automaticLifecycle;
+    this.parkIdleAfterMs = parkIdleAfterMs;
     this.store = store;
     this.now = now;
     this.sleep = sleep;
@@ -631,6 +638,35 @@ export class RuntimeController {
     }
   }
 
+  /**
+   * Automatic lifecycle: park running media workloads that have had no work for `parkIdleAfterMs`,
+   * so idle GPUs can rest; queued work starts them again. Text is never parked (callers outside
+   * Studio use it), and a workload first seen running counts as used then.
+   */
+  async parkIdle() {
+    if (!this.automaticLifecycle || !this.parkIdleAfterMs || this.current || this.claimed) return;
+    this.claim();
+    try {
+      const states = await this.states();
+      const now = this.now();
+      const running = this.workloads.filter((item) => states.get(item.id)!.replicas > 0);
+      const idle = running.filter((item) => {
+        if (item.kind === "text" || this.active.has(item.id)) return false;
+        if (!this.lastUsed.has(item.id)) this.lastUsed.set(item.id, now);
+        return now - this.lastUsed.get(item.id)! >= this.parkIdleAfterMs;
+      });
+      if (!idle.length) return;
+      const target = running.filter((item) => !idle.includes(item)).map((item) => item.id);
+      this.begin(
+        "apply",
+        this.plan(target, states),
+        `automatic: parking ${idle.map((item) => item.label).join(", ")} after ${minutes(this.parkIdleAfterMs)} without work`,
+      );
+    } finally {
+      this.claimed = false;
+    }
+  }
+
   operation(id: string) {
     const operation = this.record.operations.find((item) => item.id === id);
     if (!operation) throw new RuntimeRequestError("No runtime operation has that id.");
@@ -645,7 +681,10 @@ export class RuntimeController {
     const held = this.workloads.filter((item) => [candidates].flat().includes(item.id));
     if (!held.length)
       throw new RuntimeUnavailable("The recorded workload is no longer configured.");
-    for (const { id } of held) this.active.set(id, (this.active.get(id) ?? 0) + 1);
+    for (const { id } of held) {
+      this.active.set(id, (this.active.get(id) ?? 0) + 1);
+      this.lastUsed.set(id, this.now());
+    }
     let released = false;
     return {
       workload: held[0],
@@ -653,6 +692,7 @@ export class RuntimeController {
         if (released) return;
         released = true;
         for (const { id } of held) {
+          this.lastUsed.set(id, this.now());
           const remaining = (this.active.get(id) ?? 1) - 1;
           if (remaining) this.active.set(id, remaining);
           else this.active.delete(id);
