@@ -1,6 +1,16 @@
 import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
-import { ActionIcon, Button, Divider, Menu, Paper, Tooltip, type PaperProps } from "@mantine/core";
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import {
+  ActionIcon,
+  Button,
+  Divider,
+  Loader,
+  Menu,
+  Paper,
+  Tooltip,
+  UnstyledButton,
+  type PaperProps,
+} from "@mantine/core";
+import { Check, ChevronDown, Ellipsis, type LucideIcon } from "lucide-react";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -211,6 +221,85 @@ export function ActionBarGroups({
         </>
       )}
     </>
+  );
+}
+
+/** A phone bar control: its icon over its label; a split action's ▾ beside it opens its options. */
+function StackedControl({ action }: { action: Action }) {
+  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
+  const content = (
+    <>
+      {loading ? (
+        <Loader size={20} color="gray" />
+      ) : (
+        <Icon size={20} fill={pressed ? "currentColor" : "none"} />
+      )}
+      <span>{label}</span>
+    </>
+  );
+  const props = {
+    className: classes.stacked,
+    "aria-pressed": pressed,
+    "data-color": color,
+    disabled: disabled || loading,
+  };
+  const options = menu && shown(menu).length > 0 ? menu : undefined;
+  const dropdown = options && (
+    <Menu.Dropdown>
+      {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
+      <ActionMenuItems groups={options} />
+    </Menu.Dropdown>
+  );
+  if (options && !onClick && !link)
+    return (
+      <Menu position="top" width={240}>
+        <Menu.Target>
+          <UnstyledButton {...props}>{content}</UnstyledButton>
+        </Menu.Target>
+        {dropdown}
+      </Menu>
+    );
+  const button =
+    link && !disabled ? (
+      <UnstyledButton component="a" {...props} {...link}>
+        {content}
+      </UnstyledButton>
+    ) : (
+      <UnstyledButton {...props} onClick={onClick}>
+        {content}
+      </UnstyledButton>
+    );
+  if (!options) return button;
+  return (
+    <div className={classes.stackedSplit}>
+      {button}
+      <Menu position="top" width={240}>
+        <Menu.Target>
+          <UnstyledButton
+            className={classes.stackedMenu}
+            aria-label={`${label} Options`}
+            disabled={disabled}
+          >
+            <ChevronDown size={14} />
+          </UnstyledButton>
+        </Menu.Target>
+        {dropdown}
+      </Menu>
+    </div>
+  );
+}
+
+/** The phone bar: the primary actions labelled under their icons, every other one under More. */
+export function StackedActionBar({ primary, more }: { primary: Action[]; more: ActionGroups }) {
+  return (
+    <div className={classes.stackedBar}>
+      {primary.map((action) => (
+        <StackedControl key={action.id} action={action} />
+      ))}
+      {shown(more).length > 0 && (
+        <StackedControl action={{ id: "more", label: "More", icon: Ellipsis, menu: more }} />
+      )}
+    </div>
   );
 }
 

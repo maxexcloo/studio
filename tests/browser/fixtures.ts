@@ -772,12 +772,18 @@ export async function compareUpscale(page: Page) {
   await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
-/** Runs a viewer action from its bar, which phones scroll sideways. */
+/**
+ * Runs a viewer action from its bar. Phones keep Edit, Animate and Prompt there and list the rest
+ * under More, where a split action's options (Upscale Options) are its submenu.
+ */
 export async function viewerAction(page: Page, label: string) {
-  await page
-    .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: label, exact: true })
-    .click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  if ((page.viewportSize()?.width || 1440) >= 768)
+    return viewer.getByRole("button", { name: label, exact: true }).click();
+  const button = viewer.getByRole("button", { name: label, exact: true });
+  if (await button.count()) return button.click();
+  await viewer.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("menuitem", { name: label.replace(/ Options$/, ""), exact: true }).click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {

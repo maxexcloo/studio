@@ -1,11 +1,20 @@
 import { useState, type RefObject } from "react";
 import type { MediaItem } from "../../types";
-import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
+import { usePhone } from "../../ui/usePhone";
+import {
+  ActionBarGroups,
+  ActionBarSurface,
+  StackedActionBar,
+  type ActionGroups,
+} from "./ActionBar";
 import { CustomAnimationDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
 import type { Iteration } from "./useMediaAction";
 import classes from "./MediaViewer.module.css";
+
+// Phones keep these on the bar, in this order; the rest open from More.
+const phonePrimary = ["retry", "stop", "edit", "animate", "prompt", "upscale"];
 
 /** The viewer's action bar: the shared item actions. */
 export function MediaViewerActions({
@@ -34,6 +43,7 @@ export function MediaViewerActions({
   /** Holds the current actions for the viewer's keyboard shortcuts. */
   shortcuts?: RefObject<ActionGroups>;
 }) {
+  const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
   const [instructing, setInstructing] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
@@ -60,7 +70,14 @@ export function MediaViewerActions({
       className={classes.actions}
       onClick={(event) => event.stopPropagation()}
     >
-      <ActionBarGroups groups={groups} />
+      {phone ? (
+        <StackedActionBar
+          primary={phonePrimary.flatMap((id) => groups.flat().filter((action) => action.id === id))}
+          more={groups.map((group) => group.filter((action) => !phonePrimary.includes(action.id)))}
+        />
+      ) : (
+        <ActionBarGroups groups={groups} />
+      )}
       <CustomAnimationDialog
         item={item}
         sessionId={sessionId}
