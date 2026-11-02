@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 # Only pull requests cancel superseded runs: every main commit must publish its sha image, which
-# Studio's release job tags.
+# Studio's release job tags latest and versioned.
 concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   group: worker-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
@@ -54,9 +54,7 @@ jobs:
         with:
           flavor: latest=false
           images: ghcr.io/${{ github.repository }}-worker
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=long,enable={{is_default_branch}}
+          tags: type=sha,format=long,enable={{is_default_branch}}
       - name: Build Worker For Verification
         uses: docker/build-push-action@v7
         with:
