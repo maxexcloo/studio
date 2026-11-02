@@ -16,7 +16,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearchParams } from "react-router";
 import { useGenerationActions } from "../generation/GenerationProvider";
-import { queueQuery, terminal } from "../generation/Queue";
+import { queueQuery } from "../generation/Queue";
 import { api } from "../../api";
 import type { MediaItem } from "../../types";
 import { MediaGrid } from "./MediaGrid";
@@ -39,6 +39,7 @@ import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
 import classes from "./GalleryPage.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 interface Page {
   items: MediaItem[];
@@ -88,7 +89,7 @@ export function GalleryPage() {
     ...queueQuery,
     select: (data) => ({
       key: data.jobs.map((job) => `${job.id}:${job.status}`).join(),
-      active: data.jobs.some((job) => !terminal.has(job.status)),
+      active: data.jobs.some((job) => !terminalStatuses.has(job.status)),
     }),
   }).data;
   const gallery = useInfiniteQuery({

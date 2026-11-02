@@ -17,7 +17,7 @@ import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
 import { families } from "./family-catalog.js";
-import { mimeExtension, referenceInputName } from "./reference-names.js";
+import { imageMimes, mimeExtension, referenceInputName } from "./reference-names.js";
 import { uploadedGalleryItem } from "./uploads.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
 
@@ -29,7 +29,7 @@ const maxPixels = Math.max(
   1_000_000,
   Number(process.env.STUDIO_REFERENCE_MAX_PIXELS || 80_000_000),
 );
-const acceptedMimes = new Set(["image/png", "image/jpeg", "image/webp"]);
+const acceptedMimes = new Set(imageMimes);
 
 function safeName(value = "reference-image") {
   return (
