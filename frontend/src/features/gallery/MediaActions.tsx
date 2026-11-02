@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Group, Modal, Stack } from "@mantine/core";
 import {
+  ArrowLeftRight,
   Camera,
   Columns2,
   Columns3,
@@ -46,7 +47,7 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
-import { gifDownload } from "./download";
+import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
 import { upscaling, useQuickUpscale } from "./UpscaleControls";
@@ -287,7 +288,8 @@ export function useMediaActions(
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
-  const gif = ready ? gifDownload(item) : null;
+  const gif = ready ? videoExport(item, "gif") : null;
+  const loop = ready ? videoExport(item, "loop") : null;
   const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
@@ -534,9 +536,20 @@ export function useMediaActions(
           })
         : itemAction("download", {
             link: transfer.download,
-            menu: gif
-              ? [[{ id: "download-gif", label: "Download as GIF", icon: Film, link: gif }]]
-              : undefined,
+            menu:
+              gif && loop
+                ? [
+                    [
+                      { id: "download-gif", label: "Download as GIF", icon: Film, link: gif },
+                      {
+                        id: "download-loop",
+                        label: "Download Back and Forth",
+                        icon: ArrowLeftRight,
+                        link: loop,
+                      },
+                    ],
+                  ]
+                : undefined,
           })),
     itemAction("delete", { onClick: onDelete }),
     ready &&
