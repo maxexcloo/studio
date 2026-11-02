@@ -857,3 +857,18 @@ test("The phone composer opens its prompt editor in one tap and fits the screen 
       .toBeLessThanOrEqual(0);
   }
 });
+
+test("On phones the prompt editor sends the run itself", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Only phones open the prompt in its own editor.");
+  const state = await fixtures(page);
+  await page.goto("/images");
+  await page.locator("[data-composer-prompt]").click();
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  await editor
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("A quiet harbour at dawn");
+  await editor.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.prompt).toBe("A quiet harbour at dawn");
+  await expect(editor).toBeHidden();
+});
