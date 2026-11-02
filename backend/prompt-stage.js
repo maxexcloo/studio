@@ -13,7 +13,7 @@
  * prompt into the item; a failure throws with the reason, which fails the item.
  */
 import { mayUseFeature } from "./account-policy.js";
-import { maxPromptCharacters } from "./assistant.js";
+import { maxPromptCharacters } from "../shared/queue.ts";
 import { withLoraTags } from "./lora-prompts.js";
 import { animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 

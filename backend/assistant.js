@@ -22,6 +22,7 @@ import { negativeUnused, recommendedNegative } from "./lora-prompts.js";
 import { replyTitle } from "../shared/titles.ts";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
 import { userContent } from "./domain/model-content.ts";
+import { maxPromptCharacters } from "../shared/queue.ts";
 
 const gatewayKeys = [
   "STUDIO_PROMPT_WRITER_URL",
@@ -31,7 +32,6 @@ const gatewayKeys = [
 export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
 const omittedGuideKeys = new Set(["reviewed_on", "sampling", "sources"]);
-export const maxPromptCharacters = 4000;
 const titleInstructions =
   "Title this image or video from the prompt that made it. Reply with only a very concise Title Case title of two to five words naming its subject, without quotes or punctuation.";
 // The `reasoning_effort` each call sends: `none` where it wants a structured (JSON) answer, and

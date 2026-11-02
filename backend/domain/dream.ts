@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import {
   awaitsWriting,
+  maxPromptCharacters,
   terminalStatuses,
   type GenerationInput,
   type QueueMedia,
@@ -175,7 +176,6 @@ const starredDays = 30;
 /** Calibration shows gallery images at least this old, so it doesn't repeat what was just made. */
 const calibrationAgeMs = 86_400_000;
 const judgedLimit = 2000;
-const maxPrompt = 4000;
 /** Dream adds at most this many of the account's thumbs-up LoRAs to a result. */
 const dreamLoras = 2;
 /** Every fourth image of the day is a comparison, when a kept or starred image can start one. */
@@ -489,7 +489,7 @@ export function createDream(options: {
     } catch {
       /* An unusable reply fails below. */
     }
-    const prompt = clean(reply.prompt, maxPrompt);
+    const prompt = clean(reply.prompt, maxPromptCharacters);
     if (
       !prompt ||
       [...recent, ...(reword ? [reword] : [])].some(
@@ -646,7 +646,7 @@ export function createDream(options: {
         const profile = profiles.find(
           (entry) => kindOf(entry) === "image" && entry.id === input?.profileId,
         );
-        const prompt = clean(input?.prompt, maxPrompt);
+        const prompt = clean(input?.prompt, maxPromptCharacters);
         const references = input?.referenceAssets;
         return input && profile && prompt && !(Array.isArray(references) && references.length)
           ? [{ item, input, profile, prompt }]
@@ -1029,7 +1029,7 @@ export function createDream(options: {
       const item = decide(ownerId, itemId, "kept");
       const record = read(ownerId);
       record.steer = {
-        prompt: clean(item.prompt || item.dream?.prompt, maxPrompt),
+        prompt: clean(item.prompt || item.dream?.prompt, maxPromptCharacters),
         ...(item.settings?.profileId ? { profileId: String(item.settings.profileId) } : {}),
         remaining: steerCount,
       };

@@ -2,13 +2,8 @@
 // Studio writes MCP prompts itself: one fresh call to an OpenAI-compatible chat model per generation,
 // carrying the user's request and the target profile's full prompting guide. The call goes through
 // the prompt assistant engine (assistant.js), so MCP Generate and the Studio assistant share one adapter.
-import {
-  AssistantError,
-  createAssistant,
-  maxPromptCharacters,
-  stripThinking,
-  writerGuide,
-} from "./assistant.js";
+import { maxPromptCharacters } from "../shared/queue.ts";
+import { AssistantError, createAssistant, stripThinking, writerGuide } from "./assistant.js";
 
 export { writerGuide };
 

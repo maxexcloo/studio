@@ -8,6 +8,8 @@ export type QueueStatus =
   | "completed"
   | "failed"
   | "cancelled";
+/** The longest prompt Studio writes, keeps or accepts, in characters. */
+export const maxPromptCharacters = 4000;
 /** A job in one of these is done and changes no more. */
 export const terminalStatuses: ReadonlySet<string> = new Set<QueueStatus>([
   "completed",

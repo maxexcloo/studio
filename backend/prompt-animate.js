@@ -6,7 +6,8 @@
  *
  *   input.writing = { kind: "animate", theme, instruction?, source }
  */
-import { AssistantError, cleanPrompt, maxPromptCharacters, writerGuide } from "./assistant.js";
+import { maxPromptCharacters } from "../shared/queue.ts";
+import { AssistantError, cleanPrompt, writerGuide } from "./assistant.js";
 
 export const animateThemes = Object.freeze({
   cinematic:
