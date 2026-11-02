@@ -632,14 +632,15 @@ export class RuntimeController {
   }
 
   /**
-   * Automatic lifecycle: restore Studio's last placement after something else stopped a workload.
-   * Running text stays; a restore that needs its GPUs is skipped until it is stopped in Studio.
+   * Restore Studio's last placement after something else stopped a workload, such as a Flux upgrade
+   * (which resets GPU deployments to 0), with or without automatic control. Running text stays; a
+   * restore that needs its GPUs is skipped until it is stopped in Studio.
    */
   async reconcile() {
     const desired = this.record.desired?.filter((id) =>
       this.workloads.some((item) => item.id === id),
     );
-    if (!this.automaticLifecycle || !desired || this.current || this.claimed) return;
+    if (!desired || this.current || this.claimed) return;
     this.claim();
     try {
       const states = await this.states();
@@ -649,7 +650,7 @@ export class RuntimeController {
         Object.entries(this.pools).some(([pool, capacity]) => this.usage(target, pool) > capacity)
       )
         return;
-      this.begin("apply", this.plan(target, states), "automatic: restoring the last placement");
+      this.begin("apply", this.plan(target, states), "restoring the last placement after an outside stop");
     } finally {
       this.claimed = false;
     }

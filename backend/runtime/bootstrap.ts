@@ -55,7 +55,7 @@ export async function loadRuntime(
         }
       : {}),
   });
-  // Both return at once unless automatic control is on in Settings › Workers.
+  // Restores the last placement after an outside stop; parking needs automatic control.
   setInterval(() => {
     void controller.reconcile().catch(() => {});
     void controller.parkIdle().catch(() => {});
