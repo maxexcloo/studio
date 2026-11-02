@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import express from "express";
-import { closeRuntimeDatabase } from "../persistence/runtime.ts";
+import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import {
   createDream,
@@ -18,7 +18,7 @@ import {
 } from "./dream.ts";
 import { writtenJob, type GenerationQueue } from "./queue.ts";
 import { registerRewriteRoutes } from "./routes.ts";
-import { queuePriority, RewriteStore } from "./store.ts";
+import { queuePriority, Store } from "./store.ts";
 import { createTaste } from "./taste.ts";
 
 const profiles: DreamProfile[] = [
@@ -46,7 +46,7 @@ const everything: DreamAccess = {
 /** Dream with fakes for every service; nothing generates and nothing starts on its own. */
 function fixture(t: TestContext) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-dream-"));
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   t.after(() => {
     store.close();
     closeRuntimeDatabase(dataDir);

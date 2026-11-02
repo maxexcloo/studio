@@ -4,15 +4,16 @@ import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
 import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
+import { openDatabase } from "../persistence/runtime.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
-import { everyone, RewriteStore } from "./store.ts";
+import { everyone, Store } from "./store.ts";
 const { enforceMultiUserRequest } = await import(
   new URL("../multi-user-gate.js", import.meta.url).href
 );
 
 test("Cancel All isolates the owner and retains accepted work until cancellation or durable saving is confirmed", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const alice = store.createSession("alice"),
     bob = store.createSession("bob");
   const pending = store.enqueue("alice", alice.id, {}, "image");
@@ -105,7 +106,7 @@ test("Cancel All isolates the owner and retains accepted work until cancellation
 });
 
 test("Clearing takes only the owner's failed jobs out of the queue and keeps their records", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const alice = store.createSession("alice"),
     bob = store.createSession("bob");
   const [first, second, active] = [0, 1, 2].map(() =>
@@ -144,7 +145,7 @@ test("Clearing takes only the owner's failed jobs out of the queue and keeps the
 });
 
 test("Deleting a chat is owner scoped, waits for active work and deletes only chosen results", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const chat = store.createSession("alice"),
     other = store.createSession("bob");
   const done = store.enqueue("alice", chat.id, {}, "image");
@@ -201,7 +202,7 @@ test("Deleting a chat is owner scoped, waits for active work and deletes only ch
 });
 
 test("Unfinished Items lists every account's unfinished jobs and ends stuck ones for administrators", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const alice = store.createSession("alice"),
     bob = store.createSession("bob");
   // Accepted by a worker that is gone: nothing observes it and cancelling never confirms.

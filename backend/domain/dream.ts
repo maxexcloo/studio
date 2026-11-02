@@ -10,7 +10,7 @@ import { replyTitle } from "../../shared/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
 import type { PromptWriter, WrittenPrompt } from "./queue.ts";
-import { queuePriority, type OwnedJob, type QueueOrigin, type RewriteStore } from "./store.ts";
+import { queuePriority, type OwnedJob, type QueueOrigin, type Store } from "./store.ts";
 import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
 
 /** One account's Dream settings. Dream is off until the person turns it on. */
@@ -212,7 +212,7 @@ const failure = (message: string, status: number) => Object.assign(new Error(mes
  */
 export function createDream(options: {
   dataDir: string;
-  store: RewriteStore;
+  store: Store;
   taste: Taste;
   owners(): string[];
   access(ownerId: string): DreamAccess | null;

@@ -29,7 +29,7 @@ import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from 
 import { ChatStore } from "./domain/chat-store.ts";
 import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
-import { publicJob, queuePriority, RewriteStore } from "./domain/store.ts";
+import { publicJob, queuePriority, Store } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
@@ -397,7 +397,7 @@ const mcp = registerMcpRoutes(app, {
   resolveSignedResult: resolveSignedMcpResult,
   domainRequest: mcpGenerationRequest,
   cloudVideoFailures: (since) =>
-    rewriteStore
+    store
       .failedJobs("provider:cliproxyapi:", new Date(since).toISOString())
       .filter((job) => job.input.kind === "video")
       .map((job) => ({ reason: job.reason, at: Date.parse(job.updatedAt) })),
@@ -433,7 +433,7 @@ app.use((error, _req, res, next) => {
 app.use(compressJson({ skip: (req) => clientOf(req).thisComputer }));
 // Each worker's latest ComfyUI answer (node list and stats), by worker id.
 const emptyContext = { info: null, stats: null, fetchedAt: 0 };
-const rewriteStore = new RewriteStore(path.join(dataDir, "studio.sqlite"));
+const store = new Store(runtimeDatabase(dataDir));
 const contextCaches = new Map();
 const contextFor = (id = defaultWorkerId()) => contextCaches.get(id) || emptyContext;
 // A stopped extra worker fails slowly (a name that no longer resolves, a refused
@@ -491,7 +491,7 @@ async function fetchComfyContext(backend) {
   const worker = workerById(backend);
   if (worker) {
     contextCaches.set(backend, result);
-    rewriteStore.saveWorkerModels(backend, worker.url, { info, stats });
+    store.saveWorkerModels(backend, worker.url, { info, stats });
   }
   return result;
 }
@@ -590,7 +590,7 @@ app.get("/api/services/status", async (req, res) => {
     ...(!req.studioAccount || mayUseFeature(req.studioAccount, "promptAssistant") ? ["text"] : []),
   ];
   res.setHeader("Cache-Control", "no-store");
-  const waitingWorkers = rewriteStore
+  const waitingWorkers = store
     .jobs(ownerIdForRequest(req))
     .filter((job) => ["waiting", "starting"].includes(job.status))
     .map((job) => job.backend || job.input.backendId)
@@ -811,7 +811,7 @@ async function mediaModels(force = false) {
     .map((worker) => {
       const online = answered.find((entry) => entry.worker.id === worker.id);
       if (online) return online;
-      const observed = rewriteStore.workerModels(worker.id, worker.url);
+      const observed = store.workerModels(worker.id, worker.url);
       // Persist worker observations; project current runtime catalogue metadata on each read.
       const cached = observed?.info && inferModels(observed.info, observed.stats);
       // Current runtime definitions replace cached custom profiles, including their permissions and defaults.
@@ -1409,9 +1409,9 @@ registerGalleryReadRoutes(app, {
   near: (text) => imageSearch.near(text),
   jobChats: (req) => {
     const ownerId = ownerIdForRequest(req);
-    const titles = new Map(rewriteStore.sessions(ownerId).map((chat) => [chat.id, chat.title]));
+    const titles = new Map(store.sessions(ownerId).map((chat) => [chat.id, chat.title]));
     return new Map(
-      rewriteStore
+      store
         .jobs(ownerId)
         .map((job) => [job.id, { id: job.sessionId, title: titles.get(job.sessionId) }]),
     );
@@ -1637,8 +1637,8 @@ function thumbnailCacheControl(req) {
 
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
-registerVideoEditRoutes(app, { store: rewriteStore });
-registerRecreateRoute(app, { store: rewriteStore });
+registerVideoEditRoutes(app, { store });
+registerRecreateRoute(app, { store });
 
 /**
  * What the deployment decides, for Settings: each value with its source
@@ -1787,8 +1787,8 @@ async function permitQueueFallback(job) {
   );
   const backend = profile?.workerIds?.find((id) => id !== job.backend);
   if (!backend) return false;
-  const latest = rewriteStore.job(job.ownerId, job.id);
-  rewriteStore.save({
+  const latest = store.job(job.ownerId, job.id);
+  store.save({
     ...latest,
     backend,
     resource: `worker:${backend}`,
@@ -1880,7 +1880,7 @@ const queueAdapter = createGenerationQueueAdapter({
   },
 });
 // Reconstruct leases synchronously before the HTTP listener accepts work.
-for (const job of rewriteStore
+for (const job of store
   .jobs()
   .filter(
     (item) =>
@@ -1893,7 +1893,7 @@ for (const job of rewriteStore
 const directCloudAdapter =
   directCloud &&
   createCloudQueueAdapter({
-    store: rewriteStore,
+    store,
     provider: cloudProvider,
     resolve: directCloud.resolve,
     saveMedia: providerMediaWriter(mediaRoot, mediaSubfolder, writeBytesFileAsync, withPngText),
@@ -1919,7 +1919,7 @@ const directCloudAdapter =
     },
   });
 const upscaleQueueAdapter = createUpscaleQueueAdapter({
-  store: rewriteStore,
+  store,
   jobs,
   itemFor: (ownerId, itemId) =>
     gallery.find((item) => item.id === itemId && (item.ownerId || "") === ownerId),
@@ -1970,7 +1970,7 @@ const generationAdapter = withUpscaleAdapter(
   upscaleQueueAdapter,
 );
 const generationQueue = new GenerationQueue(
-  rewriteStore,
+  store,
   {
     ...generationAdapter,
     // A local generation may move to another idle worker that runs it: the forms fill in a
@@ -2056,7 +2056,7 @@ function chatTitle(account, sessionId, prompt) {
   );
 }
 registerRewriteRoutes(app, {
-  store: rewriteStore,
+  store,
   queue: generationQueue,
   resourceFor: queueResourceFor,
   validate: validateGenerationInput,
@@ -2072,9 +2072,9 @@ registerRewriteRoutes(app, {
   title: chatTitle,
   admitted: jobAdmitted,
 });
-registerMaintenanceRoutes(app, { store: rewriteStore, queue: generationQueue, requireAdmin });
+registerMaintenanceRoutes(app, { store, queue: generationQueue, requireAdmin });
 const admitGeneration = createGenerationAdmission({
-  store: rewriteStore,
+  store,
   queue: generationQueue,
   resourceFor: queueResourceFor,
   pendingItems: makePendingItems,
@@ -2084,7 +2084,7 @@ const admitGeneration = createGenerationAdmission({
 });
 const comparisonsFile = path.join(dataDir, "comparisons.json");
 registerCompareRoutes(app, {
-  store: rewriteStore,
+  store,
   admit: admitGeneration,
   cancel: (ownerId, jobId) => generationQueue.cancel(ownerId, jobId),
   read: () => {
@@ -2104,7 +2104,7 @@ registerCompareRoutes(app, {
   voted: (ownerId, jobId, others) => {
     const values = (id) => {
       const item = gallery.find((entry) => entry.jobId === id && (entry.ownerId || "") === ownerId);
-      return rewriteStore.job(ownerId, id)?.input || { ...item?.settings, prompt: item?.prompt };
+      return store.job(ownerId, id)?.input || { ...item?.settings, prompt: item?.prompt };
     };
     const winner = { jobId, values: values(jobId) };
     taste.record(ownerId, [
@@ -2121,7 +2121,7 @@ const textBusy = () =>
     runtime?.controller
       .status()
       .some((workload) => workload.kind === "text" && workload.acceptedOperations > 0) ||
-    rewriteStore.db
+    store.db
       .prepare(
         "SELECT 1 FROM studio_chat_messages WHERE json_extract(record, '$.status') = 'streaming' LIMIT 1",
       )
@@ -2150,7 +2150,7 @@ registerSuggestionRoutes(app, { suggestions });
 // It only queues work; GPU placement stays with AI Control and cloud profiles never take part.
 const dream = createDream({
   dataDir,
-  store: rewriteStore,
+  store,
   taste,
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   access: (ownerId) => {
@@ -2223,7 +2223,7 @@ registerDreamRoutes(app, { dream });
 // Dream's idle rule (domain/dream.ts), with Dream's own jobs counting as work: no live job, no text work.
 const studioIdle = () =>
   !textBusy() &&
-  !rewriteStore.db
+  !store.db
     .prepare(
       "SELECT 1 FROM studio_queue WHERE status NOT IN ('completed', 'failed', 'cancelled') LIMIT 1",
     )
@@ -2231,7 +2231,7 @@ const studioIdle = () =>
 // Finish Starred Images (domain/finishing.ts): idle-time smart upscales of what an account stars.
 const finishing = createFinishing({
   dataDir,
-  store: rewriteStore,
+  store,
   owners: () => (multiUserEnabled ? listAccounts().map((account) => account.id) : [""]),
   allowed: (ownerId) => {
     if (!ownerId) return !multiUserEnabled;
@@ -2383,11 +2383,11 @@ async function selectedChatMediaProfile(input, operation) {
 }
 let chatGateway;
 const sessionChat = new ChatService({
-  store: new ChatStore(rewriteStore.db),
+  store: new ChatStore(store.db),
   settings: chatSettings,
   // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
   taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
-  session: (ownerId, id) => rewriteStore.session(ownerId, id),
+  session: (ownerId, id) => store.session(ownerId, id),
   // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
   agent: (ownerId, sessionId, owned) =>
     mcp.agent({
@@ -2397,7 +2397,7 @@ const sessionChat = new ChatService({
       ...owned,
     }),
   results: (ownerId, sessionId) =>
-    rewriteStore.jobs(ownerId, sessionId).map((job) => ({
+    store.jobs(ownerId, sessionId).map((job) => ({
       id: job.id,
       status: job.status,
       kind: job.input.kind,
@@ -2441,7 +2441,7 @@ const sessionChat = new ChatService({
     return servedChatModels(models, workloads, phases);
   },
   revision: async (ownerId, sessionId, revision) => {
-    const source = rewriteStore.job(ownerId, revision.sourceJobId);
+    const source = store.job(ownerId, revision.sourceJobId);
     if (!source || source.sessionId !== sessionId)
       throw Object.assign(new Error("Source generation not found."), { status: 404 });
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
@@ -2526,7 +2526,7 @@ const sessionChat = new ChatService({
       throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
         status: result.status,
       });
-    return { job: publicJob(rewriteStore.job(ownerId, result.payload.jobId)) };
+    return { job: publicJob(store.job(ownerId, result.payload.jobId)) };
   },
 });
 app.use(
@@ -2564,7 +2564,7 @@ async function mcpGenerationRequest(method, route, input, owner) {
   const { queueSet, studioSession, ...body } = input || {};
   // Studio Chat's agent queues into its chat as the person's own work, made from the result it reuses.
   if (studioSession) {
-    const parent = studioSession.parent && rewriteStore.job(owner, studioSession.parent);
+    const parent = studioSession.parent && store.job(owner, studioSession.parent);
     const parentJobId = parent?.sessionId === studioSession.id ? parent.id : undefined;
     return admitGeneration(
       body,
@@ -2796,11 +2796,11 @@ async function queueUpscaleOnWorker(account, request, origin) {
     customWorkflow,
   });
   const ownerId = account?.userId || "";
-  const parent = item.jobId && rewriteStore.job(ownerId, item.jobId);
+  const parent = item.jobId && store.job(ownerId, item.jobId);
   const session = parent
-    ? rewriteStore.session(ownerId, parent.sessionId)
-    : rewriteStore.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
-  const queued = rewriteStore.enqueue(
+    ? store.session(ownerId, parent.sessionId)
+    : store.createSession(ownerId, "Upscale", { prompt: item.prompt || "" });
+  const queued = store.enqueue(
     ownerId,
     session.id,
     {
@@ -2852,7 +2852,7 @@ function generationJobResponse(account, id) {
   if (account && !mayUseFeature(account, "gallery")) {
     return { status: "missing" };
   }
-  const queued = rewriteStore.job(account?.userId || "", id);
+  const queued = store.job(account?.userId || "", id);
   if (queued && !jobs.has(id)) {
     const status =
       {
@@ -2889,7 +2889,7 @@ app.get("/api/jobs/:id", (req, res) => {
 });
 
 app.post("/api/jobs/:id/cancel", async (req, res) => {
-  if (rewriteStore.job(ownerIdForRequest(req), req.params.id)) {
+  if (store.job(ownerIdForRequest(req), req.params.id)) {
     await generationQueue.cancel(ownerIdForRequest(req), req.params.id);
     return res.json({ ok: true });
   }
@@ -2919,7 +2919,7 @@ app.post("/api/jobs/:id/cancel", async (req, res) => {
 
 app.post("/api/queue/cancel", async (req, res) => {
   const ownerId = ownerIdForRequest(req);
-  for (const pending of rewriteStore
+  for (const pending of store
     .jobs(ownerId)
     .filter((job) => ["writing", "queued", "waiting"].includes(job.status)))
     await generationQueue.cancel(ownerId, pending.id);
@@ -3328,5 +3328,5 @@ drainServer = async () => {
   );
   await Promise.all([generationQueue.stop(), closed]);
   await flushGalleryStrict();
-  rewriteStore.close();
+  store.close();
 };

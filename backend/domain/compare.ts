@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
 import type { GenerationInput, QueueMedia } from "../../shared/queue.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
-import type { RewriteStore, QueueOrigin } from "./store.ts";
+import type { Store, QueueOrigin } from "./store.ts";
 
 /**
  * A compare set: 2–4 image jobs shown side by side. `vote` is the starred winner and, with the
@@ -44,7 +44,7 @@ const owner = (req: Request) => req.studioAccount?.userId || "";
 export function registerCompareRoutes(
   app: Router,
   options: {
-    store: RewriteStore;
+    store: Store;
     admit(
       input: GenerationInput,
       account?: GenerationAccount,

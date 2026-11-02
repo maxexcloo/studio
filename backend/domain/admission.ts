@@ -1,7 +1,7 @@
 import type { GenerationInput, GenerationOperation, QueueMedia } from "../../shared/queue.ts";
 import { referencedResult } from "../../shared/versions.ts";
 import { GenerationQueue } from "./queue.ts";
-import { queuePriority, RewriteStore, type OwnedJob, type QueueOrigin } from "./store.ts";
+import { queuePriority, Store, type OwnedJob, type QueueOrigin } from "./store.ts";
 
 export type GenerationAccount = Record<string, unknown> & {
   userId: string;
@@ -18,7 +18,7 @@ export interface GenerationScope {
   parentJobId?: string;
 }
 interface AdmissionOptions {
-  store: RewriteStore;
+  store: Store;
   queue: GenerationQueue;
   validate(input: GenerationInput, account?: GenerationAccount): Promise<DomainResponse>;
   resourceFor(input: GenerationInput, priority?: number): Promise<string>;

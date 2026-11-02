@@ -56,15 +56,24 @@ export function readOfflineRuntime(dataDir: string, names: readonly string[] = [
   return result;
 }
 
+/** Opens a database with Studio's settings; the server shares one connection through runtimeDatabase. */
+export function openDatabase(filename: string): DatabaseSync {
+  const db = new DatabaseSync(filename);
+  // Before WAL creates the sidecars, which take the database file's mode.
+  if (filename !== ":memory:") fs.chmodSync(filename, 0o600);
+  db.exec(
+    "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;",
+  );
+  return db;
+}
+
 export function runtimeDatabase(dataDir: string): DatabaseSync {
   const filename = databaseFile(dataDir);
   let db = databases.get(filename);
   if (!db) {
     fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-    db = new DatabaseSync(filename);
-    fs.chmodSync(filename, 0o600);
-    db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;
-      CREATE TABLE IF NOT EXISTS studio_documents (name TEXT PRIMARY KEY, value TEXT NOT NULL);
+    db = openDatabase(filename);
+    db.exec(`CREATE TABLE IF NOT EXISTS studio_documents (name TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);`);
     databases.set(filename, db);
   }

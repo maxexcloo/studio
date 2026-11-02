@@ -5,7 +5,7 @@ import {
   type QueueMedia,
   type QueueStatus,
 } from "../../shared/queue.ts";
-import { everyone, pendingStatuses, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
+import { everyone, pendingStatuses, queuePriority, Store, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;
@@ -117,11 +117,11 @@ export class GenerationQueue {
   /** Jobs whose prompt is being written, to abort on cancel or stop. */
   private writing = new Map<string, AbortController>();
   private stopped = false;
-  readonly store: RewriteStore;
+  readonly store: Store;
   readonly adapter: QueueAdapter;
   readonly writer?: PromptWriter;
 
-  constructor(store: RewriteStore, adapter: QueueAdapter, writer?: PromptWriter) {
+  constructor(store: Store, adapter: QueueAdapter, writer?: PromptWriter) {
     this.store = store;
     this.adapter = adapter;
     this.writer = writer;
