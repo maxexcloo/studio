@@ -214,9 +214,8 @@ jobs:
           done
           docker buildx imagetools inspect "$worker" >/dev/null || { echo "::error::$worker is missing; run the Worker workflow on main, then rerun this job."; exit 1; }
           for image in "$IMAGE_NAME:sha-$GITHUB_SHA" "$worker"; do
-            docker buildx imagetools create --tag "${image%%:*}:$VERSION" "$image"
+            docker buildx imagetools create --tag "${image%%:*}:$VERSION" --tag "${image%%:*}:latest" "$image"
           done
-          docker buildx imagetools create --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
       - name: Publish Release
         if: steps.version.outputs.version
         env:
