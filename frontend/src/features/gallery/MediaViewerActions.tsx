@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import type { MediaItem } from "../../types";
 import { usePhone } from "../../ui/usePhone";
-import { ActionBarGroups, ActionBarSurface, StackedActionBar } from "./ActionBar";
+import {
+  ActionBarGroups,
+  ActionBarSurface,
+  StackedActionBar,
+  type ActionGroups,
+} from "./ActionBar";
 import { CustomAnimationDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
@@ -23,6 +28,7 @@ export function MediaViewerActions({
   onDelete,
   onRetried,
   onVersionChange,
+  shortcuts,
 }: {
   item: MediaItem;
   sessionId?: string;
@@ -34,6 +40,8 @@ export function MediaViewerActions({
   onDelete: () => void;
   onRetried: (jobId: string) => void;
   onVersionChange: (id: string, active: boolean) => void;
+  /** Holds the current actions for the viewer's keyboard shortcuts. */
+  shortcuts?: RefObject<ActionGroups>;
 }) {
   const phone = usePhone();
   const transfer = useMediaTransfer(item, true);
@@ -55,6 +63,7 @@ export function MediaViewerActions({
     onUpscale: () => setUpscaling(true),
     onVersionChange,
   });
+  if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface
       aria-label="Generation Actions"

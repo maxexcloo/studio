@@ -61,7 +61,7 @@ primary component reference and verify APIs against the installed version.
   purpose reads Parked in grey wherever it shows, never as failing, with Start
   for administrators there; one that should run but doesn't stays red. It opens the same
   slideout everywhere: Chats in Chat, active and failed generations with Stop,
-  Retry and Clear in gallery modes, and the compact service summary at the bottom.
+  Retry and Clear in gallery modes, and the compact service summary at the bottom, which administrators tap to open Settings › Workers.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Account, Library,
@@ -141,7 +141,7 @@ primary component reference and verify APIs against the installed version.
   collapse controls. Phones open a full-height Drawer titled Generate upward with
   a short transition and the standard accessible close action; tapping the
   collapsed bar's prompt summary opens the full-screen prompt editor over it in
-  one tap, and Done lands in the Generate Drawer.
+  one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. On phones a text box is a summary of its
@@ -234,7 +234,7 @@ primary component reference and verify APIs against the installed version.
 - Dream is a card deck of background results, up to a maximum height, with a
   strip showing progress through the current batch. Swipe or press left to skip,
   right to keep and up to keep and queue variations. One compact bar under the
-  card offers Skip, Refine, Animate, Star, More Like This and Keep; Refine and
+  card offers Skip, Refine, Animate, Star, More Like This and Keep (phones: icons with short names under them, More Like This as Similar); Refine and
   Animate keep the result and stage it in the composer, Star keeps it too and
   More Like This keeps it and steers the next ideas toward it. Tapping a card,
   or its View action, opens it in the viewer over the deck; closing returns to
@@ -334,7 +334,7 @@ primary component reference and verify APIs against the installed version.
   Phones show the image full-bleed above a bar of Edit, Animate, Prompt and Upscale, labelled under their icons with ▾ for their options, and More listing every other action; the selection bar keeps Download or Share, Star and Delete with More and Close; swipe left/right navigates,
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
-  swipes. A video tile plays its short preview under the mouse. Navigation (swipe,
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while
@@ -375,7 +375,7 @@ primary component reference and verify APIs against the installed version.
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
   Detail (listed even when the worker can't run it, saying why), Upscale
-  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
+  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download as GIF. Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out

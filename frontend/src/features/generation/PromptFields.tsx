@@ -23,6 +23,7 @@ export function PromptFields({
   edit = false,
   fill = false,
   ideas: offerIdeas = false,
+  submit,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -40,6 +41,8 @@ export function PromptFields({
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
   ideas?: boolean;
+  /** The form's send action, offered in the phone prompt editor. */
+  submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
   const phone = usePhone();
   const assistant = usePromptAssistant({
@@ -98,6 +101,7 @@ export function PromptFields({
           overlay={offerIdeas && ideas.ideas}
           below={assistant.suggestions}
           edit={edit}
+          submit={submit}
         />
       </div>
       {negative && (
