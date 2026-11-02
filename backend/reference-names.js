@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
 
+/** The image types Studio takes as references and reuses as results. */
+export const imageMimes = ["image/png", "image/jpeg", "image/webp"];
+
 /**
  * The name an image gets in ComfyUI's input folder when a run uses it as a
  * reference (references.js). It is named by its content, so the same

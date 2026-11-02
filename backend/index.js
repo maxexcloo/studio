@@ -51,6 +51,7 @@ import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
+import { terminalStatuses } from "../shared/queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
@@ -1868,7 +1869,7 @@ for (const job of rewriteStore
   .jobs()
   .filter(
     (item) =>
-      !["completed", "failed", "cancelled"].includes(item.status) &&
+      !terminalStatuses.has(item.status) &&
       (["starting", "running", "saving"].includes(item.status) || item.providerJobId),
   )) {
   const workloads = managedWorkloads(job);

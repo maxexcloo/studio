@@ -4,19 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Layers, RotateCw, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
-import {
-  progressPercent,
-  queueQuery,
-  statusLabels,
-  terminal,
-  useQueueAction,
-} from "../generation/Queue";
+import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useHoldToSelect } from "./useGalleryLayout";
 import classes from "./MediaTile.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>
@@ -60,7 +55,7 @@ function TileStatus({
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
   const cancellable =
-    active && job && !terminal.has(job.status) && (!owner || owner.id === item.id);
+    active && job && !terminalStatuses.has(job.status) && (!owner || owner.id === item.id);
   const retryable = failed && job?.status === "failed" && onTryAgain;
   return (
     <>

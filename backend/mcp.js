@@ -49,6 +49,7 @@ import { mayUseFeature } from "./account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
 import { adminInstructions, registerAdminTools } from "./mcp-admin.js";
 import fs from "node:fs";
+import { imageMimes } from "./reference-names.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -1317,7 +1318,7 @@ export function registerMcpRoutes(
                 "mode reference takes only job_id and output_index. To generate from this result, call Reuse with mode again or animate.",
               );
             const result = await media.download(owner, id, output_index);
-            if (!["image/png", "image/jpeg", "image/webp"].includes(result.mime))
+            if (!imageMimes.includes(result.mime))
               throw new Error("Only images can be reused as references.");
             return mcpJson(
               await media.upload(

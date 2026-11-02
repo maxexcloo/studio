@@ -8,6 +8,12 @@ export type QueueStatus =
   | "completed"
   | "failed"
   | "cancelled";
+/** A job in one of these is done and changes no more. */
+export const terminalStatuses: ReadonlySet<string> = new Set<QueueStatus>([
+  "completed",
+  "failed",
+  "cancelled",
+]);
 export type GenerationOperation = "image" | "refine" | "animate" | "upscale";
 export type GenerationInput = Record<string, unknown>;
 /**
