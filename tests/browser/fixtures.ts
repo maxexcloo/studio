@@ -533,6 +533,10 @@ export async function fixtures(page: Page) {
         },
       });
     }
+    if (path === "/api/gallery/frame") {
+      referenceRequests.push({ save: true, ...body });
+      return respond({ asset: { id: "frame-upload", name: "Saved Frame", url: image } }, 201);
+    }
     if (path === "/api/reference-assets/from-gallery") {
       referenceRequests.push(body);
       return respond({
