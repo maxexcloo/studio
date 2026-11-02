@@ -7,7 +7,13 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
 COPY --from=radiance /opt/radiance /opt/radiance
 COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
 COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
-RUN python3 -m pip install --no-cache-dir fsspec==2026.9.0 peft==0.21.2 rotary_embedding_torch==0.9.1 \
+RUN python3 -m pip install --no-cache-dir \
+    # renovate: datasource=pypi depName=fsspec
+    fsspec==2026.9.0 \
+    # renovate: datasource=pypi depName=peft
+    peft==0.21.2 \
+    # renovate: datasource=pypi depName=rotary_embedding_torch
+    rotary_embedding_torch==0.9.1 \
     && rm -rf /root/ComfyUI
 COPY worker/install_nodes.py worker/source.json worker/sources.json /opt/studio/
 RUN python3 /opt/studio/install_nodes.py /opt/studio/source.json /opt/studio/sources.json /root/ComfyUI
@@ -22,6 +28,7 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
     && zypper --non-interactive --no-refresh update --repo repo-oss --repo repo-update --no-recommends \
         libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 python313 python313-dbm \
     && zypper clean --all \
+    # renovate: datasource=pypi depName=uv
     && python3 -m pip install --no-cache-dir uv==0.13.6
 COPY LICENSE /opt/studio/LICENSE
 WORKDIR /root/ComfyUI

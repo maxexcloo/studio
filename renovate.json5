@@ -20,13 +20,6 @@
         '"reference":\\s*"(?<currentValue>v?\\d+(?:\\.\\d+)+[^"]*)",\\s*"repository":\\s*"(?<depName>[^"]+)",\\s*"revision":\\s*"(?<currentDigest>[a-f0-9]{40})"',
       ],
     },
-    {
-      customType: "regex",
-      datasourceTemplate: "pypi",
-      description: "Python packages pinned in worker image commands",
-      managerFilePatterns: ["/^worker/Dockerfile$/"],
-      matchStrings: ["\\b(?<depName>[\\w.-]+)==(?<currentValue>\\d[\\w.+!-]*)"],
-    },
   ],
   packageRules: [
     {
