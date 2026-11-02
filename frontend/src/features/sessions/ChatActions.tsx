@@ -171,7 +171,7 @@ function DeleteChatDialog({ session, onClose }: { session: Session; onClose: () 
         notifications.show({
           color: "yellow",
           title: "Some Results Were Kept",
-          message: `${media.failed.length} ${media.failed.length === 1 ? "result" : "results"} could not be deleted and remain in your gallery.`,
+          message: `${media.failed.length} ${media.failed.length === 1 ? "result" : "results"} couldn’t be deleted and stay in your gallery.`,
         });
       onClose();
     },

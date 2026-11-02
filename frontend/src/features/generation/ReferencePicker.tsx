@@ -135,7 +135,7 @@ export function ReferencePicker({
       onConfirm={() => deleteId && deletion.mutate(deleteId)}
       onClose={dismissDelete}
     >
-      Delete this uploaded image from Studio? References using it will need another image.
+      Delete this upload? References using it will need another image.
     </ConfirmDialog>
   );
   function uploadFiles(files: File[], into: ReferenceTarget | null = chosen) {
@@ -348,7 +348,7 @@ export function ReferencePicker({
         )}
         {uploads && !choices.length && !listing.isPending && (
           <Text size="xs" c="dimmed" ta="center" mt="sm">
-            {search ? "No matching uploads." : "Upload, paste or drop images to use them here."}
+            {search ? "No matching uploads." : "Upload, paste or drop images."}
           </Text>
         )}
         {listing.hasNextPage && (

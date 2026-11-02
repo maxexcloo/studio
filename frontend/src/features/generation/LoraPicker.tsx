@@ -423,8 +423,7 @@ function LoraControls({
       </Group>
       {!!profile?.maxLoras && enabledCount > profile.maxLoras && (
         <Text size="xs" c="yellow">
-          This profile supports up to {profile.maxLoras} enabled LoRAs. Disable or remove extras
-          before generating.
+          This profile takes up to {profile.maxLoras} enabled LoRAs. Disable or remove the extras.
         </Text>
       )}
       {input.loras.length ? (
@@ -454,7 +453,7 @@ function LoraControls({
         </OrderedItems>
       ) : (
         <Text size="sm" c="dimmed">
-          Choose LoRAs or a saved stack to add them here.
+          Choose LoRAs or a saved stack.
         </Text>
       )}
     </>
@@ -588,8 +587,7 @@ function StackEntry({
         )}
         {!compatible && (
           <Text size="xs" c="yellow">
-            This LoRA is unavailable for the selected profile. Disable or remove it before
-            generating.
+            This profile can’t use this LoRA. Disable or remove it.
           </Text>
         )}
         {!!info?.triggers?.length && (

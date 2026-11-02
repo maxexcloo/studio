@@ -55,7 +55,7 @@ export function LibraryPage() {
       void client.invalidateQueries({ queryKey: ["library-downloads"] });
       notifications.show({
         message: choice
-          ? "Update queued. The existing file stays until the replacement is verified and no longer in use."
+          ? "Update queued. The current file stays until the new one is verified and free."
           : result.available
             ? `${result.available} updates available.`
             : "Everything is up to date.",

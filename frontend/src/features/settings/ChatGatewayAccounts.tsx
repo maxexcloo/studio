@@ -51,8 +51,8 @@ export function ChatGatewayAccounts({
   return (
     <Stack>
       <Text size="sm" c="dimmed">
-        Link chat gateway identities to Studio accounts to use their access permissions. Matching
-        verified email addresses can also link accounts automatically.
+        A linked identity gets its Studio account’s access. Matching verified emails can link
+        automatically.
       </Text>
       <Switch
         label="Chat Gateway Admin Tools"

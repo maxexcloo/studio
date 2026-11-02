@@ -274,7 +274,7 @@ export function ZoomImage({
           onClick={(event) => event.stopPropagation()}
         >
           <Text size="sm" role="alert">
-            The selected version could not be loaded. The previous image is still shown.
+            This version couldn’t be loaded.
           </Text>
           <Button
             size="compact-sm"

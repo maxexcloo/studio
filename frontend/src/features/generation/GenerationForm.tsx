@@ -119,7 +119,7 @@ export function GenerationForm({
           <Textarea
             data-composer-prompt
             aria-label="Prompt"
-            placeholder={input.kind === "video" ? "Describe the motion…" : "Describe your image…"}
+            placeholder={input.kind === "video" ? "Describe the motion" : "Describe the image"}
             autosize
             minRows={1}
             maxRows={1}

@@ -112,9 +112,7 @@ for (const failFirst of [false, true]) {
       release();
     }
     if (failFirst) {
-      await expect(viewer.getByRole("alert")).toHaveText(
-        "The selected version could not be loaded. The previous image is still shown.",
-      );
+      await expect(viewer.getByRole("alert")).toHaveText("This version couldn’t be loaded.");
       await expect(image).toHaveAttribute("src", originalUrl);
       await expect(image).toBeVisible();
       await expect

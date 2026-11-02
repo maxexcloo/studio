@@ -166,9 +166,8 @@ export function CombineBackends({ opened, onClose }: { opened: boolean; onClose:
           {pairs.length ? (
             <>
               <Text size="sm">
-                Each picked pair becomes one profile that runs on its default backend; switch it in
-                the profile. The old ids stay as aliases, so their results rerun on the backend they
-                ran on.
+                Each pair becomes one profile on its default backend, switchable in the profile. Old
+                IDs stay as aliases, so their results rerun where they ran.
               </Text>
               {pairs.map((pair) => (
                 <PairRow

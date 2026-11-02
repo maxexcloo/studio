@@ -13,7 +13,7 @@ export const librarySections = {
   },
   presets: {
     label: "Inspiration",
-    description: "Saved prompts and settings to start new work from.",
+    description: "Saved prompts and settings to start from.",
     icon: Sparkles,
     admin: true,
   },
@@ -29,8 +29,7 @@ export const librarySections = {
   },
   downloads: {
     label: "Downloads",
-    description:
-      "Model downloads in progress and recently finished. Cancelling keeps partial files to resume.",
+    description: "Current and recent model downloads. Cancelling keeps partial files to resume.",
     icon: HardDriveDownload,
     admin: true,
   },

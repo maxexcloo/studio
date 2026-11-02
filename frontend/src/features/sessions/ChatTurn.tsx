@@ -149,7 +149,7 @@ export function ChatTurn({
       )}
       {message.status === "failed" && !message.actionError && (
         <Text size="sm" c="red">
-          {message.error || "This response could not be completed."}
+          {message.error || "This reply couldn’t finish."}
         </Text>
       )}
       {message.actionError && (

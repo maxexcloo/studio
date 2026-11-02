@@ -200,7 +200,7 @@ export default function MaskEditor({
       <FocusTrap.InitialFocus />
       <Stack>
         <Text size="sm" c="dimmed">
-          Paint over the parts that should change. The rest of your image is preserved.
+          Paint over what should change; the rest stays.
         </Text>
         {error && (
           <Alert color="red" role="alert">
