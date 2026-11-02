@@ -116,6 +116,8 @@ export interface MediaItem {
   title?: string;
   /** What the image shows, from Gallery Captions; older captions have no tags. */
   caption?: { text: string; tags?: string[]; model?: string; at?: string };
+  /** A prompt that would recreate an item made without one (an upload); Recreate uses it. */
+  suggestedPrompt?: string;
   createdAt?: string;
   favorite?: boolean;
   /** An uploaded image or video (references.js), listed under the gallery's Uploads filter. */

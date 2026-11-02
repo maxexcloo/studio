@@ -28,13 +28,14 @@ const model = (input: GenerationInput) => String(input.profileId || input.model 
  * Whether a run made from a result (its recorded `parentItemId`) is one of that result's versions
  * rather than a new image derived from it. Edits and animations work on the result itself, so they
  * always are; a run from its settings (Prompt, Run Again, Exact Repeat) is while it keeps the
- * profile and at least `versionPromptOverlap` of the prompt.
+ * profile and at least `versionPromptOverlap` of the prompt. A source no model made (an upload,
+ * gallery/recreate.js) has nothing to keep, so every run from it (Recreate) is.
  */
 export function isVersion(
   run: { operation: GenerationOperation; input: GenerationInput },
   source: { input: GenerationInput },
 ) {
-  if (run.operation !== "image") return true;
+  if (run.operation !== "image" || !model(source.input)) return true;
   return (
     model(run.input) === model(source.input) &&
     promptOverlap(run.input.prompt, source.input.prompt) >= versionPromptOverlap
