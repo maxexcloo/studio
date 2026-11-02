@@ -375,7 +375,7 @@ primary component reference and verify APIs against the installed version.
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
   Detail (listed even when the worker can't run it, saying why), Upscale
-  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
+  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download as GIF. Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out
