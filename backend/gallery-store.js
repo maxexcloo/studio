@@ -1215,23 +1215,21 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         );
         if (file) {
           const { joinClips, probeVideo } = await import("./video-previews.js");
-          // An Extend (a run started from a video's frame) is kept joined onto that video.
+          // An Extend (a run started from a video's frame) is kept joined onto that video. Only the
+          // first reference is what the run was made from (shared/versions.ts). The extension's own
+          // file stays, so a retried save or a provider's recorded output still finds it.
           const { frameSourceFile } = await import("./references.js");
           const from =
-            status === "done" &&
-            !/-joined\.mp4$/.test(file) &&
-            (body.referenceAssets || [])
-              .map((reference) => frameSourceFile(reference?.assetId, ownerId))
-              .find(Boolean);
-          if (from) {
+            status === "done" && frameSourceFile(body.referenceAssets?.[0]?.assetId, ownerId);
+          if (from && from.at !== 0) {
             const name = `${path.parse(file).name}-joined.mp4`;
             const joined = mediaPath(name, subfolder);
             try {
-              await joinClips(from.file, file, joined, from.at);
-              await fs.promises.rm(file, { force: true });
+              if (!fs.existsSync(joined)) await joinClips(from.file, file, joined, from.at);
               item = { ...item, ...mediaUrls(name, subfolder), filename: name };
               file = joined;
             } catch (error) {
+              await fs.promises.rm(joined, { force: true });
               console.warn(`[Studio] Keeping an extension unjoined: ${error.message}`);
             }
           }

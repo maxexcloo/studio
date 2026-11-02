@@ -263,7 +263,9 @@ export async function joinClips(source, extension, output, at = "last") {
   if (!first || !second) throw new Error("A clip to join couldn’t be read.");
   const fps = first.fps || second.fps || 24;
   const even = (value) => Math.max(2, Math.round(value / 2) * 2);
-  const fit = `fps=${fps},scale=${even(first.width)}:${even(first.height)},setsar=1,format=yuv420p`;
+  const [width, height] = [even(first.width), even(first.height)];
+  // An extension at another aspect is fitted inside the source's frame, never stretched.
+  const fit = `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p`;
   const until = at === "last" ? "" : `trim=end=${(Number(at) / 1000).toFixed(3)},`;
   const skip = (1 / (second.fps || fps)).toFixed(4);
   const audio = first.audio && second.audio;

@@ -132,10 +132,19 @@ test("an Extend is saved joined onto the video it continued", async (context) =>
   assert.equal(completed.outputName, "extension-clip-joined.mp4");
   assert.match(completed.url, /extension-clip-joined\.mp4/);
   assert.ok(fs.existsSync(path.join(outputDir, "extension-clip-joined.mp4")));
-  assert.ok(!fs.existsSync(path.join(outputDir, "extension-clip.mp4")));
+  // The extension's own file stays for a retried save or a provider's recorded output.
+  assert.ok(fs.existsSync(path.join(outputDir, "extension-clip.mp4")));
   const { probeVideo } = await import("./video-previews.js");
   const joined = await probeVideo(path.join(outputDir, "extension-clip-joined.mp4"));
   assert.ok(joined.durationMs > 1800, `got ${joined.durationMs} ms`);
+  // A retried save takes the joined clip already made.
+  const [retried] = await replaceGalleryJob(
+    "extend-job",
+    [{ url: url("extension-clip.mp4"), filename: "extension-clip.mp4", type: "video" }],
+    body,
+    new Map(),
+  );
+  assert.equal(retried.url, completed.url);
 });
 
 test("a video that cannot be probed still completes with its requested dimensions", async () => {
