@@ -17,7 +17,7 @@ import {
   ImageUpscale,
   ListChecks,
   Loader,
-  MessageCircle,
+  MessageSquareShare,
   Pencil,
   PenLine,
   Play,
@@ -52,6 +52,7 @@ import { useGeneration, useGenerationActions } from "../generation/GenerationPro
 import { assistantQuery } from "../generation/PromptAssistant";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
+import { useChatText } from "../sessions/ChatProvider";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
 import { videoExport } from "./download";
 import { useSettingsText } from "./MediaDetails";
@@ -72,7 +73,7 @@ import { useVideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
-  chat: { label: "Chat", icon: MessageCircle },
+  chat: { label: "Continue in Chat", icon: MessageSquareShare },
   prompt: { label: "Prompt", icon: SlidersHorizontal },
   animate: { label: "Animate", icon: Play },
   edit: { label: "Edit", icon: Pencil },
@@ -88,7 +89,7 @@ const definitions = {
 };
 export type ItemActionId = keyof typeof definitions;
 /**
- * The sections: Chat and Prompt first, Star then Delete last, the rest alphabetical within each.
+ * The sections: Continue in Chat and Prompt first, Star then Delete last, the rest alphabetical within each.
  * Compare shows only in menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
@@ -220,15 +221,18 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
 }
 
 /**
- * Chat: a new Chat about the result, with it attached as the reference and its settings as the
- * generation input, so the conversation can rework its prompt or edit the image.
+ * Continue in Chat: a new Chat about the result, with it attached as the reference and its settings
+ * as the generation input, so the conversation can rework its prompt or edit the image. A `message`
+ * (the change asked for in the viewer) starts the Chat's unsent message.
  */
-function useChatAction(item: MediaItem, onApplied: () => void) {
+export function useChatAction(item: MediaItem, onApplied: () => void) {
   const { setDraft, profiles } = useGenerationActions();
   const client = useQueryClient();
   const navigate = useNavigate();
+  const [, setText] = useChatText();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (message?: string) => {
+      if (message) setText(message);
       // Without a model that takes the image, the Chat still starts from its settings.
       const { draft } = await mediaDraft(item, "refine", profiles, client).catch(() =>
         mediaDraft(item, "image", profiles, client),

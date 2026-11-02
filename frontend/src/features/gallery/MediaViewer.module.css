@@ -122,11 +122,52 @@
   width: min(100%, var(--studio-composer-width));
 }
 
-/* The strip and the action bar are sized to their content. */
-.strip,
-.actions {
+/* The strip is sized to its versions. */
+.strip {
   width: auto;
   max-width: min(100%, var(--studio-composer-width));
+}
+
+/* The action bar spans the prompt's width: the prompt field over the actions, centred under it. */
+.dock > .actions {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: min(100%, var(--studio-composer-width));
+  max-width: none;
+}
+
+/* The padding sits outside the text, so a phone summary clips at a whole line. */
+.prompt {
+  align-self: stretch;
+  padding-block: 7px;
+}
+
+.prompt textarea {
+  padding-block: 0;
+  line-height: 1.45;
+}
+
+/* A proposed change sits above the field it came from, until it runs or is dismissed. */
+.change {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 2px 4px;
+  padding: var(--mantine-spacing-xs);
+  border: 1px solid var(--studio-glass-border);
+  border-radius: var(--mantine-radius-md);
+  animation: arrive var(--studio-motion-duration) var(--studio-ease-enter);
+}
+
+.changeAction {
+  flex-shrink: 0;
+}
+
+.changeText {
+  flex: 1;
+  min-width: 0;
 }
 
 .variation {
@@ -264,7 +305,7 @@
     padding-inline: var(--mantine-spacing-sm);
   }
   /* The labelled phone bar spans the width. */
-  .actions {
-    width: 100%;
+  .dock > .actions {
+    align-items: stretch;
   }
 }

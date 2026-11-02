@@ -287,7 +287,7 @@ primary component reference and verify APIs against the installed version.
   chosen profile it takes the shared backend pick (Fast unless Quality is chosen; local video while it runs,
   otherwise granted Grok), and says why before queuing when nothing can run. Show truthful queue states and reasons.
   A prompt the assistant writes for a generation is the queue item's Writing Prompt stage, queued
-  in one click without a review pause: its thinking and prompt stream in the item, and Details keeps
+  in one click without a review pause (the viewer's plain-language change is the exception): its thinking and prompt stream in the item, and Details keeps
   the thinking collapsed under the prompt.
 - The status panel shows compact active rows with a muted spinner and Stop;
   completed/cancelled work leaves the list, failed work retains Retry and Clear.
@@ -329,20 +329,29 @@ primary component reference and verify APIs against the installed version.
 
 ## Media, Motion & Accessibility
 
-- The viewer is the iteration hub. There is no prompt bar on the image: Prompt
-  opens the item in the page's composer and Chat starts a Chat about it (the
-  item attached as its reference, its settings as the input) to rework its
-  prompt or edit the image. Runs started from the viewer queue as usual
-  into a strip of the item's versions, grouped as the grid groups them
-  (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
-  shared item actions, sized to them; Animate opens its LLM prompt menu
+- The viewer is the iteration hub. One glass action bar (`ViewerPrompt` over
+  the shared item actions) holds the item's prompt in a field: editing it and
+  pressing Enter or Generate runs it with the item's settings (a video's
+  animates again). Its chat icon switches the field to asking for a change in
+  plain words ("make it night"); the prompt assistant picks Edit, Recreate,
+  Animate or Upscale (`/api/suggestions`, surface `change`) and the proposal
+  shows its action and rewritten prompt above the field until Run or dismiss,
+  the one review pause before a written prompt runs. Continue in Chat (in the
+  field on desktop, under More on phones) starts a Chat about the item (attached
+  as its reference, its settings as the input, any change typed as the
+  message). Prompt opens the item in the page's composer. Runs started from the
+  viewer queue as usual into a strip of the item's versions, grouped as the grid
+  groups them (`gallery/versions.ts`); choosing one makes it current. Under the
+  field come the labelled primaries Edit, Animate ▾ and Prompt ▾, then the other
+  shared actions as icons with tooltips (Upscale, Copy, Download, Star,
+  Delete); Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above a bar of Edit, Animate, Prompt and Upscale, labelled under their icons with ▾ for their options, and More listing every other action; swipe left/right navigates,
+  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates,
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
   swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
@@ -374,10 +383,10 @@ primary component reference and verify APIs against the installed version.
   domain behaviour; retain the common generation actions and full settings.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
-- Item actions have one definition (`gallery/MediaActions.tsx`): Chat, Prompt ▾
-  | Animate, Edit | Upscale | Copy ▾, Download | Star, Delete, Chat and Prompt
+- Item actions have one definition (`gallery/MediaActions.tsx`): Continue in Chat, Prompt ▾
+  | Animate, Edit | Upscale | Copy ▾, Download | Star, Delete, Continue in Chat and Prompt
   first, Delete last and the rest alphabetical within each section, in every menu and action
-  bar. Compare joins Upscale's section in menus (the tile and right-click menu
+  bar (the viewer's bar leads with its labelled primaries). Compare joins Upscale's section in menus (the tile and right-click menu
   and the selection's More), never the viewer's bar. Options are submenus in menus
   and split buttons or menus in bars: Prompt (opens the composer) › Edit,
   Use as Reference (images), Run Again (new seed), Run Again (Same Seed); Edit

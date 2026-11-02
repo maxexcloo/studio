@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import type { NextStep, Suggestions } from "../../../../shared/suggestions";
+import type { Change, ChangeAction, NextStep, Suggestions } from "../../../../shared/suggestions";
 import { post } from "../../api";
 import type { MediaKind } from "../../types";
 
@@ -25,3 +25,7 @@ export const nextStepsQuery = (jobId: string) =>
     queryFn: () => askNextSteps(jobId),
     ...cached,
   });
+
+/** The action and prompt for a change asked for in plain words, chosen from `actions`. */
+export const askChange = (jobId: string, request: string, actions: ChangeAction[]) =>
+  post<Suggestions<Change>>("/api/suggestions", { surface: "change", jobId, request, actions });

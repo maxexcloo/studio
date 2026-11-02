@@ -64,11 +64,126 @@ async function newSeed(page: Page) {
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
-test("The viewer has no prompt bar; its runs queue into the strip and Prompt opens the composer", async ({
+/**
+ * Types into the viewer's prompt field and sends it: Enter on desktop, the full-screen editor's
+ * send arrow on phones.
+ */
+async function sendField(page: Page, name: string, text: string, send: string) {
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  const field = viewer.getByRole("textbox", { name, exact: true });
+  if (page.viewportSize()!.width >= 768) {
+    await field.fill(text);
+    return field.press("Enter");
+  }
+  await field.click();
+  const editor = page.getByRole("dialog", { name, exact: true });
+  await editor.getByRole("textbox", { name, exact: true }).fill(text);
+  await editor.getByRole("button", { name: send, exact: true }).click();
+}
+
+test("The viewer's prompt field runs an edited prompt with the item's settings as a version", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveCount(0);
+  const field = viewer.getByRole("textbox", { name: "Prompt", exact: true });
+  await expect(field).toHaveValue("An amber bird");
+  await sendField(page, "Prompt", "An amber bird at dusk", "Generate");
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    sessionId: "session-hub",
+    operation: "image",
+    parentJobId: "job-hub",
+    parentItemId: "hub",
+    input: { prompt: "An amber bird at dusk", count: 2, steps: 28 },
+  });
+  await expect(
+    viewer.getByRole("list", { name: "Versions", exact: true }).getByRole("listitem"),
+  ).toHaveCount(2);
+  // The bar stays in reach while phone details are open.
+  if (page.viewportSize()!.width < 768) {
+    await viewer.getByRole("button", { name: "Generation Details", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Close Details", exact: true })).toBeVisible();
+    await expect(field).toBeInViewport();
+    await viewer.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(viewer).toBeHidden();
+  }
+});
+
+test("Asking for a change in plain words shows the chosen action and prompt before it runs", async ({
+  page,
+}) => {
+  const asked: any[] = [];
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route("**/api/suggestions", (route) => {
+      const body = route.request().postDataJSON();
+      if (body.surface !== "change") return route.fallback();
+      asked.push(body);
+      return route.fulfill({
+        json: {
+          suggestions: [
+            {
+              action: "edit",
+              label: "Night Version",
+              request: body.request,
+              prompt: "An amber bird at night",
+            },
+          ],
+        },
+      });
+    }),
+  );
+  await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await sendField(page, "Ask for a Change", "make it night", "Ask");
+  const proposal = viewer.getByRole("group", { name: "Proposed Change", exact: true });
+  await expect(proposal).toContainText("Edit");
+  await expect(proposal).toContainText("An amber bird at night");
+  expect(asked).toEqual([
+    {
+      surface: "change",
+      jobId: "job-hub",
+      request: "make it night",
+      actions: ["edit", "recreate", "animate", "upscale"],
+    },
+  ]);
+  expect(state.jobs).toHaveLength(1);
+  await proposal.getByRole("button", { name: "Run Edit", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1]).toMatchObject({
+    operation: "refine",
+    parentItemId: "hub",
+    input: { prompt: "An amber bird at night", count: 1 },
+  });
+  await expect(proposal).toBeHidden();
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+});
+
+test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
+  page,
+}) => {
+  const { viewer } = await seed(page);
+  const desktop = page.viewportSize()!.width >= 768;
+  // Desktop's field carries the change typed so far into the Chat; phones list it under More.
+  if (desktop) {
+    await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+    await viewer
+      .getByRole("textbox", { name: "Ask for a Change", exact: true })
+      .fill("make it night");
+  }
+  await viewerAction(page, "Continue in Chat");
+  await expect(viewer).toBeHidden();
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toHaveValue(
+    desktop ? "make it night" : "",
+  );
+  await expect(
+    page
+      .getByRole("button", { name: "Choose References", exact: true })
+      .getByRole("img", { name: /^Reference 1/ }),
+  ).toBeVisible();
+});
+
+test("Viewer runs queue into the strip and Prompt opens the composer", async ({ page }) => {
+  const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
   await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
@@ -88,19 +203,6 @@ test("The viewer has no prompt bar; its runs queue into the strip and Prompt ope
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
   );
-});
-
-test("Chat starts a new Chat about the item, attached as its reference", async ({ page }) => {
-  const { viewer } = await seed(page);
-  await viewerAction(page, "Chat");
-  await expect(viewer).toBeHidden();
-  await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByRole("textbox", { name: "Message", exact: true })).toBeVisible();
-  await expect(
-    page
-      .getByRole("button", { name: "Choose References", exact: true })
-      .getByRole("img", { name: /^Reference 1/ }),
-  ).toBeVisible();
 });
 
 test("A regenerated result shows beside its source until All Versions collapses them", async ({
@@ -848,7 +950,12 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     await expect(sheet.getByText("Prompt", { exact: true })).toBeVisible();
     await sheet.getByRole("button", { name: "Close Details", exact: true }).click();
     await expect(sheet).toBeHidden();
-  } else await expect(dialog.getByText("Prompt", { exact: true })).toBeVisible();
+  } else
+    await expect(
+      dialog
+        .getByRole("complementary", { name: "Generation Details", exact: true })
+        .getByText("Prompt", { exact: true }),
+    ).toBeVisible();
   await expect
     .poll(async () => {
       const picture = await dialog
