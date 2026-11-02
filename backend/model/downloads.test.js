@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const { downloadState, isNetworkError, resumeValidator, setDownloadTransport, startDownload } =
-  await import("./model-downloads.js");
+  await import("./downloads.js");
 
 const spec = (file) => ({
   id: `vae:test:${file}`,

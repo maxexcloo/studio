@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cancelPrompt, isTransientComfyError, promptTracker, queuePlace } from "./comfy-queue.js";
+import { cancelPrompt, isTransientComfyError, promptTracker, queuePlace } from "./queue.js";
 
 /** A fake ComfyUI: answers by path from a table, records every call. */
 function fakeComfy(routes) {

@@ -13,8 +13,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-const editor = await import("./profile-editor.js");
-const { userWorkflowsDir } = await import("./custom-workflows.js");
+const editor = await import("./editor.js");
+const { userWorkflowsDir } = await import("../custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const profile = (overrides = {}) => ({

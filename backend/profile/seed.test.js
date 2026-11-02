@@ -3,8 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { samplesDirectory, seedSamples } from "./profile-seed.js";
-import { createProfileStore } from "./profile-store.js";
+import { samplesDirectory, seedSamples } from "./seed.js";
+import { createProfileStore } from "./store.js";
 
 const quiet = { info: () => {}, warn: () => {} };
 const scratch = (t) => {

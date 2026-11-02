@@ -1,5 +1,5 @@
 import path from "node:path";
-import { missingNodes } from "./comfy.js";
+import { missingNodes } from "./comfy/comfy.js";
 import { nodePack } from "./node-packs.js";
 
 /**

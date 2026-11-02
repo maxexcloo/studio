@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { createProfileStore } from "./profile-store.js";
+import { createProfileStore } from "./profile/store.js";
 import {
   usesRuntimeDatabase,
   withOfflineDatabase,

@@ -157,7 +157,7 @@ export async function resolveCivitaiModel(
     type: resource.type,
     uncensored,
     links: civitaiLinks(id, version.id),
-    // A checkpoint's page, for its drafted profile and guide (profile-drafts.js).
+    // A checkpoint's page, for its drafted profile and guide (profile/drafts.js).
     sourceText:
       folder === "loras"
         ? ""

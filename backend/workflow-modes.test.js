@@ -10,7 +10,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow, validateGraph } =
   await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
-const { inferModels } = await import("./models.js");
+const { inferModels } = await import("./model/models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 const graph = {

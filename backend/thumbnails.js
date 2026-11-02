@@ -2,7 +2,12 @@ import crypto from "node:crypto";
 import { mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
-import { comfyUrl, localOutputFile, noteComfyFetchError, noteComfyReachable } from "./comfy.js";
+import {
+  comfyUrl,
+  localOutputFile,
+  noteComfyFetchError,
+  noteComfyReachable,
+} from "./comfy/comfy.js";
 import { dataDir } from "./gallery-store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";

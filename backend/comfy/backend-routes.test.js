@@ -7,10 +7,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { startFakeComfy } from "./fixtures/fake-comfy.js";
-import { testImageProfile, writeTestWorkflows } from "./fixtures/test-workflows.js";
+import { startFakeComfy } from "../fixtures/fake-comfy.js";
+import { testImageProfile, writeTestWorkflows } from "../fixtures/test-workflows.js";
 
-const here = path.dirname(fileURLToPath(import.meta.url));
+const here = path.dirname(fileURLToPath(new URL("../index.js", import.meta.url)));
 const source = JSON.parse(
   fs.readFileSync(
     path.join(here, "fixtures/object_info-comfyui-0.41.0-master-ce1e922.json"),

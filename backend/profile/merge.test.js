@@ -13,15 +13,15 @@ process.env.STUDIO_WORKERS = JSON.stringify([
     capabilities: ["image", "video", "upscale", "models"],
   },
 ]);
-const { duplicateProfiles, mergeDuplicateProfiles } = await import("./profile-merge.js");
-const { canonicalProfileId, guideStore, profileStore } = await import("./profile-store.js");
-const { getCustomWorkflow, userWorkflowsDir } = await import("./custom-workflows.js");
-const { buildExport } = await import("./profile-export.js");
-const { profileStats } = await import("./stats.js");
-const { matchesGalleryFilters } = await import("./gallery-filters.js");
-const { effectiveAccountAccess, mayUseGenerationProfile } = await import("./account-policy.js");
-const { findProfile } = await import("./mcp-tiers.js");
-const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("./workflow-catalog.js");
+const { duplicateProfiles, mergeDuplicateProfiles } = await import("./merge.js");
+const { canonicalProfileId, guideStore, profileStore } = await import("./store.js");
+const { getCustomWorkflow, userWorkflowsDir } = await import("../custom-workflows.js");
+const { buildExport } = await import("./export.js");
+const { profileStats } = await import("../stats.js");
+const { matchesGalleryFilters } = await import("../gallery-filters.js");
+const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
+const { findProfile } = await import("../mcp-tiers.js");
+const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("../workflow-catalog.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const graph = (model) => ({

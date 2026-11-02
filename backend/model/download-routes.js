@@ -1,13 +1,8 @@
-import { refreshWorkerModels } from "./worker-models.js";
-import { catalogDownload } from "./catalog-downloads.js";
-import {
-  cancelDownload,
-  discardDownload,
-  downloadState,
-  startDownload,
-} from "./model-downloads.js";
-import { requireAdmin } from "./route-access.js";
-import { libraryDownload } from "./library/downloads.js";
+import { refreshWorkerModels } from "../worker-models.js";
+import { catalogDownload } from "../catalog-downloads.js";
+import { cancelDownload, discardDownload, downloadState, startDownload } from "./downloads.js";
+import { requireAdmin } from "../route-access.js";
+import { libraryDownload } from "../library/downloads.js";
 
 export function registerModelDownloadRoutes(app, { loadComfyContext }) {
   app.use("/api/models/downloads", async (req, res, next) => {

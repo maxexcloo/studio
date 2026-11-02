@@ -7,9 +7,9 @@
  *
  * The engine resolves a link (library/sources.js), matches its files against what is installed,
  * grades it (library/grade.js), writes catalogue entries for LoRAs and queues Download Missing
- * through the worker model API (library/downloads.js → model-downloads.js → worker-models.js).
+ * through the worker model API (library/downloads.js → model/downloads.js → worker-models.js).
  * Nothing downloads on its own. A checkpoint or diffusion model import drafts a profile and guide
- * (profile-drafts.js, through the injected `draftProfile`), adding the parts it needs as files.
+ * (profile/drafts.js, through the injected `draftProfile`), adding the parts it needs as files.
  *
  * Dropped image files (PNG, WebP, JPEG) are read by image-metadata.js: their prompt, settings and
  * files become the record's preset and resources, matched by hash first, then by name. An image
@@ -239,7 +239,7 @@ const fileTitle = (name) =>
  * The import engine. Dependencies are injected so tests run without providers or workers:
  *   resolveCivitai(url), resolveHf(url)   library/sources.js resolvers
  *   inspect(want, {verify})               {status: installed|missing|conflict, unverified?}
- *   downloads()                           model-downloads.js downloadState()
+ *   downloads()                           model/downloads.js downloadState()
  *   startDownload(spec)                   library/downloads.js startLibraryDownload
  *   catalogue                             library/catalogue.js store (edit)
  *   importImage(url)                      a saved image: the matched preset (preset-routes.js)

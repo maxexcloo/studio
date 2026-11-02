@@ -2,11 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { createGuideStore, createProfileStore } from "./profile-store.js";
+import { createGuideStore, createProfileStore } from "./profile/store.js";
 
 /**
  * Per-profile preferences that follow a merged or combined profile id to the id it became
- * (profile-store.js `canonical`): workflow preferences (favourites and last use) and every
+ * (profile/store.js `canonical`): workflow preferences (favourites and last use) and every
  * account's LoRA stacks (the active stack, strengths and older per-workflow snapshots). Combine
  * Backends and Merge Duplicate Profiles move them when they run; `combinedProfiles` is the
  * migrate-runtime step that moves what production's earlier combines left behind and prunes

@@ -2,7 +2,7 @@
 /**
  * MCP's admin tools (design §6): an administrator's chat manages the Library, downloads, the
  * catalogue, profiles, guides and accounts' groups through the same routes the UI uses
- * (library/routes.js, model-download-routes.js, profile-editor.js, profile-routes.js,
+ * (library/routes.js, model/download-routes.js, profile/editor.js, profile/routes.js,
  * multi-user-auth.js), with the administrator's own credential, so the same validation, Undo and
  * versioning apply and every change records chat as its origin. Registered only for the admin
  * scope (mcp.js): an administrator's own MCP token, or a gateway-linked administrator while Chat

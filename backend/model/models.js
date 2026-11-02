@@ -1,16 +1,16 @@
-import { missingNodes, nodeRange, optionsFor, textRange } from "./comfy.js";
+import { missingNodes, nodeRange, optionsFor, textRange } from "../comfy/comfy.js";
 import {
   loadCustomWorkflows,
   profileBackendLabels,
   usesGrokMedia,
   workflowOnBackend,
   workflowOptionIssues,
-} from "./custom-workflows.js";
-import { classifyModel } from "./model-families.js";
-import { families } from "./family-catalog.js";
-import { canonicalProfileId } from "./profile-store.js";
-import { inpaintingEnabled, lorasEnabled, presetsEnabled } from "./features.js";
-import { imageSaves, inpaintNodes } from "./inpaint.js";
+} from "../custom-workflows.js";
+import { classifyModel } from "./families.js";
+import { families } from "../family-catalog.js";
+import { canonicalProfileId } from "../profile/store.js";
+import { inpaintingEnabled, lorasEnabled, presetsEnabled } from "../features.js";
+import { imageSaves, inpaintNodes } from "../inpaint.js";
 
 function modelBasename(name = "") {
   return String(name).split(/[\\/]/).pop() || name;

@@ -9,11 +9,11 @@ import {
   userWorkflowsDir,
   validateGraph,
   workflowMissingFiles,
-} from "./custom-workflows.js";
-import { dataDir } from "./gallery-store.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { fromChat, requireAdmin } from "./route-access.js";
-import { profileStore } from "./profile-store.js";
+} from "../custom-workflows.js";
+import { dataDir } from "../gallery-store.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { fromChat, requireAdmin } from "../route-access.js";
+import { profileStore } from "./store.js";
 
 /**
  * Studio owns editable runtime profiles and their version history; ai is a read-only seed.
@@ -247,7 +247,7 @@ function checkGraph(raw, id, { info, where = "" }) {
 
 /**
  * Saves a checked edit: the old file goes to backups, the edit is recorded, and a stale base is refused.
- * Every save is also a version (profile-store.js); an AI draft (`origin` "ai", `aiDrafted`) is marked
+ * Every save is also a version (profile/store.js); an AI draft (`origin` "ai", `aiDrafted`) is marked
  * so, and any other save clears the marker.
  */
 export function saveEditableProfile(

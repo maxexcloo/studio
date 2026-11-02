@@ -9,9 +9,9 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-settings-"))
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { variantFor } = await import("./family-catalog.js");
+const { variantFor } = await import("../family-catalog.js");
 const { inferModels } = await import("./models.js");
-const { sanitizeGenerateBody } = await import("./validation.js");
+const { sanitizeGenerateBody } = await import("../validation.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
 const zimage = {
@@ -103,7 +103,7 @@ test("a renamed fine-tune runs at its family's usual settings: Turbo or Distille
 });
 
 test("custom MiniMax H3 profiles use the family's starting aspect", async () => {
-  const { profileImageSize } = await import("./generation-defaults.js");
+  const { profileImageSize } = await import("../generation-defaults.js");
   const workflows = path.join(scratch, "data", "workflows");
   fs.mkdirSync(workflows, { recursive: true });
   const file = path.join(workflows, "h3-aspect.json");

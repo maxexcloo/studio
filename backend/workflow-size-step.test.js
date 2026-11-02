@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-const { sizedRange, workflowFamilyStep, workflowFamilyValue } = await import("./models.js");
+const { sizedRange, workflowFamilyStep, workflowFamilyValue } = await import("./model/models.js");
 
 test("imported workflows take their model family's size step, so off-step sizes are never sent", () => {
   // The Bento Qwen Image 2.1 workflow: its latent node accepts multiples of 8, the model needs 32.

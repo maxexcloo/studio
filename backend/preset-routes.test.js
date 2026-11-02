@@ -280,7 +280,7 @@ test("disabled instances refuse every preset and provider download route", async
     for (const enabled of [undefined, "0"]) {
       if (enabled === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
       else process.env.STUDIO_ENABLE_PRESETS = enabled;
-      const { mockModelResult, offlineModelResult } = await import("./models.js");
+      const { mockModelResult, offlineModelResult } = await import("./model/models.js");
       assert.equal(mockModelResult().features.presets, false);
       assert.equal(offlineModelResult().features.presets, false);
       for (const [method, url] of [

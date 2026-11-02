@@ -8,7 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-i2v-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel } = await import("./model-families.js");
+const { classifyModel } = await import("./model/families.js");
 const { catalogDownload } = await import("./catalog-downloads.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 

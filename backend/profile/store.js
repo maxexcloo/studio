@@ -5,11 +5,11 @@
  * Profiles stay where they are (`<data>/workflows/<id>.json`, read by custom-workflows.js); every
  * change becomes an immutable version under `<data>/history/profiles/<id>/<n>.json`, and
  * `<data>/workflows/.studio-meta.json` records each profile's current version, origin, AI-Drafted
- * marker and who saved it. profile-editor.js still writes `.studio-edits.json` for every profile
+ * marker and who saved it. profile/editor.js still writes `.studio-edits.json` for every profile
  * Studio changed or drafted (the retired seed deploy read it to skip them).
  * `<data>/workflows/.studio-aliases.json` maps a removed profile id to the profile that replaced it
- * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile-merge.js
- * and profile-backends.js), so records that still name the old id resolve to the kept profile
+ * (`{"<old id>": {"to": "<kept id>", "backend"?, "at", "by", "reason"}}`, written by profile/merge.js
+ * and profile/backends.js), so records that still name the old id resolve to the kept profile
  * through `canonical`, and a per-backend id merged into a combined profile runs on its own backend
  * (`aliasBackend`).
  *
@@ -29,9 +29,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { currentDataDir } from "./data-dir.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { loadMcpPrompting } from "./mcp-prompting.js";
+import { currentDataDir } from "../data-dir.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { loadMcpPrompting } from "../mcp-prompting.js";
 
 const versionOrigins = Object.freeze(["seed", "studio", "ai", "chat"]);
 const validId = (id) =>

@@ -24,7 +24,7 @@ import {
   localVideoUnavailable,
   parkedWorker,
 } from "./mcp-tiers.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
+import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { withResolution } from "../shared/resolution.ts";
 import { imageMimes } from "./reference-names.js";
 

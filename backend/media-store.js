@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { comfy } from "./comfy.js";
-import { currentComfyBackend } from "./comfy-backends.js";
+import { comfy } from "./comfy/comfy.js";
+import { currentComfyBackend } from "./comfy/backends.js";
 import { dataDir, mediaPath, mediaSubfolder, mediaUrls } from "./media-paths.js";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Settings › Profiles beyond the JSON editor (profile-editor.js), administrators only:
+ * Settings › Profiles beyond the JSON editor (profile/editor.js), administrators only:
  *
  *   GET  /api/profiles/editable/:id/versions        the profile's versions, newest first, and its current marker
  *   GET  /api/profiles/editable/:id/versions/:n     one version with its text
@@ -22,22 +22,18 @@
  *   POST /api/profiles/guide-bindings/approve       clears AI-Drafted on the bindings
  *   GET  /api/profiles/export                       the export bundle (zip) in the ai/ layout
  *   GET  /api/profiles/duplicates                   what Merge Duplicate Profiles would merge, and what it leaves
- *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile-merge.js)
+ *   POST /api/profiles/duplicates/merge             {hash}: merges that preview, with a backup (profile/merge.js)
  *   GET  /api/profiles/backends                     Radiance and ComfyUI profiles Combine Backends could make one
- *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile-backends.js)
+ *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile/backends.js)
  *
  * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
-import { fromChat, requireAdmin } from "./route-access.js";
-import {
-  approveEditableProfile,
-  readEditableProfile,
-  revertEditableProfile,
-} from "./profile-editor.js";
-import { writeExport } from "./profile-export.js";
-import { backendCandidates, combineBackends } from "./profile-backends.js";
-import { duplicateProfiles, mergeDuplicateProfiles } from "./profile-merge.js";
+import { fromChat, requireAdmin } from "../route-access.js";
+import { approveEditableProfile, readEditableProfile, revertEditableProfile } from "./editor.js";
+import { writeExport } from "./export.js";
+import { backendCandidates, combineBackends } from "./backends.js";
+import { duplicateProfiles, mergeDuplicateProfiles } from "./merge.js";
 
 const fail = (res, error) =>
   res.status(error.status || 400).json({
@@ -47,7 +43,7 @@ const fail = (res, error) =>
   });
 
 /**
- * `profiles()` and `guides()` give the profile-store.js stores; `objectInfo(kind)` ComfyUI's
+ * `profiles()` and `guides()` give the profile/store.js stores; `objectInfo(kind)` ComfyUI's
  * object_info for revert's check; `exportOptions()` what writeExport needs besides the stores;
  * `onSaved(id)` runs after any change that affects who sees which profile.
  */

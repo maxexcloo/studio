@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const samplesDirectory = fileURLToPath(new URL("./samples/", import.meta.url));
+export const samplesDirectory = fileURLToPath(new URL("../samples", import.meta.url));
 
 const profileFiles = (dir) => {
   try {

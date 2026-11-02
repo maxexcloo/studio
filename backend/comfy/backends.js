@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { families } from "./family-catalog.js";
+import { families } from "../family-catalog.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
@@ -7,7 +7,7 @@ import {
   noWorkerMessage,
   pickWorker,
   workerById,
-} from "./workers.js";
+} from "../workers.js";
 
 // Per-operation context, never a mutable global URL: jobs on different workers overlap.
 // The scope holds a worker id (workers.js); outside any scope it is the default worker.

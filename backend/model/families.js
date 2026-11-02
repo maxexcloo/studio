@@ -1,14 +1,14 @@
 import path from "node:path";
-import { comfy } from "./comfy.js";
-import { dataDir } from "./gallery-store.js";
+import { comfy } from "../comfy/comfy.js";
+import { dataDir } from "../gallery-store.js";
 import {
   families,
   familyFromName,
   quantFromName,
   refinedFamily,
   variantFor,
-} from "./family-catalog.js";
-import { readJsonFile } from "./json-store.js";
+} from "../family-catalog.js";
+import { readJsonFile } from "../json-store.js";
 
 /**
  * Which family (and variant) a model file belongs to. Studio never reads the

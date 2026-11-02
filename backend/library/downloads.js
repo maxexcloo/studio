@@ -6,7 +6,7 @@ import { dataDir } from "../gallery-store.js";
 import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
-import { downloadState, existingCopy, startDownload } from "../model-downloads.js";
+import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
 
 const sourcesPath = path.join(dataDir, "model-download-sources.json");
 let sources;

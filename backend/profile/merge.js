@@ -13,20 +13,20 @@
  * Applying copies the removed files and the records it changes (aliases, workflow preferences,
  * guides and LoRA stacks) to
  * `<data>/backups/profile-merges/<time>/`, records each removed id as an alias of the kept one
- * (profile-store.js), then removes the removed files. Version history stays, so a seed never brings
+ * (profile/store.js), then removes the removed files. Version history stays, so a seed never brings
  * a merged id back. Workflow preferences and LoRA stacks move to the kept id and the removed ids'
  * guide bindings go (the kept one has the same); gallery records, presets, jobs, Chats and taste
  * signals keep the ids they hold, and readers resolve them through the aliases.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { graphFromJson, userWorkflowsDir } from "./custom-workflows.js";
-import { dataDir } from "./gallery-store.js";
-import { writeJsonFile } from "./json-store.js";
-import { listEditableProfiles, readEditableProfile } from "./profile-editor.js";
-import { guideStore, hashOf, profileStore } from "./profile-store.js";
-import { loraStackFiles, repointLoraStacks } from "./combined-profiles.js";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "./workflow-catalog.js";
+import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
+import { dataDir } from "../gallery-store.js";
+import { writeJsonFile } from "../json-store.js";
+import { listEditableProfiles, readEditableProfile } from "./editor.js";
+import { guideStore, hashOf, profileStore } from "./store.js";
+import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
+import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
 
 const newerId = /^(image|video)-[a-z0-9._-]+-(comfyui|radiance|cloud)$/;
 const ignoredFields = new Set(["id", "name", "description"]);

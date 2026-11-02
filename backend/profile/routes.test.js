@@ -15,12 +15,12 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 delete process.env.STUDIO_MCP_PROMPTING_PATH;
-const { userWorkflowsDir } = await import("./custom-workflows.js");
-const { profileStore, guideStore, createProfileStore } = await import("./profile-store.js");
-const editor = await import("./profile-editor.js");
-const { registerProfileRoutes } = await import("./profile-routes.js");
-const { buildExport } = await import("./profile-export.js");
-const { mcpAdminRouteAllowed } = await import("./multi-user-auth.js");
+const { userWorkflowsDir } = await import("../custom-workflows.js");
+const { profileStore, guideStore, createProfileStore } = await import("./store.js");
+const editor = await import("./editor.js");
+const { registerProfileRoutes } = await import("./routes.js");
+const { buildExport } = await import("./export.js");
+const { mcpAdminRouteAllowed } = await import("../multi-user-auth.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const profile = (name, extra = {}) =>

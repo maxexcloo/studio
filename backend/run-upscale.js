@@ -1,4 +1,4 @@
-import { normalizeComfyError } from "./comfy.js";
+import { normalizeComfyError } from "./comfy/comfy.js";
 import { embedUpscale, faceDetailSource, normalizeQuality, upscaleStatus } from "./upscale.js";
 import { generationSettings, outputsFrom } from "./gallery-store.js";
 import { saveIntoStudioFolder } from "./graphs.js";

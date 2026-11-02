@@ -40,7 +40,7 @@ import { startLibraryDownload } from "./downloads.js";
 import { createImportEngine, importStore, publicImport } from "./imports.js";
 import { detectLink, resolveCivitaiModel, resolveHuggingFace } from "./sources.js";
 import { familyFromName } from "../family-catalog.js";
-import { downloadState } from "../model-downloads.js";
+import { downloadState } from "../model/downloads.js";
 import { fromChat, requireLocal } from "../route-access.js";
 import { libraryPlacement, lookupLibrary } from "./lookup.js";
 import { refreshWorkerModels, workerInventory, workerModelFile } from "../worker-models.js";
@@ -349,7 +349,7 @@ export function registerLibraryRoutes(
     store = importStore(),
     /** [{id, label, kind, family, familyName, model}]: the image profiles and the base model each runs. */
     profiles = async () => [],
-    /** Drafts a checkpoint import's profile and guide (profile-drafts.js), or null. */
+    /** Drafts a checkpoint import's profile and guide (profile/drafts.js), or null. */
     draftProfile = null,
     /** Lookup: the family ids for a base model, and the ready profiles [{id, family}] it may fit. */
     families = () => [],

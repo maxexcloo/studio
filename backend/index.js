@@ -55,7 +55,7 @@ import { terminalStatuses } from "../shared/queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
-import { registerModelDownloadRoutes } from "./model-download-routes.js";
+import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
 import {
@@ -66,10 +66,10 @@ import {
   registerProfileEditorRoutes,
   repointProfiles,
   validateProfileText,
-} from "./profile-editor.js";
-import { registerProfileRoutes } from "./profile-routes.js";
-import { draftProfileFromImport } from "./profile-drafts.js";
-import { seedSamples } from "./profile-seed.js";
+} from "./profile/editor.js";
+import { registerProfileRoutes } from "./profile/routes.js";
+import { draftProfileFromImport } from "./profile/drafts.js";
+import { seedSamples } from "./profile/seed.js";
 import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
@@ -91,7 +91,7 @@ import {
   profileAliasBackend,
   profileStore,
   withCanonicalProfile,
-} from "./profile-store.js";
+} from "./profile/store.js";
 
 import { requireAdmin, requireLocal } from "./route-access.js";
 import express from "express";
@@ -107,7 +107,7 @@ import {
   routeJob,
   workerAvailability,
   withComfyBackend,
-} from "./comfy-backends.js";
+} from "./comfy/backends.js";
 import {
   capabilityForProfile,
   defaultWorkerId,
@@ -136,7 +136,7 @@ import {
   port,
   root,
   setListeningPort,
-} from "./comfy.js";
+} from "./comfy/comfy.js";
 import { canAdmin, clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
 import { registerMcpRoutes } from "./mcp.js";
@@ -146,7 +146,7 @@ import { startServers } from "./listen.js";
 import { sharedRequests } from "./shared-requests.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
-import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./models.js";
+import { buildProfile, inferModels, mockModelResult, offlineModelResult } from "./model/models.js";
 import { lorasEnabled, presetsEnabled } from "./features.js";
 import {
   catalogueFlags,
@@ -158,7 +158,7 @@ import {
 } from "./deployment-settings.js";
 import { civitaiTokenStatus } from "./civitai/access.js";
 import { hfFetch, hfTokenStatus } from "./hf-access.js";
-import { primeModelMetadata } from "./model-families.js";
+import { primeModelMetadata } from "./model/families.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -201,7 +201,7 @@ import {
 import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
-import { cancelPrompt } from "./comfy-queue.js";
+import { cancelPrompt } from "./comfy/queue.js";
 import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
@@ -264,7 +264,7 @@ import {
 } from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
 import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
-import { forgetComfyRun } from "./comfy-traces.js";
+import { forgetComfyRun } from "./comfy/traces.js";
 import {
   accountForRequest,
   internalMcpHeaders,
@@ -361,7 +361,7 @@ async function resolveSignedMcpResult(owner, jobId, index) {
 }
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue,
 // guide and profile stores take in what the older files hold, which stay where they are
-// (profile-seed.js, library/catalogue.js, profile-store.js). Before MCP reads guides.
+// (profile/seed.js, library/catalogue.js, profile/store.js). Before MCP reads guides.
 for (const [name, migrate] of [
   ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
@@ -787,7 +787,7 @@ async function backendModels(backend, force = false) {
 }
 
 /**
- * The catalogue across every worker (comfy-backends.js), with whether each
+ * The catalogue across every worker (comfy/backends.js), with whether each
  * capability's workers answered (`backends`), so MCP can refuse local video
  * while no video worker is up. One worker that runs everything keeps
  * upstream's catalogue exactly.
@@ -1257,7 +1257,7 @@ registerProfileEditorRoutes(app, {
   objectInfo: profileObjectInfo,
   accountName: (req) => req.studioAccount?.userId || "",
 });
-// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile-routes.js).
+// Settings › Profiles: versions, revert, approve, guides and the export bundle (profile/routes.js).
 registerProfileRoutes(app, {
   profiles: () => profileStore(),
   guides: () => guideStore(),
@@ -1273,7 +1273,7 @@ registerProfileRoutes(app, {
 });
 
 /**
- * A checkpoint or diffusion model import's AI-drafted profile and guide (profile-drafts.js): the
+ * A checkpoint or diffusion model import's AI-drafted profile and guide (profile/drafts.js): the
  * nearest same-family profile as template, parts through Download Missing, checked against
  * ComfyUI's object_info before it is written. Administrators only until approved.
  */
@@ -1484,7 +1484,7 @@ const tasteWriter = (ownerId) => {
 // gateway is always reachable; a stopped or parked local worker never makes text unavailable.
 const textOnline = async () => Boolean(assistantEngine);
 const tasteStore = createTaste({ dataDir, writer: tasteWriter, online: textOnline });
-// Signals name a merged profile by the id it goes by now (profile-merge.js).
+// Signals name a merged profile by the id it goes by now (profile/merge.js).
 const taste = {
   ...tasteStore,
   record: (ownerId, signals) =>

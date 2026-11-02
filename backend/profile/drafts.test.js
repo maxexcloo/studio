@@ -6,9 +6,9 @@ import {
   draftProfileFromImport,
   partsOf,
   recommendedFromText,
-} from "./profile-drafts.js";
-import { draftedProfile } from "./assistant.js";
-import { validateProfileText } from "./profile-editor.js";
+} from "./drafts.js";
+import { draftedProfile } from "../assistant.js";
+import { validateProfileText } from "./editor.js";
 
 const sha = (char) => char.repeat(64);
 const template = (id, { family = "krea2", loader = "UNETLoader", prompting = null } = {}) => ({
@@ -319,8 +319,8 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
   const { default: os } = await import("node:os");
   const { default: path } = await import("node:path");
   const { createImportEngine, createImportStore, publicImport } =
-    await import("./library/imports.js");
-  const { detectLink } = await import("./library/sources.js");
+    await import("../library/imports.js");
+  const { detectLink } = await import("../library/sources.js");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-draft-imports-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const resolved = {

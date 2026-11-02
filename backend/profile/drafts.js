@@ -20,7 +20,7 @@
  *
  * Everything that talks to the outside is injected, so tests need no worker or gateway.
  */
-import { catalogueKinds } from "./library/catalogue.js";
+import { catalogueKinds } from "../library/catalogue.js";
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const loaders = {
@@ -196,7 +196,7 @@ const listed = (info, classType, file) =>
  * families(baseModel) → family ids; familyFromName(file) → family id; taken(id) → bool;
  * downloadsFor(file, folder) → catalogue download specs; engine (assistant.js) or null;
  * draftedProfile (assistant.js, used without an engine); validate(id, text, {info});
- * create(id, text, {by}) → saves the new AI-drafted profile; guides (profile-store.js guide
+ * create(id, text, {by}) → saves the new AI-drafted profile; guides (profile/store.js guide
  * store); onSaved().
  */
 export async function draftProfileFromImport(record, { index = null, by = "" } = {}, deps) {

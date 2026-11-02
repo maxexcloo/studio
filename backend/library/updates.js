@@ -148,7 +148,7 @@ export function publicUpdate(item) {
  *   installed()                 Set of installed catalogue keys
  *   json(path)                  Civitai API; hfMetadata(repo) the repository's main revision
  *   familiesOf(baseModel)       family ids
- *   startDownload(spec)         library/downloads.js; downloads() model-downloads.js state
+ *   startDownload(spec)         library/downloads.js; downloads() model/downloads.js state
  *   inspect(want, {verify})     library/routes.js inspectInstalled
  *   repoint(from, to)           moves profiles from the old file to the new one: their names
  *   references({folder, file})  what still uses a file: ['Profile Flux Dev', …]

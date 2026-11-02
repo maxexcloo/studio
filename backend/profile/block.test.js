@@ -14,12 +14,12 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const { allCustomWorkflowRecords, metadataFromJson, userWorkflowsDir, saveImportedWorkflow } =
-  await import("./custom-workflows.js");
+  await import("../custom-workflows.js");
 const { validateProfileText, createEditableProfile, approveEditableProfile } =
-  await import("./profile-editor.js");
-const { draftedProfile } = await import("./assistant.js");
+  await import("./editor.js");
+const { draftedProfile } = await import("../assistant.js");
 const { effectiveAccountAccess, mayUseGenerationProfile, visibleGenerationProfiles } =
-  await import("./account-policy.js");
+  await import("../account-policy.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const graph = {

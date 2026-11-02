@@ -1,5 +1,5 @@
-import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy.js";
-import { cancelPrompt, promptTracker } from "./comfy-queue.js";
+import { activeComfyUrl, comfy, normalizeComfyError } from "./comfy/comfy.js";
+import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { flushGalleryStrict, gallery, outputsFrom, updateGalleryJob } from "./gallery-store.js";
 import { jobs, setTerminalJob, trackUpscale } from "./jobs.js";
 import { recordUpscale, upscaleEstimate } from "./timings.js";
@@ -7,7 +7,7 @@ import { upscaleWork } from "./upscale-timing.js";
 import { faceDetailSource, upscaleGraph, upscalePlan } from "./upscale.js";
 import { saveIntoStudioFolder } from "./graphs.js";
 import { ingestRunResults, removeComfyFiles } from "./media-store.js";
-import { forgetComfyRun } from "./comfy-traces.js";
+import { forgetComfyRun } from "./comfy/traces.js";
 
 export function findUpscaleTarget(id) {
   return gallery.find((item) => item.id === id || item.url === id) || null;

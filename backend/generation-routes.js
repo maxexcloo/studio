@@ -1,7 +1,7 @@
 import { loraInfos } from "./lora/info.js";
 import { optionalLoraIssue } from "./lora/catalogue.js";
 import { withLoraTriggers } from "./lora/prompts.js";
-import { currentComfyBackend, routeProfile, withComfyBackend } from "./comfy-backends.js";
+import { currentComfyBackend, routeProfile, withComfyBackend } from "./comfy/backends.js";
 import {
   capabilityForProfile,
   listWorkers,
@@ -10,7 +10,7 @@ import {
   workerHas,
 } from "./workers.js";
 import crypto from "node:crypto";
-import { demoMode } from "./comfy.js";
+import { demoMode } from "./comfy/comfy.js";
 import { families } from "./family-catalog.js";
 import { sanitizeGenerateBody, validateReferenceSlots } from "./validation.js";
 import {

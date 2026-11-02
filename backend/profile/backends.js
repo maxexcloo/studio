@@ -13,7 +13,7 @@
  * `<data>/backups/profile-backends/<time>/`, writes the combined profile (`studio.backend` and
  * `studio.backends.<id>`, custom-workflows.js) as a new profile with its own version history, gives
  * it the default backend's guide binding and negatives and drops both old ids' guide entries,
- * records each old id as an alias `{to, backend}` (profile-store.js), so records that name it run
+ * records each old id as an alias `{to, backend}` (profile/store.js), so records that name it run
  * again on the backend they ran on, then removes the old files; their version history stays, so a
  * seed never brings them back. Workflow preferences, every account's LoRA stacks and strengths, and
  * run timings (per backend) move to the combined profile. Owner records are left as they are.
@@ -27,18 +27,14 @@ import {
   profileBackendLabels,
   sharedProfileFields,
   userWorkflowsDir,
-} from "./custom-workflows.js";
-import { dataDir } from "./gallery-store.js";
-import { writeJsonFile } from "./json-store.js";
-import {
-  createEditableProfile,
-  listEditableProfiles,
-  readEditableProfile,
-} from "./profile-editor.js";
-import { loraStackFiles, repointLoraStacks } from "./combined-profiles.js";
-import { guideStore, hashOf, profileStore } from "./profile-store.js";
-import { renameTimingKeys } from "./timings.js";
-import { loadWorkflowPreferences, repointWorkflowPreferences } from "./workflow-catalog.js";
+} from "../custom-workflows.js";
+import { dataDir } from "../gallery-store.js";
+import { writeJsonFile } from "../json-store.js";
+import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
+import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";
+import { guideStore, hashOf, profileStore } from "./store.js";
+import { renameTimingKeys } from "../timings.js";
+import { loadWorkflowPreferences, repointWorkflowPreferences } from "../workflow-catalog.js";
 
 const conflict = (message) => Object.assign(new Error(message), { status: 409 });
 const invalid = (message) => Object.assign(new Error(message), { status: 400 });

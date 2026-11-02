@@ -27,7 +27,7 @@ const useWorker = (url) => {
   return reloadWorkers();
 };
 const worker = await import("./worker-models.js");
-const downloads = await import("./model-downloads.js");
+const downloads = await import("./model/downloads.js");
 
 test("worker model transport pins the backend, streams Unicode-labelled weights and refuses redirects", async (t) => {
   t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
@@ -135,7 +135,7 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
   assert.equal(matched.resources[0].unverified, undefined);
 
   const express = (await import("express")).default;
-  const { registerModelDownloadRoutes } = await import("./model-download-routes.js");
+  const { registerModelDownloadRoutes } = await import("./model/download-routes.js");
   const app = express();
   app.use(express.json());
   registerModelDownloadRoutes(app, { loadComfyContext: async () => ({}) });

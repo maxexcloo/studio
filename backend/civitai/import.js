@@ -1,5 +1,5 @@
 import path from "node:path";
-import { comfyUrl } from "../comfy.js";
+import { comfyUrl } from "../comfy/comfy.js";
 import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
 import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
 import { sameResourceFilename, workflowModelSources } from "./workflow.js";

@@ -3,15 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { startFakeComfy } from "./fixtures/fake-comfy.js";
-import { writeTestWorkflows } from "./fixtures/test-workflows.js";
+import { startFakeComfy } from "../fixtures/fake-comfy.js";
+import { writeTestWorkflows } from "../fixtures/test-workflows.js";
 import {
   backendUrl,
   currentComfyBackend,
   mergeWorkerModels,
   withComfyBackend,
-} from "./comfy-backends.js";
-import { reloadWorkers } from "./workers.js";
+} from "./backends.js";
+import { reloadWorkers } from "../workers.js";
 
 const primary = await startFakeComfy();
 const video = await startFakeComfy();
@@ -25,10 +25,10 @@ const bothWorkers = JSON.stringify([
 process.env.STUDIO_WORKERS = bothWorkers;
 process.env.STUDIO_DATA_DIR = temporary;
 writeTestWorkflows(temporary);
-const { jobs, runJob } = await import("./jobs.js");
+const { jobs, runJob } = await import("../jobs.js");
 const { comfy } = await import("./comfy.js");
-const store = await import("./gallery-store.js");
-const { cancelPrompt } = await import("./comfy-queue.js");
+const store = await import("../gallery-store.js");
+const { cancelPrompt } = await import("./queue.js");
 
 test.after(async () => {
   await primary.close();

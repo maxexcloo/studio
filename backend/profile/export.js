@@ -17,8 +17,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { zipBuffer } from "./gallery-export.js";
-import { hashOf } from "./profile-store.js";
+import { zipBuffer } from "../gallery-export.js";
+import { hashOf } from "./store.js";
 
 const exportsKept = 20;
 const validId = (id) => /^[a-z0-9][a-z0-9._-]{0,79}$/.test(id) && !id.includes("..");
@@ -28,7 +28,7 @@ const sorted = (value) =>
 
 /**
  * The bundle's files and summary, without writing anything. `profiles` and `guides` are the
- * profile-store.js stores, `catalogue` the library catalogue (or null), `manifestFile` the
+ * profile/store.js stores, `catalogue` the library catalogue (or null), `manifestFile` the
  * restore manifest's path (or '').
  */
 export function buildExport({

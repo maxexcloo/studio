@@ -9,8 +9,8 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-model-types-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { classifyModel } = await import("./model-families.js");
-const { sanitizeGenerateBody } = await import("./validation.js");
+const { classifyModel } = await import("./families.js");
+const { sanitizeGenerateBody } = await import("../validation.js");
 
 /* ------------------------------------------------------------ fixtures */
 
@@ -120,7 +120,7 @@ test("model files are placed by their names", () => {
 /* ------------------------------------------------------------ profiles */
 
 test("an imported workflow's missing file gets a download only for that exact catalog file", async () => {
-  const { catalogDownloadsForFile } = await import("./catalog-downloads.js");
+  const { catalogDownloadsForFile } = await import("../catalog-downloads.js");
   const [vae] = catalogDownloadsForFile("flux2-vae.safetensors", "vae");
   assert.deepEqual([vae.id, vae.label, vae.folder], ["vae:flux2:0", "Flux.2 VAE", "vae"]);
   assert.equal(
@@ -171,8 +171,8 @@ test("Sana is recognised from its own and diffusers-style weights", () => {
 });
 
 test("every node pack is one registry entry, and a missing one comes with both install routes", async () => {
-  const { nodePacks } = await import("./node-packs.js");
-  const { missingPackPart } = await import("./node-install.js");
+  const { nodePacks } = await import("../node-packs.js");
+  const { missingPackPart } = await import("../node-install.js");
   for (const [id, pack] of Object.entries(nodePacks)) {
     assert.match(pack.repository, /^https:\/\/github\.com\/.+\.git$/, id);
     assert.ok(pack.folder && pack.nodes.length, id);
@@ -251,8 +251,8 @@ const qwen35 = (width) => ({
 const mossTypes = [...newTypes, "moss_image"];
 
 test("a pack inside a bigger repository is cloned beside its folder and only its folder is copied in", async () => {
-  const { packInstallPlan } = await import("./node-install.js");
-  const { nodePack } = await import("./node-packs.js");
+  const { packInstallPlan } = await import("../node-install.js");
+  const { nodePack } = await import("../node-packs.js");
   const plan = packInstallPlan(nodePack("moss_image"));
   const [command] = plan.commands;
   assert.match(

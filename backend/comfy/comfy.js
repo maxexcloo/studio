@@ -3,16 +3,16 @@ import {
   currentComfyBackend,
   isDefaultBackend,
   noteWorkerReachable,
-} from "./comfy-backends.js";
-import { defaultWorker, onWorkersChanged } from "./workers.js";
-import { listensBeyondThisComputer } from "./client-trust.js";
-import { noteComfyState } from "./crash-log.js";
+} from "./backends.js";
+import { defaultWorker, onWorkersChanged } from "../workers.js";
+import { listensBeyondThisComputer } from "../client-trust.js";
+import { noteComfyState } from "../crash-log.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mediaFile, mediaType } from "./media-paths.js";
+import { mediaFile, mediaType } from "../media-paths.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const root = path.resolve(__dirname, "..");
+export const root = path.resolve(__dirname, "../..");
 // A live binding: importers see the new address as soon as the workers change.
 // It is the default worker's (workers.js), or "" with no workers at all.
 export let comfyUrl = defaultWorker()?.url || "";
