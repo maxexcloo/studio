@@ -25,8 +25,8 @@ fs.writeFileSync(
   JSON.stringify({ [view("image_00007_.png")]: Date.now() }),
 );
 
-const store = await import("./gallery-store.js");
-const thumbnails = await import("./thumbnails.js");
+const store = await import("./store.js");
+const thumbnails = await import("../thumbnails.js");
 
 test("the list of deleted outputs no longer says what they were", () => {
   const onDisk = fs.readFileSync(path.join(dataDir, "gallery-hidden.json"), "utf8");

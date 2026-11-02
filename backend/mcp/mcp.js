@@ -6,7 +6,7 @@ import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { hostAllowed } from "./request-guard.js";
+import { hostAllowed } from "../request-guard.js";
 import {
   closest,
   listedControls,
@@ -14,7 +14,7 @@ import {
   mcpGenerationCount,
   mcpLoras,
   mcpSize,
-} from "./mcp-controls.js";
+} from "./controls.js";
 import {
   McpMedia,
   assertJobCount,
@@ -22,9 +22,9 @@ import {
   mcpJson,
   mcpOutputPath,
   replyRule,
-} from "./mcp-media.js";
-import { exactPromptInstructions, fullBodyPerson } from "./mcp-prompt-checks.js";
-import { canonicalProfileId, livePrompting } from "./profile/store.js";
+} from "./media.js";
+import { exactPromptInstructions, fullBodyPerson } from "./prompt-checks.js";
+import { canonicalProfileId, livePrompting } from "../profile/store.js";
 import {
   asksForCloud,
   familyMatches,
@@ -42,14 +42,14 @@ import {
   searchProfiles,
   tierOf,
   withinFamily,
-} from "./mcp-tiers.js";
-import { createPromptWriter } from "./prompt-writer.js";
-import { gatewaySettings } from "./assistant.js";
-import { mayUseFeature } from "./account-policy.js";
-import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
-import { adminInstructions, registerAdminTools } from "./mcp-admin.js";
+} from "./tiers.js";
+import { createPromptWriter } from "../prompt-writer.js";
+import { gatewaySettings } from "../assistant.js";
+import { mayUseFeature } from "../account-policy.js";
+import { createChatAssistantMemory, registerAssistantTools } from "./assistant.js";
+import { adminInstructions, registerAdminTools } from "./admin.js";
 import fs from "node:fs";
-import { imageMimes } from "./reference-names.js";
+import { imageMimes } from "../reference-names.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -1613,7 +1613,7 @@ export function registerMcpRoutes(
       res.status(405).set("Allow", "POST").json({ error: "Use Streamable HTTP POST for MCP." }),
     );
   }
-  // Export's signed bundle links (mcp-admin.js): the file Settings › Profiles › Export wrote, for an hour.
+  // Export's signed bundle links (mcp/admin.js): the file Settings › Profiles › Export wrote, for an hour.
   const exportsDir = dataDir ? path.join(dataDir, "exports") : "";
   function signExport(name, now = Date.now()) {
     const expiresAt = new Date(now + exportLinkMs).toISOString();

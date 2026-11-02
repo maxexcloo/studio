@@ -18,9 +18,9 @@ const { canonicalProfileId, guideStore, profileStore } = await import("./store.j
 const { getCustomWorkflow, userWorkflowsDir } = await import("../custom-workflows.js");
 const { buildExport } = await import("./export.js");
 const { profileStats } = await import("../stats.js");
-const { matchesGalleryFilters } = await import("../gallery-filters.js");
+const { matchesGalleryFilters } = await import("../gallery/filters.js");
 const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
-const { findProfile } = await import("../mcp-tiers.js");
+const { findProfile } = await import("../mcp/tiers.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("../workflow-catalog.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 

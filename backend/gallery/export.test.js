@@ -10,9 +10,9 @@ const output = path.join(temporary, "output");
 process.env.STUDIO_DATA_DIR = path.join(temporary, "data");
 process.env.STUDIO_MEDIA_DIR = output;
 process.env.STUDIO_MULTI_USER = "1";
-const { setGallery } = await import("./gallery-store.js");
-const { accountOutputSubfolder } = await import("./account-ownership.js");
-const { exportFilename, sendGalleryExport } = await import("./gallery-export.js");
+const { setGallery } = await import("./store.js");
+const { accountOutputSubfolder } = await import("../account-ownership.js");
+const { exportFilename, sendGalleryExport } = await import("./export.js");
 const ownerA = { studioAccount: { userId: "account-a" } };
 const ownerB = { studioAccount: { userId: "account-b" } };
 for (const [owner, name] of [

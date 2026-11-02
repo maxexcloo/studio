@@ -13,13 +13,13 @@ import {
   registerGalleryHistoryRoutes,
   registerGalleryErrorRoutes,
   registerGalleryDeleteRoute,
-} from "./gallery-routes.js";
+} from "./gallery/routes.js";
 import { registerGenerationRoutes } from "./generation-routes.js";
 import { createGenerationAdmission } from "./domain/admission.ts";
 import { registerCompareRoutes } from "./domain/compare.ts";
 import { createDream, registerDreamRoutes } from "./domain/dream.ts";
 import { createFinishing, registerFinishingRoutes } from "./domain/finishing.ts";
-import { fullBodyPerson } from "./mcp-prompt-checks.js";
+import { fullBodyPerson } from "./mcp/prompt-checks.js";
 import {
   createNextStepWork,
   createSuggestions,
@@ -139,8 +139,8 @@ import {
 } from "./comfy/comfy.js";
 import { canAdmin, clientOf } from "./access.js";
 import { hostAllowed, requestGuard } from "./request-guard.js";
-import { registerMcpRoutes } from "./mcp.js";
-import { mcpOutputPath } from "./mcp-media.js";
+import { registerMcpRoutes } from "./mcp/mcp.js";
+import { mcpOutputPath } from "./mcp/media.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { startServers } from "./listen.js";
 import { sharedRequests } from "./shared-requests.js";
@@ -178,7 +178,7 @@ import {
   galleryRevisionValue,
   storedWritingRecord,
   onGalleryFilesDeleted,
-} from "./gallery-store.js";
+} from "./gallery/store.js";
 import { buildStats, getThumbnail } from "./thumbnails.js";
 import {
   clearPromptHistory,

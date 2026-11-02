@@ -1,6 +1,6 @@
 import path from "node:path";
 import { comfy } from "../comfy/comfy.js";
-import { dataDir } from "../gallery-store.js";
+import { dataDir } from "../gallery/store.js";
 import {
   families,
   familyFromName,

@@ -11,13 +11,13 @@ import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
-import { McpMedia } from "./mcp-media.js";
-import { adminToolNames } from "./mcp-admin.js";
-import { createPromptStage } from "./prompt-stage.js";
-import { createPromptWriter } from "./prompt-writer.js";
-import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
-import { RuntimeController } from "./runtime/controller.ts";
-import { KubernetesEngine } from "./runtime/kubernetes.ts";
+import { McpMedia } from "./media.js";
+import { adminToolNames } from "./admin.js";
+import { createPromptStage } from "../prompt-stage.js";
+import { createPromptWriter } from "../prompt-writer.js";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { RuntimeController } from "../runtime/controller.ts";
+import { KubernetesEngine } from "../runtime/kubernetes.ts";
 
 const mediaKey = "fixture-media-credential";
 const controlKey = "fixture-control-credential";
@@ -1913,7 +1913,7 @@ test(
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-native-mcp-server-"));
     const envFile = path.join(dir, ".env");
     fs.writeFileSync(envFile, "");
-    const here = path.dirname(fileURLToPath(import.meta.url));
+    const here = path.dirname(fileURLToPath(new URL("../index.js", import.meta.url)));
     const child = fork(path.join(here, "index.js"), [], {
       cwd: path.dirname(here),
       env: {
@@ -2145,7 +2145,7 @@ test(
       );
     });
     await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
-    const child = fork(path.join(path.dirname(fileURLToPath(import.meta.url)), "index.js"), [], {
+    const child = fork(fileURLToPath(new URL("../index.js", import.meta.url)), [], {
       env: {
         PATH: process.env.PATH,
         PORT: "0",

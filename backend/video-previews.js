@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import { dataDir } from "./gallery-store.js";
+import { dataDir } from "./gallery/store.js";
 import { comfyUrl, localOutputFile } from "./comfy/comfy.js";
 import { sendMediaBuffer } from "./media-response.js";
 import { mediaType } from "./media-paths.js";

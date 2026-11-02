@@ -1,5 +1,5 @@
 import path from "node:path";
-import { dataDir, gallery } from "./gallery-store.js";
+import { dataDir, gallery } from "./gallery/store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import crypto from "node:crypto";
 

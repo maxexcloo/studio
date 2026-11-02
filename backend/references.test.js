@@ -9,7 +9,7 @@ import sharp from "sharp";
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-references-"));
 process.env.STUDIO_DATA_DIR = temporary;
 const referenceAssets = await import(`./references.js?test=${Date.now()}`);
-const { pageGallery } = await import("./gallery-store.js");
+const { pageGallery } = await import("./gallery/store.js");
 const upload = async (...args) => (await referenceAssets.saveUploadedImage(...args)).asset;
 
 test("an upload becomes its owner's uploaded gallery image, listed only under Uploads", async () => {
@@ -142,7 +142,7 @@ test("staging resizes every slot before upload, keeps originals, and reuses cont
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 test("a video’s last frame is referenced only by its owner and only for finished videos", async () => {
-  const { gallery } = await import("./gallery-store.js");
+  const { gallery } = await import("./gallery/store.js");
   const owner = { studioAccount: { userId: "account-a", role: "user" } };
   const other = { studioAccount: { userId: "account-b", role: "user" } };
   const items = [

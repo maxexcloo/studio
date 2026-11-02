@@ -7,7 +7,7 @@ import express from "express";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { registerMcpRoutes } from "./mcp.js";
-import { createChatAssistantMemory } from "./mcp-assistant.js";
+import { createChatAssistantMemory } from "./assistant.js";
 
 const gateway = {
   STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid:4000",

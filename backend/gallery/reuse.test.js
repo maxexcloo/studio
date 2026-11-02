@@ -17,7 +17,7 @@ const {
   pageGallery,
   replaceGalleryJob,
   setGallery,
-} = await import("./gallery-store.js");
+} = await import("./store.js");
 
 const url = (filename) =>
   `/comfy/view?${new URLSearchParams({ filename, subfolder: "", type: "media" })}`;
@@ -231,10 +231,10 @@ test("a finished image is listed at once, before the folder listing catches up",
 });
 
 test("an image shown upscaled is used upscaled, at the original's size", async () => {
-  const { loadSharp } = await import("./sharp-loader.js");
+  const { loadSharp } = await import("../sharp-loader.js");
   const sharp = await loadSharp();
   if (!sharp) return;
-  const { bytesForReference } = await import("./references.js");
+  const { bytesForReference } = await import("../references.js");
   const png = (width, height, r) =>
     sharp({ create: { width, height, channels: 3, background: { r, g: 0, b: 0 } } })
       .png()
@@ -268,7 +268,7 @@ test("an image shown upscaled is used upscaled, at the original's size", async (
 });
 
 test("Radiance reference settings omit unsupported denoise", async () => {
-  const { generationSettings } = await import("./gallery-store.js");
+  const { generationSettings } = await import("./store.js");
   const reference = {
     kind: "image",
     modelName: "qwen-image.rad",

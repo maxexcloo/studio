@@ -1,5 +1,5 @@
 import path from "node:path";
-import { dataDir } from "./gallery-store.js";
+import { dataDir } from "./gallery/store.js";
 import { readJsonFile, writeJsonFile } from "./json-store.js";
 import { addRun, estimateRun, isWarm, timingKey } from "./generation-timing.js";
 import { addUpscale, estimateUpscale } from "./upscale-timing.js";

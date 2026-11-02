@@ -4,10 +4,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createGenerationAdmission } from "./domain/admission.ts";
-import { GenerationQueue } from "./domain/queue.ts";
-import { RewriteStore } from "./domain/store.ts";
-import { McpMedia } from "./mcp-media.js";
+import { createGenerationAdmission } from "../domain/admission.ts";
+import { GenerationQueue } from "../domain/queue.ts";
+import { RewriteStore } from "../domain/store.ts";
+import { McpMedia } from "./media.js";
 
 function deferred() {
   let resolve;

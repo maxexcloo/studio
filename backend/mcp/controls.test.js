@@ -7,7 +7,7 @@ import {
   mcpLoras,
   prepareLoras,
   resolveLoraName,
-} from "./mcp-controls.js";
+} from "./controls.js";
 
 const profile = {
   id: "image:sdxl",

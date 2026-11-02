@@ -6,9 +6,9 @@
 // beside MCP's ownership file), so a Generate with that prompt records it on the result
 // (`assistant`, source "chat") for Details and Recreate, even across a restart.
 import { z } from "zod";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { assistantPresets, defaultPreset } from "./assistant-presets.js";
-import { mcpJson } from "./mcp-media.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { assistantPresets, defaultPreset } from "../assistant-presets.js";
+import { mcpJson } from "./media.js";
 
 const maxRemembered = 512;
 const rememberMs = 6 * 60 * 60 * 1000;

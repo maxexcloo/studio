@@ -3,9 +3,9 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import sharp from "sharp";
-import { flagEnabled } from "./deployment-settings.js";
-import { animateProfile, frameSize } from "./animate-profile.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { flagEnabled } from "../deployment-settings.js";
+import { animateProfile, frameSize } from "../animate-profile.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
 import {
   assertAdjustable,
   maxJobsPerCall,
@@ -14,19 +14,19 @@ import {
   mcpSize,
   prepareLoras,
   resolveLoraName,
-} from "./mcp-controls.js";
-import { compatibleLoras, loraCompatibility, loraName } from "./lora/policy.js";
-import { recommendedNegative, withLoraTags } from "./lora/prompts.js";
+} from "./controls.js";
+import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
+import { recommendedNegative, withLoraTags } from "../lora/prompts.js";
 import {
   choicePool,
   chooseProfile,
   isCloudProfile,
   localVideoUnavailable,
   parkedWorker,
-} from "./mcp-tiers.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
-import { withResolution } from "../shared/resolution.ts";
-import { imageMimes } from "./reference-names.js";
+} from "./tiers.js";
+import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
+import { withResolution } from "../../shared/resolution.ts";
+import { imageMimes } from "../reference-names.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
