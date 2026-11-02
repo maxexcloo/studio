@@ -853,7 +853,12 @@ test("media and administrator credentials discover only their own friendly tools
     reuse.inputSchema.properties.job_id.description,
     'Its ref as the reply shows it ("result 1"), or a job_id; never "all".',
   );
-  assert.deepEqual(reuse.inputSchema.properties.mode.enum, ["again", "animate", "reference"]);
+  assert.deepEqual(reuse.inputSchema.properties.mode.enum, [
+    "again",
+    "animate",
+    "extend",
+    "reference",
+  ]);
   // Schemas state the per-call limit their descriptions give.
   const generateSchema = tools.find((tool) => tool.name === "Generate").inputSchema.properties;
   assert.equal(generateSchema.count.maximum, 10);
@@ -3227,8 +3232,9 @@ test("Reuse animates an image from its first frame with the default first-frame 
     constraints: {
       width: { min: 256, max: 2048, step: 32 },
       height: { min: 256, max: 2048, step: 32 },
+      frames: { min: 17, max: 161, step: 8 },
     },
-    defaults: { width: 1344, height: 768, count: 1, steps: 8 },
+    defaults: { width: 1344, height: 768, count: 1, steps: 8, fps: 16 },
     ...extra,
   });
   await f.profiles(
@@ -3285,6 +3291,27 @@ test("Reuse animates an image from its first frame with the default first-frame 
     instruction: "",
     source: "The heron takes flight",
   });
+  // mode extend continues a video on its own model; length is seconds on the profile's frame grid.
+  data(
+    await call(client, "Reuse", {
+      job_id: "result 3",
+      mode: "extend",
+      prompt: "It lands",
+      length: 5,
+    }),
+  );
+  const longer = f.submitted.at(-1);
+  assert.deepEqual(
+    [longer.profileId, longer.frames, longer.prompt],
+    ["fl-quality", 81, "It lands"],
+  );
+  assert.match(longer.referenceAssets[0].assetId, /^fixture-frame-.+-0-last$/);
+  for (const [args, error] of [
+    [{ job_id: "result 3", mode: "extend", length: 30 }, /makes 1.1 s to 10.1 s/],
+    [{ job_id: "result 1", mode: "extend" }, /mode extend continues a video/],
+    [{ job_id: "result 1", length: 5 }, /length is for mode animate or extend/],
+  ])
+    assert.match(texts(await call(client, "Reuse", args)), error);
   // Another tier needs a profile in it.
   const otherTier = await call(client, "Reuse", {
     job_id: "result 1",
