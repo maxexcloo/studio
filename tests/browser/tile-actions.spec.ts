@@ -94,10 +94,10 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await page
     .getByRole("button", { name: "Open image: A copper bird", exact: true })
     .click({ button: "right" });
-  // The viewer's sections and order, plus Compare: Chat, Prompt | Animate, Edit | Compare,
+  // The viewer's sections and order, plus Compare: Continue in Chat, Prompt | Animate, Edit | Compare,
   // Upscale | Copy, Download | Star, Delete.
   await expect(page.getByRole("menuitem")).toContainText([
-    "Chat",
+    "Continue in Chat",
     "Prompt",
     "Animate",
     "Edit",
@@ -118,7 +118,7 @@ test("The same tile menu opens by context click and More, with keyboard navigati
   await expect(page.getByRole("menu")).toBeVisible();
   await expect(page.getByRole("menu").locator(":focus")).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("menuitem", { name: "Chat", exact: true })).toBeFocused();
+  await expect(page.getByRole("menuitem", { name: "Continue in Chat", exact: true })).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Prompt", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");

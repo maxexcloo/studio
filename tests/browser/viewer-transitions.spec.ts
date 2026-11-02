@@ -80,10 +80,20 @@ for (const failFirst of [false, true]) {
     expect(originalImage).not.toBeNull();
     expect(picture).not.toBeNull();
     try {
-      // With an upscale, Upscale's click shows it.
-      const version = viewer.getByRole("button", { name: "Upscale", exact: true });
-      await version.click();
-      await expect(version).toHaveAttribute("aria-pressed", "true");
+      // With an upscale, Upscale's click shows it; phones list it under More.
+      if (page.viewportSize()!.width < 768) {
+        await viewer.getByRole("button", { name: "More", exact: true }).click();
+        await page.getByRole("menuitem", { name: "Upscale", exact: true }).click();
+        const show = page.getByRole("menuitem", { name: "Show Upscale", exact: true });
+        await show.click();
+        await expect(show).toHaveAttribute("aria-checked", "true");
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("menu")).toHaveCount(0);
+      } else {
+        const version = viewer.getByRole("button", { name: "Upscale", exact: true });
+        await version.click();
+        await expect(version).toHaveAttribute("aria-pressed", "true");
+      }
       await expect.poll(() => requested).toBe(true);
       expect(toggles).toEqual([{ galleryItemId: item.id, active: true }]);
       await expect(image).toHaveAttribute("src", originalUrl);

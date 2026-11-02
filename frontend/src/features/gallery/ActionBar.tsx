@@ -1,6 +1,7 @@
 import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
+  Button,
   Divider,
   Loader,
   Menu,
@@ -114,12 +115,17 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   ));
 }
 
-/** A bar action: an icon, a split button or an options menu, opening on the `menuPosition` side. */
+/**
+ * A bar action: an icon, a split button or an options menu, opening on the `menuPosition` side.
+ * A `labelled` one names itself beside its icon, with ▾ when it only opens options.
+ */
 function ActionControl({
   action,
+  labelled,
   menuPosition,
 }: {
   action: Action;
+  labelled: boolean;
   menuPosition: FloatingPosition;
 }) {
   const phone = usePhone();
@@ -127,23 +133,34 @@ function ActionControl({
   // A tooltip must not linger behind the menu its control opened.
   const [opened, setOpened] = useState(false);
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
-  const control = (
-    <ActionIcon
-      {...iconProps}
-      aria-label={label}
-      aria-pressed={pressed}
-      color={color || (pressed ? undefined : iconProps.color)}
-      loading={loading}
-      disabled={disabled}
-      {...(link
-        ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
-        : { onClick: menu && !onClick ? undefined : onClick })}
+  const optionsOnly = Boolean(menu && !onClick && !link);
+  const props = {
+    "aria-pressed": pressed,
+    color: color || (pressed ? undefined : iconProps.color),
+    loading,
+    disabled,
+    ...(link
+      ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
+      : { onClick: optionsOnly ? undefined : onClick }),
+  };
+  const control = labelled ? (
+    <Button
+      variant="subtle"
+      size="sm"
+      className={classes.action}
+      leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
+      rightSection={optionsOnly ? <ChevronDown size={14} /> : undefined}
+      {...props}
     >
+      {label}
+    </Button>
+  ) : (
+    <ActionIcon {...iconProps} aria-label={label} {...props}>
       <Icon size={18} fill={pressed ? "currentColor" : "none"} />
     </ActionIcon>
   );
   const tip = (name: string, target: ReactNode) => (
-    <Tooltip label={name} disabled={phone || opened}>
+    <Tooltip label={name} disabled={phone || opened || (labelled && name === label)}>
       {target}
     </Tooltip>
   );
@@ -155,7 +172,7 @@ function ActionControl({
     </Menu.Dropdown>
   );
   // A link with options (Download ▾) is a split button like one with a click.
-  if (!onClick && !link)
+  if (optionsOnly)
     return (
       <Menu position={menuPosition} width={240} onChange={setOpened}>
         {tip(label, <Menu.Target>{control}</Menu.Target>)}
@@ -187,13 +204,16 @@ function ActionControl({
 
 /**
  * The action bar shared by the viewer and gallery selection: icon controls in divided groups,
- * scrolling sideways when they overflow. Menus open above it unless `menuPosition` says otherwise.
+ * scrolling sideways when they overflow; the `labelled` ones (the viewer's primaries) show their
+ * names. Menus open above it unless `menuPosition` says otherwise.
  */
 export function ActionBarGroups({
   groups,
+  labelled = [],
   menuPosition = "top",
 }: {
   groups: ActionGroups;
+  labelled?: string[];
   menuPosition?: FloatingPosition;
 }) {
   return (
@@ -202,7 +222,12 @@ export function ActionBarGroups({
         <Fragment key={group[0].id}>
           {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
           {group.map((action) => (
-            <ActionControl key={action.id} action={action} menuPosition={menuPosition} />
+            <ActionControl
+              key={action.id}
+              action={action}
+              labelled={labelled.includes(action.id)}
+              menuPosition={menuPosition}
+            />
           ))}
         </Fragment>
       ))}
@@ -210,7 +235,10 @@ export function ActionBarGroups({
   );
 }
 
-/** A phone bar control: its icon over its label; a split action's ▾ beside it opens its options. */
+/**
+ * A phone bar control: its icon over its label. With options a tap opens them (their first item does
+ * what a desktop click does), so no separate ▾ crowds the bar; a link with options keeps a ▾ beside it.
+ */
 function StackedControl({ action }: { action: Action }) {
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
   const content = (
@@ -236,7 +264,7 @@ function StackedControl({ action }: { action: Action }) {
       <ActionMenuItems groups={options} />
     </Menu.Dropdown>
   );
-  if (options && !onClick && !link)
+  if (options && !link)
     return (
       <Menu position="top" width={240}>
         <Menu.Target>
