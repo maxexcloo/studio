@@ -60,11 +60,15 @@ function cookieToken(req, name = accountCookieName) {
 const mcpBearerRoutes = [
   ["GET", /^\/api\/models$/],
   ["GET", /^\/api\/loras\/info$/],
+  // The account's LoRA thumbs up and down, which order every LoRA list MCP shows.
+  ["GET", /^\/api\/loras\/library$/],
   ["POST", /^\/api\/generate$/],
   ["GET", /^\/api\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/jobs\/[\w-]+\/cancel$/],
   ["GET", /^\/api\/gallery\/jobs\/[\w-]+$/],
   ["POST", /^\/api\/reference-assets\/upload$/],
+  // Reuse's Extend: a video result's last frame as the next video's first.
+  ["POST", /^\/api\/reference-assets\/from-gallery$/],
   // A multi-model run's side-by-side page, of the account's own image jobs.
   ["POST", /^\/api\/comparisons$/],
   // An uploaded reference's own pixels (owner-scoped): RewritePrompt's vision references and Import's upload_id.
@@ -79,7 +83,7 @@ function mcpBearerRouteAllowed(method, routePath) {
 }
 
 /**
- * The routes MCP's admin tools call (mcp/admin.js): the Library, downloads, the catalogue, profiles,
+ * The routes MCP's admin tools call (mcp-admin.js): the Library, downloads, the catalogue, profiles,
  * guides, Combine Backends, the export, and accounts' groups. Only an administrator's own MCP token reaches them, or
  * MCP's loopback credential for a gateway-linked administrator while Chat Gateway Admin Tools is on.
  * Nothing here deletes a model file, replaces a download or touches a GPU; Combine Backends backs up

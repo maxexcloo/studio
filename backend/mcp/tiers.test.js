@@ -482,7 +482,7 @@ test('a model named only in the request ("six baby ducks, fast moss") is used wh
   );
 });
 
-// Access tiers above media: the admin tools (mcp/admin.js) and who gets them (mcp.js adminScope).
+// Access tiers above media: the admin tools (mcp-admin.js) and who gets them (mcp.js adminScope).
 test("admin tools go to administrator accounts by their own token, and through the gateway only with the switch on", async () => {
   const { adminScope } = await import("./mcp.js");
   const administrator = { userId: "a", role: "administrator", authenticated: true };

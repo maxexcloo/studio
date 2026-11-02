@@ -31,7 +31,7 @@ export function requireAdmin(req, res) {
 }
 
 /**
- * Whether an administrator's request came from chat: MCP's admin tools (mcp/admin.js) call the same
+ * Whether an administrator's request came from chat: MCP's admin tools (mcp-admin.js) call the same
  * routes as the UI with MCP's administrator credential, so imports, catalogue edits and profile
  * versions record their origin as chat.
  */

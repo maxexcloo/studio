@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+/** Family names as `/api/models` serves them from the catalogue, for the families fixtures use. */
+const familyLabels = { flux1: "Flux.1", sdxl: "SDXL" };
+
 export const stamp = "2026-10-23T00:00:00.000Z";
 /** A ready upscale worker with face detail. */
 export const upscaleCapabilities = {
@@ -207,7 +210,7 @@ export async function fixtures(page: Page) {
     }
     if (path === "/api/accounts/status") return respond({ mode: "single-user" });
     if (path === "/api/models")
-      return respond({ profiles, features: { library: true, presets: true } });
+      return respond({ profiles, features: { library: true, presets: true }, familyLabels });
     if (path === "/api/upscale/status") return respond(upscaleCapabilities);
     // Local video is running: Animate takes the local video profile.
     if (path === "/api/animate/profile")
@@ -278,8 +281,19 @@ export async function fixtures(page: Page) {
         };
         const job = recordGeneration(input, sessionId);
         assistant.jobId = job.id;
-        assistant.draft = { operation: "image", input };
-        events.push({ event: "generation", data: { job } });
+        // A card revision runs as submitted; anything else is the agent's Generate call.
+        if (body.revision) assistant.draft = { operation: "image", input };
+        else
+          assistant.steps = [
+            {
+              id: `call-${messages.length + 2}`,
+              tool: "Generate",
+              input: { prompts: [input.prompt] },
+              status: "completed",
+              output: "Queued on Test Image. Chose Test Image, the default.",
+            },
+          ];
+        events.push({ event: "generation", data: { jobIds: [job.id] } });
       }
       assistant.status = "completed";
       messages.push(user, assistant);
@@ -680,7 +694,7 @@ export async function serveProfiles(
   features?: { library: boolean; presets: boolean },
 ) {
   await page.route(/\/api\/models(?:\?.*)?$/, (route) =>
-    route.fulfill({ json: { profiles, features } }),
+    route.fulfill({ json: { profiles, features, familyLabels } }),
   );
 }
 
@@ -761,12 +775,18 @@ export async function compareUpscale(page: Page) {
   await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
-/** Runs a viewer action from its bar, which phones scroll sideways. */
+/**
+ * Runs a viewer action from its bar. Phones keep Edit, Animate and Prompt there and list the rest
+ * under More, where a split action's options (Upscale Options) are its submenu.
+ */
 export async function viewerAction(page: Page, label: string) {
-  await page
-    .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: label, exact: true })
-    .click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  if ((page.viewportSize()?.width || 1440) >= 768)
+    return viewer.getByRole("button", { name: label, exact: true }).click();
+  const button = viewer.getByRole("button", { name: label, exact: true });
+  if (await button.count()) return button.click();
+  await viewer.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("menuitem", { name: label.replace(/ Options$/, ""), exact: true }).click();
 }
 
 export async function section(page: Page, workspace: "Library" | "Settings", label: string) {

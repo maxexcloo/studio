@@ -540,6 +540,14 @@ export function useMediaActions(
               gif && loop
                 ? [
                     [
+                      // Its own download leads, as Prompt and Edit list theirs, so a menu that
+                      // stands in for the button (More, card menus) still offers it.
+                      {
+                        id: "download-video",
+                        label: "Download Video",
+                        icon: Download,
+                        link: transfer.download,
+                      },
                       { id: "download-gif", label: "Download as GIF", icon: Film, link: gif },
                       {
                         id: "download-loop",

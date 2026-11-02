@@ -26,7 +26,7 @@
  *   GET  /api/profiles/backends                     Radiance and ComfyUI profiles Combine Backends could make one
  *   POST /api/profiles/backends/combine             {hash, selections}: combines the picked pairs, with a backup (profile/backends.js)
  *
- * Every change is a new version; nothing is deleted. MCP's admin tools (mcp/admin.js) call these
+ * Every change is a new version; nothing is deleted. MCP's admin tools (mcp-admin.js) call these
  * same routes: their versions record chat as the origin, and a chat draft stays AI-Drafted.
  */
 import { fromChat, requireAdmin } from "../route-access.js";
@@ -145,7 +145,7 @@ export function registerProfileRoutes(
         family: String(meta.family || "custom"),
         kind: meta.kind === "video" ? "video" : "image",
       };
-      // Guidance in the profile's own JSON wins over any pack (mcp/prompting.js).
+      // Guidance in the profile's own JSON wins over any pack (mcp-prompting.js).
       if (meta.prompting && typeof meta.prompting === "object" && !Array.isArray(meta.prompting)) {
         res.json({ ok: true, source: "owned", profile, owned: meta.prompting });
         return;

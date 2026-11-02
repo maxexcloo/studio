@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionBar, Button, Group, Menu, Stack, Text } from "@mantine/core";
+import { ActionBar, ActionIcon, Button, Group, Menu, Stack, Text } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { failure } from "../../api";
@@ -8,6 +8,7 @@ import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import {
   ActionBarGroups,
+  StackedActionBar,
   ActionMenuItems,
   actionBarClass,
   type Action,
@@ -31,6 +32,8 @@ import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
 
 const shareLimit = 20;
+// Phones keep these, which act on several items, on the selection bar in this order.
+const phoneSelection = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
  * The selection header (count and quick selections), the bulk action bar in the viewer's sections
@@ -226,26 +229,50 @@ export function GallerySelectionBar({
         }}
         transitionProps={{ transition: "slide-up" }}
       >
-        <Stack gap={4} align="center" miw={0}>
-          <Group gap={2} wrap="nowrap" maw="100%">
-            <ActionBarGroups
-              groups={actions}
-              labelled={!phone}
-              trailing={
-                <Button
-                  variant="subtle"
-                  color="gray"
-                  size="compact-sm"
-                  leftSection={<X size={16} />}
-                  aria-label="Close Selection"
-                  disabled={pending}
-                  onClick={selection.end}
-                >
-                  Close
-                </Button>
-              }
-            />
-          </Group>
+        <Stack gap={4} align="center" miw={0} w={phone ? "100%" : undefined}>
+          {phone ? (
+            // Phones keep what acts on several items on the bar, the rest under More.
+            <Group gap={2} wrap="nowrap" w="100%">
+              <StackedActionBar
+                primary={phoneSelection.flatMap((id) =>
+                  actions.flat().filter((action) => action.id === id),
+                )}
+                more={actions.map((group) =>
+                  group.filter((action) => !phoneSelection.includes(action.id)),
+                )}
+              />
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size={40}
+                aria-label="Close Selection"
+                disabled={pending}
+                onClick={selection.end}
+              >
+                <X size={18} />
+              </ActionIcon>
+            </Group>
+          ) : (
+            <Group gap={2} wrap="nowrap" maw="100%">
+              <ActionBarGroups
+                groups={actions}
+                labelled
+                trailing={
+                  <Button
+                    variant="subtle"
+                    color="gray"
+                    size="compact-sm"
+                    leftSection={<X size={16} />}
+                    aria-label="Close Selection"
+                    disabled={pending}
+                    onClick={selection.end}
+                  >
+                    Close
+                  </Button>
+                }
+              />
+            </Group>
+          )}
           {downloadTooLarge && (
             <Text size="xs" c="dimmed" ta="center" px="sm">
               Select fewer items to download in one archive.

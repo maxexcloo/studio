@@ -174,11 +174,14 @@ primary component reference and verify APIs against the installed version.
   checklist of media to delete as well.
 - Chat retains streamed text, generation snapshots and results chronologically.
   A reply streams the model's thinking until its text starts, then keeps it collapsed
-  under Thinking, and names the media it requested. Opening a chat waits for its
-  messages and lands at the bottom once.
+  under Thinking. Its tool trail sits above its text, one quiet row per call
+  naming what it made or used ("New images (3) on …", "Editing Result 2"), with a
+  running, done or failed mark, opening to what the tool answered. Opening a chat
+  waits for its messages and lands at the bottom once.
   Assistant text appears above each input card and results below it. Discussion
-  stays text-only; explicit media requests use selected settings without model
-  fallback or an extra confirmation. Refine/Animate stage a new timeline card.
+  stays text-only; media requests run without an extra confirmation, the
+  selected settings filling only what the request leaves open. Refine/Animate
+  stage a new timeline card.
 - Editing and submitting an old card sends a structured Chat revision with its
   source job and full normalised input. The assistant sees the changed prompt,
   references, settings and LoRAs; successful admission creates a new iteration
@@ -331,7 +334,7 @@ primary component reference and verify APIs against the installed version.
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed with an icon row; swipe left/right navigates,
+  Phones show the image full-bleed above a bar of Edit, Animate, Prompt and Upscale, labelled under their icons with ▾ for their options, and More listing every other action; the selection bar keeps Download or Share, Star and Delete with More and Close; swipe left/right navigates,
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
   swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
@@ -371,11 +374,11 @@ primary component reference and verify APIs against the installed version.
   and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
   Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
   Reference; Animate ›
-  themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
+  themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
   Detail (listed even when the worker can't run it, saying why), Upscale
-  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download as GIF, Download Back and Forth (an MP4 played forward then back, looping without a jump). Phones that share natively show
+  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download Video, Download as GIF, Download Back and Forth (an MP4 played forward then back, looping without a jump). Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out
