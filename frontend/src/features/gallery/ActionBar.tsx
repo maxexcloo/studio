@@ -250,7 +250,7 @@ function StackedControl({ action }: { action: Action }) {
       <ActionMenuItems groups={options} />
     </Menu.Dropdown>
   );
-  if (options && !onClick)
+  if (options && !onClick && !link)
     return (
       <Menu position="top" width={240}>
         <Menu.Target>
