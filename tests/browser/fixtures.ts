@@ -278,8 +278,19 @@ export async function fixtures(page: Page) {
         };
         const job = recordGeneration(input, sessionId);
         assistant.jobId = job.id;
-        assistant.draft = { operation: "image", input };
-        events.push({ event: "generation", data: { job } });
+        // A card revision runs as submitted; anything else is the agent's Generate call.
+        if (body.revision) assistant.draft = { operation: "image", input };
+        else
+          assistant.steps = [
+            {
+              id: `call-${messages.length + 2}`,
+              tool: "Generate",
+              input: { prompts: [input.prompt] },
+              status: "completed",
+              output: "Queued on Test Image. Chose Test Image, the default.",
+            },
+          ];
+        events.push({ event: "generation", data: { jobIds: [job.id] } });
       }
       assistant.status = "completed";
       messages.push(user, assistant);
