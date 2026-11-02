@@ -265,14 +265,20 @@ export class RewriteStore {
   }
 
   /**
-   * A job finished outside the queue (a video edit, gallery/video-edits.js), recorded so its result
-   * joins the versions of the one it was made from. It is never scheduled.
+   * A job finished outside the queue, never scheduled: a video edit (gallery/video-edits.js),
+   * recorded so its result joins the versions of the one it was made from, or an upload Recreate
+   * makes a version of (gallery/recreate.js).
    */
   recordFinished(
     ownerId: string,
     sessionId: string,
     input: GenerationInput,
-    origin: { parentJobId?: string; parentItemId?: string; outputs: QueueJob["outputs"] },
+    origin: {
+      parentJobId?: string;
+      parentItemId?: string;
+      operation?: GenerationOperation;
+      outputs: QueueJob["outputs"];
+    },
   ): OwnedJob {
     const stamp = now();
     const id = randomUUID();
@@ -285,7 +291,7 @@ export class RewriteStore {
       ...(origin.parentJobId
         ? { parentJobId: origin.parentJobId, parentItemId: origin.parentItemId }
         : {}),
-      operation: "animate",
+      operation: origin.operation ?? "animate",
       status: "completed",
       reason: "",
       input: { ...input, clientJobId: id },

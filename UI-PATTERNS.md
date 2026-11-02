@@ -389,7 +389,8 @@ primary component reference and verify APIs against the installed version.
   bar (the viewer's bar leads with its labelled primaries). Compare joins Upscale's section in menus (the tile and right-click menu
   and the selection's More), never the viewer's bar. Options are submenus in menus
   and split buttons or menus in bars: Prompt (opens the composer) › Edit,
-  Use as Reference (images), Run Again (new seed), Run Again (Same Seed); Edit
+  Use as Reference (images), Recreate (an upload with a suggested prompt; the run is
+  its version), Run Again (new seed), Run Again (Same Seed); Edit
   opens the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
   Fast or Quality (checked; Fast by default, shown when they run different video profiles, for the themes and the composer), themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›

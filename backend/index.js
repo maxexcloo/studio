@@ -35,6 +35,7 @@ import { createCaptioner } from "./domain/captions.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
 import { registerIdlePassRoutes } from "./domain/idle-work.ts";
 import { createTitler } from "./domain/titles.ts";
+import { createPromptSuggester } from "./domain/suggested-prompts.ts";
 import {
   readRuntimeDocument,
   runtimeDatabase,
@@ -220,6 +221,7 @@ import {
 } from "./workflow-catalog.js";
 import { registerReferenceRoutes } from "./reference-routes.js";
 import { registerVideoEditRoutes } from "./gallery/video-edits.js";
+import { registerRecreateRoute } from "./gallery/recreate.js";
 
 import {
   applyLoraOps,
@@ -1512,6 +1514,7 @@ const jobAdmitted = (job) => {
   captioner.interrupt();
   imageSearch.interrupt();
   titler.interrupt();
+  suggester.interrupt();
   nextSteps.interrupt();
 };
 registerGalleryHistoryRoutes(app, {
@@ -1635,6 +1638,7 @@ function thumbnailCacheControl(req) {
 // An upload is searchable at once, like a finished generation.
 registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([item]) });
 registerVideoEditRoutes(app, { store: rewriteStore });
+registerRecreateRoute(app, { store: rewriteStore });
 
 /**
  * What the deployment decides, for Settings: each value with its source
@@ -2325,6 +2329,16 @@ const titler = createTitler({
   visible: (item) => filterVisibleGallery([item]).length > 0,
   save: (item, title) => updateGalleryJob(galleryKey(item), { title }),
 });
+// Suggested prompts (domain/suggested-prompts.ts) for items without one, such as uploads; Recreate uses them.
+const suggester = createPromptSuggester({
+  writer: assistantEngine,
+  idle: studioIdle,
+  allowed: promptAssistantOwner,
+  items: () => gallery,
+  visible: (item) => filterVisibleGallery([item]).length > 0,
+  image: smallImage,
+  save: (item, suggestedPrompt) => updateGalleryJob(galleryKey(item), { suggestedPrompt }),
+});
 // Viewer next steps (domain/suggestions.ts), written while idle so the viewer shows them at once.
 const nextSteps = createNextStepWork({
   suggestions,
@@ -2577,6 +2591,7 @@ finishing.start();
 captioner.start();
 imageSearch.start();
 titler.start();
+suggester.start();
 nextSteps.start();
 
 /**
