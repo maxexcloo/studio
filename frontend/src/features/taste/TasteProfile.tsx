@@ -5,6 +5,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
 import { SettingGroup } from "../settings/SettingRows";
+import { maxTasteSummary } from "../../../../shared/taste";
 
 export interface Taste {
   summary: string;
@@ -71,7 +72,7 @@ export function TasteProfile() {
           aria-label="Taste Profile"
           autosize
           minRows={4}
-          maxLength={1000}
+          maxLength={maxTasteSummary}
           disabled={!data || refresh.isPending}
           placeholder="Studio learns what you like from your stars, comparisons and iterations. You can also describe your taste here."
           value={value}

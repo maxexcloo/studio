@@ -3,6 +3,7 @@ import {
   readRuntimeDocument,
   writeRuntimeDocument,
 } from "../persistence/runtime.ts";
+import { maxTasteSummary } from "../../shared/taste.ts";
 
 /**
  * What a person did with a result; "keep" and "discard" are their verdicts on Dream results,
@@ -80,7 +81,6 @@ interface Router {
   delete(path: string, handler: Handler): unknown;
 }
 
-const maxSummary = 1000;
 const maxSignals = 200;
 /** One action, such as a bulk star, adds at most this many signals so it can't flood the profile. */
 const maxPerCall = 20;
@@ -254,7 +254,7 @@ export function createTaste({
       .replace(/^(?:revised\s+)?(?:taste\s+)?profile\s*:\s*/i, "")
       .replace(/\s+/g, " ")
       .trim()
-      .slice(0, maxSummary);
+      .slice(0, maxTasteSummary);
     if (!summary) throw failure("The text model’s reply was unusable. Try again.", 502);
     const current = read(ownerId);
     // An edit or Clear while the model wrote wins over its reply.
@@ -338,10 +338,10 @@ export function registerTasteRoutes(app: Router, { taste }: { taste: Taste }) {
   app.get("/api/taste", (req, res) => res.json(show(req, taste.read(owner(req)))));
   app.put("/api/taste", (req, res) => {
     const summary = req.body?.summary;
-    if (typeof summary !== "string" || summary.trim().length > maxSummary)
+    if (typeof summary !== "string" || summary.trim().length > maxTasteSummary)
       return res
         .status(400)
-        .json({ ok: false, error: `Keep the taste profile to ${maxSummary} characters.` });
+        .json({ ok: false, error: `Keep the taste profile to ${maxTasteSummary} characters.` });
     return res.json(show(req, taste.save(owner(req), summary.trim())));
   });
   app.post("/api/taste/refresh", async (req, res) => {
