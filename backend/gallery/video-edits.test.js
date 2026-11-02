@@ -86,7 +86,7 @@ function seed() {
 }
 
 test(
-  "Trim saves the kept part, with its sound, as a version of the original",
+  "Trim and Reverse save the edited clip, with its sound, as a version of the original",
   {
     skip: !available,
   },
@@ -110,5 +110,13 @@ test(
     assert.equal(clip.audio, true);
     // The original stays.
     assert.ok(fs.existsSync(file));
+    // Reversed, it keeps its length and sound.
+    const reversed = await call("alice", { galleryItemId: url, kind: "reverse" });
+    assert.equal(reversed.code, 201, JSON.stringify(reversed.body));
+    const backwards = await previews.probeVideo(
+      media.mediaFile(media.mediaParams(reversed.body.id).filename, params.subfolder),
+    );
+    assert.ok(Math.abs(backwards.durationMs - 2000) < 120, `got ${backwards.durationMs} ms`);
+    assert.equal(backwards.audio, true);
   },
 );

@@ -318,15 +318,25 @@ export async function joinClips(source, extension, output, at = "last") {
 }
 
 const seconds = (ms) => (Number(ms) / 1000).toFixed(3);
+/** Reversing holds every frame in memory, so it takes clips up to this long. */
+const maxReversedMs = 30_000;
+const reversible = (clip) => {
+  if (clip.durationMs > maxReversedMs)
+    throw new Error(`Only clips up to ${maxReversedMs / 1000} seconds can be reversed.`);
+};
 /**
  * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
- * `trim` keeps `start` to `end` milliseconds.
+ * `trim` keeps `start` to `end` milliseconds; `reverse` plays it backwards.
  */
 const videoEdits = {
   trim: ({ start, end }) => ({
     video: `trim=start=${seconds(start)}:end=${seconds(end)},setpts=PTS-STARTPTS`,
     audio: `atrim=start=${seconds(start)}:end=${seconds(end)},asetpts=PTS-STARTPTS`,
   }),
+  reverse: (_edit, clip) => {
+    reversible(clip);
+    return { video: "reverse", audio: "areverse" };
+  },
 };
 export const videoEditKinds = Object.keys(videoEdits);
 
