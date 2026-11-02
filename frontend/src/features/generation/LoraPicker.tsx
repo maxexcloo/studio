@@ -13,7 +13,7 @@ import {
   Text,
 } from "@mantine/core";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import { Layers, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, Layers, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
@@ -153,6 +153,7 @@ export function LoraPicker({ value, onChange, picker }: LoraPickerProps) {
       aria-expanded={picker.opened}
       aria-controls={picker.controlsId}
       leftSection={input.loras.length ? undefined : <Layers size={15} />}
+      rightSection={<ChevronDown size={14} />}
       onPointerEnter={warm}
       onFocus={warm}
       onClick={() => picker.setOpened(!picker.opened)}
