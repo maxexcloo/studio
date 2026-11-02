@@ -86,7 +86,7 @@ function seed() {
 }
 
 test(
-  "Trim and Reverse save the edited clip, with its sound, as a version of the original",
+  "Trim, Reverse and Back and Forth save the edited clip as a version of the original",
   {
     skip: !available,
   },
@@ -118,5 +118,12 @@ test(
     );
     assert.ok(Math.abs(backwards.durationMs - 2000) < 120, `got ${backwards.durationMs} ms`);
     assert.equal(backwards.audio, true);
+    // Back and Forth plays it forward then back, silent like its download.
+    const loop = await call("alice", { galleryItemId: url, kind: "loop" });
+    const both = await previews.probeVideo(
+      media.mediaFile(media.mediaParams(loop.body.id).filename, params.subfolder),
+    );
+    assert.ok(Math.abs(both.durationMs - 3958) < 120, `got ${both.durationMs} ms`);
+    assert.equal(both.audio, false);
   },
 );
