@@ -788,6 +788,12 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
+/** Opens the selection bar's More menu and returns one of its items. */
+export async function selectionMenuItem(page: Page, label: string) {
+  await selectionAction(page, "More").click();
+  return page.getByRole("menuitem", { name: label, exact: true });
+}
+
 /** Chat with nothing open: desktop says so; phones list the chats in its place. */
 export async function expectNoChatOpen(page: Page) {
   if ((page.viewportSize()?.width || 1440) < 768)
