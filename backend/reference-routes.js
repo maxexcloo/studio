@@ -4,10 +4,10 @@ import { clientOf } from "./access.js";
 import { accountForRequest, multiUserEnabled } from "./multi-user-auth.js";
 import {
   bytesForReferenceAccount,
-  readMultipartImage,
+  readMultipartUpload,
   referenceAssetFromGallery,
   referenceAssetMetadataForAccount,
-  saveUploadedImage,
+  saveUpload,
 } from "./references.js";
 import { requireLocal } from "./route-access.js";
 
@@ -20,8 +20,8 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
         mayUseFeature(req.studioAccount, "videoReferences"));
     if (!canReference && !requireLocal(req, res)) return;
     try {
-      const { item, asset } = await saveUploadedImage(
-        await readMultipartImage(req),
+      const { item, asset } = await saveUpload(
+        await readMultipartUpload(req),
         ownerIdForRequest(req),
       );
       uploaded(item);
@@ -31,8 +31,8 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     }
   });
 
-  // The installed app's share target (manifest.webmanifest): an image shared to Studio becomes a
-  // reference and opens the composer with it. Another site's form post carries no session, and in
+  // The installed app's share target (manifest.webmanifest): an image or video shared to Studio is
+  // saved as an upload and opens the composer with it (a video's first frame) as a reference. Another site's form post carries no session, and in
   // single-user mode the browser's own Sec-Fetch-Site marks it, so neither can add one.
   app.post("/share", async (req, res) => {
     const site = String(req.headers["sec-fetch-site"] || "").toLowerCase();
@@ -47,8 +47,8 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     if (!allowed) return res.redirect(303, "/images");
     req.studioAccount = account;
     try {
-      const { item, asset } = await saveUploadedImage(
-        await readMultipartImage(req),
+      const { item, asset } = await saveUpload(
+        await readMultipartUpload(req),
         ownerIdForRequest(req),
       );
       uploaded(item);
@@ -70,7 +70,7 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
       const reference = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
         frame: Number.isInteger(frame) && frame >= 0 ? frame : "last",
       });
-      const { item, asset } = await saveUploadedImage(
+      const { item, asset } = await saveUpload(
         await bytesForReferenceAccount(req.studioAccount, reference.id),
         ownerIdForRequest(req),
       );

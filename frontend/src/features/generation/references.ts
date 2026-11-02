@@ -14,6 +14,8 @@ import {
 import { useGeneration } from "./GenerationProvider";
 
 export const galleryReferenceType = "application/x-studio-gallery-item";
+/** What an upload can be (backend/references.js): an image, or a video placed by its first frame. */
+export const uploadTypes = ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"];
 export const referenceKey = (asset: ReferenceAsset) => `${asset.slot}:${asset.id}`;
 export function referenceLabel(asset: ReferenceAsset, index: number, profile?: Profile) {
   const role = profile?.mediaInputs?.find((input) => input.id === asset.slot)?.label;
@@ -165,7 +167,7 @@ export function useReferencePlacement(list: ReferenceList) {
         })
       ).asset;
     },
-    // An upload is a gallery image, listed under the Uploads filter.
+    // An upload is a gallery image or video, listed under the Uploads filter.
     onSuccess: async () => {
       await client.invalidateQueries({ queryKey: ["reference-gallery"] });
       await client.invalidateQueries({ queryKey: ["gallery"] });
@@ -185,7 +187,7 @@ export function useReferencePlacement(list: ReferenceList) {
     if (target) list.set(placeReference(references, asset, list.profile, target));
   }
   async function uploadFiles(files: File[], chosen?: ReferenceTarget | null) {
-    for (const file of files.filter((file) => file.type.startsWith("image/"))) {
+    for (const file of files.filter((file) => uploadTypes.includes(file.type))) {
       if (!nextReferenceTarget(list.get(), list.profile, chosen)) break;
       const asset = await upload.mutateAsync(file).catch(() => undefined);
       if (!asset) break;

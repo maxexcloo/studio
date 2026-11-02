@@ -1,5 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
-import { createIdleWork, type IdleDocument, type IdleItem, type PassScope } from "./idle-work.ts";
+import {
+  createIdleWork,
+  pictured,
+  type IdleDocument,
+  type IdleItem,
+  type PassScope,
+} from "./idle-work.ts";
 
 /** The SigLIP 2 encoders (providers/siglip.ts). */
 export interface ImageEncoder {
@@ -86,7 +92,7 @@ export function createImageSearch(options: {
     off: "Image Search is off in Settings › Models.",
     allowed: () => true,
     unavailable: async () => encoder.unavailable(),
-    wanted: (item) => item.type === "image" && !vectors.has(item),
+    wanted: (item) => pictured(item) && !vectors.has(item),
     async run(item) {
       // Once read, the vector is kept even if other work arrived meanwhile.
       vectors.set(item, await encoder.embedImage(await options.image(item)));

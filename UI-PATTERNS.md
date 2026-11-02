@@ -197,8 +197,8 @@ primary component reference and verify APIs against the installed version.
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
   up, then unrated, then thumbs down, each alphabetically; Dream loads only thumbs
   up.
-- References pick from the gallery. Uploads are the uploader's gallery images,
-  hidden until the gallery's Uploads filter is on (the picker's too, where the
+- References pick from the gallery. Uploads are the uploader's gallery images
+  and videos (a video is placed by its first frame), hidden until the gallery's Uploads filter is on (the picker's too, where the
   Upload tile sits). Gallery drag-and-drop passes an
   owned item identifier, never arbitrary media URLs or shared worker history.
   Preserve intentional reference order and source-result lineage across edits.

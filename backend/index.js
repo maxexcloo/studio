@@ -231,7 +231,7 @@ import {
 } from "./lora/stacks.js";
 import {
   bytesForReferenceAccount,
-  publicGalleryBuffer,
+  galleryStill,
   referenceAssetForAccount,
   referenceExistsForAccount,
   stageReferenceAssetsForAccount,
@@ -2268,11 +2268,11 @@ function promptAssistantOwner(ownerId) {
   const account = ownerId ? accountAccessForId(ownerId) : undefined;
   return Boolean(account?.authenticated && mayUseFeature(account, "promptAssistant"));
 }
-/** A small (≤512 px) JPEG of a gallery image for the text model, or null without sharp. */
+/** A small (≤512 px) JPEG of a gallery image (a video's first frame) for the text model, or null without sharp. */
 async function smallImage(item) {
   const sharp = await loadSharp();
   if (!sharp) return null;
-  const data = await sharp((await publicGalleryBuffer(item)).buffer)
+  const data = await sharp(await galleryStill(item))
     .rotate()
     .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
     .jpeg({ quality: 80 })
@@ -2310,7 +2310,7 @@ const imageSearch = createImageSearch({
   idle: studioIdle,
   items: () => gallery,
   visible: (item) => filterVisibleGallery([item]).length > 0,
-  image: async (item) => (await publicGalleryBuffer(item)).buffer,
+  image: galleryStill,
   load: runtimeLoad("image-search"),
   persist: (document) => writeRuntimeDocument(dataDir, "image-search", document),
 });

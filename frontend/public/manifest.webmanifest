@@ -18,7 +18,12 @@
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
-      "files": [{ "name": "image", "accept": ["image/png", "image/jpeg", "image/webp"] }]
+      "files": [
+        {
+          "name": "image",
+          "accept": ["image/png", "image/jpeg", "image/webp", "video/mp4", "video/webm"]
+        }
+      ]
     }
   }
 }
