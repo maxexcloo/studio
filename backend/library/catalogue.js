@@ -4,20 +4,19 @@
  * text encoders, VAEs and CLIP vision), keyed by `folder/file`, with provenance and a hash index:
  * `<data>/library/catalogue.json`.
  *
- * It replaces the scattered catalogue files, which stay where they are as backups and are never
- * deleted or written here:
- *   - seed:     `<data>/config/lora-catalogue.json` (an older LoRA catalogue copy)
+ * It merges these source files, which stay where they are as backups and are never deleted or
+ * written here:
  *   - definitions: `<data>/config/catalogue.json` (model metadata from a Studio export)
- *   - admin:    `<data>/lora-catalogue.json` (installed by hand)
  *   - provider: `<data>/model-download-sources.json` (Civitai and Hugging Face downloads)
  *   - manifest: the restore manifest (an imported `<data>/model-manifest.json`, else
  *     STUDIO_MODEL_MANIFEST, else `<data>/config/models.json`)
  *
  * Each source is copied into its own layer. A layer is refreshed when its file changes and kept
- * when the file goes, so the migration is idempotent. Studio's own edits are a layer above all of
- * them. On a conflict the more
- * specific source wins: edits over the admin file over the seed over provider details over the
- * manifest, except that provider metadata wins for links and hashes.
+ * when the file goes, so the migration is idempotent. The `seed` and `admin` layers hold LoRA
+ * entries synced from the retired lora-catalogue.json files; nothing refreshes them now. Studio's
+ * own edits are a layer above all of them. On a conflict the more specific source wins: edits
+ * over the admin layer over the seed layer over provider details over the manifest, except that
+ * provider metadata wins for links and hashes.
  *
  * This module is the catalogue's only writer; writes are atomic (json-store.js).
  */
@@ -96,7 +95,7 @@ function providerSource(spec) {
   return null;
 }
 
-/** The old catalogue entry shape (lora-catalogue.json) from Entry-shaped edits. */
+/** The seed and admin layers' LoRA entry shape from Entry-shaped edits. */
 function rawFromEdit(edit = {}) {
   const raw = {};
   for (const key of [
@@ -288,9 +287,7 @@ export function createCatalogueStore({
   const manifestPrefix = () =>
     String(environment.STUDIO_MODEL_MANIFEST_PREFIX || "").replace(/^\/+/, "");
   const sources = {
-    seed: () => path.join(dataDir, "config", "lora-catalogue.json"),
     definitions: () => path.join(dataDir, "config", "catalogue.json"),
-    admin: () => path.join(dataDir, "lora-catalogue.json"),
     provider: () => path.join(dataDir, "model-download-sources.json"),
     manifest: () => {
       const imported = path.join(dataDir, "model-manifest.json");
@@ -342,12 +339,6 @@ export function createCatalogueStore({
         layer[key] = cleanCataloguePatch(
           Object.fromEntries(Object.entries(fields).filter(([field]) => editableFields.has(field))),
         );
-      }
-    } else if (name === "seed" || name === "admin") {
-      if (!isObject(value)) return null;
-      for (const [loraName, entry] of Object.entries(value)) {
-        const key = safeKey("loras", loraName);
-        if (key && isObject(entry)) layer[key] = structuredClone(entry);
       }
     } else if (name === "provider") {
       if (!isObject(value)) return null;
@@ -520,8 +511,8 @@ export function createCatalogueStore({
   function plan() {
     const current = load();
     const changes = {};
-    for (const name of layerNames) {
-      const read = readSource(sources[name]());
+    for (const [name, source] of Object.entries(sources)) {
+      const read = readSource(source());
       if (
         !read.signature ||
         read.signature === "unreadable" ||
@@ -671,7 +662,7 @@ export function createCatalogueStore({
   /**
    * The LoRA view in the old shapes lora/info.js reads, so /api/loras/info keeps its response:
    * `sources` as model-download-sources.json had them, `catalogue` by LoRA name as the merged
-   * lora-catalogue.json files (admin over seed) plus Studio's edits.
+   * seed and admin layers (admin over seed) plus the definitions and Studio's edits.
    */
   function loraView() {
     const current = fresh();
