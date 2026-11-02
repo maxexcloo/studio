@@ -37,6 +37,8 @@ import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
+import { useGenerationActions } from "./GenerationProvider";
+import { isProfile } from "./payload";
 import { WritingStream } from "./PromptWriting";
 import { terminalStatuses, type QueueMove, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
@@ -195,6 +197,10 @@ function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; las
   const { progress } = job;
   const percent = progressPercent(progress);
   const Kind = failed ? CircleAlert : job.input?.kind === "video" ? Video : Image;
+  // The profile it runs on, by its short name.
+  const profile = useGenerationActions().profiles.find((entry) =>
+    isProfile(entry, job.input?.profileId),
+  );
   return (
     <Group wrap="nowrap" gap="sm" py="xs" className={classes.row}>
       <Kind
@@ -208,7 +214,14 @@ function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; las
           {String(job.input?.prompt || "Generation")}
         </Text>
         <Text size="xs" c={failed ? "red" : "dimmed"} lineClamp={2}>
-          {[statusLabels[job.status], progress?.phase, job.reason].filter(Boolean).join(" · ")}
+          {[
+            profile?.displayName || profile?.label,
+            statusLabels[job.status],
+            progress?.phase,
+            job.reason,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </Text>
         {job.status === "writing" && <WritingStream progress={progress} />}
       </Stack>

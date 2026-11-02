@@ -17,7 +17,8 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
       operation: "image",
       status,
       reason: "",
-      input: { prompt: id },
+      // Each row names the profile it runs on.
+      input: { prompt: id, profileId: id === "running-job" ? "image:test" : undefined },
       items: [],
       outputs: [],
       createdAt: stamp,
@@ -28,6 +29,7 @@ test("the queue pauses, resumes and reorders the account's waiting work", async 
   const queue = page.getByRole("dialog", { name: "Generations", exact: true });
   const order = () => queue.getByText(/^(running-job|first|second|third)$/).allTextContents();
   await expect.poll(order).toEqual(["running-job", "first", "second", "third"]);
+  await expect(queue.getByText("Image Quality · Generating", { exact: true })).toBeVisible();
 
   await queue.getByRole("button", { name: "Pause Queue", exact: true }).click();
   await expect(queue.getByRole("button", { name: "Resume", exact: true })).toBeVisible();
