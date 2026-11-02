@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Read-only Library answers for MCP's admin tools (mcp-admin.js), behind the Library's routes:
+ * Read-only Library answers for MCP's admin tools (mcp/admin.js), behind the Library's routes:
  *
  *   lookup     a Civitai model or Hugging Face link, or a Civitai search: its versions and files with
  *              availability, licence and whether a profile here fits, without importing or writing

@@ -28,7 +28,7 @@ import {
   sharedProfileFields,
   userWorkflowsDir,
 } from "../custom-workflows.js";
-import { dataDir } from "../gallery-store.js";
+import { dataDir } from "../gallery/store.js";
 import { writeJsonFile } from "../json-store.js";
 import { createEditableProfile, listEditableProfiles, readEditableProfile } from "./editor.js";
 import { loraStackFiles, repointLoraStacks } from "../combined-profiles.js";

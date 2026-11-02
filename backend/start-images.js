@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir } from "./gallery-store.js";
+import { dataDir } from "./gallery/store.js";
 
 const startImageDir = path.join(dataDir, "start-images");
 const memoryCache = new Map();

@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { civitaiFetch, limitedBody } from "./access.js";
 import { parametersText } from "./civitai.js";
 import { matchResources } from "./import.js";
-import { addGalleryItems, gallery, importedImageFile } from "../gallery-store.js";
+import { addGalleryItems, gallery, importedImageFile } from "../gallery/store.js";
 import { startLibraryDownload } from "../library/downloads.js";
 import { withPngText } from "../png-text.js";
 import { probeVideo } from "../video-previews.js";

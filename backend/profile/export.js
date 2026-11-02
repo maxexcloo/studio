@@ -17,7 +17,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { zipBuffer } from "../gallery-export.js";
+import { zipBuffer } from "../gallery/export.js";
 import { hashOf } from "./store.js";
 
 const exportsKept = 20;

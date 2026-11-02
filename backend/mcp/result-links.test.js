@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { McpMedia } from "./mcp-media.js";
+import { McpMedia } from "./media.js";
 
 test("result links are sealed, reveal no account or job, and earlier signed links still open", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-result-links-"));

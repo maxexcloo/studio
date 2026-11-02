@@ -19,16 +19,16 @@ const { inferModels } = await import("../model/models.js");
 const { mergeWorkerModels, noteWorkerProfiles, routeJob } = await import("../comfy/backends.js");
 const { readEditableProfile, saveEditableProfile, validateProfileText } =
   await import("./editor.js");
-const { generationSettings } = await import("../gallery-store.js");
+const { generationSettings } = await import("../gallery/store.js");
 const { timingKey } = await import("../generation-timing.js");
 const { generationEstimate, recordGeneration } = await import("../timings.js");
 const { profileStats } = await import("../stats.js");
-const { matchesGalleryFilters } = await import("../gallery-filters.js");
+const { matchesGalleryFilters } = await import("../gallery/filters.js");
 const { effectiveAccountAccess, mayUseGenerationProfile } = await import("../account-policy.js");
-const { findProfile } = await import("../mcp-tiers.js");
+const { findProfile } = await import("../mcp/tiers.js");
 const { buildExport } = await import("./export.js");
 const { loadWorkflowPreferences, saveWorkflowPreferences } = await import("../workflow-catalog.js");
-const { McpMedia } = await import("../mcp-media.js");
+const { McpMedia } = await import("../mcp/media.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
 const radianceBlock = {

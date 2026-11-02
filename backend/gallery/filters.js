@@ -3,7 +3,7 @@
  * one value or several: any of a filter's values matches, and every filter
  * that is on must match. `workflow` is a single value.
  */
-import { canonicalProfileId } from "./profile/store.js";
+import { canonicalProfileId } from "../profile/store.js";
 
 /** Long-edge size bands, without overlap: each upper bound is inclusive, the next band starts one pixel above. */
 export const gallerySizeBands = [

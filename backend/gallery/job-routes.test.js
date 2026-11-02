@@ -8,8 +8,8 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-gallery-job-"));
 process.env.STUDIO_DATA_DIR = dir;
 process.env.STUDIO_MEDIA_DIR = dir;
-const { setGallery } = await import("./gallery-store.js");
-const { registerGalleryReadRoutes } = await import("./gallery-routes.js");
+const { setGallery } = await import("./store.js");
+const { registerGalleryReadRoutes } = await import("./routes.js");
 
 test("exact job results exclude unrelated and deleted outputs and expose prompts only on request", async (t) => {
   const app = express();

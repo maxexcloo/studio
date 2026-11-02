@@ -34,7 +34,7 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
     });
   run(`
     import {createLocalAccount} from './backend/account-store.js';
-    import {setGallery,flushGalleryStrict} from './backend/gallery-store.js';
+    import {setGallery,flushGalleryStrict} from './backend/gallery/store.js';
     await createLocalAccount({username:'migration.example',password:'fixture password for migration',role:'administrator'});
     setGallery([{id:'kept',jobId:'kept-job',index:0,type:'image',status:'pending',createdAt:'2020-01-01T00:00:00Z'}]);
     await flushGalleryStrict();
@@ -45,7 +45,7 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
   run(`
     import assert from 'node:assert/strict';
     import {verifyLocalAccount,createAccountSession,accountSession} from './backend/account-store.js';
-    import {gallery,setGallery,flushGalleryStrict} from './backend/gallery-store.js';
+    import {gallery,setGallery,flushGalleryStrict} from './backend/gallery/store.js';
     import {runtimeDatabase,readRuntimeDocument} from './backend/persistence/runtime.ts';
     const account=await verifyLocalAccount('migration.example','fixture password for migration');
     assert.ok(account?.userId);
@@ -63,7 +63,7 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
   run(`
     import assert from 'node:assert/strict';
     import {accountStoreSnapshot} from './backend/account-store.js';
-    import {gallery} from './backend/gallery-store.js';
+    import {gallery} from './backend/gallery/store.js';
     assert.equal(accountStoreSnapshot().sessions,1);
     assert.equal(gallery.length,2);
     assert.ok(gallery.every(item=>item.status==='pending'));

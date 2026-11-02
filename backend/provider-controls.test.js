@@ -10,7 +10,7 @@ const { saveImportedWorkflow } = await import("./custom-workflows.js");
 const { buildProfile, inferModels } = await import("./model/models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 const { customWorkflowGraph } = await import("./graphs.js");
-const { generationSettings } = await import("./gallery-store.js");
+const { generationSettings } = await import("./gallery/store.js");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const info = {

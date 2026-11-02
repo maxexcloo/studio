@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { McpMedia } from "./mcp-media.js";
+import { McpMedia } from "./media.js";
 
 test("concurrent profile discovery shares one scan and refreshes after the cache expires", async () => {
   const media = Object.create(McpMedia.prototype);

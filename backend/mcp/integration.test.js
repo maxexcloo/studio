@@ -11,13 +11,13 @@ import sharp from "sharp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
-import { McpMedia } from "./mcp-media.js";
-import { adminToolNames } from "./mcp-admin.js";
-import { createPromptStage } from "./prompt-stage.js";
-import { createPromptWriter } from "./prompt-writer.js";
-import { fakeKubernetes } from "./fixtures/fake-kubernetes.ts";
-import { RuntimeController } from "./runtime/controller.ts";
-import { KubernetesEngine } from "./runtime/kubernetes.ts";
+import { McpMedia } from "./media.js";
+import { adminToolNames } from "./admin.js";
+import { createPromptStage } from "../prompt-stage.js";
+import { createPromptWriter } from "../prompt-writer.js";
+import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
+import { RuntimeController } from "../runtime/controller.ts";
+import { KubernetesEngine } from "../runtime/kubernetes.ts";
 
 const mediaKey = "fixture-media-credential";
 const controlKey = "fixture-control-credential";
@@ -1925,8 +1925,8 @@ test(
     const envFile = path.join(dir, ".env");
     fs.writeFileSync(envFile, "");
     const here = path.dirname(fileURLToPath(import.meta.url));
-    const child = fork(path.join(here, "index.js"), [], {
-      cwd: path.dirname(here),
+    const child = fork(path.join(here, "..", "index.js"), [], {
+      cwd: path.resolve(here, "../.."),
       env: {
         PATH: process.env.PATH,
         PORT: "0",
@@ -2156,24 +2156,28 @@ test(
       );
     });
     await new Promise((resolve) => backend.listen(0, "127.0.0.1", resolve));
-    const child = fork(path.join(path.dirname(fileURLToPath(import.meta.url)), "index.js"), [], {
-      env: {
-        PATH: process.env.PATH,
-        PORT: "0",
-        HOST: "127.0.0.1",
-        STUDIO_DATA_DIR: dir,
-        STUDIO_ENV_FILE: path.join(dir, ".env"),
-        STUDIO_MCP_API_KEY: mediaKey,
-        STUDIO_WORKERS: JSON.stringify([
-          {
-            id: "primary",
-            url: `http://127.0.0.1:${backend.address().port}`,
-            capabilities: ["image", "video", "upscale", "models"],
-          },
-        ]),
+    const child = fork(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "index.js"),
+      [],
+      {
+        env: {
+          PATH: process.env.PATH,
+          PORT: "0",
+          HOST: "127.0.0.1",
+          STUDIO_DATA_DIR: dir,
+          STUDIO_ENV_FILE: path.join(dir, ".env"),
+          STUDIO_MCP_API_KEY: mediaKey,
+          STUDIO_WORKERS: JSON.stringify([
+            {
+              id: "primary",
+              url: `http://127.0.0.1:${backend.address().port}`,
+              capabilities: ["image", "video", "upscale", "models"],
+            },
+          ]),
+        },
+        stdio: ["ignore", "ignore", "ignore", "ipc"],
       },
-      stdio: ["ignore", "ignore", "ignore", "ipc"],
-    });
+    );
     const client = new Client(
       { name: "owned-profile-fixture", version: "1.0.0" },
       { capabilities: {} },

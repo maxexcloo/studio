@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { dataDir } from "./gallery-store.js";
+import { dataDir } from "./gallery/store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 import { writeJsonFile } from "./json-store.js";
 import { grokEnabled } from "./features.js";

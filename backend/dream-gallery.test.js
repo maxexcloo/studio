@@ -13,8 +13,8 @@ const {
   pageGallery,
   setGallery,
   updateGalleryJob,
-} = await import("./gallery-store.js");
-const { galleryJobResponse } = await import("./gallery-routes.js");
+} = await import("./gallery/store.js");
+const { galleryJobResponse } = await import("./gallery/routes.js");
 
 const mark = { prompt: "a fox at dawn", why: "You star foxes.", at: new Date().toISOString() };
 const item = (id, dream) => ({

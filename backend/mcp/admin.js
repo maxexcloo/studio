@@ -14,9 +14,9 @@
  * deletes a model file or touches a GPU.
  */
 import { z } from "zod";
-import { mcpJson } from "./mcp-media.js";
-import { lineDiff } from "./line-diff.js";
-import { imageMimes } from "./reference-names.js";
+import { mcpJson } from "./media.js";
+import { lineDiff } from "../line-diff.js";
+import { imageMimes } from "../reference-names.js";
 
 export const adminToolNames = Object.freeze([
   "Library",

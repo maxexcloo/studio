@@ -21,7 +21,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { graphFromJson, userWorkflowsDir } from "../custom-workflows.js";
-import { dataDir } from "../gallery-store.js";
+import { dataDir } from "../gallery/store.js";
 import { writeJsonFile } from "../json-store.js";
 import { listEditableProfiles, readEditableProfile } from "./editor.js";
 import { guideStore, hashOf, profileStore } from "./store.js";
