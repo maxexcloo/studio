@@ -61,6 +61,11 @@
   transition: background-color var(--studio-motion-duration) var(--studio-ease-enter);
 }
 
+/* A whole control keeps room for its name; a split one shares its width with its ▾. */
+.stackedBar > .stacked {
+  min-width: 64px;
+}
+
 .stackedSplit {
   display: flex;
   flex: 1;
