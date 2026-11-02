@@ -324,7 +324,8 @@ primary component reference and verify APIs against the installed version.
   views. Notifications sit bottom right, raised clear of the composer and viewer
   action bars, so they never cover header buttons. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
-  and actions, and Australian English for explanatory prose.
+  and actions, and Australian English for explanatory prose. Placeholders are
+  short hints without a trailing ellipsis.
 
 ## Media, Motion & Accessibility
 
@@ -353,7 +354,7 @@ primary component reference and verify APIs against the installed version.
 - Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
   generation by default (the All Versions filter chip, on). Turning it off
-  collapses a result and its versions (runs made from it: Edit, Prompt, New Seed
+  collapses a result and its versions (runs made from it: Edit, Prompt, Run Again
   and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it
   with the pointer, or a sideways swipe on phones, flips through them. Sharing a
@@ -374,13 +375,13 @@ primary component reference and verify APIs against the installed version.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
 - Item actions have one definition (`gallery/MediaActions.tsx`): Chat, Prompt ▾
-  | Animate, Edit ▾ | Upscale | Copy ▾, Download | Delete, Star, Chat and Prompt
-  first and the rest alphabetical within each section, in every menu and action
+  | Animate, Edit | Upscale | Copy ▾, Download | Star, Delete, Chat and Prompt
+  first, Delete last and the rest alphabetical within each section, in every menu and action
   bar. Compare joins Upscale's section in menus (the tile and right-click menu)
   and the selection bar, never the viewer's bar. Options are submenus in menus
-  and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
-  Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
-  Reference; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
+  and split buttons or menus in bars: Prompt (opens the composer) › Edit,
+  Use as Reference (images), Run Again (new seed), Run Again (Same Seed); Edit
+  opens the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
   themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
