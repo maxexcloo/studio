@@ -47,12 +47,15 @@ test("Popups anchored to the composer stay put while the gallery scrolls", async
   await page.getByRole("button", { name: "Recent Prompts", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "Recent Prompts", exact: true });
   await expect(panel.getByText("Earlier landscape")).toBeVisible();
-  // Measured in one task, before any scroll handler could move the popup back.
-  const moved = await panel.evaluate((element) => {
+  // Once its scale-in has finished; measured in one task, before any scroll handler could move it back.
+  const moved = await panel.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+    );
     const before = element.getBoundingClientRect().top;
     window.scrollBy(0, 400);
     return element.getBoundingClientRect().top - before;
   });
-  // Sub-pixel drift is the tail of the popup's scale-in, not the scroll.
-  expect(moved).toBeCloseTo(0);
+  // A popup that followed the page would move by the whole scroll.
+  expect(Math.abs(moved)).toBeLessThan(1);
 });
