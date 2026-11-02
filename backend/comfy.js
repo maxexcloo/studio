@@ -44,10 +44,6 @@ export function inDotFolder(subfolder = "") {
       .some((part) => part.startsWith(".")),
   );
 }
-/** What an output can be: images, videos and sound. Anything else is never served. */
-export const outputMediaPattern =
-  /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
-
 /** The file behind an output URL's parts when it is Studio media; null otherwise. */
 export function localOutputFile(filename, subfolder = "", type = "output") {
   return type === mediaType ? mediaFile(String(filename || ""), String(subfolder || "")) : null;
