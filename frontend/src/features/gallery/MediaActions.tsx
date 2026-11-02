@@ -21,6 +21,7 @@ import {
   PenLine,
   Play,
   Repeat,
+  Rewind,
   RotateCw,
   ScanFace,
   Scissors,
@@ -62,6 +63,7 @@ import {
   type Iteration,
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
+import { useVideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
@@ -288,6 +290,7 @@ export function useMediaActions(
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
+  const videoEdit = useVideoEdit(item);
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
@@ -398,8 +401,20 @@ export function useMediaActions(
     ready &&
       item.type === "video" &&
       itemAction("edit", {
+        loading: videoEdit.isPending,
         note: "Each edit is saved as a new version.",
-        menu: [[{ id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim }]],
+        menu: [
+          [
+            { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
+            {
+              id: "reverse",
+              label: "Reverse",
+              icon: Rewind,
+              disabled: videoEdit.isPending,
+              onClick: () => videoEdit.mutate({ kind: "reverse" }),
+            },
+          ],
+        ],
       }),
     ready &&
       itemAction("chat", {
