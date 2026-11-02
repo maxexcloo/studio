@@ -17,8 +17,8 @@ the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
 finished, so a switch waits for it. Idle workers stay warm.
 
-Configure `STUDIO_BIFROST_URL` when used; Studio refuses to target that gateway
-origin as a worker.
+Studio refuses to target its text gateway's origin (`STUDIO_ASSISTANT_URL`) as a
+worker.
 
 Automatic lifecycle control (Settings › Workers › Automatic Control) never stops or starts
 text workers; only an administrator's change in Settings › Workers or the control

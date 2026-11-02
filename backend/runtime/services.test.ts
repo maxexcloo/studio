@@ -45,7 +45,7 @@ test("service health observes direct runtimes, shares a bounded cache and scopes
   const calls: string[] = [];
   const observe = createServicesObserver({
     controller,
-    environment: { STUDIO_CHAT_GATEWAY_URL: "http://gateway.invalid" },
+    environment: { STUDIO_ASSISTANT_URL: "http://gateway.invalid" },
     workers: () => [
       {
         id: "image-worker",
