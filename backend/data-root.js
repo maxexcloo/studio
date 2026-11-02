@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEnv } from "node:util";
 
 /**
  * Where Studio runs from and keeps its state, with no side effects: the dev
@@ -16,17 +17,12 @@ export function currentDataDir(env = process.env) {
   return env.STUDIO_DATA_DIR ? path.resolve(env.STUDIO_DATA_DIR) : path.join(projectRoot, "data");
 }
 
-/** A .env file's values as they are on disk, without loading them; the first line for a key wins. {} when there is none. */
+/** A .env file's values as they are on disk, without loading them. {} when there is none. */
 export function readEnvFile(file) {
-  const values = {};
   try {
-    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-      if (match && !(match[1] in values))
-        values[match[1]] = match[2].replace(/^(["'])(.*)\1$/, "$2");
-    }
+    return parseEnv(fs.readFileSync(file, "utf8"));
   } catch {
     // .env is optional.
+    return {};
   }
-  return values;
 }
