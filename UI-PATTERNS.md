@@ -332,7 +332,9 @@ primary component reference and verify APIs against the installed version.
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
   Phones show the image full-bleed with an icon row; swipe left/right navigates,
-  down closes and up reveals details and further options. Navigation (swipe,
+  down closes and up reveals details and further options. At Fit the picture
+  follows the finger and the next one slides in; videos loop and take the same
+  swipes. A video tile plays its short preview under the mouse. Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while
