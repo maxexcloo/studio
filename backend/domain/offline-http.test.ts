@@ -10,6 +10,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import type { QueueJob } from "../../shared/queue.ts";
+import { closeRuntimeDatabase, writeRuntimeDocument } from "../persistence/runtime.ts";
 import { clusterDns, fakeKubernetes, serviceUrl } from "../fixtures/fake-kubernetes.ts";
 const { startFakeComfy } = await import(new URL("../fixtures/fake-comfy.js", import.meta.url).href);
 
@@ -20,6 +21,11 @@ test(
     const temporary = mkdtempSync(path.join(os.tmpdir(), "studio-offline-"));
     const dataDir = path.join(temporary, "runtime");
     mkdirSync(path.join(dataDir, "workflows"), { recursive: true });
+    writeRuntimeDocument(dataDir, "runtime-operations", {
+      operations: [],
+      settings: { automatic: true, parkIdleMinutes: 0 },
+    });
+    closeRuntimeDatabase(dataDir);
     const raw = {
       studio: {
         id: "cold",
@@ -139,7 +145,6 @@ test(
           STUDIO_ENABLE_GROK: "0",
           STUDIO_MEDIA_DIR: path.join(dataDir, "media"),
           STUDIO_CLIPROXYAPI_URL: "",
-          STUDIO_RUNTIME_AUTOMATIC: "1",
           STUDIO_KUBERNETES_GPUS: JSON.stringify({ gpu: 1 }),
           STUDIO_KUBERNETES_URL: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
           STUDIO_KUBERNETES_NAMESPACES: "comfyui",

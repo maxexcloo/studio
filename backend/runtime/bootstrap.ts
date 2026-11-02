@@ -33,17 +33,12 @@ export async function loadRuntime(
       : inClusterRequest(environment));
   const { pools, workloads } = await discoverWorkloads(environment, send);
   if (!workloads.length) return undefined;
-  const automatic = environment.STUDIO_RUNTIME_AUTOMATIC === "1";
-  // Off unless set: minutes without work before automatic control parks a media workload.
-  const parkIdleMinutes = Number(environment.STUDIO_RUNTIME_PARK_IDLE_MINUTES || 0);
   const engine = new KubernetesEngine(send);
   const name = "runtime-operations";
   const controller = new RuntimeController({
     engine,
     workloads,
     pools,
-    automaticLifecycle: automatic,
-    parkIdleAfterMs: parkIdleMinutes > 0 ? parkIdleMinutes * 60_000 : 0,
     ...(dataDir
       ? {
           store: {
@@ -60,11 +55,11 @@ export async function loadRuntime(
         }
       : {}),
   });
-  if (automatic)
-    setInterval(() => {
-      void controller.reconcile().catch(() => {});
-      void controller.parkIdle().catch(() => {});
-    }, 30_000).unref();
+  // Both return at once unless automatic control is on in Settings › Workers.
+  setInterval(() => {
+    void controller.reconcile().catch(() => {});
+    void controller.parkIdle().catch(() => {});
+  }, 30_000).unref();
   return { controller };
 }
 

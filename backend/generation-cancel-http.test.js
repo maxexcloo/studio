@@ -12,10 +12,16 @@ import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
 import { writeTestWorkflows } from "./fixtures/test-workflows.js";
 import { clusterDns, fakeKubernetes, serviceUrl } from "./fixtures/fake-kubernetes.ts";
+import { closeRuntimeDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 async function cancellationFixture(t, lostAcknowledgement = false) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-generation-cancel-"));
   writeTestWorkflows(path.join(directory, "runtime"));
+  writeRuntimeDocument(path.join(directory, "runtime"), "runtime-operations", {
+    operations: [],
+    settings: { automatic: true, parkIdleMinutes: 0 },
+  });
+  closeRuntimeDatabase(path.join(directory, "runtime"));
   const info = JSON.parse(
     fs.readFileSync(
       new URL("./fixtures/object_info-comfyui-0.41.0-master-ce1e922.json", import.meta.url),
@@ -98,7 +104,6 @@ async function cancellationFixture(t, lostAcknowledgement = false) {
         STUDIO_KUBERNETES_URL: `http://127.0.0.1:${engine.address().port}`,
         STUDIO_KUBERNETES_NAMESPACES: "gpu",
         STUDIO_LOCAL_TEXT_MODEL: "local/auto",
-        STUDIO_RUNTIME_AUTOMATIC: "1",
         STUDIO_TEXT_KEY: "fixture-text",
       },
       stdio: ["ignore", "ignore", "ignore", "ipc"],

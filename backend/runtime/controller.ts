@@ -3,6 +3,7 @@ import type { ServiceKind } from "../../shared/services.ts";
 import type {
   RuntimeOperation,
   RuntimePreview,
+  RuntimeSettings,
   RuntimeStatus,
   WorkloadPhase,
 } from "../../shared/runtime.ts";
@@ -48,6 +49,7 @@ export interface RuntimeRecord {
   /** The placement last applied in Studio; a deployment stopped outside Studio is drift from it. */
   desired?: string[];
   operations: RuntimeOperation[];
+  settings?: RuntimeSettings;
 }
 export interface RuntimeStore {
   read(): RuntimeRecord | undefined;
@@ -67,9 +69,6 @@ interface Options {
   workloads: Workload[];
   /** GPUs per node pool. */
   pools: Record<string, number>;
-  automaticLifecycle?: boolean;
-  /** With automatic control, park a media workload after this long without work; 0 never. */
-  parkIdleAfterMs?: number;
   store?: RuntimeStore;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -102,8 +101,6 @@ const holds = (state: DeploymentState) => state.replicas > 0 || state.pods > 0;
 export class RuntimeController {
   readonly workloads: Workload[];
   readonly pools: Record<string, number>;
-  readonly automaticLifecycle: boolean;
-  readonly parkIdleAfterMs: number;
   /** Settles when the running operation finishes; for tests and shutdown. */
   settled: Promise<void> = Promise.resolve();
   private active = new Map<string, number>();
@@ -124,8 +121,6 @@ export class RuntimeController {
     engine,
     workloads,
     pools,
-    automaticLifecycle = false,
-    parkIdleAfterMs = 0,
     store = memoryStore(),
     now = Date.now,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -135,8 +130,6 @@ export class RuntimeController {
     this.engine = engine;
     this.workloads = workloads;
     this.pools = pools;
-    this.automaticLifecycle = automaticLifecycle;
-    this.parkIdleAfterMs = parkIdleAfterMs;
     this.store = store;
     this.now = now;
     this.sleep = sleep;
@@ -156,6 +149,30 @@ export class RuntimeController {
         interrupted = true;
       }
     if (interrupted) this.save();
+  }
+
+  /** Set by an administrator in Settings › Workers; off until then. */
+  get settings(): RuntimeSettings {
+    return this.record.settings ?? { automatic: false, parkIdleMinutes: 0 };
+  }
+  get automaticLifecycle() {
+    return this.settings.automatic;
+  }
+  /** With automatic control, park a media workload after this long without work; 0 never. */
+  get parkIdleAfterMs() {
+    return this.settings.parkIdleMinutes * 60_000;
+  }
+  configure({ automatic, parkIdleMinutes }: RuntimeSettings) {
+    if (typeof automatic !== "boolean")
+      throw new RuntimeRequestError("automatic must be true or false.");
+    if (!Number.isInteger(parkIdleMinutes) || parkIdleMinutes < 0 || parkIdleMinutes > 1440)
+      throw new RuntimeRequestError("parkIdleMinutes must be a whole number from 0 to 1440.");
+    this.record.settings = { automatic, parkIdleMinutes };
+    // Idle time counts from the change, not from before automatic control was on.
+    this.lastUsed.clear();
+    this.parkedCache = undefined;
+    this.save();
+    return this.settings;
   }
 
   private timestamp() {
@@ -244,7 +261,7 @@ export class RuntimeController {
         used[entry.workload.pool] = (used[entry.workload.pool] ?? 0) + entry.workload.gpus;
     const desired = this.record.desired;
     return {
-      automaticLifecycle: this.automaticLifecycle,
+      settings: this.settings,
       pools: Object.entries(this.pools).map(([id, capacity]) => ({
         id,
         capacity,

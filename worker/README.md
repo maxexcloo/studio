@@ -20,7 +20,7 @@ finished, so a switch waits for it. Idle workers stay warm.
 Configure `STUDIO_BIFROST_URL` when used; Studio refuses to target that gateway
 origin as a worker.
 
-Automatic lifecycle control (`STUDIO_RUNTIME_AUTOMATIC=1`) never stops or starts
+Automatic lifecycle control (Settings › Workers › Automatic Control) never stops or starts
 text workers; only an administrator's change in Settings › Workers or the control
 MCP tools does. Runtime status and control are administrator-only at
 `/api/runtime`.

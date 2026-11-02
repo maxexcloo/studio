@@ -46,8 +46,15 @@ export interface RuntimeOperation {
   error?: string;
 }
 
+/** Automatic control starts and parks media workloads; text is never started or stopped by it. */
+export interface RuntimeSettings {
+  automatic: boolean;
+  /** Minutes without work before automatic control parks a media workload; 0 never. */
+  parkIdleMinutes: number;
+}
+
 export interface RuntimeStatus {
-  automaticLifecycle: boolean;
+  settings: RuntimeSettings;
   pools: { id: string; capacity: number; used: number }[];
   desired?: string[];
   operation?: RuntimeOperation;

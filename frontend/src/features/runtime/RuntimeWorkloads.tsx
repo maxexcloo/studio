@@ -1,9 +1,21 @@
-import { Alert, Badge, Button, Checkbox, Group, Loader, Menu, Stack, Text } from "@mantine/core";
+import {
+  Alert,
+  Badge,
+  Button,
+  Checkbox,
+  Group,
+  Loader,
+  Menu,
+  Stack,
+  Switch,
+  Text,
+} from "@mantine/core";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type {
   RuntimeOperation,
   RuntimePreview,
+  RuntimeSettings,
   RuntimeStatus,
   WorkloadPhase,
 } from "../../../../shared/runtime";
@@ -11,6 +23,7 @@ import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
+import { NumberSetting } from "../../ui/NumberSetting";
 import { SectionHeading } from "../../ui/SectionHeading";
 
 export const runtimeStatusQuery = queryOptions({
@@ -76,6 +89,44 @@ const holding = (phase: WorkloadPhase) => phase === "running" || phase === "star
 const sameSet = (a: string[], b: string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
+/** Automatic control starts stopped media workloads for queued work and parks idle ones; never text. */
+function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
+  const client = useQueryClient();
+  const save = useMutation({
+    meta: { inlineError: true },
+    mutationFn: (patch: Partial<RuntimeSettings>) =>
+      api<RuntimeSettings>("/api/runtime/settings", {
+        method: "PUT",
+        body: JSON.stringify({ ...settings, ...patch }),
+      }),
+    onSettled: () => client.invalidateQueries({ queryKey: runtimeStatusQuery.queryKey }),
+  });
+  return (
+    <Stack gap="sm">
+      <Switch
+        label="Automatic Control"
+        description="Queued work starts the stopped image or video workload it needs. Text workloads are only started and stopped here."
+        checked={settings.automatic}
+        onChange={(event) => save.mutate({ automatic: event.currentTarget.checked })}
+      />
+      <NumberSetting
+        label="Park Idle After (Minutes)"
+        description="Stop an image or video workload after this long without work so its GPUs can rest; 0 never."
+        value={settings.parkIdleMinutes}
+        min={0}
+        max={1440}
+        disabled={!settings.automatic}
+        onSave={(parkIdleMinutes) => save.mutate({ parkIdleMinutes })}
+      />
+      {save.error && (
+        <Alert color="red" title="Couldn’t Save Automatic Control">
+          {save.error.message}
+        </Alert>
+      )}
+    </Stack>
+  );
+}
+
 /** Settings › Workers: which GPU deployments run, a previewed switch, restarts and the change history. */
 export function RuntimeWorkloads() {
   const client = useQueryClient();
@@ -114,7 +165,7 @@ export function RuntimeWorkloads() {
   });
   if (status.isPending) return <LoadingState label="Loading GPU Workloads" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const { workloads, pools, operation, history, desired } = status.data;
+  const { workloads, pools, operation, history, desired, settings } = status.data;
   const label = (id: string) => workloads.find((item) => item.id === id)?.label ?? id;
   const names = (ids: string[]) => (ids.length ? ids.map(label).join(", ") : "None");
   const running = workloads.filter((item) => holding(item.phase)).map((item) => item.id);
@@ -132,6 +183,7 @@ export function RuntimeWorkloads() {
           {pools.map((pool) => `${pool.id}: ${pool.used} of ${pool.capacity} GPUs`).join(" · ")}
         </Text>
       </Group>
+      <AutomaticControl settings={settings} />
       {operation && (
         <Alert color="blue" title="Switching Workloads" icon={<Loader size={16} />}>
           {operation.progress}

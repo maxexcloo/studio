@@ -449,7 +449,7 @@ test("An administrator's parked Chat model starts after confirming what it stops
   await page.route("**/api/runtime", (route) =>
     route.fulfill({
       json: {
-        automaticLifecycle: false,
+        settings: { automatic: false, parkIdleMinutes: 0 },
         pools: [{ id: "gpu", capacity: 2, used: 2 }],
         history: [],
         workloads: [
