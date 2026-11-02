@@ -458,6 +458,34 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
   await expect(video).toHaveAttribute("controls");
 });
 
+test("A video tile plays its preview while a mouse is over it", async ({ page }, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no hover.");
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function () {
+      (window as any).played = this.currentSrc || this.src;
+      return Promise.resolve();
+    };
+  });
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
+    thumbnailUrl: image,
+    prompt: "A rolling wave",
+    width: 1280,
+    height: 720,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).hover();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).played))
+    .toContain("/comfy/video-preview?filename=clip.mp4");
+});
+
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
   const { viewer } = await seed(page, {
     caption: {

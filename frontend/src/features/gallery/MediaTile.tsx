@@ -232,6 +232,11 @@ export function MediaTile({
       data-selected={selected || undefined}
       data-expanded={expanded || undefined}
       onPointerEnter={(event) => {
+        if (event.pointerType === "mouse")
+          void event.currentTarget
+            .querySelector("video")
+            ?.play()
+            .catch(() => {});
         if (!flips || event.pointerType !== "mouse") return;
         // Thumbnails load before the pointer reaches them, so flipping never shows an empty tile.
         for (const version of versions!) {
@@ -247,6 +252,7 @@ export function MediaTile({
         if (index !== version) onVersion!(index);
       }}
       onPointerLeave={(event) => {
+        event.currentTarget.querySelector("video")?.load();
         if (flips && event.pointerType === "mouse") onVersion!(undefined);
       }}
       onPointerDown={(event) => {
@@ -314,10 +320,12 @@ export function MediaTile({
           <video
             className={classes.media}
             data-loaded
-            src={media.url || undefined}
+            // A mouse over the tile plays Studio's short preview; leaving returns to the poster.
+            src={media.url?.replace("/comfy/view?", "/comfy/video-preview?") || undefined}
             poster={media.thumbnailUrl}
             preload="none"
             muted
+            loop
             playsInline
             aria-hidden
           />
