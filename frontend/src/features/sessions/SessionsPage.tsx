@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Paper, Stack } from "@mantine/core";
-import { MessagesSquare } from "lucide-react";
+import { Alert, Paper, Stack } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useParams } from "react-router";
 import type { ChatMessage } from "../../../../shared/chat";
@@ -14,7 +13,7 @@ import { currentMedia } from "../gallery/mediaSource";
 import { ChatDock } from "./ChatComposer";
 import { useChatController, useChatMessages } from "./ChatProvider";
 import { ChatTurn } from "./ChatTurn";
-import { ChatWorkspace, openChatsEvent } from "./ChatWorkspace";
+import { ChatWorkspace, SessionList } from "./ChatWorkspace";
 import { GenerationCard } from "./GenerationCard";
 import { sessionQuery } from "./queries";
 import { iterationTiles, SessionIteration } from "./SessionIteration";
@@ -30,24 +29,21 @@ export function SessionsPage() {
   if (draft.sessionId) return <Navigate to={`/chat/${draft.sessionId}`} replace />;
   return (
     <ChatWorkspace>
-      <EmptyState
-        fill
-        action={
-          // Phones have no Chats sidebar, so the empty state opens the list; the message box
-          // below starts a new chat.
-          phone && (
-            <Button
-              variant="default"
-              leftSection={<MessagesSquare size={16} />}
-              onClick={() => window.dispatchEvent(new Event(openChatsEvent))}
-            >
-              Chats
-            </Button>
-          )
-        }
-      >
-        No Chat Selected
-      </EmptyState>
+      {/* Phones have no Chats sidebar, so the chats are listed here; the box below starts one. */}
+      {phone ? (
+        <Stack
+          component="section"
+          aria-label="Chats"
+          flex={1}
+          mih={0}
+          p="sm"
+          style={{ overflowY: "auto" }}
+        >
+          <SessionList />
+        </Stack>
+      ) : (
+        <EmptyState fill>No Chat Selected</EmptyState>
+      )}
       <ChatDock />
     </ChatWorkspace>
   );

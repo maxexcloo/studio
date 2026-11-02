@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
+import { fixtures, image, openTheme, section, signIn, stamp, expectNoChatOpen } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -312,7 +312,7 @@ test("Status summarises service health and opens Workers over the current page",
   await expect(settings.getByText("Automatic Control Off", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+  await expectNoChatOpen(page);
 });
 
 test("Workers switch GPU workloads only through a reviewed preview", async ({ page }) => {
