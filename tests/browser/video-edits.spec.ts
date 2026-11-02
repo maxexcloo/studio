@@ -47,6 +47,8 @@ test("A video's Edit menu reverses or trims it into a new version", async ({
   test.skip(browserName === "webkit", "WebKit test builds may not play WebM.");
   const save = dialog.getByRole("button", { name: "Save Version", exact: true });
   await expect(save).toBeEnabled();
+  // The fixture WebM stores no length; the dialog still reads a real one.
+  await expect(dialog).not.toContainText("Infinity");
   await dialog.getByRole("slider", { name: "Start", exact: true }).focus();
   for (let step = 0; step < 20; step++) await page.keyboard.press("ArrowRight");
   await save.click();
