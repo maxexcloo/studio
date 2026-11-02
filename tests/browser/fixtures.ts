@@ -818,11 +818,9 @@ export async function viewerAction(page: Page, label: string) {
   // Phone controls open their options on tap, so "X Options" is X itself there.
   const button = viewer.getByRole("button", { name: label.replace(/ Options$/, ""), exact: true });
   if (await button.count()) {
-    const opensMenu = (await button.getAttribute("aria-haspopup")) === "menu";
     await button.click();
-    // A tap on a control with options opens them; their first item does what a desktop click does.
-    if (opensMenu && !label.endsWith(" Options"))
-      await page.getByRole("menu").getByRole("menuitem").first().click();
+    // Prompt is a split button on desktop; a phone tap opens its options, whose first item is the click.
+    if (label === "Prompt") await page.getByRole("menu").getByRole("menuitem").first().click();
     return;
   }
   await viewer.getByRole("button", { name: "More", exact: true }).click();
