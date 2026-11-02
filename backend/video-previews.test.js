@@ -82,6 +82,8 @@ test(
       width: 1280,
       height: 720,
       durationMs: 10000,
+      fps: 30,
+      audio: true,
     });
     const app = express();
     app.get("/preview", (req, res) => previews.sendVideoPreview(req, res, one));
@@ -168,6 +170,41 @@ test(
       early[0] > 200 && early[2] < 60,
       `expected a red frame, got rgb ${[...early.subarray(0, 3)]}`,
     );
+  },
+);
+
+test(
+  "an extension joins onto its source at the frame it started from",
+  { skip: !available },
+  async () => {
+    const clip = (name, colour, rate) => {
+      const file = path.join(dir, name);
+      execFileSync(encoder, [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        `color=${colour}:size=320x180:rate=${rate}:duration=1`,
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        file,
+      ]);
+      return file;
+    };
+    const source = clip("source.mp4", "red", 24);
+    // A different frame rate still joins at the source's.
+    const extension = clip("extension.mp4", "blue", 16);
+    const whole = await previews.joinClips(source, extension, path.join(dir, "whole.mp4"));
+    const joined = await previews.probeVideo(whole);
+    assert.deepEqual([joined.width, joined.height, joined.fps], [320, 180, 24]);
+    assert.ok(Math.abs(joined.durationMs - 1940) < 120, `got ${joined.durationMs} ms`);
+    const partial = await previews.joinClips(source, extension, path.join(dir, "partial.mp4"), 500);
+    assert.ok(Math.abs((await previews.probeVideo(partial)).durationMs - 1440) < 120);
   },
 );
 
