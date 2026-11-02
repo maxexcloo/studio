@@ -24,7 +24,7 @@ export type GenerationInput = Record<string, unknown>;
  * the `thinking` behind it and the text `model`, and the item then queues for generation.
  */
 export interface PromptWriting {
-  kind: "animate" | "request" | "dream";
+  kind: "animate" | "dream";
   prompt?: string;
   thinking?: string;
   model?: string;

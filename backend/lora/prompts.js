@@ -1,35 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-// What a stacked LoRA adds to a written prompt, and the negative a profile's guide recommends.
-// The base prompt stays natural language: triggers lead as words, tag-trained LoRAs get one short line of tags.
+// What a stacked LoRA adds to a prompt (its trigger words, leading), and the negative a profile's guide recommends.
 import { cleanTriggers } from "./catalogue.js";
 
-const maxTagLine = 6;
-const words = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .match(/[\p{L}\p{N}]+/gu) || [];
 const has = (prompt, text) => String(prompt).toLowerCase().includes(String(text).toLowerCase());
-
-/** "tags" | "mixed" | "natural"; anything else (or nothing) reads as natural. */
-export function loraPromptStyle(info) {
-  return ["tags", "mixed"].includes(info?.promptStyle) ? info.promptStyle : "natural";
-}
-
-/**
- * A tag-trained LoRA's tags that fit the request: those sharing a word with it, else its first few
- * (they describe what it was trained on), never ones the prompt already says.
- */
-export function relevantTags(info, request, prompt = "") {
-  const tags = (Array.isArray(info?.tags) ? info.tags : [])
-    .filter((tag) => typeof tag === "string" && tag.trim())
-    .map((tag) => tag.trim())
-    .slice(0, 10);
-  const asked = new Set(words(request));
-  const matching = tags.filter((tag) => words(tag).some((word) => asked.has(word)));
-  return (matching.length ? matching : tags.slice(0, 3))
-    .filter((tag) => !has(prompt, tag))
-    .slice(0, maxTagLine);
-}
 
 /**
  * The prompt with the trigger words of each enabled LoRA whose Trigger Words toggle is on
@@ -46,17 +19,6 @@ export function withLoraTriggers(prompt, stack = [], infos = {}) {
         lead.push(trigger);
   }
   return lead.length ? `${lead.join(", ")}, ${text}` : text;
-}
-
-/** A prompt Studio wrote, with one comma-separated line of the tags "tags" or "mixed" LoRAs find relevant to the request. */
-export function withLoraTags(prompt, stack = [], infos = {}, request = "") {
-  const text = String(prompt || "").trim();
-  const tagLine = [];
-  for (const { name } of stack)
-    if (loraPromptStyle(infos[name]) !== "natural")
-      for (const tag of relevantTags(infos[name], request, text))
-        if (!tagLine.includes(tag)) tagLine.push(tag);
-  return tagLine.length ? `${text}\n${tagLine.slice(0, maxTagLine).join(", ")}` : text;
 }
 
 /**

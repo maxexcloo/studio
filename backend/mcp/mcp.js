@@ -45,7 +45,6 @@ import {
   tierOf,
   withinFamily,
 } from "./tiers.js";
-import { createPromptWriter } from "../prompt-writer.js";
 import { animateThemes } from "../prompt-animate.js";
 import { gatewaySettings } from "../assistant.js";
 import { mayUseFeature } from "../account-policy.js";
@@ -85,7 +84,7 @@ const stableJson = (value) =>
 // and each reply carry the details, so hosts that resend these every step stay small.
 const tierWords =
   '"turbo", "super fast" or "draft" → turbo; "fast" or "quick" → fast; "best" or "high quality" → quality; else omit';
-const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt or the change as request, not a new Generate. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
+const mediaInstructions = `Studio makes images and videos. Always write finished Generate prompts yourself to the model's prompting guide (sent once, with Models or a model's first Generate), keeping the user's subject; pass them as prompts and the user's words as request. Studio runs them exactly as written. count is images per prompt; without a number, make 2–4 variations to pick from, and keep a follow-up's count. Choose the model, size, count and LoRAs yourself from the request, guides and the user's taste (thumbs-up LoRAs first) and say briefly what you chose and why. "N sets of K" is N distinct prompts with count K in one call. To suggest first, call Generate with preview and wait for the user. Set kind, and tier only when asked (${tierWords}). "16:9" is aspect, "2K" resolution; upscale only when the user asks to upscale or enlarge. Ordinary requests need no Models call. For a follow-up on a result ("again", "warmer", "with Krea", "animate it"), call Reuse with its ref and your revised prompt, not a new Generate. To animate or extend, pass Reuse a fitting theme (custom: request is the motion) and name the others. Reply briefly as each result says; if queued, share the links and end the turn. Call Result only when the user asks to see results, never in the background. Never poll, resubmit or invent results. If a named model is unavailable, say so; don't substitute. Call Review only when asked to judge, compare or improve images. When the host reports about 90% context used, call Handover.`;
 const controlInstructions =
   "GPU placement is manual: use these tools only on explicit request, and present a Preview or Mode preview and get approval before Apply. Restart only what the user names. Media generation never changes the placement.";
 const unlinkedMessage =
@@ -182,8 +181,6 @@ export function registerMcpRoutes(
     environment = process.env,
     // Studio's RuntimeController (runtime/controller.ts), which the control key's tools drive.
     runtime,
-    // The local text route (runtime/services.ts) the prompt writer takes while a local text model runs.
-    localText,
     imageWaitSeconds = generateWaitSeconds,
     etaProbeMs = etaProbeMilliseconds,
     generateDedupeMs = generateDedupeWindowMs,
@@ -199,8 +196,6 @@ export function registerMcpRoutes(
     // Failed cloud video jobs updated since a time, as { reason, at }, so a provider refusal pauses cloud video.
     cloudVideoFailures,
     gatewayAdminTools = () => false,
-    // The owner's taste profile summary, or "", as context for the auto model pick and prompt writing.
-    taste = () => "",
   } = {},
 ) {
   const mediaKey = environment.STUDIO_MCP_API_KEY;
@@ -239,8 +234,6 @@ export function registerMcpRoutes(
   });
   // Studio's guide store (guides/prompting.json) first, the deployment's STUDIO_MCP_PROMPTING_PATH as seed, reloaded on change.
   const prompting = livePrompting({ dataDir, seedFile: environment.STUDIO_MCP_PROMPTING_PATH });
-  // Optional: with a writer, Generate picks a model by the request and Reuse writes changes; a partial setting fails at start.
-  const writer = createPromptWriter(environment, { fetchImpl, localText });
   const instructions = mediaInstructions;
   // The prompt assistant's tools need its LiteLLM gateway; what the chat wrote is remembered for the results' records.
   const assistantGateway = Boolean(gatewaySettings(environment));
@@ -413,7 +406,7 @@ export function registerMcpRoutes(
     ) => {
       const label = profile.label || profile.id;
       // Iterations that rebuild a whole Generate call drift from the result; Reuse keeps its settings.
-      const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt (or the change as request).`;
+      const followUp = `To change or animate one later, call Reuse with its ref (such as "${submission.jobs[0]?.ref || "result 1"}") and your revised prompt.`;
       // A set Studio expects to finish within the wait comes back finished, so the agent needs no Result call;
       // anything longer, or with no trusted estimate, hands back its links at once.
       const [endsAt] = await media.finishTimes(owner, [submission], {
@@ -541,7 +534,7 @@ export function registerMcpRoutes(
         content: [
           {
             type: "text",
-            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. Never poll or resubmit. To change or animate one later, call Reuse with its ref (such as "${first}") and the change as request.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
+            text: `Queued ${sets.length} sets, one per model. ${note}Share the links below, not images (none exist yet), and end your turn; do not call Result now or in the background. Never poll or resubmit. To change or animate one later, call Reuse with its ref (such as "${first}") and your revised prompt.${compare ? " Share the comparison link first: it shows every model side by side with the same seed." : ""}\n\n${compare ? `[Compare Side by Side](${compare})\n` : ""}${lines.join("\n")}\n[All Results](${media.allUrl(owner, refs)})`,
           },
         ],
         structuredContent: {
@@ -560,28 +553,11 @@ export function registerMcpRoutes(
         },
       };
     };
-    /**
-     * Without a named model, the writer picks from Studio's choices by the request; otherwise the usual
-     * pick stands. With several to choose from, the note says which and why, in one line.
-     */
-    const picked = async ({ pool, profile, note: fallback }, request, signal) => {
-      if (pool.length < 2) return { profile, note: fallback };
-      const choice =
-        writer && request
-          ? await writer.pick({
-              request,
-              profiles: pool,
-              preferred: profile,
-              taste: taste(owner),
-              signal,
-            })
-          : null;
-      const chosen = choice?.profile || profile;
-      return {
-        profile: chosen,
-        note: `${fallback}Chose ${chosen.label || chosen.id}${choice ? `: ${choice.reason}` : ", the default"}. `,
-      };
-    };
+    /** Studio's usual pick; with several to choose from, the note says which. */
+    const picked = ({ pool, profile, note }) =>
+      pool.length < 2
+        ? { profile, note }
+        : { profile, note: `${note}Chose ${profile.label || profile.id}, the default. ` };
     /** A named profile, moved to the wanted tier within its family (an exact id stays), with a note when the tier fell back. */
     const namedInTier = (profiles, value, wanted) => {
       // A cloud (Grok) profile only by its exact id or when the name asks for the cloud.
@@ -658,12 +634,6 @@ export function registerMcpRoutes(
         if (fresh) reviewedGuides.delete(guideKey(refs, profile.id));
         throw error;
       }
-    };
-    /** Sets a plan's prompts from what was written: one each, or the fallback with the requested count. */
-    const usePrompts = (args, written, count) => {
-      if (written.source === "studio") Object.assign(args, { prompts: written.prompts, count: 1 });
-      else Object.assign(args, { prompts: written.prompts, count });
-      return written.source;
     };
     const server = new McpServer(
       { name: "Studio", version: "1.0.0" },
@@ -881,7 +851,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request, which picks the model. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
         {
           request: z
             .string()
@@ -1031,7 +1001,7 @@ export function registerMcpRoutes(
             args.profile_id === undefined
               ? fits
                 ? fromRequest
-                : await picked(
+                : picked(
                     await media.choices(owner, {
                       kind,
                       tier: wanted,
@@ -1039,8 +1009,6 @@ export function registerMcpRoutes(
                       loras: args.loras || [],
                       cloud,
                     }),
-                    request,
-                    signal,
                   )
               : namedInTier(await media.profiles(kind || "all", owner), args.profile_id, wanted),
           ];
@@ -1091,13 +1059,13 @@ export function registerMcpRoutes(
             ],
           };
         }
-        // Request and prompts together: the prompts run, and the request stays on the record for Reuse.
-        const recordOf = ({ source, plan }) => {
+        // Request and prompts together: the prompts run, and the request stays on the record.
+        const recordOf = ({ plan }) => {
           const assistant = actor.assistant
             ? chatAssistant.record(owner, plan.prompts || [], plan.loras || [])
             : null;
           return {
-            ...(request ? { request, styled: source !== "exact" } : {}),
+            ...(request ? { request } : {}),
             ...(assistant ? { assistant } : {}),
           };
         };
@@ -1132,7 +1100,7 @@ export function registerMcpRoutes(
           faceNote = "Face detail on for the full-body person. ";
           plan.face_detail = true;
         }
-        const submission = await submit(profile, plan, recordOf({ source, plan }));
+        const submission = await submit(profile, plan, recordOf({ plan }));
         return respond(
           submission.queued,
           profile,
@@ -1288,7 +1256,7 @@ export function registerMcpRoutes(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt replaces its prompt (fastest), request changes it in words, preserve_seed keeps its seed. mode animate makes an image a video or extends a video; theme has Studio write the motion. Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video or extends a video: prompt is your motion prompt, or theme has Studio write it (custom: request is the motion). Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
         {
           ...output,
           job_id: z
@@ -1342,9 +1310,10 @@ export function registerMcpRoutes(
               ),
             );
           }
-          if (prompt && request)
+          // Studio never rewrites a prompt: the chat writes the change into it; request is the user's words.
+          if (request && !prompt && !theme)
             throw new Error(
-              "Use either request (a change in words) or prompt (an exact new prompt), not both. Call Reuse again with only one of them.",
+              "Studio runs prompts exactly as given. Write the revised prompt yourself from the result's prompt and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call Reuse again.",
             );
           const item = await media.source(owner, id, output_index);
           const own = item.type === "video" ? "video" : "image";
@@ -1380,10 +1349,7 @@ export function registerMcpRoutes(
               : await media.choose(owner, { kind, tier: wanted, references, cloud });
             plan = { ...media.retarget(item, target.profile, { count }), tierNote: target.note };
           } else plan = await media.rerun(owner, item, { count });
-          // Changes re-expand the original request for the target profile, so no prompt or guide piles up in the chat.
           const recorded = media.promptRecord(id);
-          const base = recorded?.request || item.prompt;
-          const changes = [...(recorded?.changes || []), ...(request ? [request] : [])].slice(-8);
           const moved = animating || Boolean(wanted || profile_id);
           if (preserve_seed) {
             const seed = String(item.settings?.seed ?? "");
@@ -1397,42 +1363,19 @@ export function registerMcpRoutes(
             plan.args.seed = numeric;
           }
           let source = "exact";
-          if (prompt) usePrompts(plan.args, { prompts: [prompt], source: "exact" }, count);
+          if (prompt) plan.args.prompts = [prompt];
           else if (theme) {
             // The viewer's Animate themes: the queue item writes the motion prompt (prompt-animate.js).
             const write = { animate: { theme, instruction: request || "", source: item.prompt } };
-            Object.assign(plan.args, { prompts: [""], write, count });
+            Object.assign(plan.args, { prompts: [""], write });
             source = "studio";
-          } else if (request || (moved && writer)) {
-            const references = plan.args.reference_asset_ids?.length || 0;
-            const role = animating
-              ? "first-frame"
-              : references
-                ? item.settings?.referenceRole || "reference"
-                : "";
-            if (writer) {
-              // Each job writes its own prompt as its queue item's first stage (prompt-stage.js).
-              Object.assign(plan.args, { prompts: [base], write: { changes, role }, count });
-              source = "studio";
-            } else
-              source = usePrompts(
-                plan.args,
-                {
-                  prompts: [request ? `${item.prompt}, ${request}` : item.prompt],
-                  source: "request",
-                },
-                count,
-              );
           }
           // A plain run again keeps the result's prompt, so it keeps how that prompt was written (Recreate does the same).
-          const carried =
-            !prompt && !request && !moved && source === "exact"
-              ? item.assistant || recorded?.assistant
-              : null;
+          const carried = !prompt && !moved ? item.assistant || recorded?.assistant : null;
           const submission = await submit(plan.profile, plan.args, {
-            ...(prompt
-              ? { request: prompt }
-              : { request: base, changes, styled: source !== "exact" }),
+            ...((request || !prompt) && (request || recorded?.request)
+              ? { request: request || recorded.request }
+              : {}),
             ...(carried ? { assistant: carried } : {}),
             parent: id,
           });
