@@ -122,8 +122,16 @@ export function ChatTurn({
         ))}
       {!!message.steps?.length && (
         <Stack gap={0} aria-label="Tools">
-          {message.steps.map((step) => (
-            <Step key={step.id} step={step} />
+          {message.steps.map((step, index) => (
+            <Step
+              key={`${index}:${step.id}`}
+              // A reply that ended (failed, cancelled, a restart) runs no step any more.
+              step={
+                step.status === "running" && message.status !== "streaming"
+                  ? { ...step, status: "failed" }
+                  : step
+              }
+            />
           ))}
         </Stack>
       )}

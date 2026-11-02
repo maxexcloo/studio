@@ -72,6 +72,8 @@ interface ChatOptions {
 }
 /** Model calls one reply may make: tool rounds, then a last answer without tools. */
 const maxRounds = 8;
+/** Tool calls one round runs; a model that asks for more is told to send the rest next round. */
+const maxCallsPerRound = 6;
 /** What a step keeps of a tool's answer, for the trail and later turns. */
 const maxOutput = 6000;
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
@@ -587,7 +589,7 @@ export class ChatService {
           })),
         });
         const seen: { type: string; image_url: { url: string } }[] = [];
-        for (const call of calls) {
+        for (const [index, call] of calls.entries()) {
           let args: Record<string, unknown> = {};
           let output: string;
           let failed = false;
@@ -603,7 +605,10 @@ export class ChatService {
           reply.steps = [...(reply.steps || []), step];
           save();
           emit({ event: "message", data: reply });
-          if (failed) output = "The arguments were not a JSON object. Call the tool again.";
+          if (index >= maxCallsPerRound) {
+            output = `Only ${maxCallsPerRound} tool calls run per step; call this one again next.`;
+            failed = true;
+          } else if (failed) output = "The arguments were not a JSON object. Call the tool again.";
           else if (!agent!.tools.some((tool) => tool.name === call.name)) {
             output = `There is no ${call.name} tool.`;
             failed = true;

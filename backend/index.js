@@ -2388,7 +2388,10 @@ const sessionChat = new ChatService({
       (item) =>
         item.kind === "text" &&
         item.model &&
-        modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1)),
+        // A workload model without a provider prefix matches only itself, not every model.
+        (item.model.includes("/")
+          ? modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1))
+          : modelId === item.model),
     );
     return served.length ? served.every((item) => item.vision === true) : true;
   },

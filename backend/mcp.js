@@ -260,8 +260,10 @@ export function registerMcpRoutes(
   const previews = new Map();
   // Stateless transport: a client's notifications/cancelled arrives on its own POST, so waits are found by actor and request id.
   const inflight = new Map();
+  // Studio Chat's in-process client numbers its requests from 0 like any other, so its session
+  // keeps a LibreChat cancel from reaching its calls, and the reverse.
   const inflightKey = (actor, requestId) =>
-    JSON.stringify([actor.scope, actor.owner, String(requestId)]);
+    JSON.stringify([actor.scope, actor.owner, actor.session || "", String(requestId)]);
   // A guide goes to each conversation once (each account and profile without a conversation header).
   const guideKey = (refs, profileId) => JSON.stringify([refs, profileId]);
   /** Marks a guide sent and reports whether it was new; synchronous, so concurrent calls attach it once. */
