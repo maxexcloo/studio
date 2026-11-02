@@ -16,7 +16,7 @@ import {
   resolveLoraName,
 } from "./controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
-import { recommendedNegative, withLoraTags } from "../lora/prompts.js";
+import { recommendedNegative } from "../lora/prompts.js";
 import {
   choicePool,
   chooseProfile,
@@ -483,16 +483,14 @@ export class McpMedia {
     return Object.hasOwn(this.state.prompts, jobId) ? this.state.prompts[jobId] : null;
   }
   /**
-   * Queues one job per prompt and count. `record` keeps the user's request and changes beside each job,
-   * so a later tweak re-expands the original request instead of the written prompt.
+   * Queues one job per prompt and count. `record` keeps the user's request beside each job, for Review.
    */
   async queue(owner, args, scope = "", record = {}) {
     const {
       profile_id,
       profile_backend,
       prompts,
-      // With `write` ({ changes, role }), each prompt is a request Studio writes in the queue:
-      // every job writes its own prompt as its first stage, one of `count` for its request.
+      // With `write` ({ animate }), every job writes its motion prompt as its first stage (prompt-animate.js).
       write,
       loras = [],
       reference_asset_ids = [],
@@ -537,9 +535,6 @@ export class McpMedia {
       });
       if (filled) controls.negative = filled;
     }
-    // Prompts Studio wrote get tag-trained LoRAs' line of tags; /api/generate adds the trigger words.
-    const styled = (prompt) =>
-      record.styled ? withLoraTags(prompt, stack, infos, record.request || "") : prompt;
     const slots = profile.mediaInputs || [];
     if (
       reference_asset_ids.length > slots.length ||
@@ -619,22 +614,7 @@ export class McpMedia {
       (Math.max(body.width, body.height) >= 2048 || body.width * body.height >= 2048 * 1152)
     )
       body.tiledDecode = true;
-    const preparedPrompts = write ? prompts : prompts.map(styled);
-    // The writing stage adds the tag line once the prompt is written (prompt-stage.js).
-    const writing = (request, index) =>
-      write &&
-      (write.animate
-        ? { kind: "animate", ...write.animate }
-        : {
-            kind: "request",
-            request,
-            changes: write.changes || [],
-            role: write.role || "",
-            references: reference_asset_ids.length,
-            index,
-            of: runs,
-            ...(record.styled ? { loraTags: true } : {}),
-          });
+    const writing = write?.animate ? { kind: "animate", ...write.animate } : null;
     // How long the set should take, asked alongside submission; it never holds up or fails the set.
     const estimate = this.runEstimate(
       owner,
@@ -652,12 +632,11 @@ export class McpMedia {
     try {
       const queued = [];
       const queueSet = crypto.randomUUID();
-      for (const prompt of preparedPrompts)
+      for (const prompt of prompts)
         for (let variant = 0; variant < runs; variant++) {
           const id = crypto.randomUUID();
-          const writes = writing(prompt, variant);
           // A prompt written in the queue is not known yet; its outputs carry it.
-          const ran = writes ? undefined : prompt;
+          const ran = writing ? undefined : prompt;
           try {
             // Persist the client id before dispatch: interrupted connections cannot lose job ownership.
             this.state.jobs[id] = owner;
@@ -670,7 +649,7 @@ export class McpMedia {
                 clientJobId: id,
                 queueSet,
                 prompt: ran ?? "",
-                ...(writes ? { writing: writes } : {}),
+                ...(writing ? { writing } : {}),
                 seed: seed === undefined ? "" : String(seed + queued.length),
               },
               owner,
@@ -687,7 +666,6 @@ export class McpMedia {
               ...(ran ? { prompt: ran } : {}),
               set: queueSet,
               ...(record.request ? { request: record.request } : {}),
-              ...(record.changes?.length ? { changes: record.changes } : {}),
               ...(record.assistant ? { assistant: record.assistant } : {}),
             });
             this.save();
@@ -1507,7 +1485,6 @@ export class McpMedia {
         ...(recorded?.request && recorded.request !== item.prompt
           ? { request: recorded.request }
           : {}),
-        ...(recorded?.changes?.length ? { changes: recorded.changes } : {}),
         size: `${item.width}x${item.height}`,
         settings,
       });

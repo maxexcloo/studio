@@ -130,17 +130,14 @@ export async function assistantIntegration({ environment = process.env, engine, 
       note: problem || "Set STUDIO_PROMPT_WRITER_URL, _KEY and _MODEL to use the prompt assistant.",
       models: [],
       model: row(assistantModelKey, ""),
-      writerModel: "",
     };
-  const [models, vision, writerModel, model] = await Promise.all([
+  const [models, vision, model] = await Promise.all([
     engine.listModels(),
     engine.supportsVision(),
-    engine.model("writer"),
     engine.model("rewrite"),
   ]);
   return {
     available: true,
-    writerModel,
     models,
     model: { ...row(assistantModelKey, model), vision },
   };

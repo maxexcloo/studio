@@ -503,7 +503,7 @@ test("at most two prompts are written at once; the next waits in order", async (
   });
   try {
     const session = store.createSession("alice");
-    const writing = { kind: "request", request: "a fox" };
+    const writing = { kind: "animate", theme: "living", source: "a fox" };
     const [first, second, third] = [1, 2, 3].map(() =>
       store.enqueue("alice", session.id, { prompt: "", writing }, "image"),
     );
