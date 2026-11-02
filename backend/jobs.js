@@ -5,10 +5,10 @@ import {
   temporaryInputFiles,
 } from "./media-store.js";
 import { flushGalleryStrict } from "./gallery-store.js";
-import { withComfyBackend } from "./comfy-backends.js";
+import { withComfyBackend } from "./comfy/backends.js";
 import { defaultWorkerId } from "./workers.js";
-import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from "./comfy.js";
-import { cancelPrompt, promptTracker } from "./comfy-queue.js";
+import { activeComfyUrl, comfy, normalizeComfyError, noteComfyReachable } from "./comfy/comfy.js";
+import { cancelPrompt, promptTracker } from "./comfy/queue.js";
 import { describeFailure } from "./failures.js";
 import { withFixes } from "./failure-fixes.js";
 import { nextProgress } from "./progress-phase.js";
@@ -20,9 +20,9 @@ import {
   updateGalleryJob,
   updateGalleryJobPreviews,
 } from "./gallery-store.js";
-import { forgetComfyRun } from "./comfy-traces.js";
+import { forgetComfyRun } from "./comfy/traces.js";
 import { keptMessage, missedUpscaleState, pairRunOutputs, runUpscaleState } from "./run-upscale.js";
-import { writeCivitaiParameters } from "./civitai.js";
+import { writeCivitaiParameters } from "./civitai/civitai.js";
 import { warmNewOutputs } from "./media-warmup.js";
 import { markWorkflowUsed } from "./workflow-catalog.js";
 import { completedTiming, remainingMs, RunTimer, slowSteps } from "./generation-timing.js";

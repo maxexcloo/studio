@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { civitaiFetch, civitaiJson, limitedBody } from "./civitai-access.js";
-import { importCivitaiImage, matchResources, versionResource } from "./civitai-import.js";
+import { civitaiFetch, civitaiJson, limitedBody } from "./civitai/access.js";
+import { importCivitaiImage, matchResources, versionResource } from "./civitai/import.js";
 import {
   dataDir,
   deleteGalleryFiles,
@@ -11,7 +11,7 @@ import {
   importedImageFile,
   setGallery,
 } from "./gallery-store.js";
-import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai-library.js";
+import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { presetsEnabled } from "./features.js";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";
@@ -21,11 +21,11 @@ import {
   libraryDownloads,
   resolveModelLink,
   startLibraryDownload,
-} from "./library-downloads.js";
+} from "./library/downloads.js";
 import { getFileVideoPoster, getFileVideoPreview, sendVideoPreview } from "./video-previews.js";
 import { requireLocal } from "./route-access.js";
 import { refreshWorkerModels } from "./worker-models.js";
-import { presetGrade } from "./library-grade.js";
+import { presetGrade } from "./library/grade.js";
 
 const presetsPath = path.join(dataDir, "presets.json");
 const previewsDir = path.join(dataDir, "preset-previews");
@@ -310,7 +310,7 @@ export function registerPresetRoutes(
       res.json({ ok: true, download: await startLibraryDownload(spec) });
     }, true),
   );
-  // The Library's Import page (library-routes.js): a saved image without its files queued, which
+  // The Library's Import page (library/routes.js): a saved image without its files queued, which
   // Download Missing does in one tap, and a saved image matched again.
   const importImage = async (url) => {
     const source = await importCivitaiImage(url, { json });

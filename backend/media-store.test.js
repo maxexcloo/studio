@@ -49,7 +49,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const media = await import("./media-store.js");
 const paths = await import("./media-paths.js");
-const { localOutputFile } = await import("./comfy.js");
+const { localOutputFile } = await import("./comfy/comfy.js");
 const store = await import("./gallery-store.js");
 const { accountOutputSubfolder } = await import("./account-ownership.js");
 test.after(() => {

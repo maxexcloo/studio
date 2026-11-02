@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const { downloadState, setDownloadTransport, startDownload } = await import("./model-downloads.js");
+const { downloadState, setDownloadTransport, startDownload } = await import("./model/downloads.js");
 const { catalogDownload, downloadSource } = await import("./catalog-downloads.js");
 
 const spec = (file, extra = {}) => ({

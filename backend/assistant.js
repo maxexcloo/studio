@@ -16,9 +16,9 @@
  * or the LoRA pre-filter.
  */
 import { assistantPreset, defaultPreset, familyUpsampler } from "./assistant-presets.js";
-import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
-import { cleanTriggers } from "./lora-catalogue.js";
-import { negativeUnused, recommendedNegative } from "./lora-prompts.js";
+import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
+import { cleanTriggers } from "./lora/catalogue.js";
+import { negativeUnused, recommendedNegative } from "./lora/prompts.js";
 import { replyTitle } from "../shared/titles.ts";
 import { captionCharacters, captionInstructions, captionTags } from "./domain/captions.ts";
 import { userContent } from "./domain/model-content.ts";

@@ -3,7 +3,7 @@
  * one value or several: any of a filter's values matches, and every filter
  * that is on must match. `workflow` is a single value.
  */
-import { canonicalProfileId } from "./profile-store.js";
+import { canonicalProfileId } from "./profile/store.js";
 
 /** Long-edge size bands, without overlap: each upper bound is inclusive, the next band starts one pixel above. */
 export const gallerySizeBands = [
@@ -71,7 +71,7 @@ export function matchesGalleryFilters(item, filters = {}) {
   const settings = item.settings || {};
   const fields = {
     lora: (Array.isArray(settings.loras) ? settings.loras : []).map((lora) => lora?.name),
-    // A merged profile's records match its kept id too (profile-merge.js).
+    // A merged profile's records match its kept id too (profile/merge.js).
     model: [item.model, settings.modelName, canonicalProfileId(item.model)],
     workflow: [settings.workflow, settings.profileId, canonicalProfileId(settings.profileId)],
   };

@@ -31,7 +31,7 @@ fs.writeFileSync(
   ]),
 );
 const { registerPresetRoutes } = await import("./preset-routes.js");
-const { downloadPresetImage } = await import("./civitai-library.js");
+const { downloadPresetImage } = await import("./civitai/library.js");
 const bytes = Buffer.from("model");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
 let online = true;
@@ -124,7 +124,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   assert.equal(media.status, 200);
   const full = Buffer.from(await media.arrayBuffer());
   assert.equal((await sharp(full).metadata()).height, 192);
-  const { readMediaInfo } = await import("./library.js");
+  const { readMediaInfo } = await import("./library/library.js");
   assert.match((await readMediaInfo(store.importedImageFile(item))).prompt, /a landscape/);
   const clean = Buffer.from(await (await fetch(base + item.url + "?clean=1")).arrayBuffer());
   assert.ok(clean.length < full.length);
@@ -280,7 +280,7 @@ test("disabled instances refuse every preset and provider download route", async
     for (const enabled of [undefined, "0"]) {
       if (enabled === undefined) delete process.env.STUDIO_ENABLE_PRESETS;
       else process.env.STUDIO_ENABLE_PRESETS = enabled;
-      const { mockModelResult, offlineModelResult } = await import("./models.js");
+      const { mockModelResult, offlineModelResult } = await import("./model/models.js");
       assert.equal(mockModelResult().features.presets, false);
       assert.equal(offlineModelResult().features.presets, false);
       for (const [method, url] of [
