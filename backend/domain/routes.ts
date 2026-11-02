@@ -4,10 +4,12 @@ import {
   type GenerationOperation,
   type QueueCancelAllResponse,
   type QueueMedia,
+  type QueueMove,
+  type QueueResponse,
   type UnfinishedJob,
 } from "../../shared/queue.ts";
 import { GenerationQueue } from "./queue.ts";
-import { publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
+import { everyone, publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 interface Request {
   studioAccount?: { userId: string; role?: string };
@@ -217,9 +219,32 @@ export function registerRewriteRoutes(
       .status(202)
       .json({ jobId: job.id, sessionId: job.sessionId, status: job.status, job: publicJob(job) });
   });
-  app.get("/api/queue", (req, res) =>
-    res.json({ jobs: shown(owner(req), listed(store, owner(req))) }),
-  );
+  app.get("/api/queue", (req, res) => {
+    const pauses = store.pauses();
+    return res.json({
+      jobs: shown(owner(req), listed(store, owner(req))),
+      paused: { mine: pauses.has(owner(req)), all: pauses.has(everyone) },
+    } satisfies QueueResponse);
+  });
+  // The account's own pause: nothing new of its work starts; started work finishes.
+  for (const [action, paused] of [
+    ["pause", true],
+    ["resume", false],
+  ] as const)
+    app.post(`/api/queue/${action}`, (req, res) => {
+      store.setPaused(owner(req), paused);
+      void queue.tick().catch(() => undefined);
+      return res.json({ ok: true });
+    });
+  app.post("/api/queue/:id/move", (req, res) => {
+    const to = req.body?.to;
+    if (!["top", "up", "down"].includes(String(to)))
+      return res.status(400).json({ error: "Move to top, up or down." });
+    if (!store.job(owner(req), req.params.id)) return missing(res);
+    return store.move(owner(req), req.params.id, to as QueueMove)
+      ? res.json({ ok: true })
+      : res.status(409).json({ error: "Only waiting generations can be moved." });
+  });
   app.post("/api/queue/cancel-pending", async (req, res) => {
     let cancelled = 0;
     for (const job of listed(store, owner(req)).filter((item) =>
@@ -300,6 +325,17 @@ export function registerMaintenanceRoutes(
     await queue.abandon(job.ownerId, job.id);
     return clear(store, store.job(job.ownerId, job.id)!);
   };
+  // An administrator's pause holds every account's pending work, Dream's included.
+  for (const [action, paused] of [
+    ["pause-all", true],
+    ["resume-all", false],
+  ] as const)
+    app.post(`/api/queue/${action}`, (req, res) => {
+      if (!requireAdmin(req, res)) return;
+      store.setPaused(everyone, paused);
+      void queue.tick().catch(() => undefined);
+      return res.json({ ok: true });
+    });
   app.get("/api/maintenance/unfinished", (req, res) => {
     if (!requireAdmin(req, res)) return;
     const jobs: UnfinishedJob[] = store

@@ -1,10 +1,11 @@
 import {
   terminalStatuses,
   type PromptWriting,
+  pausedReason,
   type QueueMedia,
   type QueueStatus,
 } from "../../shared/queue.ts";
-import { queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
+import { everyone, pendingStatuses, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
   status: QueueStatus;
@@ -56,11 +57,9 @@ export type PromptWriter = (
   },
 ) => Promise<WrittenPrompt>;
 
-/** Not yet handed to a provider: writing its prompt, or waiting for its resource. */
-const unsubmitted = new Set<QueueStatus>(["writing", "queued", "waiting"]);
 const accepted = (job: OwnedJob) =>
-  !terminalStatuses.has(job.status) && !unsubmitted.has(job.status);
-const started = (job: OwnedJob) => !unsubmitted.has(job.status) && job.status !== "cancelled";
+  !terminalStatuses.has(job.status) && !pendingStatuses.has(job.status);
+const started = (job: OwnedJob) => !pendingStatuses.has(job.status) && job.status !== "cancelled";
 const progressMs = 250;
 const maxWrites = 2;
 const writeWaitReason = "Waiting for another prompt to be written.";
@@ -223,12 +222,33 @@ export class GenerationQueue {
     return run;
   }
 
+  /**
+   * Whether a paused queue holds the job: its owner's, or everyone's. Held work keeps its place,
+   * waiting as Paused, and nothing of it starts; started work runs on.
+   */
+  private held() {
+    const pauses = this.store.pauses();
+    return (job: OwnedJob) => pauses.has(everyone) || pauses.has(job.ownerId);
+  }
+
   private async run() {
+    const held = this.held();
+    for (const job of this.store.jobs()) {
+      if (!pendingStatuses.has(job.status) || this.acceptedIds.has(job.id)) continue;
+      // A prompt already being written finishes; its job then waits as Paused.
+      if (held(job) && job.reason !== pausedReason && !this.writing.has(job.id))
+        this.store.save({
+          ...job,
+          status: job.status === "waiting" ? "queued" : job.status,
+          reason: pausedReason,
+        });
+      else if (!held(job) && job.reason === pausedReason) this.store.save({ ...job, reason: "" });
+    }
     // The shared text model writes at most maxWrites prompts at once, higher tiers first, then FIFO;
     // the rest wait in their writing stage.
     const unwritten = this.store
       .jobs()
-      .filter((job) => job.status === "writing" && !this.writing.has(job.id))
+      .filter((job) => job.status === "writing" && !this.writing.has(job.id) && !held(job))
       .sort((a, b) => (a.priority ?? queuePriority.manual) - (b.priority ?? queuePriority.manual));
     for (const job of unwritten)
       if (this.writing.size < maxWrites) this.write(job);
@@ -296,10 +316,13 @@ export class GenerationQueue {
     );
     const rank = (job: OwnedJob) =>
       job.queueSet && startedSets.has(job.queueSet) ? -1 : (job.priority ?? queuePriority.manual);
-    this.rebalance(all, occupied, rank);
+    this.rebalance(all, occupied, rank, held);
     const groups = new Map<string, OwnedJob[]>();
     for (const job of all.filter(
-      (item) => ["queued", "waiting"].includes(item.status) && !this.acceptedIds.has(item.id),
+      (item) =>
+        ["queued", "waiting"].includes(item.status) &&
+        !this.acceptedIds.has(item.id) &&
+        !held(item),
     )) {
       if (occupied.has(job.resource)) {
         this.store.save({
@@ -353,6 +376,8 @@ export class GenerationQueue {
               await this.adapter.settled?.(job);
               continue;
             }
+            // Paused while its eligibility was checked: the next tick marks it Paused.
+            if (this.held()(job)) continue;
             if (reason) {
               this.store.save({ ...job, status: "waiting", reason });
               continue;
@@ -410,13 +435,20 @@ export class GenerationQueue {
    * worker manual work prefers stays free for it; a job never moves behind higher-ranked work.
    * Updates `all` in place.
    */
-  private rebalance(all: OwnedJob[], occupied: Set<string>, rank: (job: OwnedJob) => number) {
+  private rebalance(
+    all: OwnedJob[],
+    occupied: Set<string>,
+    rank: (job: OwnedJob) => number,
+    held: (job: OwnedJob) => boolean,
+  ) {
     if (!this.adapter.alternatives) return;
     const tier = (job: OwnedJob) => job.priority ?? queuePriority.manual;
     const pending = (job: OwnedJob) =>
-      ["queued", "waiting"].includes(job.status) && !this.acceptedIds.has(job.id);
+      ["queued", "waiting"].includes(job.status) && !this.acceptedIds.has(job.id) && !held(job);
     const manualWaits = all.some(
-      (job) => (pending(job) || job.status === "writing") && tier(job) === queuePriority.manual,
+      (job) =>
+        (pending(job) || (job.status === "writing" && !held(job))) &&
+        tier(job) === queuePriority.manual,
     );
     const taken = new Set<string>();
     const stuck = all

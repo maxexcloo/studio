@@ -16,6 +16,15 @@ export const terminalStatuses: ReadonlySet<string> = new Set<QueueStatus>([
   "failed",
   "cancelled",
 ]);
+/** The waiting reason of work held by a paused queue, wherever a waiting reason shows. */
+export const pausedReason = "Paused";
+/** Whether the account paused its own queue, and whether an administrator paused everyone's. */
+export interface QueuePause {
+  mine: boolean;
+  all: boolean;
+}
+/** Where a queue move takes one of the account's pending items among its other pending items. */
+export type QueueMove = "top" | "up" | "down";
 export type GenerationOperation = "image" | "refine" | "animate" | "upscale";
 export type GenerationInput = Record<string, unknown>;
 /**
@@ -71,6 +80,11 @@ export interface QueueJob {
   backend?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface QueueResponse {
+  jobs: QueueJob[];
+  paused: QueuePause;
 }
 
 export interface QueueCancelAllResponse {

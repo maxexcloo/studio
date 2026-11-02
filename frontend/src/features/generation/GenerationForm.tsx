@@ -55,7 +55,7 @@ export function useDraftSubmit({
       // The viewer's strip shows the new run at once; polling then follows its progress.
       if (job)
         client.setQueryData(queueQuery.queryKey, (queue) =>
-          queue ? { jobs: [...queue.jobs, job] } : queue,
+          queue ? { ...queue, jobs: [...queue.jobs, job] } : queue,
         );
       return { sessionId, jobId };
     },

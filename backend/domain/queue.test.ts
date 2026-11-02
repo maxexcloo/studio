@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { GenerationQueue, type JobObservation, type QueueAdapter } from "./queue.ts";
-import { queuePriority, RewriteStore } from "./store.ts";
+import { pausedReason } from "../../shared/queue.ts";
+import { everyone, queuePriority, RewriteStore } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -553,6 +554,73 @@ test("a writing failure fails the item with its reason; cancelling stops the wri
     assert.deepEqual(events.sort(), [`released:${cancelled.id}`, `released:${failing.id}`].sort());
     // A retry writes the prompt again.
     assert.equal(queue.retry("alice", failing.id)?.status, "writing");
+  } finally {
+    store.close();
+  }
+});
+
+test("a paused queue holds only its owner's pending work, survives a restart and resumes", async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "studio-queue-pause-"));
+  const filename = path.join(directory, "studio.sqlite");
+  let queue = fixture(filename);
+  try {
+    const alice = queue.store.createSession("alice");
+    const bob = queue.store.createSession("bob");
+    const running = queue.store.enqueue("alice", alice.id, {}, "image", undefined, "alice-gpu");
+    await queue.queue.tick();
+    queue.store.setPaused("alice", true);
+    const held = queue.store.enqueue("alice", alice.id, {}, "image");
+    const free = queue.store.enqueue("bob", bob.id, {}, "image");
+    await queue.queue.tick();
+    // Alice's started job runs on; her new one waits as Paused while Bob's runs on the same worker.
+    assert.deepEqual(queue.submitted, [running.id, free.id]);
+    assert.equal(queue.store.job("alice", running.id)?.status, "running");
+    const paused = queue.store.job("alice", held.id);
+    assert.deepEqual([paused?.status, paused?.reason], ["queued", pausedReason]);
+    queue.store.close();
+    queue = fixture(filename);
+    queue.store.setPaused(everyone, true);
+    const later = queue.store.enqueue("bob", bob.id, {}, "image", undefined, "bob-gpu");
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, []);
+    assert.equal(queue.store.job("bob", later.id)?.reason, pausedReason);
+    queue.store.setPaused(everyone, false);
+    await queue.queue.tick();
+    assert.deepEqual(queue.submitted, [later.id]);
+    assert.equal(queue.store.job("alice", held.id)?.reason, pausedReason);
+    queue.store.setPaused("alice", false);
+    await drain(queue);
+    assert.equal(queue.store.job("alice", held.id)?.status, "completed");
+  } finally {
+    queue.store.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("moves reorder only the owner's pending items, within their tiers and others' places", async () => {
+  const queue = fixture();
+  const { store } = queue;
+  try {
+    const alice = store.createSession("alice");
+    const bob = store.createSession("bob");
+    const enqueue = (owner: string, session: string, origin = {}) =>
+      store.enqueue(owner, session, {}, "image", undefined, undefined, undefined, origin).id;
+    const a1 = enqueue("alice", alice.id);
+    const b1 = enqueue("bob", bob.id);
+    const a2 = enqueue("alice", alice.id);
+    const aMcp = enqueue("alice", alice.id, mcp("set"));
+    const b2 = enqueue("bob", bob.id);
+    assert.equal(store.move("alice", aMcp, "top"), true);
+    assert.equal(store.move("alice", a1, "down"), true);
+    assert.equal(store.move("bob", a2, "top"), false);
+    // Alice's items trade places among themselves; Bob's keep theirs.
+    assert.deepEqual(
+      store.jobs().map((job) => job.id),
+      [aMcp, b1, a2, a1, b2],
+    );
+    // Moved to the top, MCP work still runs after every account's manual work.
+    await drain(queue);
+    assert.deepEqual(queue.submitted, [b1, a2, a1, b2, aMcp]);
   } finally {
     store.close();
   }

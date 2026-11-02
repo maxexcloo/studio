@@ -276,7 +276,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
       // The strip shows the new run at once; polling then follows its progress.
       if (result.job)
         client.setQueryData(queueQuery.queryKey, (queue) =>
-          queue ? { jobs: [...queue.jobs, result.job!] } : queue,
+          queue ? { ...queue, jobs: [...queue.jobs, result.job!] } : queue,
         );
       void Promise.all(
         [queueQuery.queryKey, ["gallery"], ["sessions"], ["session", session]].map((queryKey) =>
