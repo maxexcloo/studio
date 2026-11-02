@@ -21,7 +21,7 @@ import {
 } from "./account-ownership.js";
 import { mayUseFeature } from "./account-policy.js";
 import { galleryAspects, gallerySizeBands, otherAspect } from "./gallery-filters.js";
-import { canonicalProfileId } from "./profile-store.js";
+import { canonicalProfileId } from "./profile/store.js";
 import { requireAdmin } from "./route-access.js";
 
 function requireGalleryAccess(req, res) {

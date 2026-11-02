@@ -10,7 +10,7 @@ test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 const { metadataFromJson, saveImportedWorkflow, validateGraph } =
   await import("./custom-workflows.js");
 const { customWorkflowGraph } = await import("./graphs.js");
-const { inferModels } = await import("./models.js");
+const { inferModels } = await import("./model/models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 
 const graph = {
@@ -122,7 +122,7 @@ test("mode selection reaches final graphs, preserves fixed generation denoise an
 });
 
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
-  const { optionalLoraIssue } = await import("./lora-catalogue.js");
+  const { optionalLoraIssue } = await import("./lora/catalogue.js");
   const prepared = structuredClone(raw);
   prepared.studio.id = "fixed-accelerator";
   const fixed = {

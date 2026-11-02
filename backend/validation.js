@@ -1,9 +1,9 @@
 import { defaultGenerationCount } from "./generation-defaults.js";
 import { isResolution } from "../shared/resolution.ts";
-import { catalogueLoraInfo } from "./lora-info.js";
-import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
-import { missingNodes, nodeRange, optionsFor } from "./comfy.js";
-import { inferModels } from "./models.js";
+import { catalogueLoraInfo } from "./lora/info.js";
+import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
+import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
+import { inferModels } from "./model/models.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { inpaintingEnabled } from "./features.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";

@@ -1,6 +1,6 @@
 // Numbers for the About page and per-profile health. Computed from the gallery record only:
 // nothing is tracked beyond what Studio already keeps about its own outputs.
-import { canonicalProfileId } from "./profile-store.js";
+import { canonicalProfileId } from "./profile/store.js";
 
 const dayKey = (value) => {
   const date = new Date(value);

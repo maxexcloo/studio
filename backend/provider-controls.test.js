@@ -7,7 +7,7 @@ import test from "node:test";
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-provider-controls-"));
 process.env.STUDIO_DATA_DIR = scratch;
 const { saveImportedWorkflow } = await import("./custom-workflows.js");
-const { buildProfile, inferModels } = await import("./models.js");
+const { buildProfile, inferModels } = await import("./model/models.js");
 const { sanitizeGenerateBody } = await import("./validation.js");
 const { customWorkflowGraph } = await import("./graphs.js");
 const { generationSettings } = await import("./gallery-store.js");

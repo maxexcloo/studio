@@ -14,7 +14,7 @@
  */
 import { mayUseFeature } from "./account-policy.js";
 import { maxPromptCharacters } from "../shared/queue.ts";
-import { withLoraTags } from "./lora-prompts.js";
+import { withLoraTags } from "./lora/prompts.js";
 import { animateIssue, animateRequest, writeAnimatePrompt } from "./prompt-animate.js";
 
 const text = (value, limit = maxPromptCharacters) =>

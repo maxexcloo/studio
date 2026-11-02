@@ -26,7 +26,7 @@ import {
   replyRule,
 } from "./mcp-media.js";
 import { exactPromptInstructions, fullBodyPerson } from "./mcp-prompt-checks.js";
-import { canonicalProfileId, livePrompting } from "./profile-store.js";
+import { canonicalProfileId, livePrompting } from "./profile/store.js";
 import {
   asksForCloud,
   familyMatches,
