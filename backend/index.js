@@ -51,7 +51,7 @@ import { withPngText } from "./png-text.js";
 import { composeWorkflowPrompt } from "./graphs.js";
 import { studioCloudProfiles } from "./providers/profiles.ts";
 import { withResolution } from "../shared/resolution.ts";
-import { terminalStatuses } from "../shared/queue.ts";
+import { pausedReason, terminalStatuses } from "../shared/queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/routes.ts";
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
@@ -2851,6 +2851,8 @@ function generationJobResponse(account, id) {
       items: queued.items,
       outputs: queued.outputs,
       error: queued.status === "failed" ? queued.reason : undefined,
+      // A paused queue's hold is the one waiting reason a chat hears.
+      ...(queued.reason === pausedReason ? { reason: pausedReason } : {}),
       // The prompt's thinking stays in Studio; a chat hears only the status.
       progress: queued.status === "writing" ? undefined : queued.progress,
       ...(queued.resource.startsWith("provider:cliproxyapi")

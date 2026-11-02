@@ -1529,7 +1529,7 @@ export class McpMedia {
     if (!finished.has(job.status)) {
       const pending = !terminal.has(job.status);
       const message = pending
-        ? `${ref ? label : "This job"} is still ${job.status || "running"}. Reply now with its link; do not poll. It continues in the studio and appears at the link when done.`
+        ? `${ref ? label : "This job"} is still ${job.status || "running"}${job.reason ? ` (${job.reason})` : ""}. Reply now with its link; do not poll. It continues in the studio and appears at the link when done.`
         : job.cloudQuota
           ? `${cloudQuotaMessage} ${ref ? label : "This job"} did not run; video needs the local video worker until the quota returns. Do not resubmit.`
           : failedReason(job)

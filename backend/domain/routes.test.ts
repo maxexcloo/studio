@@ -6,7 +6,7 @@ import express from "express";
 import type { QueueCancelAllResponse, UnfinishedJob } from "../../shared/queue.ts";
 import { GenerationQueue, type JobObservation } from "./queue.ts";
 import { registerMaintenanceRoutes, registerRewriteRoutes } from "./routes.ts";
-import { RewriteStore } from "./store.ts";
+import { everyone, RewriteStore } from "./store.ts";
 const { enforceMultiUserRequest } = await import(
   new URL("../multi-user-gate.js", import.meta.url).href
 );
@@ -243,7 +243,15 @@ test("Unfinished Items lists every account's unfinished jobs and ends stuck ones
     });
   try {
     assert.equal((await fetch(base)).status, 403);
+    // Only administrators pause everyone's queue.
+    const pauseAll = () =>
+      fetch(base.replace("maintenance/unfinished", "queue/pause-all"), { method: "POST" });
+    assert.equal((await pauseAll()).status, 403);
+    assert.equal(store.pauses().size, 0);
     admin = true;
+    assert.equal((await pauseAll()).status, 200);
+    assert.deepEqual([...store.pauses()], [everyone]);
+    store.setPaused(everyone, false);
     assert.deepEqual(await listed(), [
       ["alice", "a fox", "running"],
       ["bob", "a hare", "queued"],

@@ -13,6 +13,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { generateWaitSeconds, registerMcpRoutes } from "./mcp.js";
 import { McpMedia } from "./media.js";
 import { adminToolNames } from "./admin.js";
+import { pausedReason } from "../../shared/queue.ts";
 import { fakeKubernetes } from "../fixtures/fake-kubernetes.ts";
 import { RuntimeController } from "../runtime/controller.ts";
 import { KubernetesEngine } from "../runtime/kubernetes.ts";
@@ -1060,6 +1061,12 @@ test("Status and Result wait 20 seconds at most, so a chat never blocks on a bac
   const pending = await call(client, "Result", { job_id: id });
   assert.equal(data(pending).status, "running");
   assert.match(texts(pending), /do not poll/);
+  // Work a paused queue holds says so in the queue's words.
+  Object.assign(f.jobs.get(id), { status: "queued", reason: pausedReason });
+  assert.match(
+    texts(await call(client, "Result", { job_id: id })),
+    / is still queued \(Paused\)\./,
+  );
   setTimeout(
     () =>
       Object.assign(f.jobs.get(id), {
