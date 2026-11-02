@@ -236,6 +236,35 @@ test("the agent calls Studio's tools in steps, reads each answer and keeps its t
   fixture.db.close();
 });
 
+test("tool calls a gateway numbers per round keep distinct ids in later turns", async () => {
+  const fixture = setup([]);
+  const round = () => [
+    frame({ choices: [{ delta: { tool_calls: [toolCall(0, "call_0", "Models", {})] } }] }),
+    "data: [DONE]\n\n",
+  ];
+  rounds(fixture, [
+    round(),
+    round(),
+    [frame({ choices: [{ delta: { content: "Done." } }] }), "data: [DONE]\n\n"],
+  ]);
+  fakeAgent(fixture, {});
+  await fixture.service.stream("alice", fixture.session.id, { content: "Look twice" }, () => {});
+  rounds(fixture, [[frame({ choices: [{ delta: { content: "Sure." } }] }), "data: [DONE]\n\n"]]);
+  await fixture.service.stream("alice", fixture.session.id, { content: "Thanks" }, () => {});
+  const later = fixture.requests.at(-1)!.messages as {
+    role: string;
+    tool_calls?: { id: string }[];
+    tool_call_id?: string;
+  }[];
+  const calls = later.flatMap((message) => message.tool_calls?.map((call) => call.id) || []);
+  assert.deepEqual(calls, ["call_0", "call_0_1"]);
+  assert.deepEqual(
+    later.filter((message) => message.role === "tool").map((message) => message.tool_call_id),
+    calls,
+  );
+  fixture.db.close();
+});
+
 test("a reply's tool rounds are bounded: the last call answers without tools", async () => {
   const fixture = setup([]);
   rounds(fixture, [

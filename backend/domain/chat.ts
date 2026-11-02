@@ -173,19 +173,27 @@ function conversation(history: ChatMessage[]) {
         ? [{ role: message.role, content: conversationContent(message) }]
         : [];
     if (!steps.length) return text;
+    // A gateway may number calls per round (call_0 again), so repeated ids get a suffix: one
+    // message must not answer two calls under one id.
+    const seen = new Map<string, number>();
+    const ids = steps.map((step) => {
+      const count = seen.get(step.id) ?? 0;
+      seen.set(step.id, count + 1);
+      return count ? `${step.id}_${count}` : step.id;
+    });
     return [
       {
         role: "assistant",
         content: null,
-        tool_calls: steps.map((step) => ({
-          id: step.id,
+        tool_calls: steps.map((step, index) => ({
+          id: ids[index],
           type: "function",
           function: { name: step.tool, arguments: JSON.stringify(step.input) },
         })),
       },
-      ...steps.map((step) => ({
+      ...steps.map((step, index) => ({
         role: "tool",
-        tool_call_id: step.id,
+        tool_call_id: ids[index],
         content: step.output || (step.status === "running" ? "Interrupted." : step.status),
       })),
       ...text,
