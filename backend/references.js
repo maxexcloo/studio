@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { mediaFile, mediaParams, mediaPath, mediaSubfolder } from "./media-paths.js";
+import { mediaFile, mediaParams, mediaPath, mediaSubfolder, mediaType } from "./media-paths.js";
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
@@ -12,7 +12,7 @@ import {
   galleryKey,
 } from "./gallery/store.js";
 
-import { extractFrame } from "./video-previews.js";
+import { extractFrame, getComfyVideoPoster, probeVideo } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
@@ -25,6 +25,8 @@ const maxUploadBytes = Math.max(
   1024,
   Number(process.env.STUDIO_REFERENCE_MAX_BYTES || 25 * 1024 * 1024),
 );
+const maxVideoBytes = Math.max(maxUploadBytes, 200 * 1024 * 1024);
+const megabytes = (bytes) => Math.round(bytes / 1024 / 1024);
 const maxPixels = Math.max(
   1_000_000,
   Number(process.env.STUDIO_REFERENCE_MAX_PIXELS || 80_000_000),
@@ -72,7 +74,8 @@ function galleryAsset(item) {
   };
 }
 
-export function readMultipartImage(req) {
+/** The `image` field of a multipart upload: an image, or a video up to `maxVideoBytes`. */
+export function readMultipartUpload(req) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let found = false;
@@ -85,7 +88,7 @@ export function readMultipartImage(req) {
     try {
       parser = Busboy({
         headers: req.headers,
-        limits: { files: 1, fileSize: maxUploadBytes, fields: 4 },
+        limits: { files: 1, fileSize: maxVideoBytes, fields: 4 },
       });
     } catch (error) {
       reject(new Error(`The upload failed: ${error.message}`));
@@ -116,13 +119,9 @@ export function readMultipartImage(req) {
     parser.on("error", fail);
     parser.on("finish", () => {
       if (settled) return;
-      if (!found) return fail(new Error("Choose an image to upload."));
-      if (limited || size > maxUploadBytes)
-        return fail(
-          new Error(
-            `Reference images can be up to ${Math.round(maxUploadBytes / 1024 / 1024)} MB.`,
-          ),
-        );
+      if (!found) return fail(new Error("Choose an image or video to upload."));
+      if (limited || size > maxVideoBytes)
+        return fail(new Error(`Videos can be up to ${megabytes(maxVideoBytes)} MB.`));
       settled = true;
       resolve({ buffer: Buffer.concat(chunks), name, mime, size });
     });
@@ -171,14 +170,29 @@ async function inspectImage(buffer, declaredMime = "") {
   return { mime, width, height };
 }
 
-/** An uploaded image as a gallery image (uploads.js); the same bytes from the same owner return the first copy. */
-export async function saveUploadedImage({ buffer, name, mime: declaredMime = "" }, ownerId = "") {
-  if (!buffer?.length) throw new Error("That image is empty.");
-  if (buffer.length > maxUploadBytes)
-    throw new Error(
-      `Reference images can be up to ${Math.round(maxUploadBytes / 1024 / 1024)} MB.`,
-    );
-  const inspected = await inspectImage(buffer, declaredMime);
+/** MP4 or WebM by the file's first bytes, else "". HEIF and AVIF images share MP4's box format. */
+function sniffVideo(buffer) {
+  if (
+    buffer.length > 12 &&
+    buffer.toString("latin1", 4, 8) === "ftyp" &&
+    !/^(hei|hev|mif|msf|avi)/.test(buffer.toString("latin1", 8, 12))
+  )
+    return "video/mp4";
+  if (buffer.length > 4 && buffer.readUInt32BE(0) === 0x1a45dfa3) return "video/webm";
+  return "";
+}
+
+/**
+ * An uploaded image, or MP4 or WebM video, as a gallery item (uploads.js); the same bytes from the
+ * same owner return the first copy.
+ */
+export async function saveUpload({ buffer, name, mime: declaredMime = "" }, ownerId = "") {
+  if (!buffer?.length) throw new Error("That file is empty.");
+  const video = sniffVideo(buffer);
+  const limit = video ? maxVideoBytes : maxUploadBytes;
+  if (buffer.length > limit)
+    throw new Error(`${video ? "Videos" : "Images"} can be up to ${megabytes(limit)} MB.`);
+  const inspected = video ? { mime: video } : await inspectImage(buffer, declaredMime);
   const hash = crypto.createHash("sha256").update(buffer).digest("hex");
   const stored = (item) => {
     const media = mediaParams(item.url);
@@ -188,13 +202,25 @@ export async function saveUploadedImage({ buffer, name, mime: declaredMime = "" 
     (item) =>
       item.uploaded && item.hash === hash && (item.ownerId || "") === ownerId && stored(item),
   );
-  if (existing) return { item: existing, asset: galleryAsset(existing) };
+  if (existing) return { item: existing, asset: uploadAsset(existing) };
   const id = crypto.randomUUID();
   const subfolder = mediaSubfolder(ownerId);
   const filename = `${id}.${mimeExtension(inspected.mime)}`;
   const file = mediaPath(filename, subfolder);
   if (!file) throw new Error("This upload's name cannot be stored.");
   await writeBytesFileAsync(file, buffer, { mode: 0o600 });
+  if (video) {
+    const clip = await probeVideo(file);
+    if (!clip) {
+      await fs.promises.rm(file, { force: true });
+      throw new Error("That video can’t be read.");
+    }
+    Object.assign(inspected, {
+      width: clip.width,
+      height: clip.height,
+      durationMs: clip.durationMs,
+    });
+  }
   const item = uploadedGalleryItem({
     id,
     ownerId,
@@ -207,7 +233,23 @@ export async function saveUploadedImage({ buffer, name, mime: declaredMime = "" 
     subfolder,
   });
   addGalleryItems([item]);
-  return { item, asset: galleryAsset(item) };
+  return { item, asset: uploadAsset(item) };
+}
+
+/** An upload as a reference: a video by its first frame, as reference slots take images. */
+const uploadAsset = (item) => (item.type === "video" ? frameAsset(item, 0) : galleryAsset(item));
+
+/**
+ * A gallery image's bytes, or a video's poster (its first frame, cut by ffmpeg and cached with the
+ * grid's), for captions, suggested prompts and image search.
+ */
+export async function galleryStill(item) {
+  if (item.type !== "video") return (await publicGalleryBuffer(item)).buffer;
+  const media = mediaParams(item.url);
+  if (!media) throw new Error("That video is no longer in the gallery.");
+  return fs.promises.readFile(
+    await getComfyVideoPoster(media.filename, media.subfolder, mediaType),
+  );
 }
 
 function decodeGalleryReference(id = "") {
@@ -277,6 +319,10 @@ function frameAssetForAccount(account, galleryItemId, at) {
   const item = findGalleryItemForAccount(galleryItemId, account);
   if (!item || item.type !== "video" || item.status !== "done" || !item.url)
     throw new Error("That video is no longer in the gallery.");
+  return frameAsset(item, at);
+}
+
+function frameAsset(item, at) {
   const asset = galleryAsset(item);
   const label = at === "last" ? "last frame" : `frame at ${(at / 1000).toFixed(1)} s`;
   return {
