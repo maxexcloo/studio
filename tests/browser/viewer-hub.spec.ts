@@ -324,7 +324,7 @@ test("With local video stopped, an Animate theme says it runs on Grok and queues
   });
 });
 
-test("A video's Animate theme continues it from its last frame, and its frame can be a reference", async ({
+test("A video's Animate theme continues it from its last frame, and its frame can be a reference or an image", async ({
   page,
 }) => {
   const state = await fixtures(page);
@@ -358,8 +358,13 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
       writing: { kind: "animate", theme: "living", source: "A rolling wave" },
     },
   });
-  // The frame showing becomes a reference.
+  // The frame showing is saved as an image, or becomes a reference in the composer.
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
+  await expect(
+    page.getByText("Frame saved as an image in Uploads.", { exact: true }),
+  ).toBeVisible();
+  expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
   await page.getByRole("menuitem", { name: "Use Frame as Reference", exact: true }).click();
   await expect
     .poll(() => state.referenceRequests.at(-1))

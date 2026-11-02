@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   FastForward,
+  ImageDown,
   Flame,
   ImagePlus,
   ImageUpscale,
@@ -30,6 +31,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
@@ -133,6 +135,37 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   });
 }
 
+/** The milliseconds into a video the viewer is showing, or undefined (its last frame) elsewhere. */
+function viewerFrame(item: MediaItem) {
+  const player = document.querySelector<HTMLVideoElement>(
+    `video[data-media-id="${CSS.escape(item.id)}"]`,
+  );
+  return player ? Math.round(player.currentTime * 1000) : undefined;
+}
+
+/** Save Frame as Image: the frame a video is showing (else its last) as an image under Uploads. */
+function useSaveFrame(item: MediaItem): Action {
+  const cache = useQueryClient();
+  const save = useMutation({
+    mutationFn: () =>
+      post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
+    onSuccess: () => {
+      notifications.show({ message: "Frame saved as an image in Uploads." });
+      void cache.invalidateQueries({ queryKey: ["gallery"] });
+    },
+    onError: (error) => notifications.show({ color: "red", message: error.message }),
+  });
+  return {
+    id: "save-frame",
+    label: "Save Frame as Image",
+    icon: ImageDown,
+    disabled: save.isPending,
+    loading: save.isPending,
+    keepOpen: true,
+    onClick: () => save.mutate(),
+  };
+}
+
 /**
  * Edit › Use as Reference: adds the image to the composer's references when its profile takes one.
  * A video gives the frame showing in the viewer, or its last frame from elsewhere.
@@ -158,12 +191,8 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     disabled: reference.isPending,
     keepOpen: true,
     onClick: () => {
-      const player = video
-        ? document.querySelector<HTMLVideoElement>(`video[data-media-id="${CSS.escape(item.id)}"]`)
-        : null;
-      const frame = player ? Math.round(player.currentTime * 1000) : undefined;
       reference.mutate(
-        { ...item, frame },
+        { ...item, frame: video ? viewerFrame(item) : undefined },
         {
           onSuccess: () => {
             onApplied();
@@ -252,6 +281,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const saveFrame = useSaveFrame(item);
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
@@ -333,8 +363,8 @@ export function useMediaActions(
               disabled: action.isPending,
               onClick: () => action.mutate("extend"),
             },
-            ...(reference ? [reference] : []),
           ],
+          [...(reference ? [reference] : []), saveFrame],
         ],
       }),
     image &&
