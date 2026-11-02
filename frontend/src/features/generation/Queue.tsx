@@ -4,6 +4,7 @@ import {
   Button,
   Group,
   Loader,
+  Menu,
   RingProgress,
   Stack,
   Text,
@@ -17,18 +18,30 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
-import { CircleAlert, Eraser, Image, RotateCw, Video, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpToLine,
+  CircleAlert,
+  Eraser,
+  Image,
+  ListOrdered,
+  RotateCw,
+  Video,
+  X,
+} from "lucide-react";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import classes from "./Queue.module.css";
 import { api, post } from "../../api";
 import type { QueueJob } from "../../types";
+import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WritingStream } from "./PromptWriting";
-import { terminalStatuses } from "../../../../shared/queue";
+import { terminalStatuses, type QueueMove, type QueuePause } from "../../../../shared/queue";
 export const queueQuery = queryOptions({
   queryKey: ["queue"],
-  queryFn: () => api<{ jobs: QueueJob[] }>("/api/queue"),
+  queryFn: () => api<{ jobs: QueueJob[]; paused: QueuePause }>("/api/queue"),
   // Idle queues don't poll: every in-app submit (composer, viewer, Chat stream) invalidates this
   // query, and work started elsewhere (another tab, MCP) appears on window focus.
   refetchInterval: (query) =>
@@ -38,10 +51,22 @@ export function useQueue() {
   return useQuery(queueQuery);
 }
 const queueActionKey = ["queue-action"];
-/** An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`). */
+/** An empty `id` acts on the whole queue (`cancel-all`, `clear-failed`, `pause` and the like). */
 type QueueAction = {
   id: string;
-  action: "cancel" | "clear" | "retry" | "cancel-all" | "clear-failed";
+  action:
+    | "cancel"
+    | "clear"
+    | "retry"
+    | "move"
+    | "cancel-all"
+    | "clear-failed"
+    | "pause"
+    | "resume"
+    | "pause-all"
+    | "resume-all";
+  /** Where `move` takes the item among the account's waiting items. */
+  to?: QueueMove;
 };
 export function useQueueAction(jobId?: string) {
   const client = useQueryClient();
@@ -52,9 +77,10 @@ export function useQueueAction(jobId?: string) {
   });
   const action = useMutation({
     mutationKey: queueActionKey,
-    mutationFn: ({ id, action }: QueueAction) =>
+    mutationFn: ({ id, action, to }: QueueAction) =>
       post<{ job?: QueueJob }>(
         id ? `/api/queue/${encodeURIComponent(id)}/${action}` : `/api/queue/${action}`,
+        to && { to },
       ),
     onSuccess: () =>
       Promise.all([
@@ -130,7 +156,41 @@ export const statusLabels: Record<QueueJob["status"], string> = {
 /** A generation's progress as a percentage, or 0 while it has no steps to count. */
 export const progressPercent = (progress: QueueJob["progress"]) =>
   progress?.max ? Math.max(0, Math.min(100, ((progress.value ?? 0) / progress.max) * 100)) : 0;
-function QueueRow({ job }: { job: QueueJob }) {
+/** Not yet started: the items a pause holds and Move reorders. */
+const waiting = (job: QueueJob) => ["writing", "queued", "waiting"].includes(job.status);
+const moves = [
+  { to: "top", label: "Move to Top", Icon: ArrowUpToLine },
+  { to: "up", label: "Move Up", Icon: ArrowUp },
+  { to: "down", label: "Move Down", Icon: ArrowDown },
+] as const;
+/** Moves a waiting item among the account's other waiting items; other accounts keep their places. */
+function MoveJob({ job, first, last }: { job: QueueJob; first: boolean; last: boolean }) {
+  const action = useQueueAction(job.id);
+  return (
+    <Menu position="bottom-end">
+      <Tooltip label="Move">
+        <Menu.Target>
+          <ActionIcon aria-label="Move" variant="subtle" color="gray" loading={action.isPending}>
+            <ListOrdered size={16} />
+          </ActionIcon>
+        </Menu.Target>
+      </Tooltip>
+      <Menu.Dropdown>
+        {moves.map(({ to, label, Icon }) => (
+          <Menu.Item
+            key={to}
+            leftSection={<Icon size={16} />}
+            disabled={to === "down" ? last : first}
+            onClick={() => action.mutate({ id: job.id, action: "move", to })}
+          >
+            {label}
+          </Menu.Item>
+        ))}
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+function QueueRow({ job, place }: { job: QueueJob; place?: { first: boolean; last: boolean } }) {
   const failed = job.status === "failed";
   const { progress } = job;
   const percent = progressPercent(progress);
@@ -165,6 +225,7 @@ function QueueRow({ job }: { job: QueueJob }) {
         ) : (
           <Loader size={16} color="gray" aria-label={statusLabels[job.status]} />
         ))}
+      {place && <MoveJob job={job} {...place} />}
       <QueueJobAction job={job} compact />
       {failed && <ClearJob job={job} />}
     </Group>
@@ -202,21 +263,68 @@ const bulk = {
 export function Queue() {
   const queue = useQueue();
   const action = useQueueAction();
+  // In single-user mode the account's own pause already holds everything.
+  const multiUser = useAccount().data?.mode === "multi-user";
+  const everyone = useIsAdmin() && multiUser;
   const [confirming, setConfirming] = useState<keyof typeof bulk>();
   const jobs = (queue.data?.jobs ?? []).filter(
     (job) => !["completed", "cancelled"].includes(job.status),
   );
   if (queue.error) return <Alert color="red">{queue.error.message}</Alert>;
   if (queue.isPending) return <LoadingState label="Loading Generations" fill />;
-  if (!jobs.length) return <EmptyState fill>Empty Queue</EmptyState>;
+  const { paused } = queue.data;
+  const pauses: { key: QueueAction["action"]; label: string }[] = [
+    paused.mine ? { key: "resume", label: "Resume" } : { key: "pause", label: "Pause Queue" },
+  ];
+  if (everyone)
+    pauses.push(
+      paused.all
+        ? { key: "resume-all", label: "Resume All" }
+        : { key: "pause-all", label: "Pause All" },
+    );
+  if (!jobs.length) {
+    // An empty queue still offers the one action that lets work start again.
+    const resume = pauses.find(({ key }) => key.startsWith("resume"));
+    return (
+      <EmptyState
+        fill
+        action={
+          resume && (
+            <Button
+              variant="default"
+              loading={action.isPending}
+              onClick={() => action.mutate({ id: "", action: resume.key })}
+            >
+              {resume.label}
+            </Button>
+          )
+        }
+      >
+        Empty Queue
+      </EmptyState>
+    );
+  }
   const available = (Object.keys(bulk) as (keyof typeof bulk)[]).filter((key) =>
     jobs.some((job) =>
       key === "cancel-all" ? !terminalStatuses.has(job.status) : job.status === "failed",
     ),
   );
+  const movable = jobs.filter(waiting);
   return (
     <Stack gap={0} aria-label="Queue">
       <Group gap="xs" justify="flex-end">
+        {pauses.map(({ key, label }) => (
+          <Button
+            key={key}
+            variant="subtle"
+            color="gray"
+            size="compact-sm"
+            disabled={action.isPending}
+            onClick={() => action.mutate({ id: "", action: key })}
+          >
+            {label}
+          </Button>
+        ))}
         {available.map((key) => (
           <Button
             key={key}
@@ -230,8 +338,21 @@ export function Queue() {
           </Button>
         ))}
       </Group>
+      {paused.all && !everyone && (
+        <Text size="xs" c="dimmed" py="xs">
+          An administrator has paused the queue.
+        </Text>
+      )}
       {jobs.map((job) => (
-        <QueueRow key={job.id} job={job} />
+        <QueueRow
+          key={job.id}
+          job={job}
+          place={
+            movable.length > 1 && waiting(job)
+              ? { first: job === movable[0], last: job === movable.at(-1) }
+              : undefined
+          }
+        />
       ))}
       <ConfirmDialog
         opened={confirming !== undefined}

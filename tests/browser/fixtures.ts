@@ -83,6 +83,7 @@ export async function fixtures(page: Page) {
     recents: [],
   };
   const loraOperations: any[] = [];
+  const queuePause = { mine: false, all: false };
   let clock = Date.parse(stamp);
   const nextStamp = () => new Date((clock += 1000)).toISOString();
   const comparisons: any[] = [];
@@ -411,7 +412,31 @@ export async function fixtures(page: Page) {
             "Studio runtime control is not configured; GPU workloads are neither observed nor switched.",
         },
       });
-    if (path === "/api/queue") return respond({ jobs: jobs.filter((job) => !job.cleared) });
+    if (path === "/api/queue")
+      return respond({ jobs: jobs.filter((job) => !job.cleared), paused: queuePause });
+    const pause = /^\/api\/queue\/(pause|resume)(-all)?$/.exec(path);
+    if (pause) {
+      queuePause[pause[2] ? "all" : "mine"] = pause[1] === "pause";
+      const held = queuePause.mine || queuePause.all;
+      for (const job of jobs)
+        if (["queued", "waiting"].includes(job.status))
+          Object.assign(job, { status: "queued", reason: held ? "Paused" : "" });
+      return respond({ ok: true });
+    }
+    if (path.match(/^\/api\/queue\/[^/]+\/move$/)) {
+      // The fixture has one account, so its waiting items trade places among themselves.
+      const waiting = jobs.filter((job) => ["writing", "queued", "waiting"].includes(job.status));
+      const job = jobs.find((j) => j.id === path.split("/")[3]);
+      const from = waiting.indexOf(job);
+      const to =
+        body.to === "top"
+          ? 0
+          : Math.max(0, Math.min(waiting.length - 1, from + (body.to === "up" ? -1 : 1)));
+      const slots = waiting.map((item) => jobs.indexOf(item));
+      waiting.splice(to, 0, ...waiting.splice(from, 1));
+      slots.forEach((slot, index) => (jobs[slot] = waiting[index]));
+      return respond({ ok: true });
+    }
     if (path === "/api/queue/clear-failed") {
       const failed = jobs.filter((job) => job.status === "failed" && !job.cleared);
       failed.forEach((job) => (job.cleared = true));
@@ -685,6 +710,7 @@ export async function fixtures(page: Page) {
     loraLibrary,
     loraOperations,
     comparisons,
+    queuePause,
   };
 }
 /** Serves `/api/models` with these profiles in place of the fixture catalogue. */

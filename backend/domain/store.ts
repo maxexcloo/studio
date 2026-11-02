@@ -6,6 +6,7 @@ import type {
   GenerationInput,
   GenerationOperation,
   QueueJob,
+  QueueMove,
   StudioSession,
 } from "../../shared/queue.ts";
 import { awaitsWriting } from "../../shared/queue.ts";
@@ -38,6 +39,10 @@ interface UserPreset {
   savedAt?: string;
 }
 const now = () => new Date().toISOString();
+/** The pause key that holds every account's queue. */
+export const everyone = "*";
+/** Not yet handed to a provider: the work a pause holds and a move reorders. */
+export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued", "waiting"]);
 
 export class RewriteStore {
   readonly db: DatabaseSync;
@@ -60,6 +65,7 @@ export class RewriteStore {
       );
       CREATE INDEX IF NOT EXISTS studio_queue_owner ON studio_queue(owner_id, created_at);
       CREATE INDEX IF NOT EXISTS studio_queue_status ON studio_queue(status, created_at);
+      CREATE TABLE IF NOT EXISTS studio_queue_pauses (owner_id TEXT PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS studio_user_presets (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, record TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS studio_user_presets_owner ON studio_user_presets(owner_id);
       CREATE TABLE IF NOT EXISTS studio_provider_jobs (id TEXT PRIMARY KEY REFERENCES studio_queue(id), owner_id TEXT NOT NULL, record TEXT NOT NULL);
@@ -311,6 +317,64 @@ export class RewriteStore {
       )
       .all(...values)
       .map((row) => JSON.parse(row.record as string));
+  }
+
+  /**
+   * Moves one of the owner's pending queue items to the top of, or one place up or down among, the
+   * owner's other pending items (Dream's stay out, as in the queue panel). The items trade their
+   * places in the queue order (`created_at, rowid`), so other accounts' work keeps its place.
+   * Returns false when the item is not one of the owner's pending items.
+   */
+  move(ownerId: string, id: string, to: QueueMove): boolean {
+    const pending = this.jobs(ownerId).filter(
+      (job) => pendingStatuses.has(job.status) && job.priority !== queuePriority.dream,
+    );
+    const from = pending.findIndex((job) => job.id === id);
+    if (from < 0) return false;
+    const target =
+      to === "top" ? 0 : Math.max(0, Math.min(pending.length - 1, from + (to === "up" ? -1 : 1)));
+    if (target === from) return true;
+    const read = this.db.prepare("SELECT rowid, created_at FROM studio_queue WHERE id = ?");
+    const places = pending.map((job) => read.get(job.id) as { rowid: number; created_at: string });
+    const order = pending.map((job) => job.id);
+    order.splice(target, 0, ...order.splice(from, 1));
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      // Rowids are unique, so negating them frees the places first.
+      const free = this.db.prepare("UPDATE studio_queue SET rowid = -rowid WHERE id = ?");
+      for (const jobId of order) free.run(jobId);
+      const place = this.db.prepare(
+        "UPDATE studio_queue SET rowid = ?, created_at = ? WHERE id = ?",
+      );
+      order.forEach((jobId, index) =>
+        place.run(places[index].rowid, places[index].created_at, jobId),
+      );
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return true;
+  }
+
+  /** The owners whose pending work is held; `everyone` holds every account's. */
+  pauses(): Set<string> {
+    return new Set(
+      this.db
+        .prepare("SELECT owner_id FROM studio_queue_pauses")
+        .all()
+        .map((row) => row.owner_id as string),
+    );
+  }
+
+  setPaused(ownerId: string, paused: boolean) {
+    this.db
+      .prepare(
+        paused
+          ? "INSERT OR IGNORE INTO studio_queue_pauses VALUES (?)"
+          : "DELETE FROM studio_queue_pauses WHERE owner_id = ?",
+      )
+      .run(ownerId);
   }
 
   /** Every owner's failed jobs on a resource prefix updated since an ISO time, newest first. */
