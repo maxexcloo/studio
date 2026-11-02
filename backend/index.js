@@ -57,7 +57,7 @@ import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver, parkedWorkers } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model-download-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
-import { registerLibraryRoutes } from "./library-routes.js";
+import { registerLibraryRoutes } from "./library/routes.js";
 import {
   createEditableProfile,
   listEditableProfiles,
@@ -189,7 +189,7 @@ import {
   setPromptHistoryEnabled,
   setPromptPinned,
 } from "./prompt-history.js";
-import { fillVideoSizes } from "./library.js";
+import { fillVideoSizes } from "./library/library.js";
 import {
   getComfyVideoGif,
   getComfyVideoLoop,
@@ -361,7 +361,7 @@ async function resolveSignedMcpResult(owner, jobId, index) {
 }
 // Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue,
 // guide and profile stores take in what the older files hold, which stay where they are
-// (profile-seed.js, library-catalogue.js, profile-store.js). Before MCP reads guides.
+// (profile-seed.js, library/catalogue.js, profile-store.js). Before MCP reads guides.
 for (const [name, migrate] of [
   ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
@@ -1062,7 +1062,7 @@ const presetRoutes = registerPresetRoutes(app, {
     return info ? inferModels(info, stats) : demoMode ? mockModelResult() : offlineModelResult();
   },
 });
-// The Library (library-routes.js): imports, their records and grades, and what is installed with its provenance.
+// The Library (library/routes.js): imports, their records and grades, and what is installed with its provenance.
 const unique = (...lists) => [
   ...new Set(lists.flat().filter((name) => typeof name === "string" && name)),
 ];

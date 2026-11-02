@@ -3,12 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createCatalogueStore } from "./library-catalogue.js";
-import { createImportEngine, createImportStore, publicImport } from "./library-imports.js";
-import { civitaiOffers } from "./library-offers.js";
-import { matchImageResource } from "./library-routes.js";
-import { detectLink } from "./library-sources.js";
-import { findSubstitute } from "./library-substitutes.js";
+import { createCatalogueStore } from "./catalogue.js";
+import { createImportEngine, createImportStore, publicImport } from "./imports.js";
+import { civitaiOffers } from "./offers.js";
+import { matchImageResource } from "./routes.js";
+import { detectLink } from "./sources.js";
+import { findSubstitute } from "./substitutes.js";
 
 /*
  * Dropped image files through the import engine: metadata becomes a graded preset, files match
@@ -17,9 +17,9 @@ import { findSubstitute } from "./library-substitutes.js";
  */
 
 const quiet = { info: () => {}, warn: () => {} };
-const fixture = (name) => fs.readFileSync(new URL(`./fixtures/images/${name}`, import.meta.url));
+const fixture = (name) => fs.readFileSync(new URL(`../fixtures/images/${name}`, import.meta.url));
 const { model: offerModel } = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
+  fs.readFileSync(new URL("../fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
 );
 const full = (prefix) => (prefix + "0".repeat(64)).slice(0, 64);
 const dreamshaper8 = {

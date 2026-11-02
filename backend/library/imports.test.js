@@ -3,14 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createCatalogueStore } from "./library-catalogue.js";
-import {
-  createImportEngine,
-  createImportStore,
-  importId,
-  publicImport,
-} from "./library-imports.js";
-import { detectLink } from "./library-sources.js";
+import { createCatalogueStore } from "./catalogue.js";
+import { createImportEngine, createImportStore, importId, publicImport } from "./imports.js";
+import { detectLink } from "./sources.js";
 
 const quiet = { info: () => {}, warn: () => {} };
 const tempDir = (t) => {

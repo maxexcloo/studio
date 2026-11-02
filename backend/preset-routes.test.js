@@ -124,7 +124,7 @@ test("the import, save, offline reuse and deletion routes retain the recipe", as
   assert.equal(media.status, 200);
   const full = Buffer.from(await media.arrayBuffer());
   assert.equal((await sharp(full).metadata()).height, 192);
-  const { readMediaInfo } = await import("./library.js");
+  const { readMediaInfo } = await import("./library/library.js");
   assert.match((await readMediaInfo(store.importedImageFile(item))).prompt, /a landscape/);
   const clean = Buffer.from(await (await fetch(base + item.url + "?clean=1")).arrayBuffer());
   assert.ok(clean.length < full.length);

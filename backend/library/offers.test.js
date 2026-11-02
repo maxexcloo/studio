@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { civitaiOffers, fileFits, hfOffers, publicOffers, variantWords } from "./library-offers.js";
+import { civitaiOffers, fileFits, hfOffers, publicOffers, variantWords } from "./offers.js";
 
 const { model } = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
+  fs.readFileSync(new URL("../fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
 );
 const familiesOf = (base) => (/flux/i.test(base) ? ["flux1"] : /sdxl/i.test(base) ? ["sdxl"] : []);
 const version = (id) => ({

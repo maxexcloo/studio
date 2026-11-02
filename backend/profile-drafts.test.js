@@ -319,8 +319,8 @@ test("the import engine drafts a checkpoint on import, records a failure as a wa
   const { default: os } = await import("node:os");
   const { default: path } = await import("node:path");
   const { createImportEngine, createImportStore, publicImport } =
-    await import("./library-imports.js");
-  const { detectLink } = await import("./library-sources.js");
+    await import("./library/imports.js");
+  const { detectLink } = await import("./library/sources.js");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-draft-imports-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const resolved = {

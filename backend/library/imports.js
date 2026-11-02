@@ -5,28 +5,28 @@
  * that was still resolving when Studio stopped is marked failed on the next start (the
  * job-recovery pattern), so nothing waits forever.
  *
- * The engine resolves a link (library-sources.js), matches its files against what is installed,
- * grades it (library-grade.js), writes catalogue entries for LoRAs and queues Download Missing
- * through the worker model API (library-downloads.js → model-downloads.js → worker-models.js).
+ * The engine resolves a link (library/sources.js), matches its files against what is installed,
+ * grades it (library/grade.js), writes catalogue entries for LoRAs and queues Download Missing
+ * through the worker model API (library/downloads.js → model-downloads.js → worker-models.js).
  * Nothing downloads on its own. A checkpoint or diffusion model import drafts a profile and guide
  * (profile-drafts.js, through the injected `draftProfile`), adding the parts it needs as files.
  *
  * Dropped image files (PNG, WebP, JPEG) are read by image-metadata.js: their prompt, settings and
  * files become the record's preset and resources, matched by hash first, then by name. An image
  * without metadata is described by the assistant's vision model (graded Partial). A missing file
- * gets the nearest installed stand-in (library-substitutes.js), marked and lowering the grade,
- * with Use Exact File once the exact one is installed. Offers (library-offers.js) are other
+ * gets the nearest installed stand-in (library/substitutes.js), marked and lowering the grade,
+ * with Use Exact File once the exact one is installed. Offers (library/offers.js) are other
  * versions and variants that fit; one is downloaded only when chosen.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { currentDataDir } from "./data-dir.js";
-import { readJsonFile, removeJsonFile, writeJsonFile } from "./json-store.js";
-import { gradeImport, presetGrade } from "./library-grade.js";
-import { catalogueKinds } from "./library-catalogue.js";
-import { imageRecipe, readImageMetadata } from "./image-metadata.js";
-import { publicOffers } from "./library-offers.js";
+import { currentDataDir } from "../data-dir.js";
+import { readJsonFile, removeJsonFile, writeJsonFile } from "../json-store.js";
+import { gradeImport, presetGrade } from "./grade.js";
+import { catalogueKinds } from "./catalogue.js";
+import { imageRecipe, readImageMetadata } from "../image-metadata.js";
+import { publicOffers } from "./offers.js";
 
 const importLimit = 500;
 const idPattern = /^imp-[a-z0-9]{6,40}$/;
@@ -237,15 +237,15 @@ const fileTitle = (name) =>
 
 /**
  * The import engine. Dependencies are injected so tests run without providers or workers:
- *   resolveCivitai(url), resolveHf(url)   library-sources.js resolvers
+ *   resolveCivitai(url), resolveHf(url)   library/sources.js resolvers
  *   inspect(want, {verify})               {status: installed|missing|conflict, unverified?}
  *   downloads()                           model-downloads.js downloadState()
- *   startDownload(spec)                   library-downloads.js startLibraryDownload
- *   catalogue                             library-catalogue.js store (edit)
+ *   startDownload(spec)                   library/downloads.js startLibraryDownload
+ *   catalogue                             library/catalogue.js store (edit)
  *   importImage(url)                      a saved image: the matched preset (preset-routes.js)
  *   resolvePreset(id, {verify})           a saved image again, matched
  *   matchImage(item)                      a dropped image's recipe resource → {name, version, want, spec?, unavailable?, nameOnly?, unsourced?, note}
- *   substituteFor(resource, record)       the nearest installed stand-in (library-substitutes.js), or null
+ *   substituteFor(resource, record)       the nearest installed stand-in (library/substitutes.js), or null
  *   profileFor(file)                      the profile id that runs an installed base model, or '' (may be async)
  *   pictures                              {save(id, buffer), copy(from, to)}: the import's own picture
  *   describe({id})                        the vision model's prompt for the import's picture

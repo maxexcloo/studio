@@ -20,7 +20,7 @@
  *
  * Everything that talks to the outside is injected, so tests need no worker or gateway.
  */
-import { catalogueKinds } from "./library-catalogue.js";
+import { catalogueKinds } from "./library/catalogue.js";
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const loaders = {

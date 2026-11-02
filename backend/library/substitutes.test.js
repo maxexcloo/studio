@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { findSubstitute, nameParts } from "./library-substitutes.js";
+import { findSubstitute, nameParts } from "./substitutes.js";
 
 const installed = [
   { folder: "diffusion_models", file: "flux1-dev.safetensors" },

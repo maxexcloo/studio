@@ -17,12 +17,12 @@
  *    applied: {key: {downloadId, from, to, state: downloading|kept|removed|failed, note, startedAt, finishedAt?}}}
  */
 import path from "node:path";
-import { currentDataDir } from "./data-dir.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { civitaiFileSpec, civitaiModelFiles } from "./civitai-import.js";
-import { civitaiAvailability } from "./library-availability.js";
-import { splitCatalogueKey } from "./library-catalogue.js";
-import { limitedBody } from "./civitai-access.js";
+import { currentDataDir } from "../data-dir.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { civitaiFileSpec, civitaiModelFiles } from "../civitai-import.js";
+import { civitaiAvailability } from "./availability.js";
+import { splitCatalogueKey } from "./catalogue.js";
+import { limitedBody } from "../civitai-access.js";
 
 export const dailyMs = 24 * 60 * 60 * 1000;
 const checkLimit = 300;
@@ -144,12 +144,12 @@ export function publicUpdate(item) {
 
 /**
  * The checker over one data folder. Dependencies are injected so tests run offline:
- *   catalogue                   library-catalogue.js store (entries, edit)
+ *   catalogue                   library/catalogue.js store (entries, edit)
  *   installed()                 Set of installed catalogue keys
  *   json(path)                  Civitai API; hfMetadata(repo) the repository's main revision
  *   familiesOf(baseModel)       family ids
- *   startDownload(spec)         library-downloads.js; downloads() model-downloads.js state
- *   inspect(want, {verify})     library-routes.js inspectInstalled
+ *   startDownload(spec)         library/downloads.js; downloads() model-downloads.js state
+ *   inspect(want, {verify})     library/routes.js inspectInstalled
  *   repoint(from, to)           moves profiles from the old file to the new one: their names
  *   references({folder, file})  what still uses a file: ['Profile Flux Dev', …]
  *   removeFile(want)            removes an installed file (the worker model API), checking its hash

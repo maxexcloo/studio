@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { versionResource } from "./civitai-import.js";
+import { versionResource } from "../civitai-import.js";
 import {
   civitaiAvailability,
   civitaiUncensored,
@@ -11,10 +11,10 @@ import {
   plainDescription,
   resolveCivitaiModel,
   resolveHuggingFace,
-} from "./library-sources.js";
+} from "./sources.js";
 
 const fixture = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
+  fs.readFileSync(new URL("../fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
 );
 const { model, versions } = fixture;
 const now = Date.parse("2026-10-21T00:00:00Z");

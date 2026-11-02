@@ -8,7 +8,7 @@ import {
   isCivitaiHost,
 } from "./civitai-access.js";
 import { sameResourceFilename, workflowModelSources } from "./civitai-workflow.js";
-import { civitaiAvailability } from "./library-availability.js";
+import { civitaiAvailability } from "./library/availability.js";
 import { a1111Samplers, a1111Schedules } from "./image-metadata.js";
 
 const samplers = a1111Samplers;
@@ -337,7 +337,7 @@ export async function importCivitaiImage(
     generation = civitaiGenerationData,
     json = civitaiJson,
     resolveSource = async (url, folder) =>
-      (await import("./library-downloads.js")).resolveModelLink(url, folder),
+      (await import("./library/downloads.js")).resolveModelLink(url, folder),
   } = {},
 ) {
   const { id } = civitaiLink(value);

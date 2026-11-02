@@ -9,9 +9,9 @@ import {
   libraryItems,
   matchImageResource,
   registerLibraryRoutes,
-} from "./library-routes.js";
-import { createImportStore } from "./library-imports.js";
-import { createCatalogueStore } from "./library-catalogue.js";
+} from "./routes.js";
+import { createImportStore } from "./imports.js";
+import { createCatalogueStore } from "./catalogue.js";
 
 test("installed files join the catalogue, and catalogued files that are not installed still list", () => {
   const items = libraryItems({
@@ -72,7 +72,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     else process.env.STUDIO_ENABLE_PRESETS = presets;
   });
   const { model, versions } = JSON.parse(
-    fs.readFileSync(new URL("./fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
+    fs.readFileSync(new URL("../fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
   );
   const json = async (pathname) =>
     pathname === "models/9"
@@ -139,7 +139,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     false,
   );
   assert.equal(ui.import.origin, "ui");
-  const png = fs.readFileSync(new URL("./fixtures/images/a1111.png", import.meta.url));
+  const png = fs.readFileSync(new URL("../fixtures/images/a1111.png", import.meta.url));
   const picture = await call("POST", "/api/library/imports/image", {
     image: `data:image/png;base64,${png.toString("base64")}`,
     name: "fox.png",

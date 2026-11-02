@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { civitaiLicence, libraryPlacement, lookupLibrary } from "./library-lookup.js";
+import { civitaiLicence, libraryPlacement, lookupLibrary } from "./lookup.js";
 
 const { model, versions } = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
+  fs.readFileSync(new URL("../fixtures/civitai/model-versions.json", import.meta.url), "utf8"),
 );
 const json = async (pathname) => {
   if (pathname === "models/9")

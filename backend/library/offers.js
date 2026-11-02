@@ -10,9 +10,9 @@
  * suggested instead.
  */
 import path from "node:path";
-import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "./civitai-import.js";
-import { civitaiAvailability } from "./library-availability.js";
-import { nameParts } from "./library-substitutes.js";
+import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "../civitai-import.js";
+import { civitaiAvailability } from "./availability.js";
+import { nameParts } from "./substitutes.js";
 
 const offerLimit = 12;
 

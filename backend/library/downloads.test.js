@@ -19,8 +19,7 @@ fs.writeFileSync(
     },
   }),
 );
-const { libraryDownload, resolveModelLink, startLibraryDownload } =
-  await import("./library-downloads.js");
+const { libraryDownload, resolveModelLink, startLibraryDownload } = await import("./downloads.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("Hugging Face preview pins a revision and requires the published checksum", async () => {

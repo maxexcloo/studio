@@ -8,7 +8,7 @@ import test from "node:test";
 const outputDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-")));
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-")));
 process.env.STUDIO_DATA_DIR = dataDir;
-const store = await import("./gallery-store.js");
+const store = await import("../gallery-store.js");
 test.after(() => {
   for (const folder of [outputDir, dataDir]) fs.rmSync(folder, { recursive: true, force: true });
 });

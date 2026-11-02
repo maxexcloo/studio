@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createCatalogueStore } from "./library-catalogue.js";
-import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./library-updates.js";
+import { createCatalogueStore } from "./catalogue.js";
+import { civitaiUpdate, createUpdateChecker, hfUpdate, publicUpdate } from "./updates.js";
 
 const { model } = JSON.parse(
-  fs.readFileSync(new URL("./fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
+  fs.readFileSync(new URL("../fixtures/civitai/model-offers.json", import.meta.url), "utf8"),
 );
 const familiesOf = (base) => (/flux/i.test(base) ? ["flux1"] : /sdxl/i.test(base) ? ["sdxl"] : []);
 const now = Date.parse("2026-10-21T00:00:00Z");

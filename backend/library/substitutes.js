@@ -10,7 +10,7 @@
  *
  * A LoRA is never replaced by a different LoRA. Pure: no files, no network.
  */
-import { fileStem } from "./image-metadata.js";
+import { fileStem } from "../image-metadata.js";
 
 const precisionPattern =
   /^(fp8(?:_?e4m3fn|_?e5m2)?(?:_?scaled)?|e4m3fn|e5m2|fp16|f16|bf16|fp32|f32|nf4|int8|int4|q\d+(?:_k)?(?:_[msl0-9])?|q\d+_\d|scaled|pruned|prunedonly|emaonly|ema|full|svdq?|mxfp4|nvfp4)$/i;

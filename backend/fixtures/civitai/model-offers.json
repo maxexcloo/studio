@@ -1,5 +1,5 @@
 {
-  "_note": "A Civitai /api/v1/models/:id answer pinned for version offers and update checks (library-offers.js, library-updates.js). Versions are newest first; hashes are placeholders.",
+  "_note": "A Civitai /api/v1/models/:id answer pinned for version offers and update checks (library/offers.js, library/updates.js). Versions are newest first; hashes are placeholders.",
   "model": {
     "id": 70,
     "name": "Nightfall Diffusion",

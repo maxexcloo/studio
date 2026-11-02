@@ -5,12 +5,12 @@
  * it can't be downloaded) and the metadata a catalogue entry needs.
  */
 import path from "node:path";
-import { civitaiJson, isCivitaiHost, limitedBody } from "./civitai-access.js";
-import { civitaiLink, versionResource } from "./civitai-import.js";
-import { catalogueKinds } from "./library-catalogue.js";
-import { hfFetch } from "./hf-access.js";
-import { civitaiAvailability } from "./library-availability.js";
-import { civitaiOffers, hfOffers } from "./library-offers.js";
+import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai-access.js";
+import { civitaiLink, versionResource } from "../civitai-import.js";
+import { catalogueKinds } from "./catalogue.js";
+import { hfFetch } from "../hf-access.js";
+import { civitaiAvailability } from "./availability.js";
+import { civitaiOffers, hfOffers } from "./offers.js";
 
 export { civitaiAvailability };
 
@@ -76,7 +76,7 @@ const roleOf = (folder) => catalogueKinds[folder] || "model";
 /**
  * A Civitai model or version link: the version's primary file as one resource, the catalogue
  * patch for a LoRA, a free version to suggest when this one is paid or in early access, and the
- * model's other versions and files that fit (library-offers.js). `familiesOf(baseModel)` gives
+ * model's other versions and files that fit (library/offers.js). `familiesOf(baseModel)` gives
  * family ids; `gguf` says whether the worker has the GGUF loader.
  */
 export async function resolveCivitaiModel(

@@ -1,7 +1,7 @@
 import { comfy } from "./comfy.js";
 import { families as modelFamilies } from "./family-catalog.js";
 import { enrichLocalLoraInfo, enrichLoraInfo } from "./lora-catalogue.js";
-import { catalogueStore } from "./library-catalogue.js";
+import { catalogueStore } from "./library/catalogue.js";
 
 // Imported-only model families still need precise adapter compatibility labels.
 const families = {
@@ -217,7 +217,7 @@ export async function loraInfos(names = [], { concurrency = 6 } = {}) {
   return result;
 }
 
-/** The catalogue store (library-catalogue.js), with entry families read the way LoRA metadata is. */
+/** The catalogue store (library/catalogue.js), with entry families read the way LoRA metadata is. */
 export const loraCatalogue = () => catalogueStore({ familiesFromMetadata });
 
 /** Provider and local policy metadata can be checked before submitting an optional stack. */

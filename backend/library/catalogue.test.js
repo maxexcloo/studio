@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createCatalogueStore } from "./library-catalogue.js";
+import { createCatalogueStore } from "./catalogue.js";
 
 const hex = (digit) => digit.repeat(64);
 const quiet = { info: () => {}, warn: () => {} };
@@ -260,7 +260,7 @@ test("the LoRA view keeps the older shapes, with Studio’s edits applied", (t) 
 test("explicit Original/Finetune classification persists and projects through Library", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-catalogue-type-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const { libraryItems } = await import("./library-routes.js");
+  const { libraryItems } = await import("./routes.js");
   createCatalogueStore({ dataDir: dir, log: quiet }).edit("checkpoints/base.safetensors", {
     title: "Base",
     description: "Studio model notes.",
