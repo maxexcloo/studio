@@ -3,7 +3,7 @@ import { mediaFile, mediaParams, mediaPath, mediaSubfolder } from "./media-paths
 import fs from "node:fs";
 import path from "node:path";
 import Busboy from "busboy";
-import { comfy } from "./comfy.js";
+import { comfy } from "./comfy/comfy.js";
 import {
   addGalleryItems,
   importedImageFile,

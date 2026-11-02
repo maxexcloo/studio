@@ -18,7 +18,7 @@ import { mediaFile, mediaParams, mediaPath, mediaUrls, videoPattern } from "./me
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { localOutputFile } from "./comfy.js";
+import { localOutputFile } from "./comfy/comfy.js";
 import { defaultWorkerId } from "./workers.js";
 
 import {

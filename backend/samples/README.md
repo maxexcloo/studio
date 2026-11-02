@@ -1,6 +1,6 @@
 # Sample Profiles
 
-These sample profiles seed a data folder that has never held a profile (profile-seed.js); Studio owns them in its data directory from then on. They also show the profile format.
+These sample profiles seed a data folder that has never held a profile (profile/seed.js); Studio owns them in its data directory from then on. They also show the profile format.
 
 Use ComfyUI's API workflow JSON format, then add a `studio` block that tells the simple UI which node inputs map to common controls.
 

@@ -15,8 +15,8 @@ import {
   prepareLoras,
   resolveLoraName,
 } from "./mcp-controls.js";
-import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
-import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
+import { compatibleLoras, loraCompatibility, loraName } from "./lora/policy.js";
+import { recommendedNegative, withLoraTags } from "./lora/prompts.js";
 import {
   choicePool,
   chooseProfile,
@@ -24,7 +24,7 @@ import {
   localVideoUnavailable,
   parkedWorker,
 } from "./mcp-tiers.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
+import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { withResolution } from "../shared/resolution.ts";
 import { imageMimes } from "./reference-names.js";
 

@@ -1,5 +1,5 @@
 {
-  "_note": "Civitai /api/v1 shapes pinned for availability checks (library-availability.js). Hashes are placeholders.",
+  "_note": "Civitai /api/v1 shapes pinned for availability checks (library/availability.js). Hashes are placeholders.",
   "model": {
     "id": 9,
     "name": "Watercolour Style",

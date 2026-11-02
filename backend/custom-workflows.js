@@ -5,7 +5,7 @@ import { dataDir } from "./gallery-store.js";
 import { chainReferenceSlots } from "./reference-chains.js";
 import { writeJsonFile } from "./json-store.js";
 import { grokEnabled } from "./features.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
+import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
 import { profileBackendLabels, sharedProfileFields } from "../shared/profiles.ts";
 
 export { profileBackendLabels, sharedProfileFields };
@@ -393,7 +393,7 @@ export function allCustomWorkflowRecords({ dedupe = true } = {}) {
   const dir = userWorkflowsDir;
   const source = "custom";
   const items = [];
-  // profile-store.js keeps each Studio profile's version and AI-Drafted marker beside them.
+  // profile/store.js keeps each Studio profile's version and AI-Drafted marker beside them.
   const versions = readJson(path.join(dir, ".studio-meta.json")) || {};
   // Dotfiles beside the profiles (.studio-edits.json, .studio-meta.json) are Studio's records, not workflows.
   const files = fs.existsSync(dir)

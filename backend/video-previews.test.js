@@ -10,7 +10,7 @@ import express from "express";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-previews-test-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
 const previews = await import("./video-previews.js");
-const { comfyUrl } = await import("./comfy.js");
+const { comfyUrl } = await import("./comfy/comfy.js");
 let encoder;
 try {
   encoder = createRequire(import.meta.url)("ffmpeg-static");

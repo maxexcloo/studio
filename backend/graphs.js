@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { selectImageMode } from "./workflow-modes.js";
-import { comfy } from "./comfy.js";
+import { comfy } from "./comfy/comfy.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
 import { startImageDataUrl } from "./start-images.js";
 import { prepareInputImage } from "./input-image-sizing.js";

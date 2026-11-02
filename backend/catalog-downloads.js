@@ -7,8 +7,8 @@ import {
   visionDownloads,
   visionKinds,
 } from "./family-catalog.js";
-import { existingCopy } from "./model-downloads.js";
-import { encoderKinds, vaeKinds } from "./model-components.js";
+import { existingCopy } from "./model/downloads.js";
+import { encoderKinds, vaeKinds } from "./model/components.js";
 
 /** What a download is called in the queue and the top pill: the part, not its file name. */
 function partLabel(kind, key, file) {

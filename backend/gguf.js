@@ -1,4 +1,4 @@
-import { optionsFor } from "./comfy.js";
+import { optionsFor } from "./comfy/comfy.js";
 
 /**
  * GGUF model files, the way ComfyUI-GGUF (city96) loads them: in a graph, a
