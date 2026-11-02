@@ -277,6 +277,16 @@ export function useMediaActions(
   const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
     quick.queue.mutate({ quality, faceDetail });
   const copyDetails = () => void copyText(settingsText(), "Details");
+  const themeItems = (disabled: boolean) =>
+    assistant.data?.available
+      ? themes.map((theme) => ({
+          id: `animate-${theme}`,
+          label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
+          icon: themeIcons[theme],
+          disabled,
+          onClick: theme === "custom" ? onCustomAnimation : () => run({ kind: "animate", theme }),
+        }))
+      : [];
   const actions = [
     retry,
     image &&
@@ -284,16 +294,7 @@ export function useMediaActions(
         loading: running === "animate" || action.isPending,
         note: animateNote,
         menu: [
-          assistant.data?.available
-            ? themes.map((theme) => ({
-                id: `animate-${theme}`,
-                label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
-                icon: themeIcons[theme],
-                disabled: !animation.data,
-                onClick:
-                  theme === "custom" ? onCustomAnimation : () => run({ kind: "animate", theme }),
-              }))
-            : [],
+          themeItems(!animation.data),
           [
             {
               id: "animate-composer",
@@ -308,12 +309,14 @@ export function useMediaActions(
     ready &&
       item.type === "video" &&
       itemAction("animate", {
-        loading: action.isPending,
+        loading: running === "animate" || action.isPending,
+        // A theme continues the clip from its last frame at once; the composer shows it first.
         menu: [
+          themeItems(action.isPending),
           [
             {
               id: "extend",
-              label: "Extend",
+              label: "Extend in Composer",
               icon: FastForward,
               disabled: action.isPending,
               onClick: () => action.mutate("extend"),

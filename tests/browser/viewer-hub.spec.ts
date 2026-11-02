@@ -324,6 +324,42 @@ test("With local video stopped, an Animate theme says it runs on Grok and queues
   });
 });
 
+test("A video's Animate theme continues it from its last frame on its own model", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    prompt: "A rolling wave",
+    model: "video.safetensors",
+    settings: { profileId: "video:test" },
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0]).toMatchObject({
+    operation: "animate",
+    input: {
+      kind: "video",
+      profileId: "video:test",
+      writing: { kind: "animate", theme: "living", source: "A rolling wave" },
+    },
+  });
+});
+
 test("With local video stopped, Animate in Composer pre-selects Grok", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, offline);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
