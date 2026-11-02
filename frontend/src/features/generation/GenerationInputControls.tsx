@@ -5,7 +5,7 @@ import type { GenerationInput, Profile } from "../../types";
 import { chipProps, iconChipProps } from "./chip";
 import { ExpertSettings } from "./ExpertSettings";
 import { LoraPicker, type LoraPickerState } from "./LoraPicker";
-import { backendLabel } from "./payload";
+import { backendLabel, controlRange } from "./payload";
 import { ChipPopup } from "./Picker";
 import { ProfilePicker } from "./ProfilePicker";
 import { SizePicker } from "./SizePicker";
@@ -43,10 +43,44 @@ function ChoiceChip({
 }
 
 /**
+ * A video's length choices in seconds, as the profile's own duration or as frames at its FPS on the
+ * frame grid the worker accepts (counted from the minimum, as backend/validation.js does).
+ */
+function lengthChoices(input: GenerationInput, profile?: Profile) {
+  if (input.kind !== "video" || !profile) return null;
+  const duration = profile.capabilities.duration === true;
+  const range = controlRange(profile, duration ? "duration" : "frames", { min: 1 });
+  const fps = duration ? 1 : input.fps;
+  if (!range || !(fps > 0)) return null;
+  const { min = 1, max = Infinity, step = 1 } = range;
+  const offset = (range as { offset?: number }).offset ?? min;
+  const current = Number(duration ? input.duration : input.frames);
+  const values = [2, 3, 5, 8, 10, 15]
+    .map((seconds) => offset + step * Math.round((seconds * fps - offset) / step))
+    .concat(current > 0 ? [current] : [])
+    .filter((value) => value >= min && value <= max);
+  return {
+    key: duration ? "duration" : "frames",
+    value: String(current),
+    data: [...new Set(values)]
+      .sort((a, b) => a - b)
+      // A frame grid's extra frame (81 at 16 FPS) still reads as whole seconds.
+      .map((value) => {
+        const seconds = value / fps;
+        const whole = Math.abs(seconds - Math.round(seconds)) < 0.2;
+        return {
+          value: String(value),
+          label: `${whole ? Math.round(seconds) : seconds.toFixed(1)} s`,
+        };
+      }),
+  };
+}
+
+/**
  * The wrapping chip rail shared by the gallery composer and timeline cards, in one order on
  * every breakpoint: what runs (Profile, and its Backend when it has several), what it starts
  * from (Reference Role, References, Mask), what shapes it (LoRAs), what comes out (Aspect,
- * Count, a set Seed), then the tools (Expert, Compare, Presets).
+ * Count, a video's Length, a set Seed), then the tools (Expert, Compare, Presets).
  */
 export function GenerationInputControls({
   input,
@@ -82,6 +116,7 @@ export function GenerationInputControls({
   const counted = (profile?.capabilities.variations ?? input.kind === "image") && countMax > 1;
   const backends = profile?.backendOptions || [];
   const seed = input.seed === "" || input.seed == null ? "" : String(input.seed);
+  const length = lengthChoices(input, profile);
   return (
     <div className={classes.rail} role="group" aria-label="Generation Inputs">
       <ProfilePicker value={input} onChange={onChange} startParked />
@@ -123,6 +158,14 @@ export function GenerationInputControls({
             value: String(index + 1),
             label: `${index + 1} ${index ? "Images" : "Image"}`,
           }))}
+        />
+      )}
+      {length && length.data.length > 1 && (
+        <ChoiceChip
+          label="Length"
+          value={length.value}
+          onChange={(value) => onChange({ [length.key]: Number(value) })}
+          data={length.data}
         />
       )}
       {seed && profile?.capabilities.seed !== false && (
