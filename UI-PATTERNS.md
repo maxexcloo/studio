@@ -141,7 +141,7 @@ primary component reference and verify APIs against the installed version.
   collapse controls. Phones open a full-height Drawer titled Generate upward with
   a short transition and the standard accessible close action; tapping the
   collapsed bar's prompt summary opens the full-screen prompt editor over it in
-  one tap, and Done lands in the Generate Drawer.
+  one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. On phones a text box is a summary of its

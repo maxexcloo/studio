@@ -22,7 +22,7 @@ import {
   useProps,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { Copy, X } from "lucide-react";
+import { ArrowUp, Copy, X } from "lucide-react";
 import { copyText } from "./clipboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
@@ -34,7 +34,8 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
  * Every multi-line text box. `tools` adds compact Copy and Clear (undoable) beside the box's own
  * right section. On phones the box is a summary of its text: tapping it (or `edit`) opens it full
  * screen with the same right section, Copy, Clear and Done, and `below` under the text; Done,
- * Escape or dismissing the keyboard returns to the page.
+ * Escape or dismissing the keyboard returns to the page. `submit` adds its send arrow there too,
+ * so typing and sending take one tap.
  */
 export function TextBox({
   value,
@@ -43,6 +44,7 @@ export function TextBox({
   overlay,
   below,
   edit = false,
+  submit,
   rightSection,
   rightSectionWidth,
   onClick,
@@ -58,6 +60,8 @@ export function TextBox({
   below?: ReactNode;
   /** Opens the phone editor once it turns true. */
   edit?: boolean;
+  /** The form's send action, offered in the phone editor beside Done. */
+  submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
   const phone = usePhone();
   const [editing, setEditing] = useState(false);
@@ -220,9 +224,24 @@ export function TextBox({
               <Group gap={4} wrap="nowrap">
                 {rightSection}
                 {actions}
-                <Button size="compact-sm" onClick={close}>
+                <Button size="compact-sm" variant={submit ? "default" : undefined} onClick={close}>
                   Done
                 </Button>
+                {submit && (
+                  <ActionIcon
+                    aria-label={submit.label}
+                    radius="xl"
+                    disabled={submit.disabled}
+                    // Sending before the keyboard drops keeps the text's blur from closing first.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      close();
+                      submit.onSubmit();
+                    }}
+                  >
+                    <ArrowUp size={16} />
+                  </ActionIcon>
+                )}
               </Group>
             </Modal.Header>
             <Modal.Body>
