@@ -330,10 +330,13 @@ const reversible = (clip) => {
  */
 const backAndForth =
   "split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1:a=0";
+/** Motion-interpolated frames to `fps` (ffmpeg's own, no ComfyUI node), estimated per block. */
+const interpolated = (fps) => `minterpolate=fps=${fps}:mi_mode=mci`;
 /**
  * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
  * `trim` keeps `start` to `end` milliseconds; `reverse` plays it backwards; `loop` forward then
- * back, without sound as its download has none.
+ * back, without sound as its download has none; `smooth` doubles its frame rate (up to 60) with
+ * in-between frames; `slow` plays it at half speed, the missing frames filled in the same way.
  */
 const videoEdits = {
   trim: ({ start, end }) => ({
@@ -348,6 +351,15 @@ const videoEdits = {
     reversible(clip);
     return { video: backAndForth, audio: null };
   },
+  smooth: (_edit, clip) => {
+    const fps = Math.min(60, (clip.fps || 24) * 2);
+    if (fps <= clip.fps) throw new Error("This clip already plays at 60 FPS or more.");
+    return { video: interpolated(fps), audio: "anull" };
+  },
+  slow: (_edit, clip) => ({
+    video: `setpts=2*PTS,${interpolated(clip.fps || 24)}`,
+    audio: "atempo=0.5",
+  }),
 };
 export const videoEditKinds = Object.keys(videoEdits);
 
