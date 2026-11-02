@@ -10,7 +10,7 @@ import path from "node:path";
 import { comfyUrl } from "./comfy.js";
 // Every catalog request goes through Hugging Face access: token, mirror and proxy (hf-access.js).
 import { hfFetch as fetch } from "./hf-access.js";
-import { civitaiFetch } from "./civitai-access.js";
+import { civitaiFetch } from "./civitai/access.js";
 
 /**
  * Streams catalogue files and verified provider files into the worker's model

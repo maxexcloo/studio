@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { loraStackFiles } from "./combined-profiles.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
-import { verifiedBackup } from "./persistence/migration.ts";
+import { loraStackFiles } from "../combined-profiles.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { verifiedBackup } from "../persistence/migration.ts";
 
 /**
  * The migrate-runtime step that turns each account's LoRA favourites into thumbs up: every

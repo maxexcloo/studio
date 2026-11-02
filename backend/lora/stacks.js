@@ -1,6 +1,6 @@
 import path from "node:path";
-import { dataDir } from "./gallery-store.js";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
+import { dataDir } from "../gallery-store.js";
+import { readJsonFile, writeJsonFile } from "../json-store.js";
 import crypto from "node:crypto";
 
 const stacksPath = (ownerId = "") =>

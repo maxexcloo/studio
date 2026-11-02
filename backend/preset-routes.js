@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { civitaiFetch, civitaiJson, limitedBody } from "./civitai-access.js";
-import { importCivitaiImage, matchResources, versionResource } from "./civitai-import.js";
+import { civitaiFetch, civitaiJson, limitedBody } from "./civitai/access.js";
+import { importCivitaiImage, matchResources, versionResource } from "./civitai/import.js";
 import {
   dataDir,
   deleteGalleryFiles,
@@ -11,7 +11,7 @@ import {
   importedImageFile,
   setGallery,
 } from "./gallery-store.js";
-import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai-library.js";
+import { downloadPresetImage, presetFromGallery, refreshImportedItem } from "./civitai/library.js";
 import { stripMetadata } from "./metadata-strip.js";
 import { presetsEnabled } from "./features.js";
 import { readJsonFile, writeBytesFileAsync, writeJsonFile } from "./json-store.js";

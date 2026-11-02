@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { enrichLocalLoraInfo, enrichLoraInfo, optionalLoraIssue } from "./lora-catalogue.js";
+import { enrichLocalLoraInfo, enrichLoraInfo, optionalLoraIssue } from "./catalogue.js";
 
 const families = {
   krea2: { label: "Krea 2" },

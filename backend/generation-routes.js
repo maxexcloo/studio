@@ -1,6 +1,6 @@
-import { loraInfos } from "./lora-info.js";
-import { optionalLoraIssue } from "./lora-catalogue.js";
-import { withLoraTriggers } from "./lora-prompts.js";
+import { loraInfos } from "./lora/info.js";
+import { optionalLoraIssue } from "./lora/catalogue.js";
+import { withLoraTriggers } from "./lora/prompts.js";
 import { currentComfyBackend, routeProfile, withComfyBackend } from "./comfy-backends.js";
 import {
   capabilityForProfile,

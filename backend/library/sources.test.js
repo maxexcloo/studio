@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { versionResource } from "../civitai-import.js";
+import { versionResource } from "../civitai/import.js";
 import {
   civitaiAvailability,
   civitaiUncensored,

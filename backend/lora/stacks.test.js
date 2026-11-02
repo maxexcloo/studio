@@ -7,7 +7,7 @@ import test from "node:test";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-loras-"));
 process.env.STUDIO_DATA_DIR = dir;
 const { applyLoraOps, clearLoraState, loadLoraLibrary, loadLoraStack, saveLoraLibrary } =
-  await import("./lora-stacks.js");
+  await import("./stacks.js");
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const stack = (id, name, loras = [{ name: "a.safetensors", strength: 1 }]) => ({ id, name, loras });

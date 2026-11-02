@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { loraRatings } from "./lora-ratings.js";
+import { loraRatings } from "./ratings.js";
 
 test("favourites become thumbs up after a dry run, with a backup, once", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-ratings-"));

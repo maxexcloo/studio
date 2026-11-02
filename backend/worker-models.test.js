@@ -122,7 +122,7 @@ test("worker model transport pins the backend, streams Unicode-labelled weights 
       .digest("hex"),
   );
 
-  const { matchResources } = await import("./civitai-import.js");
+  const { matchResources } = await import("./civitai/import.js");
   const matched = await matchResources(
     {
       resources: [

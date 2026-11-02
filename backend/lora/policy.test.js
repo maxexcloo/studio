@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compatibleLoras, loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
-import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./lora-catalogue.js";
+import { compatibleLoras, loraCompatibility, loraName, strengthRange } from "./policy.js";
+import { enrichLocalLoraInfo, optionalLoraPolicyIssue } from "./catalogue.js";
 
 const profile = {
   id: "custom:fl",
@@ -103,16 +103,14 @@ test("packaged server catalogue imports and applies policy without a source tree
   try {
     fs.mkdirSync(path.join(scratch, "server"));
     fs.writeFileSync(path.join(scratch, "package.json"), JSON.stringify({ type: "module" }));
-    for (const name of ["lora-policy.js", "lora-catalogue.js"]) {
+    for (const name of ["policy.js", "catalogue.js"]) {
       fs.copyFileSync(
         fileURLToPath(new URL(name, import.meta.url)),
         path.join(scratch, "server", name),
       );
     }
     assert.equal(fs.existsSync(path.join(scratch, "src")), false);
-    const packaged = await import(
-      pathToFileURL(path.join(scratch, "server", "lora-catalogue.js")).href
-    );
+    const packaged = await import(pathToFileURL(path.join(scratch, "server", "catalogue.js")).href);
     assert.match(
       packaged.optionalLoraPolicyIssue({ name: "effect", strength: 1 }, effect, {
         ...profile,

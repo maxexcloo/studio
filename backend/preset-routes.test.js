@@ -31,7 +31,7 @@ fs.writeFileSync(
   ]),
 );
 const { registerPresetRoutes } = await import("./preset-routes.js");
-const { downloadPresetImage } = await import("./civitai-library.js");
+const { downloadPresetImage } = await import("./civitai/library.js");
 const bytes = Buffer.from("model");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
 let online = true;

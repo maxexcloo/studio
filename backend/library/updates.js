@@ -19,10 +19,10 @@
 import path from "node:path";
 import { currentDataDir } from "../data-dir.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
-import { civitaiFileSpec, civitaiModelFiles } from "../civitai-import.js";
+import { civitaiFileSpec, civitaiModelFiles } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
 import { splitCatalogueKey } from "./catalogue.js";
-import { limitedBody } from "../civitai-access.js";
+import { limitedBody } from "../civitai/access.js";
 
 export const dailyMs = 24 * 60 * 60 * 1000;
 const checkLimit = 300;

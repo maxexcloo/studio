@@ -1,13 +1,13 @@
 import fs from "node:fs";
 import sharp from "sharp";
-import { civitaiFetch, limitedBody } from "./civitai-access.js";
+import { civitaiFetch, limitedBody } from "./access.js";
 import { parametersText } from "./civitai.js";
-import { matchResources } from "./civitai-import.js";
-import { addGalleryItems, gallery, importedImageFile } from "./gallery-store.js";
-import { startLibraryDownload } from "./library/downloads.js";
-import { withPngText } from "./png-text.js";
-import { probeVideo } from "./video-previews.js";
-import { writeBytesFileAsync } from "./json-store.js";
+import { matchResources } from "./import.js";
+import { addGalleryItems, gallery, importedImageFile } from "../gallery-store.js";
+import { startLibraryDownload } from "../library/downloads.js";
+import { withPngText } from "../png-text.js";
+import { probeVideo } from "../video-previews.js";
+import { writeBytesFileAsync } from "../json-store.js";
 
 function importedGalleryItem(preset, previous = {}) {
   const checkpoint = preset.resources.find((item) =>

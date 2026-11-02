@@ -7,7 +7,7 @@ import {
 } from "../persistence/migration.ts";
 import { combinedProfiles } from "../combined-profiles.js";
 import { dreamOwnership } from "../dream-ownership.js";
-import { loraRatings } from "../lora-ratings.js";
+import { loraRatings } from "../lora/ratings.js";
 import { uncensoredMarker, upscaleFeature } from "../uncensored-marker.js";
 import { migrateUploads } from "../uploads.js";
 import { versionSources } from "../version-sources.js";

@@ -10,7 +10,7 @@
  * suggested instead.
  */
 import path from "node:path";
-import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "../civitai-import.js";
+import { civitaiFileSpec, civitaiFolder, civitaiModelFiles } from "../civitai/import.js";
 import { civitaiAvailability } from "./availability.js";
 import { nameParts } from "./substitutes.js";
 

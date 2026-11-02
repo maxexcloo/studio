@@ -26,8 +26,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { writeBytesFileAsync } from "../json-store.js";
-import { civitaiJson } from "../civitai-access.js";
-import { versionResource } from "../civitai-import.js";
+import { civitaiJson } from "../civitai/access.js";
+import { versionResource } from "../civitai/import.js";
 import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";
 import { catalogueKinds, splitCatalogueKey } from "./catalogue.js";
@@ -331,7 +331,7 @@ export function libraryItems({ installed = {}, entries = {}, loraInfo = {}, prof
 
 /**
  * `presets` is what registerPresetRoutes returns (importImage, resolvePreset); `installed()` the
- * files ComfyUI lists per folder; `loraInfo(names)` the LoRA metadata (lora-info.js);
+ * files ComfyUI lists per folder; `loraInfo(names)` the LoRA metadata (lora/info.js);
  * `catalogue()` the catalogue store.
  */
 export function registerLibraryRoutes(

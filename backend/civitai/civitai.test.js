@@ -10,7 +10,7 @@ const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-media-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
 process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
 const { parametersText, writeCivitaiParameters } = await import("./civitai.js");
-const { parseA1111Parameters, readPngInfo } = await import("./png-text.js");
+const { parseA1111Parameters, readPngInfo } = await import("../png-text.js");
 
 const body = {
   prompt: "a lighthouse at dusk",

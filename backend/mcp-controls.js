@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Which Generate arguments a profile lets MCP adjust; fixed controls are never advertised.
 import { referenceImageSize } from "./generation-defaults.js";
-import { loraCompatibility, strengthRange } from "./lora-policy.js";
+import { loraCompatibility, strengthRange } from "./lora/policy.js";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;

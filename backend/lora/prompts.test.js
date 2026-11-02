@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loraPromptMetadata } from "./lora-catalogue.js";
+import { loraPromptMetadata } from "./catalogue.js";
 import {
   loraPromptStyle,
   negativeUnused,
@@ -8,7 +8,7 @@ import {
   relevantTags,
   withLoraTags,
   withLoraTriggers,
-} from "./lora-prompts.js";
+} from "./prompts.js";
 
 test("the catalogue keeps a LoRA prompt style, up to ten tags and its own negative", () => {
   assert.deepEqual(

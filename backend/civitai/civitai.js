@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { dataDir } from "./gallery-store.js";
-import { writeBytesFileAsync } from "./json-store.js";
-import { mediaFile, mediaParams } from "./media-paths.js";
-import { withPngText } from "./png-text.js";
-import { appVersion } from "./data-dir.js";
+import { dataDir } from "../gallery-store.js";
+import { writeBytesFileAsync } from "../json-store.js";
+import { mediaFile, mediaParams } from "../media-paths.js";
+import { withPngText } from "../png-text.js";
+import { appVersion } from "../data-dir.js";
 
 /**
  * Civitai-ready PNGs, always on.

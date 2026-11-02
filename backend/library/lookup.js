@@ -9,7 +9,7 @@
  *
  * Nothing here downloads, writes or deletes. Dependencies are injected so tests run offline.
  */
-import { civitaiLink } from "../civitai-import.js";
+import { civitaiLink } from "../civitai/import.js";
 import {
   civitaiAvailability,
   civitaiLinks,
@@ -71,10 +71,10 @@ const fitting = (families, profiles) =>
 
 /**
  * Looks up a link or a search without importing it.
- *   json(path)              Civitai REST (civitai-access.js civitaiJson)
+ *   json(path)              Civitai REST (civitai/access.js civitaiJson)
  *   hfRequest(url, init)    Hugging Face (hf-access.js hfFetch)
  *   inspect(want)           whether a file is installed (library/routes.js inspectInstalled)
- *   families(baseModel)     families a base model names (lora-info.js familiesFromMetadata)
+ *   families(baseModel)     families a base model names (lora/info.js familiesFromMetadata)
  *   profiles()              ready profiles [{id, family}]
  */
 export async function lookupLibrary(

@@ -1,4 +1,4 @@
-import { loraCompatibility, strengthRange } from "./lora-policy.js";
+import { loraCompatibility, strengthRange } from "./policy.js";
 
 // Local catalogue entries describe installed files; they never become download records.
 export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata, families) {
@@ -31,7 +31,7 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
   };
 }
 
-/** How the LoRA wants its prompt (lora-prompts.js): its style, up to 10 tags, and a negative of its own (reserved). */
+/** How the LoRA wants its prompt (lora/prompts.js): its style, up to 10 tags, and a negative of its own (reserved). */
 export function loraPromptMetadata(entry) {
   const tags = (Array.isArray(entry?.tags) ? entry.tags : [])
     .filter((tag) => typeof tag === "string" && tag.trim())

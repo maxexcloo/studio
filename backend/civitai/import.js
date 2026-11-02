@@ -1,15 +1,10 @@
 import path from "node:path";
-import { comfyUrl } from "./comfy.js";
-import { refreshWorkerModels, workerModelFile } from "./worker-models.js";
-import {
-  civitaiAssetUrl,
-  civitaiGenerationData,
-  civitaiJson,
-  isCivitaiHost,
-} from "./civitai-access.js";
-import { sameResourceFilename, workflowModelSources } from "./civitai-workflow.js";
-import { civitaiAvailability } from "./library/availability.js";
-import { a1111Samplers, a1111Schedules } from "./image-metadata.js";
+import { comfyUrl } from "../comfy.js";
+import { refreshWorkerModels, workerModelFile } from "../worker-models.js";
+import { civitaiAssetUrl, civitaiGenerationData, civitaiJson, isCivitaiHost } from "./access.js";
+import { sameResourceFilename, workflowModelSources } from "./workflow.js";
+import { civitaiAvailability } from "../library/availability.js";
+import { a1111Samplers, a1111Schedules } from "../image-metadata.js";
 
 const samplers = a1111Samplers;
 const schedules = a1111Schedules;
@@ -337,7 +332,7 @@ export async function importCivitaiImage(
     generation = civitaiGenerationData,
     json = civitaiJson,
     resolveSource = async (url, folder) =>
-      (await import("./library/downloads.js")).resolveModelLink(url, folder),
+      (await import("../library/downloads.js")).resolveModelLink(url, folder),
   } = {},
 ) {
   const { id } = civitaiLink(value);

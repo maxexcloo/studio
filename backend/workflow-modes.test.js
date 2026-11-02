@@ -122,7 +122,7 @@ test("mode selection reaches final graphs, preserves fixed generation denoise an
 });
 
 test("recipe-owned graph adapters are not inspected as optional stack entries", async () => {
-  const { optionalLoraIssue } = await import("./lora-catalogue.js");
+  const { optionalLoraIssue } = await import("./lora/catalogue.js");
   const prepared = structuredClone(raw);
   prepared.studio.id = "fixed-accelerator";
   const fixed = {

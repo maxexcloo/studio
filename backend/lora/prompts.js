@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // What a stacked LoRA adds to a written prompt, and the negative a profile's guide recommends.
 // The base prompt stays natural language: triggers lead as words, tag-trained LoRAs get one short line of tags.
-import { cleanTriggers } from "./lora-catalogue.js";
+import { cleanTriggers } from "./catalogue.js";
 
 const maxTagLine = 6;
 const words = (value) =>

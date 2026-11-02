@@ -1,7 +1,7 @@
 import { workerInventory, workerModelFile, refreshWorkerModels } from "../worker-models.js";
 import path from "node:path";
-import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai-access.js";
-import { civitaiLink, versionResource } from "../civitai-import.js";
+import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
+import { civitaiLink, versionResource } from "../civitai/import.js";
 import { dataDir } from "../gallery-store.js";
 import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";

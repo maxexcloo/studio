@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-import { civitaiFetch } from "./civitai-access.js";
-import { civitaiLink, imagePreset, importCivitaiImage, versionResource } from "./civitai-import.js";
+import { civitaiFetch } from "./access.js";
+import { civitaiLink, imagePreset, importCivitaiImage, versionResource } from "./import.js";
 
 const bytes = Buffer.from("test model weights");
 const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");

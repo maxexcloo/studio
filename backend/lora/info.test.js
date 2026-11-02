@@ -8,8 +8,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "studio-lora-info-"));
 process.env.STUDIO_DATA_DIR = path.join(scratch, "data");
 test.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
-const { catalogueLoraInfo, familiesFromMetadata, triggersFromMetadata } =
-  await import("./lora-info.js");
+const { catalogueLoraInfo, familiesFromMetadata, triggersFromMetadata } = await import("./info.js");
 
 const t = (shape) => ({ dtype: "F16", shape, data_offsets: [0, 0] });
 

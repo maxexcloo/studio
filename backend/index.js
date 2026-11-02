@@ -156,7 +156,7 @@ import {
   saveDeploymentSetting,
   settingSource,
 } from "./deployment-settings.js";
-import { civitaiTokenStatus } from "./civitai-access.js";
+import { civitaiTokenStatus } from "./civitai/access.js";
 import { hfFetch, hfTokenStatus } from "./hf-access.js";
 import { primeModelMetadata } from "./model-families.js";
 import {
@@ -202,9 +202,9 @@ import { derivedMediaCache, immutableMediaCache } from "./media-response.js";
 import { startMediaWarmup } from "./media-warmup.js";
 import { jobs, queueClearsAt, setTerminalJob } from "./jobs.js";
 import { cancelPrompt } from "./comfy-queue.js";
-import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora-info.js";
-import { optionalLoraPolicyIssue } from "./lora-catalogue.js";
-import { loraCompatibility, loraName, strengthRange } from "./lora-policy.js";
+import { catalogueLoraInfo, familiesFromMetadata, loraCatalogue, loraInfos } from "./lora/info.js";
+import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
+import { loraCompatibility, loraName, strengthRange } from "./lora/policy.js";
 import {
   deleteImportedWorkflow,
   getCustomWorkflow,
@@ -228,7 +228,7 @@ import {
   loadLoraStack,
   saveLoraLibrary,
   saveLoraStack,
-} from "./lora-stacks.js";
+} from "./lora/stacks.js";
 import {
   bytesForReferenceAccount,
   publicGalleryBuffer,

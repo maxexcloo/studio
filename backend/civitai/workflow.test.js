@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { civitaiGenerationData } from "./civitai-access.js";
-import { importCivitaiImage, versionResource } from "./civitai-import.js";
-import { sameResourceFilename, workflowModelSources } from "./civitai-workflow.js";
+import { civitaiGenerationData } from "./access.js";
+import { importCivitaiImage, versionResource } from "./import.js";
+import { sameResourceFilename, workflowModelSources } from "./workflow.js";
 
 const hash = "a".repeat(64);
 const revision = "b".repeat(40);

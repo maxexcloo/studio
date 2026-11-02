@@ -284,7 +284,7 @@ function readSource(file) {
   }
 }
 
-/** A catalogue store over one data folder. `familiesFromMetadata` (lora-info.js) fills each entry's families. */
+/** A catalogue store over one data folder. `familiesFromMetadata` (lora/info.js) fills each entry's families. */
 export function createCatalogueStore({
   dataDir = currentDataDir(),
   environment = process.env,
@@ -674,7 +674,7 @@ export function createCatalogueStore({
   }
 
   /**
-   * The LoRA view in the old shapes lora-info.js reads, so /api/loras/info keeps its response:
+   * The LoRA view in the old shapes lora/info.js reads, so /api/loras/info keeps its response:
    * `sources` as model-download-sources.json had them, `catalogue` by LoRA name as the merged
    * lora-catalogue.json files (admin over seed) plus Studio's edits.
    */

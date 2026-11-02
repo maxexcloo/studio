@@ -15,8 +15,8 @@ import {
   prepareLoras,
   resolveLoraName,
 } from "./mcp-controls.js";
-import { compatibleLoras, loraCompatibility, loraName } from "./lora-policy.js";
-import { recommendedNegative, withLoraTags } from "./lora-prompts.js";
+import { compatibleLoras, loraCompatibility, loraName } from "./lora/policy.js";
+import { recommendedNegative, withLoraTags } from "./lora/prompts.js";
 import {
   choicePool,
   chooseProfile,
