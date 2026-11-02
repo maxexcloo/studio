@@ -722,6 +722,32 @@ test("Typing straight after clicking the collapsed prompt keeps every keystroke"
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue("abc");
 });
 
+test("Clicking out of the open composer closes it without opening what lies under it", async ({
+  page,
+}, testInfo) => {
+  test.skip(!!testInfo.project.use.isMobile, "Desktop only");
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "under",
+    jobId: "job-under",
+    type: "image",
+    status: "done",
+    url: "/test-media/image.png",
+    prompt: "A quiet harbour",
+    width: 1024,
+    height: 1024,
+    createdAt: new Date().toISOString(),
+  });
+  await page.goto("/");
+  await page.locator("[data-composer-prompt]").click();
+  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A lantern in fog");
+  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
+  // The next click works as usual.
+  await page.getByRole("button", { name: "Open image: A quiet harbour", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
+});
+
 test("Prompt boxes copy and undoably clear, and open full screen on phones", async ({
   page,
 }, testInfo) => {
@@ -806,10 +832,10 @@ test("Images and Videos retain independent prompts and expert settings", async (
   await withExpertSettings(page, () => seed.fill("777"));
   // A set seed shows on the options bar.
   await expect(page.getByRole("button", { name: "Clear Seed 777", exact: true })).toBeVisible();
-  if (testInfo.project.use.isMobile) {
-    await page.keyboard.press("Escape");
+  // Escape closes the composer; a click outside it would only close it.
+  await page.keyboard.press("Escape");
+  if (testInfo.project.use.isMobile)
     await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
-  }
   await page.getByRole("link", { name: "Videos", exact: true }).first().click();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("Video draft");
   await page.getByRole("link", { name: "Images", exact: true }).first().click();
@@ -819,10 +845,10 @@ test("Images and Videos retain independent prompts and expert settings", async (
   await expandComposer(page);
   await expect(negative).toHaveValue("Image exclusions");
   await withExpertSettings(page, () => expect(seed).toHaveValue("777"));
-  if (testInfo.project.use.isMobile) {
-    await page.keyboard.press("Escape");
+  // Escape closes the composer; a click outside it would only close it.
+  await page.keyboard.press("Escape");
+  if (testInfo.project.use.isMobile)
     await expect(page.getByRole("dialog", { name: "Generate", exact: true })).toBeHidden();
-  }
   await page.getByRole("link", { name: "Videos", exact: true }).first().click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "Video draft",

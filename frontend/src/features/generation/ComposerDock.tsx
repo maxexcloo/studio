@@ -152,6 +152,13 @@ export function ComposerDock({ chat }: { chat?: ReactNode }) {
     (event) => {
       if (closingPopup() || inLayer(event.target as HTMLElement)) return;
       collapse(false);
+      // The click that closes the composer does nothing else, such as opening what lies under it.
+      const swallow = (click: Event) => {
+        click.preventDefault();
+        click.stopPropagation();
+      };
+      document.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener("click", swallow, true), 500);
     },
     ["mousedown", "touchstart"],
     undefined,
