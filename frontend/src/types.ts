@@ -176,6 +176,8 @@ export interface Account {
 }
 export interface Models {
   features?: { library?: boolean; presets?: boolean };
+  /** Each family's display name, from the catalogue. */
+  familyLabels?: Record<string, string>;
   profiles: Profile[];
   defaults?: { imageModel?: string; videoModel?: string };
   workers?: {

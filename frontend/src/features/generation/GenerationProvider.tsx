@@ -13,11 +13,16 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { GenerationInput, MediaKind, Models, Profile, ReferenceAsset } from "../../types";
 import { api } from "../../api";
 import { useRememberedKey } from "../auth/useRemembered";
+import { setFamilyLabels } from "../../ui/modelFamily";
 import { isProfile } from "./payload";
 
 export const modelsQuery = queryOptions({
   queryKey: ["models"],
-  queryFn: () => api<Models>("/api/models?cached=1"),
+  queryFn: async () => {
+    const models = await api<Models>("/api/models?cached=1");
+    setFamilyLabels(models.familyLabels);
+    return models;
+  },
 });
 export const initialInput: GenerationInput = {
   kind: "image",
