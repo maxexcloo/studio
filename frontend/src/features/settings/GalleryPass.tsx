@@ -114,7 +114,7 @@ export function GalleryPass({
       {scopeLabel && (
         <Select
           aria-label={scopeLabel}
-          w={150}
+          w={190}
           data={(["all", "missing", "outdated"] as const).map((value) => ({
             value,
             label: data
