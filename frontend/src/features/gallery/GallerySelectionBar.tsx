@@ -24,6 +24,7 @@ import {
 } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
+import { TrimVideoDialog } from "./videoEdits";
 import { mediaDownload } from "./download";
 import { finished } from "./MediaTile";
 import { useFavorites } from "./useMediaFavorite";
@@ -379,12 +380,14 @@ function OneItemActions({
   const transfer = useMediaTransfer(item, false);
   const [animating, setAnimating] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
+  const [trimming, setTrimming] = useState(false);
   const actions = useMediaActions(item, {
     transfer,
     onApplied,
     onCustomAnimation: () => setAnimating(true),
     // The selection's own Delete covers it.
     onDelete: () => {},
+    onTrim: () => setTrimming(true),
     onUpscale: () => setUpscaling(true),
   }).flat();
   sink.current = actions;
@@ -405,6 +408,7 @@ function OneItemActions({
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
+      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </>
   );
 }

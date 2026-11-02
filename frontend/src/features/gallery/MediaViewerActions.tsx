@@ -11,6 +11,7 @@ import { CustomAnimationDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
 import { UpscaleDialog } from "./UpscaleControls";
 import type { Iteration } from "./useMediaAction";
+import { TrimVideoDialog } from "./videoEdits";
 import classes from "./MediaViewer.module.css";
 
 // Phones keep these on the bar, in this order; the rest open from More.
@@ -47,6 +48,7 @@ export function MediaViewerActions({
   const transfer = useMediaTransfer(item, true);
   const [instructing, setInstructing] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
+  const [trimming, setTrimming] = useState(false);
   const groups = useMediaActions(item, {
     transfer,
     sessionId,
@@ -60,6 +62,7 @@ export function MediaViewerActions({
     onCustomAnimation: () => setInstructing(true),
     onDelete,
     onRetried,
+    onTrim: () => setTrimming(true),
     onUpscale: () => setUpscaling(true),
     onVersionChange,
   });
@@ -88,6 +91,7 @@ export function MediaViewerActions({
       {item.status === "done" && (
         <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
       )}
+      {trimming && <TrimVideoDialog item={item} onClose={() => setTrimming(false)} />}
     </ActionBarSurface>
   );
 }
