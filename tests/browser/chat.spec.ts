@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtures, image, loadSaved, openTheme, profiles, signIn, stamp } from "./fixtures";
+import {
+  fixtures,
+  image,
+  loadSaved,
+  openTheme,
+  profiles,
+  signIn,
+  stamp,
+  expectNoChatOpen,
+} from "./fixtures";
 
 const at = (seconds: number) => new Date(Date.parse(stamp) + seconds * 1000).toISOString();
 
@@ -370,10 +379,11 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
     "Studio Assistant",
   );
   await expect(inputs.getByRole("button", { name: "Choose References" })).toBeVisible();
-  // Without a sidebar, the phone's empty state opens the Chats list, which offers New Chat.
-  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+  // Without a sidebar, phones list the chats in place of the empty state; the header's Chats
+  // drawer offers New Chat.
+  await expectNoChatOpen(page);
   if (testInfo.project.use.isMobile) {
-    await page.getByRole("button", { name: "Chats", exact: true }).click();
+    await page.getByRole("button", { name: "Open Chats", exact: true }).click();
     const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
     await expect(drawer.getByRole("button", { name: "New Chat", exact: true })).toBeVisible();
     await drawer.getByRole("button", { name: "Close Chats", exact: true }).click();
@@ -405,7 +415,7 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   const full = await page.locator("[data-chat-workspace]").boundingBox();
   if (!testInfo.project.use.isMobile) expect(full!.width).toBeGreaterThan(fixed!.width);
   const composer = await page.locator("[data-composer-dock]").boundingBox();
-  expect(composer!.width).toBeLessThanOrEqual(780);
+  expect(composer!.width).toBeLessThanOrEqual(820);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 

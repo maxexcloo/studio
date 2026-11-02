@@ -58,6 +58,29 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     }
   });
 
+  // A video's frame (milliseconds in, or "last") kept as an image of its own, listed under Uploads.
+  app.post("/api/gallery/frame", async (req, res) => {
+    if (req.studioAccount && !mayUseFeature(req.studioAccount, "gallery"))
+      return res
+        .status(403)
+        .json({ ok: false, error: "The gallery is disabled for this account." });
+    if (!req.studioAccount && !requireLocal(req, res)) return;
+    const frame = req.body?.frame;
+    try {
+      const reference = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
+        frame: Number.isInteger(frame) && frame >= 0 ? frame : "last",
+      });
+      const { item, asset } = await saveUploadedImage(
+        await bytesForReferenceAccount(req.studioAccount, reference.id),
+        ownerIdForRequest(req),
+      );
+      uploaded(item);
+      res.status(201).json({ ok: true, asset });
+    } catch (error) {
+      res.status(404).json({ ok: false, error: error.message });
+    }
+  });
+
   app.post("/api/reference-assets/from-gallery", (req, res) => {
     const canReference =
       req.studioAccount &&
@@ -70,7 +93,11 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     if (!canReference && !requireLocal(req, res)) return;
     try {
       const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
-        frame: req.body?.frame === "last" ? "last" : "",
+        // A video's last frame, or the one at a time in milliseconds.
+        frame:
+          req.body?.frame === "last" || (Number.isInteger(req.body?.frame) && req.body.frame >= 0)
+            ? req.body.frame
+            : "",
       });
       res.json({ ok: true, asset });
     } catch (error) {

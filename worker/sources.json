@@ -14,7 +14,7 @@
   {
     "branch": "Main",
     "path": "custom_nodes/ComfyUI-Impact-Pack",
-    "revision": "429d0159ad429e64d2b3916e6e7be9c22d025c3c",
+    "revision": "082523b2dbbe0a38282f021ad3a0e33e9f222562",
     "url": "https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
   },
   {
@@ -26,13 +26,13 @@
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-KJNodes",
-    "revision": "b5316a9e247338dc1460df8e4d01e906c566299c",
+    "revision": "ab72eda7ffad6280422d71ab7d54d3fb87c0ba18",
     "url": "https://github.com/kijai/ComfyUI-KJNodes.git"
   },
   {
     "branch": "main",
     "path": "custom_nodes/ComfyUI-Manager",
-    "revision": "8afdee041650a18e7b66b88a06668c7b684d7c6f",
+    "revision": "4e4077b0a557d2dbde36b6d5dd30f6dee9f0f641",
     "url": "https://github.com/Comfy-Org/ComfyUI-Manager.git"
   },
   {
@@ -50,7 +50,7 @@
   {
     "branch": "main",
     "path": "custom_nodes/rgthree-comfy",
-    "revision": "218d6347dac5b6499ae56dbfeb25cbb6dd203ac5",
+    "revision": "bc48c6aaeca87bedbc14245d89f9bc6be37a630e",
     "url": "https://github.com/rgthree/rgthree-comfy.git"
   }
 ]

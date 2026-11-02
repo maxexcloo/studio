@@ -8,7 +8,7 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 import { closeRuntimeDatabase } from "../persistence/runtime.ts";
 import { createFinishing, registerFinishingRoutes, type FinishingItem } from "./finishing.ts";
-import { terminalStatuses } from "./queue.ts";
+import { terminalStatuses } from "../../shared/queue.ts";
 import { queuePriority, RewriteStore } from "./store.ts";
 
 type Item = FinishingItem & { id: string; ownerId: string };

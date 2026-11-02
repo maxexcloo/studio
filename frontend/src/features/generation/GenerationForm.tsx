@@ -116,8 +116,6 @@ export function GenerationForm({
         }}
       >
         <Group wrap="nowrap" gap="xs">
-          {/* Shown while profiles load so the prompt doesn't jump when they arrive. */}
-          {(models.isPending || supportsReferences) && <ReferencePicker compact />}
           <Textarea
             data-composer-prompt
             aria-label="Prompt"
@@ -130,6 +128,8 @@ export function GenerationForm({
             value={input.prompt}
             onChange={(event) => update({ prompt: event.currentTarget.value })}
           />
+          {/* Shown while profiles load so Submit doesn't move when they arrive. */}
+          {(models.isPending || supportsReferences) && <ReferencePicker compact />}
           <Tooltip label={blockedReason || label}>
             <ActionIcon
               type="submit"

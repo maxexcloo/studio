@@ -52,6 +52,7 @@ test("administrators see every model with its workloads; others models that run 
     { id: "text-gemma-tp2", model: "gemma/31b" },
     { id: "text-qwen", model: "qwen/27b" },
     { id: "text-mistral", model: "mistral/24b" },
+    { id: "text-llama", model: "llama/8b" },
     { id: "comfyui" },
   ];
   assert.deepEqual(servedChatModels(models, workloads), [
@@ -59,17 +60,20 @@ test("administrators see every model with its workloads; others models that run 
     { id: "gemma/31b", workloads: ["text-gemma", "text-gemma-tp2"] },
     { id: "qwen/27b", workloads: ["text-qwen"] },
     { id: "mistral/24b", workloads: ["text-mistral"] },
+    { id: "llama/8b", label: "llama/8b", workloads: ["text-llama"] },
   ]);
   const phases = {
     "text-gemma": "parked",
     "text-gemma-tp2": "running",
     "text-qwen": "parked",
     "text-mistral": "down",
+    "text-llama": "parked",
     comfyui: "running",
   };
   assert.deepEqual(servedChatModels(models, workloads, phases), [
     { id: "cloud/model" },
     { id: "gemma/31b" },
     { id: "qwen/27b", parked: true },
+    { id: "llama/8b", label: "llama/8b", parked: true },
   ]);
 });

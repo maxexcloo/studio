@@ -26,6 +26,7 @@ import {
 } from "./mcp-tiers.js";
 import { canonicalProfileId, profileAliasBackend } from "./profile-store.js";
 import { withResolution } from "../shared/resolution.ts";
+import { imageMimes } from "./reference-names.js";
 
 /** What a failed job's own error says, as one sentence for the chat (a Radiance LoRA refusal reads as it was written). */
 function failedReason(job) {
@@ -1288,8 +1289,7 @@ export class McpMedia {
       this.adopt(owner, "", { assets: [frame.id] });
     } else {
       const output = await this.download(owner, jobId, index);
-      if (!["image/png", "image/jpeg", "image/webp"].includes(output.mime))
-        throw new Error("Only image results can be animated.");
+      if (!imageMimes.includes(output.mime)) throw new Error("Only image results can be animated.");
       ({ width, height } = await sharp(output.content, {
         limitInputPixels: 80000000,
       }).metadata());
@@ -1342,7 +1342,7 @@ export class McpMedia {
   }
   /** A chat-sized JPEG of an image output; other media pass through unchanged. */
   async previewOf(result) {
-    if (!["image/png", "image/jpeg", "image/webp"].includes(result.mime)) return result;
+    if (!imageMimes.includes(result.mime)) return result;
     const content = await sharp(result.content, { limitInputPixels: 80000000 })
       .rotate()
       .resize({ width: previewSize, height: previewSize, fit: "inside", withoutEnlargement: true })
@@ -1359,7 +1359,7 @@ export class McpMedia {
     const images = (await Promise.allSettled(items.map(([jobId, index]) => read(jobId, index))))
       .filter((item) => item.status === "fulfilled")
       .map((item) => item.value)
-      .filter((item) => ["image/png", "image/jpeg", "image/webp"].includes(item.mime));
+      .filter((item) => imageMimes.includes(item.mime));
     if (!images.length) throw new Error("The sheet's images are unavailable.");
     const open = (image) => sharp(image.content, { limitInputPixels: 80000000 }).rotate();
     const { info } = await open(images[0]).toBuffer({ resolveWithObject: true });
@@ -1438,6 +1438,11 @@ export class McpMedia {
     }
     if (!["png", "jpeg", "webp"].includes(metadata.format))
       throw new Error("Use a PNG, JPEG or WebP reference image.");
+    // A chat model without the image's bytes tends to send a made-up few-pixel image, which a model's encoder rejects.
+    if (Math.min(metadata.width, metadata.height) < 32)
+      throw new Error(
+        "This image is only a few pixels, so it is not the real picture. For a Studio result, call Reuse with mode reference and its ref; otherwise upload the user's actual image.",
+      );
     const form = new FormData();
     form.append(
       "image",
@@ -1470,7 +1475,7 @@ export class McpMedia {
       if (item.type === "video")
         throw new Error("Review supports still images; review video frames separately.");
       const image = await this.readOutput(output, owner);
-      if (!["image/png", "image/jpeg", "image/webp"].includes(image.mime))
+      if (!imageMimes.includes(image.mime))
         throw new Error("Review supports PNG, JPEG and WebP images.");
       tiles.push(
         await sharp(image.content, { limitInputPixels: 80000000 })

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, stamp, viewerAction } from "./fixtures";
+import { fixtures, stamp } from "./fixtures";
 
 const original = await sharp({
   create: { width: 800, height: 1200, channels: 3, background: "#46a3ff" },
@@ -80,10 +80,10 @@ for (const failFirst of [false, true]) {
     expect(originalImage).not.toBeNull();
     expect(picture).not.toBeNull();
     try {
-      await viewerAction(page, "Upscale");
-      const version = page.getByRole("switch", { name: "Show Upscale", exact: true });
+      // With an upscale, Upscale's click shows it.
+      const version = viewer.getByRole("button", { name: "Upscale", exact: true });
       await version.click();
-      await expect(version).toBeChecked();
+      await expect(version).toHaveAttribute("aria-pressed", "true");
       await expect.poll(() => requested).toBe(true);
       expect(toggles).toEqual([{ galleryItemId: item.id, active: true }]);
       await expect(image).toHaveAttribute("src", originalUrl);
@@ -120,7 +120,6 @@ for (const failFirst of [false, true]) {
       await expect
         .poll(() => image.evaluate((node: HTMLImageElement) => node.naturalWidth))
         .toBe(800);
-      await viewerAction(page, "Upscale");
       await viewer.getByRole("button", { name: "Retry Selected Version", exact: true }).click();
     }
     await expect(image).toHaveAttribute("src", upscaleUrl);

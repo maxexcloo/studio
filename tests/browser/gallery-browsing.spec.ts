@@ -683,3 +683,34 @@ test("Gallery filters submit repeated models together with LoRA, size, aspect an
     .toBe(true);
   await expect(await gallerySearch(page)).toHaveValue(expected);
 });
+
+test("The phone Generations drawer fills the screen height and swipes away", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.use.isMobile || testInfo.project.use.browserName === "webkit",
+    "Touch input is dispatched through Chromium's protocol.",
+  );
+  await fixtures(page);
+  await page.goto("/images");
+  await page.getByRole("button", { name: "Open Status", exact: true }).click();
+  const drawer = page.getByRole("dialog", { name: "Generations", exact: true });
+  await expect(drawer).toBeVisible();
+  const viewport = page.viewportSize()!;
+  // Once it has slid in, it spans the full height and most of the width.
+  await expect.poll(async () => (await drawer.boundingBox())!.x).toBe(0);
+  const box = (await drawer.boundingBox())!;
+  expect(box.height).toBe(viewport.height);
+  expect(box.width).toBeGreaterThan(viewport.width * 0.8);
+  const touch = await page.context().newCDPSession(page);
+  const x = viewport.width / 2;
+  const y = viewport.height / 2;
+  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (const step of [40, 80, 150])
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - step, y }],
+    });
+  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect(drawer).toBeHidden();
+});

@@ -3,14 +3,9 @@ import { useState } from "react";
 import { Link } from "react-router";
 import type { MediaItem } from "../../types";
 import { useTryAgain } from "./useTryAgain";
-import {
-  progressPercent,
-  QueueJobAction,
-  statusLabels,
-  terminal,
-  useQueue,
-} from "../generation/Queue";
+import { progressPercent, QueueJobAction, statusLabels, useQueue } from "../generation/Queue";
 import { WritingStream } from "../generation/PromptWriting";
+import { terminalStatuses } from "../../../../shared/queue";
 
 /** Only a matching account-owned durable queue record can expose retry or cancellation. */
 export function MediaJobStatus({
@@ -29,7 +24,7 @@ export function MediaJobStatus({
   const loading = Boolean(item.jobId && !job && (queue.isPending || queue.isFetching));
   const failed = job?.status === "failed" || (!job && item.status === "error");
   const cancelled = job?.status === "cancelled" || (!job && item.status === "canceled");
-  const active = job && !terminal.has(job.status);
+  const active = job && !terminalStatuses.has(job.status);
   const progress = job?.progress;
   return (
     <Stack

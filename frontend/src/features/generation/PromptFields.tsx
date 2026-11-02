@@ -23,6 +23,7 @@ export function PromptFields({
   edit = false,
   fill = false,
   ideas: offerIdeas = false,
+  submit,
 }: {
   input: GenerationInput;
   profile?: Profile;
@@ -36,10 +37,12 @@ export function PromptFields({
   autoFocus?: boolean;
   /** Opens the phone's full-screen prompt editor. */
   edit?: boolean;
-  /** Grows the prompt to fill a phone Drawer that owns scrolling. */
+  /** Sizes the prompt for the phone Drawer, whose editor fills the screen while typing. */
   fill?: boolean;
   /** Offers taste-led prompt ideas while the prompt is empty and focused. */
   ideas?: boolean;
+  /** The form's send action, offered in the phone prompt editor. */
+  submit?: { label: string; disabled: boolean; onSubmit: () => void };
 }) {
   const phone = usePhone();
   const assistant = usePromptAssistant({
@@ -76,9 +79,9 @@ export function PromptFields({
               ? "Describe the image you want to create…"
               : "Describe the motion and camera…"
           }
-          // On phones the prompt summary takes the room left above the chips.
-          autosize={!fill}
-          minRows={3}
+          // The phone prompt leaves room for the settings below; its editor takes the screen to type.
+          autosize
+          minRows={fill ? 5 : 3}
           maxRows={10}
           rightSection={
             <>
@@ -98,6 +101,7 @@ export function PromptFields({
           overlay={offerIdeas && ideas.ideas}
           below={assistant.suggestions}
           edit={edit}
+          submit={submit}
         />
       </div>
       {negative && (

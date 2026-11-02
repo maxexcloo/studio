@@ -1,17 +1,7 @@
 import { isCloudProfile } from "./cloud-profiles.js";
 import { profileImageSize, referenceImageSize } from "./generation-defaults.js";
 import { chooseProfile, takesFirstFrame } from "./mcp-tiers.js";
-
-// The aspect ratios Grok video accepts; any other ratio is refused by the provider.
-const cloudAspects = [
-  [1, 1],
-  [16, 9],
-  [9, 16],
-  [4, 3],
-  [3, 4],
-  [3, 2],
-  [2, 3],
-];
+import { videoAspect } from "./providers/cliproxy.ts";
 
 /**
  * The video's size from its first frame: the image's proportions at the profile's default pixel
@@ -24,12 +14,7 @@ export function frameSize(profile, width, height) {
     const scale = Math.sqrt((budget.width * budget.height) / (width * height));
     return referenceImageSize(mode, { width: width * scale, height: height * scale });
   }
-  const ratio = Math.log(width / height);
-  const [a, b] = cloudAspects.reduce((best, item) =>
-    Math.abs(Math.log(item[0] / item[1]) - ratio) < Math.abs(Math.log(best[0] / best[1]) - ratio)
-      ? item
-      : best,
-  );
+  const [a, b] = videoAspect(width, height).split(":").map(Number);
   const unit = Math.round(Math.sqrt((budget.width * budget.height) / (a * b)));
   return { width: a * unit, height: b * unit };
 }

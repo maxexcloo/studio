@@ -150,7 +150,7 @@ test(
       "yuv420p",
       source,
     ]);
-    const frame = await previews.extractLastFrame(fs.readFileSync(source));
+    const frame = await previews.extractFrame(fs.readFileSync(source));
     assert.equal(frame.subarray(1, 4).toString(), "PNG");
     const { default: sharp } = await import("sharp");
     const { data, info } = await sharp(frame).raw().toBuffer({ resolveWithObject: true });
@@ -160,5 +160,39 @@ test(
       blue > 200 && red < 60,
       `expected the final blue frame, got rgb ${[...data.subarray(0, 3)]}`,
     );
+    // A time picks that moment's frame instead.
+    const early = await sharp(await previews.extractFrame(fs.readFileSync(source), 500))
+      .raw()
+      .toBuffer();
+    assert.ok(
+      early[0] > 200 && early[2] < 60,
+      `expected a red frame, got rgb ${[...early.subarray(0, 3)]}`,
+    );
   },
 );
+
+test("a Studio video downloads as a looping GIF", { skip: !available }, async () => {
+  const { mediaPath } = await import("./media-paths.js");
+  const file = mediaPath("gif-source.mp4", "");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  execFileSync(encoder, [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "color=green:size=640x360:rate=24:duration=1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    file,
+  ]);
+  const { mediaType } = await import("./media-paths.js");
+  const gif = await previews.getComfyVideoGif("gif-source.mp4", "", mediaType);
+  assert.equal(gif.subarray(0, 6).toString(), "GIF89a");
+  // Its logical screen is at most 480 pixels wide.
+  assert.equal(gif.readUInt16LE(6), 480);
+});

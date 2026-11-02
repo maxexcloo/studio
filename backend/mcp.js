@@ -52,6 +52,7 @@ import { mayUseFeature } from "./account-policy.js";
 import { createChatAssistantMemory, registerAssistantTools } from "./mcp-assistant.js";
 import { adminInstructions, registerAdminTools } from "./mcp-admin.js";
 import fs from "node:fs";
+import { imageMimes } from "./reference-names.js";
 
 // Generate waits up to this long, and only when Studio's estimate says the set finishes within it; otherwise its links return at once.
 export const generateWaitSeconds = 30;
@@ -878,7 +879,7 @@ export function registerMcpRoutes(
         server,
         "Generate",
         "Generate",
-        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request, which picks the model. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Krea, FLUX.3) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
+        `Queue images or videos. Pass your finished prompts (run as written) and the user's words as request, which picks the model. "4 sets of 2" is 4 distinct prompts with count 2; one call queues at most ${maxJobsPerCall} jobs. For several models in one call pass profile_ids, or each_profile with kind and tier ("each turbo model"). preview returns the prompts without queuing, for "suggest first". Put a model the user names (Kromafine Turbo) in profile_id. Pass other controls only as Models lists them. upscale_quality only when the user asks to upscale or enlarge (it adds face detail for full-body people). Cloud profiles only if asked. To change, rerun or animate an earlier result, call Reuse instead.`,
         {
           request: z
             .string()
@@ -1329,7 +1330,7 @@ export function registerMcpRoutes(
                 "mode reference takes only job_id and output_index. To generate from this result, call Reuse with mode again or animate.",
               );
             const result = await media.download(owner, id, output_index);
-            if (!["image/png", "image/jpeg", "image/webp"].includes(result.mime))
+            if (!imageMimes.includes(result.mime))
               throw new Error("Only images can be reused as references.");
             return mcpJson(
               await media.upload(

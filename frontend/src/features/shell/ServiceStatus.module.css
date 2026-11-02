@@ -1,6 +1,8 @@
 .content {
   display: flex;
   flex-direction: column;
+  /* The list scrolls vertically; sideways drags are the drawer's own, to swipe it closed. */
+  touch-action: pan-y;
 }
 /* The list scrolls while the service summary stays at the safe bottom edge. */
 .body {
@@ -17,4 +19,27 @@
   min-height: 0;
   overflow-y: auto;
   padding-bottom: var(--mantine-spacing-md);
+  touch-action: pan-y;
+}
+/* The status block sits above a link covering it; its own buttons (Start) stay on top. */
+.status {
+  position: relative;
+  margin-top: var(--mantine-spacing-xs);
+  padding: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-md);
+}
+.status:has(.statusLink:hover) {
+  background: var(--mantine-color-default-hover);
+}
+.status button {
+  position: relative;
+  z-index: 1;
+}
+.statusLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.statusLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
 }

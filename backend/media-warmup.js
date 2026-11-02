@@ -1,5 +1,5 @@
 import { yieldToEventLoop } from "./json-store.js";
-import { mediaType } from "./media-paths.js";
+import { mediaType, videoPattern } from "./media-paths.js";
 import { gallery, galleryRevisionValue, isGalleryHidden } from "./gallery-store.js";
 import { buildStats, cacheLimitBytes, viewParams, warmThumbnail } from "./thumbnails.js";
 import {
@@ -17,7 +17,6 @@ import {
  * never takes more than half a core from the studio. It stops short of
  * filling either cache, which would only sweep its own work away again.
  */
-const videoPattern = /\.(mp4|webm|mov|mkv|m4v)$/i;
 const imagePattern = /\.(png|jpe?g|webp|gif|avif|bmp|tiff?)$/i;
 const thumbnailBudget = Math.floor(cacheLimitBytes / 2 / (64 * 1024));
 // The viewer's display copies are larger: only the newest get one ahead of time.

@@ -13,6 +13,7 @@ export function ZoomImage({
   height,
   placeholder,
   swipe,
+  arrive,
 }: {
   src: string;
   alt: string;
@@ -22,6 +23,8 @@ export function ZoomImage({
   height?: number;
   /** Touch swipes at Fit: left/right navigate, down closes, up reveals details. */
   swipe?: (direction: SwipeDirection) => void;
+  /** A picture reached by swiping slides in from the side it was pulled from. */
+  arrive?: "next" | "previous";
 }) {
   const instructions = useId();
   const [size, setSize] = useState({ width: width || 1, height: height || 1 });
@@ -44,6 +47,7 @@ export function ZoomImage({
     image: boolean;
     fit: boolean;
     multiple: boolean;
+    drag?: "x" | "y";
   } | null>(null);
 
   useEffect(() => {
@@ -88,6 +92,12 @@ export function ZoomImage({
   }, []);
 
   // The library owns all transforms; Studio only recognises clicks and Fit-only navigation.
+  // At Fit the picture follows a swiping finger, then slides back if the swipe goes nowhere.
+  function follow(transform: string) {
+    const node = zoom.viewport.current!;
+    node.style.transition = transform ? "none" : "";
+    node.style.transform = transform;
+  }
   function down(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
     touched.current = event.pointerType === "touch";
@@ -95,6 +105,7 @@ export function ZoomImage({
     if (gesture.current) {
       gesture.current.multiple = true;
       suppressClick.current = true;
+      follow("");
       return;
     }
     gesture.current = {
@@ -109,13 +120,29 @@ export function ZoomImage({
   }
   function move(event: PointerEvent<HTMLDivElement>) {
     const start = gesture.current;
-    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5)
-      suppressClick.current = true;
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.hypot(dx, dy) > 5) suppressClick.current = true;
+    if (!swipe || !start.touch || start.multiple || !start.fit || zoom.modeRef.current !== "Fit")
+      return;
+    start.drag ??=
+      Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)
+        ? "x"
+        : dy > 10 && dy > Math.abs(dx)
+          ? "y"
+          : undefined;
+    if (start.drag === "x") follow(`translateX(${dx}px)`);
+    else if (start.drag === "y")
+      follow(
+        `translateY(${Math.max(0, dy)}px) scale(${1 - Math.min(Math.max(0, dy), 400) / 2000})`,
+      );
   }
   function up(event: PointerEvent<HTMLDivElement>) {
     const start = gesture.current;
     if (!start || start.id !== event.pointerId) return;
     gesture.current = null;
+    if (start.drag) follow("");
     const dx = event.clientX - start.x;
     const dy = event.clientY - start.y;
     if (event.type === "pointercancel" || !start.touch || start.multiple) {
@@ -146,6 +173,7 @@ export function ZoomImage({
       ref={zoom.viewport}
       className={classes.zoom}
       data-zoom-mode={zoom.mode}
+      data-arrive={arrive}
       onPointerDownCapture={down}
       onPointerMoveCapture={move}
       onPointerUpCapture={up}

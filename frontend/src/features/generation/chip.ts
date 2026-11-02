@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import type { KeyboardEvent, PointerEvent } from "react";
 import classes from "./GenerationInputControls.module.css";
 
 /** Shared Button props for the compact chips in the generation rail. */
@@ -8,6 +8,10 @@ export const chipProps = {
   radius: "xl",
   className: classes.chip,
   classNames: { section: classes.chipSection },
+  // A tapped combobox chip is focused by Mantine without preventScroll, which jumps an iOS page;
+  // focusing it first without scrolling makes that call a no-op.
+  onPointerDown: (event: PointerEvent<HTMLElement>) =>
+    event.currentTarget.focus({ preventScroll: true }),
 } as const;
 
 /** A chip that shows only its icon; callers give it an accessible name and a tooltip. */

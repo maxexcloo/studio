@@ -1,9 +1,14 @@
 import { randomInt, randomUUID } from "node:crypto";
-import { awaitsWriting, type GenerationInput, type QueueMedia } from "../../shared/queue.ts";
+import {
+  awaitsWriting,
+  terminalStatuses,
+  type GenerationInput,
+  type QueueMedia,
+} from "../../shared/queue.ts";
 import { replyTitle } from "../../shared/titles.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse, GenerationAccount, GenerationScope } from "./admission.ts";
-import { terminalStatuses, type PromptWriter, type WrittenPrompt } from "./queue.ts";
+import type { PromptWriter, WrittenPrompt } from "./queue.ts";
 import { queuePriority, type OwnedJob, type QueueOrigin, type RewriteStore } from "./store.ts";
 import { pairSignal, tasteSignal, type Taste } from "./taste.ts";
 

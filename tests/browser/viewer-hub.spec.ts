@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { Profile } from "../../frontend/src/types";
 import {
   closeLoras,
@@ -154,6 +154,24 @@ test("Run Again and Prompt draw a new seed; only Exact Repeat keeps it", async (
     "An amber bird",
   );
   await expect(page.getByRole("button", { name: /^Clear Seed/ })).toHaveCount(0);
+});
+
+test("One key runs a viewer action: R runs again, P opens the composer", async ({
+  page,
+}, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no keyboard shortcuts.");
+  const { state, viewer } = await seed(page);
+  // The keys act through the bar's own actions, so wait for it.
+  await expect(viewer.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  await viewer.getByRole("img", { name: "An amber bird", exact: true }).focus();
+  await page.keyboard.press("r");
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
+  await page.keyboard.press("p");
+  await expect(viewer).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "An amber bird",
+  );
 });
 
 /** A profile with a ComfyUI and a Radiance backend that runs on `backend`, defining `defined`. */
@@ -324,6 +342,53 @@ test("With local video stopped, an Animate theme says it runs on Grok and queues
   });
 });
 
+test("A video's Animate theme continues it from its last frame, and its frame can be a reference or an image", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    prompt: "A rolling wave",
+    model: "video.safetensors",
+    settings: { profileId: "video:test" },
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Extend in Composer", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0]).toMatchObject({
+    operation: "animate",
+    input: {
+      kind: "video",
+      profileId: "video:test",
+      writing: { kind: "animate", theme: "living", source: "A rolling wave" },
+    },
+  });
+  // The frame showing is saved as an image, or becomes a reference in the composer.
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
+  await expect(
+    page.getByText("Frame saved as an image in Uploads.", { exact: true }),
+  ).toBeVisible();
+  expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
+  await page.getByRole("menuitem", { name: "Use Frame as Reference", exact: true }).click();
+  await expect
+    .poll(() => state.referenceRequests.at(-1))
+    .toEqual({ galleryItemId: "clip", frame: 0 });
+});
+
 test("With local video stopped, Animate in Composer pre-selects Grok", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, offline);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
@@ -458,6 +523,43 @@ test("An opened video plays, muted when the browser refuses sound", async ({ pag
   await expect(video).toHaveAttribute("controls");
 });
 
+test("A video tile plays its preview while a mouse is over it", async ({ page }, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), "Phones have no hover.");
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function () {
+      (window as any).played = this.currentSrc || this.src;
+      return Promise.resolve();
+    };
+  });
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
+    thumbnailUrl: image,
+    prompt: "A rolling wave",
+    width: 1280,
+    height: 720,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).hover();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).played))
+    .toContain("/comfy/video-preview?filename=clip.mp4");
+  // Opened, it also downloads as a GIF.
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await viewerAction(page, "Download Options");
+  const gif = page.getByRole("menuitem", { name: "Download as GIF", exact: true });
+  await expect(gif).toHaveAttribute(
+    "href",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
+  );
+  await expect(gif).toHaveAttribute("download", /\.gif$/);
+});
+
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
   const { viewer } = await seed(page, {
     caption: {
@@ -524,6 +626,18 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
     });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
+  // A drag too short to navigate follows the finger, then settles back.
+  const start = (await picture.boundingBox())!;
+  const x = start.x + start.width / 2;
+  const y = start.y + start.height / 2;
+  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  await touch.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: x - 40, y }],
+  });
+  await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(-40);
+  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(0);
   await swipe(-120);
   const sheet = page.getByRole("dialog", { name: "An amber bird", exact: true });
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();
@@ -533,7 +647,7 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
   await expect(viewer).toBeHidden();
 });
 
-test("Work still generating takes the same swipes as a finished image", async ({
+test("Work still generating and videos take the same swipes as a picture", async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -545,39 +659,54 @@ test("Work still generating takes the same swipes as a finished image", async ({
     {
       id: "live",
       jobId: "live-job",
-      type: "image",
+      type: "video",
       status: "pending",
       prompt: "A live study",
       createdAt: stamp,
     },
     {
-      id: "done",
-      type: "image",
+      id: "clip",
+      type: "video",
       status: "done",
-      url: image,
-      thumbnailUrl: image,
-      prompt: "A finished study",
-      width: 1024,
-      height: 1024,
+      url: "/test-media/clip.mp4",
+      prompt: "A rolling wave",
+      width: 1280,
+      height: 720,
+      createdAt: stamp,
+    },
+    {
+      id: "clip-2",
+      type: "video",
+      status: "done",
+      url: "/test-media/clip-2.mp4",
+      prompt: "A breaking wave",
+      width: 1280,
+      height: 720,
       createdAt: stamp,
     },
   );
-  await page.goto("/images");
-  await page.getByRole("button", { name: "Open image: A live study", exact: true }).click();
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A live study", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   const status = viewer.getByRole("status", { name: "Generation Status", exact: true });
   await expect(status).toBeVisible();
   const touch = await page.context().newCDPSession(page);
-  const box = (await status.boundingBox())!;
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
-  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-  await touch.send("Input.dispatchTouchEvent", {
-    type: "touchMove",
-    touchPoints: [{ x: x - 150, y }],
-  });
-  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await expect(viewer.getByRole("img", { name: "A finished study", exact: true })).toBeVisible();
+  async function swipeLeft(target: Locator) {
+    const box = (await target.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - 150, y }],
+    });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  }
+  await swipeLeft(status);
+  const video = viewer.locator("video");
+  await expect(video).toHaveAttribute("src", "/test-media/clip.mp4");
+  await swipeLeft(video);
+  await expect(video).toHaveAttribute("src", "/test-media/clip-2.mp4");
 });
 
 test("Fullscreen viewer preserves media interaction and closes on the surrounding blurred stage", async ({
@@ -705,7 +834,7 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
 
 test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile settings", async ({
   page,
-}) => {
+}, testInfo) => {
   const state = await fixtures(page);
   state.gallery.push({
     id: "legacy-item",
@@ -729,6 +858,12 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   await viewerAction(page, "Prompt");
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  // Phones open the prompt in its own editor, which Done closes.
+  if (testInfo.project.use.isMobile)
+    await page
+      .getByRole("dialog", { name: "Prompt", exact: true })
+      .getByRole("button", { name: "Done", exact: true })
+      .click();
   await expect(page.getByRole("img", { name: "Reference 1", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).press("Enter");
   await expect(page.getByRole("region", { name: "LoRA Controls", exact: true })).toBeVisible();

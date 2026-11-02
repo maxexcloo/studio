@@ -544,6 +544,10 @@ export async function fixtures(page: Page) {
         },
       });
     }
+    if (path === "/api/gallery/frame") {
+      referenceRequests.push({ save: true, ...body });
+      return respond({ asset: { id: "frame-upload", name: "Saved Frame", url: image } }, 201);
+    }
     if (path === "/api/reference-assets/from-gallery") {
       referenceRequests.push(body);
       return respond({
@@ -741,8 +745,11 @@ export async function openTheme(page: Page) {
 /** The gallery search box: in the toolbar on desktop, opened from its icon on phones. */
 export async function gallerySearch(scope: Page | Locator) {
   const open = scope.getByRole("button", { name: "Search Gallery", exact: true });
+  const box = scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+  // Phones show a button that opens the box; wait until the page shows either.
+  await expect(open.or(box).first()).toBeVisible();
   if (await open.isVisible()) await open.click();
-  return scope.getByRole("textbox", { name: "Search Gallery", exact: true });
+  return box;
 }
 
 /** A labelled action in the gallery selection bar. */
@@ -752,11 +759,17 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
+/** Chat with nothing open: desktop says so; phones list the chats in its place. */
+export async function expectNoChatOpen(page: Page) {
+  if ((page.viewportSize()?.width || 1440) < 768)
+    await expect(page.getByRole("region", { name: "Chats", exact: true })).toBeVisible();
+  else await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+}
+
 /** Turns on Compare Upscale in the viewer's Upscale options, then closes them. */
 export async function compareUpscale(page: Page) {
-  await viewerAction(page, "Upscale");
-  await page.getByRole("switch", { name: "Compare Upscale", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  await viewerAction(page, "Upscale Options");
+  await page.getByRole("menuitem", { name: "Compare Upscale", exact: true }).click();
 }
 
 /** Runs a viewer action from its bar, which phones scroll sideways. */

@@ -21,11 +21,11 @@ interface AnimateChoice {
   note: string;
   size?: { width: number; height: number };
 }
-/** The video profile that animates this image (backend/animate-profile.js), or why none can. */
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
 
+/** The video profile that animates this image (backend/animate-profile.js), or why none can. */
 export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =>
   queryOptions({
     queryKey: ["animate-profile", item.width || 0, item.height || 0],
@@ -58,15 +58,16 @@ export async function mediaDraft(
   const original = compatible.find((profile) =>
     priorId ? isProfile(profile, priorId) : profile.model === item.model,
   );
-  // Animating an image takes Animate's own pick, so the composer shows the model that will run.
+  // Animating an image takes Animate's own pick, so the composer shows the model that will run; a
+  // video continues on its own model unless that is unavailable or stopped.
   const choice =
-    operation === "animate" && item.type === "image"
+    targetKind === "video" && (item.type === "image" || original?.ready === false || !original)
       ? await client.fetchQuery(animateProfileQuery(item))
       : undefined;
-  const profile = choice
-    ? profiles.find((profile) => isProfile(profile, choice.profileId))
-    : original ||
-      (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
+  const profile =
+    (choice && profiles.find((profile) => isProfile(profile, choice.profileId))) ||
+    original ||
+    (operation !== "image" ? compatible.find((profile) => profile.ready !== false) : undefined);
   if (!profile)
     throw new Error(
       operation === "image"

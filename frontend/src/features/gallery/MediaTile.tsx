@@ -4,19 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { CircleAlert, Layers, RotateCw, X } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { useMotionDuration } from "../../ui/Appearance";
-import {
-  progressPercent,
-  queueQuery,
-  statusLabels,
-  terminal,
-  useQueueAction,
-} from "../generation/Queue";
+import { progressPercent, queueQuery, statusLabels, useQueueAction } from "../generation/Queue";
 import { galleryReferenceType } from "../generation/references";
 import { mediaSource } from "./mediaSource";
 import { mediaTitle } from "./mediaLabels";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useHoldToSelect } from "./useGalleryLayout";
 import classes from "./MediaTile.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 /** Saved, failed or cancelled; anything else is still generating. */
 export const finished = (item: { status?: unknown }) =>
@@ -60,7 +55,7 @@ function TileStatus({
   // A multi-output run shows one Cancel, on its first unfinished placeholder.
   const owner = job?.items.find((entry) => !finished(entry));
   const cancellable =
-    active && job && !terminal.has(job.status) && (!owner || owner.id === item.id);
+    active && job && !terminalStatuses.has(job.status) && (!owner || owner.id === item.id);
   const retryable = failed && job?.status === "failed" && onTryAgain;
   return (
     <>
@@ -232,6 +227,11 @@ export function MediaTile({
       data-selected={selected || undefined}
       data-expanded={expanded || undefined}
       onPointerEnter={(event) => {
+        if (event.pointerType === "mouse")
+          void event.currentTarget
+            .querySelector("video")
+            ?.play()
+            .catch(() => {});
         if (!flips || event.pointerType !== "mouse") return;
         // Thumbnails load before the pointer reaches them, so flipping never shows an empty tile.
         for (const version of versions!) {
@@ -247,6 +247,7 @@ export function MediaTile({
         if (index !== version) onVersion!(index);
       }}
       onPointerLeave={(event) => {
+        event.currentTarget.querySelector("video")?.load();
         if (flips && event.pointerType === "mouse") onVersion!(undefined);
       }}
       onPointerDown={(event) => {
@@ -314,10 +315,12 @@ export function MediaTile({
           <video
             className={classes.media}
             data-loaded
-            src={media.url || undefined}
+            // A mouse over the tile plays Studio's short preview; leaving returns to the poster.
+            src={media.url?.replace("/comfy/view?", "/comfy/video-preview?") || undefined}
             poster={media.thumbnailUrl}
             preload="none"
             muted
+            loop
             playsInline
             aria-hidden
           />

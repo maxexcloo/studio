@@ -61,7 +61,7 @@ primary component reference and verify APIs against the installed version.
   purpose reads Parked in grey wherever it shows, never as failing, with Start
   for administrators there; one that should run but doesn't stays red. It opens the same
   slideout everywhere: Chats in Chat, active and failed generations with Stop,
-  Retry and Clear in gallery modes, and the compact service summary at the bottom.
+  Retry and Clear in gallery modes, and the compact service summary at the bottom, which administrators tap to open Settings › Workers.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Account, Library,
@@ -73,11 +73,11 @@ primary component reference and verify APIs against the installed version.
   sidebar, flush below the header through the viewport bottom, with a distinct
   neutral surface and divider, listing Chats under date headings (Today,
   Yesterday, Previous 7 Days, Previous 30 Days, Older), under a Chats heading
-  with a small New Chat icon. Phones use a session Drawer opened by the status
-  action, which shows a Chats icon in Chat, or by Chats in the No Chat Selected
-  view; its header carries New Chat beside Close. With no chat selected, the
+  with a small New Chat icon. Phones list the Chats in place of No Chat
+  Selected, and the status action (a Chats icon in Chat) opens them as a Drawer
+  whose header carries New Chat beside Close. With no chat selected, the
   message box starts one; an open chat's heading ends with a close cross back to
-  No Chat Selected. There is no other New Chat button. The Chat composer
+  No Chat Selected (the list on phones). There is no other New Chat button. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
 - Dialogs are centred on a raised plane from the theme defaults: a dimmed,
@@ -124,7 +124,7 @@ primary component reference and verify APIs against the installed version.
   box with a history action inside it, the negative prompt under it when the
   profile takes one, and a row of compact chips: Profile, Backend (when the
   profile has several), Reference Role (once references are placed), References,
-  LoRAs, Aspect, Count, a set Seed (clearable), Expert settings, Compare and
+  LoRAs, Aspect, Count, a video's Length, a set Seed (clearable), Expert settings, Compare and
   Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
@@ -141,7 +141,7 @@ primary component reference and verify APIs against the installed version.
   collapse controls. Phones open a full-height Drawer titled Generate upward with
   a short transition and the standard accessible close action; tapping the
   collapsed bar's prompt summary opens the full-screen prompt editor over it in
-  one tap, and Done lands in the Generate Drawer.
+  one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
   offers Undo in its notification. On phones a text box is a summary of its
@@ -237,7 +237,7 @@ primary component reference and verify APIs against the installed version.
 - Dream is a card deck of background results, up to a maximum height, with a
   strip showing progress through the current batch. Swipe or press left to skip,
   right to keep and up to keep and queue variations. One compact bar under the
-  card offers Skip, Refine, Animate, Star, More Like This and Keep; Refine and
+  card offers Skip, Refine, Animate, Star, More Like This and Keep (phones: icons with short names under them, More Like This as Similar); Refine and
   Animate keep the result and stage it in the composer, Star keeps it too and
   More Like This keeps it and steers the next ideas toward it. Tapping a card,
   or its View action, opens it in the viewer over the deck; closing returns to
@@ -329,14 +329,15 @@ primary component reference and verify APIs against the installed version.
   (`gallery/versions.ts`); choosing one makes it current. Its action bar is the
   shared item actions, sized to them; Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
-  Models, Custom Animation, Animate in Composer) and Upscale its settings with
-  Show Upscale and Compare Upscale. Details lists
+  Models, Custom Animation, Animate in Composer). Details lists
   every input in run order with Copy Prompt and Copy Settings beside its title;
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
   Phones show the image full-bleed with an icon row; swipe left/right navigates,
-  down closes and up reveals details and further options. Navigation (swipe,
+  down closes and up reveals details and further options. At Fit the picture
+  follows the finger and the next one slides in; videos loop and take the same
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while
@@ -373,8 +374,11 @@ primary component reference and verify APIs against the installed version.
   and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
   Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
   Reference; Animate ›
-  themes, Custom Animation, Animate in Composer (Extend for videos); Upscale ›
-  Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt. Phones that share natively show
+  themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
+  automatic size; with an upscale, switches between it and the original) ›
+  Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
+  Detail (listed even when the worker can't run it, saying why), Upscale
+  Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download as GIF. Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
   sideways when it overflows. The selection bar labels its buttons on desktop, greys out

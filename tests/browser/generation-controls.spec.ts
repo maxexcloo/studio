@@ -601,10 +601,13 @@ test("The chip composer offers supported sizes and settings, follows the output 
     "Motion Quality",
   );
   await expect(page.getByRole("combobox", { name: "Count", exact: true })).toHaveCount(0);
+  // Length sits on the rail; Expert shows the same value.
+  await page.getByRole("combobox", { name: "Length", exact: true }).click();
+  await page.getByRole("option", { name: "8 s", exact: true }).click();
   await withExpertSettings(page, async () => {
     await expect(
       page.getByRole("textbox", { name: "Duration (Seconds)", exact: true }),
-    ).toBeVisible();
+    ).toHaveValue("8");
     await expect(page.getByRole("textbox", { name: "Frames", exact: true })).toHaveCount(0);
   });
 });
@@ -853,4 +856,19 @@ test("The phone composer opens its prompt editor in one tap and fits the screen 
       .poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight))
       .toBeLessThanOrEqual(0);
   }
+});
+
+test("On phones the prompt editor sends the run itself", async ({ page }, testInfo) => {
+  test.skip(!testInfo.project.use.isMobile, "Only phones open the prompt in its own editor.");
+  const state = await fixtures(page);
+  await page.goto("/images");
+  await page.locator("[data-composer-prompt]").click();
+  const editor = page.getByRole("dialog", { name: "Prompt", exact: true });
+  await editor
+    .getByRole("textbox", { name: "Prompt", exact: true })
+    .fill("A quiet harbour at dawn");
+  await editor.getByRole("button", { name: "Generate Image", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(1);
+  expect(state.jobs[0].input.prompt).toBe("A quiet harbour at dawn");
+  await expect(editor).toBeHidden();
 });

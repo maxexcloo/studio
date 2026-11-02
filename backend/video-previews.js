@@ -70,87 +70,54 @@ export function encoderIdle() {
 }
 
 /** Only one low-priority, single-threaded child encodes at a time. */
-function encode(input, output = "pipe:1") {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      encoder,
-      [
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-nostdin",
-        "-y",
-        "-threads",
-        "1",
-        "-i",
-        input,
-        "-t",
-        "8",
-        "-map",
-        "0:v:0",
-        "-an",
-        "-sn",
-        "-dn",
-        "-filter_threads",
-        "1",
-        "-vf",
-        `fps=24,scale=w='min(${previewEdge},iw)':h='min(${previewEdge},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1`,
-        "-c:v",
-        "libx264",
-        "-threads",
-        "1",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "26",
-        "-pix_fmt",
-        "yuv420p",
-        "-map_metadata",
-        "-1",
-        "-movflags",
-        output === "pipe:1" ? "frag_keyframe+empty_moov+default_base_moof" : "+faststart",
-        "-f",
-        "mp4",
-        output,
-      ],
-      { stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+async function encode(input, output = "pipe:1") {
+  const { code, stdout, stderr, timedOut } = await run(
+    [
+      "-loglevel",
+      "error",
+      "-y",
+      "-threads",
+      "1",
+      "-i",
+      input,
+      "-t",
+      "8",
+      "-map",
+      "0:v:0",
+      "-an",
+      "-sn",
+      "-dn",
+      "-filter_threads",
+      "1",
+      "-vf",
+      `fps=24,scale=w='min(${previewEdge},iw)':h='min(${previewEdge},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1`,
+      "-c:v",
+      "libx264",
+      "-threads",
+      "1",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "26",
+      "-pix_fmt",
+      "yuv420p",
+      "-map_metadata",
+      "-1",
+      "-movflags",
+      output === "pipe:1" ? "frag_keyframe+empty_moov+default_base_moof" : "+faststart",
+      "-f",
+      "mp4",
+      output,
+    ],
+    { timeout: 180_000, limit: 32 * 1024 * 1024, low: true },
+  );
+  if (code !== 0 || timedOut)
+    throw new Error(
+      timedOut
+        ? "Preview encoding timed out."
+        : `Preview encoding failed: ${stderr.slice(0, 2000) || code}`,
     );
-    try {
-      os.setPriority(child.pid, os.constants.priority.PRIORITY_LOW);
-    } catch {
-      /* Not all platforms permit nice. */
-    }
-    const chunks = [];
-    let length = 0;
-    let stderr = "";
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill("SIGKILL");
-    }, 180_000);
-    child.stdout.on("data", (chunk) => {
-      length += chunk.length;
-      if (length > 32 * 1024 * 1024) child.kill("SIGKILL");
-      else chunks.push(chunk);
-    });
-    child.stderr.on("data", (chunk) => {
-      if (stderr.length < 2000) stderr += chunk.toString();
-    });
-    child.on("error", (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code !== 0 || timedOut)
-        reject(
-          new Error(
-            timedOut ? "Preview encoding timed out." : `Preview encoding failed: ${stderr || code}`,
-          ),
-        );
-      else resolve(output === "pipe:1" ? Buffer.concat(chunks) : output);
-    });
-  });
+  return output === "pipe:1" ? stdout : output;
 }
 
 async function sweep() {
@@ -212,17 +179,30 @@ export async function getFileVideoPreview(file, identity = file) {
   });
 }
 
-/** Runs ffmpeg for a short job and gives back stdout and stderr. */
-function run(args, { timeout = 20_000, limit = 4 * 1024 * 1024 } = {}) {
+/**
+ * Runs ffmpeg and gives back its exit code, stdout and stderr. `stdin` feeds it bytes; `low` runs
+ * it at low priority; past `timeout` or `limit` bytes of output it is killed.
+ */
+function run(args, { timeout = 20_000, limit = 4 * 1024 * 1024, stdin, low = false } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(encoder, ["-hide_banner", "-nostdin", ...args], {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdin ? "pipe" : "ignore", "pipe", "pipe"],
       windowsHide: true,
     });
+    if (low)
+      try {
+        os.setPriority(child.pid, os.constants.priority.PRIORITY_LOW);
+      } catch {
+        /* Not all platforms permit nice. */
+      }
     const chunks = [];
     let length = 0;
     let stderr = "";
-    const timer = setTimeout(() => child.kill("SIGKILL"), timeout);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeout);
     child.stdout.on("data", (chunk) => {
       length += chunk.length;
       if (length > limit) child.kill("SIGKILL");
@@ -237,8 +217,12 @@ function run(args, { timeout = 20_000, limit = 4 * 1024 * 1024 } = {}) {
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ code, stdout: Buffer.concat(chunks), stderr });
+      resolve({ code, stdout: Buffer.concat(chunks), stderr, timedOut });
     });
+    if (stdin) {
+      child.stdin.on("error", () => {});
+      child.stdin.end(stdin);
+    }
   });
 }
 
@@ -265,6 +249,37 @@ export async function probeVideo(file) {
   } catch {
     return null;
   }
+}
+
+/** A Studio video as a looping GIF to share: its first 15 seconds at 12 FPS, 480 pixels wide. */
+export async function getComfyVideoGif(filename, subfolder, type) {
+  const local = localOutputFile(filename, subfolder, type);
+  if (!local) throw new Error("Source video is unavailable.");
+  const { code, stdout } = await queued(() =>
+    run(
+      [
+        "-loglevel",
+        "error",
+        "-threads",
+        "1",
+        "-t",
+        "15",
+        "-i",
+        local,
+        "-an",
+        "-vf",
+        "fps=12,scale='min(480,iw)':-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer",
+        "-loop",
+        "0",
+        "-f",
+        "gif",
+        "pipe:1",
+      ],
+      { timeout: 120_000, limit: 48 * 1024 * 1024, low: true },
+    ),
+  );
+  if (code !== 0 || !stdout.length) throw new Error("The GIF couldn’t be made.");
+  return stdout;
 }
 
 /** The first frame of the source, as a JPEG that fits a grid tile. */
@@ -466,8 +481,12 @@ async function withLoopback(buffer, work) {
  * extension. Only the last half second is decoded, then played backwards so
  * the first frame out is the last one in.
  */
-export async function extractLastFrame(buffer) {
+/** A video's frame as PNG: its last, or the one at a time in milliseconds. */
+export async function extractFrame(buffer, at = "last") {
   if (buffer.length > maxSourceBytes) throw new Error("This video is too large to extend.");
+  // The last frame is the first of the reversed final half second.
+  const seek =
+    at === "last" ? ["-sseof", "-0.5"] : ["-ss", (Math.max(0, Number(at) || 0) / 1000).toFixed(3)];
   return queued(
     () =>
       withLoopback(buffer, async (input) => {
@@ -477,15 +496,13 @@ export async function extractLastFrame(buffer) {
             "error",
             "-threads",
             "1",
-            "-sseof",
-            "-0.5",
+            ...seek,
             "-i",
             input,
             "-map",
             "0:v:0",
             "-an",
-            "-vf",
-            "reverse",
+            ...(at === "last" ? ["-vf", "reverse"] : []),
             "-frames:v",
             "1",
             "-f",
@@ -496,8 +513,7 @@ export async function extractLastFrame(buffer) {
           ],
           { timeout: 60_000, limit: 64 * 1024 * 1024 },
         );
-        if (code !== 0 || !stdout.length)
-          throw new Error("The video’s last frame couldn’t be read.");
+        if (code !== 0 || !stdout.length) throw new Error("The video’s frame couldn’t be read.");
         return stdout;
       }),
     { poster: true },
@@ -524,62 +540,32 @@ export function sendVideoPreview(req, res, file, cacheControl = "private, max-ag
 async function getVideoPoster(preview) {
   const file = typeof preview === "string" ? `${preview}.jpg` : "";
   if (file && fs.existsSync(file)) return file;
-  const work = () =>
-    new Promise((resolve, reject) => {
-      const child = spawn(
-        encoder,
-        [
-          "-hide_banner",
-          "-loglevel",
-          "error",
-          "-nostdin",
-          "-threads",
-          "1",
-          "-i",
-          file ? preview : "pipe:0",
-          "-frames:v",
-          "1",
-          "-an",
-          "-f",
-          "image2pipe",
-          "-vcodec",
-          "mjpeg",
-          "-q:v",
-          "3",
-          "pipe:1",
-        ],
-        { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] },
-      );
-      const chunks = [];
-      let length = 0;
-      const timer = setTimeout(() => child.kill("SIGKILL"), 15_000);
-      child.stdout.on("data", (chunk) => {
-        length += chunk.length;
-        if (length > 2 * 1024 * 1024) child.kill("SIGKILL");
-        else chunks.push(chunk);
-      });
-      child.stderr.resume();
-      child.stdin.on("error", () => {});
-      child.on("error", (error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-      child.on("close", async (code) => {
-        clearTimeout(timer);
-        if (code !== 0 || !length) {
-          reject(new Error("Video thumbnail is unavailable."));
-          return;
-        }
-        const bytes = Buffer.concat(chunks);
-        try {
-          if (file) await fs.promises.writeFile(file, bytes);
-          resolve(file || bytes);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      child.stdin.end(file ? undefined : preview);
-    });
+  const work = async () => {
+    const { code, stdout } = await run(
+      [
+        "-loglevel",
+        "error",
+        "-threads",
+        "1",
+        "-i",
+        file ? preview : "pipe:0",
+        "-frames:v",
+        "1",
+        "-an",
+        "-f",
+        "image2pipe",
+        "-vcodec",
+        "mjpeg",
+        "-q:v",
+        "3",
+        "pipe:1",
+      ],
+      { timeout: 15_000, limit: 2 * 1024 * 1024, stdin: file ? undefined : preview },
+    );
+    if (code !== 0 || !stdout.length) throw new Error("Video thumbnail is unavailable.");
+    if (file) await fs.promises.writeFile(file, stdout);
+    return file || stdout;
+  };
   return file ? coalesce(`poster:${file}`, work, { poster: true }) : queued(work, { poster: true });
 }
 

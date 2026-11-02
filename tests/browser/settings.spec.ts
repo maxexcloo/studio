@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtures, image, openTheme, section, signIn, stamp } from "./fixtures";
+import { fixtures, image, openTheme, section, signIn, stamp, expectNoChatOpen } from "./fixtures";
 
 test("Settings follow the settled section order and run maintenance and worker refreshes", async ({
   page,
@@ -297,7 +297,11 @@ test("Status summarises service health and opens Workers over the current page",
   await status.click();
   const drawer = page.getByRole("dialog", { name: "Chats", exact: true });
   await expect(drawer.getByLabel("Videos: Offline", { exact: true })).toBeVisible();
-  await drawer.getByRole("link", { name: "Workers", exact: true }).click();
+  // A link covering the whole status block opens Workers.
+  const workers = drawer.getByRole("link", { name: "Open Workers", exact: true });
+  const block = (await drawer.getByRole("region", { name: "Service Status" }).boundingBox())!;
+  expect((await workers.boundingBox())!.height).toBeGreaterThan(block.height);
+  await workers.click();
   await expect(drawer).toBeHidden();
   const settings = page.getByRole("dialog", { name: /^Settings/ });
   const images = settings.getByRole("combobox", { name: "Images Endpoint", exact: true });
@@ -308,7 +312,7 @@ test("Status summarises service health and opens Workers over the current page",
   await expect(settings.getByText("Automatic Control Off", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+  await expectNoChatOpen(page);
 });
 
 test("Workers switch GPU workloads only through a reviewed preview", async ({ page }) => {

@@ -148,6 +148,8 @@ export function useReferenceList({
 }
 type ReferenceList = ReturnType<typeof useReferenceList>;
 
+type GalleryReference = Pick<MediaItem, "id" | "type"> & { frame?: number };
+
 /** Taps, drops and pastes fill the chosen target, else the next empty slot. */
 export function useReferencePlacement(list: ReferenceList) {
   const client = useQueryClient();
@@ -169,11 +171,12 @@ export function useReferencePlacement(list: ReferenceList) {
       await client.invalidateQueries({ queryKey: ["gallery"] });
     },
   });
+  // A video gives one frame: `frame` milliseconds in, or its last.
   const gallery = useMutation({
-    mutationFn: ({ id, type }: Pick<MediaItem, "id" | "type">) =>
+    mutationFn: ({ id, type, frame }: GalleryReference) =>
       post<{ asset: ReferenceAsset }>("/api/reference-assets/from-gallery", {
         galleryItemId: id,
-        ...(type === "video" ? { frame: "last" } : {}),
+        ...(type === "video" ? { frame: frame ?? "last" } : {}),
       }),
   });
   function place(asset: ReferenceAsset, chosen?: ReferenceTarget | null) {
@@ -191,7 +194,7 @@ export function useReferencePlacement(list: ReferenceList) {
     }
   }
   function addGalleryItem(
-    item: Pick<MediaItem, "id" | "type">,
+    item: GalleryReference,
     chosen?: ReferenceTarget | null,
     onAdded?: () => void,
   ) {
@@ -219,7 +222,7 @@ export function useReferenceFiles() {
 export function useGalleryReference() {
   const placement = useReferencePlacement(useReferenceList());
   return {
-    mutate: (item: Pick<MediaItem, "id" | "type">, options?: { onSuccess?: () => void }) =>
+    mutate: (item: GalleryReference, options?: { onSuccess?: () => void }) =>
       placement.addGalleryItem(item, null, options?.onSuccess),
     isPending: placement.adding,
   };

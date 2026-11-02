@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import type { MediaItem } from "../../types";
-import { ActionBarGroups, ActionBarSurface } from "./ActionBar";
+import { ActionBarGroups, ActionBarSurface, type ActionGroups } from "./ActionBar";
 import { CustomAnimationDialog, useMediaActions } from "./MediaActions";
 import { useMediaTransfer } from "./mediaShare";
-import { UpscaleControls } from "./UpscaleControls";
+import { UpscaleDialog } from "./UpscaleControls";
 import type { Iteration } from "./useMediaAction";
 import classes from "./MediaViewer.module.css";
 
-/** The viewer's action bar: the shared item actions, with Upscale's form in its own popover. */
+/** The viewer's action bar: the shared item actions. */
 export function MediaViewerActions({
   item,
   sessionId,
@@ -19,6 +19,7 @@ export function MediaViewerActions({
   onDelete,
   onRetried,
   onVersionChange,
+  shortcuts,
 }: {
   item: MediaItem;
   sessionId?: string;
@@ -30,9 +31,12 @@ export function MediaViewerActions({
   onDelete: () => void;
   onRetried: (jobId: string) => void;
   onVersionChange: (id: string, active: boolean) => void;
+  /** Holds the current actions for the viewer's keyboard shortcuts. */
+  shortcuts?: RefObject<ActionGroups>;
 }) {
   const transfer = useMediaTransfer(item, true);
   const [instructing, setInstructing] = useState(false);
+  const [upscaling, setUpscaling] = useState(false);
   const groups = useMediaActions(item, {
     transfer,
     sessionId,
@@ -46,19 +50,10 @@ export function MediaViewerActions({
     onCustomAnimation: () => setInstructing(true),
     onDelete,
     onRetried,
+    onUpscale: () => setUpscaling(true),
     onVersionChange,
-  }).map((group) =>
-    group.map((entry) =>
-      entry.id === "upscale"
-        ? {
-            ...entry,
-            control: (
-              <UpscaleControls key={item.id} item={item} options={entry.menu?.slice(1).flat()} />
-            ),
-          }
-        : entry,
-    ),
-  );
+  });
+  if (shortcuts) shortcuts.current = groups;
   return (
     <ActionBarSurface
       aria-label="Generation Actions"
@@ -73,6 +68,9 @@ export function MediaViewerActions({
         opened={instructing}
         onClose={() => setInstructing(false)}
       />
+      {item.status === "done" && (
+        <UpscaleDialog item={item} opened={upscaling} onClose={() => setUpscaling(false)} />
+      )}
     </ActionBarSurface>
   );
 }

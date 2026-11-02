@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from "react";
 import {
   ActionIcon,
   Badge,
@@ -26,6 +26,7 @@ import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource } from "./mediaSource";
+import { findAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -87,8 +88,29 @@ function playVideo(media: HTMLVideoElement | null) {
   };
 }
 
+// One key runs a viewer action, as its bar would (Settings › Studio lists them).
+const viewerShortcuts: Record<string, string> = {
+  e: "edit",
+  p: "prompt",
+  r: "new-seed",
+  u: "upscale",
+};
+
 /** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
-function ViewerVideo({ src, width, height }: { src: string; width?: number; height?: number }) {
+function ViewerVideo({
+  id,
+  src,
+  width,
+  height,
+  swipe,
+}: {
+  /** The item's id, so Use Frame as Reference finds the frame showing. */
+  id: string;
+  src: string;
+  width?: number;
+  height?: number;
+  swipe: ReturnType<typeof useTouchSwipe>;
+}) {
   const [controls, setControls] = useState(false);
   const hide = useRef(0);
   useEffect(() => () => clearTimeout(hide.current), []);
@@ -100,18 +122,45 @@ function ViewerVideo({ src, width, height }: { src: string; width?: number; heig
   return (
     <video
       ref={playVideo}
+      data-media-id={id}
       src={src}
       width={width}
       height={height}
       controls={controls}
+      // Generated clips are short, so they repeat like a live photo.
+      loop
       playsInline
       className={classes.video}
       onPointerMove={reveal}
-      onPointerDown={reveal}
+      onPointerDown={(event) => {
+        reveal();
+        swipe.onPointerDown(event);
+      }}
+      onPointerUp={swipe.onPointerUp}
       onFocus={reveal}
       onClick={(event) => event.stopPropagation()}
     />
   );
+}
+
+/** Touch swipes over media that has no zoom of its own: running work and videos. */
+function useTouchSwipe(swipe: (direction: SwipeDirection) => void) {
+  const start = useRef<{ id: number; x: number; y: number } | null>(null);
+  return {
+    onPointerDown(event: PointerEvent) {
+      start.current =
+        event.pointerType === "touch"
+          ? { id: event.pointerId, x: event.clientX, y: event.clientY }
+          : null;
+    },
+    onPointerUp(event: PointerEvent) {
+      const from = start.current;
+      start.current = null;
+      if (from?.id !== event.pointerId) return;
+      const direction = swipeDirection(event.clientX - from.x, event.clientY - from.y);
+      if (direction) swipe(direction);
+    },
+  };
 }
 
 /** Decodes the display copies two either side of the current one, so navigation lands on a picture. */
@@ -177,12 +226,14 @@ export function MediaViewer({
   const [sheet, setSheet] = useState(false);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
+  const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
   const family = useRunFamily(item, queued);
   const iteration = useMediaIteration(item, sessionId);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
+  const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
   useEffect(() => {
     const next = replacement && items.find((candidate) => candidate.jobId === replacement);
     if (!next) return;
@@ -198,7 +249,9 @@ export function MediaViewer({
     const next = canNavigate && viewable[currentIndex + direction];
     if (!next) return;
     setCompare(false);
+    setArrival(undefined);
     navigate!(next);
+    return next;
   }
   const returnTarget = useRef(document.activeElement as HTMLElement | null);
   const restoreFocus = useRef(true);
@@ -232,10 +285,13 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") setSheet(phone);
-    else move(direction === "left" ? 1 : -1);
+    else {
+      const next = move(direction === "left" ? 1 : -1);
+      if (next) setArrival({ id: next.id, from: direction === "left" ? "next" : "previous" });
+    }
   }
-  // Running, failed and cancelled work takes the same touch swipes as a picture at Fit.
-  const statusSwipe = useRef<{ id: number; x: number; y: number } | null>(null);
+  // Running, failed and cancelled work and videos take the same touch swipes as a picture at Fit.
+  const touchSwipe = useTouchSwipe(swipe);
   return (
     <>
       <Modal
@@ -287,7 +343,13 @@ export function MediaViewer({
             )
           )
             return;
-          if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
+          const shortcut = viewerShortcuts[event.key.toLowerCase()];
+          const action = shortcut && findAction(shortcutActions.current, shortcut);
+          if (action) {
+            event.preventDefault();
+            if (action.onClick && !action.disabled && !action.loading && !event.repeat)
+              action.onClick();
+          } else if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
             event.preventDefault();
             if (!favorite.isPending && !event.repeat) favorite.mutate();
           } else if (event.key === "Delete") {
@@ -390,33 +452,17 @@ export function MediaViewer({
                 </Group>
               )}
               {!item.url ? (
-                <div
-                  className={classes.status}
-                  onPointerDown={(event) => {
-                    statusSwipe.current =
-                      event.pointerType === "touch"
-                        ? { id: event.pointerId, x: event.clientX, y: event.clientY }
-                        : null;
-                  }}
-                  onPointerUp={(event) => {
-                    const start = statusSwipe.current;
-                    statusSwipe.current = null;
-                    if (start?.id !== event.pointerId) return;
-                    const direction = swipeDirection(
-                      event.clientX - start.x,
-                      event.clientY - start.y,
-                    );
-                    if (direction) swipe(direction);
-                  }}
-                >
+                <div className={classes.status} {...touchSwipe}>
                   <MediaJobStatus item={item} onRetried={setReplacement} />
                 </div>
               ) : item.type === "video" ? (
                 <ViewerVideo
                   key={`${item.id}:${source.url}`}
+                  id={item.id}
                   src={source.url}
                   width={source.width}
                   height={source.height}
+                  swipe={touchSwipe}
                 />
               ) : compare && item.upscale?.url ? (
                 <div className={classes.comparison}>
@@ -439,6 +485,7 @@ export function MediaViewer({
                     width={source.width}
                     height={source.height}
                     swipe={swipe}
+                    arrive={arrival?.id === item.id ? arrival.from : undefined}
                   />
                 </Suspense>
               )}
@@ -464,6 +511,7 @@ export function MediaViewer({
                   onDelete={() => setDeleting(true)}
                   onRetried={setReplacement}
                   onVersionChange={(id, active) => setVersion({ id, active })}
+                  shortcuts={shortcutActions}
                   onApplied={() => {
                     restoreFocus.current = false;
                     close();

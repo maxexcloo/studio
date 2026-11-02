@@ -12,7 +12,7 @@ export interface Action {
   icon: LucideIcon;
   /** A toggled-on action (Star): a filled icon, pressed state and the primary colour in bars. */
   pressed?: boolean;
-  /** An on/off option (Show Upscale): a checked menu item, or a switch in a bar's own control. */
+  /** An on/off option (Show Upscale): a checked menu item. */
   checked?: boolean;
   color?: "red";
   disabled?: boolean;
@@ -29,14 +29,12 @@ export interface Action {
   menu?: ActionGroups;
   /** A line above the options, such as the model Animate runs on. */
   note?: string;
-  /** The bar's own control, for an action with a form of its own (Upscale). */
-  control?: ReactNode;
 }
 /** Groups are separated by dividers, in menus and bars alike. */
 export type ActionGroups = Action[][];
 
-/** Bar icon props, shared with custom controls (Upscale); phones keep 40px targets. */
-export function useActionIconProps() {
+/** Bar icon props; phones keep 40px targets. */
+function useActionIconProps() {
   const phone = usePhone();
   return {
     className: classes.action,
@@ -47,6 +45,15 @@ export function useActionIconProps() {
 }
 
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
+
+/** The action with this id in the groups or any of their options, for keyboard shortcuts. */
+export function findAction(groups: ActionGroups, id: string): Action | undefined {
+  for (const action of groups.flat()) {
+    if (action.id === id) return action;
+    const nested = action.menu && findAction(action.menu, id);
+    if (nested) return nested;
+  }
+}
 
 /** The groups as Menu items, options as submenus; render inside a `Menu.Dropdown`. */
 export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
@@ -103,7 +110,6 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
   const iconProps = useActionIconProps();
   // A tooltip must not linger behind the menu its control opened.
   const [opened, setOpened] = useState(false);
-  if (action.control) return action.control;
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
   const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
   const props = {
@@ -142,7 +148,8 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
       <ActionMenuItems groups={menu} />
     </Menu.Dropdown>
   );
-  if (!onClick)
+  // A link with options (Download ▾) is a split button like one with a click.
+  if (!onClick && !link)
     return (
       <Menu position="top" width={240} onChange={setOpened}>
         {tip(label, <Menu.Target>{control}</Menu.Target>)}

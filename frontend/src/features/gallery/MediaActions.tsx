@@ -8,6 +8,8 @@ import {
   Download,
   Eye,
   FastForward,
+  Film,
+  ImageDown,
   Flame,
   ImagePlus,
   ImageUpscale,
@@ -19,6 +21,7 @@ import {
   Play,
   Repeat,
   RotateCw,
+  ScanFace,
   Share,
   Shuffle,
   SlidersHorizontal,
@@ -29,6 +32,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
+import { notifications } from "@mantine/notifications";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { post } from "../../api";
@@ -42,9 +46,10 @@ import { assistantQuery } from "../generation/PromptAssistant";
 import { useQueue, useQueueAction } from "../generation/Queue";
 import { useGalleryReference } from "../generation/references";
 import { ActionMenuItems, type Action, type ActionGroups } from "./ActionBar";
+import { gifDownload } from "./download";
 import { useSettingsText } from "./MediaDetails";
 import type { MediaTransferActions } from "./mediaShare";
-import { upscaling } from "./UpscaleControls";
+import { upscaling, useQuickUpscale } from "./UpscaleControls";
 import {
   animateProfileQuery,
   animateThemes,
@@ -132,7 +137,41 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   });
 }
 
-/** Edit › Use as Reference: adds the image to the composer's references when its profile takes one. */
+/** The milliseconds into a video the viewer is showing, or undefined (its last frame) elsewhere. */
+function viewerFrame(item: MediaItem) {
+  const player = document.querySelector<HTMLVideoElement>(
+    `video[data-media-id="${CSS.escape(item.id)}"]`,
+  );
+  return player ? Math.round(player.currentTime * 1000) : undefined;
+}
+
+/** Save Frame as Image: the frame a video is showing (else its last) as an image under Uploads. */
+function useSaveFrame(item: MediaItem): Action {
+  const cache = useQueryClient();
+  const save = useMutation({
+    mutationFn: () =>
+      post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
+    onSuccess: () => {
+      notifications.show({ message: "Frame saved as an image in Uploads." });
+      void cache.invalidateQueries({ queryKey: ["gallery"] });
+    },
+    onError: (error) => notifications.show({ color: "red", message: error.message }),
+  });
+  return {
+    id: "save-frame",
+    label: "Save Frame as Image",
+    icon: ImageDown,
+    disabled: save.isPending,
+    loading: save.isPending,
+    keepOpen: true,
+    onClick: () => save.mutate(),
+  };
+}
+
+/**
+ * Edit › Use as Reference: adds the image to the composer's references when its profile takes one.
+ * A video gives the frame showing in the viewer, or its last frame from elsewhere.
+ */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
   const { profile } = useGeneration();
   const reference = useGalleryReference();
@@ -146,23 +185,28 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     )
   )
     return null;
+  const video = item.type === "video";
   return {
     id: "use-reference",
-    label: "Use as Reference",
+    label: video ? "Use Frame as Reference" : "Use as Reference",
     icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
-    onClick: () =>
-      reference.mutate(item, {
-        onSuccess: () => {
-          onApplied();
-          if (["/images", "/video"].includes(location.pathname)) {
-            const next = new URLSearchParams(params);
-            next.set("compose", "1");
-            setParams(next, { replace: true });
-          }
+    onClick: () => {
+      reference.mutate(
+        { ...item, frame: video ? viewerFrame(item) : undefined },
+        {
+          onSuccess: () => {
+            onApplied();
+            if (["/images", "/video"].includes(location.pathname)) {
+              const next = new URLSearchParams(params);
+              next.set("compose", "1");
+              setParams(next, { replace: true });
+            }
+          },
         },
-      }),
+      );
+    },
   };
 }
 
@@ -239,9 +283,11 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const saveFrame = useSaveFrame(item);
   const chat = useChatAction(item, onApplied);
   const favorite = useMediaFavorite(item);
   const ready = item.status === "done" && Boolean(item.url);
+  const gif = ready ? gifDownload(item) : null;
   const mayUpscale = useMayUpscale();
   const image = ready && item.type === "image";
   const assistant = useQuery(assistantQuery);
@@ -271,7 +317,21 @@ export function useMediaActions(
     .filter(Boolean)
     .join(" ");
   const upscaled = Boolean(item.upscale?.url && !item.upscale.withRun);
+  const quick = useQuickUpscale(item, ready && mayUpscale);
+  const upscaleBusy = upscaling(item) || quick.queue.isPending;
+  const queueUpscale = (quality: "fast" | "balanced" | "high", faceDetail = false) =>
+    quick.queue.mutate({ quality, faceDetail });
   const copyDetails = () => void copyText(settingsText(), "Details");
+  const themeItems = (disabled: boolean) =>
+    assistant.data?.available
+      ? themes.map((theme) => ({
+          id: `animate-${theme}`,
+          label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
+          icon: themeIcons[theme],
+          disabled,
+          onClick: theme === "custom" ? onCustomAnimation : () => run({ kind: "animate", theme }),
+        }))
+      : [];
   const actions = [
     retry,
     image &&
@@ -279,16 +339,7 @@ export function useMediaActions(
         loading: running === "animate" || action.isPending,
         note: animateNote,
         menu: [
-          assistant.data?.available
-            ? themes.map((theme) => ({
-                id: `animate-${theme}`,
-                label: `${animateThemes[theme]}${theme === "custom" ? "…" : ""}`,
-                icon: themeIcons[theme],
-                disabled: !animation.data,
-                onClick:
-                  theme === "custom" ? onCustomAnimation : () => run({ kind: "animate", theme }),
-              }))
-            : [],
+          themeItems(!animation.data),
           [
             {
               id: "animate-composer",
@@ -303,17 +354,20 @@ export function useMediaActions(
     ready &&
       item.type === "video" &&
       itemAction("animate", {
-        loading: action.isPending,
+        loading: running === "animate" || action.isPending,
+        // A theme continues the clip from its last frame at once; the composer shows it first.
         menu: [
+          themeItems(action.isPending),
           [
             {
               id: "extend",
-              label: "Extend",
+              label: "Extend in Composer",
               icon: FastForward,
               disabled: action.isPending,
               onClick: () => action.mutate("extend"),
             },
           ],
+          [...(reference ? [reference] : []), saveFrame],
         ],
       }),
     image &&
@@ -379,21 +433,55 @@ export function useMediaActions(
     ready &&
       mayUpscale &&
       itemAction("upscale", {
+        // With an upscale, the click switches between it and the original; otherwise it runs Balanced.
         label: upscaling(item) ? "Upscaling…" : "Upscale",
-        disabled: upscaling(item) && !upscaled,
-        onClick: onUpscale,
-        menu: upscaled
-          ? [
-              [
-                {
-                  id: "upscale-new",
-                  label: "New Upscale…",
+        pressed: upscaled && Boolean(item.upscaleActive),
+        loading: upscaleBusy && !upscaled,
+        disabled: upscaled ? version.isPending : upscaleBusy,
+        onClick: upscaled
+          ? () => version.mutate(!item.upscaleActive)
+          : () => queueUpscale("balanced"),
+        note: quick.faceNote || undefined,
+        menu: [
+          [
+            ...(upscaled
+              ? [
+                  {
+                    id: "upscale-again",
+                    label: "Regenerate Upscale",
+                    icon: RotateCw,
+                    disabled: upscaleBusy,
+                    onClick: () => queueUpscale("balanced"),
+                  },
+                ]
+              : (["fast", "balanced", "high"] as const).map((quality) => ({
+                  id: `upscale-${quality}`,
+                  label: quality[0].toUpperCase() + quality.slice(1),
                   icon: ImageUpscale,
-                  disabled: upscaling(item),
-                  onClick: onUpscale,
-                },
-              ],
-              [
+                  disabled: upscaleBusy,
+                  onClick: () => queueUpscale(quality),
+                }))),
+            ...(image
+              ? [
+                  {
+                    id: "upscale-face",
+                    label: upscaled ? "Regenerate with Face Detail" : "Balanced with Face Detail",
+                    icon: ScanFace,
+                    disabled: upscaleBusy || !quick.faceDetail,
+                    onClick: () => queueUpscale("balanced", true),
+                  },
+                ]
+              : []),
+            {
+              id: "upscale-options",
+              label: "Upscale Options…",
+              icon: SlidersHorizontal,
+              disabled: upscaleBusy,
+              onClick: onUpscale,
+            },
+          ],
+          upscaled
+            ? [
                 {
                   id: "show-upscale",
                   label: "Show Upscale",
@@ -414,9 +502,9 @@ export function useMediaActions(
                       },
                     ]
                   : []),
-              ],
-            ]
-          : undefined,
+              ]
+            : [],
+        ],
       }),
     itemAction("copy", {
       onClick: copyDetails,
@@ -444,7 +532,12 @@ export function useMediaActions(
             keepOpen: !transfer.shareReady,
             onClick: () => void transfer.share(),
           })
-        : itemAction("download", { link: transfer.download })),
+        : itemAction("download", {
+            link: transfer.download,
+            menu: gif
+              ? [[{ id: "download-gif", label: "Download as GIF", icon: Film, link: gif }]]
+              : undefined,
+          })),
     itemAction("delete", { onClick: onDelete }),
     ready &&
       itemAction("star", {

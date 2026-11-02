@@ -11,6 +11,7 @@ import {
   Input,
   Menu,
   Modal,
+  MultiSelect,
   NavLink,
   Notification,
   Paper,
@@ -23,6 +24,10 @@ import {
   type CSSProperties,
   type CSSVariablesResolver,
 } from "@mantine/core";
+import { createElement } from "react";
+import { ChevronDown } from "lucide-react";
+
+const chevron = createElement(ChevronDown, { size: 16 });
 
 // Adapted from MantineHub's exported Shadcn theme (MIT, RubixCube Innovations).
 // https://github.com/RubixCube-Innovations/mantine-theme-builder/tree/main/src/themes/shadcn
@@ -263,7 +268,11 @@ export function studioTheme({
           transitionTimingFunction: easing.enter,
         },
       }),
-      Select: Select.extend({ defaultProps: { checkIconPosition: "right" } }),
+      // Every control that opens a picker shows ▾, as the chips do (UI-PATTERNS.md).
+      MultiSelect: MultiSelect.extend({ defaultProps: { rightSection: chevron } }),
+      Select: Select.extend({
+        defaultProps: { checkIconPosition: "right", rightSection: chevron },
+      }),
       Switch: Switch.extend({
         styles: {
           thumb: {
@@ -312,7 +321,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
   return {
     variables: {
       "--studio-workspace-width": "1600px",
-      "--studio-composer-width": "780px",
+      "--studio-composer-width": "820px",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,

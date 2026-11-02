@@ -9,11 +9,12 @@ import { useHoldToSelect } from "../gallery/useGalleryLayout";
 import { useMediaAction } from "../gallery/useMediaAction";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { WritingStream } from "../generation/PromptWriting";
-import { QueueJobAction, terminal } from "../generation/Queue";
+import { QueueJobAction } from "../generation/Queue";
 import { referenceLabel } from "../generation/references";
 import { GenerationCard } from "./GenerationCard";
 import { jobResults } from "./queries";
 import classes from "./SessionsPage.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 const operationLabels = {
   image: "New image",
@@ -50,7 +51,7 @@ export function iterationTiles(job: QueueJob): MediaItem[] {
   const saved = jobResults(job)
     .filter((item) => item.status === "done" || item.url)
     .map((item) => (item.prompt ? item : { ...item, prompt }));
-  const expected = terminal.has(job.status)
+  const expected = terminalStatuses.has(job.status)
     ? job.status === "completed" || saved.length
       ? 0
       : 1
