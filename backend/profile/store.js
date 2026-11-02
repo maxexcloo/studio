@@ -780,21 +780,17 @@ export function createGuideStore({
 }
 
 /**
- * The MCP guide loader (loadMcpPrompting) over the guide store, falling back to the seed file, and
+ * The guide resolver (loadMcpPrompting) over the guide store, falling back to the seed file, and
  * reloaded whenever the store changes, so a saved guide applies without a restart. A store that
- * fails to load keeps the last good guides. With `negatives` (the prompt assistant), a profile's
- * `negatives` entry also becomes its guide's `negative` when the guide has none; MCP leaves it off,
- * so its guides stay exactly as loadMcpPrompting gives them.
+ * fails to load keeps the last good guides.
  */
 export function livePrompting({
   dataDir = currentDataDir(),
   seedFile = guideSeedFile(),
   log = console,
-  negatives: fillNegatives = false,
 } = {}) {
   const store = createGuideStore({ dataDir, seedFile, log });
   let loaded = null;
-  let negatives = {};
   let signature = null;
   const current = () => {
     const target = store.configFile();
@@ -808,7 +804,6 @@ export function livePrompting({
     if (loaded && next === signature) return loaded;
     try {
       loaded = loadMcpPrompting(target);
-      negatives = next ? readObject(target).negatives || {} : {};
       signature = next;
     } catch (error) {
       if (!loaded) throw error;
@@ -818,18 +813,7 @@ export function livePrompting({
     return loaded;
   };
   current();
-  return (profile, detailed = false) => {
-    const guide = current()(profile, detailed);
-    if (
-      !fillNegatives ||
-      !detailed ||
-      !guide ||
-      guide.negative ||
-      !isObject(negatives[profile?.id])
-    )
-      return guide;
-    return { ...guide, negative: structuredClone(negatives[profile.id]) };
-  };
+  return (profile) => current()(profile);
 }
 
 const profileStores = new Map();

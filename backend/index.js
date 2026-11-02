@@ -1324,7 +1324,7 @@ async function draftCheckpointProfile(record, options) {
 // The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
 const assistantGuides = (() => {
   try {
-    return livePrompting({ negatives: true });
+    return livePrompting();
   } catch (error) {
     console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`);
     return () => null;
@@ -1349,7 +1349,7 @@ const assistantLoras = async (req) => {
 };
 const assistantGuide = (profile) => {
   try {
-    return assistantGuides(profile, true);
+    return assistantGuides(profile);
   } catch {
     return null;
   }

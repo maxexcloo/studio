@@ -3,7 +3,7 @@ import test from "node:test";
 import { McpMedia } from "./media.js";
 
 test("concurrent profile discovery shares one scan and refreshes after the cache expires", async () => {
-  const media = Object.create(McpMedia.prototype);
+  const media = Object.assign(Object.create(McpMedia.prototype), { prompting: () => null });
   media.profileTtl = 0;
   let reads = 0;
   let release;
@@ -38,7 +38,7 @@ test("concurrent profile discovery shares one scan and refreshes after the cache
 });
 
 test("cached discovery is per owner, expires after its TTL and is invalidated by model changes", async () => {
-  const media = Object.create(McpMedia.prototype);
+  const media = Object.assign(Object.create(McpMedia.prototype), { prompting: () => null });
   const reads = [];
   media.request = async (_method, _route, _body, owner) => {
     reads.push(owner);
@@ -72,7 +72,7 @@ test("cached discovery is per owner, expires after its TTL and is invalidated by
 });
 
 test("a scan overlapping a model change is not cached", async () => {
-  const media = Object.create(McpMedia.prototype);
+  const media = Object.assign(Object.create(McpMedia.prototype), { prompting: () => null });
   let reads = 0;
   media.request = async () => {
     reads++;
@@ -89,7 +89,7 @@ test("a scan overlapping a model change is not cached", async () => {
 });
 
 test("a failed shared scan does not poison later discovery", async () => {
-  const media = Object.create(McpMedia.prototype);
+  const media = Object.assign(Object.create(McpMedia.prototype), { prompting: () => null });
   media.request = async () => {
     throw new Error("temporarily offline");
   };

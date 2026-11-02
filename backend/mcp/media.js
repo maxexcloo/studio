@@ -163,6 +163,8 @@ function outputIndex(item) {
 export class McpMedia {
   constructor({
     dataDir,
+    // A profile's resolved prompting (profile/store.js livePrompting); tests may leave it out.
+    prompting = (profile) => profile.prompting ?? null,
     baseUrl,
     publicUrl,
     signingKey,
@@ -173,6 +175,7 @@ export class McpMedia {
     profileTtl = 60000,
   }) {
     this.profileTtl = profileTtl;
+    this.prompting = prompting;
     this.baseUrl = baseUrl;
     this.publicBase = publicUrl;
     this.fetch = fetchImpl;
@@ -349,7 +352,26 @@ export class McpMedia {
     const models = await this.catalogue(owner);
     return (models.profiles || [])
       .filter((profile) => profile.ready !== false && (kind === "all" || profile.kind === kind))
-      .map((profile) => ({ ...profile, ...profile.imageModes?.generate }));
+      .map((listed) => {
+        // Each profile and image mode carries its guide merged with its own fields (mcp/prompting.js).
+        const profile = { ...listed, ...listed.imageModes?.generate };
+        const imageModes =
+          profile.imageModes &&
+          Object.fromEntries(
+            Object.entries(profile.imageModes).map(([name, mode]) => [
+              name,
+              mode?.prompting
+                ? { ...mode, prompting: this.prompting({ ...profile, prompting: mode.prompting }) }
+                : mode,
+            ]),
+          );
+        const prompting = this.prompting(profile);
+        return {
+          ...profile,
+          ...(imageModes ? { imageModes } : {}),
+          ...(prompting ? { prompting } : {}),
+        };
+      });
   }
   /**
    * The profile Generate uses for a kind and optional tier when no profile_id is given; access rules apply upstream.
