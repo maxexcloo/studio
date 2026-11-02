@@ -95,7 +95,14 @@ test("A parked profile reads as parked, and an administrator choosing it starts 
     }),
   );
   await page.route("**/api/runtime", (route) =>
-    route.fulfill({ json: { automaticLifecycle: false, pools: [], history: [], workloads: [] } }),
+    route.fulfill({
+      json: {
+        settings: { automatic: false, parkIdleMinutes: 0 },
+        pools: [],
+        history: [],
+        workloads: [],
+      },
+    }),
   );
   const previews: unknown[] = [];
   await page.route("**/api/runtime/preview", (route) => {

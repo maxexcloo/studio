@@ -58,6 +58,15 @@ export function createRuntimeRouter(
       202,
     ),
   );
+  router.put(
+    "/settings",
+    handle((request) =>
+      controller.configure({
+        automatic: request.body?.automatic,
+        parkIdleMinutes: request.body?.parkIdleMinutes,
+      }),
+    ),
+  );
   router.get(
     "/operations/:id",
     handle((request) => controller.operation(String(request.params.id))),

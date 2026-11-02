@@ -91,7 +91,6 @@ test(
           STUDIO_WORKERS: "[]",
           STUDIO_DEMO: "1",
           STUDIO_MULTI_USER: "1",
-          STUDIO_RUNTIME_AUTOMATIC: "",
           STUDIO_CLIPROXYAPI_URL: "",
           STUDIO_CHAT_GATEWAY_URL: gatewayUrl,
           STUDIO_CHAT_GATEWAY_KEY: "fixture",

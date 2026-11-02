@@ -48,8 +48,6 @@ function fixture(
     engine: new KubernetesEngine(kube.request),
     workloads,
     pools: { gpu: 2, gaming: 1 },
-    automaticLifecycle,
-    parkIdleAfterMs,
     ...(store ? { store } : {}),
     now: () => clock,
     // Each poll lets the fake cluster move one step and the test act in between.
@@ -60,6 +58,11 @@ function fixture(
     },
     timeouts: { drain: 60 * 60_000, stop: 60_000, start: 60_000 },
   });
+  if (automaticLifecycle || parkIdleAfterMs)
+    controller.configure({
+      automatic: automaticLifecycle,
+      parkIdleMinutes: parkIdleAfterMs / 60_000,
+    });
   return { kube, controller, advance: (ms: number) => void (clock += ms) };
 }
 
