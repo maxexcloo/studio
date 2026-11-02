@@ -1038,12 +1038,13 @@ const catalogueModels = () =>
       throw error;
     });
 /** Animate's profile for an account (animate-profile.js), from its catalogue and whether a local video worker answered. */
-async function animateChoice(account, { width, height } = {}) {
+async function animateChoice(account, { tier, width, height } = {}) {
   const models = modelsForAccount(await catalogueModels(), { studioAccount: account });
   return animateProfile(models.profiles || [], {
     defaultId: models.defaults?.videoModel,
     localRunning: models.backends?.video?.available !== false,
     localParked: models.backends?.video?.parked === true,
+    tier,
     width,
     height,
   });
@@ -1051,11 +1052,13 @@ async function animateChoice(account, { width, height } = {}) {
 // Every Animate surface asks this before queuing or staging, so it shows the model that will run.
 app.get("/api/animate/profile", async (req, res) => {
   try {
-    const { profile, cloud, size } = await animateChoice(req.studioAccount, {
+    const { profile, cloud, size, tiers } = await animateChoice(req.studioAccount, {
+      // Fast or Quality, as Animate's menu offers them.
+      tier: req.query.tier === "quality" ? "quality" : "fast",
       width: Number(req.query.width),
       height: Number(req.query.height),
     });
-    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, size });
+    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, size, tiers });
   } catch (error) {
     res.status(409).json({ ok: false, error: error.message });
   }
