@@ -1,11 +1,12 @@
-import type {
-  GenerationInput,
-  GenerationOperation,
-  QueueCancelAllResponse,
-  QueueMedia,
-  UnfinishedJob,
+import {
+  terminalStatuses,
+  type GenerationInput,
+  type GenerationOperation,
+  type QueueCancelAllResponse,
+  type QueueMedia,
+  type UnfinishedJob,
 } from "../../shared/queue.ts";
-import { GenerationQueue, terminalStatuses } from "./queue.ts";
+import { GenerationQueue } from "./queue.ts";
 import { publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 interface Request {

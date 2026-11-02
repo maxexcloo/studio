@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { create, expandComposer, fixtures, openNav, profiles, stamp } from "./fixtures";
+import {
+  create,
+  expandComposer,
+  fixtures,
+  openNav,
+  profiles,
+  stamp,
+  expectNoChatOpen,
+} from "./fixtures";
 
 test("Image → Refine → Animate retains one session and can reopen saved work", async ({ page }) => {
   const state = await fixtures(page);
@@ -101,9 +109,7 @@ test("Images and Videos tabs keep an expanding bottom composer while Chat keeps 
   await expect(page.getByRole("heading", { name: "Videos", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Generate Video", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Chat", exact: true }).first().click();
-  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
-  if (testInfo.project.use.isMobile)
-    await page.getByRole("button", { name: "Open Chats", exact: true }).click();
+  await expectNoChatOpen(page);
   // The Chat stays New Chat until the text model titles it.
   await expect(page.getByRole("link", { name: /New Chat/ }).first()).toBeVisible();
 });

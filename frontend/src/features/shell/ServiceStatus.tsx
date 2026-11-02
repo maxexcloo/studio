@@ -1,27 +1,26 @@
 import { ActionIcon, Divider, Drawer, FocusTrap, Group, Loader, Tooltip } from "@mantine/core";
-import { useDisclosure, useWindowEvent } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import { useRef, type PointerEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
-import { Queue, terminal, useQueue } from "../generation/Queue";
+import { Queue, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { NewChatAction, openChatsEvent, SessionList } from "../sessions/ChatWorkspace";
+import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ServiceStatus.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 /** The one header entry to work in progress, Chats and service health on every breakpoint. */
 export function StatusAction({ chat }: { chat: boolean }) {
   const [opened, { open, close }] = useDisclosure(false);
-  // The phone's No Chat Selected view opens the Chats list too.
-  useWindowEvent(openChatsEvent, open);
   const phone = usePhone();
   const admin = useIsAdmin();
   const location = useLocation();
   const queue = useQueue();
   const summary = serviceSummary(useQuery(servicesStatusQuery));
-  const generating = queue.data?.jobs.some((job) => !terminal.has(job.status));
+  const generating = queue.data?.jobs.some((job) => !terminalStatuses.has(job.status));
   const title = chat ? "Chats" : "Generations";
   // In Chat it is plainly the Chats list, still coloured by service health.
   const Icon = chat ? MessagesSquare : Activity;

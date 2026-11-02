@@ -1,4 +1,9 @@
-import type { PromptWriting, QueueMedia, QueueStatus } from "../../shared/queue.ts";
+import {
+  terminalStatuses,
+  type PromptWriting,
+  type QueueMedia,
+  type QueueStatus,
+} from "../../shared/queue.ts";
 import { queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
 
 export interface JobObservation {
@@ -51,7 +56,6 @@ export type PromptWriter = (
   },
 ) => Promise<WrittenPrompt>;
 
-export const terminalStatuses = new Set<QueueStatus>(["completed", "failed", "cancelled"]);
 /** Not yet handed to a provider: writing its prompt, or waiting for its resource. */
 const unsubmitted = new Set<QueueStatus>(["writing", "queued", "waiting"]);
 const accepted = (job: OwnedJob) =>

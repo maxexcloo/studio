@@ -16,11 +16,12 @@ import type { MediaItem, QueueJob } from "../../types";
 import { useDraftSubmit } from "../generation/GenerationForm";
 import { GenerationProvider, useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
-import { queueQuery, terminal } from "../generation/Queue";
+import { queueQuery } from "../generation/Queue";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
 import { mediaDraft, typedPrompt } from "./useMediaAction";
 import { derivation, versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
+import { terminalStatuses } from "../../../../shared/queue";
 
 interface Entry {
   key: string;
@@ -56,7 +57,7 @@ export function useRunFamily(item: MediaItem, extra: string[]): Entry[] {
     const waiting = all
       .filter(
         (job) =>
-          !terminal.has(job.status) &&
+          !terminalStatuses.has(job.status) &&
           !results(job).length &&
           (extra.includes(job.id) || from(job)),
       )

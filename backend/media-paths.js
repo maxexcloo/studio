@@ -25,8 +25,11 @@ export function mediaSubfolder(ownerId = "") {
   return ownerId ? accountOutputSubfolder(ownerId) : outputFolderName;
 }
 
-const mediaPattern =
+/** What an output can be: images, videos and sound. Anything else is never served. */
+export const outputMediaPattern =
   /\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|mkv|m4v|flac|mp3|wav|ogg|opus|m4a|aac)$/i;
+/** The output files that are videos. */
+export const videoPattern = /\.(mp4|webm|mov|mkv|m4v)$/i;
 const inDotFolder = (subfolder) =>
   String(subfolder || "")
     .split(/[\\/]/)
@@ -38,7 +41,7 @@ export function mediaPath(filename, subfolder = "") {
     !filename ||
     filename !== path.basename(String(filename)) ||
     /[\\/]/.test(String(filename)) ||
-    !mediaPattern.test(String(filename))
+    !outputMediaPattern.test(String(filename))
   )
     return null;
   if (inDotFolder(subfolder) || path.isAbsolute(String(subfolder || ""))) return null;
