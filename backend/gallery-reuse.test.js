@@ -82,6 +82,61 @@ test("completed videos use their encoded dimensions instead of requested aspect 
   assert.equal(pageGallery({}).items[0].height, 160);
 });
 
+test("an Extend is saved joined onto the video it continued", async (context) => {
+  let encoder;
+  try {
+    encoder = createRequire(import.meta.url)("ffmpeg-static");
+    execFileSync(encoder, ["-version"], { stdio: "ignore" });
+  } catch {
+    context.skip("Video encoder unavailable");
+    return;
+  }
+  const clip = (filename, colour) =>
+    execFileSync(encoder, [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      `color=c=${colour}:size=96x160:rate=24:duration=1`,
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      path.join(outputDir, filename),
+    ]);
+  clip("source-clip.mp4", "red");
+  clip("extension-clip.mp4", "blue");
+  const source = {
+    id: "source-clip",
+    jobId: "source-job",
+    type: "video",
+    status: "done",
+    url: url("source-clip.mp4"),
+    createdAt: new Date().toISOString(),
+  };
+  const body = {
+    kind: "video",
+    prompt: "The wave rolls on",
+    referenceAssets: [{ assetId: "source-clip:last-frame", slot: "start" }],
+  };
+  setGallery([source, ...makePendingItems("extend-job", body)]);
+  const [completed] = await replaceGalleryJob(
+    "extend-job",
+    [{ url: url("extension-clip.mp4"), filename: "extension-clip.mp4", type: "video" }],
+    body,
+    new Map(),
+  );
+  assert.equal(completed.outputName, "extension-clip-joined.mp4");
+  assert.match(completed.url, /extension-clip-joined\.mp4/);
+  assert.ok(fs.existsSync(path.join(outputDir, "extension-clip-joined.mp4")));
+  assert.ok(!fs.existsSync(path.join(outputDir, "extension-clip.mp4")));
+  const { probeVideo } = await import("./video-previews.js");
+  const joined = await probeVideo(path.join(outputDir, "extension-clip-joined.mp4"));
+  assert.ok(joined.durationMs > 1800, `got ${joined.durationMs} ms`);
+});
+
 test("a video that cannot be probed still completes with its requested dimensions", async () => {
   const filename = "unreadable-video.mp4";
   fs.writeFileSync(path.join(outputDir, filename), "not a video");

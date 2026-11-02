@@ -245,10 +245,74 @@ export async function probeVideo(file) {
     const durationMs = time
       ? Math.round(((Number(time[1]) * 60 + Number(time[2])) * 60 + Number(time[3])) * 1000)
       : 0;
-    return width > 0 && height > 0 ? { width, height, durationMs } : null;
+    const fps = Number(stderr.match(/Video:[^\n]*?(\d+(?:\.\d+)?) fps/)?.[1] || 0);
+    const audio = /Stream #[^\n]*Audio:/.test(stderr);
+    return width > 0 && height > 0 ? { width, height, durationMs, fps, audio } : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * An extension joined onto the clip it continues: `source` up to `at` milliseconds (all of it for
+ * "last"), then `extension` without its first frame, which repeats the frame it started from, at
+ * the source's size and frame rate. Sound is kept only when both have it. Written to `output`.
+ */
+export async function joinClips(source, extension, output, at = "last") {
+  const [first, second] = await Promise.all([probeVideo(source), probeVideo(extension)]);
+  if (!first || !second) throw new Error("A clip to join couldn’t be read.");
+  const fps = first.fps || second.fps || 24;
+  const even = (value) => Math.max(2, Math.round(value / 2) * 2);
+  const fit = `fps=${fps},scale=${even(first.width)}:${even(first.height)},setsar=1,format=yuv420p`;
+  const until = at === "last" ? "" : `trim=end=${(Number(at) / 1000).toFixed(3)},`;
+  const skip = (1 / (second.fps || fps)).toFixed(4);
+  const audio = first.audio && second.audio;
+  const graph = [
+    `[0:v]${until}setpts=PTS-STARTPTS,${fit}[v0]`,
+    `[1:v]trim=start_frame=1,setpts=PTS-STARTPTS,${fit}[v1]`,
+    ...(audio
+      ? [
+          `[0:a]${until.replace("trim", "atrim")}asetpts=PTS-STARTPTS[a0]`,
+          `[1:a]atrim=start=${skip},asetpts=PTS-STARTPTS[a1]`,
+          "[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]",
+        ]
+      : ["[v0][v1]concat=n=2:v=1:a=0[v]"]),
+  ].join(";");
+  const { code, stderr, timedOut } = await queued(() =>
+    run(
+      [
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        source,
+        "-i",
+        extension,
+        "-filter_complex",
+        graph,
+        "-map",
+        "[v]",
+        ...(audio ? ["-map", "[a]", "-c:a", "aac"] : ["-an"]),
+        "-c:v",
+        "libx264",
+        "-threads",
+        "2",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-movflags",
+        "+faststart",
+        output,
+      ],
+      { timeout: 600_000, low: true },
+    ),
+  );
+  if (code !== 0 || timedOut)
+    throw new Error(
+      timedOut ? "Joining the clips timed out." : `Joining failed: ${stderr.slice(0, 500)}`,
+    );
+  return output;
 }
 
 /** The first frame of the source, as a JPEG that fits a grid tile. */

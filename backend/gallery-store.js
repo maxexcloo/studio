@@ -14,7 +14,7 @@ import {
 } from "./persistence/gallery-rows.ts";
 import { generationRecord } from "./generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
-import { mediaFile, mediaParams, mediaPath } from "./media-paths.js";
+import { mediaFile, mediaParams, mediaPath, mediaUrls } from "./media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -1198,7 +1198,8 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
   const ownJob = (item) => item.jobId === id && (item.ownerId || "") === ownerId;
   const existing = gallery.filter(ownJob);
   const completed = await Promise.all(
-    outputs.map(async (item, index) => {
+    outputs.map(async (output, index) => {
+      let item = output;
       let videoSize = null;
       if (
         item.type === "video" &&
@@ -1206,13 +1207,34 @@ export async function replaceGalleryJob(id, outputs, body, jobs, status = "done"
         item.url.startsWith("/comfy/view?")
       ) {
         const params = new URLSearchParams(item.url.slice(item.url.indexOf("?") + 1));
-        const file = localOutputFile(
+        const subfolder = params.get("subfolder") || "";
+        let file = localOutputFile(
           params.get("filename") || "",
-          params.get("subfolder") || "",
+          subfolder,
           params.get("type") || "output",
         );
         if (file) {
-          const { probeVideo } = await import("./video-previews.js");
+          const { joinClips, probeVideo } = await import("./video-previews.js");
+          // An Extend (a run started from a video's frame) is kept joined onto that video.
+          const { frameSourceFile } = await import("./references.js");
+          const from =
+            status === "done" &&
+            !/-joined\.mp4$/.test(file) &&
+            (body.referenceAssets || [])
+              .map((reference) => frameSourceFile(reference?.assetId, ownerId))
+              .find(Boolean);
+          if (from) {
+            const name = `${path.parse(file).name}-joined.mp4`;
+            const joined = mediaPath(name, subfolder);
+            try {
+              await joinClips(from.file, file, joined, from.at);
+              await fs.promises.rm(file, { force: true });
+              item = { ...item, ...mediaUrls(name, subfolder), filename: name };
+              file = joined;
+            } catch (error) {
+              console.warn(`[Studio] Keeping an extension unjoined: ${error.message}`);
+            }
+          }
           videoSize = await probeVideo(file);
         }
       }
