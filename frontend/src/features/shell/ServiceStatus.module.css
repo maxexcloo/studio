@@ -1,6 +1,8 @@
 .content {
   display: flex;
   flex-direction: column;
+  /* The list scrolls vertically; sideways drags are the drawer's own, to swipe it closed. */
+  touch-action: pan-y;
 }
 /* The list scrolls while the service summary stays at the safe bottom edge. */
 .body {
@@ -17,4 +19,5 @@
   min-height: 0;
   overflow-y: auto;
   padding-bottom: var(--mantine-spacing-md);
+  touch-action: pan-y;
 }
