@@ -185,7 +185,11 @@ export function profileOnBackend(raw, requested = "") {
   const { backends, backend: chosen, ...shared } = raw.studio;
   const backend = ids.includes(requested) ? requested : ids.includes(chosen) ? chosen : ids[0];
   const { graph, ...own } = isRecord(backends[backend]) ? backends[backend] : {};
-  return { raw: { graph: graph || {}, studio: { ...shared, ...own } }, backend, backendIds: ids };
+  const studio = { ...shared, ...own };
+  // A backend's own prompting fields go over the shared ones, as a profile's go over its guide.
+  if (isRecord(shared.prompting) && isRecord(own.prompting))
+    studio.prompting = { ...shared.prompting, ...own.prompting };
+  return { raw: { graph: graph || {}, studio }, backend, backendIds: ids };
 }
 
 /** A workflow record (metadataFromJson) on another of its backends; the record itself when it already runs there or has one graph. */
@@ -229,7 +233,10 @@ export function metadataFromJson(raw, file, { backend: requested = "" } = {}) {
             ...meta,
             ...variant,
             capabilities: variant.capabilities || {},
-            prompting: variant.prompting,
+            // A mode's own prompting fields go over the profile's; without any it has none of its own.
+            prompting: isRecord(variant.prompting)
+              ? { ...(isRecord(meta.prompting) ? meta.prompting : {}), ...variant.prompting }
+              : undefined,
             imageModes: undefined,
           },
         },

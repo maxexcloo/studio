@@ -71,12 +71,12 @@ const combinedId = (radianceId, comfyuiId) =>
       ? radianceId.replace(/-radiance$/, "")
       : `${comfyuiId}-combined`;
 
-/** What a guide reader shows for a profile: its own guidance, else its binding's pack, else its family's. */
+/** Which guide a profile reads: its binding's pack, else its family's, with any own fields it keeps over it. */
 function guideName(raw, guides, id) {
+  const pack = guides?.profiles?.[`custom:${id}`]?.pack || "Family Guide";
   const prompting = raw?.studio?.prompting;
-  if (prompting && typeof prompting === "object")
-    return `Own Guide (${prompting.name || "Unnamed"})`;
-  return guides?.profiles?.[`custom:${id}`]?.pack || "Family Guide";
+  const own = prompting && typeof prompting === "object" ? Object.keys(prompting).sort() : [];
+  return own.length ? `${pack} + Own ${own.join(", ")}` : pack;
 }
 
 /** What differs between a pair, as `[{label, radiance, comfyui}]`; equal values are left out. */
