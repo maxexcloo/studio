@@ -334,7 +334,7 @@ primary component reference and verify APIs against the installed version.
   Phones show the image full-bleed with an icon row; swipe left/right navigates,
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
-  swipes. A video tile plays its short preview under the mouse. Navigation (swipe,
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while

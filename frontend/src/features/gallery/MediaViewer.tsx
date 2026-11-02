@@ -26,6 +26,7 @@ import classes from "./MediaViewer.module.css";
 import { MediaViewerActions } from "./MediaViewerActions";
 import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource } from "./mediaSource";
+import { findAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
 import { useMediaIteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
@@ -86,6 +87,14 @@ function playVideo(media: HTMLVideoElement | null) {
     media.load();
   };
 }
+
+// One key runs a viewer action, as its bar would (Settings › Studio lists them).
+const viewerShortcuts: Record<string, string> = {
+  e: "edit",
+  p: "prompt",
+  r: "new-seed",
+  u: "upscale",
+};
 
 /** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
 function ViewerVideo({
@@ -217,6 +226,7 @@ export function MediaViewer({
   const [sheet, setSheet] = useState(false);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
+  const shortcutActions = useRef<ActionGroups>([]);
   // Runs this viewer queued outside the item's session still join its strip.
   const [queued, setQueued] = useState<string[]>([]);
   const family = useRunFamily(item, queued);
@@ -333,7 +343,13 @@ export function MediaViewer({
             )
           )
             return;
-          if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
+          const shortcut = viewerShortcuts[event.key.toLowerCase()];
+          const action = shortcut && findAction(shortcutActions.current, shortcut);
+          if (action) {
+            event.preventDefault();
+            if (action.onClick && !action.disabled && !action.loading && !event.repeat)
+              action.onClick();
+          } else if (event.key.toLowerCase() === "f" && item.status === "done" && item.url) {
             event.preventDefault();
             if (!favorite.isPending && !event.repeat) favorite.mutate();
           } else if (event.key === "Delete") {
@@ -495,6 +511,7 @@ export function MediaViewer({
                   onDelete={() => setDeleting(true)}
                   onRetried={setReplacement}
                   onVersionChange={(id, active) => setVersion({ id, active })}
+                  shortcuts={shortcutActions}
                   onApplied={() => {
                     restoreFocus.current = false;
                     close();

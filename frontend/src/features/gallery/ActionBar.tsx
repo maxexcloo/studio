@@ -46,6 +46,15 @@ function useActionIconProps() {
 
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
 
+/** The action with this id in the groups or any of their options, for keyboard shortcuts. */
+export function findAction(groups: ActionGroups, id: string): Action | undefined {
+  for (const action of groups.flat()) {
+    if (action.id === id) return action;
+    const nested = action.menu && findAction(action.menu, id);
+    if (nested) return nested;
+  }
+}
+
 /** The groups as Menu items, options as submenus; render inside a `Menu.Dropdown`. */
 export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   // Phones have no room beside the menu, so options open below their item.
