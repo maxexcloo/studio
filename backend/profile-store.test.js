@@ -254,6 +254,26 @@ test("guides copy from the seed once, then take only packs and bindings they lac
   assert.throws(() => store.save("broken", "text"), /JSON object/);
 });
 
+test("the seed never restores a binding of a profile that Combine Backends replaced", (t) => {
+  const dir = scratch(t);
+  const seedFile = path.join(dir, "prompting.json");
+  const seed = seedGuides();
+  seed.profiles["custom:fixture-comfyui"] = { pack: "krea2" };
+  seed.negatives["custom:fixture-comfyui"] = { effect: "none" };
+  fs.writeFileSync(seedFile, JSON.stringify(seed));
+  fs.mkdirSync(path.join(dir, "workflows"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "workflows", ".studio-aliases.json"),
+    JSON.stringify({ "fixture-comfyui": { to: "fixture", backend: "comfyui" } }),
+  );
+  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
+  // On the first copy and on every later start, the replaced profile's bindings stay out.
+  store.migrate();
+  store.migrate();
+  assert.deepEqual(Object.keys(store.read().profiles), ["custom:fixture"]);
+  assert.deepEqual(Object.keys(store.read().negatives), ["custom:fixture"]);
+});
+
 test("a guide resolves per profile, binds to a drafted profile and records its export", (t) => {
   const dir = scratch(t);
   const seedFile = path.join(dir, "prompting.json");
