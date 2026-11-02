@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Replays the prompt assistant's eval cases (backend/fixtures/assistant-evals/) against the live
 // LiteLLM gateway and scores the replies: `mise run eval:assistant`. On demand only, never in CI.
-// It uses STUDIO_PROMPT_WRITER_URL, _KEY and _MODEL (the cloud model; STUDIO_ASSISTANT_MODEL when set) from the
+// It uses STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL (the cloud model; STUDIO_ASSISTANT_MODEL when set) from the
 // environment. `--record` writes the live replies
 // back as the recorded ones CI replays; review that diff before committing it.
 import fs from "node:fs";
@@ -19,7 +19,7 @@ try {
 }
 if (!settings) {
   console.error(
-    "Set STUDIO_PROMPT_WRITER_URL, STUDIO_PROMPT_WRITER_KEY and STUDIO_PROMPT_WRITER_MODEL to replay the evals live.",
+    "Set STUDIO_ASSISTANT_URL, STUDIO_ASSISTANT_KEY and STUDIO_ASSISTANT_CLOUD_MODEL to replay the evals live.",
   );
   process.exit(2);
 }

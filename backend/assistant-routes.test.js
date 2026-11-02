@@ -21,9 +21,9 @@ const { createAssistant } = await import("./assistant.js");
 const { builtInAccessProfile, effectiveAccountAccess } = await import("./account-policy.js");
 
 const environment = {
-  STUDIO_PROMPT_WRITER_URL: "http://litellm.invalid:4000",
-  STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
+  STUDIO_ASSISTANT_URL: "http://litellm.invalid:4000",
+  STUDIO_ASSISTANT_KEY: "fixture-key",
+  STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
 };
 const plain = { id: "custom:plain", label: "Plain Image", kind: "image", family: "krea2" };
 const uncensored = {
@@ -279,7 +279,7 @@ test("Settings rows: gateway models, vision and validated model names", async ()
   );
   assert.equal(assistantSettingValue("STUDIO_ASSISTANT_MODEL", " cloud/vision "), "cloud/vision");
   assert.throws(() => assistantSettingValue("STUDIO_ASSISTANT_MODEL", "bad\nmodel"), /valid model/);
-  assert.throws(() => assistantSettingValue("STUDIO_PROMPT_WRITER_KEY", "x"), /cannot be changed/);
+  assert.throws(() => assistantSettingValue("STUDIO_ASSISTANT_KEY", "x"), /cannot be changed/);
   assert.deepEqual(imageFromDataUrl("data:image/png;base64,AAAA"), {
     mime: "image/png",
     data: "AAAA",
@@ -363,7 +363,7 @@ test("stopping prompt assistance disconnects the actual gateway request without 
       app.use(express.json());
       registerAssistantRoutes(app, {
         engine: createAssistant(
-          { ...environment, STUDIO_PROMPT_WRITER_URL: gatewayUrl },
+          { ...environment, STUDIO_ASSISTANT_URL: gatewayUrl },
           { log: { warn: (message) => warnings.push(message) } },
         ),
         profiles: async () => [
