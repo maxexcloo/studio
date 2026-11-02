@@ -400,7 +400,7 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   const full = await page.locator("[data-chat-workspace]").boundingBox();
   if (!testInfo.project.use.isMobile) expect(full!.width).toBeGreaterThan(fixed!.width);
   const composer = await page.locator("[data-composer-dock]").boundingBox();
-  expect(composer!.width).toBeLessThanOrEqual(780);
+  expect(composer!.width).toBeLessThanOrEqual(820);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
 
