@@ -13,12 +13,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, RefreshCw } from "lucide-react";
 import type { MediaItem, QueueJob } from "../../types";
-import { useDraftSubmit } from "../generation/GenerationForm";
-import { GenerationProvider, useGeneration } from "../generation/GenerationProvider";
 import { assistantQuery } from "../generation/PromptAssistant";
 import { queueQuery } from "../generation/Queue";
 import { askNextSteps, nextStepsQuery } from "../taste/suggestions";
-import { mediaDraft, typedPrompt } from "./useMediaAction";
+import type { Iteration } from "./useMediaAction";
 import { derivation, versionGroups } from "./versions";
 import classes from "./MediaViewer.module.css";
 import { terminalStatuses } from "../../../../shared/queue";
@@ -83,15 +81,16 @@ const steppable = (item: MediaItem | undefined, assistant: boolean): item is Med
 function NextSteps({
   item,
   neighbour,
-  onQueued,
+  iterate,
+  pending,
 }: {
   item: MediaItem;
   neighbour?: MediaItem;
-  onQueued: (jobId: string) => void;
+  iterate: (iteration: Iteration) => void;
+  pending?: Iteration;
 }) {
   const client = useQueryClient();
-  const { input, update } = useGeneration();
-  const apply = useDraftSubmit({ onSubmitted: onQueued, embedded: true, inlineError: false });
+  const running = pending?.kind === "prompt";
   const query = nextStepsQuery(item.jobId!);
   const steps = useQuery(query);
   const more = useMutation({
@@ -125,15 +124,12 @@ function NextSteps({
                 key={step.label}
                 size="compact-sm"
                 radius="xl"
-                variant={input.prompt === step.prompt ? "light" : "default"}
+                variant="default"
                 title={step.request}
                 className={classes.step}
-                loading={apply.isPending && apply.variables?.prompt === step.prompt}
-                disabled={apply.isPending}
-                onClick={() => {
-                  update({ prompt: step.prompt });
-                  apply.mutate({ prompt: step.prompt });
-                }}
+                loading={running && pending.prompt === step.prompt}
+                disabled={running}
+                onClick={() => iterate({ kind: "prompt", prompt: step.prompt, operation: "image" })}
               >
                 {step.label}
               </Button>
@@ -154,49 +150,14 @@ function NextSteps({
   );
 }
 
-/**
- * The next steps' draft, in its own GenerationProvider so it never touches the page's: the item's
- * settings, refilled whenever the item changes. Its runs join the strip.
- */
-function ItemNextSteps({
-  item,
-  neighbour,
-  sessionId,
-  onQueued,
-}: {
-  item: MediaItem;
-  neighbour?: MediaItem;
-  sessionId?: string;
-  onQueued: (jobId: string) => void;
-}) {
-  const { setDraft, profiles } = useGeneration();
-  const client = useQueryClient();
-  useEffect(() => {
-    setDraft((previous) => ({
-      ...previous,
-      input: { ...previous.input, prompt: typedPrompt(item) },
-    }));
-    if (!profiles.length) return;
-    let current = true;
-    void mediaDraft(item, "image", profiles, client, sessionId)
-      .then(({ draft }) => current && setDraft(draft))
-      // Without its recorded profile the item's prompt runs on the default one.
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [item.id, profiles.length > 0]);
-  return <NextSteps key={item.jobId} item={item} neighbour={neighbour} onQueued={onQueued} />;
-}
-
 /** The version strip, the actions and the next steps under the viewer image. */
 export function MediaViewerDock({
   item,
   neighbour,
   family,
   choose,
-  sessionId,
-  onQueued,
+  iterate,
+  pending,
   actions,
 }: {
   item: MediaItem;
@@ -204,9 +165,9 @@ export function MediaViewerDock({
   neighbour?: MediaItem;
   family: Entry[];
   choose?: (item: MediaItem) => void;
-  sessionId?: string;
-  /** A run queued from a next step, which joins the strip. */
-  onQueued: (jobId: string) => void;
+  /** Queues a next step's prompt with the item's settings; its run joins the strip. */
+  iterate: (iteration: Iteration) => void;
+  pending?: Iteration;
   actions: React.ReactNode;
 }) {
   const assistant = useQuery(assistantQuery);
@@ -267,14 +228,13 @@ export function MediaViewerDock({
       )}
       {actions}
       {steppable(item, Boolean(assistant.data?.available)) && (
-        <GenerationProvider workspace="gallery">
-          <ItemNextSteps
-            item={item}
-            neighbour={neighbour}
-            sessionId={sessionId}
-            onQueued={onQueued}
-          />
-        </GenerationProvider>
+        <NextSteps
+          key={item.jobId}
+          item={item}
+          neighbour={neighbour}
+          iterate={iterate}
+          pending={pending}
+        />
       )}
     </div>
   );

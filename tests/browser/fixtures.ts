@@ -815,8 +815,16 @@ export async function viewerAction(page: Page, label: string) {
   const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
   if ((page.viewportSize()?.width || 1440) >= 768)
     return viewer.getByRole("button", { name: label, exact: true }).click();
-  const button = viewer.getByRole("button", { name: label, exact: true });
-  if (await button.count()) return button.click();
+  // Phone controls open their options on tap, so "X Options" is X itself there.
+  const button = viewer.getByRole("button", { name: label.replace(/ Options$/, ""), exact: true });
+  if (await button.count()) {
+    const opensMenu = (await button.getAttribute("aria-haspopup")) === "menu";
+    await button.click();
+    // A tap on a control with options opens them; their first item does what a desktop click does.
+    if (opensMenu && !label.endsWith(" Options"))
+      await page.getByRole("menu").getByRole("menuitem").first().click();
+    return;
+  }
   await viewer.getByRole("button", { name: "More", exact: true }).click();
   await page.getByRole("menuitem", { name: label.replace(/ Options$/, ""), exact: true }).click();
 }
