@@ -234,7 +234,7 @@ primary component reference and verify APIs against the installed version.
 - Dream is a card deck of background results, up to a maximum height, with a
   strip showing progress through the current batch. Swipe or press left to skip,
   right to keep and up to keep and queue variations. One compact bar under the
-  card offers Skip, Refine, Animate, Star, More Like This and Keep; Refine and
+  card offers Skip, Refine, Animate, Star, More Like This and Keep (phones: icons with short names under them, More Like This as Similar); Refine and
   Animate keep the result and stage it in the composer, Star keeps it too and
   More Like This keeps it and steers the next ideas toward it. Tapping a card,
   or its View action, opens it in the viewer over the deck; closing returns to

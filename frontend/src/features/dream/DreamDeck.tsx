@@ -353,28 +353,43 @@ export function DreamDeck({
       </>
     );
   const calibrating = top.kind === "calibration";
-  // Phones show the bar's icons alone, named by their tooltips.
+  // Phones show the bar's icons with a short name under each.
+  const labelled = (control: ReactNode, name: string) => (
+    <div className={classes.labelled}>
+      {control}
+      <span aria-hidden>{name}</span>
+    </div>
+  );
   const button = (
     choice: Verdict | PairAnswer,
     label: string,
     icon: ReactNode,
-    options: { hint?: string; tip?: string; primary?: boolean; disabled?: boolean } = {},
+    options: {
+      hint?: string;
+      tip?: string;
+      primary?: boolean;
+      disabled?: boolean;
+      short?: string;
+    } = {},
   ) => (
     <Tooltip
       key={choice}
       label={`${options.tip || label}${options.hint ? ` (${options.hint})` : ""}`}
     >
       {phone && icon ? (
-        <ActionIcon
-          variant={options.primary ? "filled" : "default"}
-          radius="xl"
-          size={44}
-          aria-label={label}
-          disabled={options.disabled}
-          onClick={() => void act(choice)}
-        >
-          {icon}
-        </ActionIcon>
+        labelled(
+          <ActionIcon
+            variant={options.primary ? "filled" : "default"}
+            radius="xl"
+            size={44}
+            aria-label={label}
+            disabled={options.disabled}
+            onClick={() => void act(choice)}
+          >
+            {icon}
+          </ActionIcon>,
+          options.short || label,
+        )
       ) : (
         <Button
           variant={options.primary ? "filled" : "default"}
@@ -387,6 +402,17 @@ export function DreamDeck({
         </Button>
       )}
     </Tooltip>
+  );
+  const star = (
+    <ActionIcon
+      variant="default"
+      radius="xl"
+      size={phone ? 44 : 36}
+      aria-label="Star"
+      onClick={() => void act("star")}
+    >
+      <Star size={18} />
+    </ActionIcon>
   );
   const view = (item: MediaItem, label = "View") => (
     <Tooltip label={label}>
@@ -488,19 +514,10 @@ export function DreamDeck({
             {button("animate", "Animate", <Clapperboard size={18} />, {
               disabled: !(image && dream),
             })}
-            <Tooltip label="Star">
-              <ActionIcon
-                variant="default"
-                radius="xl"
-                size={phone ? 44 : 36}
-                aria-label="Star"
-                onClick={() => void act("star")}
-              >
-                <Star size={18} />
-              </ActionIcon>
-            </Tooltip>
+            <Tooltip label="Star">{phone ? labelled(star, "Star") : star}</Tooltip>
             {button("more", "More Like This", <Layers size={18} />, {
               disabled: !(image && dream),
+              short: "Similar",
             })}
             {button("keep", calibrating ? "Like" : "Keep", <Heart size={18} />, {
               hint: "→",
