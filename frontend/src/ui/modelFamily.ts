@@ -17,7 +17,8 @@ export function setFamilyLabels(labels: Record<string, string> = {}) {
 export function modelFamilyLabel(family = "", familyName?: string): string {
   const label = (familyName || family).trim();
   if (!label) return "Unclassified";
-  if (!familyName && catalogue[family]) return catalogue[family];
+  // A family the catalogue knows has one name everywhere, whatever a profile spells it as.
+  if (catalogue[family]) return catalogue[family];
   const flux = /^flux[. _-]?(\d+)/i.exec(label);
   if (flux) return `Flux ${flux[1]}`;
   // A written family name (a profile's own, such as "Qwen-Image") is shown as written.
