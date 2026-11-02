@@ -5,7 +5,14 @@ export interface IdleItem {
   type?: string;
   status?: string;
   ownerId?: string;
+  uploaded?: boolean;
 }
+/**
+ * Whether work that reads pictures (captions, image search) takes the item: images, and uploaded
+ * videos by their first frame (references.js galleryStill), as they have no prompt to search by.
+ */
+export const pictured = (item: IdleItem) =>
+  item.type === "image" || (item.type === "video" && Boolean(item.uploaded));
 export type IdleTick =
   | "off"
   | "busy"

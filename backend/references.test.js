@@ -1,6 +1,8 @@
 import "./fixtures/local-worker.js";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,7 +12,7 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-references-"));
 process.env.STUDIO_DATA_DIR = temporary;
 const referenceAssets = await import(`./references.js?test=${Date.now()}`);
 const { pageGallery } = await import("./gallery/store.js");
-const upload = async (...args) => (await referenceAssets.saveUploadedImage(...args)).asset;
+const upload = async (...args) => (await referenceAssets.saveUpload(...args)).asset;
 
 test("an upload becomes its owner's uploaded gallery image, listed only under Uploads", async () => {
   const buffer = await sharp({
@@ -18,7 +20,7 @@ test("an upload becomes its owner's uploaded gallery image, listed only under Up
   })
     .png()
     .toBuffer();
-  const { item, asset } = await referenceAssets.saveUploadedImage({
+  const { item, asset } = await referenceAssets.saveUpload({
     buffer,
     name: "sample.png",
     mime: "image/png",
@@ -193,4 +195,42 @@ test("a video’s last frame is referenced only by its owner and only for finish
   } finally {
     for (const item of items) gallery.splice(gallery.indexOf(item), 1);
   }
+});
+
+test("a video upload is an uploaded gallery video, used by its first frame and read by its poster", async (t) => {
+  let encoder;
+  try {
+    encoder = createRequire(import.meta.url)("ffmpeg-static");
+    execFileSync(encoder, ["-version"], { stdio: "ignore" });
+  } catch {
+    return t.skip("ffmpeg is not installed");
+  }
+  const clip = path.join(temporary, "clip.mp4");
+  execFileSync(encoder, [
+    ...["-hide_banner", "-loglevel", "error", "-f", "lavfi"],
+    ...["-i", "testsrc=size=64x48:rate=12:duration=1", "-c:v", "libx264", "-pix_fmt", "yuv420p"],
+    clip,
+  ]);
+  const buffer = fs.readFileSync(clip);
+  const { item, asset } = await referenceAssets.saveUpload(
+    { buffer, name: "clip.mp4", mime: "video/mp4" },
+    "account-v",
+  );
+  assert.equal(item.type, "video");
+  assert.equal(item.uploaded, true);
+  assert.equal(item.mime, "video/mp4");
+  assert.match(item.outputName, /\.mp4$/);
+  assert.deepEqual([item.width, item.height], [64, 48]);
+  assert.ok(item.durationMs >= 900);
+  assert.match(asset.id, /^gallery:.+:frame-0$/);
+  assert.equal(asset.mime, "image/png");
+  const owner = { studioAccount: { userId: "account-v", role: "user" } };
+  const frame = await referenceAssets.bytesForReference(owner, asset.id);
+  assert.equal(frame.buffer.readUInt32BE(0), 0x89504e47, "the reference is the frame as a PNG");
+  const still = await referenceAssets.galleryStill(item);
+  assert.deepEqual([...still.subarray(0, 3)], [0xff, 0xd8, 0xff], "captions read its JPEG poster");
+  await assert.rejects(
+    referenceAssets.saveUpload({ buffer: buffer.subarray(0, 64), name: "cut.mp4" }, "account-v"),
+    /can’t be read/,
+  );
 });

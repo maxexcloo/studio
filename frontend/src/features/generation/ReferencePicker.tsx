@@ -40,6 +40,7 @@ import {
   placeReference,
   referenceKey,
   referenceLabel,
+  uploadTypes,
   useReferenceList,
   useReferencePlacement,
   type ReferenceTarget,
@@ -212,11 +213,7 @@ export function ReferencePicker({
   }, [viewport, choices.length, browser.scroll]);
   const uploadTile = (
     <div role="listitem">
-      <FileButton
-        accept="image/png,image/jpeg,image/webp"
-        multiple
-        onChange={(files) => uploadFiles(files)}
-      >
+      <FileButton accept={uploadTypes.join(",")} multiple onChange={(files) => uploadFiles(files)}>
         {(props) => (
           <UnstyledButton
             {...props}

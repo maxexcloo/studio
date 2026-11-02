@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createIdleWork, type IdleDocument, type IdleItem } from "./idle-work.ts";
+import { createIdleWork, pictured, type IdleDocument, type IdleItem } from "./idle-work.ts";
 import type { ModelImage } from "./model-content.ts";
 
 /** What a finished gallery image shows, in the assistant model's words, so search can find it. */
@@ -67,7 +67,7 @@ export function createCaptioner(options: {
     // The trickle and a Missing pass caption new images; Out of Date also redoes captions from older
     // rules, and All redoes every caption written before the pass began.
     wanted: (item, all, target) =>
-      item.type === "image" &&
+      pictured(item) &&
       (!all || target?.scope === "missing"
         ? !item.caption
         : target?.scope === "all"
