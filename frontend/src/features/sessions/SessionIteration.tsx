@@ -144,12 +144,13 @@ function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string
   const action = useMediaAction(item, sessionId);
   const [custom, setCustom] = useState(false);
   const animate = findAction(
-    // Only Animate is shown here, so the transfer and delete parts stay idle.
+    // Only Animate is shown here, so the transfer, delete and trim parts stay idle.
     useMediaActions(item, {
       transfer: useMediaTransfer(item, false),
       sessionId,
       onCustomAnimation: () => setCustom(true),
       onDelete: () => {},
+      onTrim: () => {},
     }),
     "animate",
   );

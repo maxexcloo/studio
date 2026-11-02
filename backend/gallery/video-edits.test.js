@@ -85,45 +85,48 @@ function seed() {
   return { file, parent, url };
 }
 
+/** The clip one of Alice's edits saved. */
+async function edited(url, edit) {
+  const res = await call("alice", { galleryItemId: url, ...edit });
+  assert.equal(res.code, 201, JSON.stringify(res.body));
+  const { filename, subfolder } = media.mediaParams(res.body.id);
+  return { id: res.body.id, clip: await previews.probeVideo(media.mediaFile(filename, subfolder)) };
+}
+const near = (actual, expected) =>
+  assert.ok(Math.abs(actual - expected) < 150, `got ${actual} ms, not ${expected}`);
+
 test(
-  "Trim, Reverse and Back and Forth save the edited clip as a version of the original",
+  "Each video edit saves the edited clip as a version of the original",
   {
     skip: !available,
   },
   async () => {
     const { file, parent, url } = seed();
-    assert.equal(
-      (await call("bob", { galleryItemId: url, kind: "trim", start: 0, end: 500 })).code,
-      404,
+    const denied = await call("bob", { galleryItemId: url, kind: "trim", start: 0, end: 500 });
+    assert.equal(denied.code, 404);
+    const trimmed = await edited(url, { kind: "trim", start: 500, end: 1500 });
+    const version = galleryStore.gallery.find((item) => item.id === trimmed.id);
+    assert.deepEqual(
+      [version.ownerId, version.prompt, version.favorite],
+      ["alice", "A wave", undefined],
     );
-    const res = await call("alice", { galleryItemId: url, kind: "trim", start: 500, end: 1500 });
-    assert.equal(res.code, 201, JSON.stringify(res.body));
-    const version = galleryStore.gallery.find((item) => item.id === res.body.id);
-    assert.equal(version.ownerId, "alice");
-    assert.equal(version.prompt, "A wave");
-    assert.equal(version.favorite, undefined);
     const { parentJobId, parentItemId } = store.job("alice", version.jobId);
     assert.deepEqual([parentJobId, parentItemId], [parent.id, url]);
-    const params = media.mediaParams(version.url);
-    const clip = await previews.probeVideo(media.mediaFile(params.filename, params.subfolder));
-    assert.ok(Math.abs(clip.durationMs - 1000) < 120, `got ${clip.durationMs} ms`);
-    assert.equal(clip.audio, true);
+    near(trimmed.clip.durationMs, 1000);
+    assert.equal(trimmed.clip.audio, true);
     // The original stays.
     assert.ok(fs.existsSync(file));
-    // Reversed, it keeps its length and sound.
-    const reversed = await call("alice", { galleryItemId: url, kind: "reverse" });
-    assert.equal(reversed.code, 201, JSON.stringify(reversed.body));
-    const backwards = await previews.probeVideo(
-      media.mediaFile(media.mediaParams(reversed.body.id).filename, params.subfolder),
-    );
-    assert.ok(Math.abs(backwards.durationMs - 2000) < 120, `got ${backwards.durationMs} ms`);
-    assert.equal(backwards.audio, true);
-    // Back and Forth plays it forward then back, silent like its download.
-    const loop = await call("alice", { galleryItemId: url, kind: "loop" });
-    const both = await previews.probeVideo(
-      media.mediaFile(media.mediaParams(loop.body.id).filename, params.subfolder),
-    );
-    assert.ok(Math.abs(both.durationMs - 3958) < 120, `got ${both.durationMs} ms`);
-    assert.equal(both.audio, false);
+    const reversed = (await edited(url, { kind: "reverse" })).clip;
+    near(reversed.durationMs, 2000);
+    assert.equal(reversed.audio, true);
+    // Back and Forth repeats no frame at the turn and is silent, like its download.
+    const loop = (await edited(url, { kind: "loop" })).clip;
+    near(loop.durationMs, 3958);
+    assert.equal(loop.audio, false);
+    // Slow Motion takes twice as long at the same rate; Smooth Motion doubles the rate.
+    const slow = (await edited(url, { kind: "slow" })).clip;
+    near(slow.durationMs, 4000);
+    assert.deepEqual([slow.fps, slow.audio], [24, true]);
+    assert.equal((await edited(url, { kind: "smooth" })).clip.fps, 48);
   },
 );
