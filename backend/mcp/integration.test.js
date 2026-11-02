@@ -2570,7 +2570,6 @@ test("prompts run as sent with LoRAs, and a guide’s recommended negative fills
     base: "",
     triggers: ["inkstyle"],
     note: "Put the trigger first.",
-    promptStyle: "tags",
     tags: ["ink wash", "lighthouse", "monochrome"],
     negative: "colour bleed",
   };
