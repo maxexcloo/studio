@@ -171,8 +171,7 @@ function CatalogueForm({
             />
             <TagsInput label="Trigger Words" {...form.getInputProps("triggers")} />
             <Text size="sm" c="dimmed">
-              Suggested Strength — these values guide generation controls without restricting expert
-              input.
+              Suggested Strength guides the controls without limiting expert input.
             </Text>
             <SimpleGrid cols={2}>
               {(["default", "min", "max", "step"] as const).map((key) => (

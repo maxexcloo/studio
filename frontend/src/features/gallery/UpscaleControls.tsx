@@ -104,7 +104,7 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
               description={
                 faceAvailable
                   ? "Refine faces using this image’s original model."
-                  : "Face detail requires the worker’s face detector and Impact Pack nodes."
+                  : "Face Detail needs the worker’s face detector and Impact Pack nodes."
               }
               checked={faceDetail && Boolean(faceAvailable)}
               disabled={!faceAvailable || upscale.isPending}
@@ -119,7 +119,7 @@ function UpscaleForm({ item, onQueued }: { item: MediaItem; onQueued: () => void
           {!status.data.ready && (
             <Alert color="yellow">
               {status.data.nodesInstalled
-                ? "The upscale models are unavailable on this worker."
+                ? "This worker has no upscale models."
                 : `The worker is missing ${status.data.missingNodes.join(", ")}.`}
             </Alert>
           )}

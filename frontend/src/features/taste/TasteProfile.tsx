@@ -74,7 +74,7 @@ export function TasteProfile() {
           minRows={4}
           maxLength={maxTasteSummary}
           disabled={!data || refresh.isPending}
-          placeholder="Studio learns what you like from your stars, comparisons and iterations. You can also describe your taste here."
+          placeholder="Describe your taste"
           value={value}
           onChange={setDraft}
         />
@@ -131,8 +131,7 @@ export function TasteProfile() {
           clear.reset();
         }}
       >
-        Studio forgets this summary and everything it learnt from your stars, comparisons and
-        iterations. Your gallery and stars stay as they are.
+        Studio forgets this summary and what it learnt. Your gallery and stars stay.
       </ConfirmDialog>
     </SettingGroup>
   );

@@ -73,8 +73,8 @@ export function MergeDuplicateProfiles({
           {count ? (
             <>
               <Text size="sm">
-                Each older profile is removed and its id becomes an alias of the kept one, so
-                results, presets and links that name it keep working.
+                Each older profile is removed and its ID becomes an alias of the kept one, so
+                results, presets and links keep working.
               </Text>
               <List size="sm" spacing={4}>
                 {data!.merges.map((item) => (

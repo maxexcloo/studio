@@ -54,7 +54,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [outcome] = useState(
     () =>
       ({
-        pending: "An administrator needs to approve this account before you can open Studio.",
+        pending: "An administrator needs to approve this account.",
         refused: "This account is disabled. Ask an administrator.",
         failed: "Single sign-on did not complete. Try again.",
         unavailable: "Single sign-on is unavailable right now.",

@@ -207,9 +207,7 @@ test("Offline workers and unavailable upscale models explain why submission is d
   await expect(page.getByRole("combobox", { name: "Upscale Quality", exact: true })).toHaveValue(
     "Balanced",
   );
-  await expect(page.getByRole("alert")).toContainText(
-    "The upscale models are unavailable on this worker.",
-  );
+  await expect(page.getByRole("alert")).toContainText("This worker has no upscale models.");
   await expect(page.getByRole("switch", { name: /^Face Detail/ })).toBeDisabled();
   await expect(queue).toBeDisabled();
   expect(submitted).toHaveLength(0);

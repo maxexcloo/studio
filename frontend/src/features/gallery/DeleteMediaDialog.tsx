@@ -55,11 +55,10 @@ export function DeleteMediaDialog({
       onConfirm={() => deletion.mutate(ids)}
       error={
         !!failedCount &&
-        `${failedCount} ${failedCount === 1 ? "item could" : "items could"} not be deleted. You can try again.`
+        `${failedCount} ${failedCount === 1 ? "item" : "items"} couldn’t be deleted. Try again.`
       }
     >
-      Delete {ids.length} {ids.length === 1 ? "item" : "items"} from your gallery? Studio-managed
-      media files will also be deleted.
+      Delete {ids.length} {ids.length === 1 ? "item and its file" : "items and their files"}?
     </ConfirmDialog>
   );
 }

@@ -86,8 +86,7 @@ export function SizePicker({
           <Stack gap="xs">
             <Text size="sm">The reference sets the output framing to {aspect}.</Text>
             <Text size="xs" c="dimmed">
-              Remove the reference or use Reference mode to choose a different aspect. Your custom
-              size is kept for when you return.
+              Remove the reference or use Reference mode to change it. Your custom size is kept.
             </Text>
           </Stack>
         ) : (

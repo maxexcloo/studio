@@ -202,8 +202,7 @@ export function usePromptAssistant({
         (action === "negative" && current.input.negative !== source.negative)
       ) {
         notifications.show({
-          message:
-            "Your inputs changed while assistance was running. Request assistance again to use the updated inputs.",
+          message: "Your inputs changed while the assistant worked. Try again to use them.",
         });
         return;
       }
@@ -324,7 +323,7 @@ export function usePromptAssistant({
         )}
         {!!references.length && info.vision && (
           <Text size="xs" c="dimmed" px="sm" py={6}>
-            Selected references are shared with the assistant when improving the prompt.
+            The assistant sees your selected references.
           </Text>
         )}
       </Menu.Dropdown>

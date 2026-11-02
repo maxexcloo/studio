@@ -411,7 +411,7 @@ function CompareDialog({ base, onClose }: { base: CompareBase; onClose: () => vo
               <LoraPicker value={shared} onChange={setShared} picker={loraPicker} />
               {dimension === "loras" && (
                 <Text size="xs" c="dimmed">
-                  The other LoRAs in the stack stay the same in every variant.
+                  Other LoRAs in the stack stay the same.
                 </Text>
               )}
             </Group>
