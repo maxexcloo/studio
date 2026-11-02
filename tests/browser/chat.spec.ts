@@ -253,7 +253,7 @@ test("Chat keeps discussion, requested generation inputs and variation results t
   );
   await expect(
     first.getByRole("button", { name: "Generate Video", exact: true }),
-  ).toHaveAccessibleDescription("This workflow requires a reference image.");
+  ).toHaveAccessibleDescription("Add a reference image.");
   await output.locator("label").filter({ hasText: "Image" }).click();
   await first
     .getByRole("textbox", { name: "Prompt", exact: true })

@@ -75,9 +75,7 @@ export function PromptFields({
           aria-label="Prompt"
           data-autofocus={autoFocus || undefined}
           placeholder={
-            input.kind === "image"
-              ? "Describe the image you want to create…"
-              : "Describe the motion and camera…"
+            input.kind === "image" ? "Describe the image" : "Describe the motion and camera"
           }
           // The phone prompt leaves room for the settings below; its editor takes the screen to type.
           autosize
@@ -108,7 +106,7 @@ export function PromptFields({
         <TextBox
           tools
           aria-label="Negative Prompt"
-          placeholder="Negative prompt: what to leave out…"
+          placeholder="Negative prompt: what to leave out"
           size="sm"
           autosize
           minRows={1}

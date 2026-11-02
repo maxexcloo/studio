@@ -54,8 +54,7 @@ export function PlacementChanges({
       <Text size="sm">Start: {names(preview.start)}</Text>
       <Text size="sm">Keep: {names(preview.keep)}</Text>
       <Text size="xs" c="dimmed">
-        Studio waits for accepted work on stopping workloads to finish and save, then stops them
-        before it starts the others.
+        Accepted work on the stopping workloads finishes and saves first.
       </Text>
     </Stack>
   );
@@ -111,7 +110,7 @@ function AutomaticControl({ settings }: { settings: RuntimeSettings }) {
       />
       <NumberSetting
         label="Park Idle After (Minutes)"
-        description="Stop an image or video workload after this long without work so its GPUs can rest; 0 never."
+        description="Frees an idle image or video workload’s GPUs; 0 never parks."
         value={settings.parkIdleMinutes}
         min={0}
         max={1440}
@@ -322,8 +321,7 @@ export function RuntimeWorkloads() {
           restart.reset();
         }}
       >
-        Studio waits for its accepted work to finish, stops it and starts it again with the same
-        model and GPUs.
+        Accepted work finishes first, then it restarts with the same model and GPUs.
       </ConfirmDialog>
       {!!history.length && (
         <DataTable

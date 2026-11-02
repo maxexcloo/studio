@@ -32,10 +32,9 @@ function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
   const resources = preset.resources || [];
   const loras = resources.filter((resource) => resource.folder === "loras");
   const settings = { ...preset.settings };
-  if (!profile) blockers.push("Choose a profile before applying these settings.");
+  if (!profile) blockers.push("Choose a profile first.");
   if (!preset.prompt) blockers.push("This inspiration has no prompt to apply.");
-  if (profile?.ready === false)
-    blockers.push("This profile needs compatible model parts before it can run.");
+  if (profile?.ready === false) blockers.push("This profile is missing compatible model parts.");
   if (resources.some((resource) => resource.status === "unsupported"))
     blockers.push("Some source files need a compatible model or a local filename match.");
   if (loras.some((resource) => !resource.localName))
@@ -58,7 +57,7 @@ function compatibleSettings(preset: LibraryPreset, profile?: Profile) {
       ["checkpoints", "diffusion_models"].includes(resource.folder || ""),
     );
     if (checkpoint?.profileId && checkpoint.profileId !== profile.id)
-      warnings.push("You selected a different profile from the source image.");
+      warnings.push("This profile differs from the source image’s.");
     for (const [field, options] of [
       ["sampler", "samplers"],
       ["scheduler", "schedulers"],

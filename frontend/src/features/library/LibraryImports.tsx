@@ -116,7 +116,7 @@ export function LibraryImports({ active, admin }: { active: boolean; admin: bool
         <Group gap="xs" wrap="nowrap" align="start">
           <TextInput
             aria-label="Civitai or Hugging Face URL"
-            placeholder="Civitai or Hugging Face link…"
+            placeholder="Civitai or Hugging Face link"
             value={url}
             onChange={(event) => setUrl(event.currentTarget.value)}
             required

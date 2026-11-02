@@ -412,8 +412,8 @@ export function LibraryImportReview({
             <>
               <SectionHeading>Other Versions</SectionHeading>
               <Text size="sm" c="dimmed">
-                Only versions compatible with this model’s family and worker are offered. Downloads
-                start only when selected.
+                Only versions that suit this model’s family and worker are listed. Nothing downloads
+                until you choose one.
               </Text>
               {record.offers.map((offer, index) => (
                 <Stack key={offer.key} gap="xs">

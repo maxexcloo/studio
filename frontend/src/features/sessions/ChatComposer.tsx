@@ -142,7 +142,7 @@ function ChatComposer() {
       <div className={classes.message} {...ideas.focusProps}>
         <TextBox
           aria-label="Message"
-          placeholder="Message Studio…"
+          placeholder="Message Studio"
           variant="unstyled"
           autosize
           minRows={1}

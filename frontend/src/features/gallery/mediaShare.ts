@@ -31,7 +31,7 @@ function ownMediaUrl(href: string) {
 }
 async function mediaBlob(target: MediaTransfer, signal?: AbortSignal) {
   const response = await fetch(ownMediaUrl(target.href), { credentials: "same-origin", signal });
-  if (!response.ok) throw new Error(`Studio could not prepare this media (${response.status}).`);
+  if (!response.ok) throw new Error(`Couldn’t prepare this media (${response.status}).`);
   return response.blob();
 }
 function downloadMedia(target: MediaTransfer) {

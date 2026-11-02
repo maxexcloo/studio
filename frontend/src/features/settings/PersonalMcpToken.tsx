@@ -60,8 +60,7 @@ export function PersonalMcpToken({ initial }: { initial?: McpTokenStatus }) {
   return (
     <Stack>
       <Text size="sm" c="dimmed">
-        Your personal MCP token has your account’s access. Use it as a bearer token separately from
-        the endpoint URL.
+        Carries your account’s access. Send it as a bearer token, not in the endpoint URL.
       </Text>
       {status.error && <Alert color="red">{status.error.message}</Alert>}
       {error && <Alert color="red">{error}</Alert>}

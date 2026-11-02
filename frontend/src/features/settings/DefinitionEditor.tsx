@@ -223,8 +223,7 @@ function DefinitionForm({
             <Stack gap="md">
               {!metadata ? (
                 <Alert color="yellow">
-                  This file needs its profile metadata repaired in Advanced JSON before structured
-                  editing is available.
+                  Repair this file’s profile metadata in Advanced JSON to edit it here.
                 </Alert>
               ) : (
                 <>
@@ -402,8 +401,8 @@ function DefinitionForm({
           <Tabs.Panel value="advanced" pt="md">
             <Stack gap="sm">
               <Text size="sm" c="dimmed">
-                Edit workflow graphs, control mappings or nested guide variants here. Structured
-                fields preserve everything else in this document.
+                For workflow graphs, control mappings and nested guide variants. The other tabs keep
+                everything else.
               </Text>
               <TextBox
                 label={kind === "profile" ? "Profile JSON" : "Guide JSON"}
@@ -486,8 +485,7 @@ function DefinitionForm({
                 />
               )}
               <Text size="xs" c="dimmed">
-                Restoring saves the selected version as a new version. Save or discard current edits
-                first.
+                Restoring saves it as a new version. Save or discard your edits first.
               </Text>
             </Stack>
           </Tabs.Panel>

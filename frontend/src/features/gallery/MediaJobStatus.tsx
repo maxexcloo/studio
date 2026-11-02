@@ -86,8 +86,7 @@ export function MediaJobStatus({
         </Alert>
       ) : !job && !loading ? (
         <Text size="sm" c="dimmed" ta="center">
-          No recorded generation is available to retry. Use Prompt to generate from this item’s
-          saved inputs.
+          Nothing to retry. Use Prompt to run this item’s settings again.
         </Text>
       ) : null}
       {job && (

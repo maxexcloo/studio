@@ -127,7 +127,7 @@ function UnfinishedItems() {
     <SettingRow
       label="Unfinished Items"
       description={[
-        "Every account's generations that haven't finished, to retry or delete one that is stuck.",
+        "Unfinished generations from every account, to retry or delete stuck ones.",
         unfinished.data && `${count(jobs.length)} now.`,
       ]
         .filter(Boolean)
@@ -238,7 +238,7 @@ export function MaintenanceSettings() {
           <GalleryPass
             route="/api/gallery/captions"
             label="Caption Gallery"
-            description="Describe and tag images for search, as fast as the assistant model allows while Studio is idle. Out of Date takes missing captions and those written under older rules."
+            description="Describe and tag images for search while Studio is idle. Out of Date covers missing captions and those from older rules."
             remaining="to caption"
             progressLabel="Caption Progress"
             scopeLabel="Images to Caption"
@@ -263,7 +263,7 @@ export function MaintenanceSettings() {
           <GalleryPass
             route="/api/gallery/embeddings"
             label="Index Gallery"
-            description="Read every image for Image Search, on Studio's CPU while it is idle. The first run downloads the model."
+            description="Index every image for Image Search on the CPU while Studio is idle. The first run downloads the model."
             remaining="to index"
             progressLabel="Index Progress"
           />

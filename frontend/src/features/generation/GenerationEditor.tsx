@@ -83,11 +83,11 @@ export function submitBlockedReason({
     : (backend ? backend.ready === false : profile.ready === false)
       ? backend?.reason
         ? `${backend.label} isn’t ready: ${backend.reason}`
-        : "This model is not ready to run."
+        : "This model isn’t ready."
       : !input.prompt.trim()
         ? "Describe what you want to create."
         : requiredReference
-          ? "This workflow requires a reference image."
+          ? "Add a reference image."
           : uploading
             ? "Wait for the reference upload to finish."
             : assisting
@@ -247,8 +247,8 @@ export function GenerationEditor({
           {!profile && (
             <Alert color="yellow">
               {input.profileId && profiles.length
-                ? "The selected profile is unavailable. Choose another model explicitly."
-                : "No models are available. Check your worker and mounted configuration."}
+                ? "The selected profile is unavailable. Choose another."
+                : "No models are available. Check the workers."}
             </Alert>
           )}
           {models.error && <Alert color="red">{models.error.message}</Alert>}

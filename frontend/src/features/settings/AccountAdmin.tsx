@@ -106,7 +106,7 @@ function GroupEditor({
           <TextInput label="Group Name" required {...form.getInputProps("name")} />
           <TextInput
             label="Group ID"
-            description="A stable lowercase name with letters, numbers, colons or hyphens."
+            description="Lowercase letters, numbers, colons or hyphens."
             required
             disabled={!!initial}
             {...form.getInputProps("id")}

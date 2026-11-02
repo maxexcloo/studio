@@ -68,9 +68,8 @@ export function SettingsPage() {
               </>
             ) : (
               <Text size="sm" c="dimmed">
-                Studio is running for one person on this computer, so there is no sign-in and every
-                feature is available. Accounts, groups and personal MCP access come with multi-user
-                mode.
+                Single-user mode: no sign-in and every feature on. Accounts, groups and personal MCP
+                access need multi-user mode.
               </Text>
             )}
             <TasteProfile />
