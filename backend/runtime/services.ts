@@ -224,7 +224,7 @@ export function createServicesObserver({
               endpoint = url
                 ? directAddress(url, kind === "text" ? "health" : "system_stats")
                 : undefined;
-              const gateway = environment.STUDIO_CHAT_GATEWAY_URL || environment.STUDIO_BIFROST_URL;
+              const gateway = environment.STUDIO_ASSISTANT_URL;
               if (
                 kind === "text" &&
                 endpoint &&

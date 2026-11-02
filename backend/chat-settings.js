@@ -1,18 +1,17 @@
 import { gatewayAddress } from "./assistant.js";
 
-const settingNames = [
-  "STUDIO_CHAT_GATEWAY_URL",
-  "STUDIO_CHAT_GATEWAY_KEY",
-  "STUDIO_CHAT_GATEWAY_MODELS",
-];
-
-/** Session Chat has its own gateway and explicit model allowlist. */
+/** Chat talks to the assistant's gateway (STUDIO_ASSISTANT_URL, _KEY) with its own model allowlist. */
 export function chatSettings(environment = process.env) {
-  const [url, key, allowed] = settingNames.map((name) => String(environment[name] || "").trim());
-  if (!url && !key && !allowed) return null;
-  const missing = settingNames.filter((_name, index) => ![url, key, allowed][index]);
-  if (missing.length)
-    throw Object.assign(new Error(`Chat needs ${missing.join(", ")}.`), { status: 503 });
+  const [url, credential, allowed] = [
+    "STUDIO_ASSISTANT_URL",
+    "STUDIO_ASSISTANT_KEY",
+    "STUDIO_CHAT_MODELS",
+  ].map((name) => String(environment[name] || "").trim());
+  if (!allowed) return null;
+  if (!url || !credential)
+    throw Object.assign(new Error("Chat needs STUDIO_ASSISTANT_URL and STUDIO_ASSISTANT_KEY."), {
+      status: 503,
+    });
   const patterns = allowed
     .split(",")
     .map((value) => value.trim())
@@ -23,12 +22,12 @@ export function chatSettings(environment = process.env) {
   )
     throw Object.assign(
       new Error(
-        "STUDIO_CHAT_GATEWAY_MODELS needs comma-separated exact model IDs or prefixes ending in *.",
+        "STUDIO_CHAT_MODELS needs comma-separated exact model IDs or prefixes ending in *.",
       ),
       { status: 503 },
     );
   try {
-    return { ...gatewayAddress(url, settingNames[0]), key, model: "", patterns };
+    return { ...gatewayAddress(url, "STUDIO_ASSISTANT_URL"), key: credential, model: "", patterns };
   } catch (error) {
     throw Object.assign(error, { status: 503 });
   }

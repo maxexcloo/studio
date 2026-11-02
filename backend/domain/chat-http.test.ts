@@ -17,6 +17,8 @@ test(
   async () => {
     const dataDir = mkdtempSync(path.join(os.tmpdir(), "studio-chat-http-"));
     const requests: any[] = [];
+    // The assistant shares the gateway for titles; these are Chat's own requests.
+    const chatRequests = () => requests.filter((request) => request.model !== "unrelated-writer/");
     const gateway = createServer(async (request, response) => {
       if (request.method === "GET" && request.url === "/v1/models") {
         response.writeHead(200, { "content-type": "application/json" });
@@ -92,11 +94,9 @@ test(
           STUDIO_DEMO: "1",
           STUDIO_MULTI_USER: "1",
           STUDIO_CLIPROXYAPI_URL: "",
-          STUDIO_CHAT_GATEWAY_URL: gatewayUrl,
-          STUDIO_CHAT_GATEWAY_KEY: "fixture",
-          STUDIO_CHAT_GATEWAY_MODELS: allowedModels,
-          STUDIO_ASSISTANT_URL: "http://127.0.0.1:1",
-          STUDIO_ASSISTANT_KEY: "unrelated-fixture",
+          STUDIO_ASSISTANT_URL: gatewayUrl,
+          STUDIO_ASSISTANT_KEY: "fixture",
+          STUDIO_CHAT_MODELS: allowedModels,
           STUDIO_ASSISTANT_CLOUD_MODEL: "unrelated-writer/",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -294,8 +294,8 @@ test(
       assert.equal(fourth.input.steps, 3);
       assert.deepEqual(fourth.input.referenceAssets, revisionInput.referenceAssets);
       assert.equal(fourth.parentJobId, second.id);
-      assert.equal(requests.at(-1).model, "fixture-text-model");
-      const revisionContext = requests.at(-1).messages.at(-1).content;
+      assert.equal(chatRequests().at(-1).model, "fixture-text-model");
+      const revisionContext = chatRequests().at(-1).messages.at(-1).content;
       assert.match(revisionContext, /Exact edited card prompt/);
       assert.match(revisionContext, /"steps":\{"before":\d+,"after":3\}/);
       const savedRevision = (await api(`/api/sessions/${session.id}/chat`)).messages;
@@ -356,15 +356,18 @@ test(
       assert.equal((await api(`/api/sessions/${session.id}/chat`)).messages.length, messageCount);
       await chat(session.id, "Discuss this image.", { operation: "image", input }, [asset.id]);
       assert.match(
-        JSON.stringify(requests.at(-1).messages.slice(1, -1)),
+        JSON.stringify(chatRequests().at(-1).messages.slice(1, -1)),
         /Exact edited card prompt/,
       );
-      assert.match(JSON.stringify(requests.at(-1).messages.slice(1, -1)), new RegExp(fourthId));
       assert.match(
-        requests.at(-1).messages.at(-1).content[1].image_url.url,
+        JSON.stringify(chatRequests().at(-1).messages.slice(1, -1)),
+        new RegExp(fourthId),
+      );
+      assert.match(
+        chatRequests().at(-1).messages.at(-1).content[1].image_url.url,
         /^data:image\/jpeg;base64,/,
       );
-      assert.equal(requests.at(-1).model, "alternate-text");
+      assert.equal(chatRequests().at(-1).model, "alternate-text");
       cookie = adminCookie;
       assert.equal((await request(`/api/sessions/${session.id}/chat`)).status, 404);
       assert.equal(
@@ -414,7 +417,7 @@ test(
       const unconfigured = await api("/api/chat/status");
       assert.equal(unconfigured.available, false);
       assert.deepEqual(unconfigured.models, []);
-      assert.match(unconfigured.reason, /STUDIO_CHAT_GATEWAY_MODELS/);
+      assert.match(unconfigured.reason, /not connected/);
       const beforeDisabled = requests.length;
       assert.equal(
         (

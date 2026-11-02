@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 
-test("Chat has a separate required gateway and anchored explicit model allowlist", () => {
+test("Chat uses the assistant's gateway with an anchored explicit model allowlist", () => {
   assert.equal(chatSettings({}), null);
   assert.equal(
     chatSettings({
@@ -13,9 +13,9 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
     null,
   );
   const environment = {
-    STUDIO_CHAT_GATEWAY_URL: "https://gateway.invalid/openai/v1",
-    STUDIO_CHAT_GATEWAY_KEY: "chat-fixture",
-    STUDIO_CHAT_GATEWAY_MODELS: "local/*,deepseek/specific",
+    STUDIO_ASSISTANT_URL: "https://gateway.invalid/openai/v1",
+    STUDIO_ASSISTANT_KEY: "chat-fixture",
+    STUDIO_CHAT_MODELS: "local/*,deepseek/specific",
   };
   const settings = chatSettings(environment);
   assert.equal(settings.endpoint, "https://gateway.invalid/openai/v1/chat/completions");
@@ -27,16 +27,18 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
     ["deepseek/specific-extra", false],
   ])
     assert.equal(chatModelAllowed(id, settings.patterns), allowed);
-  for (const name of Object.keys(environment))
+  // Without a model list Chat is off; with one, the assistant's gateway must be set.
+  assert.equal(chatSettings({ ...environment, STUDIO_CHAT_MODELS: "" }), null);
+  for (const name of ["STUDIO_ASSISTANT_URL", "STUDIO_ASSISTANT_KEY"])
     assert.throws(() => chatSettings({ ...environment, [name]: "" }), new RegExp(name));
   for (const patterns of [", ,", "local/*/text", "local/**"])
     assert.throws(
-      () => chatSettings({ ...environment, STUDIO_CHAT_GATEWAY_MODELS: patterns }),
-      /STUDIO_CHAT_GATEWAY_MODELS/,
+      () => chatSettings({ ...environment, STUDIO_CHAT_MODELS: patterns }),
+      /STUDIO_CHAT_MODELS/,
     );
   assert.throws(
-    () => chatSettings({ ...environment, STUDIO_CHAT_GATEWAY_URL: "not-a-url" }),
-    /STUDIO_CHAT_GATEWAY_URL/,
+    () => chatSettings({ ...environment, STUDIO_ASSISTANT_URL: "not-a-url" }),
+    /STUDIO_ASSISTANT_URL/,
   );
 });
 
