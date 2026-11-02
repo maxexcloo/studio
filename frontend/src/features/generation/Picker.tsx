@@ -151,7 +151,6 @@ export function PickerHeader<Tab extends string>({
   onTabChange,
   query,
   onQueryChange,
-  placeholder,
   filters,
   filterCount = 0,
   chips,
@@ -168,7 +167,6 @@ export function PickerHeader<Tab extends string>({
   onTabChange?: (tab: Tab) => void;
   query: string;
   onQueryChange: (query: string) => void;
-  placeholder: string;
   filters?: ReactNode;
   filterCount?: number;
   actions?: ReactNode;
@@ -191,7 +189,6 @@ export function PickerHeader<Tab extends string>({
           className={classes.search}
           data-autofocus
           aria-label={`Search ${searched}`}
-          placeholder={placeholder}
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
           onClear={() => onQueryChange("")}

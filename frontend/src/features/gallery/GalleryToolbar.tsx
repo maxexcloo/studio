@@ -93,7 +93,6 @@ export function GalleryToolbar({
     <SearchInput
       ref={searchInput}
       aria-label="Search Gallery"
-      placeholder="Search your generations…"
       size="sm"
       radius="xl"
       value={query}

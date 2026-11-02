@@ -223,7 +223,6 @@ export function PromptHistory({
           <Combobox.EventsTarget>
             <SearchInput
               aria-label="Search Prompt History"
-              placeholder="Search prompts…"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
               onClear={() => setQuery("")}

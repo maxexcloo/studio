@@ -317,7 +317,8 @@ primary component reference and verify APIs against the installed version.
 - Grid and Runs zoom between column counts (1–4 on phones, 2–8 wider) by
   pinching on phones, or Ctrl/Cmd+scroll and the slider on desktop, holding the
   tile under the fingers, pointer or view centre in place.
-  Shared `SearchInput` clears only the query, never a selected model/profile.
+  Shared `SearchInput` reads Search, never naming what it searches (its
+  accessible name does), and clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
 - Use notifications for action outcomes and inline alerts for failed forms or
   views. Notifications sit bottom right, raised clear of the composer and viewer

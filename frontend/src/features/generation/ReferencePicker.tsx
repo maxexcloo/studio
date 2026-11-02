@@ -282,7 +282,6 @@ export function ReferencePicker({
         searched={uploads ? "Uploads" : "Gallery"}
         query={query}
         onQueryChange={(query) => browse({ query })}
-        placeholder={uploads ? "Search uploads…" : "Search your generations…"}
         filterCount={activeFilters.length}
         chips={
           <FilterChips
