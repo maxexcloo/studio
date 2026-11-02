@@ -35,6 +35,8 @@ test("Image → Refine → Animate retains one session and can reopen saved work
     .getByRole("article", { name: "Iteration 2", exact: true })
     .getByRole("button", { name: "Animate", exact: true })
     .click();
+  // Animate offers the viewer's options; the composer stages a card.
+  await page.getByRole("menuitem", { name: "Animate in Composer", exact: true }).click();
   const animate = page.getByRole("region", { name: "Animate Iteration 2", exact: true });
   await animate
     .getByRole("textbox", { name: "Prompt", exact: true })

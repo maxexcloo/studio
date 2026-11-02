@@ -1,8 +1,22 @@
 import { useRef, useState, type CSSProperties } from "react";
-import { Anchor, Badge, Button, Group, Image, Paper, SimpleGrid, Stack, Text } from "@mantine/core";
-import { Pencil, Play } from "lucide-react";
+import {
+  Anchor,
+  Badge,
+  Button,
+  Group,
+  Image,
+  Menu,
+  Paper,
+  SimpleGrid,
+  Stack,
+  Text,
+} from "@mantine/core";
+import { ChevronDown, FastForward, Pencil, Play } from "lucide-react";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset } from "../../types";
 import { isProfile } from "../generation/payload";
+import { ActionMenuItems, findAction } from "../gallery/ActionBar";
+import { CustomAnimationDialog, useMediaActions } from "../gallery/MediaActions";
+import { useMediaTransfer } from "../gallery/mediaShare";
 import { MediaTile } from "../gallery/MediaTile";
 import { MediaTileActions } from "../gallery/MediaTileActions";
 import { useHoldToSelect } from "../gallery/useGalleryLayout";
@@ -122,34 +136,67 @@ function ResultTile({
   );
 }
 
-/** Refine (or Extend) and Animate stage a new card below for a single result. */
+/**
+ * Refine (or Extend) stages a new card below a single result; Animate ▾ (Extend ▾ on videos) offers
+ * the viewer's options: motion themes run at once, Custom Animation and the composer stage a card.
+ */
 function ResultActions({ item, sessionId }: { item: MediaItem; sessionId: string }) {
   const action = useMediaAction(item, sessionId);
+  const [custom, setCustom] = useState(false);
+  const animate = findAction(
+    // Only Animate is shown here, so the transfer and delete parts stay idle.
+    useMediaActions(item, {
+      transfer: useMediaTransfer(item, false),
+      sessionId,
+      onCustomAnimation: () => setCustom(true),
+      onDelete: () => {},
+    }),
+    "animate",
+  );
+  const video = item.type === "video";
   return (
     <Group gap="xs">
-      <Button
-        variant="default"
-        radius="xl"
-        size="compact-sm"
-        leftSection={<Pencil size={14} />}
-        loading={action.isPending && action.variables !== "animate"}
-        disabled={action.isPending}
-        onClick={() => action.mutate(item.type === "video" ? "extend" : "refine")}
-      >
-        {item.type === "video" ? "Extend" : "Refine"}
-      </Button>
-      {item.type === "image" && (
+      {!video && (
         <Button
           variant="default"
           radius="xl"
           size="compact-sm"
-          leftSection={<Play size={14} />}
-          loading={action.isPending && action.variables === "animate"}
+          leftSection={<Pencil size={14} />}
+          loading={action.isPending && action.variables === "refine"}
           disabled={action.isPending}
-          onClick={() => action.mutate("animate")}
+          onClick={() => action.mutate("refine")}
         >
-          Animate
+          Refine
         </Button>
+      )}
+      {animate?.menu && (
+        <Menu position="bottom-start" withinPortal>
+          <Menu.Target>
+            <Button
+              variant="default"
+              radius="xl"
+              size="compact-sm"
+              leftSection={video ? <FastForward size={14} /> : <Play size={14} />}
+              rightSection={<ChevronDown size={14} />}
+              loading={animate.loading}
+              disabled={animate.disabled}
+            >
+              {video ? "Extend" : "Animate"}
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown miw={220}>
+            {animate.note && <Menu.Label fw={400}>{animate.note}</Menu.Label>}
+            <ActionMenuItems groups={animate.menu} />
+          </Menu.Dropdown>
+        </Menu>
+      )}
+      {custom && (
+        <CustomAnimationDialog
+          item={item}
+          sessionId={sessionId}
+          opened
+          onClose={() => setCustom(false)}
+        />
       )}
     </Group>
   );
