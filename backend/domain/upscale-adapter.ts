@@ -1,10 +1,10 @@
 import type { QueueMedia } from "../../shared/queue.ts";
 import type { JobObservation, QueueAdapter } from "./queue.ts";
-import { RewriteStore, type OwnedJob } from "./store.ts";
+import { Store, type OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
 interface UpscaleOptions {
-  store: RewriteStore;
+  store: Store;
   jobs: Map<string, RecordValue>;
   itemFor(ownerId: string, itemId: string): RecordValue | undefined;
   execute(

@@ -5,18 +5,18 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
+import { openDatabase } from "../persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-video-edits-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_MULTI_USER = "1";
-const [{ registerVideoEditRoutes }, galleryStore, { RewriteStore }, media, previews] =
-  await Promise.all([
-    import("./video-edits.js"),
-    import("./store.js"),
-    import("../domain/store.ts"),
-    import("../media-paths.js"),
-    import("../video-previews.js"),
-  ]);
+const [{ registerVideoEditRoutes }, galleryStore, { Store }, media, previews] = await Promise.all([
+  import("./video-edits.js"),
+  import("./store.js"),
+  import("../domain/store.ts"),
+  import("../media-paths.js"),
+  import("../video-previews.js"),
+]);
 after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 let encoder;
 try {
@@ -31,7 +31,7 @@ try {
   available = false;
 }
 
-const store = new RewriteStore(":memory:");
+const store = new Store(openDatabase(":memory:"));
 let edit;
 registerVideoEditRoutes({ post: (_route, handler) => (edit = handler) }, { store });
 const account = (userId) => ({

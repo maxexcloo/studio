@@ -1,7 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import type {
   GenerationInput,
   GenerationOperation,
@@ -44,14 +42,14 @@ export const everyone = "*";
 /** Not yet handed to a provider: the work a pause holds and a move reorders. */
 export const pendingStatuses: ReadonlySet<string> = new Set(["writing", "queued", "waiting"]);
 
-export class RewriteStore {
+export class Store {
   readonly db: DatabaseSync;
 
-  constructor(filename: string) {
-    if (filename !== ":memory:") mkdirSync(path.dirname(filename), { recursive: true });
-    this.db = new DatabaseSync(filename);
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
-      CREATE TABLE IF NOT EXISTS studio_worker_models (id TEXT PRIMARY KEY, url TEXT NOT NULL, record TEXT NOT NULL);
+  /** `db` comes from runtimeDatabase (or openDatabase in tests), which sets its pragmas. */
+  constructor(db: DatabaseSync) {
+    this.db = db;
+    this.db
+      .exec(`CREATE TABLE IF NOT EXISTS studio_worker_models (id TEXT PRIMARY KEY, url TEXT NOT NULL, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS studio_sessions (
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, updated_at TEXT NOT NULL, record TEXT NOT NULL
       );
@@ -181,7 +179,7 @@ export class RewriteStore {
   ): "deleted" | "missing" | "active-jobs" | "active-chat" {
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      let outcome: ReturnType<RewriteStore["deleteSession"]> = "deleted";
+      let outcome: ReturnType<Store["deleteSession"]> = "deleted";
       const activity = this.sessionActivity(ownerId, id);
       if (!this.session(ownerId, id)) outcome = "missing";
       else if (activity) outcome = activity;

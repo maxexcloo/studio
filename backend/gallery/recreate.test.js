@@ -3,20 +3,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test, { after } from "node:test";
+import { openDatabase } from "../persistence/runtime.ts";
 
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "studio-recreate-"));
 process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_MULTI_USER = "1";
-const [{ registerRecreateRoute }, galleryStore, { RewriteStore }, { isVersion }] =
-  await Promise.all([
-    import("./recreate.js"),
-    import("./store.js"),
-    import("../domain/store.ts"),
-    import("../../shared/versions.ts"),
-  ]);
+const [{ registerRecreateRoute }, galleryStore, { Store }, { isVersion }] = await Promise.all([
+  import("./recreate.js"),
+  import("./store.js"),
+  import("../domain/store.ts"),
+  import("../../shared/versions.ts"),
+]);
 after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 
-const store = new RewriteStore(":memory:");
+const store = new Store(openDatabase(":memory:"));
 let recreate;
 registerRecreateRoute({ post: (_route, handler) => (recreate = handler) }, { store });
 function call(userId, body) {

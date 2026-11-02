@@ -6,7 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { createGenerationAdmission } from "../domain/admission.ts";
 import { GenerationQueue } from "../domain/queue.ts";
-import { RewriteStore } from "../domain/store.ts";
+import { Store } from "../domain/store.ts";
+import { openDatabase } from "../persistence/runtime.ts";
 import { McpMedia } from "./media.js";
 
 function deferred() {
@@ -20,7 +21,7 @@ function deferred() {
 async function fixture(t, beforeAcknowledgement) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "studio-mcp-sets-"));
   const filename = path.join(dir, "studio.sqlite");
-  let store = new RewriteStore(filename);
+  let store = new Store(openDatabase(filename));
   let queue = new GenerationQueue(store, {
     async submit() {
       throw new Error("Admission must not execute work in this fixture");
@@ -96,7 +97,7 @@ async function fixture(t, beforeAcknowledgement) {
     jobs: () => store.jobs(),
     async execute({ failFirst = false, firstStarted, releaseFirst } = {}) {
       store.close();
-      store = new RewriteStore(filename);
+      store = new Store(openDatabase(filename));
       const executed = [];
       const saved = [];
       queue = new GenerationQueue(store, {

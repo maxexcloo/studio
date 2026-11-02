@@ -3,13 +3,14 @@ import { once } from "node:events";
 import type { AddressInfo } from "node:net";
 import test from "node:test";
 import express from "express";
+import { openDatabase } from "../persistence/runtime.ts";
 import { createGenerationAdmission } from "./admission.ts";
 import { registerCompareRoutes, type ComparisonRecord } from "./compare.ts";
 import type { GenerationQueue } from "./queue.ts";
-import { RewriteStore } from "./store.ts";
+import { Store } from "./store.ts";
 
 test("compare runs queue one seeded set, read back per owner and record the starred winner", async (t) => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   let records: ComparisonRecord[] = [
     // A legacy record: gallery job IDs only, no labels.
     {

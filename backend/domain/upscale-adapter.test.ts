@@ -3,8 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { openDatabase } from "../persistence/runtime.ts";
 import { GenerationQueue, type QueueAdapter } from "./queue.ts";
-import { RewriteStore } from "./store.ts";
+import { Store } from "./store.ts";
 import { createUpscaleQueueAdapter, withUpscaleAdapter } from "./upscale-adapter.ts";
 
 const finishedTasks = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -12,7 +13,7 @@ const finishedTasks = () => new Promise<void>((resolve) => setImmediate(resolve)
 test("recorded upscale resumes its own prompt and blocks switching until the output is durably saved", async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-upscale-queue-"));
   const filename = path.join(directory, "studio.sqlite");
-  let store = new RewriteStore(filename);
+  let store = new Store(openDatabase(filename));
   const session = store.createSession("alice", "Existing Session", {
     prompt: "Keep these generation settings",
   });
@@ -79,7 +80,7 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
     assert.deepEqual(submitted, []);
     await queue.stop();
     store.close();
-    store = new RewriteStore(filename);
+    store = new Store(openDatabase(filename));
     queue = new GenerationQueue(store, withUpscaleAdapter(other, adapter(true)));
     await queue.tick();
     await finishedTasks();
@@ -105,7 +106,7 @@ test("recorded upscale resumes its own prompt and blocks switching until the out
 });
 
 test("only the owner's accepted upscale is cancelled, and admission stays held until it is confirmed stopped", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const session = store.createSession("alice", "Image", { prompt: "Original input" });
   const job = store.enqueue(
     "alice",
@@ -162,7 +163,7 @@ test("only the owner's accepted upscale is cancelled, and admission stays held u
 });
 
 test("an explicitly refused upscale can retry, while a lost acknowledgement is never submitted twice", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const session = store.createSession("alice");
   const job = store.enqueue(
     "alice",

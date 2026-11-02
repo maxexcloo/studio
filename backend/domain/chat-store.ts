@@ -6,7 +6,7 @@ export class ChatStore {
   readonly db: DatabaseSync;
   constructor(db: DatabaseSync) {
     this.db = db;
-    // RewriteStore owns the schema. A stream cannot survive an application restart. Keep its partial answer visible.
+    // Store owns the schema. A stream cannot survive an application restart. Keep its partial answer visible.
     db.exec(
       "UPDATE studio_chat_messages SET record = json_set(record, '$.status', 'failed') WHERE json_extract(record, '$.status') = 'streaming'",
     );
@@ -44,7 +44,7 @@ export class ChatStore {
       .run(message.createdAt, message.createdAt, sessionId, ownerId);
     return message;
   }
-  /** Titles a chat once, unless the user renamed it first (`RewriteStore.updateSession`). */
+  /** Titles a chat once, unless the user renamed it first (`Store.updateSession`). */
   generatedTitle(ownerId: string, sessionId: string, title: string): boolean {
     return (
       this.db

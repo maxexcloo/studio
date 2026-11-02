@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RewriteStore } from "./store.ts";
+import { openDatabase } from "../persistence/runtime.ts";
+import { Store } from "./store.ts";
 import { ChatStore } from "./chat-store.ts";
 import { ChatService } from "./chat.ts";
 import type { ChatEvent } from "../../shared/chat.ts";
@@ -13,7 +14,7 @@ import { createChatRouter } from "./chat-routes.ts";
 
 const frame = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`;
 function setup(chunks: string[]) {
-  const db = new RewriteStore(":memory:");
+  const db = new Store(openDatabase(":memory:"));
   const session = db.createSession("alice");
   const store = new ChatStore(db.db);
   const admissions: unknown[] = [];
@@ -443,7 +444,7 @@ test("unauthorised reference fails before sending any content or persisting mess
 test("restart retains prepared action and partial text without resubmitting a generation", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "studio-chat-"));
   try {
-    let db = new RewriteStore(path.join(directory, "studio.sqlite"));
+    let db = new Store(openDatabase(path.join(directory, "studio.sqlite")));
     const session = db.createSession("alice");
     new ChatStore(db.db).add("alice", session.id, {
       role: "assistant",
@@ -452,7 +453,7 @@ test("restart retains prepared action and partial text without resubmitting a ge
       draft: { operation: "refine", input: { prompt: "blue", profileId: "chosen" } },
     });
     db.close();
-    db = new RewriteStore(path.join(directory, "studio.sqlite"));
+    db = new Store(openDatabase(path.join(directory, "studio.sqlite")));
     const messages = new ChatStore(db.db).messages("alice", session.id);
     assert.equal(messages[0].status, "failed");
     assert.equal(messages[0].content, "Making it blue");
@@ -559,7 +560,7 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
   }
 });
 test("new chats get a model title, stay New Chat while it is offline and never replace a rename", async () => {
-  const db = new RewriteStore(":memory:");
+  const db = new Store(openDatabase(":memory:"));
   let reply: (() => Response) | undefined;
   const requests: Record<string, unknown>[] = [];
   const service = new ChatService({

@@ -3,9 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { openDatabase } from "../persistence/runtime.ts";
 import { GenerationQueue, type JobObservation, type QueueAdapter } from "./queue.ts";
 import { pausedReason } from "../../shared/queue.ts";
-import { everyone, queuePriority, RewriteStore } from "./store.ts";
+import { everyone, queuePriority, Store } from "./store.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -16,7 +17,7 @@ function deferred() {
 }
 
 function fixture(filename = ":memory:") {
-  const store = new RewriteStore(filename);
+  const store = new Store(openDatabase(filename));
   const submitted: string[] = [];
   const observations = new Map<string, JobObservation>();
   const events: string[] = [];
@@ -252,7 +253,7 @@ test("a started MCP set stays contiguous and its order survives restart", async 
   const filename = path.join(dir, "studio.sqlite");
   const first = fixture(filename);
   const session = first.store.createSession("alice");
-  const enqueue = (store: RewriteStore, origin = {}) =>
+  const enqueue = (store: Store, origin = {}) =>
     store.enqueue("alice", session.id, {}, "image", undefined, undefined, undefined, origin).id;
   const a1 = enqueue(first.store, mcp("a"));
   const a2 = enqueue(first.store, mcp("a"));
@@ -273,7 +274,7 @@ test("a started MCP set stays contiguous and its order survives restart", async 
 
 /** Enqueues an image job loading `model` (and optional LoRAs) with an optional queue origin. */
 const loading =
-  (store: RewriteStore, sessionId: string) =>
+  (store: Store, sessionId: string) =>
   (model: string, origin = {}, loras?: unknown[]) =>
     store.enqueue(
       "alice",
@@ -424,7 +425,7 @@ test("cancellation while readiness is pending releases its acquired runtime admi
 test("editable user presets are independent from profiles and owner scoped", () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-presets-"));
   const filename = path.join(directory, "studio.sqlite");
-  let store = new RewriteStore(filename);
+  let store = new Store(openDatabase(filename));
   try {
     const preset = store.createPreset("alice", "Birds", {
       prompt: "A bird",
@@ -438,7 +439,7 @@ test("editable user presets are independent from profiles and owner scoped", () 
       input: { prompt: "A blue bird", profileId: "unchanged-profile-id" },
     });
     store.close();
-    store = new RewriteStore(filename);
+    store = new Store(openDatabase(filename));
     assert.deepEqual(store.presets("alice"), [updated]);
     assert.equal(store.deletePreset("bob", preset.id), false);
     assert.equal(store.deletePreset("alice", preset.id), true);

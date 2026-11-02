@@ -6,10 +6,10 @@ import os from "node:os";
 import path from "node:path";
 import test, { type TestContext } from "node:test";
 import express from "express";
-import { closeRuntimeDatabase } from "../persistence/runtime.ts";
+import { closeRuntimeDatabase, openDatabase } from "../persistence/runtime.ts";
 import { createFinishing, registerFinishingRoutes, type FinishingItem } from "./finishing.ts";
 import { terminalStatuses } from "../../shared/queue.ts";
-import { queuePriority, RewriteStore } from "./store.ts";
+import { queuePriority, Store } from "./store.ts";
 
 type Item = FinishingItem & { id: string; ownerId: string };
 const image = (id: string, ownerId = "alice", extra: Partial<Item> = {}): Item => ({
@@ -25,7 +25,7 @@ const image = (id: string, ownerId = "alice", extra: Partial<Item> = {}): Item =
 /** Finishing with fakes for the gallery, the upscale worker and the queue; nothing upscales. */
 function fixture(t: TestContext) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-finishing-"));
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   t.after(() => {
     finishing.stop();
     store.close();

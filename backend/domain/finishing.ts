@@ -1,7 +1,7 @@
 import type { FinishingSettings, FinishingStatus, UpscaleQuality } from "../../shared/upscale.ts";
 import { readRuntimeDocument, writeRuntimeDocument } from "../persistence/runtime.ts";
 import type { DomainResponse } from "./admission.ts";
-import { queuePriority, type OwnedJob, type RewriteStore } from "./store.ts";
+import { queuePriority, type OwnedJob, type Store } from "./store.ts";
 
 export interface FinishingItem {
   id?: string;
@@ -51,7 +51,7 @@ const finishingJob = (job: OwnedJob) => job.priority === queuePriority.finishing
  */
 export function createFinishing(options: {
   dataDir: string;
-  store: RewriteStore;
+  store: Store;
   owners(): string[];
   /** Whether the account may upscale its gallery images. */
   allowed(ownerId: string): boolean;

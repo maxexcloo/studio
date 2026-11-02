@@ -9,7 +9,7 @@ import {
   type UnfinishedJob,
 } from "../../shared/queue.ts";
 import { GenerationQueue } from "./queue.ts";
-import { everyone, publicJob, queuePriority, RewriteStore, type OwnedJob } from "./store.ts";
+import { everyone, publicJob, queuePriority, Store, type OwnedJob } from "./store.ts";
 
 interface Request {
   studioAccount?: { userId: string; role?: string };
@@ -32,9 +32,9 @@ const owner = (req: Request) => req.studioAccount?.userId || "";
  * The person's queue: Dream's background jobs stay out of it (Dream's own pause stops them), and
  * so do failed jobs the person cleared.
  */
-const listed = (store: RewriteStore, ownerId: string) =>
+const listed = (store: Store, ownerId: string) =>
   store.jobs(ownerId).filter((job) => job.priority !== queuePriority.dream && !job.cleared);
-const clear = (store: RewriteStore, job: OwnedJob) => store.save({ ...job, cleared: true });
+const clear = (store: Store, job: OwnedJob) => store.save({ ...job, cleared: true });
 const missing = (res: Response) => res.status(404).json({ error: "Not found." });
 const object = (value: unknown): value is GenerationInput =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -51,7 +51,7 @@ export function registerRewriteRoutes(
     title,
     admitted,
   }: {
-    store: RewriteStore;
+    store: Store;
     queue: GenerationQueue;
     resourceFor?: (input: GenerationInput) => string | Promise<string>;
     validate?: (
@@ -314,7 +314,7 @@ export function registerMaintenanceRoutes(
     queue,
     requireAdmin,
   }: {
-    store: RewriteStore;
+    store: Store;
     queue: GenerationQueue;
     requireAdmin(req: Request, res: Response): boolean;
   },

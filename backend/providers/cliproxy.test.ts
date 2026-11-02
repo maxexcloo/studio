@@ -4,12 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import sharp from "sharp";
+import { openDatabase } from "../persistence/runtime.ts";
 import { CliProxyMedia, type CloudRequest } from "./cliproxy.ts";
 import { providerMediaWriter } from "./media.ts";
 import { studioCloudProfiles } from "./profiles.ts";
 import { createCloudQueueAdapter } from "../domain/cloud-adapter.ts";
 import { GenerationQueue } from "../domain/queue.ts";
-import { RewriteStore } from "../domain/store.ts";
+import { Store } from "../domain/store.ts";
 const { writeBytesFileAsync } = await import(new URL("../json-store.js", import.meta.url).href);
 const { withPngText } = await import(new URL("../png-text.js", import.meta.url).href);
 
@@ -87,7 +88,7 @@ function fixture() {
 
 test("direct image refinement uses advertised provider model and saves real owned media", async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-provider-"));
-  const store = new RewriteStore(path.join(directory, "studio.sqlite"));
+  const store = new Store(openDatabase(path.join(directory, "studio.sqlite")));
   const remote = fixture();
   const published: string[] = [];
   try {
@@ -137,7 +138,7 @@ test("direct image refinement uses advertised provider model and saves real owne
 });
 
 test("confirmed provider refusal can be retried with a distinct durable generation ID", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   remote.rejectImages(true);
   try {
@@ -166,7 +167,7 @@ test("confirmed provider refusal can be retried with a distinct durable generati
 test("async video resumes its persisted provider ID after restart without another POST", async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "studio-provider-"));
   const filename = path.join(directory, "studio.sqlite");
-  let store = new RewriteStore(filename);
+  let store = new Store(openDatabase(filename));
   const remote = fixture();
   const options = () => ({
     store,
@@ -198,7 +199,7 @@ test("async video resumes its persisted provider ID after restart without anothe
     await new GenerationQueue(store, createCloudQueueAdapter(options())).tick();
     assert.equal(store.job("alice", job.id)?.providerJobId, "provider-video-7");
     store.close();
-    store = new RewriteStore(filename);
+    store = new Store(openDatabase(filename));
     remote.complete();
     await new GenerationQueue(store, createCloudQueueAdapter(options())).tick();
     assert.equal(store.job("alice", job.id)?.status, "completed");
@@ -222,7 +223,7 @@ test("async video resumes its persisted provider ID after restart without anothe
 });
 
 test("lost synchronous response is recovered without resubmit and only its owner may cancel", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   remote.failImages();
   try {
@@ -262,7 +263,7 @@ test("lost synchronous response is recovered without resubmit and only its owner
 });
 
 test("animating an image sends it as the first frame, shaped by the image, within provider limits", async () => {
-  const store = new RewriteStore(":memory:");
+  const store = new Store(openDatabase(":memory:"));
   const remote = fixture();
   const node = {
     class_type: "GrokMedia",
