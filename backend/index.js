@@ -192,6 +192,7 @@ import {
 import { fillVideoSizes } from "./library.js";
 import {
   getComfyVideoGif,
+  getComfyVideoLoop,
   getComfyVideoPoster,
   getComfyVideoPreview,
   sendVideoPreview,
@@ -3058,6 +3059,13 @@ app.get("/comfy/video-preview", async (req, res) => {
         .type("image/gif")
         .attachment(`${path.parse(filename).name}.gif`)
         .send(await getComfyVideoGif(filename, subfolder, type));
+      return;
+    }
+    if (req.query.format === "loop") {
+      res
+        .type("video/mp4")
+        .attachment(`${path.parse(filename).name} loop.mp4`)
+        .send(await getComfyVideoLoop(filename, subfolder, type));
       return;
     }
     // The still comes from the original, ahead of any preview still being encoded.
