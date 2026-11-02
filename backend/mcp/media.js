@@ -14,6 +14,7 @@ import {
   mcpSize,
   prepareLoras,
   resolveLoraName,
+  videoLength,
 } from "./controls.js";
 import { compatibleLoras, loraCompatibility, loraName } from "../lora/policy.js";
 import { recommendedNegative } from "../lora/prompts.js";
@@ -590,7 +591,8 @@ export class McpMedia {
         assetId: id,
       })),
     };
-    for (const key of ["width", "height", "steps"])
+    // A video's length comes only from Reuse's length (videoLength).
+    for (const key of ["width", "height", "steps", "duration", "frames"])
       if (args[key] !== undefined) body[key] = args[key];
     // A profile framed by its reference draws at the primary reference's proportions, as the
     // composer does, unless that reference only guides (reference_role "reference").
@@ -1244,13 +1246,24 @@ export class McpMedia {
       Object.assign(args, mcpSize(profile, { aspect: `${item.width}:${item.height}` }));
     return { profile, args };
   }
-  /** Generate arguments that animate a finished image from its first frame, or extend a video from its last, with the chosen video profile. */
+  /**
+   * Generate arguments that animate a finished image from its first frame, or extend a video from
+   * its last (saved joined onto it), with the chosen video profile and `length` in seconds.
+   */
   async animate(
     owner,
     jobId,
     index,
     item,
-    { tier, prompt, count = 1, cloud = false, profile: named = null, note: namedNote = "" } = {},
+    {
+      tier,
+      prompt,
+      count = 1,
+      cloud = false,
+      length,
+      profile: named = null,
+      note: namedNote = "",
+    } = {},
   ) {
     let width, height, frame;
     if (item.type === "video") {
@@ -1277,12 +1290,24 @@ export class McpMedia {
         `first-frame.${output.mime.split("/")[1]}`,
       ));
     }
-    // A named profile picks the video model outright; otherwise Animate's own rule does, as in the app.
-    let base = named;
+    // A named profile picks the video model outright. As in the app, an extension otherwise continues
+    // on its video's own model while that runs, and anything else takes Animate's own pick.
+    const videos = await this.profiles("video", owner);
+    const own =
+      item.type === "video" &&
+      !tier &&
+      !cloud &&
+      videos.find(
+        (profile) =>
+          profile.id === canonicalProfileId(item.settings.profileId) &&
+          profile.mediaInputs?.length &&
+          !["offline", "parked"].includes(profile.availability),
+      );
+    let base = named || own;
     let note = namedNote;
-    if (!named) {
+    if (!base) {
       const models = await this.catalogue(owner);
-      const choice = animateProfile(await this.profiles("video", owner), {
+      const choice = animateProfile(videos, {
         defaultId: models.defaults?.videoModel,
         localRunning: models.backends?.video?.available !== false,
         localParked: models.backends?.video?.parked === true,
@@ -1302,6 +1327,7 @@ export class McpMedia {
       prompts: [prompt || item.prompt],
       count,
       reference_asset_ids: [frame.id],
+      ...(length ? videoLength(profile, length) : {}),
     };
     const controls = mcpControls(profile);
     const size = controls.width && controls.height ? frameSize(base, width, height) : null;
