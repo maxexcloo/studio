@@ -73,11 +73,11 @@ primary component reference and verify APIs against the installed version.
   sidebar, flush below the header through the viewport bottom, with a distinct
   neutral surface and divider, listing Chats under date headings (Today,
   Yesterday, Previous 7 Days, Previous 30 Days, Older), under a Chats heading
-  with a small New Chat icon. Phones use a session Drawer opened by the status
-  action, which shows a Chats icon in Chat, or by Chats in the No Chat Selected
-  view; its header carries New Chat beside Close. With no chat selected, the
+  with a small New Chat icon. Phones list the Chats in place of No Chat
+  Selected, and the status action (a Chats icon in Chat) opens them as a Drawer
+  whose header carries New Chat beside Close. With no chat selected, the
   message box starts one; an open chat's heading ends with a close cross back to
-  No Chat Selected. There is no other New Chat button. The Chat composer
+  No Chat Selected (the list on phones). There is no other New Chat button. The Chat composer
   stays centred in its main pane and capped at the same `--studio-composer-width` as the gallery composer in
   both layout modes; Full does not impose a separate conversation width.
 - Dialogs are centred on a raised plane from the theme defaults: a dimmed,

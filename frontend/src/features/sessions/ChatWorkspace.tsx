@@ -23,9 +23,6 @@ import classes from "./ChatWorkspace.module.css";
 
 export const chatShellClass = classes.shell;
 
-/** Opens the header's Chats list, for phones, which have no sidebar. */
-export const openChatsEvent = "studio-open-chats";
-
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 /** The time for today's chats, otherwise the date (with the year once it differs). */
 function updated(value: string) {

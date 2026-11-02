@@ -748,6 +748,13 @@ export function selectionAction(page: Page, label: string, role: "button" | "lin
     .getByRole(role, { name: label, exact: true });
 }
 
+/** Chat with nothing open: desktop says so; phones list the chats in its place. */
+export async function expectNoChatOpen(page: Page) {
+  if ((page.viewportSize()?.width || 1440) < 768)
+    await expect(page.getByRole("region", { name: "Chats", exact: true })).toBeVisible();
+  else await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+}
+
 /** Turns on Compare Upscale in the viewer's Upscale options, then closes them. */
 export async function compareUpscale(page: Page) {
   await viewerAction(page, "Upscale Options");
