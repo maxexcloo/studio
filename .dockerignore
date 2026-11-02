@@ -1,12 +1,14 @@
 **/.env*
+**/*.test.js
+**/*.test.ts
 *.log
-*.test.js
 *.tsbuildinfo
 .claude
 .git
 .github
 .mise.toml
 artifacts
+backend/fixtures
 worker/comfyui/*/test_*.py
 data
 node_modules
@@ -18,4 +20,3 @@ release
 renovate.json5
 test-results
 tests
-**/*.test.ts
