@@ -89,11 +89,14 @@ function playVideo(media: HTMLVideoElement | null) {
 
 /** The opened video, its controls hidden until a pointer moves over or taps it, then fading again. */
 function ViewerVideo({
+  id,
   src,
   width,
   height,
   swipe,
 }: {
+  /** The item's id, so Use Frame as Reference finds the frame showing. */
+  id: string;
   src: string;
   width?: number;
   height?: number;
@@ -110,6 +113,7 @@ function ViewerVideo({
   return (
     <video
       ref={playVideo}
+      data-media-id={id}
       src={src}
       width={width}
       height={height}
@@ -438,6 +442,7 @@ export function MediaViewer({
               ) : item.type === "video" ? (
                 <ViewerVideo
                   key={`${item.id}:${source.url}`}
+                  id={item.id}
                   src={source.url}
                   width={source.width}
                   height={source.height}

@@ -70,7 +70,11 @@ export function registerReferenceRoutes(app, { uploaded = () => {} } = {}) {
     if (!canReference && !requireLocal(req, res)) return;
     try {
       const asset = referenceAssetFromGallery(req, String(req.body?.galleryItemId || ""), {
-        frame: req.body?.frame === "last" ? "last" : "",
+        // A video's last frame, or the one at a time in milliseconds.
+        frame:
+          req.body?.frame === "last" || (Number.isInteger(req.body?.frame) && req.body.frame >= 0)
+            ? req.body.frame
+            : "",
       });
       res.json({ ok: true, asset });
     } catch (error) {
