@@ -126,7 +126,6 @@ import {
   comfy,
   inDotFolder,
   localOutputFile,
-  outputMediaPattern,
   comfyUrl,
   host,
   noteComfyFetchError,
@@ -253,7 +252,14 @@ import {
 } from "./upscale-jobs.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { diagnostics, diagnosticsText } from "./diagnostics.js";
-import { isMediaUrl, mediaRoot, mediaSubfolder, mediaType } from "./media-paths.js";
+import {
+  isMediaUrl,
+  mediaRoot,
+  mediaSubfolder,
+  mediaType,
+  outputMediaPattern,
+  videoPattern,
+} from "./media-paths.js";
 import { gatedPath } from "./gated-path.js";
 import { ingestRecords, ingestRunResults, noteIngested, removeComfyFiles } from "./media-store.js";
 import { forgetComfyRun } from "./comfy-traces.js";
@@ -3036,7 +3042,7 @@ app.get("/comfy/video-preview", async (req, res) => {
   }
   if (
     !["output", "input", "temp", mediaType].includes(type) ||
-    !/\.(mp4|webm|mov|mkv)$/i.test(filename) ||
+    !videoPattern.test(filename) ||
     filename !== path.basename(filename) ||
     /[\\/]/.test(filename) ||
     inDotFolder(subfolder)
@@ -3101,7 +3107,7 @@ app.get("/comfy/thumb", async (req, res) => {
   }
   try {
     // A video's thumbnail is its poster, so every small view that asks for one gets a picture.
-    if (/\.(mp4|webm|mov|mkv|m4v)$/i.test(filename)) {
+    if (videoPattern.test(filename)) {
       await sendVideoPoster(
         req,
         res,

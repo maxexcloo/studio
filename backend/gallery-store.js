@@ -14,7 +14,7 @@ import {
 } from "./persistence/gallery-rows.ts";
 import { generationRecord } from "./generation-record.js";
 import { hasGalleryFilters, matchesGalleryFilters } from "./gallery-filters.js";
-import { mediaFile, mediaParams, mediaPath } from "./media-paths.js";
+import { mediaFile, mediaParams, mediaPath, videoPattern } from "./media-paths.js";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -827,7 +827,7 @@ export function outputsFrom(history) {
         subfolder: item.subfolder || "",
         type: item.type || "output",
       });
-      const isVideo = collectionType === "video" || /\.(mp4|webm|mov|mkv)$/i.test(filename);
+      const isVideo = collectionType === "video" || videoPattern.test(filename);
       urls.push({
         url: `/comfy/view?${params}`,
         thumbnailUrl: isVideo ? undefined : `/comfy/thumb?${params}`,
