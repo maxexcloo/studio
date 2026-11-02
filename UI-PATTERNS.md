@@ -61,7 +61,7 @@ primary component reference and verify APIs against the installed version.
   purpose reads Parked in grey wherever it shows, never as failing, with Start
   for administrators there; one that should run but doesn't stays red. It opens the same
   slideout everywhere: Chats in Chat, active and failed generations with Stop,
-  Retry and Clear in gallery modes, and the compact service summary at the bottom.
+  Retry and Clear in gallery modes, and the compact service summary at the bottom, which administrators tap to open Settings › Workers.
   Endpoint selection and full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Account, Library,

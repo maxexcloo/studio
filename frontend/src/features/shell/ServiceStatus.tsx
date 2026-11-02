@@ -1,18 +1,8 @@
-import {
-  ActionIcon,
-  Button,
-  Divider,
-  Drawer,
-  FocusTrap,
-  Group,
-  Loader,
-  Stack,
-  Tooltip,
-} from "@mantine/core";
+import { ActionIcon, Divider, Drawer, FocusTrap, Group, Loader, Tooltip } from "@mantine/core";
 import { useDisclosure, useWindowEvent } from "@mantine/hooks";
 import { useRef, type PointerEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, MessagesSquare, Server } from "lucide-react";
+import { Activity, MessagesSquare } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, terminal, useQueue } from "../generation/Queue";
@@ -105,25 +95,19 @@ export function StatusAction({ chat }: { chat: boolean }) {
             <FocusTrap.InitialFocus />
             <div className={classes.list}>{chat ? <SessionList close={close} /> : <Queue />}</div>
             <Divider />
-            <Stack gap="xs" pt="md">
-              <ServiceHealthSummary />
+            {/* For administrators the whole status block opens Settings › Workers. */}
+            <div className={classes.status}>
               {admin && (
-                <Group justify="end">
-                  <Button
-                    component={Link}
-                    to="/settings#workers"
-                    state={{ backgroundLocation: location }}
-                    variant="subtle"
-                    color="gray"
-                    size="compact-sm"
-                    leftSection={<Server size={14} />}
-                    onClick={close}
-                  >
-                    Workers
-                  </Button>
-                </Group>
+                <Link
+                  to="/settings#workers"
+                  state={{ backgroundLocation: location }}
+                  className={classes.statusLink}
+                  aria-label="Open Workers"
+                  onClick={close}
+                />
               )}
-            </Stack>
+              <ServiceHealthSummary />
+            </div>
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
