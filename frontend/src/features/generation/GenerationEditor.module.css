@@ -43,6 +43,6 @@
   padding-block: var(--mantine-spacing-sm)
     max(var(--mantine-spacing-md), env(safe-area-inset-bottom));
   background: var(--studio-glass-raised);
-  backdrop-filter: var(--studio-glass-filter);
   -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
 }

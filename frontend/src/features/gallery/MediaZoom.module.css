@@ -9,6 +9,6 @@
   border: 1px solid var(--studio-glass-border);
   border-radius: var(--mantine-radius-xl);
   background: var(--studio-glass-raised);
-  backdrop-filter: var(--studio-glass-filter);
   -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
 }
