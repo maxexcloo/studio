@@ -5,6 +5,7 @@ import test, { type TestContext } from "node:test";
 import express from "express";
 import { createNextStepWork, createSuggestions, registerSuggestionRoutes } from "./suggestions.ts";
 import type { userContent } from "./model-content.ts";
+import type { Change } from "../../shared/suggestions.ts";
 import type { TasteRecord, TasteWriter } from "./taste.ts";
 
 /** A message as the model got it: its text, and how many images came with it. */
@@ -225,6 +226,35 @@ test("idle work writes next steps ahead of time, from the image where the model 
   assert.equal(calls.length, 2);
 });
 
+test("a requested change picks one of the offered actions and rewrites the prompt", async () => {
+  let answer = { action: "edit", label: "night version", prompt: "A harbour at night" };
+  const { calls, suggestions } = fixture({ reply: () => JSON.stringify(answer) });
+  const ask = (actions: string[], jobId = "job-a") =>
+    suggestions.suggest("alice", { surface: "change", jobId, request: "make it night", actions });
+  assert.deepEqual(await ask(["edit", "recreate", "upscale", "teleport"]), {
+    suggestions: [
+      {
+        action: "edit",
+        label: "Night Version",
+        request: "make it night",
+        prompt: "A harbour at night",
+      },
+    ],
+  });
+  const [system, user] = calls[0];
+  assert.match(system.content, /- edit: [\s\S]*- recreate: [\s\S]*- upscale: /);
+  assert.doesNotMatch(system.content, /animate:|teleport/);
+  assert.match(user.content, /Prompt: A harbour at dawn[\s\S]*Request: make it night/);
+  // An action that wasn't offered is unusable; a video's animate runs it again.
+  assert.equal((await ask(["recreate"])).reason, "The text model’s reply was unusable.");
+  answer = { action: "animate", label: "Slower", prompt: "Slow waves" };
+  assert.equal(((await ask(["animate"], "job-video")).suggestions[0] as Change).action, "animate");
+  assert.match(calls[2][0].content, /make the video again/);
+  // Upscale keeps the prompt as it was.
+  answer = { action: "upscale", label: "Sharper", prompt: "ignored" };
+  assert.equal(((await ask(["upscale"])).suggestions[0] as Change).prompt, "A harbour at dawn");
+});
+
 test("chat context is one paragraph from the taste profile", async () => {
   const { suggestions } = fixture();
   assert.deepEqual(await suggestions.suggest("bob", { surface: "chat" }), {
@@ -288,4 +318,8 @@ test("the route serves only the caller's own results and rejects unusable reques
   assert.equal((await request("alice", { surface: "dream" })).status, 400);
   assert.equal((await request("alice", { surface: "composer" })).status, 400);
   assert.equal((await request("alice", { surface: "viewer" })).status, 400);
+  const change = { surface: "change", jobId: "job-a", request: "make it night", actions: ["edit"] };
+  assert.equal((await request("bob", change)).status, 404);
+  assert.equal((await request("alice", { ...change, request: " " })).status, 400);
+  assert.equal((await request("alice", { ...change, actions: ["teleport"] })).status, 400);
 });

@@ -1,4 +1,12 @@
-import { lazy, Suspense, useEffect, useRef, useState, type PointerEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import {
   ActionIcon,
   Badge,
@@ -28,7 +36,7 @@ import { MediaViewerDock, useRunFamily } from "./MediaViewerDock";
 import { mediaSource } from "./mediaSource";
 import { findAction, type ActionGroups } from "./ActionBar";
 import { swipeDirection, type SwipeDirection } from "./swipe";
-import { useMediaIteration } from "./useMediaAction";
+import { useMediaIteration, type Iteration } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 const MediaComparison = lazy(() =>
   import("./MediaComparison").then((module) => ({ default: module.MediaComparison })),
@@ -224,6 +232,23 @@ export function MediaViewer({
     getInitialValueInEffect: false,
   });
   const [sheet, setSheet] = useState(false);
+  // The phone details sheet opens above the action bar, which stays in reach.
+  const bar = useRef<HTMLDivElement>(null);
+  const [barOffset, setBarOffset] = useState(0);
+  useLayoutEffect(() => {
+    const element = bar.current;
+    if (!phone || !sheet || !element) return;
+    const measure = () =>
+      setBarOffset(Math.max(0, window.innerHeight - element.getBoundingClientRect().top));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [phone, sheet]);
   const [ZoomImage] = useState(() => zoomImage || LazyZoomImage);
   const [deleting, setDeleting] = useState(false);
   const shortcutActions = useRef<ActionGroups>([]);
@@ -241,9 +266,10 @@ export function MediaViewer({
     navigate?.(next);
   }, [replacement, items, navigate]);
   const joinStrip = (jobId: string) => setQueued((ids) => [...ids, jobId]);
-  function iterate(next: Parameters<typeof iteration.mutate>[0]) {
+  function iterate(next: Iteration) {
     iteration.mutate(next, { onSuccess: joinStrip });
   }
+  const pending = iteration.isPending ? iteration.variables : undefined;
   function move(direction: -1 | 1) {
     // Navigation stops at either end rather than wrapping round.
     const next = canNavigate && viewable[currentIndex + direction];
@@ -498,20 +524,21 @@ export function MediaViewer({
                 setCompare(false);
                 navigate?.(next);
               }}
-              sessionId={sessionId}
-              onQueued={joinStrip}
+              iterate={iterate}
+              pending={pending}
               actions={
                 <MediaViewerActions
                   item={displayed}
                   sessionId={sessionId}
                   compare={compare}
                   iterate={iterate}
-                  iterating={iteration.isPending ? iteration.variables?.kind : undefined}
+                  pending={pending}
                   onCompare={() => setCompare((value) => !value)}
                   onDelete={() => setDeleting(true)}
                   onRetried={setReplacement}
                   onVersionChange={(id, active) => setVersion({ id, active })}
                   shortcuts={shortcutActions}
+                  ref={bar}
                   onApplied={() => {
                     restoreFocus.current = false;
                     close();
@@ -567,7 +594,11 @@ export function MediaViewer({
             title={mediaTitle(item)}
             closeButtonProps={{ "aria-label": "Close Details" }}
             // The title scrolls away with the details instead of staying pinned.
-            styles={{ header: { position: "static" } }}
+            styles={{
+              header: { position: "static" },
+              inner: { bottom: barOffset },
+              overlay: { bottom: barOffset },
+            }}
           >
             <FocusTrap.InitialFocus />
             <Stack gap="lg" pb="max(var(--mantine-spacing-md), env(safe-area-inset-bottom))">

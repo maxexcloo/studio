@@ -56,11 +56,14 @@ async function readChat(response: Response, receive: (event: ChatEvent) => void)
   }
 }
 
+/** The unsent Chat message, which the viewer's Continue in Chat may start. */
+export const useChatText = () => useRemembered("chat-draft", "");
+
 function useChatState() {
   const client = useQueryClient(),
     navigate = useNavigate();
   const { draft, setDraft, profile } = useGeneration();
-  const [text, setText] = useRemembered("chat-draft", "");
+  const [text, setText] = useChatText();
   const [sendingSession, setSendingSession] = useState("");
   const [error, setError] = useState("");
   const [selectedModel, setSelectedModel] = useState<string | null>(null);

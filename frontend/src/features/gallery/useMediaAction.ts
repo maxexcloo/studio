@@ -227,12 +227,15 @@ export type AnimateTheme = keyof typeof animateThemes;
 export type Iteration =
   | { kind: "regenerate" }
   | { kind: "repeat" }
-  | { kind: "animate"; theme: AnimateTheme; instruction?: string };
+  | { kind: "animate"; theme: AnimateTheme; instruction?: string }
+  | { kind: "prompt"; prompt: string; operation: PromptOperation };
+/** How a given prompt runs: as Prompt › Edit would (a video animates again), an image edit or its animation. */
+export type PromptOperation = "image" | "refine" | "animate";
 
 /**
  * Queues a new run from a saved result without leaving the viewer: a new seed (the composer's
- * Count), an exact repeat, or an animation whose motion prompt the assistant writes from a theme
- * as the queue item's first stage. Resolves to the new job's ID.
+ * Count), an exact repeat, an animation whose motion prompt the assistant writes from a theme
+ * as the queue item's first stage, or a given prompt. Resolves to the new job's ID.
  */
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
@@ -241,25 +244,29 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
+      const given = iteration.kind === "prompt" ? iteration : undefined;
       const { profile, seed, draft, note } = await mediaDraft(
         item,
-        animate ? "animate" : "image",
+        given?.operation ?? (animate ? "animate" : "image"),
         profiles,
         client,
         sessionId,
         tier,
       );
       if (note) notifications.show({ message: note });
-      const prompt = animate ? "" : draft.input.prompt;
+      const prompt = given?.prompt ?? (animate ? "" : draft.input.prompt);
       const repeat = iteration.kind === "repeat";
+      // A given prompt keeps the item's Count, as the composer would; an edit or animation runs once.
+      const count = given
+        ? given.operation === "image"
+          ? draft.input.count
+          : 1
+        : repeat || animate
+          ? 1
+          : composer.count;
       const payload = {
         ...generationInput(
-          {
-            ...draft.input,
-            prompt,
-            seed: repeat ? (seed ?? "") : "",
-            count: repeat || animate ? 1 : composer.count,
-          },
+          { ...draft.input, prompt, seed: repeat ? (seed ?? "") : "", count },
           profile,
           draft.references,
         ),
@@ -274,7 +281,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
               },
             }
           : {}),
-        operation: draft.input.kind === "video" ? "animate" : "image",
+        operation: draft.input.kind === "video" ? "animate" : draft.operation,
         parentJobId: draft.parentJobId,
         parentItemId: draft.parentItemId,
       };
