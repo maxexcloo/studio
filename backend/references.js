@@ -309,6 +309,18 @@ export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {
   return referenceAssetForAccount(req?.studioAccount, galleryItemId, { frame });
 }
 
+/**
+ * The local file and time of a video frame reference the owner may use (an Extend's start), or
+ * null for any other reference.
+ */
+export function frameSourceFile(id, ownerId = "") {
+  const frame = frameReference(id);
+  const item = frame && findGalleryItemForAccount(frame.videoId, { userId: ownerId });
+  const media = item?.type === "video" && mediaParams(item.url);
+  const file = media && mediaFile(media.filename, media.subfolder);
+  return file ? { file, at: frame.at } : null;
+}
+
 /** `frame` picks a video's frame: "last", or a time in milliseconds. */
 export function referenceAssetForAccount(account, galleryItemId, { frame = "" } = {}) {
   if (frame !== "") return frameAssetForAccount(account, galleryItemId, frame);
