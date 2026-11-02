@@ -1,5 +1,5 @@
 import { ActionIcon, Divider, Drawer, FocusTrap, Group, Loader, Tooltip } from "@mantine/core";
-import { useDisclosure, useWindowEvent } from "@mantine/hooks";
+import { useDisclosure } from "@mantine/hooks";
 import { useRef, type PointerEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
@@ -7,15 +7,13 @@ import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
 import { Queue, terminal, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
-import { NewChatAction, openChatsEvent, SessionList } from "../sessions/ChatWorkspace";
+import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ServiceStatus.module.css";
 
 /** The one header entry to work in progress, Chats and service health on every breakpoint. */
 export function StatusAction({ chat }: { chat: boolean }) {
   const [opened, { open, close }] = useDisclosure(false);
-  // The phone's No Chat Selected view opens the Chats list too.
-  useWindowEvent(openChatsEvent, open);
   const phone = usePhone();
   const admin = useIsAdmin();
   const location = useLocation();

@@ -1,5 +1,13 @@
 import { expect, test, type Page } from "@playwright/test";
-import { closeReferences, create, fixtures, image, showUploads, stamp } from "./fixtures";
+import {
+  closeReferences,
+  create,
+  fixtures,
+  image,
+  showUploads,
+  stamp,
+  expectNoChatOpen,
+} from "./fixtures";
 
 function referenceItem() {
   return {
@@ -65,7 +73,7 @@ test("Mode navigation keeps the unsent Chat reference and resumes the selected s
   // Closing the open chat leaves an empty draft, where the next message starts a new chat.
   await page.getByRole("button", { name: "Close Chat", exact: true }).click();
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByText("No Chat Selected", { exact: true })).toBeVisible();
+  await expectNoChatOpen(page);
   await message.fill("A new independent discussion");
   await page.getByRole("button", { name: "Send Message", exact: true }).click();
   await expect.poll(() => state.sessions.length).toBe(2);
