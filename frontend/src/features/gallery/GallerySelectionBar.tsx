@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ActionBar, ActionIcon, Button, Group, Menu, Stack, Text } from "@mantine/core";
+import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Ellipsis, LoaderCircle, SquareCheck, TriangleAlert, X } from "lucide-react";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
-import { chipProps } from "../generation/chip";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import {
-  ActionBarGroups,
-  StackedActionBar,
-  ActionMenuItems,
-  actionBarClass,
-  type Action,
-  type ActionGroups,
-} from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, StackedActionBar, type Action } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import {
   CustomAnimationDialog,
@@ -31,15 +23,16 @@ import { useFavorites } from "./useMediaFavorite";
 import type { MediaItem } from "../../types";
 import type { GallerySelection } from "./useGallerySelection";
 import type { useTryAgain } from "./useTryAgain";
+import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
-// Phones keep these, which act on several items, on the selection bar in this order.
-const phoneSelection = ["retry", "stop", "share", "download", "star", "delete"];
+// What acts on several items stays on the bar, in this order; everything else is under More.
+const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
- * The selection header (count and quick selections), the bulk action bar in the viewer's sections
- * (labelled on desktop) with Close, and the same actions as a context menu at `menu` (right-click
- * or Shift+F10).
+ * The contextual selection bar in the toolbar's place: Clear Selection and the count, then on
+ * desktop the bulk actions and More; phones keep those on a bottom toolbar. The same actions show
+ * as a context menu at `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
   selection,
@@ -127,59 +120,55 @@ export function GallerySelectionBar({
   // A sole selected item's own actions, kept by `OneItemActions` so the bar never remounts.
   const oneItem = useRef<Action[]>([]);
   const [, setOneItemState] = useState("");
-  // Actions for one item at a time act on a sole selected item; for several they stay in place,
-  // greyed out, so the bar matches the viewer's.
-  const groups = (one: Action[]) => {
-    const single = (id: ItemActionId) =>
-      one.find((action) => action.id === id) ?? itemAction(id, { disabled: true });
-    return itemActionGroups([
-      single("chat"),
-      single("prompt"),
-      single("animate"),
-      single("edit"),
-      (failed.length > 0 || busy === "retry") &&
-        itemAction("retry", {
-          disabled: pending || !failed.length,
-          loading: busy === "retry",
-          onClick: () => void retrySelected(),
-        }),
-      (runningJobs.length > 0 || busy === "stop") &&
-        itemAction("stop", {
-          disabled: pending || !runningJobs.length,
-          loading: busy === "stop",
-          onClick: () => void stopSelected(),
-        }),
-      single("compare"),
-      single("upscale"),
-      single("copy"),
-      // Phones that share natively share instead of downloading.
-      phone && typeof navigator.share === "function"
-        ? itemAction("share", {
-            label: prepared ? "Share" : "Prepare Share",
-            disabled: !ready.length || ready.length > shareLimit,
-            loading: prepare.isPending,
-            onClick: () => void share(),
-          })
-        : itemAction("download", {
-            disabled: !ready.length || downloadTooLarge,
-            link: {
-              href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
-              download: true,
-            },
-          }),
-      itemAction("delete", {
-        disabled: !deletable.length || pending,
-        onClick: () => setConfirm(true),
+  // Actions for one item at a time show only while one item is selected.
+  const single = (id: ItemActionId) =>
+    selected.length === 1 ? oneItem.current.find((action) => action.id === id) : undefined;
+  const actions = itemActionGroups([
+    single("chat"),
+    single("prompt"),
+    single("animate"),
+    single("edit"),
+    (failed.length > 0 || busy === "retry") &&
+      itemAction("retry", {
+        disabled: pending || !failed.length,
+        loading: busy === "retry",
+        onClick: () => void retrySelected(),
       }),
-      itemAction("star", {
-        label: allStarred ? "Unstar" : "Star",
-        pressed: allStarred,
-        disabled: !ready.length || pending,
-        onClick: () =>
-          favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+    (runningJobs.length > 0 || busy === "stop") &&
+      itemAction("stop", {
+        disabled: pending || !runningJobs.length,
+        loading: busy === "stop",
+        onClick: () => void stopSelected(),
       }),
-    ]);
-  };
+    single("compare"),
+    single("upscale"),
+    single("copy"),
+    // Phones that share natively share instead of downloading.
+    phone && typeof navigator.share === "function"
+      ? itemAction("share", {
+          label: prepared ? "Share" : "Prepare Share",
+          disabled: !ready.length || ready.length > shareLimit,
+          loading: prepare.isPending,
+          onClick: () => void share(),
+        })
+      : itemAction("download", {
+          disabled: !ready.length || downloadTooLarge,
+          link: {
+            href: ready.length && !downloadTooLarge ? downloadUrl : undefined,
+            download: true,
+          },
+        }),
+    itemAction("star", {
+      label: allStarred ? "Unstar" : "Star",
+      pressed: allStarred,
+      disabled: !ready.length || pending,
+      onClick: () => favorites.mutate({ ids: ready.map((item) => item.id), favorite: !allStarred }),
+    }),
+    itemAction("delete", {
+      disabled: !deletable.length || pending,
+      onClick: () => setConfirm(true),
+    }),
+  ]);
   useEffect(() => {
     if (confirm || pending) return;
     const keys = (event: KeyboardEvent) => {
@@ -203,79 +192,73 @@ export function GallerySelectionBar({
     return () => window.removeEventListener("keydown", keys);
   }, [confirm, pending, selection.end, deletable.length]);
   const quick = [
-    { label: "All", name: "Select All Loaded", items: selection.items },
+    { id: "select-all", label: "Select All", icon: SquareCheck, items: selection.items },
     {
-      label: "Failed",
-      name: "Select Failed",
+      id: "select-failed",
+      label: "Select Failed",
+      icon: TriangleAlert,
       items: selection.items.filter((item) => item.status === "error"),
     },
     {
-      label: "In Progress",
-      name: "Select In Progress",
+      id: "select-running",
+      label: "Select In Progress",
+      icon: LoaderCircle,
       items: selection.items.filter((item) => !finished(item)),
     },
+  ]
+    .filter(({ id, items }) => id === "select-all" || items.length > 0)
+    .map(({ items, ...action }): Action => ({
+      ...action,
+      disabled: !items.length || pending,
+      onClick: () => {
+        const ids = new Set(items.map((item) => item.id));
+        selection.select((item) => ids.has(item.id));
+      },
+    }));
+  const primary = primaryIds.flatMap((id) => actions.flat().filter((action) => action.id === id));
+  const more = [
+    quick,
+    ...actions.map((group) => group.filter((action) => !primaryIds.includes(action.id))),
   ];
-  const actionSurfaces = (actions: ActionGroups) => (
+  return (
     <>
-      <ActionBar
-        opened={selection.selecting}
-        aria-label="Selected Item Actions"
-        radius="xl"
-        shadow="lg"
-        className={actionBarClass}
-        position={{
-          left: 0,
-          right: 0,
-          bottom: "calc(var(--studio-composer-gap) + env(safe-area-inset-bottom))",
-        }}
-        transitionProps={{ transition: "slide-up" }}
-      >
-        <Stack gap={4} align="center" miw={0} w={phone ? "100%" : undefined}>
-          {phone ? (
-            // Phones keep what acts on several items on the bar, the rest under More.
-            <Group gap={2} wrap="nowrap" w="100%">
-              <StackedActionBar
-                primary={phoneSelection.flatMap((id) =>
-                  actions.flat().filter((action) => action.id === id),
-                )}
-                more={actions.map((group) =>
-                  group.filter((action) => !phoneSelection.includes(action.id)),
-                )}
-              />
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size={40}
-                aria-label="Close Selection"
-                disabled={pending}
-                onClick={selection.end}
-              >
-                <X size={18} />
-              </ActionIcon>
-            </Group>
-          ) : (
-            <Group gap={2} wrap="nowrap" maw="100%">
-              <ActionBarGroups
-                groups={actions}
-                labelled
-                trailing={
-                  <Button
-                    variant="subtle"
-                    color="gray"
-                    size="compact-sm"
-                    leftSection={<X size={16} />}
-                    aria-label="Close Selection"
-                    disabled={pending}
-                    onClick={selection.end}
-                  >
-                    Close
-                  </Button>
-                }
-              />
-            </Group>
-          )}
-        </Stack>
-      </ActionBar>
+      <div className={classes.header} role="group" aria-label="Gallery Selection">
+        <Tooltip label="Clear Selection" disabled={phone}>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            aria-label="Clear Selection"
+            disabled={pending}
+            onClick={selection.end}
+          >
+            <X size={18} />
+          </ActionIcon>
+        </Tooltip>
+        <Text size="sm" fw={500} role="status" className={classes.count}>
+          {selected.length} Selected
+        </Text>
+        {!phone && (
+          <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
+            <ActionBarGroups
+              groups={[[...primary, { id: "more", label: "More", icon: Ellipsis, menu: more }]]}
+              menuPosition="bottom-end"
+            />
+          </div>
+        )}
+      </div>
+      {phone && (
+        <ActionBar
+          opened
+          aria-label="Selected Item Actions"
+          radius={0}
+          shadow="none"
+          className={classes.toolbar}
+          position={{ left: 0, right: 0, bottom: 0 }}
+          transitionProps={{ transition: "slide-up" }}
+        >
+          <StackedActionBar primary={primary} more={more} />
+        </ActionBar>
+      )}
       <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>
         <Menu.Target>
           <div
@@ -288,47 +271,6 @@ export function GallerySelectionBar({
           <ActionMenuItems groups={actions} />
         </Menu.Dropdown>
       </Menu>
-    </>
-  );
-  return (
-    <>
-      <Group gap={6} wrap="nowrap" mih={44} aria-label="Gallery Selection" role="group">
-        <Text
-          size="sm"
-          fw={500}
-          role="status"
-          mr={4}
-          style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-        >
-          {selected.length} Selected
-        </Text>
-        {quick.map(
-          ({ label, name, items }, index) =>
-            (index === 0 || items.length > 0) && (
-              <Button
-                key={name}
-                {...chipProps}
-                aria-label={name}
-                disabled={!items.length || pending}
-                onClick={() => {
-                  const ids = new Set(items.map((item) => item.id));
-                  selection.select((item) => ids.has(item.id));
-                }}
-              >
-                {label}
-              </Button>
-            ),
-        )}
-        <Button
-          {...chipProps}
-          aria-label="Clear Selection"
-          disabled={!selected.length || pending}
-          onClick={() => selection.retain([])}
-        >
-          Clear
-        </Button>
-      </Group>
-      {actionSurfaces(groups(selected.length === 1 ? oneItem.current : []))}
       {selected.length === 1 && (
         <OneItemActions
           item={selected[0]}

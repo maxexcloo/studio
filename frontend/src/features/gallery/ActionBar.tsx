@@ -1,13 +1,13 @@
 import { Fragment, useState, type ComponentProps, type ReactNode } from "react";
 import {
   ActionIcon,
-  Button,
   Divider,
   Loader,
   Menu,
   Paper,
   Tooltip,
   UnstyledButton,
+  type FloatingPosition,
   type PaperProps,
 } from "@mantine/core";
 import { Check, ChevronDown, Ellipsis, type LucideIcon } from "lucide-react";
@@ -114,40 +114,36 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   ));
 }
 
-/** A bar action: an icon (or a labelled button), a split button or an options menu. */
-function ActionControl({ action, labelled }: { action: Action; labelled: boolean }) {
+/** A bar action: an icon, a split button or an options menu, opening on the `menuPosition` side. */
+function ActionControl({
+  action,
+  menuPosition,
+}: {
+  action: Action;
+  menuPosition: FloatingPosition;
+}) {
   const phone = usePhone();
   const iconProps = useActionIconProps();
   // A tooltip must not linger behind the menu its control opened.
   const [opened, setOpened] = useState(false);
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
-  const icon = <Icon size={labelled ? 16 : 18} fill={pressed ? "currentColor" : "none"} />;
-  const props = {
-    "aria-pressed": pressed,
-    color: color || (pressed ? undefined : iconProps.color),
-    loading,
-    disabled,
-    ...(link
-      ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
-      : { onClick: menu && !onClick ? undefined : onClick }),
-  };
-  const control = labelled ? (
-    <Button
-      variant="subtle"
-      size="compact-sm"
-      className={classes.action}
-      leftSection={icon}
-      {...props}
+  const control = (
+    <ActionIcon
+      {...iconProps}
+      aria-label={label}
+      aria-pressed={pressed}
+      color={color || (pressed ? undefined : iconProps.color)}
+      loading={loading}
+      disabled={disabled}
+      {...(link
+        ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
+        : { onClick: menu && !onClick ? undefined : onClick })}
     >
-      {label}
-    </Button>
-  ) : (
-    <ActionIcon {...iconProps} aria-label={label} {...props}>
-      {icon}
+      <Icon size={18} fill={pressed ? "currentColor" : "none"} />
     </ActionIcon>
   );
   const tip = (name: string, target: ReactNode) => (
-    <Tooltip label={name} disabled={phone || labelled || opened}>
+    <Tooltip label={name} disabled={phone || opened}>
       {target}
     </Tooltip>
   );
@@ -161,7 +157,7 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
   // A link with options (Download ▾) is a split button like one with a click.
   if (!onClick && !link)
     return (
-      <Menu position="top" width={240} onChange={setOpened}>
+      <Menu position={menuPosition} width={240} onChange={setOpened}>
         {tip(label, <Menu.Target>{control}</Menu.Target>)}
         {dropdown}
       </Menu>
@@ -169,7 +165,7 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
   return (
     <ActionIcon.Group>
       {tip(label, control)}
-      <Menu position="top" width={220} onChange={setOpened}>
+      <Menu position={menuPosition} width={220} onChange={setOpened}>
         {tip(
           `${label} Options`,
           <Menu.Target>
@@ -190,37 +186,27 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
 }
 
 /**
- * The action bar shared by the viewer and gallery selection: controls in divided groups, scrolling
- * sideways when they overflow. `labelled` shows each action's name; `trailing` stays at the end.
+ * The action bar shared by the viewer and gallery selection: icon controls in divided groups,
+ * scrolling sideways when they overflow. Menus open above it unless `menuPosition` says otherwise.
  */
 export function ActionBarGroups({
   groups,
-  labelled = false,
-  trailing,
+  menuPosition = "top",
 }: {
   groups: ActionGroups;
-  labelled?: boolean;
-  trailing?: ReactNode;
+  menuPosition?: FloatingPosition;
 }) {
   return (
-    <>
-      <div className={classes.actions}>
-        {shown(groups).map((group, index) => (
-          <Fragment key={group[0].id}>
-            {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
-            {group.map((action) => (
-              <ActionControl key={action.id} action={action} labelled={labelled} />
-            ))}
-          </Fragment>
-        ))}
-      </div>
-      {trailing && (
-        <>
-          <Divider orientation="vertical" className={classes.divider} />
-          {trailing}
-        </>
-      )}
-    </>
+    <div className={classes.actions}>
+      {shown(groups).map((group, index) => (
+        <Fragment key={group[0].id}>
+          {index > 0 && <Divider orientation="vertical" className={classes.divider} />}
+          {group.map((action) => (
+            <ActionControl key={action.id} action={action} menuPosition={menuPosition} />
+          ))}
+        </Fragment>
+      ))}
+    </div>
   );
 }
 
@@ -303,7 +289,7 @@ export function StackedActionBar({ primary, more }: { primary: Action[]; more: A
   );
 }
 
-/** The bar's surface where it sits inline (the viewer); the gallery's floats in Mantine's ActionBar. */
+/** The viewer's floating bar surface. */
 export function ActionBarSurface({
   className,
   ...props
@@ -314,10 +300,8 @@ export function ActionBarSurface({
       withBorder
       radius="xl"
       shadow="lg"
-      className={`${actionBarClass} ${className ?? ""}`}
+      className={`${classes.bar} ${className ?? ""}`}
       {...props}
     />
   );
 }
-/** The surface layout both bars share. */
-export const actionBarClass = classes.bar;

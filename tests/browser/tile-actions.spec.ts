@@ -73,7 +73,7 @@ test("A tile can be starred and read back without opening the viewer", async ({
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
     await page.getByRole("button", { name: "Select image: A copper bird", exact: true }).click();
     await selectionAction(page, "Star").click();
-    await page.getByRole("button", { name: "Close Selection", exact: true }).click();
+    await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   } else await page.getByRole("button", { name: "Star A copper bird", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Unstar A copper bird", exact: true }),
