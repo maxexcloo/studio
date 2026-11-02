@@ -54,7 +54,7 @@ export function WorkspaceSectionSelect({
       <Select
         aria-label={`${label} Section`}
         size="xs"
-        w={160}
+        w={180}
         miw={0}
         flex={1}
         data={sections}
