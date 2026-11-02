@@ -531,6 +531,15 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   await expect
     .poll(() => page.evaluate(() => (window as any).played))
     .toContain("/comfy/video-preview?filename=clip.mp4");
+  // Opened, it also downloads as a GIF.
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  await viewerAction(page, "Download Options");
+  const gif = page.getByRole("menuitem", { name: "Download as GIF", exact: true });
+  await expect(gif).toHaveAttribute(
+    "href",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
+  );
+  await expect(gif).toHaveAttribute("download", /\.gif$/);
 });
 
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {
