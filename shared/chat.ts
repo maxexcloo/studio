@@ -1,5 +1,4 @@
 import type { GenerationInput, GenerationOperation } from "./queue.ts";
-import type { QueueJob } from "./queue.ts";
 
 export interface ChatDraft {
   operation: Exclude<GenerationOperation, "upscale">;
@@ -21,6 +20,17 @@ export interface ChatModel {
   /** For accounts that may not start workloads: every workload serving it was stopped on purpose. */
   parked?: boolean;
 }
+/** One tool call of a reply's agent loop, as the reply's tool trail shows it. */
+export interface ChatStep {
+  /** The model's tool call id. */
+  id: string;
+  /** The Studio MCP tool, such as Generate. */
+  tool: string;
+  input: Record<string, unknown>;
+  status: "running" | "completed" | "failed";
+  /** What the tool answered, shortened. */
+  output?: string;
+}
 export interface ChatStatus {
   available: boolean;
   reason?: string;
@@ -36,6 +46,8 @@ export interface ChatMessage {
   thinking?: string;
   status: "streaming" | "completed" | "cancelled" | "failed";
   createdAt: string;
+  /** The tools the reply called, in order. */
+  steps?: ChatStep[];
   references?: string[];
   draft?: ChatDraft;
   jobId?: string;
@@ -59,5 +71,5 @@ export type ChatEvent =
   | { event: "delta"; data: { id: string; text: string } }
   | { event: "thinking"; data: { id: string; text: string } }
   | { event: "done"; data: Record<string, never> }
-  | { event: "generation"; data: { job: QueueJob } }
+  | { event: "generation"; data: { jobIds: string[] } }
   | { event: "error"; data: { error: string } };

@@ -37,24 +37,39 @@ test(
       const input = JSON.parse(body);
       requests.push(input);
       response.writeHead(200, { "content-type": "text/event-stream" });
-      const latest = input.messages.at(-1).content;
-      const content = (typeof latest === "string" ? latest : latest[0].text).split(
-        "\n\nStudio context",
-      )[0];
+      const latest = input.messages.at(-1);
+      const content = (
+        typeof latest.content === "string" ? latest.content : latest.content[0].text
+      ).split("\n\nStudio context")[0];
       response.write(
         `data: ${JSON.stringify({ model: "actual-" + input.model, choices: [{ delta: { content: "Here is my response." } }] })}\n\n`,
       );
-      const operation =
-        content === "Create a landscape."
-          ? "image"
-          : content === "Make it painterly." || content === "Submit edited card."
-            ? "refine"
-            : content === "Animate this."
-              ? "animate"
-              : undefined;
-      if (operation)
+      // Studio's own MCP tools, called as the agent would; a tool's answer ends the turn.
+      const call =
+        latest.role === "tool"
+          ? undefined
+          : content === "Create a landscape."
+            ? {
+                name: "Generate",
+                arguments: {
+                  profile_id: "mock-flux-schnell",
+                  prompts: ["Neutral mountain landscape"],
+                },
+              }
+            : content === "Make it painterly."
+              ? {
+                  name: "Generate",
+                  arguments: {
+                    profile_id: "mock-flux-schnell",
+                    prompts: ["Painterly mountain landscape"],
+                  },
+                }
+              : content === "Animate this."
+                ? { name: "Reuse", arguments: { job_id: "result 1", mode: "animate" } }
+                : undefined;
+      if (call && input.tools?.length)
         response.write(
-          `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { name: "request_media", arguments: JSON.stringify({ operation, prompt: operation === "image" ? "Neutral mountain landscape" : "Painterly mountain landscape" }) } }] } }] })}\n\n`,
+          `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: `call-${requests.length}`, function: { name: call.name, arguments: JSON.stringify(call.arguments) } }] } }] })}\n\n`,
         );
       response.end("data: [DONE]\n\n");
     });
@@ -225,27 +240,24 @@ test(
         operation: "image",
         input,
       });
-      const firstId = generated.find((event) => event.event === "generation")!.data.job.id;
+      const firstId = generated.find((event) => event.event === "generation")!.data.jobIds[0];
       const first = await completed(firstId);
+      assert.equal(first.operation, "image");
       assert.equal(first.sessionId, session.id);
-      assert.equal(first.input.allowFallback, true);
-      assert.equal(first.input.seed, 42);
+      // The agent's Generate ran as written, as the person's own work.
+      assert.equal(first.input.prompt, "Neutral mountain landscape");
+      assert.equal(first.input.profileId, "mock-flux-schnell");
       assert.equal((await api("/api/sessions")).sessions.length, 1);
+      // Each turn's work joins the chat. (Demo results are inline images, which Reuse can't read.)
       const refined = await chat(session.id, "Make it painterly.", { operation: "image", input });
-      const secondId = refined.find((event) => event.event === "generation")!.data.job.id;
+      const secondId = refined.find((event) => event.event === "generation")!.data.jobIds[0];
       const second = await completed(secondId);
-      assert.equal(second.operation, "refine");
-      assert.equal(second.parentJobId, first.id);
       assert.equal(second.sessionId, first.sessionId);
-      assert.equal(
-        (second.input.referenceAssets as unknown[]).length,
-        1,
-        "follow-up anchors the latest own output",
-      );
-      // Animate picks its own video model, and says why when this account has none to use.
+      assert.equal(second.input.prompt, "Painterly mountain landscape");
+      // A tool's refusal stays on the reply's trail and queues nothing.
       const invalid = await chat(session.id, "Animate this.", { operation: "image", input });
       const explanation = invalid.filter((event) => event.event === "message").at(-1)!.data;
-      assert.match(explanation.actionError, /No video profile that takes a starting image/);
+      assert.equal(explanation.steps[0].status, "failed");
       assert.equal((await api("/api/queue")).jobs.length, 2);
       const png = await sharp({
         create: { width: 32, height: 16, channels: 3, background: "white" },
@@ -261,37 +273,18 @@ test(
       });
       assert.equal(upload.status, 201);
       const asset = (await upload.json()).asset;
-      const style = { assetId: asset.id, source: "upload", slot: "style" };
-      const continued = await chat(session.id, "Make it painterly.", {
-        operation: "refine",
-        parentJobId: second.id,
-        input: {
-          ...second.input,
-          referenceAssets: [...(second.input.referenceAssets as object[]), style],
-        },
-      });
-      const thirdId = continued.find((event) => event.event === "generation")!.data.job.id;
-      const third = await completed(thirdId);
-      assert.equal(third.parentJobId, second.id);
-      const thirdReferences = third.input.referenceAssets as { assetId: string }[];
-      assert.equal(
-        Buffer.from(thirdReferences[0].assetId.slice(8), "base64url").toString(),
-        second.outputs[0].url,
-        "third turn anchors the new parent rather than its inherited old source",
-      );
-      assert.deepEqual(thirdReferences[1], style, "a deliberate additional reference is retained");
       const revisionInput: GenerationInput = {
-        ...third.input,
+        ...second.input,
         prompt: "Exact edited card prompt",
         steps: 3,
         seed: 123,
       };
       const revised = await chat(session.id, "Submit edited card.", undefined, undefined, {
         modelId: "fixture-text-model",
-        revision: { sourceJobId: third.id, operation: "refine", input: revisionInput },
+        revision: { sourceJobId: second.id, operation: "image", input: revisionInput },
       });
       assert.equal(revised.filter((event) => event.event === "generation").length, 1);
-      const fourthId = revised.find((event) => event.event === "generation")!.data.job.id;
+      const fourthId = revised.find((event) => event.event === "generation")!.data.jobIds[0];
       const fourth = await completed(fourthId);
       assert.equal(
         fourth.input.prompt,
@@ -301,11 +294,11 @@ test(
       assert.equal(fourth.input.seed, 123);
       assert.equal(fourth.input.steps, 3);
       assert.deepEqual(fourth.input.referenceAssets, revisionInput.referenceAssets);
-      assert.equal(fourth.parentJobId, third.id);
+      assert.equal(fourth.parentJobId, second.id);
       assert.equal(requests.at(-1).model, "fixture-text-model");
       const revisionContext = requests.at(-1).messages.at(-1).content;
       assert.match(revisionContext, /Exact edited card prompt/);
-      assert.match(revisionContext, /"steps":\{"before":2,"after":3\}/);
+      assert.match(revisionContext, /"steps":\{"before":\d+,"after":3\}/);
       const savedRevision = (await api(`/api/sessions/${session.id}/chat`)).messages;
       const editedReply = savedRevision.find((message: any) => message.jobId === fourthId);
       assert.equal(editedReply.actualModelId, "actual-fixture-text-model");
@@ -320,7 +313,7 @@ test(
         const legacyEvents = await chat(session.id, "Submit edited card.", undefined, undefined, {
           revision: { sourceJobId: fourth.id, operation: "refine", input: legacyInput },
         });
-        const legacyId = legacyEvents.find((event) => event.event === "generation")!.data.job.id;
+        const legacyId = legacyEvents.find((event) => event.event === "generation")!.data.jobIds[0];
         aliasJobIds.push(legacyId);
         const legacyJob = await completed(legacyId);
         assert.equal(legacyJob.input[alias], asset.id);
@@ -343,12 +336,12 @@ test(
         },
         {
           content: "Wrong media model",
-          revision: { sourceJobId: third.id, operation: "animate", input },
+          revision: { sourceJobId: second.id, operation: "animate", input },
         },
         {
           content: "Foreign start image",
           revision: {
-            sourceJobId: third.id,
+            sourceJobId: second.id,
             operation: "refine",
             input: { ...input, startImageId: "not-owned" },
           },
@@ -399,7 +392,10 @@ test(
       assert.equal(requests.length, before);
       cookie = artistCookie;
       const messages = (await api(`/api/sessions/${session.id}/chat`)).messages;
-      assert.equal(messages.find((message: any) => message.jobId === firstId).id, firstId);
+      assert.equal(
+        messages.find((message: any) => message.jobId === firstId).steps[0].tool,
+        "Generate",
+      );
       await stop();
       await start();
       assert.deepEqual((await api(`/api/sessions/${session.id}/chat`)).messages, messages);
@@ -409,7 +405,6 @@ test(
         [
           [firstId, "completed"],
           [secondId, "completed"],
-          [thirdId, "completed"],
           [fourthId, "completed"],
           ...aliasJobIds.map((id) => [id, "completed"]),
         ],
