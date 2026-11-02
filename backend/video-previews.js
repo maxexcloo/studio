@@ -466,8 +466,12 @@ async function withLoopback(buffer, work) {
  * extension. Only the last half second is decoded, then played backwards so
  * the first frame out is the last one in.
  */
-export async function extractLastFrame(buffer) {
+/** A video's frame as PNG: its last, or the one at a time in milliseconds. */
+export async function extractFrame(buffer, at = "last") {
   if (buffer.length > maxSourceBytes) throw new Error("This video is too large to extend.");
+  // The last frame is the first of the reversed final half second.
+  const seek =
+    at === "last" ? ["-sseof", "-0.5"] : ["-ss", (Math.max(0, Number(at) || 0) / 1000).toFixed(3)];
   return queued(
     () =>
       withLoopback(buffer, async (input) => {
@@ -477,15 +481,13 @@ export async function extractLastFrame(buffer) {
             "error",
             "-threads",
             "1",
-            "-sseof",
-            "-0.5",
+            ...seek,
             "-i",
             input,
             "-map",
             "0:v:0",
             "-an",
-            "-vf",
-            "reverse",
+            ...(at === "last" ? ["-vf", "reverse"] : []),
             "-frames:v",
             "1",
             "-f",
@@ -496,8 +498,7 @@ export async function extractLastFrame(buffer) {
           ],
           { timeout: 60_000, limit: 64 * 1024 * 1024 },
         );
-        if (code !== 0 || !stdout.length)
-          throw new Error("The video’s last frame couldn’t be read.");
+        if (code !== 0 || !stdout.length) throw new Error("The video’s frame couldn’t be read.");
         return stdout;
       }),
     { poster: true },

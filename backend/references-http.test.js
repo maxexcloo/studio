@@ -178,6 +178,14 @@ test(
     ).asset;
     assert.deepEqual((await metadata(imageAsset.id)).asset, imageAsset);
     assert.deepEqual((await metadata(lastFrame.id)).asset, lastFrame);
+    const frameAt = (
+      await api("/api/reference-assets/from-gallery", "POST", {
+        galleryItemId: video.id,
+        frame: 1500,
+      })
+    ).asset;
+    assert.match(frameAt.id, /:frame-1500$/);
+    assert.deepEqual((await metadata(frameAt.id)).asset, frameAt);
     const legacy = (await metadata(image.id)).asset;
     assert.equal(legacy.id, image.id);
     assert.equal(legacy.url, imageAsset.url);

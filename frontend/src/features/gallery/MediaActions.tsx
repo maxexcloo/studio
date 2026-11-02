@@ -133,7 +133,10 @@ function useRetryAction(item: MediaItem, onRetried?: (jobId: string) => void): A
   });
 }
 
-/** Edit › Use as Reference: adds the image to the composer's references when its profile takes one. */
+/**
+ * Edit › Use as Reference: adds the image to the composer's references when its profile takes one.
+ * A video gives the frame showing in the viewer, or its last frame from elsewhere.
+ */
 function useReferenceAction(item: MediaItem, onApplied: () => void): Action | null {
   const { profile } = useGeneration();
   const reference = useGalleryReference();
@@ -147,23 +150,32 @@ function useReferenceAction(item: MediaItem, onApplied: () => void): Action | nu
     )
   )
     return null;
+  const video = item.type === "video";
   return {
     id: "use-reference",
-    label: "Use as Reference",
+    label: video ? "Use Frame as Reference" : "Use as Reference",
     icon: ImagePlus,
     disabled: reference.isPending,
     keepOpen: true,
-    onClick: () =>
-      reference.mutate(item, {
-        onSuccess: () => {
-          onApplied();
-          if (["/images", "/video"].includes(location.pathname)) {
-            const next = new URLSearchParams(params);
-            next.set("compose", "1");
-            setParams(next, { replace: true });
-          }
+    onClick: () => {
+      const player = video
+        ? document.querySelector<HTMLVideoElement>(`video[data-media-id="${CSS.escape(item.id)}"]`)
+        : null;
+      const frame = player ? Math.round(player.currentTime * 1000) : undefined;
+      reference.mutate(
+        { ...item, frame },
+        {
+          onSuccess: () => {
+            onApplied();
+            if (["/images", "/video"].includes(location.pathname)) {
+              const next = new URLSearchParams(params);
+              next.set("compose", "1");
+              setParams(next, { replace: true });
+            }
+          },
         },
-      }),
+      );
+    },
   };
 }
 
@@ -321,6 +333,7 @@ export function useMediaActions(
               disabled: action.isPending,
               onClick: () => action.mutate("extend"),
             },
+            ...(reference ? [reference] : []),
           ],
         ],
       }),
