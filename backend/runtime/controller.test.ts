@@ -305,8 +305,8 @@ test("restoring the last placement leaves text started outside Studio running", 
   assert.equal(kube.log.at(-1), "scale comfyui/image 1");
 });
 
-test("a deployment reset outside Studio shows as drift and automatic control restores it", async () => {
-  const { kube, controller } = fixture(["image"], { automaticLifecycle: true });
+test("a deployment reset outside Studio shows as drift and is restored, even without automatic control", async () => {
+  const { kube, controller } = fixture(["image"]);
   const preview = await controller.preview(["image", "text"]);
   await controller.apply(["image", "text"], preview.signature, "local");
   await controller.settled;
@@ -325,7 +325,7 @@ test("a deployment reset outside Studio shows as drift and automatic control res
   assert.equal(status.history.length, 1);
   assert.equal(
     (await controller.observe()).history[0].requestedBy,
-    "automatic: restoring the last placement",
+    "restoring the last placement after an outside stop",
   );
 });
 
