@@ -10,7 +10,7 @@ import {
   validateGraph,
   workflowMissingFiles,
 } from "../custom-workflows.js";
-import { dataDir } from "../gallery-store.js";
+import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
 import { fromChat, requireAdmin } from "../route-access.js";
 import { profileStore } from "./store.js";

@@ -8,7 +8,7 @@ import {
   noteComfyFetchError,
   noteComfyReachable,
 } from "./comfy/comfy.js";
-import { dataDir } from "./gallery-store.js";
+import { dataDir } from "./gallery/store.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 

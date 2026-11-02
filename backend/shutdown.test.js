@@ -16,7 +16,7 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       const source = `
       import { installShutdown } from './backend/shutdown.js';
       import { startSession } from './backend/exit-record.js';
-      import { setGallery, flushPendingGallery } from './backend/gallery-store.js';
+      import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
       import http from 'node:http';
       const kill = process.kill.bind(process);
       process.kill = (pid, signal) => pid === process.pid ? true : kill(pid, signal);
@@ -83,7 +83,7 @@ test("an uncaught exception logs its cause and synchronously saves pending galle
         `
       import { installShutdown } from './backend/shutdown.js';
       import { startSession } from './backend/exit-record.js';
-      import { setGallery, flushPendingGallery } from './backend/gallery-store.js';
+      import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
       installShutdown({ flush: flushPendingGallery });
       startSession();
       setGallery([{ id: 'crash-pending', type: 'image', status: 'pending' }]);
@@ -124,7 +124,7 @@ test(
     const source = `
     import { installShutdown } from './backend/shutdown.js';
     import { startSession } from './backend/exit-record.js';
-    import { setGallery, flushPendingGallery } from './backend/gallery-store.js';
+    import { setGallery, flushPendingGallery } from './backend/gallery/store.js';
     startSession();
     setGallery([{ id: 'still-accepted', type: 'image', status: 'pending' }]);
     installShutdown({ flush: flushPendingGallery, drain: () => new Promise(() => {}), graceMs: 25 });

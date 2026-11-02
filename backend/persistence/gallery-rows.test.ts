@@ -49,7 +49,7 @@ test("gallery-rows-v1 moves the gallery document into rows that Studio then save
     });
   run(`
     import assert from 'node:assert/strict';
-    import {gallery,setGallery,setGalleryFavorites,flushGalleryStrict} from './backend/gallery-store.js';
+    import {gallery,setGallery,setGalleryFavorites,flushGalleryStrict} from './backend/gallery/store.js';
     assert.deepEqual(gallery.map(item=>item.id),['kept','removed']);
     setGalleryFavorites(['kept'],true);
     setGallery([{id:'added',type:'image',status:'done',createdAt:'2026-01-02T00:00:00Z',preview:'data:'},...gallery.filter(item=>item.id!=='removed')]);

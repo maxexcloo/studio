@@ -15,8 +15,8 @@ process.env.STUDIO_WORKERS = JSON.stringify([
   },
 ]);
 const [{ registerGalleryReadRoutes }, galleryStore] = await Promise.all([
-  import("./gallery-routes.js"),
-  import("./gallery-store.js"),
+  import("./gallery/routes.js"),
+  import("./gallery/store.js"),
 ]);
 
 const routes = {};
@@ -112,7 +112,7 @@ test("access profiles without gallery permission cannot read pages or exact job 
 });
 
 test("Clear Failed takes the account's own failed items; administrators may name an owner or all", async () => {
-  const { registerGalleryErrorRoutes } = await import("./gallery-routes.js");
+  const { registerGalleryErrorRoutes } = await import("./gallery/routes.js");
   const posts = {};
   registerGalleryErrorRoutes({ post: (route, handler) => (posts[route] = handler) });
   const failed = (ownerId, jobId) => ({ ...item(ownerId, jobId), status: "error", url: "" });

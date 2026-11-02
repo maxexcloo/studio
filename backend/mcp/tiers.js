@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Speed tiers for MCP: read from the tier segment of a profile label such as "Krea 2 Turbo · Super Fast · 2 Steps".
 
-import { isCloudProfile } from "./cloud-profiles.js";
-import { canonicalProfileId, profileAliasBackend } from "./profile/store.js";
+import { isCloudProfile } from "../cloud-profiles.js";
+import { canonicalProfileId, profileAliasBackend } from "../profile/store.js";
 
 export const mcpTiers = ["quality", "standard", "fast", "turbo"];
 

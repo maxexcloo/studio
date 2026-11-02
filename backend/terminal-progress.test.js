@@ -46,7 +46,7 @@ globalThis.fetch = async (url, options = {}) => {
   return nativeFetch(url, options);
 };
 const { jobs, runJob } = await import("./jobs.js");
-const store = await import("./gallery-store.js");
+const store = await import("./gallery/store.js");
 test.after(async () => {
   releaseCleanup();
   globalThis.fetch = nativeFetch;

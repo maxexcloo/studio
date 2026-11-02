@@ -26,7 +26,7 @@ run = "node dev.mjs"
 run = "node dev.mjs --demo"
 
 [tasks.test]
-run = "node --test backend/*.test.js backend/library/*.test.js backend/civitai/*.test.js backend/lora/*.test.js backend/profile/*.test.js backend/comfy/*.test.js backend/model/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
+run = "node --test backend/*.test.js backend/library/*.test.js backend/civitai/*.test.js backend/lora/*.test.js backend/profile/*.test.js backend/comfy/*.test.js backend/model/*.test.js backend/gallery/*.test.js backend/mcp/*.test.js backend/domain/*.test.ts backend/runtime/*.test.ts backend/persistence/*.test.ts backend/providers/*.test.ts"
 
 [tasks."test:browser"]
 run = "playwright test"
