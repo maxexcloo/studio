@@ -16,3 +16,13 @@ export function mediaDownload(item: MediaItem) {
     download: selected.upscaled ? filename.replace(/\.[^.]+$/, `.${extension}`) : filename,
   };
 }
+
+/** A Studio video as a looping GIF (backend/video-previews.js), or null for anything else. */
+export function gifDownload(item: MediaItem) {
+  const { href, download } = mediaDownload(item);
+  if (item.type !== "video" || !href.startsWith("/comfy/view?")) return null;
+  return {
+    href: `${href.replace("/comfy/view?", "/comfy/video-preview?")}&format=gif`,
+    download: download.replace(/\.[^.]+$/, ".gif"),
+  };
+}

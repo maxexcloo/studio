@@ -251,6 +251,37 @@ export async function probeVideo(file) {
   }
 }
 
+/** A Studio video as a looping GIF to share: its first 15 seconds at 12 FPS, 480 pixels wide. */
+export async function getComfyVideoGif(filename, subfolder, type) {
+  const local = localOutputFile(filename, subfolder, type);
+  if (!local) throw new Error("Source video is unavailable.");
+  const { code, stdout } = await queued(() =>
+    run(
+      [
+        "-loglevel",
+        "error",
+        "-threads",
+        "1",
+        "-t",
+        "15",
+        "-i",
+        local,
+        "-an",
+        "-vf",
+        "fps=12,scale='min(480,iw)':-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer",
+        "-loop",
+        "0",
+        "-f",
+        "gif",
+        "pipe:1",
+      ],
+      { timeout: 120_000, limit: 48 * 1024 * 1024, low: true },
+    ),
+  );
+  if (code !== 0 || !stdout.length) throw new Error("The GIF couldn’t be made.");
+  return stdout;
+}
+
 /** The first frame of the source, as a JPEG that fits a grid tile. */
 async function extractPoster(input) {
   const { code, stdout } = await run([

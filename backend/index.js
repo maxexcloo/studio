@@ -191,6 +191,7 @@ import {
 } from "./prompt-history.js";
 import { fillVideoSizes } from "./library.js";
 import {
+  getComfyVideoGif,
   getComfyVideoPoster,
   getComfyVideoPreview,
   sendVideoPreview,
@@ -3045,6 +3046,13 @@ app.get("/comfy/video-preview", async (req, res) => {
   }
   try {
     const cacheControl = type === mediaType ? derivedMediaCache : undefined;
+    if (req.query.format === "gif") {
+      res
+        .type("image/gif")
+        .attachment(`${path.parse(filename).name}.gif`)
+        .send(await getComfyVideoGif(filename, subfolder, type));
+      return;
+    }
     // The still comes from the original, ahead of any preview still being encoded.
     if (req.query.poster === "1")
       await sendVideoPoster(

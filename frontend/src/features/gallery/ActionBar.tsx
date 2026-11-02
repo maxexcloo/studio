@@ -139,7 +139,8 @@ function ActionControl({ action, labelled }: { action: Action; labelled: boolean
       <ActionMenuItems groups={menu} />
     </Menu.Dropdown>
   );
-  if (!onClick)
+  // A link with options (Download ▾) is a split button like one with a click.
+  if (!onClick && !link)
     return (
       <Menu position="top" width={240} onChange={setOpened}>
         {tip(label, <Menu.Target>{control}</Menu.Target>)}
