@@ -325,8 +325,15 @@ const reversible = (clip) => {
     throw new Error(`Only clips up to ${maxReversedMs / 1000} seconds can be reversed.`);
 };
 /**
+ * A clip played forward then back, so it loops without a jump. The reversed half skips its first
+ * frame, which is the forward half's last.
+ */
+const backAndForth =
+  "split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1:a=0";
+/**
  * The Edit menu's video edits, each the filters for the picture and for the sound (null drops it):
- * `trim` keeps `start` to `end` milliseconds; `reverse` plays it backwards.
+ * `trim` keeps `start` to `end` milliseconds; `reverse` plays it backwards; `loop` forward then
+ * back, without sound as its download has none.
  */
 const videoEdits = {
   trim: ({ start, end }) => ({
@@ -336,6 +343,10 @@ const videoEdits = {
   reverse: (_edit, clip) => {
     reversible(clip);
     return { video: "reverse", audio: "areverse" };
+  },
+  loop: (_edit, clip) => {
+    reversible(clip);
+    return { video: backAndForth, audio: null };
   },
 };
 export const videoEditKinds = Object.keys(videoEdits);
@@ -414,7 +425,7 @@ export async function getComfyVideoGif(filename, subfolder, type) {
   return stdout;
 }
 
-/** A Studio video played forward then back, so it loops without a jump; its first 15 seconds. */
+/** A Studio video played forward then back (`backAndForth`) to download; its first 15 seconds. */
 export async function getComfyVideoLoop(filename, subfolder, type) {
   const local = localOutputFile(filename, subfolder, type);
   if (!local) throw new Error("Source video is unavailable.");
@@ -429,8 +440,7 @@ export async function getComfyVideoLoop(filename, subfolder, type) {
         local,
         "-an",
         "-filter_complex",
-        // The reversed half skips its first frame, which is the forward half's last.
-        "[0:v]split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1:a=0,format=yuv420p[v]",
+        `[0:v]${backAndForth},format=yuv420p[v]`,
         "-map",
         "[v]",
         "-c:v",

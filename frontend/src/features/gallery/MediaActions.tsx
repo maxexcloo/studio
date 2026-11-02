@@ -413,6 +413,13 @@ export function useMediaActions(
               disabled: videoEdit.isPending,
               onClick: () => videoEdit.mutate({ kind: "reverse" }),
             },
+            {
+              id: "back-and-forth",
+              label: "Back and Forth",
+              icon: ArrowLeftRight,
+              disabled: videoEdit.isPending,
+              onClick: () => videoEdit.mutate({ kind: "loop" }),
+            },
           ],
         ],
       }),
