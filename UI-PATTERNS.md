@@ -342,7 +342,7 @@ primary component reference and verify APIs against the installed version.
   prompts sit on a subtle surface aligned with the column and scroll within a
   bounded height; LoRAs have their own heading, each with its strength. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above a bar of Edit, Animate, Prompt and Upscale, labelled under their icons with ▾ for their options, and More listing every other action; the selection bar keeps Download or Share, Star and Delete with More and Close; swipe left/right navigates,
+  Phones show the image full-bleed above a bar of Edit, Animate, Prompt and Upscale, labelled under their icons with ▾ for their options, and More listing every other action; swipe left/right navigates,
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
   swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
@@ -377,8 +377,8 @@ primary component reference and verify APIs against the installed version.
 - Item actions have one definition (`gallery/MediaActions.tsx`): Chat, Prompt ▾
   | Animate, Edit | Upscale | Copy ▾, Download | Star, Delete, Chat and Prompt
   first, Delete last and the rest alphabetical within each section, in every menu and action
-  bar. Compare joins Upscale's section in menus (the tile and right-click menu)
-  and the selection bar, never the viewer's bar. Options are submenus in menus
+  bar. Compare joins Upscale's section in menus (the tile and right-click menu
+  and the selection's More), never the viewer's bar. Options are submenus in menus
   and split buttons or menus in bars: Prompt (opens the composer) › Edit,
   Use as Reference (images), Run Again (new seed), Run Again (Same Seed); Edit
   opens the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
@@ -389,12 +389,20 @@ primary component reference and verify APIs against the installed version.
   Options… (quality, size, Face Detail), Show Upscale, Compare Upscale; Copy (Details by default) › Details, Prompt; a video's Download ▾ › Download Video, Download as GIF, Download Back and Forth (an MP4 played forward then back, looping without a jump). Phones that share natively show
   Share Image in Download's place; desktop has no Share. The viewer and gallery
   selection share one `ActionBarGroups` bar of divided groups that scrolls
-  sideways when it overflows. The selection bar labels its buttons on desktop, greys out
-  actions for one item at a time and ends with Close.
+  sideways when it overflows.
   Keep the current decoded image visible while another saved version loads,
   then refit its new dimensions before painting.
   Image viewing and original/upscale comparison share `MediaZoom` for named
   zoom modes, native transforms, keyboard shortcuts and transient controls.
+- Gallery selection uses a contextual action bar (`GallerySelectionBar`) in the
+  toolbar's place, sticky under the header on its surface: Clear Selection (✕)
+  and the count, then on desktop icon actions with tooltips (Retry or Stop when
+  they apply, Download, Star, Delete) and More. Phones keep the count bar on top
+  and move the actions to a full-width bottom toolbar, labelled under their
+  icons, above the safe area. More lists Select All, Select Failed and Select In
+  Progress, then every other shared action; actions for one item at a time show
+  only while one item is selected. Right-click or Shift+F10 opens the same
+  actions as a menu; Escape ends selection and Delete asks to delete.
 - Display, thumbnails, sharing and downloads use the saved original/upscale
   choice through `mediaSource`. Video upscales stay videos; comparison is an
   image action. Upscale quality, size and optional face detail use the worker’s

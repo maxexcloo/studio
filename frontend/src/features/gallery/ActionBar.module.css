@@ -1,4 +1,4 @@
-/* One bar layout for the viewer and the gallery selection: compact controls in divided groups. */
+/* The viewer's floating bar: compact controls in divided groups. */
 .bar {
   display: flex;
   align-items: center;

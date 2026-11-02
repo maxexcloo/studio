@@ -1,0 +1,41 @@
+/* The contextual bar takes the toolbar's row and stays under the header, on the header's surface.
+ * The prefixed blur comes first: the minifier keeps only the last of the pair. */
+.header {
+  position: sticky;
+  top: var(--app-shell-header-offset, 0px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  /* It spans the page's gutters, so tiles never show beside it. */
+  margin-inline: calc(-1 * var(--app-shell-padding, 0px));
+  padding-inline: var(--app-shell-padding, 0px);
+  background: var(--studio-glass-chrome);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+  border-bottom: 1px solid var(--studio-glass-border);
+}
+
+.count {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+}
+
+/* Phones: a full-width toolbar on the header's surface, clear of the home indicator. */
+.toolbar {
+  width: 100%;
+  padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+  background: var(--studio-glass-chrome);
+  -webkit-backdrop-filter: var(--studio-glass-filter);
+  backdrop-filter: var(--studio-glass-filter);
+  border: 0;
+  border-top: 1px solid var(--studio-glass-border);
+}

@@ -6,6 +6,7 @@ import {
   gallerySearch,
   image,
   selectionAction,
+  selectionMenuItem,
   stamp,
 } from "./fixtures";
 const results = (count: number) =>
@@ -220,7 +221,7 @@ test("Touch scrolling cancels hold selection and a held tile remains selected af
   await selectionAction(page, "Star").click();
   await expect.poll(() => state.gallery[1].favorite).toBe(true);
   expect(state.gallery[0].favorite).not.toBe(true);
-  await page.getByRole("button", { name: "Close Selection", exact: true }).click();
+  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   await page.getByRole("button", { name: "Open image: Browse Result 1", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeVisible();
 });
@@ -277,7 +278,7 @@ test("Retry Selected deduplicates owned jobs and retains partial failures for an
   try {
     await page.goto("/images");
     await page.getByRole("button", { name: "Select Items", exact: true }).click();
-    await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
+    await (await selectionMenuItem(page, "Select All")).click();
     const selection = page.getByRole("group", { name: "Gallery Selection", exact: true });
     await expect(selection.getByRole("status")).toHaveText("4 Selected");
     const retry = selectionAction(page, "Retry");
@@ -456,11 +457,11 @@ test("Selection extends with Shift, picks in-progress or failed work and acts fr
     .getByRole("button", { name: "Select image: Browse Result 2", exact: true })
     .click({ modifiers: ["Shift"] });
   await expect(status).toHaveText("3 Selected");
-  await page.getByRole("button", { name: "Select In Progress", exact: true }).click();
+  await (await selectionMenuItem(page, "Select In Progress")).click();
   await expect(status).toHaveText("1 Selected");
   await selectionAction(page, "Stop").click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await page.getByRole("button", { name: "Select Failed", exact: true }).click();
+  await (await selectionMenuItem(page, "Select Failed")).click();
   await expect(status).toHaveText("1 Selected");
   await page
     .getByRole("button", { name: "Select image: Browse Result 3", exact: true })
@@ -572,20 +573,15 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  // A sole item's own actions work; with several they grey out. Phones list Edit under More.
-  const phone = test.info().project.use.isMobile;
-  const edit = async () => {
-    if (!phone) return selectionAction(page, "Edit");
-    await selectionAction(page, "More").click();
-    return page.getByRole("menuitem", { name: "Edit", exact: true });
-  };
+  // A sole item's own actions are under More; with several they are left out.
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
-  await expect(await edit()).toBeEnabled();
-  if (phone) await selectionAction(page, "More").click();
-  await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
+  await expect(await selectionMenuItem(page, "Edit")).toBeEnabled();
+  await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  await expect(await edit()).toBeDisabled();
-  if (phone) await selectionAction(page, "More").click();
+  await expect(await selectionMenuItem(page, "Select All")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toHaveCount(0);
+  await selectionAction(page, "More").click();
+  await expect(page.getByRole("menu")).toBeHidden();
   // Phones that share natively share instead of downloading.
   const sharing =
     test.info().project.use.isMobile &&
@@ -604,7 +600,7 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
     .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect.poll(() => state.gallery.map((item) => item.id)).toEqual(["selection-2"]);
-  await page.getByRole("button", { name: "Close Selection", exact: true }).click();
+  await page.getByRole("button", { name: "Clear Selection", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
 });
 
