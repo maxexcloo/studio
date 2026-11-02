@@ -572,12 +572,20 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  // A sole item's own actions work; with several they grey out.
+  // A sole item's own actions work; with several they grey out. Phones list Edit under More.
+  const phone = test.info().project.use.isMobile;
+  const edit = async () => {
+    if (!phone) return selectionAction(page, "Edit");
+    await selectionAction(page, "More").click();
+    return page.getByRole("menuitem", { name: "Edit", exact: true });
+  };
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
-  await expect(selectionAction(page, "Edit")).toBeEnabled();
+  await expect(await edit()).toBeEnabled();
+  if (phone) await selectionAction(page, "More").click();
   await page.getByRole("button", { name: "Select All Loaded", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
-  await expect(selectionAction(page, "Edit")).toBeDisabled();
+  await expect(await edit()).toBeDisabled();
+  if (phone) await selectionAction(page, "More").click();
   // Phones that share natively share instead of downloading.
   const sharing =
     test.info().project.use.isMobile &&
