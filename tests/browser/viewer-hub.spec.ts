@@ -60,10 +60,7 @@ async function seed(
 
 /** Prompt › Run Again (New Seed): queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
-  await page
-    .getByRole("dialog", { name: "Generation", exact: true })
-    .getByRole("button", { name: "Prompt Options", exact: true })
-    .click();
+  await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Run Again (New Seed)", exact: true }).click();
 }
 
@@ -73,7 +70,7 @@ test("The viewer has no prompt bar; its runs queue into the strip and Prompt ope
   const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveCount(0);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
-  await viewer.getByRole("button", { name: "Prompt Options", exact: true }).click();
+  await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -144,7 +141,7 @@ test("Run Again and Prompt draw a new seed; only Exact Repeat keeps it", async (
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewer.getByRole("button", { name: "Prompt Options", exact: true }).click();
+  await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
@@ -196,7 +193,7 @@ test("Exact Repeat and Prompt keep the backend a combined profile ran on", async
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewer.getByRole("button", { name: "Prompt Options", exact: true }).click();
+  await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -216,10 +213,10 @@ test("Exact Repeat and Prompt keep the backend a combined profile ran on", async
 test("A rerun whose backend the profile no longer has runs on its current one and says so", async ({
   page,
 }) => {
-  const { state, viewer } = await seed(page, ranOn("radiance"), () =>
+  const { state } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewer.getByRole("button", { name: "Prompt Options", exact: true }).click();
+  await viewerAction(page, "Prompt Options");
   await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
   await expect(
     page.getByText(
@@ -761,9 +758,15 @@ test("Fullscreen viewer preserves media interaction and closes on the surroundin
     viewport = page.viewportSize()!;
   expect(bounds?.width).toBe(viewport.width);
   expect(bounds?.height).toBe(viewport.height);
-  const download = dialog.getByRole("link", { name: "Download", exact: true });
+  // Phones list Download under More.
+  const phone = viewport.width < 768;
+  if (phone) await dialog.getByRole("button", { name: "More", exact: true }).click();
+  const download = phone
+    ? page.getByRole("menuitem", { name: "Download", exact: true })
+    : dialog.getByRole("link", { name: "Download", exact: true });
   await expect(download).toHaveAttribute("href", image);
   await expect(download).toHaveAttribute("download", "studio-viewer.png");
+  if (phone) await page.keyboard.press("Escape");
   await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
   await expect(dialog.getByRole("img", { name: "Next Viewer Study", exact: true })).toBeVisible();
   // Navigation stops at the ends instead of wrapping round.

@@ -263,4 +263,8 @@
   .dock {
     padding-inline: var(--mantine-spacing-sm);
   }
+  /* The labelled phone bar spans the width. */
+  .actions {
+    width: 100%;
+  }
 }

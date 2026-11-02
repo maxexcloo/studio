@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
-import { fixtures, image, stamp } from "./fixtures";
+import { fixtures, image, stamp, viewerAction } from "./fixtures";
 
 const png = await sharp({ create: { width: 24, height: 16, channels: 3, background: "#46a3ff" } })
   .png()
@@ -110,7 +110,7 @@ test("Phones that share natively share the image where desktop downloads it", as
     return;
   }
   await expect(download).toHaveCount(0);
-  await viewer.getByRole("button", { name: "Share Image", exact: true }).click();
+  await viewerAction(page, "Share Image");
   await expect
     .poll(() => page.evaluate(() => (window as any).sharedMedia?.[0]?.type))
     .toBe("image/png");
