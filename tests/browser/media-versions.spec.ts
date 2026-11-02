@@ -4,7 +4,11 @@ import { fixtures, image, stamp, viewerAction } from "./fixtures";
 for (const kind of ["image", "video"] as const) {
   test(`${kind} version selection persists and downloads the displayed format`, async ({
     page,
-  }) => {
+  }, testInfo) => {
+    test.skip(
+      Boolean(testInfo.project.use.isMobile),
+      "Phones reach Download and Show Upscale under More (viewer-transitions); the versions are the same.",
+    );
     const state = await fixtures(page);
     // Native sharing replaces the row's Download on phones; this checks the downloaded version.
     await page.addInitScript(() =>

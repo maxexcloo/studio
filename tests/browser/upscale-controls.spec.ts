@@ -39,7 +39,11 @@ test("Upscale queues Balanced in one click and its menu runs a quality or Face D
   });
   await page.goto("/images");
   await page.getByRole("button", { name: "Open image: Upscale Study", exact: true }).click();
-  await viewerAction(page, "Upscale");
+  // Phones reach Balanced under More › Upscale.
+  if ((page.viewportSize()?.width || 1440) < 768) {
+    await viewerAction(page, "Upscale Options");
+    await page.getByRole("menuitem", { name: "Balanced", exact: true }).click();
+  } else await viewerAction(page, "Upscale");
   await expect.poll(() => submitted.length).toBe(1);
   expect(submitted[0]).toEqual({
     galleryItemId: source.id,

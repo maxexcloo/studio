@@ -214,7 +214,7 @@ export function ActionBarGroups({
   );
 }
 
-/** A phone bar control: its icon over its label; options open in a menu above it. */
+/** A phone bar control: its icon over its label; a split action's ▾ beside it opens its options. */
 function StackedControl({ action }: { action: Action }) {
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
   const content = (
@@ -233,8 +233,24 @@ function StackedControl({ action }: { action: Action }) {
     "data-color": color,
     disabled: disabled || loading,
   };
-  if (!menu)
-    return link && !disabled ? (
+  const options = menu && shown(menu).length > 0 ? menu : undefined;
+  const dropdown = options && (
+    <Menu.Dropdown>
+      {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
+      <ActionMenuItems groups={options} />
+    </Menu.Dropdown>
+  );
+  if (options && !onClick)
+    return (
+      <Menu position="top" width={240}>
+        <Menu.Target>
+          <UnstyledButton {...props}>{content}</UnstyledButton>
+        </Menu.Target>
+        {dropdown}
+      </Menu>
+    );
+  const button =
+    link && !disabled ? (
       <UnstyledButton component="a" {...props} {...link}>
         {content}
       </UnstyledButton>
@@ -243,18 +259,23 @@ function StackedControl({ action }: { action: Action }) {
         {content}
       </UnstyledButton>
     );
-  // A split action's own click leads its options, so one tap reaches either.
-  const groups = onClick ? [[{ ...action, menu: undefined, note: undefined }], ...menu] : menu;
+  if (!options) return button;
   return (
-    <Menu position="top" width={240}>
-      <Menu.Target>
-        <UnstyledButton {...props}>{content}</UnstyledButton>
-      </Menu.Target>
-      <Menu.Dropdown>
-        {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
-        <ActionMenuItems groups={groups} />
-      </Menu.Dropdown>
-    </Menu>
+    <div className={classes.stackedSplit}>
+      {button}
+      <Menu position="top" width={240}>
+        <Menu.Target>
+          <UnstyledButton
+            className={classes.stackedMenu}
+            aria-label={`${label} Options`}
+            disabled={disabled}
+          >
+            <ChevronDown size={14} />
+          </UnstyledButton>
+        </Menu.Target>
+        {dropdown}
+      </Menu>
+    </div>
   );
 }
 
