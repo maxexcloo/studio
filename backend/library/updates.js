@@ -365,7 +365,6 @@ export function createUpdateChecker({
             "role",
             "triggers",
             "strength",
-            "promptStyle",
             "tags",
             "negative",
             "description",

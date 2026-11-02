@@ -31,16 +31,13 @@ export function enrichLocalLoraInfo(info, name, catalogue, familiesFromMetadata,
   };
 }
 
-/** How the LoRA wants its prompt (lora/prompts.js): its style, up to 10 tags, and a negative of its own (reserved). */
+/** Up to 10 tags (LoRA matching, assistant.js) and a negative of its own (lora/prompts.js). */
 export function loraPromptMetadata(entry) {
   const tags = (Array.isArray(entry?.tags) ? entry.tags : [])
     .filter((tag) => typeof tag === "string" && tag.trim())
     .map((tag) => tag.trim().slice(0, 80))
     .slice(0, 10);
   return {
-    ...(["tags", "natural", "mixed"].includes(entry?.promptStyle)
-      ? { promptStyle: entry.promptStyle }
-      : {}),
     ...(tags.length ? { tags } : {}),
     ...(typeof entry?.negative === "string" && entry.negative.trim()
       ? { negative: entry.negative.trim().slice(0, 500) }
