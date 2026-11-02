@@ -22,6 +22,7 @@ import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
 import { backendLabel } from "../generation/payload";
+import { modelsQuery } from "../generation/GenerationProvider";
 
 interface DefinitionRow {
   id?: string;
@@ -86,6 +87,8 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
   const [merging, setMerging] = useState(false);
   const [combining, setCombining] = useState(false);
   const noun = nouns[kind];
+  // Family names come with the models list; following it re-labels once they arrive.
+  useQuery(modelsQuery);
   const list = useQuery({
     queryKey: ["definition-list", kind],
     queryFn: () =>
