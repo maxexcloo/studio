@@ -6,7 +6,7 @@
  *   GET  /api/profiles/editable/:id/versions/:n     one version with its text
  *   POST /api/profiles/editable/:id/revert          {version, baseHash}: that version again, as a new version
  *   POST /api/profiles/editable/:id/approve         clears AI-Drafted, so access profiles decide who sees it
- *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, or its own guidance
+ *   GET  /api/profiles/editable/:id/guide           the guide pack that applies to the profile, and its own fields over it
  *   GET  /api/profiles/guides                       every guide pack with its version and AI-Drafted state
  *   GET  /api/profiles/guides/:packId               one pack with its hash (an edit's base) and meta
  *   PUT  /api/profiles/guides/:packId               {pack, baseHash, draft?}: saves a guide pack as a new version
@@ -145,14 +145,14 @@ export function registerProfileRoutes(
         family: String(meta.family || "custom"),
         kind: meta.kind === "video" ? "video" : "image",
       };
-      // Guidance in the profile's own JSON wins over any pack (mcp-prompting.js).
-      if (meta.prompting && typeof meta.prompting === "object" && !Array.isArray(meta.prompting)) {
-        res.json({ ok: true, source: "owned", profile, owned: meta.prompting });
-        return;
-      }
+      // The profile's own prompting fields go over its pack's (mcp/prompting.js mergedPrompting).
+      const own =
+        meta.prompting && typeof meta.prompting === "object" && !Array.isArray(meta.prompting)
+          ? { own: meta.prompting }
+          : {};
       const resolved = guides().resolve(profile);
       if (!resolved) {
-        res.json({ ok: true, source: "none", profile });
+        res.json({ ok: true, source: "none", profile, ...own });
         return;
       }
       let pack = null;
@@ -165,6 +165,7 @@ export function registerProfileRoutes(
         ok: true,
         ...resolved,
         profile,
+        ...own,
         ...(pack ? { pack: pack.pack, hash: pack.hash, meta: pack.meta } : { readOnly: true }),
       });
     }),

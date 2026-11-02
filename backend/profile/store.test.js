@@ -15,7 +15,7 @@ process.env.STUDIO_WORKERS = JSON.stringify([
 ]);
 const { createGuideStore, createProfileStore, hashOf, livePrompting } = await import("./store.js");
 const editor = await import("./editor.js");
-const { loadMcpPrompting } = await import("../mcp/prompting.js");
+const { loadMcpPrompting, mergedPrompting, ownPrompting } = await import("../mcp/prompting.js");
 const { userWorkflowsDir } = await import("../custom-workflows.js");
 test.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
 const quiet = { info: () => {}, warn: () => {} };
@@ -303,10 +303,7 @@ test("a guide resolves per profile, binds to a drafted profile and records its e
   assert.equal(store.pack("drafted").meta.exportedHash, store.pack("drafted").hash);
   // The live loader follows the binding without a restart.
   const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet });
-  assert.equal(
-    prompting({ id: "custom:new", family: "krea2", kind: "image" }, true).summary,
-    "Drafted.",
-  );
+  assert.equal(prompting({ id: "custom:new", family: "krea2", kind: "image" }).summary, "Drafted.");
 });
 
 test("guide bindings are edited, removed, reverted and approved as versions, and a stale edit is refused", (t) => {
@@ -363,29 +360,31 @@ test("the guide loader reads the store first, falls back to the seed, reloads on
   const dir = scratch(t);
   const seedFile = path.join(dir, "prompting.json");
   fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet, negatives: true });
+  const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet });
   const fixture = { id: "custom:fixture", family: "krea2", kind: "image" };
-  assert.equal(
-    prompting(fixture, true).summary,
-    "Other summary.",
-    "the seed while there is no store",
-  );
-  assert.deepEqual(prompting(fixture, true).negative, { effect: "none", notes: "No negative." });
-  // MCP's loader leaves negatives off: its guides stay exactly as loadMcpPrompting gives them.
-  const mcp = livePrompting({ dataDir: dir, seedFile, log: quiet });
-  assert.deepEqual(mcp(fixture, true), loadMcpPrompting(seedFile)(fixture, true));
+  assert.equal(prompting(fixture).summary, "Other summary.", "the seed while there is no store");
+  assert.deepEqual(prompting(fixture).negative, { effect: "none", notes: "No negative." });
+  assert.deepEqual(prompting(fixture), loadMcpPrompting(seedFile)(fixture));
   const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
   store.migrate();
   store.save("other", { summary: "Edited in Studio." }, { by: "admin-1" });
   assert.equal(
-    prompting(fixture, true).summary,
+    prompting(fixture).summary,
     "Edited in Studio.",
     "a saved guide applies without a restart",
   );
   assert.equal(prompting({ id: "x", family: "krea2", kind: "image" }).summary, "Seed summary.");
-  // Owned guidance still wins, as before.
-  assert.equal(
-    prompting({ ...fixture, prompting: { id: "own", summary: "Own." } }, true).summary,
-    "Own.",
-  );
+  // A profile's own fields go over its guide's; the rest still follow the guide.
+  const own = prompting({ ...fixture, prompting: { negative: { effect: "optional" } } });
+  assert.deepEqual([own.summary, own.negative], ["Edited in Studio.", { effect: "optional" }]);
+});
+
+test("a profile keeps only the prompting fields that differ from its guide", () => {
+  const guide = { id: "krea2", summary: "S", rules: ["R"], mode: { id: "base", rules: ["M"] } };
+  const own = { id: "krea2", summary: "S", rules: ["R"], mode: { id: "fast", rules: ["F"] } };
+  assert.deepEqual(ownPrompting(guide, own), { mode: { id: "fast", rules: ["F"] } });
+  assert.deepEqual(mergedPrompting(guide, ownPrompting(guide, own)), own);
+  assert.deepEqual(mergedPrompting(guide, {}), guide);
+  assert.deepEqual(mergedPrompting(null, own), own);
+  assert.equal(mergedPrompting(null, undefined), null);
 });
