@@ -552,6 +552,10 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
   // Opened, it also downloads as a GIF.
   await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
   await viewerAction(page, "Download Options");
+  await expect(page.getByRole("menuitem", { name: "Download Video", exact: true })).toHaveAttribute(
+    "href",
+    "/comfy/view?filename=clip.mp4&subfolder=&type=studio",
+  );
   const gif = page.getByRole("menuitem", { name: "Download as GIF", exact: true });
   await expect(gif).toHaveAttribute(
     "href",
