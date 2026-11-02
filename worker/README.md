@@ -15,7 +15,8 @@ and 1 replicas; see
 [runtime control](../CONFIGURATION.md#queue-sessions--runtime-control) for
 the labels and annotations a deployment needs and the service account role.
 Workers without them stay unmanaged. Media output saving retains admission until
-finished, so a switch waits for it. Idle workers stay warm.
+finished, so a switch waits for it. Idle workers keep running unless Park Idle
+After parks them (see [runtime control](../CONFIGURATION.md#queue-sessions--runtime-control)).
 
 Studio refuses to target its text gateway's origin (`STUDIO_ASSISTANT_URL`) as a
 worker.
