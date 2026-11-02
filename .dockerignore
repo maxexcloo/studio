@@ -7,16 +7,12 @@
 .git
 .github
 .mise.toml
-artifacts
 backend/fixtures
 worker/comfyui/*/test_*.py
 data
 node_modules
-outputs
 playwright-report
 private
-product-screenshots
-release
 renovate.json5
 test-results
 tests
