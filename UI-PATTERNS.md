@@ -373,7 +373,7 @@ primary component reference and verify APIs against the installed version.
   and the selection bar, never the viewer's bar. Options are submenus in menus
   and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
   Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
-  Reference; a video's Edit › Trim…, Reverse, Back and Forth (each saved by ffmpeg as a new version, the original kept); Animate ›
+  Reference; a video's Edit › Trim…, Reverse, Back and Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the original kept); Animate ›
   themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and the result is saved joined onto it; Extend in Composer replaces Animate in Composer, and Use Frame as Reference and Save Frame as Image take the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face

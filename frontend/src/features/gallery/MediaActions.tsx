@@ -27,12 +27,14 @@ import {
   Scissors,
   Share,
   Shuffle,
+  Snail,
   SlidersHorizontal,
   Sparkles,
   Square,
   Star,
   TextQuote,
   Trash2,
+  Waves,
   Zap,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
@@ -419,6 +421,23 @@ export function useMediaActions(
               icon: ArrowLeftRight,
               disabled: videoEdit.isPending,
               onClick: () => videoEdit.mutate({ kind: "loop" }),
+            },
+          ],
+          // Interpolated edits, the slowest to make.
+          [
+            {
+              id: "slow-motion",
+              label: "Slow Motion",
+              icon: Snail,
+              disabled: videoEdit.isPending,
+              onClick: () => videoEdit.mutate({ kind: "slow" }),
+            },
+            {
+              id: "smooth-motion",
+              label: "Smooth Motion",
+              icon: Waves,
+              disabled: videoEdit.isPending,
+              onClick: () => videoEdit.mutate({ kind: "smooth" }),
             },
           ],
         ],

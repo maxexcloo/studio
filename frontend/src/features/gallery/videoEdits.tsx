@@ -10,8 +10,7 @@ import { queueQuery } from "../generation/Queue";
 /** A video edit backend/gallery/video-edits.js saves as a new version of the clip. */
 export type VideoEdit =
   | { kind: "trim"; start: number; end: number }
-  | { kind: "reverse" }
-  | { kind: "loop" };
+  | { kind: "reverse" | "loop" | "smooth" | "slow" };
 
 /** Edit › a video edit; the original stays and the edited clip joins its versions. */
 export function useVideoEdit(item: MediaItem, { inlineError = false } = {}) {
