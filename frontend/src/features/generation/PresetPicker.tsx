@@ -112,7 +112,6 @@ export function PresetPicker({
         label="Presets"
         query={query}
         onQueryChange={setQuery}
-        placeholder="Search presets…"
         actions={<SortMenu value={sort} onChange={setSort} />}
       />
       {presets.error && (

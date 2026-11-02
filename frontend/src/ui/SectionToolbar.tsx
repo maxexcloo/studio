@@ -70,7 +70,6 @@ export function SectionToolbar({
         <SearchInput
           ref={input}
           aria-label={`Search ${label}`}
-          placeholder={`Search ${label}…`}
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
           onClear={() => onQueryChange("")}

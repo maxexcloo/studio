@@ -19,6 +19,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
   const controls = Number(hasQuery);
   return (
     <TextInput
+      placeholder="Search"
       {...props}
       value={value}
       ref={ref}
