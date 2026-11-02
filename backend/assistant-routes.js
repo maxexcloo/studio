@@ -127,7 +127,8 @@ export async function assistantIntegration({ environment = process.env, engine, 
   if (!settings || !engine)
     return {
       available: false,
-      note: problem || "Set STUDIO_PROMPT_WRITER_URL, _KEY and _MODEL to use the prompt assistant.",
+      note:
+        problem || "Set STUDIO_ASSISTANT_URL, _KEY and _CLOUD_MODEL to use the prompt assistant.",
       models: [],
       model: row(assistantModelKey, ""),
     };

@@ -95,9 +95,9 @@ test(
           STUDIO_CHAT_GATEWAY_URL: gatewayUrl,
           STUDIO_CHAT_GATEWAY_KEY: "fixture",
           STUDIO_CHAT_GATEWAY_MODELS: allowedModels,
-          STUDIO_PROMPT_WRITER_URL: "http://127.0.0.1:1",
-          STUDIO_PROMPT_WRITER_KEY: "unrelated-fixture",
-          STUDIO_PROMPT_WRITER_MODEL: "unrelated-writer/",
+          STUDIO_ASSISTANT_URL: "http://127.0.0.1:1",
+          STUDIO_ASSISTANT_KEY: "unrelated-fixture",
+          STUDIO_ASSISTANT_CLOUD_MODEL: "unrelated-writer/",
         },
         stdio: ["ignore", "ignore", "pipe", "ipc"],
       });

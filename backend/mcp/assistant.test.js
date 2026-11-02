@@ -10,9 +10,9 @@ import { registerMcpRoutes } from "./mcp.js";
 import { createChatAssistantMemory } from "./assistant.js";
 
 const gateway = {
-  STUDIO_PROMPT_WRITER_URL: "http://fixture-writer.invalid:4000",
-  STUDIO_PROMPT_WRITER_KEY: "fixture-writer-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
+  STUDIO_ASSISTANT_URL: "http://fixture-writer.invalid:4000",
+  STUDIO_ASSISTANT_KEY: "fixture-writer-key",
+  STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
 };
 const profile = {
   id: "fixture-image",

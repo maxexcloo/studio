@@ -6,9 +6,9 @@ test("Chat has a separate required gateway and anchored explicit model allowlist
   assert.equal(chatSettings({}), null);
   assert.equal(
     chatSettings({
-      STUDIO_PROMPT_WRITER_URL: "http://writer.invalid",
-      STUDIO_PROMPT_WRITER_KEY: "writer-fixture",
-      STUDIO_PROMPT_WRITER_MODEL: "writer",
+      STUDIO_ASSISTANT_URL: "http://writer.invalid",
+      STUDIO_ASSISTANT_KEY: "writer-fixture",
+      STUDIO_ASSISTANT_CLOUD_MODEL: "writer",
     }),
     null,
   );

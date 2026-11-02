@@ -142,9 +142,9 @@ Public imports do not require a token. Set `CIVITAI_API_TOKEN` in the server env
 
 ## Prompt Assistant
 
-The prompt assistant uses an OpenAI-compatible Bifrost gateway: `STUDIO_PROMPT_WRITER_URL`, `STUDIO_PROMPT_WRITER_KEY` and `STUDIO_PROMPT_WRITER_MODEL`. Credentials remain server-side. Without the gateway, the assistant is off. Bifrost fixture compatibility is separate from live gateway verification.
+The prompt assistant uses an OpenAI-compatible Bifrost gateway: `STUDIO_ASSISTANT_URL`, `STUDIO_ASSISTANT_KEY` and `STUDIO_ASSISTANT_CLOUD_MODEL`. Credentials remain server-side. Without the gateway, the assistant is off. Bifrost fixture compatibility is separate from live gateway verification.
 
-Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_PROMPT_WRITER_MODEL`, such as `cloud/auto`. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts, the taste summary) sends none and gets the model's default.
+Bifrost picks the model behind each alias; Studio picks the alias and its reasoning. Calls go to `STUDIO_LOCAL_TEXT_MODEL`, such as `local/auto`, while a [text workload](#queue-sessions--runtime-control) runs; otherwise, and in single-user mode without runtime control, to `STUDIO_ASSISTANT_CLOUD_MODEL`, such as `cloud/auto`. A switch shows within 30 seconds, and Bifrost never falls back between them. Where Studio wants a structured (JSON) answer (Dream, Describe, captions, LoRA suggestions, suggestions, guide and profile drafts), it sends `reasoning_effort: "none"`; prose (rewrites, negatives, titles, motion prompts, the taste summary) sends none and gets the model's default.
 
 - `STUDIO_ASSISTANT_MODEL`: a model, such as `refuseless/glm-5.3-flash-abliterated`, that replaces the alias for every call and sends no `reasoning_effort`. Unset, Studio picks as above.
 
