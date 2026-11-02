@@ -1256,7 +1256,7 @@ export function registerMcpRoutes(
         server,
         "Reuse",
         "Reuse Result",
-        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video or extends a video: prompt is your motion prompt, or theme has Studio write it (custom: request is the motion). Either way, tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
+        `Follow up on one finished result. mode again (default) reruns it with a new seed: prompt is your revised prompt, run as written; preserve_seed keeps its seed. mode animate makes an image a video, extend continues a video from its last frame; prompt is the motion, or pass theme; length is seconds. tier or profile_id picks the model. mode reference returns it as a reference_asset_id for Generate.`,
         {
           ...output,
           job_id: z
@@ -1264,7 +1264,7 @@ export function registerMcpRoutes(
             .min(1)
             .max(200)
             .describe('Its ref as the reply shows it ("result 1"), or a job_id; never "all".'),
-          mode: z.enum(["again", "animate", "reference"]).default("again"),
+          mode: z.enum(["again", "animate", "extend", "reference"]).default("again"),
           request: z.string().trim().min(1).max(2000).optional(),
           prompt: z.string().trim().min(1).optional(),
           tier: tier.optional(),
@@ -1272,6 +1272,7 @@ export function registerMcpRoutes(
           preserve_seed: z.boolean().default(false),
           count: jobCount.default(1),
           theme: z.enum(Object.keys(animateThemes)).optional(),
+          length: z.number().optional(),
         },
         async (
           {
@@ -1285,13 +1286,18 @@ export function registerMcpRoutes(
             prompt,
             count,
             theme,
+            length,
           },
           signal,
         ) => {
           const id = resolve(job_id);
-          const animating = mode === "animate";
+          const animating = mode === "animate" || mode === "extend";
           if (theme && (!animating || prompt))
-            throw new Error("theme is for mode animate without prompt. Call Reuse again.");
+            throw new Error(
+              "theme is for mode animate or extend without prompt. Call Reuse again.",
+            );
+          if (length && !animating)
+            throw new Error("length is for mode animate or extend. Call Reuse again.");
           if (theme === "custom" && !request)
             throw new Error("theme custom needs request: what should happen. Call Reuse again.");
           if (mode === "reference") {
@@ -1316,6 +1322,10 @@ export function registerMcpRoutes(
               "Studio runs prompts exactly as given. Write the revised prompt yourself from the result's prompt and pass it as prompt (for animate, the motion), with the user's words as request, or leave request out to run the prompt unchanged. Call Reuse again.",
             );
           const item = await media.source(owner, id, output_index);
+          if (mode === "extend" && item.type !== "video")
+            throw new Error(
+              "mode extend continues a video; to make an image a video, use mode animate.",
+            );
           const own = item.type === "video" ? "video" : "image";
           const kind = animating ? "video" : own;
           if (preserve_seed && (animating || wanted || profile_id))
@@ -1337,6 +1347,7 @@ export function registerMcpRoutes(
               tier: wanted,
               count,
               cloud,
+              length,
               profile: named?.profile,
               note: named?.note,
             });

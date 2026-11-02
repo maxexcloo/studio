@@ -82,6 +82,29 @@ export function mcpControls(profile) {
   return controls;
 }
 
+/**
+ * The Generate fields for a video `seconds` long: the profile's duration, or frames at its FPS on
+ * the frame grid the worker accepts (counted from the minimum, as backend/validation.js does, and as
+ * the composer's Length chip offers). A length outside the profile's limits is refused with them.
+ */
+export function videoLength(profile, seconds) {
+  const key = profile.capabilities?.duration === true ? "duration" : "frames";
+  const fps = key === "duration" ? 1 : profile.defaults?.fps;
+  const range = profile.constraints?.[key] || {};
+  const { min = 1, max = Infinity, step = 1 } = range;
+  const name = profile.label || profile.id;
+  if (profile.capabilities?.[key] === false || min === max || !(fps > 0))
+    throw new Error(`${name} has a fixed length; leave length out.`);
+  const offset = range.offset ?? min;
+  const value = offset + step * Math.round((seconds * fps - offset) / step);
+  const time = (count) => `${Math.round((count / fps) * 10) / 10} s`;
+  if (value < min || value > max)
+    throw new Error(
+      `${name} makes ${time(min)}${Number.isFinite(max) ? ` to ${time(max)}` : " or more"}; pick a length in that range.`,
+    );
+  return { [key]: value };
+}
+
 /** The value a fixed control always uses, when the profile states one. */
 function fixedValue(profile, field) {
   const key = { negative_prompt: "negative" }[field] || field;
