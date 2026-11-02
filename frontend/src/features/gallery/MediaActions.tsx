@@ -69,6 +69,7 @@ import {
   type Iteration,
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
+import { useRecreateAction } from "./useRecreate";
 import { useVideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
@@ -298,6 +299,7 @@ export function useMediaActions(
   const settingsText = useSettingsText(item);
   const retry = useRetryAction(item, onRetried);
   const reference = useReferenceAction(item, onApplied);
+  const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
   const chat = useChatAction(item, onApplied);
@@ -468,6 +470,7 @@ export function useMediaActions(
                 onClick: () => action.mutate("image"),
               },
               ...(image && reference ? [reference] : []),
+              ...(recreate ? [recreate] : []),
             ],
             [
               {
