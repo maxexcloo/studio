@@ -3,6 +3,7 @@ import { notifications } from "@mantine/notifications";
 import { useLocation, useNavigate } from "react-router";
 import { api, post } from "../../api";
 import type { MediaItem, Profile, QueueJob, ReferenceAsset, Session } from "../../types";
+import { useRemembered } from "../auth/useRemembered";
 import {
   initialInput,
   useGeneration,
@@ -12,24 +13,33 @@ import { backendLabel, generationInput, isProfile } from "../generation/payload"
 import { queueQuery } from "../generation/Queue";
 
 type Operation = "image" | "refine" | "animate" | "extend";
+export type AnimateTier = "fast" | "quality";
 
 interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;
   size?: { width: number; height: number };
+  /** Fast and Quality when they run different profiles, so Animate offers the choice. */
+  tiers: AnimateTier[];
 }
+
+/** Animate's Fast or Quality choice, shared by every Animate menu; Fast until Quality is picked. */
+export const useAnimateTier = () => useRemembered<AnimateTier>("animate-tier", "fast");
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
 export const typedPrompt = (item: MediaItem) =>
   typeof item.settings?.typedPrompt === "string" ? item.settings.typedPrompt : item.prompt || "";
 
 /** The video profile that animates this image (backend/animate-profile.js), or why none can. */
-export const animateProfileQuery = (item: Pick<MediaItem, "width" | "height">) =>
+export const animateProfileQuery = (
+  item: Pick<MediaItem, "width" | "height">,
+  tier: AnimateTier = "fast",
+) =>
   queryOptions({
-    queryKey: ["animate-profile", item.width || 0, item.height || 0],
+    queryKey: ["animate-profile", item.width || 0, item.height || 0, tier],
     queryFn: () =>
       api<AnimateChoice>(
-        `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}`,
+        `/api/animate/profile?width=${item.width || 0}&height=${item.height || 0}&tier=${tier}`,
       ),
     staleTime: 5000,
     retry: false,
@@ -42,6 +52,7 @@ export async function mediaDraft(
   profiles: Profile[],
   client: QueryClient,
   sessionId?: string,
+  tier?: AnimateTier,
 ) {
   const targetKind = operation === "animate" || operation === "extend" ? "video" : item.type;
   const priorId = String(item.settings?.profileId || "");
@@ -60,7 +71,7 @@ export async function mediaDraft(
   // video continues on its own model unless that is unavailable or stopped.
   const choice =
     targetKind === "video" && (item.type === "image" || original?.ready === false || !original)
-      ? await client.fetchQuery(animateProfileQuery(item))
+      ? await client.fetchQuery(animateProfileQuery(item, tier))
       : undefined;
   const profile =
     (choice && profiles.find((profile) => isProfile(profile, choice.profileId))) ||
@@ -179,9 +190,10 @@ export function useMediaAction(item: MediaItem, sessionId?: string, prepared?: (
   const navigate = useNavigate();
   const location = useLocation();
   const client = useQueryClient();
+  const [tier] = useAnimateTier();
   return useMutation({
     mutationFn: async (operation: Operation) => {
-      const { draft, note } = await mediaDraft(item, operation, profiles, client, sessionId);
+      const { draft, note } = await mediaDraft(item, operation, profiles, client, sessionId, tier);
       if (note) notifications.show({ message: note });
       // Chat stages a card with its own input; the gallery loads the composer.
       if (location.pathname.startsWith("/chat")) setStaged(draft);
@@ -225,6 +237,7 @@ export type Iteration =
 export function useMediaIteration(item: MediaItem, sessionId?: string) {
   const { profiles, input: composer } = useGeneration();
   const client = useQueryClient();
+  const [tier] = useAnimateTier();
   return useMutation({
     mutationFn: async (iteration: Iteration) => {
       const animate = iteration.kind === "animate";
@@ -234,6 +247,7 @@ export function useMediaIteration(item: MediaItem, sessionId?: string) {
         profiles,
         client,
         sessionId,
+        tier,
       );
       if (note) notifications.show({ message: note });
       const prompt = animate ? "" : draft.input.prompt;

@@ -31,15 +31,17 @@ const profiles = [
 const choose = (options, list = profiles) =>
   animateProfile(list, { defaultId: "fl-quality", width: 1024, height: 1536, ...options });
 
-test("Animate takes the default local first-frame profile while local video runs", () => {
+test("Animate takes a local first-frame profile, Fast unless Quality is asked, while local video runs", () => {
   const choice = choose({ localRunning: true });
-  assert.equal(choice.profile.id, "fl-quality");
-  assert.equal(choice.cloud, false);
-  assert.equal(choice.note, "");
+  assert.equal(choice.profile.id, "fl-fast");
+  assert.deepEqual([choice.cloud, choice.note, choice.tier], [false, "", "fast"]);
+  assert.deepEqual(choice.tiers, ["fast", "quality"]);
   assert.deepEqual(choice.size, { width: 832, height: 1248 });
-  // A default that cannot take the image gives way to the usual first-frame pick; a tier narrows it.
-  assert.equal(choose({ localRunning: true, defaultId: "text-video" }).profile.id, "fl-fast");
-  assert.equal(choose({ localRunning: true, tier: "fast" }).profile.id, "fl-fast");
+  assert.equal(choose({ localRunning: true, tier: "quality" }).profile.id, "fl-quality");
+  // With one first-frame profile there is no choice: every tier takes it.
+  const one = profiles.filter((profile) => profile.id !== "fl-fast");
+  assert.equal(choose({ localRunning: true }, one).profile.id, "fl-quality");
+  assert.deepEqual(choose({ localRunning: true }, one).tiers, []);
   // Asking for Grok goes to Grok without a note.
   assert.deepEqual(
     [choose({ localRunning: true, cloud: true }).profile.id, choose({ cloud: true }).note],

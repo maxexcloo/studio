@@ -249,6 +249,33 @@ test("An Animate theme queues a video in one click; the queue item writes its mo
   });
 });
 
+test("Animate runs Fast unless Quality is checked", async ({ page }) => {
+  const tiers: string[] = [];
+  const { state, viewer } = await seed(page, {}, (page) =>
+    page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) => {
+      const tier = new URL(route.request().url()).searchParams.get("tier") || "";
+      tiers.push(tier);
+      return route.fulfill({
+        json: {
+          profileId: "video:test",
+          label: tier === "quality" ? "Motion Quality" : "Motion Fast",
+          cloud: false,
+          tiers: ["fast", "quality"],
+        },
+      });
+    }),
+  );
+  await viewer.getByRole("button", { name: "Animate", exact: true }).click();
+  const fast = page.getByRole("menuitem", { name: "Fast", exact: true });
+  await expect(fast).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menuitem", { name: "Quality", exact: true }).click();
+  await expect(fast).toHaveAttribute("aria-checked", "false");
+  await expect.poll(() => tiers.at(-1)).toBe("quality");
+  await page.getByRole("menuitem", { name: "Living Photo", exact: true }).click();
+  await expect.poll(() => state.jobs.length).toBe(2);
+  expect(tiers.at(-1)).toBe("quality");
+});
+
 test("A queue item streams its prompt's thinking; the result keeps it collapsed under the prompt", async ({
   page,
 }, testInfo) => {

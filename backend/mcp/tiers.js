@@ -256,8 +256,8 @@ export function chooseProfile(profiles, { defaultId, ...options }) {
   );
 }
 
-// From a wanted tier, the order of the nearest others.
-const tierDistance = {
+/** From a wanted tier, the order of the nearest others. */
+export const tierDistance = {
   turbo: ["turbo", "fast", "standard", "quality"],
   fast: ["fast", "turbo", "standard", "quality"],
   standard: ["standard", "quality", "fast", "turbo"],
