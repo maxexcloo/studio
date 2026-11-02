@@ -141,6 +141,10 @@ function useChatState() {
           });
         } else if (event.event === "generation") {
           generated = true;
+          // The newest result becomes the source the next message continues from.
+          const jobId = event.data.jobIds.at(-1);
+          if (jobId)
+            setDraft((previous) => ({ ...previous, parentJobId: jobId, parentItemId: undefined }));
           void client.invalidateQueries({ queryKey: ["session", sessionId] });
           void client.invalidateQueries({ queryKey: queueQuery.queryKey });
           void client.invalidateQueries({ queryKey: ["gallery"] });
