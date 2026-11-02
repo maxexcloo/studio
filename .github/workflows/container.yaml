@@ -204,8 +204,16 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          # The worker image is published only by main commits that change it.
-          worker_commit="$(git log -1 --first-parent --format=%H -- .dockerignore .github/workflows/worker.yaml LICENSE worker)"
+          docker buildx imagetools create --tag "$IMAGE_NAME:$VERSION" --tag "$IMAGE_NAME:latest" "$IMAGE_NAME:sha-$GITHUB_SHA"
+          # The worker image is published only by main commits that change it. It gets a version only
+          # when it changed since the last release, so a deployment's GPU workers restart only for that.
+          worker_paths=(.dockerignore .github/workflows/worker.yaml LICENSE worker)
+          worker_commit="$(git log -1 --first-parent --format=%H -- "${worker_paths[@]}")"
+          latest="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          if [ -n "$latest" ] && [ "$worker_commit" = "$(git log -1 --first-parent --format=%H "$latest" -- "${worker_paths[@]}")" ]; then
+            echo "::notice::The worker is unchanged since $latest."
+            exit 0
+          fi
           worker="$IMAGE_NAME-worker:sha-$worker_commit"
           # The Worker workflow starts alongside this run and can take longer.
           for _ in $(seq 1 100); do
@@ -213,9 +221,7 @@ jobs:
             sleep 30
           done
           docker buildx imagetools inspect "$worker" >/dev/null || { echo "::error::$worker is missing; run the Worker workflow on main, then rerun this job."; exit 1; }
-          for image in "$IMAGE_NAME:sha-$GITHUB_SHA" "$worker"; do
-            docker buildx imagetools create --tag "${image%%:*}:$VERSION" --tag "${image%%:*}:latest" "$image"
-          done
+          docker buildx imagetools create --tag "$IMAGE_NAME-worker:$VERSION" --tag "$IMAGE_NAME-worker:latest" "$worker"
       - name: Publish Release
         if: steps.version.outputs.version
         env:
