@@ -124,7 +124,7 @@ primary component reference and verify APIs against the installed version.
   box with a history action inside it, the negative prompt under it when the
   profile takes one, and a row of compact chips: Profile, Backend (when the
   profile has several), Reference Role (once references are placed), References,
-  LoRAs, Aspect, Count, a set Seed (clearable), Expert settings, Compare and
+  LoRAs, Aspect, Count, a video's Length, a set Seed (clearable), Expert settings, Compare and
   Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
