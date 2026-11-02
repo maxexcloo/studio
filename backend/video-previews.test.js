@@ -196,3 +196,30 @@ test("a Studio video downloads as a looping GIF", { skip: !available }, async ()
   // Its logical screen is at most 480 pixels wide.
   assert.equal(gif.readUInt16LE(6), 480);
 });
+
+test("a Studio video downloads played forward then back", { skip: !available }, async () => {
+  const { mediaPath, mediaType } = await import("./media-paths.js");
+  const file = mediaPath("loop-source.mp4", "");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  execFileSync(encoder, [
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    "testsrc=size=320x180:rate=24:duration=1",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    file,
+  ]);
+  const loop = await previews.getComfyVideoLoop("loop-source.mp4", "", mediaType);
+  const out = path.join(dir, "loop.mp4");
+  fs.writeFileSync(out, loop);
+  // Forward then back without the repeated turning frame: about twice as long.
+  const { durationMs } = await previews.probeVideo(out);
+  assert.ok(Math.abs(durationMs - 1958) < 120, `got ${durationMs} ms`);
+});

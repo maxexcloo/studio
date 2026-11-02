@@ -558,6 +558,12 @@ test("A video tile plays its preview while a mouse is over it", async ({ page },
     "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=gif",
   );
   await expect(gif).toHaveAttribute("download", /\.gif$/);
+  await expect(
+    page.getByRole("menuitem", { name: "Download Back and Forth", exact: true }),
+  ).toHaveAttribute(
+    "href",
+    "/comfy/video-preview?filename=clip.mp4&subfolder=&type=studio&format=loop",
+  );
 });
 
 test("Details show the gallery caption and its tags", async ({ page }, testInfo) => {

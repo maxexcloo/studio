@@ -282,6 +282,46 @@ export async function getComfyVideoGif(filename, subfolder, type) {
   return stdout;
 }
 
+/** A Studio video played forward then back, so it loops without a jump; its first 15 seconds. */
+export async function getComfyVideoLoop(filename, subfolder, type) {
+  const local = localOutputFile(filename, subfolder, type);
+  if (!local) throw new Error("Source video is unavailable.");
+  const { code, stdout } = await queued(() =>
+    run(
+      [
+        "-loglevel",
+        "error",
+        "-t",
+        "15",
+        "-i",
+        local,
+        "-an",
+        "-filter_complex",
+        // The reversed half skips its first frame, which is the forward half's last.
+        "[0:v]split[a][b];[b]reverse,trim=start_frame=1,setpts=PTS-STARTPTS[r];[a][r]concat=n=2:v=1:a=0,format=yuv420p[v]",
+        "-map",
+        "[v]",
+        "-c:v",
+        "libx264",
+        "-threads",
+        "2",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "20",
+        "-movflags",
+        "frag_keyframe+empty_moov+default_base_moof",
+        "-f",
+        "mp4",
+        "pipe:1",
+      ],
+      { timeout: 300_000, limit: 256 * 1024 * 1024, low: true },
+    ),
+  );
+  if (code !== 0 || !stdout.length) throw new Error("The loop couldn’t be made.");
+  return stdout;
+}
+
 /** The first frame of the source, as a JPEG that fits a grid tile. */
 async function extractPoster(input) {
   const { code, stdout } = await run([

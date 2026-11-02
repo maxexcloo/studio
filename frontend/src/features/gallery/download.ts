@@ -17,12 +17,15 @@ export function mediaDownload(item: MediaItem) {
   };
 }
 
-/** A Studio video as a looping GIF (backend/video-previews.js), or null for anything else. */
-export function gifDownload(item: MediaItem) {
+/**
+ * A Studio video exported by backend/video-previews.js: a looping GIF, or an MP4 played forward then
+ * back; null for anything else.
+ */
+export function videoExport(item: MediaItem, format: "gif" | "loop") {
   const { href, download } = mediaDownload(item);
   if (item.type !== "video" || !href.startsWith("/comfy/view?")) return null;
   return {
-    href: `${href.replace("/comfy/view?", "/comfy/video-preview?")}&format=gif`,
-    download: download.replace(/\.[^.]+$/, ".gif"),
+    href: `${href.replace("/comfy/view?", "/comfy/video-preview?")}&format=${format}`,
+    download: download.replace(/\.[^.]+$/, format === "gif" ? ".gif" : " loop.mp4"),
   };
 }
