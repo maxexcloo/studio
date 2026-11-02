@@ -13,7 +13,7 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { ImagePlus, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ImagePlus, Trash2, Upload } from "lucide-react";
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -396,6 +396,7 @@ export function ReferencePicker({
       color={missing ? "yellow" : undefined}
       variant={missing ? "outline" : chipProps.variant}
       leftSection={references.length ? undefined : <ImagePlus size={16} />}
+      rightSection={<ChevronDown size={14} />}
       onClick={() => setOpened(!opened)}
     >
       {references.length ? (

@@ -312,7 +312,7 @@ export const cssVariablesResolver: CSSVariablesResolver = (theme) => {
   return {
     variables: {
       "--studio-workspace-width": "1600px",
-      "--studio-composer-width": "780px",
+      "--studio-composer-width": "820px",
       "--studio-motion-duration": `${theme.other.motionDuration}ms`,
       "--studio-motion-exit": `${exitDuration(theme.other.motionDuration)}ms`,
       "--studio-ease-enter": easing.enter,
