@@ -109,6 +109,34 @@ test("The viewer's prompt field runs an edited prompt with the item's settings a
   }
 });
 
+test("A video's prompt field runs its edited prompt again as a video", async ({ page }) => {
+  const state = await fixtures(page);
+  state.gallery.push({
+    id: "clip",
+    jobId: "job-clip",
+    type: "video",
+    status: "done",
+    url: "/test-media/clip.mp4",
+    prompt: "A rolling wave",
+    model: "video.safetensors",
+    settings: { profileId: "video:test" },
+    width: 1024,
+    height: 1024,
+    createdAt: stamp,
+  });
+  await page.goto("/video");
+  await page.getByRole("button", { name: "Open video: A rolling wave", exact: true }).click();
+  const viewer = page.getByRole("dialog", { name: "Generation", exact: true });
+  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
+    "A rolling wave",
+  );
+  const before = state.jobs.length;
+  await sendField(page, "Prompt", "A rolling wave at night", "Generate");
+  await expect.poll(() => state.jobs.length).toBe(before + 1);
+  expect(state.jobs.at(-1)!.input.prompt).toBe("A rolling wave at night");
+  expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
+});
+
 test("Asking for a change in plain words shows the chosen action and prompt before it runs", async ({
   page,
 }) => {

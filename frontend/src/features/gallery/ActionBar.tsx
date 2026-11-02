@@ -235,7 +235,10 @@ export function ActionBarGroups({
   );
 }
 
-/** A phone bar control: its icon over its label; a split action's ▾ beside it opens its options. */
+/**
+ * A phone bar control: its icon over its label. With options a tap opens them (their first item does
+ * what a desktop click does), so no separate ▾ crowds the bar; a link with options keeps a ▾ beside it.
+ */
 function StackedControl({ action }: { action: Action }) {
   const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
   const content = (
@@ -261,7 +264,7 @@ function StackedControl({ action }: { action: Action }) {
       <ActionMenuItems groups={options} />
     </Menu.Dropdown>
   );
-  if (options && !onClick && !link)
+  if (options && !link)
     return (
       <Menu position="top" width={240}>
         <Menu.Target>
