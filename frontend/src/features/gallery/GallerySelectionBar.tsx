@@ -274,11 +274,6 @@ export function GallerySelectionBar({
               />
             </Group>
           )}
-          {downloadTooLarge && (
-            <Text size="xs" c="dimmed" ta="center" px="sm">
-              Select fewer items to download in one archive.
-            </Text>
-          )}
         </Stack>
       </ActionBar>
       <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>

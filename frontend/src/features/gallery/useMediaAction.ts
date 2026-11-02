@@ -17,8 +17,6 @@ interface AnimateChoice {
   profileId: string;
   label: string;
   cloud: boolean;
-  /** Set when it runs somewhere the user may not expect (Grok while local video is stopped). */
-  note: string;
   size?: { width: number; height: number };
 }
 /** The prompt as typed, for the prompt field: Studio adds LoRA trigger words only to the run. */
@@ -71,8 +69,8 @@ export async function mediaDraft(
   if (!profile)
     throw new Error(
       operation === "image"
-        ? "The original profile is unavailable. Choose a model in generation controls."
-        : `No ${targetKind} model with reference support is available.`,
+        ? "The original profile is unavailable. Choose another model."
+        : `No ${targetKind} model takes a reference.`,
     );
   const queue = await client.fetchQuery(queueQuery);
   const source = queue.jobs.find((job) => job.id === item.jobId);
@@ -129,7 +127,7 @@ export async function mediaDraft(
     rerun && profile.backendOptions?.some((option) => option.id === ran) ? ran : undefined;
   const note =
     rerun && !profileBackend
-      ? `${backendLabel(ran)} is no longer a backend of ${profile.displayName || profile.label}, so this run uses ${backendLabel(profile.backend!)}.`
+      ? `${profile.displayName || profile.label} no longer runs on ${backendLabel(ran)}, so this run uses ${backendLabel(profile.backend!)}.`
       : undefined;
   return {
     profile,

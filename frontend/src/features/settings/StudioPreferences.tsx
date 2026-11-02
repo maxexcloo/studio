@@ -18,7 +18,7 @@ const shortcuts: { keys: string[][]; action: string }[] = [
   { keys: [["E"]], action: "Edit the Viewed Image" },
   { keys: [["U"]], action: "Upscale, or Show the Original" },
   { keys: [["P"]], action: "Open the Prompt in the Composer" },
-  { keys: [["R"]], action: "Run Again with a New Seed" },
+  { keys: [["R"]], action: "Run Again" },
   { keys: [["Delete"]], action: "Delete the Viewed Item" },
   { keys: [["+"], ["−"], ["0"]], action: "Zoom In, Out or Fit" },
   { keys: [["Esc"]], action: "Close Search, Panels and the Viewer" },

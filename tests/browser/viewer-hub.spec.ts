@@ -58,10 +58,10 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
-/** Prompt › Run Again (New Seed): queues the same settings with a new seed, without the composer. */
+/** Prompt › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
   await viewerAction(page, "Prompt Options");
-  await page.getByRole("menuitem", { name: "Run Again (New Seed)", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
 test("The viewer has no prompt bar; its runs queue into the strip and Prompt opens the composer", async ({
@@ -71,7 +71,7 @@ test("The viewer has no prompt bar; its runs queue into the strip and Prompt ope
   await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toHaveCount(0);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
   await viewerAction(page, "Prompt Options");
-  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     sessionId: "session-hub",
@@ -135,14 +135,16 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
-test("Run Again and Prompt draw a new seed; only Exact Repeat keeps it", async ({ page }) => {
+test("Run Again and Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
+  page,
+}) => {
   const { state, viewer } = await seed(page);
-  // Prompt's menu queues Run Again and Exact Repeat at once; Prompt itself loads the composer.
+  // Prompt's menu queues Run Again and Run Again (Same Seed) at once; Prompt itself loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
   await viewerAction(page, "Prompt Options");
-  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
   await viewerAction(page, "Prompt");
@@ -189,12 +191,14 @@ const ranOn = (backend: string) => ({
   settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
 });
 
-test("Exact Repeat and Prompt keep the backend a combined profile ran on", async ({ page }) => {
+test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran on", async ({
+  page,
+}) => {
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
   await viewerAction(page, "Prompt Options");
-  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
     profileId: "custom:krea",
@@ -217,11 +221,9 @@ test("A rerun whose backend the profile no longer has runs on its current one an
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
   await viewerAction(page, "Prompt Options");
-  await page.getByRole("menuitem", { name: "Exact Repeat", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect(
-    page.getByText(
-      "Radiance is no longer a backend of Krea 2 Turbo · Fast, so this run uses ComfyUI.",
-    ),
+    page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
   ).toBeVisible();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input.profileBackend).toBeUndefined();
@@ -301,7 +303,6 @@ const grok: Profile = {
   capabilities: { imageInput: true },
   mediaInputs: [{ id: "reference", label: "Reference Image" }],
 };
-const note = "Local video isn't running, so this runs on Grok Imagine Video.";
 async function offline(page: Page) {
   await serveProfiles(page, [...profiles, grok]);
   await page.route(/\/api\/animate\/profile(?:\?.*)?$/, (route) =>
@@ -310,19 +311,15 @@ async function offline(page: Page) {
         profileId: grok.id,
         label: grok.label,
         cloud: true,
-        note,
         size: { width: 960, height: 960 },
       },
     }),
   );
 }
 
-test("With local video stopped, an Animate theme says it runs on Grok and queues there", async ({
-  page,
-}) => {
+test("With local video stopped, an Animate theme queues on Grok", async ({ page }) => {
   const { state, viewer } = await seed(page, {}, offline);
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
-  await expect(page.getByText(note, { exact: true })).toBeVisible();
   await page.getByRole("menuitem", { name: "Cinematic Camera", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -376,9 +373,7 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
   // The frame showing is saved as an image, or becomes a reference in the composer.
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
-  await expect(
-    page.getByText("Frame saved as an image in Uploads.", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("Frame saved to Uploads.", { exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
   await page.getByRole("menuitem", { name: "Use Frame as Reference", exact: true }).click();
   await expect
@@ -925,9 +920,7 @@ test("Viewer deletion retains failed media and waits for confirmed removal", asy
     await viewerAction(page, "Delete");
     const confirmation = page.getByRole("dialog", { name: "Delete Item", exact: true });
     await confirmation.getByRole("button", { name: "Delete", exact: true }).click();
-    await expect(
-      confirmation.getByText("1 item could not be deleted. You can try again."),
-    ).toBeVisible();
+    await expect(confirmation.getByText("1 item couldn’t be deleted. Try again.")).toBeVisible();
     await expect(viewer).toBeVisible();
     expect(state.gallery).toHaveLength(1);
     await confirmation.getByRole("button", { name: "Delete", exact: true }).click();

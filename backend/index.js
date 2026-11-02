@@ -1051,11 +1051,11 @@ async function animateChoice(account, { width, height } = {}) {
 // Every Animate surface asks this before queuing or staging, so it shows the model that will run.
 app.get("/api/animate/profile", async (req, res) => {
   try {
-    const { profile, cloud, note, size } = await animateChoice(req.studioAccount, {
+    const { profile, cloud, size } = await animateChoice(req.studioAccount, {
       width: Number(req.query.width),
       height: Number(req.query.height),
     });
-    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, note, size });
+    res.json({ profileId: profile.id, label: profile.label || profile.id, cloud, size });
   } catch (error) {
     res.status(409).json({ ok: false, error: error.message });
   }
