@@ -4,8 +4,8 @@
  * operation, shared by the Studio UI routes (assistant-routes.js), the queue's writing stage
  * (prompt-stage.js) and the MCP assistant and admin tools, so they cannot drift apart.
  *
- * It uses the gateway credentials (STUDIO_PROMPT_WRITER_URL, _KEY) and asks Bifrost for a model
- * (`model()`): the running local text workload's model, otherwise STUDIO_PROMPT_WRITER_MODEL.
+ * It uses the gateway credentials (STUDIO_ASSISTANT_URL, _KEY) and asks Bifrost for a model
+ * (`model()`): the running local text workload's model, otherwise STUDIO_ASSISTANT_CLOUD_MODEL.
  * Structured calls turn reasoning off with `reasoning_effort` (`reasoningEfforts`).
  * STUDIO_ASSISTANT_MODEL, when an administrator sets it, replaces the model and its effort.
  * Settings are read on every call, so a model chosen in Settings applies at once.
@@ -24,9 +24,9 @@ import { userContent } from "./domain/model-content.ts";
 import { maxPromptCharacters } from "../shared/queue.ts";
 
 const gatewayKeys = [
-  "STUDIO_PROMPT_WRITER_URL",
-  "STUDIO_PROMPT_WRITER_KEY",
-  "STUDIO_PROMPT_WRITER_MODEL",
+  "STUDIO_ASSISTANT_URL",
+  "STUDIO_ASSISTANT_KEY",
+  "STUDIO_ASSISTANT_CLOUD_MODEL",
 ];
 export const assistantModelKey = "STUDIO_ASSISTANT_MODEL";
 // Guide parts about settings or provenance; prompt writing only needs what shapes the prompt.
@@ -65,7 +65,7 @@ export class AssistantError extends Error {
 }
 
 /**
- * The gateway endpoint, key and cloud model (STUDIO_PROMPT_WRITER_MODEL, such as `cloud/auto`), or
+ * The gateway endpoint, key and cloud model (STUDIO_ASSISTANT_CLOUD_MODEL, such as `cloud/auto`), or
  * null when unset; a partial setting fails by name.
  */
 export function gatewaySettings(environment = process.env) {
@@ -79,9 +79,9 @@ export function gatewaySettings(environment = process.env) {
       `Prompt writing needs ${missing.join(", ")}; set all three of ${gatewayKeys.join(", ")} or none.`,
     );
   return {
-    ...gatewayAddress(values.STUDIO_PROMPT_WRITER_URL, "STUDIO_PROMPT_WRITER_URL"),
-    key: values.STUDIO_PROMPT_WRITER_KEY,
-    cloud: values.STUDIO_PROMPT_WRITER_MODEL,
+    ...gatewayAddress(values.STUDIO_ASSISTANT_URL, "STUDIO_ASSISTANT_URL"),
+    key: values.STUDIO_ASSISTANT_KEY,
+    cloud: values.STUDIO_ASSISTANT_CLOUD_MODEL,
   };
 }
 

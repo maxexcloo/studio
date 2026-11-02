@@ -16,9 +16,9 @@ import {
 import { flux3Upsampler } from "./prompt-upsamplers.js";
 
 const gateway = (extra = {}) => ({
-  STUDIO_PROMPT_WRITER_URL: "http://litellm.invalid:4000",
-  STUDIO_PROMPT_WRITER_KEY: "fixture-key",
-  STUDIO_PROMPT_WRITER_MODEL: "cloud/auto",
+  STUDIO_ASSISTANT_URL: "http://litellm.invalid:4000",
+  STUDIO_ASSISTANT_KEY: "fixture-key",
+  STUDIO_ASSISTANT_CLOUD_MODEL: "cloud/auto",
   ...extra,
 });
 const quiet = { info: () => {}, warn: () => {} };
@@ -53,8 +53,8 @@ function fakeGateway(reply, { models = ["cloud/auto", "cloud/vision", "local/aut
 test("settings read the gateway, whose model is the cloud model", async () => {
   assert.equal(assistantSettings({}), null);
   assert.throws(
-    () => assistantSettings({ STUDIO_PROMPT_WRITER_URL: "http://x.invalid" }),
-    /needs STUDIO_PROMPT_WRITER_KEY/,
+    () => assistantSettings({ STUDIO_ASSISTANT_URL: "http://x.invalid" }),
+    /needs STUDIO_ASSISTANT_KEY/,
   );
   const plain = assistantSettings(gateway());
   assert.deepEqual(
@@ -87,10 +87,10 @@ test("settings read the gateway, whose model is the cloud model", async () => {
 test("gateway settings are all or nothing and name an OpenAI-compatible endpoint", () => {
   assert.equal(gatewaySettings({}), null);
   assert.throws(
-    () => gatewaySettings({ STUDIO_PROMPT_WRITER_KEY: "fixture-key" }),
-    /needs STUDIO_PROMPT_WRITER_URL, STUDIO_PROMPT_WRITER_MODEL/,
+    () => gatewaySettings({ STUDIO_ASSISTANT_KEY: "fixture-key" }),
+    /needs STUDIO_ASSISTANT_URL, STUDIO_ASSISTANT_CLOUD_MODEL/,
   );
-  const at = (url) => gateway({ STUDIO_PROMPT_WRITER_URL: url });
+  const at = (url) => gateway({ STUDIO_ASSISTANT_URL: url });
   assert.throws(() => gatewaySettings(at("ftp://gateway.invalid")), /absolute HTTP\(S\) URL/);
   assert.throws(
     () => gatewaySettings(at("http://user:secret@gateway.invalid")),
