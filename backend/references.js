@@ -12,7 +12,7 @@ import {
   galleryKey,
 } from "./gallery-store.js";
 
-import { extractLastFrame } from "./video-previews.js";
+import { extractFrame } from "./video-previews.js";
 import { writeBytesFileAsync } from "./json-store.js";
 import { loadSharp } from "./sharp-loader.js";
 import { prepareInputImage } from "./input-image-sizing.js";
@@ -257,23 +257,32 @@ export async function publicGalleryBuffer(item) {
   };
 }
 
-// Marks a reference to a finished video's last frame, which is cut from the video when a run is staged.
-const lastFrameSuffix = ":last-frame";
+// Marks a reference to a frame of a finished video (its last, or at a time in milliseconds), which is
+// cut from the video when a run is staged.
+const framePattern = /^(.*):(?:last-frame|frame-(\d+))$/;
+const frameSuffix = (at) => (at === "last" ? ":last-frame" : `:frame-${at}`);
+
+/** A frame reference's video id and time ("last" or milliseconds), or null for any other id. */
+function frameReference(id) {
+  const match = framePattern.exec(String(id));
+  return match && { videoId: match[1], at: match[2] === undefined ? "last" : Number(match[2]) };
+}
 
 /**
- * A finished video of this request's own, as the reference for its last frame.
+ * A finished video of this request's own, as the reference for one of its frames.
  * Nothing is stored: the id carries the video's own reference and the frame
  * is cut when used.
  */
-function lastFrameAssetForAccount(account, galleryItemId) {
+function frameAssetForAccount(account, galleryItemId, at) {
   const item = findGalleryItemForAccount(galleryItemId, account);
   if (!item || item.type !== "video" || item.status !== "done" || !item.url)
     throw new Error("That video is no longer in the gallery.");
   const asset = galleryAsset(item);
+  const label = at === "last" ? "last frame" : `frame at ${(at / 1000).toFixed(1)} s`;
   return {
     ...asset,
-    id: `${asset.id}${lastFrameSuffix}`,
-    name: `${String(asset.name).replace(/\.[a-z0-9]+$/i, "")} last frame.png`,
+    id: `${asset.id}${frameSuffix(at)}`,
+    name: `${String(asset.name).replace(/\.[a-z0-9]+$/i, "")} ${label}.png`,
     mime: "image/png",
     size: 0,
     url: "",
@@ -281,7 +290,7 @@ function lastFrameAssetForAccount(account, galleryItemId) {
   };
 }
 
-async function lastFrameBytes(account, videoId) {
+async function frameBytes(account, { videoId, at }) {
   const item = findGalleryItemForAccount(videoId, account);
   if (!item || item.type !== "video" || item.status !== "done")
     throw new Error("That video is no longer in the gallery.");
@@ -290,9 +299,9 @@ async function lastFrameBytes(account, videoId) {
     name: item.outputName || item.filename || "video",
   };
   return {
-    buffer: await extractLastFrame(video.buffer),
+    buffer: await extractFrame(video.buffer, at),
     mime: "image/png",
-    name: `${String(video.name).replace(/\.[a-z0-9]+$/i, "")}-last-frame.png`,
+    name: `${String(video.name).replace(/\.[a-z0-9]+$/i, "")}-${at === "last" ? "last-frame" : `frame-${at}`}.png`,
   };
 }
 
@@ -300,8 +309,9 @@ export function referenceAssetFromGallery(req, galleryItemId, { frame = "" } = {
   return referenceAssetForAccount(req?.studioAccount, galleryItemId, { frame });
 }
 
+/** `frame` picks a video's frame: "last", or a time in milliseconds. */
 export function referenceAssetForAccount(account, galleryItemId, { frame = "" } = {}) {
-  if (frame === "last") return lastFrameAssetForAccount(account, galleryItemId);
+  if (frame !== "") return frameAssetForAccount(account, galleryItemId, frame);
   const publicItem = findGalleryItemForAccount(galleryItemId, account);
   if (publicItem && publicItem.type === "image" && publicItem.status === "done" && publicItem.url)
     return galleryAsset(publicItem);
@@ -310,14 +320,11 @@ export function referenceAssetForAccount(account, galleryItemId, { frame = "" } 
 
 /** Reopen one saved reference without enumerating the catalogue or reading worker media. */
 export function referenceAssetMetadataForAccount(account, id) {
-  const lastFrame = String(id).endsWith(lastFrameSuffix);
-  const item = findGalleryItemForAccount(
-    lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
-    account,
-  );
-  if (!item || item.status !== "done" || !item.url || item.type !== (lastFrame ? "video" : "image"))
+  const frame = frameReference(id);
+  const item = findGalleryItemForAccount(frame ? frame.videoId : id, account);
+  if (!item || item.status !== "done" || !item.url || item.type !== (frame ? "video" : "image"))
     throw new Error("That reference image is gone.");
-  const asset = lastFrame ? lastFrameAssetForAccount(account, item.id) : galleryAsset(item);
+  const asset = frame ? frameAssetForAccount(account, item.id, frame.at) : galleryAsset(item);
   return { ...asset, id };
 }
 
@@ -354,13 +361,10 @@ async function preferUpscale(original, readUpscale) {
 
 /** Ownership can be checked while a selected worker is offline, without fetching its media. */
 export function referenceExistsForAccount(account, id) {
-  const lastFrame = String(id).endsWith(lastFrameSuffix);
-  const item = findGalleryItemForAccount(
-    lastFrame ? String(id).slice(0, -lastFrameSuffix.length) : id,
-    account,
-  );
+  const frame = frameReference(id);
+  const item = findGalleryItemForAccount(frame ? frame.videoId : id, account);
   return Boolean(
-    item && item.status === "done" && item.url && item.type === (lastFrame ? "video" : "image"),
+    item && item.status === "done" && item.url && item.type === (frame ? "video" : "image"),
   );
 }
 
@@ -370,8 +374,8 @@ export async function bytesForReference(req, id) {
 }
 
 export async function bytesForReferenceAccount(account, id) {
-  if (String(id).endsWith(lastFrameSuffix))
-    return lastFrameBytes(account, String(id).slice(0, -lastFrameSuffix.length));
+  const frame = frameReference(id);
+  if (frame) return frameBytes(account, frame);
   const item = findGalleryItemForAccount(id, account);
   if (!item || item.type !== "image" || item.status !== "done")
     throw new Error("That image is no longer in the gallery.");

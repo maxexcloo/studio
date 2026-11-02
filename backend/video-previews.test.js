@@ -150,7 +150,7 @@ test(
       "yuv420p",
       source,
     ]);
-    const frame = await previews.extractLastFrame(fs.readFileSync(source));
+    const frame = await previews.extractFrame(fs.readFileSync(source));
     assert.equal(frame.subarray(1, 4).toString(), "PNG");
     const { default: sharp } = await import("sharp");
     const { data, info } = await sharp(frame).raw().toBuffer({ resolveWithObject: true });
@@ -159,6 +159,14 @@ test(
     assert.ok(
       blue > 200 && red < 60,
       `expected the final blue frame, got rgb ${[...data.subarray(0, 3)]}`,
+    );
+    // A time picks that moment's frame instead.
+    const early = await sharp(await previews.extractFrame(fs.readFileSync(source), 500))
+      .raw()
+      .toBuffer();
+    assert.ok(
+      early[0] > 200 && early[2] < 60,
+      `expected a red frame, got rgb ${[...early.subarray(0, 3)]}`,
     );
   },
 );

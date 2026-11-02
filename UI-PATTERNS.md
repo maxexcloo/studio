@@ -371,7 +371,7 @@ primary component reference and verify APIs against the installed version.
   and split buttons or menus in bars: Prompt (opens the composer) › Open in Composer,
   Run Again (New Seed), Exact Repeat; Edit (edits the image) › Edit Image, Use as
   Reference; Animate ›
-  themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame, and Extend in Composer replaces Animate in Composer); Upscale (queues Balanced at
+  themes, Custom Animation, Animate in Composer (a video's themes continue it from its last frame; Extend in Composer replaces Animate in Composer, and Use Frame as Reference takes the frame showing in the viewer, else the last); Upscale (queues Balanced at
   automatic size; with an upscale, switches between it and the original) ›
   Fast, Balanced, High (Regenerate Upscale once upscaled), Balanced with Face
   Detail (listed even when the worker can't run it, saying why), Upscale
