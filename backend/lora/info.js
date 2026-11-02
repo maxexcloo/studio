@@ -222,8 +222,8 @@ export const loraCatalogue = () => catalogueStore({ familiesFromMetadata });
 
 /** Provider and local policy metadata can be checked before submitting an optional stack. */
 export function catalogueLoraInfo(name, info = loraInfo(name) || { families: [], triggers: [] }) {
-  // One catalogue (library/catalogue.json) holds provider downloads, the synced and hand-installed
-  // lora-catalogue.json files and Studio's edits; this view keeps the shapes those files had.
+  // One catalogue (library/catalogue.json) holds provider downloads, LoRA definitions and Studio's
+  // edits; this view keeps the shapes the older catalogue files had.
   const { sources, catalogue } = loraCatalogue().loraView();
   return enrichLocalLoraInfo(
     enrichLoraInfo(info, name, sources, familiesFromMetadata, families),

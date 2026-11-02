@@ -73,38 +73,28 @@ test("FLUX.3 Klein provider and training metadata do not fall back to FLUX.1", (
   assert.deepEqual(familiesFromMetadata({ base_model: "Flux.1 Dev" }), ["flux1"]);
 });
 
-test("the LoRA catalogue merges data/config (seed) and the data folder (admin), the admin copy winning", () => {
+test("LoRA details come from the catalogue definitions; a left-over lora-catalogue.json is ignored", () => {
   const data = process.env.STUDIO_DATA_DIR;
   fs.mkdirSync(path.join(data, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(data, "lora-catalogue.json"),
-    JSON.stringify({
-      "a.safetensors": { title: "By Hand" },
-      "b.safetensors": { title: "Only By Hand" },
-    }),
+    JSON.stringify({ "a.safetensors": { title: "Ignored" } }),
   );
   fs.writeFileSync(
-    path.join(data, "config", "lora-catalogue.json"),
-    JSON.stringify({ "a.safetensors": { title: "Synced" } }),
+    path.join(data, "config", "catalogue.json"),
+    JSON.stringify({ "loras/a.safetensors": { title: "Defined" } }),
   );
-  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "By Hand");
-  assert.equal(
-    catalogueLoraInfo("b.safetensors", { families: [], triggers: [] }).title,
-    "Only By Hand",
-  );
+  assert.equal(catalogueLoraInfo("a.safetensors", { families: [], triggers: [] }).title, "Defined");
   fs.writeFileSync(
-    path.join(data, "config", "lora-catalogue.json"),
+    path.join(data, "config", "catalogue.json"),
     JSON.stringify({
-      "a.safetensors": { title: "Synced" },
-      "c.safetensors": { title: "Only Synced" },
+      "loras/a.safetensors": { title: "Defined" },
+      "loras/c.safetensors": { title: "Only Defined" },
     }),
   );
   assert.equal(
     catalogueLoraInfo("c.safetensors", { families: [], triggers: [] }).title,
-    "Only Synced",
-    "seed updates still flow",
+    "Only Defined",
+    "definition updates still flow",
   );
-  // Both files stay as they were; the catalogue holds the merge.
-  assert.match(fs.readFileSync(path.join(data, "lora-catalogue.json"), "utf8"), /By Hand/);
-  assert.ok(fs.existsSync(path.join(data, "library", "catalogue.json")));
 });

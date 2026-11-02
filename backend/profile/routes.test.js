@@ -303,8 +303,9 @@ test("the catalogue and manifest join the bundle when there are any", (t) => {
   const manifest = path.join(scratch, "models.json");
   fs.writeFileSync(manifest, '[{"path":"loras/a.safetensors","sha256":"x"}]\n');
   const catalogue = {
-    loraView: () => ({
-      catalogue: { "b.safetensors": { title: "B" }, "a.safetensors": { title: "A" } },
+    definitions: () => ({
+      "loras/b.safetensors": { title: "B" },
+      "loras/a.safetensors": { title: "A" },
     }),
   };
   const built = buildExport({
@@ -315,9 +316,9 @@ test("the catalogue and manifest join the bundle when there are any", (t) => {
     manifestFile: manifest,
   });
   const names = Object.fromEntries(built.files.map((file) => [file.name, file.body]));
-  assert.deepEqual(Object.keys(JSON.parse(names["lora-catalogue.json"])), [
-    "a.safetensors",
-    "b.safetensors",
+  assert.deepEqual(Object.keys(JSON.parse(names["catalogue.json"])), [
+    "loras/a.safetensors",
+    "loras/b.safetensors",
   ]);
   assert.equal(names["models.json"], fs.readFileSync(manifest, "utf8"));
   assert.equal(names["prompting.json"], undefined);

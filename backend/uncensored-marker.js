@@ -38,8 +38,6 @@ function catalogueFiles(dataDir) {
   const imports = path.join(dataDir, "library", "imports");
   return [
     "library/catalogue.json",
-    "lora-catalogue.json",
-    "config/lora-catalogue.json",
     "config/catalogue.json",
     "model-download-sources.json",
     ...(fs.existsSync(imports)

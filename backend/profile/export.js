@@ -7,7 +7,6 @@
  *   profiles/<id>.json    every profile file Studio holds, exactly as on disk
  *   profile-aliases.json  merged profile ids and the profile each became, when there are any
  *   prompting.json        the guide store without its `meta`
- *   lora-catalogue.json   the LoRA catalogue by file name (seed and admin files plus Studio's edits)
  *   catalogue.json        editable metadata for every model file, keyed by folder/file
  *   models.json           the restore manifest, when there is one
  *   EXPORT.json           what changed, each item's origin and the unreviewed AI drafts
@@ -107,12 +106,6 @@ export function buildExport({
       });
     }
   }
-  if (catalogue)
-    files.push({
-      name: "lora-catalogue.json",
-      body: json(sorted(catalogue.loraView().catalogue)),
-      date: now,
-    });
   if (catalogue?.definitions) {
     const definitions = catalogue.definitions();
     if (Object.keys(definitions).length)

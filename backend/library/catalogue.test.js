@@ -9,7 +9,10 @@ const hex = (digit) => digit.repeat(64);
 const quiet = { info: () => {}, warn: () => {} };
 const families = ({ base_model: base }) => (/krea/i.test(base) ? ["krea2"] : []);
 
-/** A data folder holding every older catalogue file, with a model file whose hash is cached. */
+/**
+ * A data folder holding every source file, a catalogue whose seed and admin layers came from the
+ * retired lora-catalogue.json files, and one such file left behind, which is ignored.
+ */
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-catalogue-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -17,22 +20,31 @@ function fixture(t) {
     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     fs.writeFileSync(path.join(dir, name), JSON.stringify(value));
   };
-  write("config/lora-catalogue.json", {
-    "style.safetensors": {
-      title: "Seed Style",
-      baseModel: "Krea 2",
-      triggers: ["seedword"],
-      note: "Strength 0.7",
-      sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
-      tags: ["a", "b"],
+  write("library/catalogue.json", {
+    version: 1,
+    layers: {
+      seed: {
+        "loras/style.safetensors": {
+          title: "Seed Style",
+          baseModel: "Krea 2",
+          triggers: ["seedword"],
+          note: "Strength 0.7",
+          sourceUrl: "https://civitai.com/models/1?modelVersionId=2",
+          tags: ["a", "b"],
+        },
+        "loras/seed-only.safetensors": { title: "Seed Only", baseModel: "Krea 2" },
+      },
+      admin: {
+        "loras/style.safetensors": {
+          title: "Admin Style",
+          strengthRange: { min: 0, max: 2, step: 0.1, default: 0.9 },
+        },
+      },
     },
-    "seed-only.safetensors": { title: "Seed Only", baseModel: "Krea 2" },
   });
   write("lora-catalogue.json", {
-    "style.safetensors": {
-      title: "Admin Style",
-      strengthRange: { min: 0, max: 2, step: 0.1, default: 0.9 },
-    },
+    "style.safetensors": { title: "Ignored" },
+    "ignored.safetensors": { title: "Ignored" },
   });
   write("model-download-sources.json", {
     "civitai:2:3": {
@@ -75,15 +87,13 @@ function fixture(t) {
 
 const snapshot = (dir) =>
   Object.fromEntries(
-    [
-      "config/lora-catalogue.json",
-      "lora-catalogue.json",
-      "model-download-sources.json",
-      "config/models.json",
-    ].map((name) => [name, fs.readFileSync(path.join(dir, name), "utf8")]),
+    ["lora-catalogue.json", "model-download-sources.json", "config/models.json"].map((name) => [
+      name,
+      fs.readFileSync(path.join(dir, name), "utf8"),
+    ]),
   );
 
-test("the migration merges every older file by folder/file with provenance, the more specific source winning", (t) => {
+test("the migration merges every source by folder/file with provenance, the more specific source winning", (t) => {
   const f = fixture(t);
   const before = snapshot(f.dir);
   const store = f.store();
@@ -97,13 +107,13 @@ test("the migration merges every older file by folder/file with provenance, the 
       "loras/style.safetensors",
       "vae/ae.safetensors",
     ],
-    "only model folders; SEEDVR2 stays in the manifest",
+    "only model folders; SEEDVR2 stays in the manifest; lora-catalogue.json is ignored",
   );
   const style = entries["loras/style.safetensors"];
   assert.deepEqual(
     [style.kind, style.title, style.origin, style.baseModel, style.families],
     ["lora", "Admin Style", "admin", "Krea 2", ["krea2"]],
-    "the admin file over the seed",
+    "the admin layer over the seed layer",
   );
   assert.deepEqual(style.triggers, ["seedword"], "catalogue triggers over provider trained words");
   assert.deepEqual(style.strength, { default: 0.9, min: 0, max: 2, step: 0.1 });
@@ -133,10 +143,10 @@ test("the migration merges every older file by folder/file with provenance, the 
     "the manifest over a cached hash",
   );
   assert.deepEqual(store.byHash(hex("a").toUpperCase()), ["loras/style.safetensors"]);
-  assert.deepEqual(snapshot(f.dir), before, "the older files stay exactly as they were");
+  assert.deepEqual(snapshot(f.dir), before, "the source files stay exactly as they were");
 });
 
-test("the migration is idempotent and seed changes flow, unless Studio changed the entry", (t) => {
+test("the migration is idempotent and definition changes flow, unless Studio changed the entry", (t) => {
   const f = fixture(t);
   f.store().migrate();
   const file = path.join(f.dir, "library", "catalogue.json");
@@ -144,17 +154,20 @@ test("the migration is idempotent and seed changes flow, unless Studio changed t
   const again = f.store();
   assert.equal(again.migrate(), false, "nothing new on the second start");
   assert.equal(fs.readFileSync(file, "utf8"), first);
-  // A seed update reaches entries Studio hasn't edited.
+  // A definitions update reaches entries Studio hasn't edited.
+  const definitions = path.join(f.dir, "config", "catalogue.json");
   fs.writeFileSync(
-    path.join(f.dir, "config", "lora-catalogue.json"),
-    JSON.stringify({
-      "seed-only.safetensors": { title: "Seed Only v2" },
-      "style.safetensors": { title: "Seed Style" },
-    }),
+    definitions,
+    JSON.stringify({ "loras/defined.safetensors": { title: "Defined" } }),
   );
-  again.edit("loras/style.safetensors", { title: "Studio Style" }, { by: "admin-1" });
-  assert.equal(again.entry("loras/seed-only.safetensors").title, "Seed Only v2");
-  assert.equal(again.entry("loras/style.safetensors").title, "Studio Style");
+  assert.equal(again.entry("loras/defined.safetensors").title, "Defined");
+  again.edit("loras/defined.safetensors", { title: "Studio Defined" }, { by: "admin-1" });
+  fs.writeFileSync(
+    definitions,
+    JSON.stringify({ "loras/defined.safetensors": { title: "Defined v2", note: "Low" } }),
+  );
+  assert.equal(again.entry("loras/defined.safetensors").title, "Studio Defined");
+  assert.equal(again.entry("loras/defined.safetensors").note, "Low");
   // A source file that goes keeps its last layer.
   fs.rmSync(path.join(f.dir, "model-download-sources.json"));
   assert.equal(f.store().entry("loras/style.safetensors").sha256, hex("a"));

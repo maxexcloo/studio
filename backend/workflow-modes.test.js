@@ -155,13 +155,15 @@ test("trusted optional adapter policy validates conditioning and full publisher 
   prepared.studio.recipe = { modelLabel: "H3", label: "Standard", conditioning: "FL2VA" };
   saveImportedWorkflow(prepared);
   const catalogue = {
-    "style.safetensors": {
+    "loras/style.safetensors": {
       baseModel: "MiniMax H3",
       compatibility: { conditionings: ["FL2VA"], unlisted: "other" },
-      strengthRange: { min: -3, max: 10, step: 0.05 },
+      strength: { min: -3, max: 10, step: 0.05 },
     },
   };
-  fs.writeFileSync(path.join(scratch, "lora-catalogue.json"), JSON.stringify(catalogue));
+  const definitions = path.join(scratch, "config", "catalogue.json");
+  fs.mkdirSync(path.dirname(definitions), { recursive: true });
+  fs.writeFileSync(definitions, JSON.stringify(catalogue));
   const request = {
     kind: "image",
     workflow: "custom:effect-policy",
@@ -196,8 +198,8 @@ test("trusted optional adapter policy validates conditioning and full publisher 
     ).loras,
     [],
   );
-  delete catalogue["style.safetensors"].compatibility.unlisted;
-  fs.writeFileSync(path.join(scratch, "lora-catalogue.json"), JSON.stringify(catalogue));
+  delete catalogue["loras/style.safetensors"].compatibility.unlisted;
+  fs.writeFileSync(definitions, JSON.stringify(catalogue));
   assert.equal(sanitizeGenerateBody(request, info).loras[0].strength, 10);
 });
 
