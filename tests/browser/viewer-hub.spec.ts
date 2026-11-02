@@ -524,6 +524,18 @@ test("Phone swipes reveal details and close the viewer", async ({ page }, testIn
     });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   }
+  // A drag too short to navigate follows the finger, then settles back.
+  const start = (await picture.boundingBox())!;
+  const x = start.x + start.width / 2;
+  const y = start.y + start.height / 2;
+  await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  await touch.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: x - 40, y }],
+  });
+  await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(-40);
+  await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await expect.poll(async () => Math.round((await picture.boundingBox())!.x - start.x)).toBe(0);
   await swipe(-120);
   const sheet = page.getByRole("dialog", { name: "An amber bird", exact: true });
   await expect(sheet.getByText("1234567", { exact: true })).toBeVisible();

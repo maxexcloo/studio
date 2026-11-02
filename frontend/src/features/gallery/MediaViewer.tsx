@@ -183,6 +183,7 @@ export function MediaViewer({
   const iteration = useMediaIteration(item, sessionId);
   // An accepted retry removes the failed item; the viewer follows its replacement once listed.
   const [replacement, setReplacement] = useState("");
+  const [arrival, setArrival] = useState<{ id: string; from: "next" | "previous" }>();
   useEffect(() => {
     const next = replacement && items.find((candidate) => candidate.jobId === replacement);
     if (!next) return;
@@ -198,7 +199,9 @@ export function MediaViewer({
     const next = canNavigate && viewable[currentIndex + direction];
     if (!next) return;
     setCompare(false);
+    setArrival(undefined);
     navigate!(next);
+    return next;
   }
   const returnTarget = useRef(document.activeElement as HTMLElement | null);
   const restoreFocus = useRef(true);
@@ -232,7 +235,10 @@ export function MediaViewer({
     });
     if (direction === "down") close();
     else if (direction === "up") setSheet(phone);
-    else move(direction === "left" ? 1 : -1);
+    else {
+      const next = move(direction === "left" ? 1 : -1);
+      if (next) setArrival({ id: next.id, from: direction === "left" ? "next" : "previous" });
+    }
   }
   // Running, failed and cancelled work takes the same touch swipes as a picture at Fit.
   const statusSwipe = useRef<{ id: number; x: number; y: number } | null>(null);
@@ -439,6 +445,7 @@ export function MediaViewer({
                     width={source.width}
                     height={source.height}
                     swipe={swipe}
+                    arrive={arrival?.id === item.id ? arrival.from : undefined}
                   />
                 </Suspense>
               )}
