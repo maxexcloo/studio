@@ -166,6 +166,8 @@ export async function mediaDraft(
         profileId: profile.id,
         model: profile.model,
         workflow: profile.workflow,
+        // The profile's current checkpoint runs, not the file the original result loaded.
+        modelName: undefined,
         backendId:
           profile.provider === "cliproxyapi"
             ? undefined
