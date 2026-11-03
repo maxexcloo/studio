@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, MessagesSquare } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useIsAdmin } from "../auth/AccountGate";
-import { Queue, useQueue } from "../generation/Queue";
+import { Queue, QueueActions, useQueue } from "../generation/Queue";
 import { ServiceHealthSummary, serviceSummary, servicesStatusQuery } from "../runtime/RuntimePanel";
 import { NewChatAction, SessionList } from "../sessions/ChatWorkspace";
 import { closeWhenTop, layerAbove } from "../../ui/popupClicks";
@@ -116,7 +116,10 @@ export function StatusAction({ chat }: { chat: boolean }) {
           aria-labelledby=""
           className={classes.dropdown}
         >
-          <Text fw={500}>{title}</Text>
+          <Group justify="space-between" wrap="nowrap" mih={28}>
+            <Text fw={500}>{title}</Text>
+            <QueueActions />
+          </Group>
           <div className={classes.list}>
             <Queue />
           </div>
@@ -170,7 +173,7 @@ export function StatusAction({ chat }: { chat: boolean }) {
           <Drawer.Header>
             <Drawer.Title>{title}</Drawer.Title>
             <Group gap="xs" wrap="nowrap">
-              {chats && <NewChatAction onDone={close} />}
+              {chats ? <NewChatAction onDone={close} /> : <QueueActions />}
               <Drawer.CloseButton aria-label={`Close ${title}`} />
             </Group>
           </Drawer.Header>
