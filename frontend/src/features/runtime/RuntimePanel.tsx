@@ -1,17 +1,9 @@
-import { Alert, Anchor, Badge, Button, Group, Select, Stack, Text } from "@mantine/core";
-import { useState } from "react";
+import { Alert, Button, Group, Stack, Text } from "@mantine/core";
 import { queryOptions, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { CircleDot } from "lucide-react";
-import type {
-  ServiceEndpoint,
-  ServiceHealth,
-  ServiceStatus,
-  ServicesStatus,
-} from "../../../../shared/services";
+import type { ServiceHealth, ServiceStatus, ServicesStatus } from "../../../../shared/services";
 import { api } from "../../api";
-import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeading } from "../../ui/SectionHeading";
 import { useIsAdmin } from "../auth/AccountGate";
 import { RuntimeWorkloads } from "./RuntimeWorkloads";
 import { useWorkloadStart } from "./WorkloadStart";
@@ -149,128 +141,38 @@ export function ServiceHealthSummary() {
     </Stack>
   );
 }
-const memory = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
-/** What the endpoint reports, on one line. */
-function endpointFacts(endpoint: ServiceEndpoint) {
-  const memoryText = [
-    endpoint.memoryFree != null ? `${memory(endpoint.memoryFree)} Free` : null,
-    endpoint.memoryTotal != null ? `${memory(endpoint.memoryTotal)} Total` : null,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-  return [
-    endpoint.loadedModel,
-    endpoint.device,
-    endpoint.version && `Version ${endpoint.version}`,
-    memoryText,
-    endpoint.checkedAt && `Checked ${new Date(endpoint.checkedAt).toLocaleTimeString()}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-// Several text workloads may share a display label; the workload ID tells them apart.
-const endpointLabel = (endpoint: ServiceEndpoint, endpoints: ServiceEndpoint[]) =>
-  endpoints.filter((other) => other.label === endpoint.label).length > 1
-    ? `${endpoint.label} · ${endpoint.id}`
-    : endpoint.label;
-/** One service: its health, the endpoint shown (chosen when there are several) and what it reports. */
-function ServiceEndpointRow({ label, service }: { label: string; service: ServiceStatus }) {
-  const [selection, setSelection] = useState<string | null>(null);
-  const endpoint =
-    service.endpoints.find((endpoint) => endpoint.id === selection) ||
-    service.endpoints.find((endpoint) => endpoint.state === service.state) ||
-    service.endpoints[0];
-  const facts = endpoint && endpointFacts(endpoint);
-  // A healthy service, or a reason that only repeats its badge, needs no explanation.
-  const reason = endpoint?.reason || service.reason;
-  const shown = endpoint?.state ?? service.state;
-  const explained =
-    shown !== "healthy" && reason.toLowerCase() !== healthLabel(shown).toLowerCase();
-  return (
-    <Stack gap={6} component="section" aria-label={label} style={{ overflowWrap: "anywhere" }}>
-      <Group gap="xs" justify="space-between" wrap="nowrap">
-        <Group gap="xs" wrap="nowrap">
-          <Text fw={600}>{label}</Text>
-          <Badge color={healthColour(service.state)}>{healthLabel(service.state)}</Badge>
-        </Group>
-        {endpoint && (
-          <Select
-            aria-label={`${label} Endpoint`}
-            size="xs"
-            w={{ base: 160, sm: 240 }}
-            data={service.endpoints.map((option) => ({
-              value: option.id,
-              label: endpointLabel(option, service.endpoints),
-            }))}
-            value={endpoint.id}
-            onChange={setSelection}
-            allowDeselect={false}
-            leftSection={
-              <CircleDot
-                size={12}
-                color={`var(--mantine-color-${healthColour(endpoint.state)}-6)`}
-              />
-            }
-            renderOption={({ option }) => {
-              const state = service.endpoints.find((item) => item.id === option.value)!.state;
-              return (
-                <Group gap="xs" wrap="nowrap">
-                  <CircleDot size={12} color={`var(--mantine-color-${healthColour(state)}-6)`} />
-                  <Text size="sm">{option.label}</Text>
-                  <Text size="xs" c="dimmed" ml="auto">
-                    {healthLabel(state)}
-                  </Text>
-                </Group>
-              );
-            }}
-          />
-        )}
-      </Group>
-      {explained && (
-        <Group gap="xs" justify="space-between" wrap="nowrap">
-          <Text size="xs" c="dimmed">
-            {reason}
-          </Text>
-          {endpoint?.state === "parked" && !!endpoint.workloads?.length && (
-            <ParkedStart
-              key={endpoint.id}
-              label={endpointLabel(endpoint, service.endpoints)}
-              workloads={endpoint.workloads}
-            />
-          )}
-        </Group>
-      )}
-      {facts && <Text size="xs">{facts}</Text>}
-      {endpoint?.endpoint && (
-        <Anchor size="xs" href={endpoint.endpoint} target="_blank" rel="noopener noreferrer">
-          {endpoint.endpoint}
-        </Anchor>
-      )}
-    </Stack>
-  );
-}
+/** Settings › Workers: one line of service health, then the GPU workloads Studio controls. */
 export function RuntimePanel() {
   const status = useQuery(servicesStatusQuery);
   if (status.isPending) return <LoadingState label="Loading Workers" />;
   if (status.error) return <Alert color="red">{status.error.message}</Alert>;
-  const available = services.filter(({ kind }) => status.data.services[kind]);
-  const { runtime } = status.data;
+  const { runtime, services: observed } = status.data;
+  // An unhealthy endpoint's reason, shown on the workloads that serve it.
+  const reasons = Object.fromEntries(
+    Object.values(observed)
+      .flatMap((service) => service.endpoints)
+      .filter((endpoint) => endpoint.state !== "healthy" && endpoint.state !== "parked")
+      .flatMap((endpoint) => (endpoint.workloads ?? []).map((id) => [id, endpoint.reason])),
+  );
   return (
     <Stack gap="lg" aria-label="Runtime">
-      <Badge color="gray">{runtime.configured ? "Runtime Configured" : "Observe Only"}</Badge>
-      {!runtime.configured && (
+      <Text size="sm" component="section" aria-label="Services">
+        {services
+          .filter(({ kind }) => observed[kind])
+          .map(({ kind, label }) => {
+            const { state, reason } = observed[kind]!;
+            const healthy = state === "healthy" || state === "parked";
+            return `${label}: ${healthLabel(state)}${healthy ? "" : ` (${reason})`}`;
+          })
+          .join(" · ") || "No Services"}
+      </Text>
+      {runtime.configured ? (
+        <RuntimeWorkloads reasons={reasons} />
+      ) : (
         <Text size="sm" c="dimmed">
           {runtime.reason}
         </Text>
       )}
-      {runtime.configured && <RuntimeWorkloads />}
-      <Stack gap="md" component="section" aria-label="Services">
-        <SectionHeading>Services</SectionHeading>
-        {available.map(({ kind, label }) => (
-          <ServiceEndpointRow key={kind} label={label} service={status.data.services[kind]!} />
-        ))}
-        {!available.length && <EmptyState>No Services</EmptyState>}
-      </Stack>
     </Stack>
   );
 }
