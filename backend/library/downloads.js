@@ -1,29 +1,14 @@
 import { workerInventory, workerModelFile, refreshWorkerModels } from "../worker-models.js";
-import path from "node:path";
 import { civitaiJson, isCivitaiHost, limitedBody } from "../civitai/access.js";
 import { civitaiLink, versionResource } from "../civitai/import.js";
-import { dataDir } from "../gallery/store.js";
 import { presetsEnabled } from "../features.js";
 import { hfFetch } from "../hf-access.js";
-import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { loraCatalogue } from "../lora/info.js";
 import { downloadState, existingCopy, startDownload } from "../model/downloads.js";
 
-const sourcesPath = path.join(dataDir, "model-download-sources.json");
-let sources;
-try {
-  sources = readJsonFile(sourcesPath);
-} catch {
-  sources = {};
-}
-if (!sources || typeof sources !== "object" || Array.isArray(sources)) sources = {};
-
+// Provider download specs live in the catalogue's provider layer (library/catalogue.js).
 export function libraryDownload(id) {
-  return presetsEnabled() && Object.hasOwn(sources, id) ? sources[id] : null;
-}
-
-function remember(spec) {
-  sources[spec.id] = spec;
-  writeJsonFile(sourcesPath, sources);
+  return presetsEnabled() ? loraCatalogue().download(id) : null;
 }
 
 const directories = new Set([
@@ -147,7 +132,7 @@ export async function startLibraryDownload(spec) {
     if (running && running.id !== spec.id)
       throw new Error("A different download already uses this filename.");
   }
-  remember(spec);
+  loraCatalogue().rememberDownload(spec);
   return startDownload(spec);
 }
 

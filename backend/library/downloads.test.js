@@ -7,15 +7,20 @@ import test from "node:test";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-library-downloads-"));
 process.env.STUDIO_DATA_DIR = path.join(dir, "data");
 process.env.STUDIO_ENABLE_PRESETS = "1";
-fs.mkdirSync(path.join(dir, "data"), { recursive: true });
+fs.mkdirSync(path.join(dir, "data", "library"), { recursive: true });
 fs.writeFileSync(
-  path.join(dir, "data", "model-download-sources.json"),
+  path.join(dir, "data", "library", "catalogue.json"),
   JSON.stringify({
-    "civitai:17:3": {
-      id: "civitai:17:3",
-      file: "style.safetensors",
-      folder: "loras",
-      url: "https://civitai.com/api/download/models/17",
+    version: 1,
+    layers: {
+      provider: {
+        "civitai:17:3": {
+          id: "civitai:17:3",
+          file: "style.safetensors",
+          folder: "loras",
+          url: "https://civitai.com/api/download/models/17",
+        },
+      },
     },
   }),
 );
