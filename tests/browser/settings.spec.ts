@@ -590,7 +590,7 @@ test("Settings › Integrations picks the assistant model from the gateway's and
   });
   await page.goto("/settings");
   await section(page, "Settings", "Integrations");
-  const select = page.getByRole("combobox", { name: "Assistant Model", exact: true });
+  const select = page.getByRole("combobox", { name: "Prompt Assistant Model", exact: true });
   await expect(select).toHaveValue("Automatic");
   await select.click();
   await expect(page.getByRole("option")).toHaveText([
