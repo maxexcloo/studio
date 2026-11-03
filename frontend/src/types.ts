@@ -85,7 +85,8 @@ export interface GenerationInput extends Record<string, unknown> {
   denoise: number;
   fps: number;
   frames: number;
-  loras: { name: string; strength: number; enabled: boolean; triggers?: boolean }[];
+  /** `triggers`: all the LoRA's trigger words (true or unset), none (false) or the ones listed. */
+  loras: { name: string; strength: number; enabled: boolean; triggers?: boolean | string[] }[];
   referenceAssets: { slot: string; assetId: string }[];
   referenceDetails?: ReferenceAsset[];
   textEncoder?: string;

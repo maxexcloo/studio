@@ -262,11 +262,11 @@ test("chat context is one paragraph from the taste profile", async () => {
   });
 });
 
-test("no prompt assistant, offline text or no taste yet means no suggestions and no model call", async () => {
+test("an account that can't use suggestions, offline text or no taste yet means no suggestions and no model call", async () => {
   const off = fixture({ writer: (owner) => owner !== "alice" });
   assert.deepEqual(await off.suggestions.suggest("alice", { surface: "composer", kind: "image" }), {
     suggestions: [],
-    reason: "The prompt assistant is off for this account.",
+    reason: "This account can't use suggestions.",
   });
   assert.equal(
     (await off.suggestions.suggest("carol", { surface: "chat" })).reason,

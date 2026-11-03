@@ -17,17 +17,16 @@ import {
   TextInput,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, UserCog } from "lucide-react";
 import { api, post } from "../../api";
 import { DataTable } from "../../ui/DataTable";
 import { LoadingState } from "../../ui/LoadingState";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { isCloudProfile } from "../generation/payload";
-import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
+import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   chat: "Chat",
   cloudModels: "Cloud Models",
@@ -75,7 +74,6 @@ function GroupEditor({
     onSuccess: (result) => {
       form.setValues(result.profile);
       saved(result.profile);
-      notifications.show({ message: "Access group saved" });
     },
   });
   const ids = [...new Set([...admin.availableProfiles, ...form.values.generationProfiles])].filter(
@@ -154,7 +152,6 @@ function NewAccount({ admin, saved }: { admin: Administration; saved: () => void
     onSuccess: () => {
       form.reset();
       saved();
-      notifications.show({ message: "User account created" });
     },
   });
   return (
@@ -203,8 +200,8 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
     meta: { inlineError: true },
     mutationFn: () => post("/api/accounts/default-profile", form.values),
     onSuccess: () => {
+      form.resetDirty();
       saved();
-      notifications.show({ message: "New account policy saved" });
     },
   });
   return (
@@ -224,9 +221,16 @@ function DefaultPolicy({ admin, saved }: { admin: Administration; saved: () => v
           {...form.getInputProps("accessProfileId")}
         />
         {save.error && <Alert color="red">{save.error.message}</Alert>}
-        <Button type="submit" loading={save.isPending} style={{ alignSelf: "start" }}>
-          Save New Account Policy
-        </Button>
+        <Group gap="sm">
+          <Button type="submit" loading={save.isPending}>
+            Save New Account Policy
+          </Button>
+          {save.isSuccess && !form.isDirty() && (
+            <Text size="sm" c="dimmed">
+              Saved
+            </Text>
+          )}
+        </Group>
       </Stack>
     </form>
   );
@@ -249,23 +253,6 @@ const groupFeature = (on: boolean | undefined, label: string) => (
     {label} {on ? "On" : "Off"}
   </Badge>
 );
-
-/** A labelled action in a section toolbar: account actions are rare enough to spell out. */
-function ToolbarAction({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <Button variant="subtle" size="compact-sm" leftSection={icon} onClick={onClick}>
-      {label}
-    </Button>
-  );
-}
 
 /** Settings › Groups: what each access group may use. */
 export function GroupsAdmin({ heading }: { heading: ReactNode }) {
@@ -367,9 +354,10 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-/** Settings › Users: accounts, their groups and the new-account policy. */
+/** Settings › Users: accounts, their groups, linked chat identities and the new-account policy. */
 export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const { admin, refresh } = useAdministration();
+  const gatewayChange = useGatewayChange();
   const [query, setQuery] = useState("");
   const [popup, setPopup] = useState<"new" | "policy" | null>(null);
   const change = useMutation({
@@ -385,6 +373,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const data = admin.data;
   const groupOf = (account: Account) =>
     data.accessProfiles.find((group) => group.id === account.accessProfileId);
+  const identitiesOf = (account: Account) =>
+    (data.gateway?.links || []).filter((link) => link.accountId === account.id);
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -439,6 +429,11 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       Single Sign-On
                     </Badge>
                   )}
+                  {identitiesOf(account).length > 0 && (
+                    <Badge miw="max-content" color="gray">
+                      Chat Gateway
+                    </Badge>
+                  )}
                 </Group>
               </>
             ),
@@ -472,17 +467,29 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           },
         ]}
         rowActions={(account) => (
-          <Menu.Item
-            color={account.disabled ? undefined : "red"}
-            disabled={change.isPending}
-            onClick={() =>
-              change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
-            }
-          >
-            {account.disabled ? "Enable Account" : "Disable Account"}
-          </Menu.Item>
+          <>
+            {identitiesOf(account).map(({ identity }) => (
+              <Menu.Item
+                key={identity}
+                disabled={gatewayChange.isPending}
+                onClick={() => gatewayChange.mutate({ kind: "link", identity })}
+              >
+                Unlink {identity}
+              </Menu.Item>
+            ))}
+            <Menu.Item
+              color={account.disabled ? undefined : "red"}
+              disabled={change.isPending}
+              onClick={() =>
+                change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
+              }
+            >
+              {account.disabled ? "Enable Account" : "Disable Account"}
+            </Menu.Item>
+          </>
         )}
       />
+      <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
       <Modal
         opened={popup !== null}
         onClose={() => setPopup(null)}
@@ -498,24 +505,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
             }}
           />
         )}
-        {popup === "policy" && (
-          <DefaultPolicy
-            admin={data}
-            saved={() => {
-              setPopup(null);
-              refresh();
-            }}
-          />
-        )}
+        {popup === "policy" && <DefaultPolicy admin={data} saved={refresh} />}
       </Modal>
     </Stack>
   );
-}
-
-/** Settings › Chat Gateway: chat identities linked to accounts. */
-export function ChatGatewayAdmin() {
-  const { admin } = useAdministration();
-  if (admin.isPending) return <LoadingState label="Loading Chat Gateway" />;
-  if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
-  return <ChatGatewayAccounts gateway={admin.data.gateway} accounts={admin.data.accounts} />;
 }

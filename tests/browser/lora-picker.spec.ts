@@ -13,7 +13,7 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
             title: "Detail Slider",
             families: ["test"],
             type: "slider",
-            triggers: ["inkbird"],
+            triggers: ["inkbird", "fine detail"],
             strengthRange: { min: 0.4, max: 1.2, step: 0.05, default: 0.8 },
           },
           "soft-style.safetensors": { title: "Soft Style", families: ["test"], type: "style" },
@@ -42,6 +42,16 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
     )
     .toEqual(["Soft Style", "Detail Slider"]);
+  // Sorting by name sets the ratings aside.
+  await controls.getByRole("button", { name: "Sort", exact: true }).click();
+  await controls.getByRole("menuitem", { name: "Name A–Z", exact: true }).click();
+  await expect
+    .poll(() =>
+      choices
+        .getByRole("button", { name: /^(Soft Style|Detail Slider)$/ })
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+    )
+    .toEqual(["Detail Slider", "Soft Style"]);
   await pickerTab(page, "LoRAs", "Favourites");
   await expect(choices.getByRole("button", { name: "Soft Style", exact: true })).toBeVisible();
   await expect(choices.getByRole("button", { name: "Detail Slider", exact: true })).toHaveCount(0);
@@ -54,18 +64,22 @@ test("LoRA ratings persist and order the list, tabs and search narrow the choice
   await expect(
     controls.getByText("Suggested 0.4 to 1.2, default 0.8", { exact: true }),
   ).toBeVisible();
-  const triggers = controls.getByRole("switch", {
+  // Every trigger word starts on; tapping one switches it off.
+  const triggers = controls.getByRole("group", {
     name: "Detail Slider Trigger Words",
     exact: true,
   });
-  await expect(triggers).toBeChecked();
-  await triggers.uncheck();
+  const inkbird = triggers.getByRole("checkbox", { name: "inkbird", exact: true });
+  await expect(inkbird).toBeChecked();
+  await triggers.getByText("inkbird", { exact: true }).click();
+  await expect(inkbird).not.toBeChecked();
+  await expect(triggers.getByRole("checkbox", { name: "fine detail", exact: true })).toBeChecked();
   await closeLoras(page);
   await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A quiet bird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   expect(state.jobs[0].input.loras).toEqual([
-    { name: "detail.safetensors", strength: 0.8, enabled: true, triggers: false },
+    { name: "detail.safetensors", strength: 0.8, enabled: true, triggers: ["fine detail"] },
   ]);
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
@@ -93,7 +107,6 @@ test("Escape inside the LoRA picker closes only its innermost layer", async ({
   await page.keyboard.press("Escape");
   await expect(controls).toBeVisible();
   // An open sort menu closes first.
-  await pickerTab(page, "LoRAs", "Stacks");
   const sort = controls.getByRole("button", { name: "Sort", exact: true });
   await sort.click();
   await expect(sort).toHaveAttribute("aria-expanded", "true");

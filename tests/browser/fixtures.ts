@@ -804,7 +804,7 @@ export async function compareUpscale(page: Page) {
 }
 
 /**
- * Clicks a viewer action on its bar. Phones keep Retry or Stop, Edit, Animate and Prompt there and
+ * Clicks a viewer action on its bar. Phones keep Retry or Stop, Animate, Edit and Recreate there and
  * list the rest under More. A control with options opens its menu (under More, it expands in
  * place), and the test picks the item.
  */

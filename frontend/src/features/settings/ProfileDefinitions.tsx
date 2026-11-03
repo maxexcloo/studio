@@ -8,12 +8,11 @@ import { api, post } from "../../api";
 import { copyText } from "../../ui/clipboard";
 import { DataTable } from "../../ui/DataTable";
 import { modelFamilyLabel } from "../../ui/modelFamily";
-import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
+import { SectionHeader, SectionToolbar, ToolbarAction } from "../../ui/SectionToolbar";
 import { usePhone } from "../../ui/usePhone";
 import { DefinitionEditor, type DefinitionKind, type LoadedDefinition } from "./DefinitionEditor";
 import { MergeDuplicateProfiles } from "./MergeDuplicateProfiles";
 import { CombineBackends } from "./CombineBackends";
-import { backendLabel } from "../generation/payload";
 import { modelsQuery } from "../generation/GenerationProvider";
 
 interface DefinitionRow {
@@ -24,8 +23,6 @@ interface DefinitionRow {
   kind?: string;
   version: number;
   aiDrafted?: boolean;
-  /** A combined profile's current backend. */
-  backend?: string;
 }
 const nouns = { profile: "Profile", guide: "Guide" } as const;
 const kindLabels: Record<string, string> = { image: "Image", video: "Video" };
@@ -37,9 +34,11 @@ interface SectionAction {
   onClick?: () => void;
   /** A download link instead of a click. */
   href?: string;
+  /** The section's create action, labelled on desktop. */
+  create?: boolean;
 }
 
-/** Icons with tooltips on desktop; phones, which show no tooltips, list them by name under More. */
+/** Icons with tooltips on desktop, the create action labelled; phones, which show no tooltips, list them by name under More. */
 function SectionActions({ actions }: { actions: SectionAction[] }) {
   const phone = usePhone();
   const link = (href?: string) => (href ? { component: "a" as const, href, download: true } : {});
@@ -65,20 +64,30 @@ function SectionActions({ actions }: { actions: SectionAction[] }) {
         </Menu.Dropdown>
       </Menu>
     );
-  return actions.map(({ label, icon: Icon, loading, onClick, href }) => (
-    <Tooltip key={label} label={label}>
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        aria-label={label}
+  return actions.map(({ label, icon: Icon, loading, onClick, href, create }) =>
+    create ? (
+      <ToolbarAction
+        key={label}
+        label={label}
+        icon={<Icon size={18} />}
         loading={loading}
         onClick={onClick}
-        {...link(href)}
-      >
-        <Icon size={18} />
-      </ActionIcon>
-    </Tooltip>
-  ));
+      />
+    ) : (
+      <Tooltip key={label} label={label}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          aria-label={label}
+          loading={loading}
+          onClick={onClick}
+          {...link(href)}
+        >
+          <Icon size={18} />
+        </ActionIcon>
+      </Tooltip>
+    ),
+  );
 }
 
 /** Settings › Profiles: generation profiles and prompting guides, each with saved versions. */
@@ -201,10 +210,12 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
           icon: Upload,
           loading: importing.isPending,
           onClick: workflowFile.open,
+          create: true,
         }
       : {
           label: "New Guide",
           icon: Plus,
+          create: true,
           onClick: () => {
             setSelected("");
             setCreating({ pack: { name: "", summary: "", rules: [] }, hash: "" });
@@ -281,14 +292,9 @@ export function ProfileDefinitions({ heading }: { heading: ReactNode }) {
               // The name and its family wrap rather than cut off; Copy ID has the exact ID.
               cell: (entry) => (
                 <>
-                  <Group gap="xs">
-                    <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
-                      {entry.name || idOf(entry)}
-                    </Text>
-                    {entry.backend && (
-                      <Badge variant="default">{backendLabel(entry.backend)}</Badge>
-                    )}
-                  </Group>
+                  <Text size="sm" fw={500} style={{ overflowWrap: "anywhere" }}>
+                    {entry.name || idOf(entry)}
+                  </Text>
                   <Text size="xs" c="dimmed" style={{ overflowWrap: "anywhere" }}>
                     {[
                       entry.family && modelFamilyLabel(entry.family),

@@ -9,7 +9,6 @@ import {
   image,
   loadSaved,
   openPresets,
-  pickerTab,
   profiles,
   saveCurrent,
   savedAction,
@@ -184,8 +183,10 @@ test("Edit framing uses the portrait reference while Reference mode retains the 
     page.getByText("The reference sets the output framing to 2:3.", { exact: true }),
   ).toBeVisible();
   await size.click();
-  await page.getByRole("combobox", { name: "Reference Role", exact: true }).click();
-  await page.getByRole("option", { name: "Reference", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Reference Role", exact: true })
+    .getByRole("button", { name: "Reference", exact: true })
+    .click();
   await expect(size).toHaveText("1280 × 768");
   await size.click();
   await expect(page.getByRole("textbox", { name: "Width", exact: true })).toHaveValue("1280");
@@ -275,7 +276,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ];
   await create(page);
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await pickerTab(page, "LoRAs", "Stacks");
   await loadSaved(page, "Stack", "Copper Detail");
   const enabled = page.getByRole("switch", { name: "Enable Detail Slider", exact: true });
   await expect(enabled).not.toBeChecked();
@@ -284,7 +284,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   ).toHaveValue("0.35");
   await enabled.check();
   await page.getByRole("textbox", { name: "Detail Slider Strength", exact: true }).fill("1.25");
-  await pickerTab(page, "LoRAs", "Stacks");
   await savedAction(page, "Stack", "Copper Detail", "Update From Current");
   await savedAction(page, "Stack", "Copper Detail", "Rename Stack");
   const name = page.getByRole("textbox", { name: "Stack Name", exact: true });
@@ -302,7 +301,6 @@ test("Saved family LoRA stacks retain order and disabled entries through update 
   expect(state.loraLibrary.snapshots["family:other"][0].name).toBe("Other Family Stack");
   await page.reload();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await pickerTab(page, "LoRAs", "Stacks");
   await loadSaved(page, "Stack", "Copper Detail Refined");
   await closeLoras(page);
   await page
@@ -356,11 +354,12 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await loadSaved(page, "Preset", "Masked Study");
   await expect(page.getByRole("button", { name: "Clear Seed 117", exact: true })).toBeVisible();
   // A mask edits the image it is painted on, so Reference is offered but disabled.
-  const role = page.getByRole("combobox", { name: "Reference Role", exact: true });
-  await expect(role).toHaveText("Edit");
-  await role.click();
-  await expect(page.getByRole("option", { name: "Reference", exact: true })).toBeDisabled();
-  await role.click();
+  const role = page.getByRole("group", { name: "Reference Role", exact: true });
+  await expect(role.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(role.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
@@ -390,33 +389,19 @@ test("Clear restores profile defaults and random seed; masked inputs keep Edit m
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   const original = page.getByRole("article", { name: "Iteration 1", exact: true });
   await original.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
-  const cardRole = original.getByRole("combobox", { name: "Reference Role", exact: true });
-  await expect(cardRole).toHaveText("Edit");
-  await cardRole.click();
-  await expect(page.getByRole("option", { name: "Reference", exact: true })).toBeDisabled();
+  const cardRole = original.getByRole("group", { name: "Reference Role", exact: true });
+  await expect(cardRole.getByRole("button", { name: "Edit", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(cardRole.getByRole("button", { name: "Reference", exact: true })).toBeDisabled();
 });
 
-test("LoRA trigger copying and published source links work in gallery and timeline editors", async ({
+test("LoRA trigger words toggle and published source links work in gallery and timeline editors", async ({
   page,
 }) => {
   const state = await fixtures(page);
   const sourceUrl = "https://example.test/publisher/detail?version=2";
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async () => {
-          throw new Error("Fixture clipboard permission denied");
-        },
-      },
-    });
-    document.execCommand = (command: string) => {
-      const selected = document.activeElement as HTMLTextAreaElement;
-      if (command !== "copy" || selected?.tagName !== "TEXTAREA") return false;
-      (window as any).copiedTrigger = selected.value;
-      return true;
-    };
-  });
   await page.route("**/api/loras/info", (route) =>
     route.fulfill({
       json: {
@@ -452,26 +437,29 @@ test("LoRA trigger copying and published source links work in gallery and timeli
   await page.getByRole("button", { name: "Presets", exact: true }).click();
   await loadSaved(page, "Preset", "Trigger Study");
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  const copy = page.getByRole("button", { name: "Copy Trigger Word: inkbird", exact: true });
-  await copy.click();
-  await expect.poll(() => page.evaluate(() => (window as any).copiedTrigger)).toBe("inkbird");
+  const triggers = page.getByRole("group", { name: "Detail Slider Trigger Words", exact: true });
+  const inkbird = triggers.getByRole("checkbox", { name: "inkbird", exact: true });
+  await expect(inkbird).toBeChecked();
+  await triggers.getByText("inkbird", { exact: true }).click();
+  await expect(inkbird).not.toBeChecked();
   const source = page.getByRole("link", { name: "View Source", exact: true });
   await expect(source).toHaveAttribute("href", sourceUrl);
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
   expect(state.jobs).toHaveLength(0);
   await closeLoras(page);
-  await page.getByRole("textbox", { name: "Prompt", exact: true }).fill("A delicate bird inkbird");
   await page.getByRole("button", { name: "Generate Image", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(1);
-  expect(state.jobs[0].input.prompt).toBe("A delicate bird inkbird");
+  // The prompt field never gets the words; the run carries the choice.
+  expect(state.jobs[0].input.prompt).toBe("A delicate bird");
   expect(state.jobs[0].input.loras).toEqual([
-    { name: "detail.safetensors", strength: 0.7, enabled: true },
+    { name: "detail.safetensors", strength: 0.7, enabled: true, triggers: false },
   ]);
   await page.goto(`/chat/${state.jobs[0].sessionId}`);
   await page.getByRole("button", { name: "Edit Iteration 1", exact: true }).click();
   await page.getByRole("button", { name: "Choose LoRAs", exact: true }).click();
-  await copy.click();
-  await expect.poll(() => page.evaluate(() => (window as any).copiedTrigger)).toBe("inkbird");
+  await expect(inkbird).not.toBeChecked();
+  await triggers.getByText("inkbird", { exact: true }).click();
+  await expect(inkbird).toBeChecked();
   await expect(source).toHaveAttribute("href", sourceUrl);
   expect(state.jobs).toHaveLength(1);
   expect(state.chatRequests).toHaveLength(0);

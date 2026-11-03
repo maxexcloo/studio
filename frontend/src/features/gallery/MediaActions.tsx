@@ -3,6 +3,7 @@ import { Alert, Button, Group, Modal, Stack, Text } from "@mantine/core";
 import {
   ArrowLeftRight,
   Camera,
+  Check,
   Eye,
   FastForward,
   Film,
@@ -23,6 +24,7 @@ import {
   Waves,
   Wind,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 import { notifications } from "@mantine/notifications";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +35,7 @@ import { copyText } from "../../ui/clipboard";
 import { icons } from "../../ui/icons";
 import { LoadingState } from "../../ui/LoadingState";
 import { TextBox } from "../../ui/TextBox";
+import { useFlash } from "../../ui/useFlash";
 import { usePhone } from "../../ui/usePhone";
 import { useGroupFeature } from "../auth/AccountGate";
 import { useCompare } from "../compare/CompareDialog";
@@ -60,12 +63,12 @@ import {
 } from "./useMediaAction";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { useRecreateAction } from "./useRecreate";
-import { useVideoEdit } from "./videoEdits";
+import { useVideoEdit, type VideoEdit } from "./videoEdits";
 import { useTryAgain } from "./useTryAgain";
 
 const definitions = {
   chat: { label: "Continue in Chat", icon: icons.chat },
-  prompt: { label: "Prompt", icon: icons.prompt },
+  recreate: { label: "Recreate", icon: icons.recreate },
   animate: { label: "Animate", icon: icons.animate },
   edit: { label: "Edit", icon: icons.edit },
   retry: { label: "Retry", icon: icons.retry },
@@ -80,13 +83,13 @@ const definitions = {
 };
 export type ItemActionId = keyof typeof definitions;
 /**
- * The sections and order everywhere: Edit, Animate, Prompt | Upscale | Copy, Download | Star,
- * Delete. Retry and Stop lead for unfinished work and Continue in Chat follows Prompt; Compare
- * joins Upscale only in menus and the selection bar; Share takes Download's place where phones share.
+ * The sections and order everywhere: Animate, Edit, Recreate, Upscale | Compare, Continue in Chat |
+ * Copy, Download | Star, Delete. Retry and Stop lead for unfinished work; Compare shows only in
+ * menus and the selection bar; Share takes Download's place where phones share.
  */
 const sections: ItemActionId[][] = [
-  ["retry", "stop", "edit", "animate", "prompt", "chat"],
-  ["upscale", "compare"],
+  ["retry", "stop", "animate", "edit", "recreate", "upscale"],
+  ["compare", "chat"],
   ["copy", "download", "share"],
   ["star", "delete"],
 ];
@@ -102,6 +105,22 @@ export const itemActionGroups = (actions: (Action | null | false | undefined)[])
   sections.map((ids) =>
     ids.flatMap((id) => actions.filter((action): action is Action => !!action && action.id === id)),
   );
+
+/** An action whose options come to one runs that option itself, so no submenu holds just one. */
+function withoutLoneOption(action: Action): Action {
+  const options = action.menu?.flat() ?? [];
+  if (options.length !== 1 || action.note) return action;
+  const [option] = options;
+  return {
+    ...action,
+    menu: undefined,
+    link: option.link,
+    onClick: option.onClick,
+    keepOpen: option.keepOpen,
+    disabled: action.disabled || option.disabled,
+    loading: action.loading || option.loading,
+  };
+}
 
 const themeIcons: Record<AnimateTheme, typeof Camera> = {
   cinematic: Camera,
@@ -149,19 +168,20 @@ function viewerFrame(item: MediaItem) {
 /** Save Frame as Image: the frame a video is showing (else its last) as an image under Uploads. */
 function useSaveFrame(item: MediaItem): Action {
   const cache = useQueryClient();
+  const [saved, flash] = useFlash();
   const save = useMutation({
     mutationFn: () =>
       post("/api/gallery/frame", { galleryItemId: item.id, frame: viewerFrame(item) ?? "last" }),
     onSuccess: () => {
-      notifications.show({ message: "Frame saved to Uploads." });
+      flash(true);
       void cache.invalidateQueries({ queryKey: ["gallery"] });
     },
     onError: (error) => notifications.show({ color: "red", message: error.message }),
   });
   return {
     id: "save-frame",
-    label: "Save Frame as Image",
-    icon: ImageDown,
+    label: saved ? "Saved to Uploads" : "Save Frame as Image",
+    icon: saved ? Check : ImageDown,
     disabled: save.isPending,
     loading: save.isPending,
     keepOpen: true,
@@ -293,6 +313,21 @@ export function useMediaActions(
   const recreate = useRecreateAction(item, onApplied);
   const saveFrame = useSaveFrame(item);
   const videoEdit = useVideoEdit(item);
+  // A video edit's menu stays open while it saves, then its item says so for a moment.
+  const [edited, flashEdited] = useFlash<VideoEdit["kind"]>();
+  const editAction = (
+    id: string,
+    label: string,
+    icon: LucideIcon,
+    kind: Exclude<VideoEdit["kind"], "trim">,
+  ): Action => ({
+    id,
+    label: edited === kind ? "Saved as New Version" : label,
+    icon: edited === kind ? Check : icon,
+    disabled: videoEdit.isPending,
+    keepOpen: true,
+    onClick: () => videoEdit.mutate({ kind }, { onSuccess: () => flashEdited(kind) }),
+  });
   const chat = useChatAction(item, onApplied);
   const chatOn = useGroupFeature("chat");
   const favorite = useMediaFavorite(item);
@@ -428,37 +463,13 @@ export function useMediaActions(
         menu: [
           [
             { id: "trim", label: "Trim…", icon: Scissors, onClick: onTrim },
-            {
-              id: "reverse",
-              label: "Reverse",
-              icon: Rewind,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "reverse" }),
-            },
-            {
-              id: "back-and-forth",
-              label: "Back and Forth",
-              icon: ArrowLeftRight,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "loop" }),
-            },
+            editAction("reverse", "Reverse", Rewind, "reverse"),
+            editAction("back-and-forth", "Back and Forth", ArrowLeftRight, "loop"),
           ],
           // Interpolated edits, the slowest to make.
           [
-            {
-              id: "slow-motion",
-              label: "Slow Motion",
-              icon: Snail,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "slow" }),
-            },
-            {
-              id: "smooth-motion",
-              label: "Smooth Motion",
-              icon: Waves,
-              disabled: videoEdit.isPending,
-              onClick: () => videoEdit.mutate({ kind: "smooth" }),
-            },
+            editAction("slow-motion", "Slow Motion", Snail, "slow"),
+            editAction("smooth-motion", "Smooth Motion", Waves, "smooth"),
           ],
         ],
       }),
@@ -469,40 +480,42 @@ export function useMediaActions(
         disabled: chat.isPending,
         onClick: () => chat.mutate(),
       }),
-    // Prompt opens the result in the composer (its first option); the others run it again from here.
-    itemAction("prompt", {
+    // Recreate reuses the item's prompt and settings: Edit Prompt opens them in the composer (its
+    // first option) and the others run it again from here. An upload has only its suggested prompt.
+    itemAction("recreate", {
       disabled: action.isPending,
       loading: running === "regenerate" || running === "repeat",
       onClick: ready ? undefined : () => action.mutate("image"),
-      menu: ready
-        ? [
-            [
-              {
-                id: "prompt-composer",
-                label: "Edit",
-                icon: icons.prompt,
-                disabled: action.isPending,
-                onClick: () => action.mutate("image"),
-              },
-              ...(image && reference ? [reference] : []),
-              ...(recreate ? [recreate] : []),
+      menu: !ready
+        ? undefined
+        : item.uploaded
+          ? [[recreate, ...(image && reference ? [reference] : [])]]
+          : [
+              [
+                {
+                  id: "prompt-composer",
+                  label: "Edit Prompt",
+                  icon: icons.prompt,
+                  disabled: action.isPending,
+                  onClick: () => action.mutate("image"),
+                },
+                ...(image && reference ? [reference] : []),
+              ],
+              [
+                {
+                  id: "new-seed",
+                  label: "Run Again",
+                  icon: Shuffle,
+                  onClick: () => run({ kind: "regenerate" }),
+                },
+                {
+                  id: "exact-repeat",
+                  label: "Run Again (Same Seed)",
+                  icon: Repeat,
+                  onClick: () => run({ kind: "repeat" }),
+                },
+              ],
             ],
-            [
-              {
-                id: "new-seed",
-                label: "Run Again",
-                icon: Shuffle,
-                onClick: () => run({ kind: "regenerate" }),
-              },
-              {
-                id: "exact-repeat",
-                label: "Run Again (Same Seed)",
-                icon: Repeat,
-                onClick: () => run({ kind: "repeat" }),
-              },
-            ],
-          ]
-        : undefined,
     }),
     image &&
       itemAction("compare", { disabled: variants.isPending, onClick: () => variants.mutate() }),
@@ -639,7 +652,11 @@ export function useMediaActions(
         onClick: () => favorite.mutate(),
       }),
   ];
-  return itemActionGroups(actions.filter((entry) => entry && !omit.includes(entry.id)));
+  return itemActionGroups(
+    actions
+      .filter((entry): entry is Action => !!entry && !omit.includes(entry.id))
+      .map(withoutLoneOption),
+  );
 }
 
 /** The shared actions as menu items, mounted while a menu is open. */

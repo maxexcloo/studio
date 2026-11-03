@@ -18,7 +18,6 @@ import { icons } from "../../ui/icons";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
-import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { api, post } from "../../api";
@@ -39,6 +38,7 @@ import {
   SavedList,
   SortMenu,
   savedItems,
+  savedSortLabels,
   type SavedSort,
 } from "./Picker";
 import classes from "./LoraPicker.module.css";
@@ -68,8 +68,17 @@ const typeNames: Record<string, string> = {
   character: "Character",
   concept: "Concept",
 };
-/** Recommended LoRAs match the profile's family; Favourites are this family's thumbs up; All lists every one. */
-type LoraTab = "recommended" | "favourites" | "all" | "stacks";
+/**
+ * Which LoRAs the picker lists, narrowest first: Recommended match the profile's family (the
+ * default), Favourites are this family's thumbs up and All lists every one it can load. Saved stacks sit with
+ * the stack they replace, not among these.
+ */
+const loraTabs = [
+  { value: "recommended", label: "Recommended" },
+  { value: "favourites", label: "Favourites" },
+  { value: "all", label: "All" },
+] as const;
+type LoraTab = (typeof loraTabs)[number]["value"];
 /** All's filter for LoRAs without a model family. */
 const unclassified = "unclassified";
 /** A new LoRA starts at its catalogue default, else 1 kept within its published range. */
@@ -85,6 +94,13 @@ export const compatibleLoras = (profile: Profile | undefined, metadata: Record<s
   });
 
 const ratingOrder = (rating?: LoraRating) => (rating === "up" ? 0 : rating === "down" ? 2 : 1);
+/** The LoRA choices' orders: by rating (the default every LoRA list shares), or by name. */
+type LoraSort = "rating" | "name-asc" | "name-desc";
+const loraSortLabels: Record<LoraSort, string> = {
+  rating: "Rating",
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
+};
 /** Every LoRA list's order: thumbs up, then unrated, then thumbs down, each by title. */
 export const byRating =
   (ratings: Record<string, LoraRating>, title: (file: string) => string) =>
@@ -97,6 +113,7 @@ export function useLoraPicker() {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useRemembered<LoraTab>("lora-tab", "recommended");
   const [sort, setSort] = useState<SavedSort>("name-asc");
+  const [loraSort, setLoraSort] = useState<LoraSort>("rating");
   const controlsId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLDivElement>(null);
@@ -123,6 +140,8 @@ export function useLoraPicker() {
     setTab,
     sort,
     setSort,
+    loraSort,
+    setLoraSort,
     controlsId,
     trigger,
     controls,
@@ -251,13 +270,14 @@ function LoraControls({
   const available = profile?.options?.loras || [];
   const compatible = compatibleLoras(profile, metadata);
   const ratings = library.data?.library.ratings || {};
-  const tab = picker.tab;
+  // A tab remembered from before Stacks left the tabs shows Recommended.
+  const tab = loraTabs.some((item) => item.value === picker.tab) ? picker.tab : "recommended";
   const listed =
     tab === "recommended"
       ? available.filter((file) => familiesOf(file).includes(family))
       : tab === "favourites"
         ? compatible.filter((file) => ratings[file] === "up")
-        : available;
+        : compatible;
   const types = [...new Set(listed.map(typeOf))].filter((type) => type).sort();
   const filters = [...(tab === "all" ? [unclassified] : []), ...types];
   const filter = filters.includes(picker.filter) ? picker.filter : "all";
@@ -273,7 +293,11 @@ function LoraControls({
             .toLowerCase()
             .includes(terms)),
     )
-    .sort(byRating(ratings, title));
+    .sort(
+      picker.loraSort === "rating"
+        ? byRating(ratings, title)
+        : (a, b) => (picker.loraSort === "name-asc" ? 1 : -1) * title(a).localeCompare(title(b)),
+    );
   const selected = new Set(input.loras.map((lora) => lora.name));
   const toggle = (file: string) =>
     update(
@@ -298,98 +322,77 @@ function LoraControls({
         : tab === "favourites"
           ? "No Favourites"
           : "No LoRAs";
-  const choices =
-    picker.tab === "stacks" ? (
-      <SavedList
-        label="Saved LoRA Stacks"
-        noun="Stack"
-        items={savedItems(stacks.records, picker.query, picker.sort)}
-        empty={stacks.records.length ? "No Matching Stacks" : "No Saved Stacks"}
-        replaces={input.loras.length > 0}
-        replaceMessage="Replace the current LoRAs with this stack?"
-        onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
-        onRename={stacks.rename}
-        onUpdate={(record) => stacks.update(record, input.loras)}
-        onDelete={stacks.remove}
-      />
-    ) : info.isPending ? (
-      <LoadingState label="Loading LoRAs" />
-    ) : info.error ? (
-      <Alert color="red">{info.error.message}</Alert>
-    ) : shown.length ? (
-      <PickerGrid label="LoRA Choices" rows={phone}>
-        {shown.map((file) => (
-          <PickerTile
-            key={file}
-            label={title(file)}
-            title={title(file)}
-            detail={
-              typeNames[typeOf(file)] ||
-              typeOf(file) ||
-              (familiesOf(file).length ? undefined : "Unclassified")
-            }
-            image={previews.data?.previews[file]}
-            placeholder={icons.loras}
-            aspect={phone ? "1" : "4 / 3"}
-            selected={selected.has(file)}
-            row={phone}
-            onToggle={() => toggle(file)}
-            action={
-              <Group gap={4} wrap="nowrap">
-                {(
-                  [
-                    ["up", "Thumbs Up", ThumbsUp, "green"],
-                    ["down", "Thumbs Down", ThumbsDown, "red"],
-                  ] as const
-                ).map(([rating, label, Icon, color]) => (
-                  <ActionIcon
-                    key={rating}
-                    variant={phone ? "subtle" : "default"}
-                    color="gray"
-                    aria-label={`${label} ${title(file)}`}
-                    aria-pressed={ratings[file] === rating}
-                    onClick={() =>
-                      rate.mutate({ name: file, rating: ratings[file] === rating ? null : rating })
+  const choices = info.isPending ? (
+    <LoadingState label="Loading LoRAs" />
+  ) : info.error ? (
+    <Alert color="red">{info.error.message}</Alert>
+  ) : shown.length ? (
+    <PickerGrid label="LoRA Choices" rows={phone}>
+      {shown.map((file) => (
+        <PickerTile
+          key={file}
+          label={title(file)}
+          title={title(file)}
+          detail={
+            typeNames[typeOf(file)] ||
+            typeOf(file) ||
+            (familiesOf(file).length ? undefined : "Unclassified")
+          }
+          image={previews.data?.previews[file]}
+          placeholder={icons.loras}
+          aspect={phone ? "1" : "4 / 3"}
+          selected={selected.has(file)}
+          row={phone}
+          onToggle={() => toggle(file)}
+          action={
+            <Group gap={4} wrap="nowrap">
+              {(
+                [
+                  ["up", "Thumbs Up", ThumbsUp, "green"],
+                  ["down", "Thumbs Down", ThumbsDown, "red"],
+                ] as const
+              ).map(([rating, label, Icon, color]) => (
+                <ActionIcon
+                  key={rating}
+                  variant={phone ? "subtle" : "default"}
+                  color="gray"
+                  aria-label={`${label} ${title(file)}`}
+                  aria-pressed={ratings[file] === rating}
+                  onClick={() =>
+                    rate.mutate({ name: file, rating: ratings[file] === rating ? null : rating })
+                  }
+                >
+                  <Icon
+                    size={16}
+                    color={
+                      ratings[file] === rating
+                        ? `var(--mantine-color-${color}-filled)`
+                        : "currentColor"
                     }
-                  >
-                    <Icon
-                      size={16}
-                      color={
-                        ratings[file] === rating
-                          ? `var(--mantine-color-${color}-filled)`
-                          : "currentColor"
-                      }
-                    />
-                  </ActionIcon>
-                ))}
-              </Group>
-            }
-          />
-        ))}
-      </PickerGrid>
-    ) : (
-      <EmptyState fill>{empty}</EmptyState>
-    );
+                  />
+                </ActionIcon>
+              ))}
+            </Group>
+          }
+        />
+      ))}
+    </PickerGrid>
+  ) : (
+    <EmptyState fill>{empty}</EmptyState>
+  );
   const header = (
     <PickerHeader
       label="LoRAs"
-      searched={picker.tab === "stacks" ? "Stacks" : "LoRAs"}
-      tabs={[
-        { value: "recommended", label: "Recommended" },
-        { value: "favourites", label: "Favourites" },
-        { value: "all", label: "All" },
-        { value: "stacks", label: "Stacks" },
-      ]}
-      tab={picker.tab}
+      tabs={[...loraTabs]}
+      tab={tab}
       onTabChange={picker.setTab}
       query={picker.query}
       onQueryChange={picker.setQuery}
       actions={
-        picker.tab === "stacks" && <SortMenu value={picker.sort} onChange={picker.setSort} />
+        <SortMenu labels={loraSortLabels} value={picker.loraSort} onChange={picker.setLoraSort} />
       }
       filterCount={filter === "all" ? 0 : 1}
       filters={
-        picker.tab !== "stacks" &&
         filters.length > 0 && (
           <Chip.Group value={filter} onChange={(value) => picker.setFilter(value as string)}>
             <Group gap={6} role="radiogroup" aria-label="LoRA Filter">
@@ -456,6 +459,33 @@ function LoraControls({
         <Text size="sm" c="dimmed">
           Choose LoRAs or a saved stack.
         </Text>
+      )}
+      {!!stacks.records.length && (
+        <>
+          <Group justify="space-between" gap="xs" mt="xs">
+            <Text size="sm" fw={600}>
+              Saved Stacks
+            </Text>
+            <SortMenu
+              label="Sort Stacks"
+              labels={savedSortLabels}
+              value={picker.sort}
+              onChange={picker.setSort}
+            />
+          </Group>
+          <SavedList
+            label="Saved LoRA Stacks"
+            noun="Stack"
+            items={savedItems(stacks.records, "", picker.sort)}
+            empty="No Saved Stacks"
+            replaces={input.loras.length > 0}
+            replaceMessage="Replace the current LoRAs with this stack?"
+            onLoad={(record) => update(record.stack.loras.map((lora) => ({ ...lora })))}
+            onRename={stacks.rename}
+            onUpdate={(record) => stacks.update(record, input.loras)}
+            onDelete={stacks.remove}
+          />
+        </>
       )}
     </>
   );
@@ -529,6 +559,14 @@ function StackEntry({
   const max = range?.max ?? 2;
   const strength = dragging ?? lora.strength;
   const enabled = lora.enabled !== false;
+  // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
+  const triggers = info?.triggers || [];
+  const chosenTriggers =
+    lora.triggers === false
+      ? []
+      : Array.isArray(lora.triggers)
+        ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
+        : triggers;
   return (
     <Stack gap={6} className={classes.entry} data-disabled={!enabled || undefined}>
       <Group gap="xs" wrap="nowrap">
@@ -591,27 +629,29 @@ function StackEntry({
             This profile can’t use this LoRA. Disable or remove it.
           </Text>
         )}
-        {!!info?.triggers?.length && (
-          <Group gap={4}>
-            <Switch
-              label="Trigger Words"
-              aria-label={`${title} Trigger Words`}
-              checked={lora.triggers !== false}
-              onChange={(event) => onChange({ triggers: event.currentTarget.checked })}
-              mr={4}
-            />
-            {info.triggers.map((word) => (
-              <Button
-                key={word}
-                size="compact-sm"
-                variant="subtle"
-                aria-label={`Copy Trigger Word: ${word}`}
-                onClick={() => void copyText(word, "Trigger Word")}
-              >
-                {word}
-              </Button>
-            ))}
-          </Group>
+        {!!triggers.length && (
+          <Chip.Group
+            multiple
+            value={chosenTriggers}
+            // Kept in the catalogue's order; all on is the default, none on is off.
+            onChange={(words) => {
+              const next = triggers.filter((word) => words.includes(word));
+              onChange({
+                triggers: next.length === triggers.length ? true : next.length ? next : false,
+              });
+            }}
+          >
+            <Group gap={6} role="group" aria-label={`${title} Trigger Words`}>
+              <Text size="xs" c="dimmed">
+                Trigger Words
+              </Text>
+              {triggers.map((word) => (
+                <Chip key={word} value={word} size="xs" variant="light">
+                  {word}
+                </Chip>
+              ))}
+            </Group>
+          </Chip.Group>
         )}
         {info?.description && (
           <Text size="xs" c="dimmed" lineClamp={3}>

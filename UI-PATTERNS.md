@@ -23,7 +23,7 @@ primary component reference and verify APIs against the installed version.
   `MutationCache` default notification. Do not add per-call duplicate surfaces.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
-  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and `copyText`.
+  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and copying (`copyText` for menu items, `useCopy` for buttons).
 - `ui/icons.ts` gives each meaning one icon, and actions, modes and recurring
   controls take theirs from it: SlidersHorizontal only for Prompt and composer
   settings, ListFilter for filters, the gear for settings, Layers only for
@@ -101,9 +101,11 @@ primary component reference and verify APIs against the installed version.
   keep visited forms mounted to preserve edits; a section that fails to render
   shows an inline alert in its place. Navigation items carry an icon;
   each section shows its heading and one-line description with its toolbar
-  (`SectionHeader`: segmented views, an expanding search, filters in one popover
-  and icon actions, labelled in Settings › Users and Groups, whose actions are
-  rare) at the end of the same row, above compact rows with status
+  (`SectionHeader`: segmented views, an expanding search, filters in one popover,
+  then the actions: a create or primary action as a labelled compact subtle
+  button (`ToolbarAction`: New User, New Group, New Guide, Import Workflow), the
+  rest icons with tooltips; phones may fold a crowded toolbar's actions into
+  More) at the end of the same row, above compact rows with status
   badges and row menus. Sections are alphabetical, About apart at the end, and
   so are their groups and rows unless order carries meaning. No accordions:
   headings group a section's parts, and creating or configuring a record opens
@@ -133,11 +135,12 @@ primary component reference and verify APIs against the installed version.
 
 - Gallery modes keep one compact bottom prompt row with reference thumbnails,
   generation-input action and icon-only Generate. Expanded controls are one prompt
-  box with a history action inside it, the negative prompt under it when the
-  profile takes one, and a row of compact chips: Profile, Backend (when the
-  profile has several), Reference Role (once references are placed), References,
-  LoRAs, Aspect, Count, a video's Length, a set Seed (clearable), Expert settings, Compare and
-  Presets, then Image/Video and Generate. Placing the first reference applies the
+  box with its tools beside it, the negative prompt under it when the
+  profile takes one, and a row of compact chips: Profile, References, Reference
+  Role (once references are placed: Edit and Reference as pressed chips, then
+  Paint Mask where the profile inpaints, in one group), LoRAs, Aspect, Count, a
+  video's Length, a set Seed (clearable), Backend (when the profile has several),
+  Expert settings, Compare and Presets, then Image/Video and Generate. Placing the first reference applies the
   profile's reference-mode settings (a partial denoise, as Edit does); removing
   the last restores text-to-image's. Recent Prompts, References, LoRAs,
   Expert settings and Presets share one popup (`ChipPopup`): a title row with its
@@ -149,7 +152,7 @@ primary component reference and verify APIs against the installed version.
   (`Picker.tsx`): tabs, then search, active filter chips and Filter ▾ in one
   row at the gallery toolbar's compact size; a
   selected tile fades with a check and a second click removes it; saved stacks
-  and presets sort, rename, update and delete, and ask before replacing the
+  and presets sort (`SortMenu`, as the LoRA choices do), rename, update and delete, and ask before replacing the
   draft; Save sits at the footer's start and Clear at its end. No section labels or accordions. Clicking inside expands; clicking outside collapses.
   Nested Mantine pickers belong to the active composer. Do not add custom
   collapse controls. Phones open a full-height Drawer titled Generate upward with
@@ -158,7 +161,9 @@ primary component reference and verify APIs against the installed version.
   one tap; its send arrow generates at once, and Done lands in the Generate Drawer.
 - Every multi-line text box is the shared `TextBox`. The composer's prompt and
   negative prompt carry compact Copy and Clear beside their other actions; Clear
-  offers Undo in its notification. On phones a text box is a summary of its
+  offers Undo in its notification. On desktop the prompt's tools (Recent Prompts,
+  Prompt Assistance, Copy, Clear) stand in one icon column right of the text,
+  which keeps the full height; the one-row negative keeps them inside its box. On phones a text box is a summary of its
   text; tapping it (prompt, negative, Chat message, profile and guide editors and
   the rest) opens it full screen, without the keyboard until the text is tapped,
   with the same actions as the inline box (the
@@ -170,10 +175,11 @@ primary component reference and verify APIs against the installed version.
   with a sticky action row at the safe bottom. Avoid nested form scroll owners.
   While the phone Drawer is open, notifications sit over the prompt text, below
   its header and the prompt's actions, never over the chips or action row.
-- The Chat composer is the gallery prompt box, compact: the growing message
-  above a chip rail with the text model (`ChipSelect`, as Profile), shown only
-  when the account has another model it can choose, then the compact bar's
-  References action and one Send/Stop action. The model list shows administrators
+- The Chat composer is the gallery's compact prompt bar: one row of the
+  message (one line until it wraps or takes Shift+Enter, up to five), then the
+  text model (`ChipSelect`, as Profile), shown only when the account has
+  another model it can choose, the References action and one Send/Stop action,
+  centred with a single line and keeping to the last line as the message grows. The model list shows administrators
   models whose Studio text workloads are stopped; choosing one starts it,
   confirming first with the workloads it stops when no GPU is free, and selects
   it once ready, with progress under the rail. Others see models that run,
@@ -205,14 +211,20 @@ primary component reference and verify APIs against the installed version.
   gallery draft. Do not bypass the assistant with a direct queue request.
 - Profile selection is one searchable Mantine selector grouped by readable family
   names such as Flux 2. Each option is a complete profile, titled with its name and
-  its description beneath; preserve exact profile IDs. The LoRA picker's tabs are
-  Recommended (the default: LoRAs for the profile's family), Favourites (this
-  family's thumbs up), All (every LoRA, with Unclassified, those without a family,
-  as a filter) and saved Stacks; type filters follow the catalogue Type.
+  its description beneath; preserve exact profile IDs. A combined profile's backend
+  (ComfyUI, Radiance) shows only on the composer's Backend chip, where it is switched,
+  never in profile lists. The LoRA picker's tabs choose which LoRAs it lists,
+  narrowest first: Recommended (the default: LoRAs for the profile's family),
+  Favourites (this family's thumbs up) and All (every LoRA the profile can load,
+  so another family's copy of a series never shows, with Unclassified, those
+  without a family, as a filter); type filters follow the catalogue Type.
+  Saved Stacks are not a tab: they list under the current Stack, which they replace.
 - Each account rates LoRAs thumbs up or thumbs down (tapping the pressed one
   clears it). Every LoRA list (the picker, Compare and MCP's Models) orders thumbs
-  up, then unrated, then thumbs down, each alphabetically; Dream loads only thumbs
-  up.
+  up, then unrated, then thumbs down, each alphabetically (the picker's Sort can
+  order its choices by name instead); Dream loads only thumbs up. Library and
+  Settings lists sort by their `DataTable` headers, and the reference picker
+  keeps the gallery's order.
 - References pick from the gallery. Uploads are the uploader's gallery images
   and videos (a video is placed by its first frame), hidden until the gallery's Uploads filter is on (the picker's too, where the
   Upload tile sits). Gallery drag-and-drop passes an
@@ -240,11 +252,11 @@ primary component reference and verify APIs against the installed version.
   visible hint.
   Saved LoRA stacks reuse the account-owned library and preserve exact family
   keys, order, strengths and disabled entries; legacy profile groups remain explicit.
-  Trigger words use copy controls and source links use the published catalogue URL.
-  Each stacked LoRA has a Trigger Words toggle (on by default); Studio inserts
-  enabled LoRAs' trigger words at the start of the prompt in stack order, on
-  every generation path, only when the run is sent (skipping any already
-  typed). The prompt field never gets them; reusing a result restores the
+  Source links use the published catalogue URL. Each stacked LoRA lists its
+  trigger words as chips, all on by default, and tapping one switches it on or
+  off; Studio rebuilds the lead from the words switched on, at the start of the
+  prompt in stack order, once each, on every generation path, only when the run
+  is sent (skipping any already typed). The prompt field never gets them; reusing a result restores the
   prompt as typed, and Details shows the prompt that ran.
   Prompt history uses native Combobox keyboard selection alongside pin/forget controls.
 
@@ -344,8 +356,11 @@ primary component reference and verify APIs against the installed version.
   Shared `SearchInput` reads Search, never naming what it searches (its
   accessible name does), and clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
-- Use notifications for action outcomes and inline alerts for failed forms or
-  views. Notifications sit bottom right, raised clear of the composer and viewer
+- Use notifications for failures, Undo offers and outcomes with nowhere else to
+  show (a menu item's Copy), and inline alerts for failed forms or views. Routine
+  success shows where it happened, never as a toast: a copy button's check, a
+  saved record in its list, a short line beside the action, or an open menu's item
+  relabelled for a moment (`useFlash`, like `useCopy`). Notifications sit bottom right, raised clear of the composer and viewer
   action bars, so they never cover header buttons. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
   and actions, and Australian English for explanatory prose. Placeholders are
@@ -356,29 +371,36 @@ primary component reference and verify APIs against the installed version.
 - The viewer is the iteration hub. One glass action bar (`ViewerPrompt` over
   the shared item actions) holds the item's prompt in a field: editing it and
   pressing Enter or Generate runs it with the item's settings (a video's
-  animates again). Its chat icon switches the field to asking for a change in
-  plain words ("make it night"); the prompt assistant picks Edit, Recreate,
-  Animate or Upscale (`/api/suggestions`, surface `change`) and the proposal
-  shows its action and rewritten prompt above the field until Run or dismiss,
-  the one review pause before a written prompt runs. Continue in Chat (in the
+  animates again). Its Ask action (Sparkles, Ask for a Change) sends the field's
+  text as a change in plain words ("make it night"); the prompt assistant picks
+  Edit, Recreate, Animate or Upscale (`/api/suggestions`, surface `change`) and
+  its prompt replaces the text in place, tinted, with the action's name, Undo
+  (restoring what was typed) and Run at its end (on phones Run is the editor's
+  send arrow), the one review pause before a written prompt runs; there is no
+  panel above the field. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached
-  as its reference, its settings as the input, any change typed as the
-  message). Prompt opens the item in the page's composer. Runs started from the
+  as its reference, its settings as the input, any change typed over the
+  prompt as the message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
   viewer queue as usual into a strip of the item's versions, grouped as the grid
   groups them (`gallery/versions.ts`); choosing one makes it current. Under the
-  field come the labelled primaries Edit, Animate ▾ and Prompt ▾, then the other
-  shared actions as icons with tooltips (Upscale, Copy, Download, Star,
+  field come the labelled primaries Animate ▾, Edit, Recreate ▾ and Upscale ▾,
+  then the other shared actions as icons with tooltips (Copy, Download, Star,
   Delete); Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
   every input in run order (the bar's Copy ▾ copies its prompt or settings);
-  prompts sit on a subtle surface aligned with the column and scroll within a
-  bounded height; LoRAs have their own heading, each with its strength. The
+  prompts and the caption sit on the same subtle surface aligned with the
+  column and scroll within a bounded height, the caption starting expanded
+  until Show Less folds it to two lines ending in "…"; LoRAs have their own heading, each with its strength. Its
+  sections run Prompt, Caption, From, Derived, Model, LoRAs, References,
+  Settings, Output and Timing, each a heading over its content, and an
+  upscale's Output adds the Original Size the model drew beside its
+  Dimensions. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
+  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, with Ask beside its send arrow) over Animate, Edit, Recreate and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
-  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Edit Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while
@@ -387,7 +409,7 @@ primary component reference and verify APIs against the installed version.
 - Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
   generation by default (the All Versions filter chip, on). Turning it off
-  collapses a result and its versions (runs made from it: Edit, Prompt, Run Again
+  collapses a result and its versions (runs made from it: Edit, Recreate, Run Again
   and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it
   with the pointer, or a sideways swipe on phones, flips through them. Sharing a
@@ -408,21 +430,24 @@ primary component reference and verify APIs against the installed version.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
 - Item actions have one definition (`gallery/MediaActions.tsx`) and one order in
-  every bar and menu (viewer, tile ⋯, right-click and phone More): Edit, Animate,
-  Prompt | Upscale | Copy, Download | Star, Delete. Retry or Stop lead for
-  unfinished work, Continue in Chat follows Prompt, Compare joins Upscale's section
-  in menus (the tile and right-click menu and the selection's More, never the
-  viewer's bar) and Delete is last. Bars are icons with tooltips (their accessible
-  names unchanged) at one size and spacing; only the desktop viewer names Edit,
-  Animate ▾ and Prompt ▾ beside their icons, and only those labelled buttons show
+  every bar and menu (viewer, tile ⋯, right-click and phone More): Animate, Edit,
+  Recreate, Upscale | Compare, Continue in Chat | Copy, Download | Star, Delete.
+  Retry or Stop lead for unfinished work, Compare shows only in menus (the tile
+  and right-click menu and the selection's More, never the viewer's bar) and
+  Delete is last. Bars are icons with tooltips (their accessible
+  names unchanged) at one size and spacing; only the desktop viewer names Animate ▾,
+  Edit, Recreate ▾ and Upscale ▾ beside their icons, and only those labelled buttons show
   ▾. There are no split buttons: a control with options opens its menu on click,
   and its first option is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
   dividers only between real groups and no explanatory notes, only the reason when
   nothing can run. Options are submenus on desktop and expand in place on phones,
-  never as a second floating layer. The options: Prompt (opens the composer) ›
-  Edit, Use as Reference (images), Recreate (an upload with a suggested prompt;
-  the run is its version; several selected uploads queue one run each), Run Again (new seed), Run Again (Same Seed); Edit opens
+  never as a second floating layer, and an action left with one option runs it
+  without a submenu. The options: Recreate (reusing the item's prompt and
+  settings) › Edit Prompt (opens the composer), Use as Reference (images), Run
+  Again (new seed), Run Again (Same Seed), and for an upload only Edit Prompt
+  from its suggested prompt (the run is its version; several selected uploads
+  queue one run each) and Use as Reference; Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
   original kept); Animate › Fast or Quality as a small segmented control at the

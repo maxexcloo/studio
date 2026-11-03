@@ -376,6 +376,13 @@ test("Chat layout respects workspace width and keeps a structural sessions sideb
   // With only one model there is no model chip; References sits beside Send as in the gallery.
   await expect(page.getByRole("combobox", { name: "Chat Model", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Choose References", exact: true })).toBeVisible();
+  // The message is one line, centred with Send on the same row.
+  const message = await page.getByRole("textbox", { name: "Message", exact: true }).boundingBox();
+  const send = await page.getByRole("button", { name: "Send Message", exact: true }).boundingBox();
+  expect(message!.height).toBeLessThanOrEqual(send!.height + 1);
+  expect(
+    Math.abs(message!.y + message!.height / 2 - (send!.y + send!.height / 2)),
+  ).toBeLessThanOrEqual(2);
   // Without a sidebar, phones list the chats in place of the empty state; the header's Chats
   // drawer offers New Chat.
   await expectNoChatOpen(page);

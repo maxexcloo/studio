@@ -87,6 +87,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
       req.studioAccount = { id: "admin-1", role: "administrator", credential: "mcp-admin" };
     next();
   });
+  const forgotten = [];
   registerLibraryRoutes(app, {
     presets: {},
     installed: async () => ({}),
@@ -99,6 +100,9 @@ test("an import from chat goes through the same pipeline, records chat as its or
     store: createImportStore({ dataDir, log: {} }),
     schedule: false,
     pictures: { file: () => "", save: async () => false, copy: async () => false },
+    references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
+    removeFile: async () => ({ removed: true }),
+    forget: (file) => forgotten.push(file),
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -172,6 +176,25 @@ test("an import from chat goes through the same pipeline, records chat as its or
     key: "loras/watercolour-v2.safetensors",
   });
   assert.notEqual(undone.entry.title, "Watercolour FX");
+
+  // Removing takes the entry and its file; undo brings the entry back.
+  const removed = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/watercolour-v2.safetensors",
+  });
+  assert.deepEqual([removed.ok, removed.fileRemoved], [true, true], JSON.stringify(removed));
+  assert.equal(catalogue.entry("loras/watercolour-v2.safetensors"), null);
+  assert.deepEqual(
+    forgotten,
+    ["watercolour-v2.safetensors"],
+    "it leaves every account's stacks first",
+  );
+  await call("POST", "/api/library/catalogue/undo", { key: "loras/watercolour-v2.safetensors" });
+  assert.ok(catalogue.entry("loras/watercolour-v2.safetensors"));
+  catalogue.edit("loras/in-use.safetensors", { title: "In Use" });
+  const kept = await call("POST", "/api/library/catalogue/remove", {
+    key: "loras/in-use.safetensors",
+  });
+  assert.deepEqual([kept.ok, kept.users], [false, ["the Fast profile"]], "a used entry stays");
 });
 
 test("dropped images arrive as data URLs, PNG, WebP or JPEG only", () => {

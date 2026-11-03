@@ -109,6 +109,7 @@ export function LibraryCatalogueTable({
   onUpdate,
   onCheckUpdates,
   checkingUpdates = false,
+  updateNote,
   onEdit,
   updatePending = false,
 }: {
@@ -117,6 +118,8 @@ export function LibraryCatalogueTable({
   onUpdate?: (item: LibraryItem, alternative?: boolean) => void;
   onCheckUpdates?: () => void;
   checkingUpdates?: boolean;
+  /** What the last update check or update did. */
+  updateNote?: string;
   onEdit?: (item: LibraryItem) => void;
   updatePending?: boolean;
 }) {
@@ -215,6 +218,11 @@ export function LibraryCatalogueTable({
           )
         }
       />
+      {updateNote && (
+        <Text c="dimmed" size="xs">
+          {updateNote}
+        </Text>
+      )}
       {unclassified > 0 && (
         <Text c="dimmed" size="xs">
           {unclassified} {unclassified === 1 ? "resource has" : "resources have"} missing or

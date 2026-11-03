@@ -58,9 +58,9 @@ async function seed(
   return { state, viewer: page.getByRole("dialog", { name: "Generation", exact: true }) };
 }
 
-/** Prompt › Run Again: queues the same settings with a new seed, without the composer. */
+/** Recreate › Run Again: queues the same settings with a new seed, without the composer. */
 async function newSeed(page: Page) {
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again", exact: true }).click();
 }
 
@@ -137,9 +137,9 @@ test("A video's prompt field runs its edited prompt again as a video", async ({ 
   expect(state.jobs.at(-1)!.input.kind ?? "video").toBe("video");
 });
 
-test("Asking for a change in plain words shows the chosen action and prompt before it runs", async ({
+test("Ask turns a change in plain words into the chosen action's prompt in place, to run or undo", async ({
   page,
-}) => {
+}, testInfo) => {
   const asked: any[] = [];
   const { state, viewer } = await seed(page, {}, (page) =>
     page.route("**/api/suggestions", (route) => {
@@ -160,11 +160,16 @@ test("Asking for a change in plain words shows the chosen action and prompt befo
       });
     }),
   );
-  await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
-  await sendField(page, "Ask for a Change", "make it night", "Ask");
-  const proposal = viewer.getByRole("group", { name: "Proposed Change", exact: true });
-  await expect(proposal).toContainText("Edit");
-  await expect(proposal).toContainText("An amber bird at night");
+  // Phones ask from the full-screen editor, whose header carries the field's actions.
+  const phone = Boolean(testInfo.project.use.isMobile);
+  const surface = phone ? page.getByRole("dialog", { name: "Prompt", exact: true }) : viewer;
+  if (phone) await viewer.getByRole("textbox", { name: "Prompt", exact: true }).click();
+  const field = surface.getByRole("textbox", { name: "Prompt", exact: true });
+  await field.fill("make it night");
+  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  // The proposal replaces the text in place under the chosen action; Undo restores the request.
+  await expect(field).toHaveValue("An amber bird at night");
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveText("Edit");
   expect(asked).toEqual([
     {
       surface: "change",
@@ -173,16 +178,20 @@ test("Asking for a change in plain words shows the chosen action and prompt befo
       actions: ["edit", "recreate", "animate", "upscale"],
     },
   ]);
+  await surface.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(field).toHaveValue("make it night");
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
+  await surface.getByRole("button", { name: "Ask for a Change", exact: true }).click();
+  await expect(field).toHaveValue("An amber bird at night");
   expect(state.jobs).toHaveLength(1);
-  await proposal.getByRole("button", { name: "Run Edit", exact: true }).click();
+  await surface.getByRole("button", { name: "Run", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
     operation: "refine",
     parentItemId: "hub",
     input: { prompt: "An amber bird at night", count: 1 },
   });
-  await expect(proposal).toBeHidden();
-  await expect(viewer.getByRole("textbox", { name: "Prompt", exact: true })).toBeVisible();
+  await expect(surface.getByLabel("Proposed Action", { exact: true })).toHaveCount(0);
 });
 
 test("Continue in Chat starts a new Chat about the item, attached as its reference", async ({
@@ -190,13 +199,9 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
 }) => {
   const { viewer } = await seed(page);
   const desktop = page.viewportSize()!.width >= 768;
-  // Desktop's field carries the change typed so far into the Chat; phones list it under More.
-  if (desktop) {
-    await viewer.getByRole("button", { name: "Ask for a Change", exact: true }).click();
-    await viewer
-      .getByRole("textbox", { name: "Ask for a Change", exact: true })
-      .fill("make it night");
-  }
+  // Desktop's field carries a change typed over the prompt into the Chat; phones list it under More.
+  if (desktop)
+    await viewer.getByRole("textbox", { name: "Prompt", exact: true }).fill("make it night");
   await viewerAction(page, "Continue in Chat");
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/chat$/);
@@ -210,10 +215,12 @@ test("Continue in Chat starts a new Chat about the item, attached as its referen
   ).toBeVisible();
 });
 
-test("Viewer runs queue into the strip and Prompt opens the composer", async ({ page }) => {
+test("Viewer runs queue into the strip and Recreate › Edit Prompt opens the composer", async ({
+  page,
+}) => {
   const { state, viewer } = await seed(page);
   await expect(viewer.getByRole("button", { name: "Compare", exact: true })).toHaveCount(0);
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1]).toMatchObject({
@@ -226,8 +233,8 @@ test("Viewer runs queue into the strip and Prompt opens the composer", async ({ 
   await expect(strip.getByRole("listitem")).toHaveCount(2);
   await strip.getByRole("listitem", { name: "Show Version 2", exact: true }).click();
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -266,20 +273,20 @@ test("The strip holds the item's versions, not the other results of its run", as
   await expect(strip.getByRole("listitem").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
-test("Run Again and Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
+test("Run Again and Edit Prompt draw a new seed; only Run Again (Same Seed) keeps it", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page);
-  // Prompt's menu queues Run Again and Run Again (Same Seed) at once; Prompt itself loads the composer.
+  // Recreate queues Run Again and Run Again (Same Seed) at once; Edit Prompt loads the composer.
   await newSeed(page);
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({ seed: "", steps: 28 });
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(3);
   expect(state.jobs[2].input).toMatchObject({ seed: 1234567, steps: 28 });
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   await expect(page.getByRole("textbox", { name: "Prompt", exact: true })).toHaveValue(
     "An amber bird",
@@ -323,13 +330,13 @@ const ranOn = (backend: string) => ({
   settings: { profileId: "custom:krea", profileBackend: backend, seed: 1234567, steps: 28 },
 });
 
-test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran on", async ({
+test("Run Again (Same Seed) and Edit Prompt keep the backend a combined profile ran on", async ({
   page,
 }) => {
   const { state, viewer } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui"), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect.poll(() => state.jobs.length).toBe(2);
   expect(state.jobs[1].input).toMatchObject({
@@ -337,8 +344,8 @@ test("Run Again (Same Seed) and Prompt keep the backend a combined profile ran o
     profileBackend: "radiance",
     seed: 1234567,
   });
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(viewer).toBeHidden();
   // The Backend chip shows the backend this draft runs on, not the profile's current one.
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
@@ -353,7 +360,7 @@ test("A rerun whose backend the profile no longer has runs on its current one an
   const { state } = await seed(page, ranOn("radiance"), () =>
     serveProfiles(page, [combined("comfyui", ["comfyui"]), ...profiles.slice(1)]),
   );
-  await viewerAction(page, "Prompt");
+  await viewerAction(page, "Recreate");
   await page.getByRole("menuitem", { name: "Run Again (Same Seed)", exact: true }).click();
   await expect(
     page.getByText("Krea 2 Turbo · Fast no longer runs on Radiance, so this run uses ComfyUI."),
@@ -591,7 +598,7 @@ test("A video's Animate theme continues it from its last frame, and its frame ca
   // The frame showing is saved as an image, or becomes a reference in the composer.
   await viewer.getByRole("button", { name: "Animate", exact: true }).click();
   await page.getByRole("menuitem", { name: "Save Frame as Image", exact: true }).click();
-  await expect(page.getByText("Frame saved to Uploads.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Saved to Uploads", exact: true })).toBeVisible();
   expect(state.referenceRequests.at(-1)).toEqual({ save: true, galleryItemId: "clip", frame: 0 });
   await page.getByRole("menuitem", { name: "Use Frame as Reference", exact: true }).click();
   await expect
@@ -828,6 +835,10 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
   ).toBeVisible();
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
+  // The caption starts expanded; Show Less folds it and Show More brings it back.
+  await details.getByRole("button", { name: "Show Less", exact: true }).click();
+  await expect(tags).toBeHidden();
+  await details.getByRole("button", { name: "Show More", exact: true }).click();
   // A tag searches the gallery for it and closes the viewer.
   await tags.getByRole("link", { name: "Search branch", exact: true }).click();
   await expect(viewer).toBeHidden();
@@ -1114,8 +1125,8 @@ test("Legacy Prompt retains reference slots, disabled LoRAs and exact profile se
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Open image: Legacy study", exact: true }).click();
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+  await viewerAction(page, "Recreate");
+  await page.getByRole("menuitem", { name: "Edit Prompt", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Generation", exact: true })).toBeHidden();
   await page.getByRole("textbox", { name: "Prompt", exact: true }).click();
   // Phones open the prompt in its own editor, which Done closes.

@@ -267,10 +267,7 @@ export function usePromptAssistant({
         color="gray"
         aria-label="Stop Assistance"
         aria-description={working}
-        onClick={() => {
-          controller.current?.abort();
-          notifications.show({ message: "Assistance stopped" });
-        }}
+        onClick={() => controller.current?.abort()}
       >
         <span className={classes.icons}>
           <Loader className={classes.spinner} size={16} />

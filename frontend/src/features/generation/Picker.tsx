@@ -28,6 +28,7 @@ import { icons } from "../../ui/icons";
 import { FilterButton } from "../gallery/GalleryFilters";
 import { EmptyState } from "../../ui/EmptyState";
 import { SearchInput } from "../../ui/SearchInput";
+import { useFlash } from "../../ui/useFlash";
 import { usePhone } from "../../ui/usePhone";
 import { escapePanel } from "./chip";
 import classes from "./Picker.module.css";
@@ -384,7 +385,7 @@ export function ChipThumbnails({
 }
 
 export type SavedSort = "name-asc" | "name-desc" | "newest" | "oldest";
-const sortLabels: Record<SavedSort, string> = {
+export const savedSortLabels: Record<SavedSort, string> = {
   "name-asc": "Name A–Z",
   "name-desc": "Name Z–A",
   newest: "Newest First",
@@ -418,25 +419,30 @@ export function savedItems<T extends SavedItem>(items: T[], query: string, sort:
     .map(({ item }) => item);
 }
 
-/** The header action that sorts saved stacks and presets. */
-export function SortMenu({
+/** The header action that sorts a picker's list: saved stacks and presets, and the LoRAs. */
+export function SortMenu<Sort extends string>({
+  label = "Sort",
+  labels,
   value,
   onChange,
 }: {
-  value: SavedSort;
-  onChange: (sort: SavedSort) => void;
+  label?: string;
+  /** Each order's name, in menu order, such as `savedSortLabels`. */
+  labels: Record<Sort, string>;
+  value: Sort;
+  onChange: (sort: Sort) => void;
 }) {
   return (
     <Menu position="bottom-end" withinPortal={false}>
-      <Tooltip label={`Sort: ${sortLabels[value]}`}>
+      <Tooltip label={`Sort: ${labels[value]}`}>
         <Menu.Target>
-          <ActionIcon aria-label="Sort" variant="subtle" color="gray">
+          <ActionIcon aria-label={label} variant="subtle" color="gray">
             <ArrowDownUp size={18} />
           </ActionIcon>
         </Menu.Target>
       </Tooltip>
       <Menu.Dropdown>
-        {(Object.keys(sortLabels) as SavedSort[]).map((sort) => (
+        {(Object.keys(labels) as Sort[]).map((sort) => (
           <Menu.Item
             key={sort}
             role="menuitemradio"
@@ -444,7 +450,7 @@ export function SortMenu({
             rightSection={sort === value ? <Check size={14} /> : undefined}
             onClick={() => onChange(sort)}
           >
-            {sortLabels[sort]}
+            {labels[sort]}
           </Menu.Item>
         ))}
       </Menu.Dropdown>
@@ -485,6 +491,8 @@ export function SavedList<T extends SavedItem>({
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // Update From Current changes nothing in view, so its row says Updated for a moment.
+  const [updated, flashUpdated] = useFlash<string>();
   if (!items.length) return <EmptyState fill>{empty}</EmptyState>;
   return (
     <div className={classes.saved} role="list" aria-label={label}>
@@ -523,9 +531,9 @@ export function SavedList<T extends SavedItem>({
                 <Text size="sm" truncate>
                   {item.name}
                 </Text>
-                {item.detail && (
+                {(updated === item.id || item.detail) && (
                   <Text size="xs" c="dimmed" truncate>
-                    {item.detail}
+                    {updated === item.id ? "Updated" : item.detail}
                   </Text>
                 )}
               </UnstyledButton>
@@ -544,7 +552,14 @@ export function SavedList<T extends SavedItem>({
               <Menu.Dropdown>
                 <Menu.Item onClick={() => setRenaming(item.id)}>Rename {noun}</Menu.Item>
                 {onUpdate && (
-                  <Menu.Item onClick={() => onUpdate(item)}>Update From Current</Menu.Item>
+                  <Menu.Item
+                    onClick={() => {
+                      onUpdate(item);
+                      flashUpdated(item.id);
+                    }}
+                  >
+                    Update From Current
+                  </Menu.Item>
                 )}
                 <Menu.Item color="red" onClick={() => onDelete(item)}>
                   Delete {noun}
