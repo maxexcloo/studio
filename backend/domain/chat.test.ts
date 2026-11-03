@@ -475,7 +475,7 @@ test("HTTP Chat applies assistant policy, hides another account's session and de
     "/api",
     createChatRouter(fixture.service, (request) => {
       if (request.headers["x-user"] === "off")
-        throw Object.assign(new Error("The prompt assistant is off for this account."), {
+        throw Object.assign(new Error("Chat is off for this account."), {
           status: 403,
         });
       return String(request.headers["x-user"] || "bob");
