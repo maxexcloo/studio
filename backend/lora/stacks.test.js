@@ -110,17 +110,6 @@ test("rename, update, strengths, recents and the active stack all apply", () => 
   assert.equal(loadLoraStack("krea2")[0].strength, 0.9);
 });
 
-test("stacks saved per workflow by older builds move to the family", () => {
-  clearLoraState();
-  applyLoraOps([
-    { op: "stack.add", key: "krea2-workflow", stack: stack("legacy", "Old") },
-    { op: "stack.move", key, from: "krea2-workflow" },
-  ]);
-  const library = loadLoraLibrary();
-  assert.equal(library.snapshots["krea2-workflow"], undefined);
-  assert.equal(library.snapshots[key][0].id, "legacy");
-});
-
 test("a removed LoRA leaves every account's stacks, strengths, ratings and recents", () => {
   clearLoraState("account-c");
   saveLoraStack("fast", [{ name: "gone.safetensors" }, { name: "kept.safetensors" }], "account-c");

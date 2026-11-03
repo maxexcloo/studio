@@ -4,23 +4,28 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { migrateRuntime, planRuntimeMigration } from "./migration.ts";
-import { closeRuntimeDatabase, readRuntimeDocument } from "./runtime.ts";
+import { migrateGalleryRows, migrateRuntime, planRuntimeMigration } from "./migration.ts";
+import { readGalleryRows } from "./gallery-rows.ts";
+import { closeRuntimeDatabase, readRuntimeDocument, runtimeDatabase } from "./runtime.ts";
 import { DatabaseSync } from "node:sqlite";
 
-test("account sign-in and gallery edits persist across migrated SQLite restarts, preserving legacy files", (t) => {
+test("Studio refuses a folder still on JSON; once migrated, sign-in and gallery edits persist across restarts", (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-authority-"));
+  const earlier = fs.mkdtempSync(path.join(os.tmpdir(), "studio-authority-earlier-"));
   t.after(() => {
     closeRuntimeDatabase(dataDir);
+    closeRuntimeDatabase(earlier);
     fs.rmSync(dataDir, { recursive: true, force: true });
+    fs.rmSync(earlier, { recursive: true, force: true });
   });
-  const run = (source: string) =>
+  const run = (source: string, folder = dataDir) =>
     execFileSync(process.execPath, ["--input-type=module", "--eval", source], {
       cwd: new URL("../../", import.meta.url),
       encoding: "utf8",
+      stdio: "pipe",
       env: {
         ...process.env,
-        STUDIO_DATA_DIR: dataDir,
+        STUDIO_DATA_DIR: folder,
         STUDIO_ENV_FILE: "/dev/null",
         STUDIO_MULTI_USER: "",
         STUDIO_WORKERS: JSON.stringify([
@@ -32,21 +37,32 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
         ]),
       },
     });
-  run(`
+  // A data folder as JSON-era Studio left it: the accounts store and the gallery as files.
+  run(
+    `
     import {createLocalAccount} from './backend/account-store.js';
-    import {setGallery,flushGalleryStrict} from './backend/gallery/store.js';
     await createLocalAccount({username:'migration.example',password:'fixture password for migration',role:'administrator'});
-    setGallery([{id:'kept',jobId:'kept-job',index:0,type:'image',status:'pending',createdAt:'2020-01-01T00:00:00Z'}]);
-    await flushGalleryStrict();
-  `);
-  const legacyAccounts = fs.readFileSync(path.join(dataDir, "accounts.json"), "utf8");
-  const legacyGallery = fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8");
+  `,
+    earlier,
+  );
+  const legacyAccounts = JSON.stringify(readRuntimeDocument(earlier, "accounts"));
+  const legacyGallery = JSON.stringify([
+    { id: "kept", jobId: "kept-job", index: 0, type: "image", status: "pending" },
+  ]);
+  fs.writeFileSync(path.join(dataDir, "accounts.json"), legacyAccounts);
+  fs.writeFileSync(path.join(dataDir, "gallery.json"), legacyGallery);
+  assert.throws(() => run(`import './backend/gallery/store.js';`), /run migrate-runtime/);
+
   assert.equal(migrateRuntime(dataDir, { apply: true }).applied, true);
+  assert.throws(() => run(`import './backend/gallery/store.js';`), /the gallery document/);
+  assert.equal(migrateGalleryRows(dataDir, { apply: true }).applied, true);
+  closeRuntimeDatabase(dataDir);
   run(`
     import assert from 'node:assert/strict';
     import {verifyLocalAccount,createAccountSession,accountSession} from './backend/account-store.js';
     import {gallery,setGallery,flushGalleryStrict} from './backend/gallery/store.js';
-    import {runtimeDatabase,readRuntimeDocument} from './backend/persistence/runtime.ts';
+    import {runtimeDatabase} from './backend/persistence/runtime.ts';
+    import {readGalleryRows} from './backend/persistence/gallery-rows.ts';
     const account=await verifyLocalAccount('migration.example','fixture password for migration');
     assert.ok(account?.userId);
     const session=createAccountSession(account.userId);
@@ -56,7 +72,7 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
     db.exec('PRAGMA query_only=ON');
     setGallery([...gallery,{id:'after-migration',type:'image',status:'pending',createdAt:'2020-01-02T00:00:00Z'}]);
     await assert.rejects(flushGalleryStrict());
-    assert.equal(readRuntimeDocument(${JSON.stringify(dataDir)},'gallery').length,1);
+    assert.equal(readGalleryRows(db).length,1);
     db.exec('PRAGMA query_only=OFF');
     await flushGalleryStrict();
   `);
@@ -68,7 +84,7 @@ test("account sign-in and gallery edits persist across migrated SQLite restarts,
     assert.equal(gallery.length,2);
     assert.ok(gallery.every(item=>item.status==='pending'));
   `);
-  assert.equal((readRuntimeDocument(dataDir, "gallery") as unknown[]).length, 2);
+  assert.equal(readGalleryRows(runtimeDatabase(dataDir)).length, 2);
   assert.equal(fs.readFileSync(path.join(dataDir, "accounts.json"), "utf8"), legacyAccounts);
   assert.equal(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8"), legacyGallery);
 });

@@ -1,14 +1,7 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { accessFeatures, builtInAccessProfile, normaliseAccessProfile } from "./account-policy.js";
-import { writeJsonFile } from "./json-store.js";
 import { verifiedBackup } from "./persistence/migration.ts";
-import {
-  usesRuntimeDatabase,
-  withOfflineDatabase,
-  writeRuntimeDocument,
-} from "./persistence/runtime.ts";
+import { withOfflineDatabase, writeRuntimeDocument } from "./persistence/runtime.ts";
 
 /**
  * The migrate-runtime step for the approval queue and the group features Studio retired. Each
@@ -35,15 +28,10 @@ const retired = [
 
 export function accountAccess(dataDir, { apply = false } = {}) {
   const result = { applied: false, backup: "", defaultGroup: "", joined: [], groups: {} };
-  const database = usesRuntimeDatabase(dataDir);
-  const file = path.join(dataDir, "accounts.json");
-  const text = database
-    ? withOfflineDatabase(
-        dataDir,
-        (db) =>
-          db.prepare("SELECT value FROM studio_documents WHERE name = ?").get("accounts")?.value,
-      )
-    : fs.existsSync(file) && fs.readFileSync(file, "utf8");
+  const text = withOfflineDatabase(
+    dataDir,
+    (db) => db.prepare("SELECT value FROM studio_documents WHERE name = ?").get("accounts")?.value,
+  );
   if (!text) return result;
   const store = JSON.parse(text);
   const profiles = isObject(store.profiles) ? { ...store.profiles } : {};
@@ -80,7 +68,7 @@ export function accountAccess(dataDir, { apply = false } = {}) {
   const mappings = [
     {
       source: "accounts.json",
-      target: database ? "studio_documents/accounts" : "accounts.json",
+      target: "studio_documents/accounts",
       hash: crypto.createHash("sha256").update(bytes).digest("hex"),
     },
   ];
@@ -107,8 +95,7 @@ export function accountAccess(dataDir, { apply = false } = {}) {
         : account,
     ),
   };
-  if (database) writeRuntimeDocument(dataDir, "accounts", next);
-  else writeJsonFile(file, next, { mode: 0o600 });
+  writeRuntimeDocument(dataDir, "accounts", next);
   result.applied = true;
   return result;
 }
