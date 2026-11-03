@@ -43,8 +43,14 @@
   overflow-wrap: anywhere;
 }
 
+/* Settings read as static info: dimmed text separated by dots, not chips. */
 .chip {
   max-width: 16rem;
+}
+
+.chip + .chip::before {
+  content: "·" / "";
+  margin-inline-end: 6px;
 }
 
 /* One result keeps its own shape up to the media height; several share the grid. */
