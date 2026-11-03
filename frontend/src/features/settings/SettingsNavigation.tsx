@@ -1,14 +1,4 @@
-import {
-  Boxes,
-  FileCog,
-  Info,
-  MessagesSquare,
-  Server,
-  Shield,
-  UserRound,
-  UsersRound,
-  Wrench,
-} from "lucide-react";
+import { Boxes, FileCog, Info, Server, Shield, UserRound, UsersRound, Wrench } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
 import { WorkspaceSectionSelect, visibleSections } from "../../ui/WorkspaceSections";
@@ -19,12 +9,6 @@ const settingSections = {
     label: "Account",
     description: "Your role, sign-in details and personal MCP access.",
     icon: UserRound,
-  },
-  gateway: {
-    label: "Chat Gateway",
-    description: "Chat identities linked to Studio accounts, and the gateway's admin tools.",
-    icon: MessagesSquare,
-    admin: true,
   },
   groups: {
     label: "Groups",
@@ -57,7 +41,8 @@ const settingSections = {
   },
   users: {
     label: "Users",
-    description: "Accounts, their access groups and the new-account policy.",
+    description:
+      "Accounts, their access groups, linked chat identities and the new-account policy.",
     icon: UsersRound,
     admin: true,
   },
@@ -74,7 +59,7 @@ const settingSections = {
     apart: true,
   },
 };
-const multiUserOnly = new Set(["gateway", "groups", "users"]);
+const multiUserOnly = new Set(["groups", "users"]);
 export function useSettingsNavigation() {
   const multi = useAccount().data?.mode === "multi-user";
   const admin = useIsAdmin();

@@ -7,7 +7,7 @@ async function accountFixture(page: Page) {
   return state;
 }
 
-test("Administrators explicitly link, dismiss and unlink chat identities with saved readback", async ({
+test("Administrators link, dismiss and unlink chat identities in Settings › Users with saved readback", async ({
   page,
 }) => {
   const state = await accountFixture(page);
@@ -35,24 +35,23 @@ test("Administrators explicitly link, dismiss and unlink chat identities with sa
     gateway.pending = gateway.pending.filter((item) => item.identity !== body.identity);
     return route.fulfill({ json: { ok: true, gateway } });
   });
-  await page.goto("/settings#gateway");
+  await page.goto("/settings#users");
   await page.getByRole("combobox", { name: "Account for chat-member", exact: true }).click();
   await page.getByRole("option", { name: "member@example.test", exact: true }).click();
   await page.getByRole("button", { name: "Link chat-member", exact: true }).click();
-  const linked = page.getByRole("row", { name: "chat-member", exact: true });
-  await expect(linked).toContainText("member@example.test");
-  await expect(linked).not.toContainText("Awaiting Link");
-  const rowAction = async (identity: string, action: string) => {
-    await page.getByRole("button", { name: `Actions for ${identity}`, exact: true }).click();
-    await page.getByRole("menuitem", { name: action, exact: true }).click();
-  };
-  await rowAction("chat-dismiss", "Dismiss");
-  await expect(page.getByRole("row", { name: "chat-dismiss", exact: true })).toHaveCount(0);
+  // A linked identity leaves the awaiting list and marks its account's row.
+  await expect(page.getByText("chat-member", { exact: true })).toHaveCount(0);
+  const member = page.getByRole("row", { name: "member@example.test", exact: true });
+  await expect(member.getByText("Chat Gateway", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss chat-dismiss", exact: true }).click();
+  await expect(page.getByText("chat-dismiss", { exact: true })).toHaveCount(0);
   await section(page, "Settings", "Account");
-  await section(page, "Settings", "Chat Gateway");
-  await expect(linked).toBeVisible();
-  await rowAction("chat-member", "Unlink");
-  await expect(page.getByText("No Chat Users Yet", { exact: true })).toBeVisible();
+  await section(page, "Settings", "Users");
+  await member
+    .getByRole("button", { name: "Actions for member@example.test", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Unlink chat-member", exact: true }).click();
+  await expect(member.getByText("Chat Gateway", { exact: true })).toHaveCount(0);
   expect(actions).toEqual([
     { identity: "chat-member", accountId: "member" },
     { identity: "chat-member" },
@@ -81,16 +80,16 @@ test("Gateway admin access remains unchanged after a failed save and reflects a 
     gateway.adminTools = route.request().postDataJSON().on;
     return route.fulfill({ json: { ok: true, adminTools: gateway.adminTools } });
   });
-  await page.goto("/settings#gateway");
-  const control = page.getByRole("switch", { name: /^Chat Gateway Admin Tools/ });
-  await control.click();
+  await page.goto("/settings#users");
+  const control = page.getByRole("switch", { name: "Chat Gateway Admin Tools", exact: true });
+  await control.click({ force: true });
   await expect(control).toBeDisabled();
   await expect(control).not.toBeChecked();
   release();
   await expect(page.getByRole("alert")).toContainText("Gateway settings could not be saved");
   await expect(control).toBeEnabled();
   await expect(control).not.toBeChecked();
-  await control.click();
+  await control.click({ force: true });
   await expect(control).toBeChecked();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.reload();
