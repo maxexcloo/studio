@@ -1622,7 +1622,14 @@ app.get("/api/settings/deployment", async (req, res) => {
     integrations: {
       civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
       huggingFace: { token: hfTokenStatus() },
-      assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource }),
+      assistant: await assistantIntegration({
+        engine: assistantEngine,
+        source: settingSource,
+        // The gateway lists only running models; stopped text workloads' models are choices too.
+        workloadModels: (runtime?.controller.workloads || [])
+          .filter((item) => item.kind === "text" && item.model)
+          .map((item) => item.model),
+      }),
     },
   });
 });

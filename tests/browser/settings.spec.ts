@@ -509,3 +509,60 @@ test("A parked service reads as parked, and administrators start it from Status"
   expect(previews).toEqual([{ start: ["video"] }]);
   expect(applied).toEqual([{ workloads: ["video"], signature: "fixture" }]);
 });
+
+test("Settings › Models picks the assistant model from the gateway's and text workloads' models", async ({
+  page,
+}) => {
+  await fixtures(page);
+  await signIn(page, { id: "admin", role: "administrator" });
+  const saved: unknown[] = [];
+  const setting = (key: string, configured = "", effective = "") => ({
+    key,
+    configured,
+    effective,
+    source: configured ? "studio" : "default",
+    locked: false,
+  });
+  let model = "";
+  await page.route("**/api/settings/deployment", (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      saved.push(body);
+      model = body.value;
+      return route.fulfill({ json: { ok: true, setting: body } });
+    }
+    return route.fulfill({
+      json: {
+        defaults: {
+          image: setting("STUDIO_DEFAULT_IMAGE_PROFILE"),
+          video: setting("STUDIO_DEFAULT_VIDEO_PROFILE"),
+          profiles: [],
+        },
+        catalogue: [],
+        integrations: {
+          civitai: { token: { set: false }, presets: false },
+          huggingFace: { token: { set: false } },
+          assistant: {
+            available: true,
+            models: ["cloud/auto", "local/auto", "local/stopped"],
+            model: setting("STUDIO_ASSISTANT_MODEL", model, model || "cloud/auto"),
+          },
+        },
+      },
+    });
+  });
+  await page.goto("/settings");
+  await section(page, "Settings", "Models");
+  const select = page.getByRole("combobox", { name: "Assistant Model", exact: true });
+  await expect(select).toHaveValue("Automatic");
+  await select.click();
+  await expect(page.getByRole("option")).toHaveText([
+    "Automatic",
+    "cloud/auto",
+    "local/auto",
+    "local/stopped",
+  ]);
+  await page.getByRole("option", { name: "local/stopped", exact: true }).click();
+  await expect(select).toHaveValue("local/stopped");
+  expect(saved).toEqual([{ key: "STUDIO_ASSISTANT_MODEL", value: "local/stopped" }]);
+});
