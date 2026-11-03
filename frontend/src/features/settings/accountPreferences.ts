@@ -13,7 +13,7 @@ interface PreferencesStatus {
   preferences: Preferences;
   /** The preferences the account has saved itself. */
   saved: (keyof Preferences)[];
-  /** What the account's group grants, which only an ordinary account may turn off. */
+  /** What the account's role or group grants, which it may turn off for itself. */
   grants: Pick<Preferences, "cloudModels" | "uncensoredModels">;
 }
 export const preferencesQuery = queryOptions({

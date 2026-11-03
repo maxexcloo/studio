@@ -40,6 +40,13 @@ async function member(name) {
 const accountRoute = (id) => `/api/accounts/users/${encodeURIComponent(id)}`;
 
 before(async () => {
+  // An uncensored profile in the data folder, as Settings › Profiles lists it.
+  const sample = JSON.parse(
+    fs.readFileSync(new URL("./samples/sdxl-base-refiner.json", import.meta.url), "utf8"),
+  );
+  sample.studio = { ...sample.studio, id: "spicy", name: "Spicy", uncensored: true };
+  fs.mkdirSync(path.join(directory, "workflows"));
+  fs.writeFileSync(path.join(directory, "workflows", "spicy.json"), JSON.stringify(sample));
   child = fork(fileURLToPath(new URL("./index.js", import.meta.url)), [], {
     env: {
       PATH: process.env.PATH,
@@ -106,23 +113,40 @@ test(
     assert.deepEqual(off.body.saved, ["cloudModels", "tileCaptions"]);
     assert.equal((await features()).cloudModels, false);
     assert.equal((await features()).uncensoredModels, true);
-    // An administrator's grants are its role, not a group, so it has nothing to turn off here.
-    const refused = await call("/api/preferences", {
+  },
+);
+
+test(
+  "an administrator turns Uncensored Models off for its own use and still edits every profile",
+  { timeout: 30_000 },
+  async () => {
+    const own = async () =>
+      (await call("/api/accounts/status", { cookie: admin })).body.account.features;
+    assert.deepEqual((await call("/api/preferences", { cookie: admin })).body.grants, {
+      cloudModels: true,
+      uncensoredModels: true,
+    });
+    assert.equal((await own()).uncensoredModels, true);
+    const off = await call("/api/preferences", {
       method: "PATCH",
       cookie: admin,
       body: { uncensoredModels: false },
     });
-    assert.equal(refused.status, 400);
+    assert.equal(off.status, 200, off.body.error);
+    assert.equal((await own()).uncensoredModels, false);
+    assert.equal((await own()).cloudModels, true);
+    // Administration is not narrowed: Settings › Profiles still lists the uncensored profile.
+    const editable = await call("/api/profiles/editable", { cookie: admin });
+    assert.equal(editable.status, 200, editable.body.error);
     assert.equal(
-      (
-        await call("/api/preferences", {
-          method: "PATCH",
-          cookie: admin,
-          body: { tileCaptions: true },
-        })
-      ).body.preferences.tileCaptions,
+      editable.body.profiles.find((profile) => profile.id === "spicy")?.uncensored,
       true,
     );
+    await call("/api/preferences", {
+      method: "PATCH",
+      cookie: admin,
+      body: { uncensoredModels: true },
+    });
   },
 );
 

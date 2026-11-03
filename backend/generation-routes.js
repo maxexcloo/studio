@@ -33,7 +33,7 @@ import { referenceExistsForAccount, stageReferenceAssets } from "./references.js
 import { upscaleQualities, upscaleTargets } from "./upscale.js";
 import { dropsAutoUpscale, planRunUpscale } from "./run-upscale.js";
 import { ownerIdForRequest } from "./account-ownership.js";
-import { mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
+import { hasFullAccess, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import { assistantRecord } from "./assistant-routes.js";
 import { loraAllowed } from "./model/catalogue.js";
 
@@ -72,7 +72,8 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
    * without the capability, and nothing falls back to the cloud.
    */
   async function routeGeneration(input, account, pinnedBackend, admission = false) {
-    const accountUser = account?.role === "user";
+    // An account that may not use every profile has its pick checked; single-user mode has none.
+    const checked = Boolean(account) && !hasFullAccess(account);
     const workers = listWorkers();
     const kindCapability = input?.kind === "video" ? "video" : "image";
     if (!workers.length && !demoMode)
@@ -81,7 +82,7 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
         payload: { ok: false, reason: "no-worker", error: noWorkerMessage(kindCapability) },
       };
     if (
-      !accountUser &&
+      !checked &&
       !(admission && (input?.profileId || input?.model)) &&
       (workers.length === 0 ||
         (workers.length === 1 && workers[0].capabilities.includes(kindCapability)))
@@ -121,10 +122,10 @@ export function registerGenerationRoutes(app, { loadComfyContext, mediaModels, c
           status: 400,
           payload: { ok: false, error: "The requested model does not match the selected profile." },
         };
-      if (accountUser) {
-        // An ordinary account runs the profile's own checkpoint (graphs.js falls back to the
-        // selected mode's), never a file named in the request; a reused result carries the one it ran.
-        delete input.modelName;
+      // An ordinary account runs the profile's own checkpoint (graphs.js falls back to the selected
+      // mode's), never a file named in the request; a reused result carries the one it ran.
+      if (account?.role === "user") delete input.modelName;
+      if (checked) {
         if (!mayUseGenerationProfile(account, profile))
           return {
             status: 403,

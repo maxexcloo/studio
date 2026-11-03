@@ -35,6 +35,8 @@ test("uncensored LoRAs need Uncensored Models, in discovery and at admission", (
   assert.equal(loraAllowed(member(false))("explicit.safetensors"), false);
 
   assert.deepEqual(shown(member(true)).loras, names);
-  assert.deepEqual(shown({ ...member(false), role: "administrator" }).loras, names);
+  // An administrator who turned Uncensored Models off for their own use sees what a member would.
+  assert.deepEqual(shown({ ...member(true), role: "administrator" }).loras, names);
+  assert.deepEqual(shown({ ...member(false), role: "administrator" }).loras, limited.loras);
   assert.equal(loraAllowed(undefined)("explicit.safetensors"), true);
 });

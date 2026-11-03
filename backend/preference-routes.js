@@ -8,7 +8,7 @@ import { groupGrants } from "./account-store.js";
 
 /**
  * Settings › Preferences: the caller's own preferences, and which of Cloud Models and Uncensored
- * Models its group grants, which only an ordinary account may turn off for itself.
+ * Models its role or group grants, which it may turn off for itself.
  */
 export function registerPreferenceRoutes(app) {
   const show = (req) => {
