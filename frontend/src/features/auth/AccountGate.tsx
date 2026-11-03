@@ -53,7 +53,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [outcome] = useState(
     () =>
       ({
-        refused: "This account is disabled. Ask an administrator.",
+        refused: "This account is disabled or was deleted. Ask an administrator.",
         failed: "Single sign-on did not complete. Try again.",
         unavailable: "Single sign-on is unavailable right now.",
       })[new URLSearchParams(window.location.search).get("sign-in") || ("" as "refused")],

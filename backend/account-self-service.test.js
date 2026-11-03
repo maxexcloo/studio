@@ -230,3 +230,25 @@ test("an email an account set itself, or an administrator's, never links a sign-
   });
   assert.equal(store.gatewayAccountAccess("chat-boss", "boss@example.test"), null);
 });
+
+test("a deleted single sign-on or chat gateway account stays deleted until an administrator adds it again", async () => {
+  const identity = {
+    issuer: "https://id.example.test",
+    subject: "sub-gone",
+    email: "gone@example.test",
+    emailVerified: true,
+  };
+  const sso = store.signInWithOidcIdentity(identity);
+  const chat = store.gatewayAccountAccess("chat-gone", "chatgone@example.test");
+  store.deleteAccount(sso.access.userId, "an administrator");
+  store.deleteAccount(chat.userId, "an administrator");
+
+  assert.deepEqual(store.signInWithOidcIdentity(identity), { refused: true });
+  assert.equal(store.gatewayAccountAccess("chat-gone", "chatgone@example.test"), null);
+
+  const added = await store.createLocalAccount({
+    username: "gone@example.test",
+    accessProfileId: "artists",
+  });
+  assert.equal(store.signInWithOidcIdentity(identity).access.userId, added.id);
+});
