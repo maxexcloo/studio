@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
@@ -266,4 +267,43 @@ export function saveLoraLibrary(library, ownerId = "") {
 /** Forgets every saved stack and the strength/snapshot library (used by "Reset all settings"). */
 export function clearLoraState(ownerId = "") {
   writeState({ stacks: {}, library: null }, ownerId);
+}
+
+/**
+ * Takes a removed LoRA file out of every account's stacks, saved stacks, strengths, ratings and
+ * recents (library/routes.js, Remove). Returns how many files changed.
+ */
+export function forgetLora(name, directory = dataDir) {
+  const accounts = path.join(directory, "accounts");
+  const files = [
+    path.join(directory, "lora-stacks.json"),
+    ...(fs.existsSync(accounts)
+      ? fs.readdirSync(accounts).map((owner) => path.join(accounts, owner, "lora-stacks.json"))
+      : []),
+  ].filter((file) => fs.existsSync(file));
+  const without = (list) =>
+    Array.isArray(list) ? list.filter((item) => item?.name !== name) : list;
+  let changed = 0;
+  for (const file of files) {
+    const before = JSON.stringify(readJsonFile(file));
+    const state = JSON.parse(before);
+    const stacks = state?.stacks && typeof state.stacks === "object" ? state.stacks : state;
+    for (const key of Object.keys(stacks || {}))
+      if (Array.isArray(stacks[key])) stacks[key] = without(stacks[key]);
+    const library = state?.library;
+    if (library && typeof library === "object") {
+      for (const list of Object.values(library.snapshots || {}))
+        for (const snapshot of Array.isArray(list) ? list : [])
+          snapshot.loras = without(snapshot.loras);
+      for (const entries of Object.values(library.strengths || {}))
+        if (entries) delete entries[name];
+      if (library.ratings) delete library.ratings[name];
+      if (Array.isArray(library.recents))
+        library.recents = library.recents.filter((item) => item !== name);
+    }
+    if (JSON.stringify(state) === before) continue;
+    writeJsonFile(file, state);
+    changed++;
+  }
+  return changed;
 }

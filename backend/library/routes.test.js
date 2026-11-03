@@ -87,6 +87,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
       req.studioAccount = { id: "admin-1", role: "administrator", credential: "mcp-admin" };
     next();
   });
+  const forgotten = [];
   registerLibraryRoutes(app, {
     presets: {},
     installed: async () => ({}),
@@ -101,6 +102,7 @@ test("an import from chat goes through the same pipeline, records chat as its or
     pictures: { file: () => "", save: async () => false, copy: async () => false },
     references: async ({ file }) => (file === "in-use.safetensors" ? ["the Fast profile"] : []),
     removeFile: async () => ({ removed: true }),
+    forget: (file) => forgotten.push(file),
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -181,6 +183,11 @@ test("an import from chat goes through the same pipeline, records chat as its or
   });
   assert.deepEqual([removed.ok, removed.fileRemoved], [true, true], JSON.stringify(removed));
   assert.equal(catalogue.entry("loras/watercolour-v2.safetensors"), null);
+  assert.deepEqual(
+    forgotten,
+    ["watercolour-v2.safetensors"],
+    "it leaves every account's stacks first",
+  );
   await call("POST", "/api/library/catalogue/undo", { key: "loras/watercolour-v2.safetensors" });
   assert.ok(catalogue.entry("loras/watercolour-v2.safetensors"));
   catalogue.edit("loras/in-use.safetensors", { title: "In Use" });
