@@ -269,7 +269,7 @@ function Related({
 }
 
 /**
- * Details › Caption, Prompt, From, Derived, Model, LoRAs, References, Settings, Output and Timing
+ * Details › Caption, Source, Prompt, From, Derived, Model, LoRAs, References, Settings, Output and Timing
  * for one result; `open` shows a related result in the viewer.
  */
 export function MediaDetails({
@@ -312,6 +312,14 @@ export function MediaDetails({
                 ))}
             </Group>
           )}
+        </Stack>
+      )}
+      {item.source && (
+        <Stack gap={6}>
+          <Title order={6}>Source</Title>
+          <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">
+            {item.source.title || item.source.url}
+          </Anchor>
         </Stack>
       )}
       <Stack gap={6}>

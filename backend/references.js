@@ -21,7 +21,7 @@ import { imageMimes, mimeExtension, referenceInputName } from "./reference-names
 import { uploadedGalleryItem } from "./uploads.js";
 import { recordBelongsToAccount } from "./account-ownership.js";
 
-const maxUploadBytes = Math.max(
+export const maxUploadBytes = Math.max(
   1024,
   Number(process.env.STUDIO_REFERENCE_MAX_BYTES || 25 * 1024 * 1024),
 );
@@ -183,12 +183,14 @@ function sniffVideo(buffer) {
 }
 
 /**
- * An uploaded image, or MP4 or WebM video, as a gallery item (uploads.js); the same bytes from the
- * same owner return the first copy.
+ * An uploaded image, or MP4 or WebM video, as a gallery item (uploads.js), with the `source` it was
+ * imported from, if any; the same bytes from the same owner return the first copy.
  */
-export async function saveUpload({ buffer, name, mime: declaredMime = "" }, ownerId = "") {
+export async function saveUpload({ buffer, name, mime: declaredMime = "", source }, ownerId = "") {
   if (!buffer?.length) throw new Error("That file is empty.");
   const video = sniffVideo(buffer);
+  if (video && declaredMime.startsWith("image/"))
+    throw new Error("That file isn’t the type of image its name says.");
   const limit = video ? maxVideoBytes : maxUploadBytes;
   if (buffer.length > limit)
     throw new Error(`${video ? "Videos" : "Images"} can be up to ${megabytes(limit)} MB.`);
@@ -231,6 +233,7 @@ export async function saveUpload({ buffer, name, mime: declaredMime = "" }, owne
     createdAt: new Date().toISOString(),
     filename,
     subfolder,
+    source,
   });
   addGalleryItems([item]);
   return { item, asset: uploadAsset(item) };

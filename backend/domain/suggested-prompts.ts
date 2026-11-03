@@ -4,6 +4,8 @@ import type { ModelImage } from "./model-content.ts";
 export interface SuggestedPromptItem extends IdleItem {
   prompt?: string;
   caption?: { text?: string };
+  /** Where an imported upload came from (gallery/reddit.js); its title is a hint. */
+  source?: { title?: string };
   /** A prompt that would recreate an item Studio has no prompt for (an upload); Recreate uses it. */
   suggestedPrompt?: string;
 }
@@ -13,6 +15,7 @@ export interface PromptDescriber {
   describe(request: {
     images: ModelImage[];
     hint: string;
+    title?: string;
     signal?: AbortSignal;
   }): Promise<{ available: boolean; reason?: string; prompt?: string }>;
 }
@@ -59,6 +62,7 @@ export function createPromptSuggester(options: {
       const reply = await writer!.describe({
         images: image ? [image] : [],
         hint: item.caption?.text || "",
+        title: item.source?.title || "",
         signal,
       });
       if (signal.aborted) return;
