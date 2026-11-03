@@ -5,17 +5,35 @@ import { cleanTriggers } from "./catalogue.js";
 const has = (prompt, text) => String(prompt).toLowerCase().includes(String(text).toLowerCase());
 
 /**
- * The prompt with the trigger words of each enabled LoRA whose Trigger Words toggle is on
- * (`triggers !== false`) at the start, in stack order, once each, skipping any the prompt already
- * says. Studio applies it once for every generation path, when it prepares the run (generation-routes.js).
+ * A stacked LoRA's Trigger Words choice as a run, record or MCP stack keeps it: `false` for none,
+ * the words switched on, or nothing for all of them (the default).
+ */
+export const keptTriggers = (triggers) =>
+  triggers === false
+    ? { triggers: false }
+    : Array.isArray(triggers)
+      ? { triggers: cleanTriggers(triggers) }
+      : {};
+
+/**
+ * The prompt with the trigger words switched on for each enabled LoRA (all of them unless
+ * `triggers` is `false` or lists the chosen ones) at the start, in stack order, once each, skipping
+ * any the prompt already says. Studio applies it once for every generation path, when it prepares
+ * the run (generation-routes.js).
  */
 export function withLoraTriggers(prompt, stack = [], infos = {}) {
   const text = String(prompt || "").trim();
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase();
   const lead = [];
   for (const item of stack) {
     if (item?.enabled === false || item?.triggers === false) continue;
+    const chosen = Array.isArray(item?.triggers) ? item.triggers.map(String) : null;
     for (const trigger of cleanTriggers(infos[item.name]?.triggers))
-      if (!has(text, trigger) && !lead.some((word) => word.toLowerCase() === trigger.toLowerCase()))
+      if (
+        (!chosen || chosen.some((word) => same(word, trigger))) &&
+        !has(text, trigger) &&
+        !lead.some((word) => same(word, trigger))
+      )
         lead.push(trigger);
   }
   return lead.length ? `${lead.join(", ")}, ${text}` : text;

@@ -2,6 +2,7 @@ import { defaultGenerationCount } from "./generation-defaults.js";
 import { isResolution } from "../shared/resolution.ts";
 import { catalogueLoraInfo } from "./lora/info.js";
 import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
+import { keptTriggers } from "./lora/prompts.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { inferModels } from "./model/models.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
@@ -80,14 +81,11 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
     const strength = snapNumber(item.strength, strengthRange.default ?? 0.7, strengthRange);
     const issue = optionalLoraPolicyIssue({ name, strength }, catalogueLoraInfo(name), profile);
     if (issue) throw new Error(issue);
-    if (item.triggers !== undefined && typeof item.triggers !== "boolean")
-      throw new Error(`LoRA “${name}” needs Trigger Words on or off.`);
-    sanitized.push({
-      name,
-      enabled: true,
-      strength,
-      ...(item.triggers === false ? { triggers: false } : {}),
-    });
+    const words =
+      Array.isArray(item.triggers) && item.triggers.every((word) => typeof word === "string");
+    if (item.triggers !== undefined && typeof item.triggers !== "boolean" && !words)
+      throw new Error(`LoRA “${name}” needs Trigger Words on, off or a list of words.`);
+    sanitized.push({ name, enabled: true, strength, ...keptTriggers(item.triggers) });
   }
   return sanitized;
 }

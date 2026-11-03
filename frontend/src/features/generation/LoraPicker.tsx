@@ -18,7 +18,6 @@ import { icons } from "../../ui/icons";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { loraLibraryQuery, useLoraStacks, type LoraLibrary, type LoraRating } from "./LoraStacks";
 import { OrderedItems } from "../../ui/OrderedItems";
-import { copyText } from "../../ui/clipboard";
 import { EmptyState } from "../../ui/EmptyState";
 import { LoadingState } from "../../ui/LoadingState";
 import { api, post } from "../../api";
@@ -529,6 +528,14 @@ function StackEntry({
   const max = range?.max ?? 2;
   const strength = dragging ?? lora.strength;
   const enabled = lora.enabled !== false;
+  // The trigger words switched on lead the prompt when the run is sent (backend/lora/prompts.js).
+  const triggers = info?.triggers || [];
+  const chosenTriggers =
+    lora.triggers === false
+      ? []
+      : Array.isArray(lora.triggers)
+        ? triggers.filter((word) => (lora.triggers as string[]).includes(word))
+        : triggers;
   return (
     <Stack gap={6} className={classes.entry} data-disabled={!enabled || undefined}>
       <Group gap="xs" wrap="nowrap">
@@ -591,27 +598,29 @@ function StackEntry({
             This profile can’t use this LoRA. Disable or remove it.
           </Text>
         )}
-        {!!info?.triggers?.length && (
-          <Group gap={4}>
-            <Switch
-              label="Trigger Words"
-              aria-label={`${title} Trigger Words`}
-              checked={lora.triggers !== false}
-              onChange={(event) => onChange({ triggers: event.currentTarget.checked })}
-              mr={4}
-            />
-            {info.triggers.map((word) => (
-              <Button
-                key={word}
-                size="compact-sm"
-                variant="subtle"
-                aria-label={`Copy Trigger Word: ${word}`}
-                onClick={() => void copyText(word, "Trigger Word")}
-              >
-                {word}
-              </Button>
-            ))}
-          </Group>
+        {!!triggers.length && (
+          <Chip.Group
+            multiple
+            value={chosenTriggers}
+            // Kept in the catalogue's order; all on is the default, none on is off.
+            onChange={(words) => {
+              const next = triggers.filter((word) => words.includes(word));
+              onChange({
+                triggers: next.length === triggers.length ? true : next.length ? next : false,
+              });
+            }}
+          >
+            <Group gap={6} role="group" aria-label={`${title} Trigger Words`}>
+              <Text size="xs" c="dimmed">
+                Trigger Words
+              </Text>
+              {triggers.map((word) => (
+                <Chip key={word} value={word} size="xs" variant="light">
+                  {word}
+                </Chip>
+              ))}
+            </Group>
+          </Chip.Group>
         )}
         {info?.description && (
           <Text size="xs" c="dimmed" lineClamp={3}>

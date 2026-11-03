@@ -1,6 +1,7 @@
 import path from "node:path";
 import { dataDir } from "../gallery/store.js";
 import { readJsonFile, writeJsonFile } from "../json-store.js";
+import { cleanTriggers } from "./catalogue.js";
 import crypto from "node:crypto";
 
 const stacksPath = (ownerId = "") =>
@@ -46,7 +47,9 @@ function cleanStack(value) {
           name,
           enabled: item?.enabled !== false,
           strength: Number.isFinite(Number(item?.strength)) ? Number(item.strength) : 0.7,
-          triggers: item?.triggers !== false,
+          triggers: Array.isArray(item?.triggers)
+            ? cleanTriggers(item.triggers)
+            : item?.triggers !== false,
         },
       ];
     })
