@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Select, Switch } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { post } from "../../api";
-import { SettingGroup, SettingRow } from "./SettingRows";
+import { SettingGroup, SettingRow } from "../../ui/SettingRows";
 
 export interface GatewayAccounts {
   adminTools: boolean;

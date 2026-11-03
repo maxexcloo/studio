@@ -1,5 +1,15 @@
 import { Suspense, useState, type ReactNode } from "react";
-import { Box, Divider, Grid, Group, NavLink, Select, Stack, Text } from "@mantine/core";
+import {
+  Box,
+  Divider,
+  Grid,
+  Group,
+  NavLink,
+  Select,
+  Stack,
+  Text,
+  type ComboboxData,
+} from "@mantine/core";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { LoadingState } from "./LoadingState";
@@ -8,8 +18,9 @@ import { SectionHeading } from "./SectionHeading";
 import classes from "./WorkspaceSections.module.css";
 
 /**
- * One Library or Settings section; `admin` sections are hidden from other accounts and `apart`
- * sections (About) follow a divider in the desktop navigation.
+ * One Library or Settings section; `admin` sections are hidden from other accounts, `group` names the
+ * run of sections it belongs to (Personal, Administration) and `apart` sections (About) follow a
+ * divider in the desktop navigation.
  */
 interface SectionDefinition {
   label: string;
@@ -17,6 +28,7 @@ interface SectionDefinition {
   icon: LucideIcon;
   admin?: boolean;
   apart?: boolean;
+  group?: string;
 }
 type WorkspaceSection = SectionDefinition & { value: string };
 
@@ -30,11 +42,24 @@ export function visibleSections<Key extends string>(
     .filter(([key, section]) => (admin || !section.admin) && available(key))
     .map(([value, section]) => ({ value, ...section }));
 }
-function useWorkspaceSection(sections: WorkspaceSection[]) {
+/** The section open in the current route; an unknown or missing hash opens the first. */
+export function useWorkspaceSection(sections: WorkspaceSection[]) {
   const location = useLocation();
   const active =
     sections.find((section) => `#${section.value}` === location.hash)?.value || sections[0].value;
   return { location, active };
+}
+
+/** Consecutive sections by their group; ungrouped ones form their own run. */
+function groupSections(sections: WorkspaceSection[]) {
+  const runs: [string, WorkspaceSection[]][] = [];
+  for (const section of sections) {
+    const group = section.group || "";
+    const last = runs.at(-1);
+    if (last && last[0] === group) last[1].push(section);
+    else runs.push([group, [section]]);
+  }
+  return runs;
 }
 
 /** On phones the section selector replaces extra navigation below the modal title. */
@@ -47,6 +72,10 @@ export function WorkspaceSectionSelect({
 }) {
   const { location, active } = useWorkspaceSection(sections);
   const navigate = useNavigate();
+  const option = ({ value, label }: WorkspaceSection) => ({ value, label });
+  const data = groupSections(sections).flatMap<ComboboxData[number]>(([group, items]) =>
+    group ? [{ group, items: items.map(option) }] : items.map(option),
+  );
   return (
     <Group gap="xs" wrap="nowrap">
       <Text component="span" size="xl" fw={600}>
@@ -58,7 +87,7 @@ export function WorkspaceSectionSelect({
         w={180}
         miw={0}
         flex={1}
-        data={sections}
+        data={data}
         value={active}
         allowDeselect={false}
         onChange={(value) => {
@@ -107,7 +136,21 @@ export function WorkspaceSections({
     <Grid gap="xl" mih={{ base: 0, sm: "24rem" }}>
       <Grid.Col span={3} visibleFrom="sm">
         <Stack component="nav" aria-label={`${label} Sections`} gap={4} className={classes.nav}>
-          {sections.filter((section) => !section.apart).map(link)}
+          {groupSections(sections.filter((section) => !section.apart)).map(([group, items]) => (
+            <Stack
+              key={group || items[0].value}
+              gap={4}
+              role={group ? "group" : undefined}
+              aria-label={group || undefined}
+            >
+              {group && (
+                <Text size="xs" fw={600} c="dimmed" px="sm" pt="xs">
+                  {group}
+                </Text>
+              )}
+              {items.map(link)}
+            </Stack>
+          ))}
           {apart.length > 0 && (
             <>
               <Divider my="xs" />

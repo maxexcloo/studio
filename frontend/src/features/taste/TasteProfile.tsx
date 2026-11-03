@@ -4,7 +4,7 @@ import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/r
 import { api, post } from "../../api";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { TextBox } from "../../ui/TextBox";
-import { SettingGroup } from "../settings/SettingRows";
+import { SettingGroup } from "../../ui/SettingRows";
 import { maxTasteSummary } from "../../../../shared/taste";
 
 export interface Taste {

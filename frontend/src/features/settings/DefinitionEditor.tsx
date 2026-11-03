@@ -17,7 +17,7 @@ import {
   Textarea,
   TextInput,
 } from "@mantine/core";
-import { SettingGroup } from "./SettingRows";
+import { SettingGroup } from "../../ui/SettingRows";
 import { useForm } from "@mantine/form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, post } from "../../api";
