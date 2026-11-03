@@ -5,7 +5,7 @@ import { loraCompatibility, strengthRange } from "../lora/policy.js";
 
 /** Chat asks for one output unless the user asks for more; the studio UI keeps its own default. */
 export const mcpGenerationCount = 1;
-/** Jobs one Generate call may queue: every prompt times count. */
+/** Images one Generate call may queue: every prompt times count. */
 export const maxJobsPerCall = 10;
 
 const fixedRange = (range) =>
@@ -41,7 +41,7 @@ export function mcpControls(profile) {
     min: 1,
     max: maxJobsPerCall,
     default: mcpGenerationCount,
-    note: `Each output is a separate job; prompts × count is at most ${maxJobsPerCall} per call.`,
+    note: `prompts × count is at most ${maxJobsPerCall} per call.`,
   };
   if (caps.seed !== false) controls.seed = { min: 0 };
   if (caps.steps !== false && !fixedRange(constraints.steps))

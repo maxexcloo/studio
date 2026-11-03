@@ -1229,7 +1229,7 @@ test("a prompt holding generation instructions is refused with the count to pass
   assert.equal(f.submitted.at(-1).prompt, "Create two cats on a sofa");
 });
 
-test("omitted counts queue one image or video job and an explicit count queues independent jobs", async (t) => {
+test("omitted counts queue one image or video job; a count is one image batch, or a job per video", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   for (const profile of [imageProfile, videoProfile]) {
@@ -1243,29 +1243,28 @@ test("omitted counts queue one image or video job and an explicit count queues i
       [[profile.kind, 1]],
     );
     const pair = await generate(client, { profile_id: profile.id, count: 2 });
-    assert.equal(pair.jobs.length, 2);
+    const batched = profile.kind === "image";
+    assert.equal(pair.jobs.length, batched ? 1 : 2);
     assert.deepEqual(
-      f.submitted.slice(-2).map((body) => [body.kind, body.count]),
-      [
-        [profile.kind, 1],
-        [profile.kind, 1],
-      ],
+      f.submitted.slice(batched ? -1 : -2).map((body) => [body.kind, body.count]),
+      batched
+        ? [[profile.kind, 2]]
+        : [
+            [profile.kind, 1],
+            [profile.kind, 1],
+          ],
     );
   }
 });
 
-test("image variants queue separately with incrementing seeds and video keeps the actual video profile", async (t) => {
+test("image variants queue as one batch from the seed and video keeps the actual video profile", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
   const variants = await generate(client, { count: 3, seed: 20 });
-  assert.equal(variants.jobs.length, 3);
+  assert.equal(variants.jobs.length, 1);
   assert.deepEqual(
-    f.submitted.map((body) => body.count),
-    [1, 1, 1],
-  );
-  assert.deepEqual(
-    f.submitted.map((body) => body.seed),
-    ["20", "21", "22"],
+    f.submitted.map((body) => [body.count, body.seed]),
+    [[3, "20"]],
   );
   await generate(client, { profile_id: videoProfile.id });
   assert.equal(f.submitted.at(-1).kind, "video");
@@ -2306,7 +2305,7 @@ test("Generate returns per-conversation refs with signed watch pages that tools 
     return client;
   };
   const first = await conversation("alice", "conversation-a");
-  const queued = await generate(first, { count: 2 });
+  const queued = await generate(first, { prompts: ["A landscape", "A lake"] });
   assert.deepEqual(
     queued.jobs.map((job) => job.ref),
     ["result 1", "result 2"],
@@ -2968,12 +2967,12 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   const started = performance.now();
   const pending = call(client, "Generate", { kind: "image", prompts: ["An egg"], count: 2 });
   once(
-    () => f.jobs.size === 2,
+    () => f.jobs.size === 1,
     () => {
       for (const job of f.jobs.values())
         Object.assign(job, {
           status: "done",
-          outputs: [{ url: `/comfy/view?filename=${job.id}.png` }],
+          outputs: [0, 1].map((index) => ({ url: `/comfy/view?filename=${job.id}-${index}.png` })),
         });
     },
   );
@@ -2998,7 +2997,7 @@ test("Generate returns quick images inline as finished markdown, so no backgroun
   // images share one contact sheet directly under its header, in one paragraph, linking to All Results.
   assert.match(
     result.content[0].text,
-    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Results 1–2\*\* · Fixture Image\n\[!\[Results 1–2\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\((https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10})\)\n\n\[All Results\]\(\1\)\n\nPrompt: An egg$/,
+    /^Done on Fixture Image\. Reply with the markdown below exactly[^\n]+\n\n\*\*Result 1 \(2 images\)\*\* · Fixture Image\n\[!\[Result 1 \(2 images\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\.jpg\)\]\(https:\/\/studio\.example\.test\/mcp\/results\/[A-Za-z0-9]{10}\)\n\nPrompt: An egg$/,
   );
   assert.ok(result.content[0].text.length < 660, `${result.content[0].text.length} characters`);
   // The reply says how to iterate, so a follow-up reuses a result instead of rebuilding the call.
@@ -3207,14 +3206,11 @@ test("Reuse runs a result again with its profile and settings, a new seed and an
       count: 2,
     }),
   );
-  assert.equal(tweaked.jobs.length, 2);
+  assert.equal(tweaked.jobs.length, 1);
   // The new prompt goes as written; /api/generate adds the LoRA's trigger.
   assert.deepEqual(
-    f.submitted.slice(2).map((body) => [body.prompt, body.cfg]),
-    [
-      ["A heron at dusk", 4],
-      ["A heron at dusk", 4],
-    ],
+    f.submitted.slice(2).map((body) => [body.prompt, body.cfg, body.count]),
+    [["A heron at dusk", 4, 2]],
   );
   assert.ok(
     models() - before <= 1,
@@ -3913,7 +3909,8 @@ test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it w
     count: 6,
   });
   assert.equal(data(fromRequest).profile.id, "custom:bento-image-moss-base-dmd8");
-  assert.equal(data(fromRequest).jobs.length, 6);
+  assert.equal(data(fromRequest).jobs.length, 1);
+  assert.equal(f.submitted.at(-1).count, 6);
   assert.match(
     texts(fromRequest),
     /^Queued on MOSS Image Base · Fast .*\. Used MOSS Image Base · Fast .*, the model the request names\./,
@@ -3936,7 +3933,7 @@ test('"moss turbo" stays on MOSS: a tier the family lacks falls back within it w
     [
       "custom:bento-image-moss-base-dmd8",
       "custom:bento-image-moss-sft",
-      ...Array(6).fill("custom:bento-image-moss-base-dmd8"),
+      "custom:bento-image-moss-base-dmd8",
       "custom:bento-image-boogu-turbo",
     ],
   );
@@ -3997,43 +3994,54 @@ test("one Generate call queues one job per prompt, reads count beside equal prom
   assert.equal(excess.isError, true);
   assert.equal(
     texts(excess),
-    "count is images per prompt, so 2 prompts × count 6 would queue 12 jobs; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
+    "count is images per prompt, so 2 prompts × count 6 would queue 12 images; one call queues at most 10. For 2 different images, pass the 2 prompts without count, or split them into calls whose prompts × count is at most 10.",
   );
   const generate = (await client.listTools()).tools.find((tool) => tool.name === "Generate");
   assert.match(
     generate.description,
-    /"4 sets of 2" is 4 distinct prompts with count 2; one call queues at most 10 jobs\./,
+    /"4 sets of 2" is 4 distinct prompts with count 2; at most 10 images per call\./,
   );
   assert.equal(generate.inputSchema.properties.count.description, "Images per prompt; default 1.");
   assert.equal(f.submitted.length, 4);
 });
 
-test("ten images in one Generate call queue ten separate jobs, and a refusal stops the rest", async (t) => {
+test("a Generate count is one batched job where the profile batches, else a job per image", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
+  // Four images of one prompt are one job of count 4 (the model loads once); ten split at the batch limit of 8.
+  const four = await generate(client, { count: 4, seed: 1 });
+  assert.equal(four.jobs.length, 1);
   const ten = await generate(client, { count: 10, seed: 1 });
-  assert.equal(ten.jobs.length, 10);
+  assert.equal(ten.jobs.length, 2);
   assert.deepEqual(
-    f.submitted.map((body) => body.count),
-    Array(10).fill(1),
-  );
-  assert.deepEqual(
-    f.submitted.map((body) => body.seed),
-    Array.from({ length: 10 }, (_, index) => String(index + 1)),
+    f.submitted.map((body) => [body.count, body.seed]),
+    [
+      [4, "1"],
+      [8, "1"],
+      [2, "9"],
+    ],
   );
   const prompts = Array.from({ length: 10 }, (_, index) => `Plush animal ${index + 1}`);
   assert.equal((await generate(client, { prompts })).jobs.length, 10);
   assert.deepEqual(
-    f.submitted.slice(10).map((body) => body.prompt),
+    f.submitted.slice(3).map((body) => body.prompt),
     prompts,
   );
+  // A profile without a count control (capabilities.variations false) runs a job per image.
+  await f.profiles([{ ...imageProfile, capabilities: { variations: false } }]);
+  const single = await generate(client, { count: 4 });
+  assert.equal(single.jobs.length, 4);
+  assert.deepEqual(
+    f.submitted.slice(13).map((body) => body.count),
+    [1, 1, 1, 1],
+  );
   // When the studio refuses further jobs, those queued so far are kept and the reason is passed on.
-  f.failAfter(22, 422, { ok: false, error: "This profile can't run right now." });
-  const limited = await generate(client, { count: 10 });
+  f.failAfter(19, 422, { ok: false, error: "This profile can't run right now." });
+  const limited = await generate(client, { count: 4 });
   assert.equal(limited.status, "partially_queued");
   assert.equal(limited.jobs.length, 2);
   assert.match(limited.error, /can't run right now/);
-  assert.equal(f.submitted.length, 22);
+  assert.equal(f.submitted.length, 19);
 });
 
 test("the Generate wait is one shared deadline for every job of the call", async (t) => {
@@ -4294,7 +4302,7 @@ test("without a named model, Studio's default stands and the reply says which", 
   assert.equal(f.submitted.at(-1).prompt, 'A neon sign that says "OPEN"');
 });
 
-test("sets of two are one Generate call: one job per image, each prompt run as sent", async (t) => {
+test("sets of two are one Generate call: one batch per prompt, each prompt run as sent", async (t) => {
   const f = await fixture(t);
   await f.profiles(guidedCatalogue());
   const client = await f.client();
@@ -4307,10 +4315,10 @@ test("sets of two are one Generate call: one job per image, each prompt run as s
       count: 2,
     }),
   );
-  assert.equal(result.jobs.length, 8);
+  assert.equal(result.jobs.length, 4);
   assert.deepEqual(
-    f.submitted.map((item) => item.prompt),
-    prompts.flatMap((prompt) => [prompt, prompt]),
+    f.submitted.map((item) => [item.prompt, item.count]),
+    prompts.map((prompt) => [prompt, 2]),
   );
   // Without prompts nothing is written for the chat; it must write them itself.
   const missing = await call(client, "Generate", { kind: "image", request: "six photos" });
@@ -4480,7 +4488,7 @@ test("Review returns real image content and saved settings without generating or
 test("Review compares two owned results and refuses a hidden result before downloading it", async (t) => {
   const f = await fixture(t);
   const client = await f.client();
-  await generate(client, { prompts: ["A heron"], count: 2 });
+  await generate(client, { prompts: ["A heron", "A crane"] });
   finish(f);
   const compared = await call(client, "Review", { job_id: "result 2", compare_to: "result 1" });
   assert.deepEqual(
@@ -5256,7 +5264,7 @@ test("each_profile with a tier covers every ready model of that tier in one call
   });
   assert.match(
     texts(many),
-    /^4 models × 4 images each would queue 16 jobs; one call queues at most 10\./,
+    /^4 models × 4 images each would queue 16; one call queues at most 10\./,
   );
   assert.equal(f.submitted.length, 1);
 });
