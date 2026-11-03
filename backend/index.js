@@ -62,6 +62,8 @@ import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { accountMayUseLoras, createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
 import { registerStatusRoutes } from "./status-routes.js";
+import { registerPromptHistoryRoutes } from "./prompt-history-routes.js";
+import { registerDeploymentRoutes } from "./deployment-routes.js";
 import { registerLoraRoutes } from "./lora/routes.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
@@ -82,13 +84,7 @@ import { createAssistant, draftedProfile } from "./assistant.js";
 import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { familyFromName } from "./family-catalog.js";
-import {
-  assistantIntegration,
-  assistantSettingKeys,
-  assistantSettingValue,
-  downscaleReferences,
-  registerAssistantRoutes,
-} from "./assistant-routes.js";
+import { downscaleReferences, registerAssistantRoutes } from "./assistant-routes.js";
 import { createPromptStage, writingIssue, writingRequest } from "./prompt-stage.js";
 import {
   canonicalProfileId,
@@ -147,17 +143,8 @@ import { stripMetadata } from "./metadata-strip.js";
 import { loadSharp } from "./sharp-loader.js";
 import { appVersion } from "./data-dir.js";
 import { buildProfile, mockModelResult, offlineModelResult } from "./model/models.js";
-import { presetsEnabled } from "./features.js";
-import {
-  catalogueFlags,
-  describeFlag,
-  flagEnabled,
-  isCatalogueFlag,
-  saveDeploymentSetting,
-  settingSource,
-} from "./deployment-settings.js";
-import { civitaiTokenStatus } from "./civitai/access.js";
-import { hfFetch, hfTokenStatus } from "./hf-access.js";
+import { flagEnabled } from "./deployment-settings.js";
+import { hfFetch } from "./hf-access.js";
 import {
   deleteOwnedGalleryItems,
   filterVisibleGallery,
@@ -179,15 +166,6 @@ import {
   onGalleryFilesDeleted,
 } from "./gallery/store.js";
 import { getThumbnail } from "./thumbnails.js";
-import {
-  clearPromptHistory,
-  forgetPrompts,
-  listPrompts,
-  promptHistoryEnabled,
-  recordPrompt,
-  setPromptHistoryEnabled,
-  setPromptPinned,
-} from "./prompt-history.js";
 import { fillVideoSizes } from "./library/library.js";
 import {
   getComfyVideoGif,
@@ -826,63 +804,7 @@ registerGalleryHistoryRoutes(app, {
   },
 });
 
-app.get("/api/prompts", (req, res) => {
-  res.setHeader("Cache-Control", "private, no-store, max-age=0");
-  const ownerId = ownerIdForRequest(req);
-  res.json({
-    prompts: listPrompts(req.query.kind, ownerId),
-    enabled: promptHistoryEnabled(req.query.kind, ownerId),
-  });
-});
-
-app.post("/api/prompts/enabled", (req, res) => {
-  const ownerId = ownerIdForRequest(req);
-  const prompts = setPromptHistoryEnabled(req.body?.enabled !== false, ownerId);
-  res.json({ ok: true, prompts, enabled: promptHistoryEnabled("positive", ownerId) });
-});
-
-app.post("/api/prompts/pin", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: setPromptPinned(
-      String(req.body?.text || ""),
-      Boolean(req.body?.pinned),
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
-
-// The prompt assistant keeps the text it replaced (a rewrite, a written negative), so History can bring it back.
-app.post("/api/prompts/record", (req, res) => {
-  const kind = req.body?.kind === "negative" ? "negative" : "positive";
-  const ownerId = ownerIdForRequest(req);
-  recordPrompt(String(req.body?.text || "").slice(0, 8000), kind, ownerId);
-  res.json({ ok: true, prompts: listPrompts(kind, ownerId) });
-});
-
-app.post("/api/prompts/forget", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: forgetPrompts(
-      [String(req.body?.text || "")],
-      new Set(),
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
-
-app.post("/api/prompts/clear", (req, res) => {
-  res.json({
-    ok: true,
-    prompts: clearPromptHistory(
-      { keepPinned: req.body?.keepPinned !== false },
-      req.body?.kind,
-      ownerIdForRequest(req),
-    ),
-  });
-});
+registerPromptHistoryRoutes(app);
 
 /**
  * A thumbnail's caching. The gallery asks for every thumbnail with a `v` that
@@ -902,85 +824,7 @@ registerReferenceRoutes(app, { uploaded: (item) => void imageSearch.completed([i
 registerVideoEditRoutes(app, { store });
 registerRecreateRoute(app, { store });
 
-/**
- * What the deployment decides, for Settings: each value with its source
- * (deployment, this studio's .env, or the default) and whether it is locked.
- */
-app.get("/api/settings/deployment", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  res.setHeader("Cache-Control", "no-store");
-  const models = await mediaModels(false)
-    .then((result) => result.models)
-    .catch(() => unavailableModels());
-  const profiles = (models.profiles || []).map((profile) => ({
-    id: profile.id,
-    label: profile.displayName || profile.label || profile.id,
-    kind: profile.kind,
-    ready: profile.ready !== false,
-  }));
-  const defaultFor = (key, effective) => ({
-    key,
-    configured: process.env[key] || "",
-    effective: effective || "",
-    ...settingSource(key),
-  });
-  res.json({
-    ok: true,
-    defaults: {
-      image: defaultFor("STUDIO_DEFAULT_IMAGE_PROFILE", models.defaults?.imageModel),
-      video: defaultFor("STUDIO_DEFAULT_VIDEO_PROFILE", models.defaults?.videoModel),
-      profiles,
-    },
-    catalogue: catalogueFlags.map(describeFlag),
-    integrations: {
-      civitai: { token: civitaiTokenStatus(), presets: presetsEnabled() },
-      huggingFace: { token: hfTokenStatus() },
-      assistant: await assistantIntegration({ engine: assistantEngine, source: settingSource }),
-    },
-  });
-});
-
-app.post("/api/settings/deployment", (req, res) => {
-  if (!requireAdmin(req, res)) return;
-  const key = String(req.body?.key || "");
-  const value = req.body?.value;
-  try {
-    if (isCatalogueFlag(key)) {
-      if (typeof value !== "boolean") throw new Error("Choose on or off.");
-      const item = catalogueFlags.find((entry) => entry.key === key);
-      // Back to the default is no saved value at all, so a later default change still applies.
-      res.json({
-        ok: true,
-        setting: {
-          ...saveDeploymentSetting(key, value === item.defaultOn ? "" : value ? "1" : "0"),
-          key,
-        },
-      });
-      return;
-    }
-    if (assistantSettingKeys.includes(key)) {
-      res.json({
-        ok: true,
-        setting: {
-          ...saveDeploymentSetting(key, assistantSettingValue(key, value)),
-          key,
-        },
-      });
-      return;
-    }
-    if (key === "STUDIO_DEFAULT_IMAGE_PROFILE" || key === "STUDIO_DEFAULT_VIDEO_PROFILE") {
-      const id = String(value || "").trim();
-      if (id.length > 256 || /[\r\n]/.test(id)) throw new Error("Choose a valid profile.");
-      res.json({ ok: true, setting: { ...saveDeploymentSetting(key, id), key } });
-      return;
-    }
-    res.status(400).json({ ok: false, error: "That setting cannot be changed here." });
-  } catch (error) {
-    res
-      .status(error.message.includes("deployment configuration") ? 409 : 400)
-      .json({ ok: false, error: error.message });
-  }
-});
+registerDeploymentRoutes(app, { assistantEngine, mediaModels, unavailableModels });
 
 // Demo mode's placeholder profiles stand in for ComfyUI, as /api/models does.
 const generationRoutes = registerGenerationRoutes(app, {
