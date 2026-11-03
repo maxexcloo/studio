@@ -43,9 +43,9 @@ jobs:
       - name: Set Up Shared Tools & Tasks
         uses: maxexcloo/dotfiles/.github/actions/mise@main
         with:
-          tools: python ruff uv
-      - name: Check Bridges
-        run: "mise run check:python ::: test:python"
+          tools: python ruff shellcheck uv
+      - name: Check Bridges & Entrypoint
+        run: "mise run check:python ::: check:shell ::: test:python"
       - name: Set Up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Image Metadata
