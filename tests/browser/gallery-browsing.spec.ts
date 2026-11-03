@@ -103,8 +103,11 @@ test("Closing a navigated viewer reveals and focuses its current virtualised gal
   await page.getByRole("button", { name: "Open image: Browse Result 0", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Generation", exact: true });
   await expect(dialog).toBeVisible();
+  // Phones swipe instead of showing the arrows; the arrow key navigates the same way.
+  const phone = (page.viewportSize()?.width || 1440) < 768;
   for (let index = 0; index < 25; index++)
-    await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
+    if (phone) await page.keyboard.press("ArrowRight");
+    else await dialog.getByRole("button", { name: "Next Generation", exact: true }).click();
   await expect(dialog.getByRole("img", { name: "Browse Result 25", exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Close Generation", exact: true }).click();
   await expect(dialog).toBeHidden();
