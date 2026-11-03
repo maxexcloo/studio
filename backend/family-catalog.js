@@ -1968,7 +1968,8 @@ export const families = {
   // workflow: 50 steps, CFG 3, shift 5, euler / sgm_uniform, 1-2 MP (0.25-4 MP work).
   // Two ways to run it: ComfyUI's own nodes (master after 0.41.3, CLIPLoader type
   // moss_image) with Comfy-Org's single files, or its makers' pack with the official
-  // Diffusers folder, which also skips layer 22 on the negative pass as they sample.
+  // Diffusers folder. Both take SkipLayerGuidanceDiTSimple, which skips layer 22 on the
+  // negative pass as the makers sample.
   moss_image: {
     label: "MOSS-Image",
     kind: "image",
