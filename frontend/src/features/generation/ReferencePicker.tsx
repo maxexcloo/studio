@@ -13,7 +13,8 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { ChevronDown, ImagePlus, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ImagePlus, Upload } from "lucide-react";
+import { icons } from "../../ui/icons";
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -356,7 +357,7 @@ export function ReferencePicker({
                         setDeleteId(item.id);
                       }}
                     >
-                      <Trash2 size={14} />
+                      <icons.delete size={14} />
                     </ActionIcon>
                   )
                 }

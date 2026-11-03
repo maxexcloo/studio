@@ -1,6 +1,7 @@
 import { useState, type DragEvent } from "react";
 import { Badge, Image, Menu, Text, UnstyledButton } from "@mantine/core";
-import { ArrowLeft, ArrowRight, Plus, Replace, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, Replace } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { Profile, ReferenceAsset } from "../../types";
 import {
   galleryReferenceType,
@@ -155,7 +156,7 @@ export function ReferenceSlots({
                     )}
                     <Menu.Item
                       color="red"
-                      leftSection={<Trash2 size={16} />}
+                      leftSection={<icons.delete size={16} />}
                       onClick={() =>
                         onChange(references.filter((reference) => referenceKey(reference) !== key))
                       }

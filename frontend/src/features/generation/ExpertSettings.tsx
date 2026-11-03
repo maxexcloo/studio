@@ -10,7 +10,8 @@ import {
   TextInput,
   Tooltip,
 } from "@mantine/core";
-import { Dices, SlidersHorizontal } from "lucide-react";
+import { Dices } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { GenerationInput, Profile } from "../../types";
 import { iconChipProps } from "./chip";
 import { useGeneration } from "./GenerationProvider";
@@ -250,7 +251,7 @@ export function ExpertSettings({
           aria-expanded={opened}
           onClick={() => onOpenedChange(!opened)}
         >
-          <SlidersHorizontal size={16} />
+          <icons.prompt size={16} />
         </Button>
       }
     >

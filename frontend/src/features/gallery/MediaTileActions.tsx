@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
-import { Download, Ellipsis, Star } from "lucide-react";
+import { icons } from "../../ui/icons";
 import type { MediaItem } from "../../types";
+import { menuWidth } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import { AnimateDialog, MediaActionMenu } from "./MediaActions";
 import type { AnimateTheme } from "./useMediaAction";
@@ -54,7 +55,7 @@ export function MediaTileActions({
               variant="default"
               onClick={() => favorite.mutate()}
             >
-              <Star size={16} fill={item.favorite ? "currentColor" : "none"} />
+              <icons.star size={16} fill={item.favorite ? "currentColor" : "none"} />
             </ActionIcon>
           </Tooltip>
         )}
@@ -67,18 +68,18 @@ export function MediaTileActions({
               aria-label={`Download ${name}`}
               variant="default"
             >
-              <Download size={16} />
+              <icons.download size={16} />
             </ActionIcon>
           </Tooltip>
         )}
-        <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={210}>
+        <Menu opened={opened} onChange={onOpenedChange} position="bottom-end" width={menuWidth}>
           <Menu.Target>
             <ActionIcon
               className={`${classes.control} ${classes.more}`}
               aria-label={`More Actions for ${name}`}
               variant="default"
             >
-              <Ellipsis size={18} />
+              <icons.more size={18} />
             </ActionIcon>
           </Menu.Target>
           <Menu.Dropdown>

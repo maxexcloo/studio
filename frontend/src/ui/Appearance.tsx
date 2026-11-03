@@ -255,11 +255,13 @@ export function AppearanceControls() {
 export function AppearanceMenu() {
   return (
     <Popover width={300} position="bottom-end" offset={18} shadow="md" withArrow trapFocus>
-      <Popover.Target>
-        <ActionIcon aria-label="Change Theme" variant="subtle" color="gray" size="lg" radius="xl">
-          <Palette size={19} />
-        </ActionIcon>
-      </Popover.Target>
+      <Tooltip label="Theme">
+        <Popover.Target>
+          <ActionIcon aria-label="Change Theme" variant="subtle" color="gray" size="lg" radius="xl">
+            <Palette size={19} />
+          </ActionIcon>
+        </Popover.Target>
+      </Tooltip>
       <Popover.Dropdown data-composer-layer>
         <AppearanceControls />
       </Popover.Dropdown>

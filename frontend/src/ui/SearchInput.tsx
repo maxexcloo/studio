@@ -1,7 +1,8 @@
 import { forwardRef, useRef } from "react";
 import { ActionIcon, Group, TextInput, type TextInputProps } from "@mantine/core";
 import { useMergedRef } from "@mantine/hooks";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
+import { icons } from "./icons";
 
 interface SearchInputProps extends Omit<TextInputProps, "rightSection"> {
   onClear: () => void;
@@ -54,7 +55,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
                   input.current?.focus();
                 }}
               >
-                <X size={16} />
+                <icons.clear size={16} />
               </ActionIcon>
             )}
           </Group>

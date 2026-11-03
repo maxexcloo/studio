@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActionIcon, Badge, Button, Group, Text, Tooltip } from "@mantine/core";
 import { usePhone } from "../../ui/usePhone";
-import { Clapperboard, Heart, Layers, Maximize2, Star, WandSparkles, X } from "lucide-react";
+import { Maximize2, X } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { post } from "../../api";
@@ -405,7 +406,7 @@ export function DreamDeck({
   );
   const star = (
     <ActionIcon variant="default" radius="xl" aria-label="Star" onClick={() => void act("star")}>
-      <Star size={18} />
+      <icons.star size={18} />
     </ActionIcon>
   );
   const view = (item: MediaItem, label = "View") => (
@@ -502,18 +503,18 @@ export function DreamDeck({
         ) : (
           <>
             {button("discard", calibrating ? "Pass" : "Skip", <X size={18} />, { hint: "←" })}
-            {button("refine", "Edit", <WandSparkles size={18} />, {
+            {button("refine", "Edit", <icons.edit size={18} />, {
               disabled: !(image && dream),
             })}
-            {button("animate", "Animate", <Clapperboard size={18} />, {
+            {button("animate", "Animate", <icons.animate size={18} />, {
               disabled: !(image && dream),
             })}
             <Tooltip label="Star">{phone ? labelled(star, "Star") : star}</Tooltip>
-            {button("more", "More Like This", <Layers size={18} />, {
+            {button("more", "More Like This", <icons.moreLikeThis size={18} />, {
               disabled: !(image && dream),
               short: "Similar",
             })}
-            {button("keep", calibrating ? "Like" : "Keep", <Heart size={18} />, {
+            {button("keep", calibrating ? "Like" : "Keep", <icons.keep size={18} />, {
               hint: "→",
               primary: true,
             })}

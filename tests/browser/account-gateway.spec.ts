@@ -228,9 +228,23 @@ test("Account menu names the account by its email and opens the account workspac
   await fixtures(page);
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/");
-  if (testInfo.project.use.isMobile)
+  if (testInfo.project.use.isMobile) {
     await page.getByRole("button", { name: "More Options", exact: true }).click();
-  else await page.getByRole("button", { name: "Your Account", exact: true }).click();
+    // The account comes last, after Library, Settings and Theme.
+    await expect(page.getByRole("menuitem")).toContainText([
+      "Settings",
+      "Theme",
+      "Account",
+      "Sign Out",
+    ]);
+  } else {
+    // Theme and the account icon follow Library and Settings, each named on hover.
+    await page.getByRole("button", { name: "Change Theme", exact: true }).hover();
+    await expect(page.getByRole("tooltip", { name: "Theme", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Your Account", exact: true }).hover();
+    await expect(page.getByRole("tooltip", { name: "Account", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Your Account", exact: true }).click();
+  }
   await expect(page.getByText("admin@example.test", { exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Sign Out", exact: true })).toBeEnabled();
   await page.getByRole("menuitem", { name: "Account", exact: true }).click();

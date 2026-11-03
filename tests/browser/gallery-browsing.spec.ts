@@ -47,7 +47,7 @@ test("Gallery continues near the bottom and retains loaded results when the next
   ).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => failed).toBe(true);
-  const retry = page.getByRole("button", { name: "Try Again", exact: true });
+  const retry = page.getByRole("button", { name: "Retry", exact: true });
   await expect(retry).toBeVisible({ timeout: 20000 });
   await expect(
     page.getByRole("button", { name: /^Open image: Browse Result/ }).first(),
@@ -361,9 +361,7 @@ test("Runs fan a stacked run out in place, link its Chat and filter by it", asyn
     .toEqual(["chat-a"]);
 });
 
-test("Running tiles show progress with Cancel and Try Again replaces a failed tile", async ({
-  page,
-}) => {
+test("Running tiles show progress with Stop and Retry replaces a failed tile", async ({ page }) => {
   const state = await fixtures(page);
   const job = (id: string, status: string, extra = {}) => ({
     id,
@@ -413,11 +411,11 @@ test("Running tiles show progress with Cancel and Try Again replaces a failed ti
   await page.goto("/images");
   await expect(page.getByText("Sampling · 50%", { exact: true })).toHaveCount(2);
   await expect(page.getByText("The worker ran out of memory.", { exact: true })).toBeVisible();
-  // One Cancel for the two-output run.
-  await expect(page.getByRole("button", { name: "Cancel Live study", exact: true })).toHaveCount(1);
-  await page.getByRole("button", { name: "Cancel Live study", exact: true }).click();
+  // One Stop for the two-output run.
+  await expect(page.getByRole("button", { name: "Stop Live study", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Stop Live study", exact: true }).click();
   await expect.poll(() => state.jobs[0].status).toBe("cancelled");
-  await page.getByRole("button", { name: "Try Again: Failed study", exact: true }).click();
+  await page.getByRole("button", { name: "Retry Failed study", exact: true }).click();
   await expect(page.locator('[data-media-id="failed"]')).toHaveCount(0);
   await expect(page.locator('[data-media-id="retried"]')).toBeVisible();
   expect(state.gallery.map((item) => item.id)).not.toContain("failed");
@@ -492,7 +490,7 @@ test("Offline views report the API error and support retry", async ({ page }) =>
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText("The gallery is temporarily unavailable");
   fails = false;
-  await page.getByRole("button", { name: "Try Again" }).click();
+  await page.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(page.getByText("No Images", { exact: true })).toBeVisible();
 });
 
@@ -526,6 +524,13 @@ test("Gallery search closes cleanly and the status panel stops active and clears
   await expect(await gallerySearch(page)).toHaveValue(phone ? "" : "birds");
   await search.press("Escape");
   await page.getByRole("button", { name: "Gallery Filters", exact: true }).click();
+  // The view (Grid or Runs) sits apart from the on/off filters, which share one row.
+  await expect(page.getByRole("radiogroup", { name: "Gallery View", exact: true })).toBeVisible();
+  const toggles = ["All Versions", "Starred", "Uploads"].map((name) =>
+    page.getByRole("button", { name, exact: true }),
+  );
+  const tops = await Promise.all(toggles.map(async (toggle) => (await toggle.boundingBox())!.y));
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(4);
   await page.getByRole("button", { name: "Starred", exact: true }).click();
   await expect(page.getByRole("button", { name: "Starred", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -576,19 +581,26 @@ test("Gallery selection stars, downloads and deletes only selected finished reco
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Select Items", exact: true }).click();
-  // A sole item's own actions are under More; with several they are left out.
+  // A sole item's own actions show (desktop on the bar, phones under More); with several they
+  // are left out.
+  const phone = test.info().project.use.isMobile;
   await page.getByRole("button", { name: "Select image: First Study", exact: true }).click();
   await expect(await selectionMenuItem(page, "Edit")).toBeEnabled();
-  await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
+  if (phone) await page.getByRole("menuitem", { name: "Select All", exact: true }).click();
+  else await selectionAction(page, "Select All").click();
   await expect(page.getByRole("status")).toHaveText("3 Selected");
   await expect(await selectionMenuItem(page, "Select All")).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Edit", exact: true })).toHaveCount(0);
-  await selectionAction(page, "More").click();
-  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(
+    phone
+      ? page.getByRole("menuitem", { name: "Edit", exact: true })
+      : selectionAction(page, "Edit"),
+  ).toHaveCount(0);
+  if (phone) {
+    await selectionAction(page, "More").click();
+    await expect(page.getByRole("menu")).toBeHidden();
+  } else await expect(selectionAction(page, "More")).toHaveCount(0);
   // Phones that share natively share instead of downloading.
-  const sharing =
-    test.info().project.use.isMobile &&
-    (await page.evaluate(() => typeof navigator.share === "function"));
+  const sharing = phone && (await page.evaluate(() => typeof navigator.share === "function"));
   if (sharing) await expect(selectionAction(page, "Prepare Share")).toBeEnabled();
   else
     await expect(selectionAction(page, "Download", "link")).toHaveAttribute(

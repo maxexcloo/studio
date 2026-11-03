@@ -6,12 +6,14 @@ import {
   Loader,
   Menu,
   Paper,
+  SegmentedControl,
   Tooltip,
   UnstyledButton,
   type FloatingPosition,
   type PaperProps,
 } from "@mantine/core";
-import { Check, ChevronDown, Ellipsis, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { usePhone } from "../../ui/usePhone";
 import classes from "./ActionBar.module.css";
 
@@ -34,28 +36,28 @@ export interface Action {
   /** The menu stays open for actions that finish in place. */
   keepOpen?: boolean;
   /**
-   * Its options: a submenu in menus. In bars, with `onClick` a split button whose chevron opens
-   * them (Prompt ▾, Copy ▾); without, the icon opens them (Animate).
+   * Its options: a click opens them (a submenu in menus, expanded in place on phones), and the
+   * first is its usual action, so a control with options has no click of its own.
    */
   menu?: ActionGroups;
-  /** A line above the options, such as the model Animate runs on. */
+  /** A setting between a few values (Fast or Quality), a segmented control in menus. */
+  choice?: {
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (value: string) => void;
+  };
+  /** Why nothing in its options can run, above them. */
   note?: string;
 }
 /** Groups are separated by dividers, in menus and bars alike. */
 export type ActionGroups = Action[][];
 
-/** Bar icon props; phones keep 40px targets. */
-function useActionIconProps() {
-  const phone = usePhone();
-  return {
-    className: classes.action,
-    variant: "subtle",
-    color: "gray",
-    size: phone ? 40 : undefined,
-  } as const;
-}
+/** Every action menu's width and row height; their icons are 16px. */
+export const menuWidth = 220;
+const rowHeight = 36;
 
 const shown = (groups: ActionGroups) => groups.filter((group) => group.length > 0);
+const hasOptions = (action: Action) => Boolean(action.menu && shown(action.menu).length);
 
 /** The action with this id in the groups or any of their options, for keyboard shortcuts. */
 export function findAction(groups: ActionGroups, id: string): Action | undefined {
@@ -66,21 +68,75 @@ export function findAction(groups: ActionGroups, id: string): Action | undefined
   }
 }
 
-/** The groups as Menu items, options as submenus; render inside a `Menu.Dropdown`. */
+/** What clicking the action does: its own click, or with options the first one's. */
+export const usualAction = (action: Action): Action | undefined =>
+  action.menu ? shown(action.menu)[0]?.[0] : action;
+
+const note = (action: Action) =>
+  action.note && (
+    <Menu.Label fw={400} maw={menuWidth}>
+      {action.note}
+    </Menu.Label>
+  );
+
+/**
+ * The groups as Menu items; render inside a `Menu.Dropdown`. Options open as a submenu, or on
+ * phones expand in place under their item, never as a second floating layer.
+ */
 export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
-  // Phones have no room beside the menu, so options open below their item.
   const phone = usePhone();
+  const [expanded, setExpanded] = useState<string | null>(null);
   return shown(groups).map((group, index) => (
     <Fragment key={group[0].id}>
       {index > 0 && <Menu.Divider />}
       {group.map((action) => {
         const { id, label, icon: Icon, pressed, checked, color, disabled, link, onClick } = action;
+        if (action.choice)
+          return (
+            <div key={id} className={classes.choice}>
+              <SegmentedControl
+                size="xs"
+                fullWidth
+                aria-label={label}
+                disabled={disabled}
+                value={action.choice.value}
+                onChange={action.choice.onChange}
+                data={action.choice.options}
+              />
+            </div>
+          );
+        if (action.menu && phone) {
+          const open = expanded === id;
+          return (
+            <Fragment key={id}>
+              <Menu.Item
+                h={rowHeight}
+                color={color}
+                leftSection={<Icon size={16} />}
+                rightSection={<ChevronDown size={14} className={classes.expand} />}
+                aria-expanded={open}
+                data-expanded={open || undefined}
+                disabled={disabled}
+                closeMenuOnClick={false}
+                onClick={() => setExpanded(open ? null : id)}
+              >
+                {label}
+              </Menu.Item>
+              {open && (
+                <div role="group" aria-label={label} className={classes.inline}>
+                  {note(action)}
+                  <ActionMenuItems groups={action.menu} />
+                </div>
+              )}
+            </Fragment>
+          );
+        }
         if (action.menu)
           return (
-            <Menu.Sub key={id} position={phone ? "bottom-start" : "right-start"}>
+            <Menu.Sub key={id} position="right-start">
               <Menu.Sub.Target>
                 <Menu.Sub.Item
-                  h={36}
+                  h={rowHeight}
                   color={color}
                   leftSection={<Icon size={16} />}
                   disabled={disabled}
@@ -88,8 +144,8 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
                   {label}
                 </Menu.Sub.Item>
               </Menu.Sub.Target>
-              <Menu.Sub.Dropdown miw={200}>
-                {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
+              <Menu.Sub.Dropdown w={menuWidth}>
+                {note(action)}
                 <ActionMenuItems groups={action.menu} />
               </Menu.Sub.Dropdown>
             </Menu.Sub>
@@ -97,7 +153,7 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
         return (
           <Menu.Item
             key={id}
-            h={36}
+            h={rowHeight}
             color={color}
             leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
             rightSection={checked ? <Check size={14} /> : undefined}
@@ -115,9 +171,38 @@ export function ActionMenuItems({ groups }: { groups: ActionGroups }) {
   ));
 }
 
+/** A control's options as a menu opening on the `position` side; the tooltip never lingers over it. */
+function OptionsMenu({
+  action,
+  position,
+  target,
+}: {
+  action: Action;
+  position: FloatingPosition;
+  target: (opened: boolean) => ReactNode;
+}) {
+  const [opened, setOpened] = useState(false);
+  // Each opening starts with every option collapsed.
+  const [opening, setOpening] = useState(0);
+  return (
+    <Menu
+      position={position}
+      width={menuWidth}
+      onChange={setOpened}
+      onOpen={() => setOpening((count) => count + 1)}
+    >
+      {target(opened)}
+      <Menu.Dropdown>
+        {note(action)}
+        <ActionMenuItems key={opening} groups={action.menu!} />
+      </Menu.Dropdown>
+    </Menu>
+  );
+}
+
 /**
- * A bar action: an icon, a split button or an options menu, opening on the `menuPosition` side.
- * A `labelled` one names itself beside its icon, with ▾ when it only opens options.
+ * A bar action: an icon with a tooltip, or `labelled` its name beside its icon with ▾ when it has
+ * options. A control with options opens them on click.
  */
 function ActionControl({
   action,
@@ -128,77 +213,47 @@ function ActionControl({
   labelled: boolean;
   menuPosition: FloatingPosition;
 }) {
-  const phone = usePhone();
-  const iconProps = useActionIconProps();
-  // A tooltip must not linger behind the menu its control opened.
-  const [opened, setOpened] = useState(false);
-  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
-  const optionsOnly = Boolean(menu && !onClick && !link);
+  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick } = action;
+  const options = hasOptions(action);
   const props = {
+    className: classes.action,
+    variant: "subtle",
+    color: color || (pressed ? undefined : "gray"),
     "aria-pressed": pressed,
-    color: color || (pressed ? undefined : iconProps.color),
     loading,
     disabled,
-    ...(link
-      ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
-      : { onClick: optionsOnly ? undefined : onClick }),
-  };
+    ...(options
+      ? {}
+      : link
+        ? { component: "a" as const, ...(disabled ? { download: link.download } : link) }
+        : { onClick }),
+  } as const;
   const control = labelled ? (
     <Button
-      variant="subtle"
       size="sm"
-      className={classes.action}
       leftSection={<Icon size={16} fill={pressed ? "currentColor" : "none"} />}
-      rightSection={optionsOnly ? <ChevronDown size={14} /> : undefined}
+      rightSection={options ? <ChevronDown size={14} /> : undefined}
       {...props}
     >
       {label}
     </Button>
   ) : (
-    <ActionIcon {...iconProps} aria-label={label} {...props}>
+    <ActionIcon aria-label={label} {...props}>
       <Icon size={18} fill={pressed ? "currentColor" : "none"} />
     </ActionIcon>
   );
-  const tip = (name: string, target: ReactNode) => (
-    <Tooltip label={name} disabled={phone || opened || (labelled && name === label)}>
+  const tip = (opened: boolean, target: ReactNode) => (
+    <Tooltip label={label} disabled={labelled || opened}>
       {target}
     </Tooltip>
   );
-  if (!menu) return tip(label, control);
-  const dropdown = (
-    <Menu.Dropdown>
-      {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
-      <ActionMenuItems groups={menu} />
-    </Menu.Dropdown>
-  );
-  // A link with options (Download ▾) is a split button like one with a click.
-  if (optionsOnly)
-    return (
-      <Menu position={menuPosition} width={240} onChange={setOpened}>
-        {tip(label, <Menu.Target>{control}</Menu.Target>)}
-        {dropdown}
-      </Menu>
-    );
+  if (!options) return tip(false, control);
   return (
-    <ActionIcon.Group>
-      {tip(label, control)}
-      <Menu position={menuPosition} width={220} onChange={setOpened}>
-        {tip(
-          `${label} Options`,
-          <Menu.Target>
-            <ActionIcon
-              {...iconProps}
-              className={`${iconProps.className} ${classes.splitMenu}`}
-              aria-label={`${label} Options`}
-              disabled={disabled}
-            >
-              <ChevronDown size={14} />
-            </ActionIcon>
-          </Menu.Target>,
-        )}
-        {dropdown}
-      </Menu>
-    </ActionIcon.Group>
+    <OptionsMenu
+      action={action}
+      position={menuPosition}
+      target={(opened) => tip(opened, <Menu.Target>{control}</Menu.Target>)}
+    />
   );
 }
 
@@ -235,12 +290,9 @@ export function ActionBarGroups({
   );
 }
 
-/**
- * A phone bar control: its icon over its label. With options a tap opens them (their first item does
- * what a desktop click does), so no separate ▾ crowds the bar; a link with options keeps a ▾ beside it.
- */
+/** A phone viewer control: its icon over its label; with options a tap opens them. */
 function StackedControl({ action }: { action: Action }) {
-  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick, menu } = action;
+  const { label, icon: Icon, pressed, color, disabled, loading, link, onClick } = action;
   const content = (
     <>
       {loading ? (
@@ -257,53 +309,30 @@ function StackedControl({ action }: { action: Action }) {
     "data-color": color,
     disabled: disabled || loading,
   };
-  const options = menu && shown(menu).length > 0 ? menu : undefined;
-  const dropdown = options && (
-    <Menu.Dropdown>
-      {action.note && <Menu.Label fw={400}>{action.note}</Menu.Label>}
-      <ActionMenuItems groups={options} />
-    </Menu.Dropdown>
-  );
-  if (options && !link)
+  if (hasOptions(action))
     return (
-      <Menu position="top" width={240}>
-        <Menu.Target>
-          <UnstyledButton {...props}>{content}</UnstyledButton>
-        </Menu.Target>
-        {dropdown}
-      </Menu>
+      <OptionsMenu
+        action={action}
+        position="top"
+        target={() => (
+          <Menu.Target>
+            <UnstyledButton {...props}>{content}</UnstyledButton>
+          </Menu.Target>
+        )}
+      />
     );
-  const button =
-    link && !disabled ? (
-      <UnstyledButton component="a" {...props} {...link}>
-        {content}
-      </UnstyledButton>
-    ) : (
-      <UnstyledButton {...props} onClick={onClick}>
-        {content}
-      </UnstyledButton>
-    );
-  if (!options) return button;
-  return (
-    <div className={classes.stackedSplit}>
-      {button}
-      <Menu position="top" width={240}>
-        <Menu.Target>
-          <UnstyledButton
-            className={classes.stackedMenu}
-            aria-label={`${label} Options`}
-            disabled={disabled}
-          >
-            <ChevronDown size={14} />
-          </UnstyledButton>
-        </Menu.Target>
-        {dropdown}
-      </Menu>
-    </div>
+  return link && !disabled ? (
+    <UnstyledButton component="a" {...props} {...link}>
+      {content}
+    </UnstyledButton>
+  ) : (
+    <UnstyledButton {...props} onClick={onClick}>
+      {content}
+    </UnstyledButton>
   );
 }
 
-/** The phone bar: the primary actions labelled under their icons, every other one under More. */
+/** The phone viewer bar: the primary actions labelled under their icons, every other one under More. */
 export function StackedActionBar({ primary, more }: { primary: Action[]; more: ActionGroups }) {
   return (
     <div className={classes.stackedBar}>
@@ -311,7 +340,7 @@ export function StackedActionBar({ primary, more }: { primary: Action[]; more: A
         <StackedControl key={action.id} action={action} />
       ))}
       {shown(more).length > 0 && (
-        <StackedControl action={{ id: "more", label: "More", icon: Ellipsis, menu: more }} />
+        <StackedControl action={{ id: "more", label: "More", icon: icons.more, menu: more }} />
       )}
     </div>
   );

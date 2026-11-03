@@ -22,7 +22,8 @@ import {
   useProps,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { ArrowUp, Copy, X } from "lucide-react";
+import { ArrowUp } from "lucide-react";
+import { icons } from "./icons";
 import { copyText } from "./clipboard";
 import { usePhone } from "./usePhone";
 import classes from "./TextBox.module.css";
@@ -131,7 +132,7 @@ export function TextBox({
         onMouseDown={keepFocus}
         onClick={() => void copyText(value, title)}
       >
-        <Copy size={16} />
+        <icons.copy size={16} />
       </ActionIcon>
     </Tooltip>,
     <Tooltip key="clear" label={`Clear ${title}`}>
@@ -143,7 +144,7 @@ export function TextBox({
         onMouseDown={keepFocus}
         onClick={clear}
       >
-        <X size={16} />
+        <icons.clear size={16} />
       </ActionIcon>
     </Tooltip>,
   ];

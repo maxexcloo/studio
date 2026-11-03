@@ -15,8 +15,10 @@ import { TrimVideoDialog } from "./videoEdits";
 import { ViewerPrompt } from "./ViewerPrompt";
 import classes from "./MediaViewer.module.css";
 
-// The labelled primaries, in this order; the rest follow as icons (phones: under More).
-const primary = ["retry", "stop", "edit", "animate", "prompt"];
+// Desktop names Edit, Animate and Prompt beside their icons; phones keep these and Retry or Stop
+// on the bar, labelled under their icons, and list the rest under More.
+const labelled = ["edit", "animate", "prompt"];
+const primary = ["retry", "stop", ...labelled];
 
 /** The viewer's action bar: the prompt field above the shared item actions. */
 export function MediaViewerActions({
@@ -73,10 +75,9 @@ export function MediaViewerActions({
   });
   if (shortcuts) shortcuts.current = groups;
   const primaries = primary.flatMap((id) => groups.flat().filter((action) => action.id === id));
-  // Desktop's prompt field carries Continue in Chat; phones list it under More.
-  const rest = groups.map((group) =>
-    group.filter((action) => !primary.includes(action.id) && (phone || action.id !== "chat")),
-  );
+  const more = groups.map((group) => group.filter((action) => !primary.includes(action.id)));
+  // Desktop's prompt field carries Continue in Chat.
+  const bar = groups.map((group) => group.filter((action) => action.id !== "chat"));
   return (
     <ActionBarSurface
       ref={ref}
@@ -96,9 +97,9 @@ export function MediaViewerActions({
         />
       )}
       {phone ? (
-        <StackedActionBar primary={primaries} more={rest} />
+        <StackedActionBar primary={primaries} more={more} />
       ) : (
-        <ActionBarGroups groups={[primaries, ...rest]} labelled={primary} />
+        <ActionBarGroups groups={bar} labelled={labelled} />
       )}
       {animating && (
         <AnimateDialog

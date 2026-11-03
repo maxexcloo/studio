@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { Ellipsis, LoaderCircle, SquareCheck, TriangleAlert, X } from "lucide-react";
+import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
+import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
 import { useQueue, useQueueAction } from "../generation/Queue";
-import { ActionBarGroups, ActionMenuItems, StackedActionBar, type Action } from "./ActionBar";
+import { ActionBarGroups, ActionMenuItems, menuWidth, type Action } from "./ActionBar";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
 import {
   AnimateDialog,
@@ -27,12 +28,12 @@ import type { useTryAgain } from "./useTryAgain";
 import classes from "./GallerySelectionBar.module.css";
 
 const shareLimit = 20;
-// What acts on several items stays on the bar, in this order; everything else is under More.
+// Phones keep what acts on several items on the bar, in this order, and the rest under More.
 const primaryIds = ["retry", "stop", "share", "download", "star", "delete"];
 
 /**
  * The contextual selection bar in the toolbar's place: Clear Selection and the count, then on
- * desktop the bulk actions and More; phones keep those on a bottom toolbar. The same actions show
+ * desktop every action as an icon; phones keep the bulk actions and More on a bottom toolbar. The same actions show
  * as a context menu at `menu` (right-click or Shift+F10).
  */
 export function GallerySelectionBar({
@@ -221,10 +222,19 @@ export function GallerySelectionBar({
     quick,
     ...actions.map((group) => group.filter((action) => !primaryIds.includes(action.id))),
   ];
+  // Desktop shows every action as an icon: the selection's own, then the item actions.
+  const bar = phone ? (
+    <ActionBarGroups
+      groups={[[...primary, { id: "more", label: "More", icon: icons.more, menu: more }]]}
+      menuPosition="top-end"
+    />
+  ) : (
+    <ActionBarGroups groups={[quick, ...actions]} menuPosition="bottom-end" />
+  );
   return (
     <>
       <div className={classes.header} role="group" aria-label="Gallery Selection">
-        <Tooltip label="Clear Selection" disabled={phone}>
+        <Tooltip label="Clear Selection">
           <ActionIcon
             variant="subtle"
             color="gray"
@@ -232,7 +242,7 @@ export function GallerySelectionBar({
             disabled={pending}
             onClick={selection.end}
           >
-            <X size={18} />
+            <icons.clear size={18} />
           </ActionIcon>
         </Tooltip>
         <Text size="sm" fw={500} role="status" className={classes.count}>
@@ -240,10 +250,7 @@ export function GallerySelectionBar({
         </Text>
         {!phone && (
           <div role="group" aria-label="Selected Item Actions" className={classes.actions}>
-            <ActionBarGroups
-              groups={[[...primary, { id: "more", label: "More", icon: Ellipsis, menu: more }]]}
-              menuPosition="bottom-end"
-            />
+            {bar}
           </div>
         )}
       </div>
@@ -257,10 +264,14 @@ export function GallerySelectionBar({
           position={{ left: 0, right: 0, bottom: 0 }}
           transitionProps={{ transition: "slide-up" }}
         >
-          <StackedActionBar primary={primary} more={more} />
+          {bar}
         </ActionBar>
       )}
-      <Menu opened={menu !== null} onChange={(opened) => !opened && onMenuClose()} width={220}>
+      <Menu
+        opened={menu !== null}
+        onChange={(opened) => !opened && onMenuClose()}
+        width={menuWidth}
+      >
         <Menu.Target>
           <div
             aria-hidden

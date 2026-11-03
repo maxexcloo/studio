@@ -1,5 +1,4 @@
 import {
-  ActionIcon,
   Anchor,
   Badge,
   Group,
@@ -13,9 +12,7 @@ import {
 } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
-import { Copy, ListChecks } from "lucide-react";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
-import { copyText } from "../../ui/clipboard";
 import { useGenerationActions } from "../generation/GenerationProvider";
 import { backendLabel, isProfile } from "../generation/payload";
 import { loraInfoQuery } from "../generation/LoraPicker";
@@ -184,35 +181,6 @@ function PromptText({ dimmed, children }: { dimmed?: boolean; children: React.Re
         </Text>
       </ScrollArea.Autosize>
     </div>
-  );
-}
-
-/** Copy Prompt and Copy Settings beside the details title. */
-export function DetailsCopyActions({ item }: { item: MediaItem }) {
-  const settingsText = useSettingsText(item);
-  return (
-    <Group gap={6} wrap="nowrap">
-      {item.prompt && (
-        <Tooltip label="Copy Prompt">
-          <ActionIcon
-            variant="default"
-            aria-label="Copy Prompt"
-            onClick={() => void copyText(item.prompt!, "Prompt")}
-          >
-            <Copy size={18} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-      <Tooltip label="Copy Settings">
-        <ActionIcon
-          variant="default"
-          aria-label="Copy Settings"
-          onClick={() => void copyText(settingsText(), "Settings")}
-        >
-          <ListChecks size={18} />
-        </ActionIcon>
-      </Tooltip>
-    </Group>
   );
 }
 
