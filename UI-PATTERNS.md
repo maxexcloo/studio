@@ -129,7 +129,8 @@ primary component reference and verify APIs against the installed version.
   section, or a row menu, and always confirm with `ConfirmDialog`. Preferences
   follow the account, never the device.
 - A click outside or Escape closes only the topmost open layer (popover, menu,
-  dropdown, dialog, drawer or sheet); nothing beneath reacts until it has gone.
+  dropdown, dialog, drawer or sheet); nothing beneath reacts while it is open,
+  and a closing layer no longer counts while it fades out.
   `ui/popupClicks.ts` owns this: a click outside a Mantine dropdown (marked
   `data-popup` by the theme) only closes it; custom outside-click and Escape
   handlers (the composer, Status, runs, selection, Dream keys, gallery search)
