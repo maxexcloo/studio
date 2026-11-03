@@ -3633,9 +3633,7 @@ const videoCatalogue = (local = true) => [
   cloudVideo("cloud-video-fast", "Cloud Video · Fast · Cloud"),
 ];
 
-test("with Video Cloud Fallback on, video runs on a granted cloud profile while the worker is off and says so", async (t) => {
-  process.env.STUDIO_VIDEO_CLOUD_FALLBACK = "1";
-  t.after(() => delete process.env.STUDIO_VIDEO_CLOUD_FALLBACK);
+test("while the local video worker is off, video runs on a granted cloud profile and says so", async (t) => {
   const f = await fixture(t);
   await f.profiles(videoCatalogue(false), {
     defaults: { image: imageProfile.id, video: "cloud-video" },
@@ -3647,32 +3645,14 @@ test("with Video Cloud Fallback on, video runs on a granted cloud profile while 
   assert.equal(data(fallback).profile.remote, true);
 });
 
-test("by default, video never goes to the cloud by itself while the local video worker is off", async (t) => {
+test("with no cloud profile granted, video is refused while the local video worker is off, and named cloud profiles run", async (t) => {
   const f = await fixture(t);
-  await f.profiles(videoCatalogue(false), {
-    defaults: { image: imageProfile.id, video: "cloud-video" },
-    videoAvailable: false,
-  });
-  const client = await f.client();
-  // No automatic fallback: the reply says local video is unavailable and that Grok can be asked for.
-  for (const args of [
-    { kind: "video", prompts: ["A wave"], count: 1 },
-    { kind: "video", tier: "fast", prompts: ["A wave"] },
-    { kind: "video", request: "A cloud over the sea", prompts: ["A cloud over the sea"] },
-  ]) {
-    const refused = await call(client, "Generate", args);
-    assert.equal(refused.isError, true);
-    assert.match(
-      texts(refused),
-      /^Local video is unavailable right now: the video worker is offline\. Tell the user; they can ask for Grok/,
-    );
-  }
-  assert.equal(f.submitted.length, 0);
   // With no cloud profile granted, the refusal has nothing to offer and doesn't name Grok; Models lists no cloud section.
   await f.profiles(
     videoCatalogue(false).filter((profile) => !/^cloud/.test(profile.id)),
     { defaults: { image: imageProfile.id }, videoAvailable: false },
   );
+  const client = await f.client();
   const none = await call(client, "Generate", { kind: "video", prompts: ["A wave"], count: 1 });
   assert.equal(
     texts(none),
