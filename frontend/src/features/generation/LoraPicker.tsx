@@ -263,7 +263,7 @@ function LoraControls({
   const rate = useRating();
   const metadata = info.data?.loras || {};
   const family = profile?.family || "";
-  const stacks = useLoraStacks(family, profile?.id || "");
+  const stacks = useLoraStacks(family);
   const title = (file: string) => loraTitle(metadata[file], file);
   const typeOf = (file: string) => metadata[file]?.type || "";
   const familiesOf = (file: string) => metadata[file]?.families || [];

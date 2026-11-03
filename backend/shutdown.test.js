@@ -3,7 +3,19 @@ import { fork, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { readGalleryRows } from "./persistence/gallery-rows.ts";
+
+/** The gallery a stopped fixture saved. */
+function savedGallery(data) {
+  const db = new DatabaseSync(path.join(data, "studio.sqlite"), { readOnly: true });
+  try {
+    return readGalleryRows(db);
+  } finally {
+    db.close();
+  }
+}
 
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
   test(
@@ -58,7 +70,7 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       assert.deepEqual(await draining, { type: "draining" });
       await response.body.cancel();
       assert.deepEqual(await exited, { code: 0, signal: null });
-      const gallery = JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8"));
+      const gallery = savedGallery(data);
       assert.equal(gallery[0].id, "shutdown-pending");
       assert.equal(gallery[0].status, "done");
       assert.equal(gallery[0].prompt, "Saved after draining");
@@ -89,7 +101,7 @@ test("an uncaught exception logs its cause and synchronously saves pending galle
       },
     );
     assert.equal(result.status, 1);
-    const gallery = JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8"));
+    const gallery = savedGallery(data);
     assert.equal(gallery[0].id, "crash-pending");
     assert.match(result.stderr, /Crashed: uncaught exception.*Fixture crash/);
   } finally {
@@ -127,7 +139,7 @@ test(
     await new Promise((resolve) => child.once("message", resolve));
     child.kill("SIGTERM");
     assert.deepEqual(await exited, { code: 1, signal: null });
-    const gallery = JSON.parse(fs.readFileSync(path.join(data, "gallery.json"), "utf8"));
+    const gallery = savedGallery(data);
     assert.deepEqual([gallery[0].id, gallery[0].status], ["still-accepted", "pending"]);
   },
 );

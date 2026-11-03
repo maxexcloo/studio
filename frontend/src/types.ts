@@ -140,8 +140,6 @@ export interface MediaItem {
     samplingMs?: number;
     finishMs?: number;
   };
-  startImageId?: string;
-  referenceImage?: string;
   upscaleActive?: boolean;
   upscale?: {
     withRun?: boolean;

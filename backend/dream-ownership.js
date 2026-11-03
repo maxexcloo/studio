@@ -1,18 +1,9 @@
-import fs from "node:fs";
-import path from "node:path";
-import { readJsonFile, writeJsonFile } from "./json-store.js";
 import {
-  hasMigration,
   runtimeDatabase,
-  usesRuntimeDatabase,
   withOfflineDatabase,
   writeRuntimeDocument,
 } from "./persistence/runtime.ts";
-import {
-  galleryRowsMigration,
-  readGalleryRows,
-  writeGalleryRows,
-} from "./persistence/gallery-rows.ts";
+import { readGalleryRows, writeGalleryRows } from "./persistence/gallery-rows.ts";
 
 /**
  * The migrate-runtime step that clears Dream answers left on records another account owns. Dream
@@ -26,28 +17,19 @@ const dreamSignals = new Set(["keep", "discard", "calibrate-like", "calibrate-pa
 
 export function dreamOwnership(dataDir, { owner, apply = false }) {
   if (!owner) throw new Error("Name the account that used Dream with --dream-owner <account id>.");
-  const database = usesRuntimeDatabase(dataDir);
-  const galleryFile = path.join(dataDir, "gallery.json");
-  let rows = false;
   const documents = withOfflineDatabase(dataDir, (db) => {
-    rows = hasMigration(db, galleryRowsMigration);
     const read = db.prepare("SELECT value FROM studio_documents WHERE name = ?");
     const document = (name) => {
       const row = read.get(name);
       return row ? JSON.parse(row.value) : null;
     };
     return {
-      gallery: rows ? readGalleryRows(db) : document("gallery"),
+      gallery: readGalleryRows(db),
       [`dream:${owner}`]: document(`dream:${owner}`),
       [`taste:${owner}`]: document(`taste:${owner}`),
     };
   });
-  const gallery =
-    (database
-      ? documents?.gallery
-      : fs.existsSync(galleryFile)
-        ? readJsonFile(galleryFile)
-        : null) || [];
+  const gallery = documents?.gallery || [];
   const own = (item) => (item?.ownerId || "") === owner;
   const marked = gallery.filter((item) => item?.dream && !own(item));
   const foreignIds = new Set(gallery.filter((item) => !own(item)).map((item) => item.id));
@@ -80,16 +62,10 @@ export function dreamOwnership(dataDir, { owner, apply = false }) {
   if (!apply) return result;
 
   if (marked.length) {
-    const cleared = new Map(
-      marked.map((item) => {
-        const { dream: _dream, ...rest } = item;
-        return [item, rest];
-      }),
+    writeGalleryRows(
+      runtimeDatabase(dataDir),
+      marked.map(({ dream: _dream, ...rest }) => rest),
     );
-    const next = gallery.map((item) => cleared.get(item) || item);
-    if (rows) writeGalleryRows(runtimeDatabase(dataDir), [...cleared.values()]);
-    else if (database) writeRuntimeDocument(dataDir, "gallery", next);
-    else writeJsonFile(galleryFile, next);
   }
   if (judged.length)
     writeRuntimeDocument(dataDir, `dream:${owner}`, {

@@ -9,6 +9,8 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { startFakeComfy } from "./fixtures/fake-comfy.js";
+import { writeGalleryRows } from "./persistence/gallery-rows.ts";
+import { closeRuntimeDatabase, runtimeDatabase } from "./persistence/runtime.ts";
 
 // Real native routes and staging, with PNG bytes behind a stand-in ComfyUI.
 test(
@@ -91,7 +93,8 @@ test(
       model: "test-model",
       prompt: "",
     }));
-    fs.writeFileSync(path.join(dataDir, "gallery.json"), JSON.stringify(items));
+    writeGalleryRows(runtimeDatabase(dataDir), items);
+    closeRuntimeDatabase(dataDir);
     const uploads = [];
     const viewRequests = [];
     let outputAvailable = false;

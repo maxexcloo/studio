@@ -23,9 +23,6 @@ const tileFields = [
   "width",
   "height",
   "settings",
-  "referenceImage",
-  "referenceImageName",
-  "startImageId",
   "assistant",
   "ownerId",
 ];

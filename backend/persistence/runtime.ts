@@ -2,8 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
+import { createGalleryTable } from "./gallery-rows.ts";
 
 const databases = new Map<string, DatabaseSync>();
+/** The JSON stores runtime-json-v1 moves into SQLite. */
+export const legacyFiles = ["accounts.json", "gallery.json", "gallery-hidden.json"] as const;
 export const databaseFile = (dataDir: string) => path.join(dataDir, "studio.sqlite");
 
 /**
@@ -74,22 +77,32 @@ export function runtimeDatabase(dataDir: string): DatabaseSync {
     fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
     db = openDatabase(filename);
     db.exec(`CREATE TABLE IF NOT EXISTS studio_documents (name TEXT PRIMARY KEY, value TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS studio_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS studio_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
+      ${createGalleryTable};`);
     databases.set(filename, db);
   }
   return db;
 }
 
-/** Legacy JSON remains authoritative until the explicit, backed-up migration commits. */
-export function usesRuntimeDatabase(dataDir: string): boolean {
-  if (!fs.existsSync(databaseFile(dataDir))) return false;
-  const cached = databases.get(databaseFile(dataDir));
-  const db = cached || new DatabaseSync(databaseFile(dataDir), { readOnly: true });
-  try {
-    return hasMigration(db, "runtime-json-v1");
-  } finally {
-    if (!cached) db.close();
-  }
+/**
+ * Studio keeps accounts, deletion markers and the gallery only in SQLite. A data folder still on
+ * the older JSON files (`runtime-json-v1` not applied) or the single gallery document
+ * (`gallery-rows-v1` not applied) must go through migrate-runtime first, so Studio refuses to
+ * start on one rather than ignore what it holds.
+ */
+export function assertCurrentStorage(dataDir: string): void {
+  const files = legacyFiles.filter((name) => fs.existsSync(path.join(dataDir, name)));
+  const db = runtimeDatabase(dataDir);
+  const pending = [
+    ...(files.length && !hasMigration(db, "runtime-json-v1") ? files : []),
+    ...(db.prepare("SELECT 1 FROM studio_documents WHERE name = 'gallery'").get()
+      ? ["the gallery document"]
+      : []),
+  ];
+  if (pending.length)
+    throw new Error(
+      `${dataDir} still holds ${pending.join(", ")}. Stop Studio and run migrate-runtime (see CONFIGURATION.md, SQLite Migration & Rollback) before starting it.`,
+    );
 }
 
 export function readRuntimeDocument(dataDir: string, name: string): unknown {
@@ -101,16 +114,11 @@ export function readRuntimeDocument(dataDir: string, name: string): unknown {
 }
 
 export function writeRuntimeDocument(dataDir: string, name: string, value: unknown): void {
-  writeRuntimeText(dataDir, name, JSON.stringify(value));
-}
-
-/** Stores a document already turned into JSON text (as jsonTextAsync does for large ones). */
-export function writeRuntimeText(dataDir: string, name: string, text: string): void {
   runtimeDatabase(dataDir)
     .prepare(
       "INSERT INTO studio_documents (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value",
     )
-    .run(name, text);
+    .run(name, JSON.stringify(value));
 }
 
 export function deleteRuntimeDocument(dataDir: string, name: string): void {

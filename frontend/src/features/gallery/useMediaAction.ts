@@ -105,9 +105,10 @@ export async function mediaDraft(
         assetId: asset.id,
         slot: asset.slot || profile.mediaInputs?.[0]?.id || "image",
       }));
-  const legacyId = String(item.startImageId || item.referenceImage || saved.startImageId || "");
-  if (operation === "image" && !restored.length && legacyId)
-    restored = [{ assetId: legacyId, slot: profile.mediaInputs?.[0]?.id || "image" }];
+  // A job submitted with only `startImageId` (an MCP or API alias) recorded its one reference there.
+  const startImageId = String(saved.startImageId || "");
+  if (operation === "image" && !restored.length && startImageId)
+    restored = [{ assetId: startImageId, slot: profile.mediaInputs?.[0]?.id || "image" }];
   const references: ReferenceAsset[] =
     operation !== "image"
       ? []

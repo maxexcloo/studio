@@ -7,13 +7,15 @@ import test from "node:test";
 // Each test file runs in its own process, so these folders stay here.
 const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-output-"));
 process.env.STUDIO_MEDIA_DIR = outputDir;
-process.env.STUDIO_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-data-"));
+process.env.STUDIO_DATA_DIR = dataDir;
 const store = await import("./store.js");
+const { readGalleryRows } = await import("../persistence/gallery-rows.ts");
+const { runtimeDatabase } = await import("../persistence/runtime.ts");
 const {
   filterVisibleGallery,
   flushGallery,
   flushGalleryStrict,
-  galleryPath,
   galleryRevisionValue,
   markGalleryReset,
   pageGallery,
@@ -125,42 +127,23 @@ test("a change to the gallery shows on the next page request", () => {
   );
 });
 
-test("saving a large gallery is compact, runs in the background and reads back", async () => {
+test("a large gallery saves as rows, and a later change writes only its own row", async () => {
   const items = bigGallery(50_000);
   setGallery(items, { persist: false });
   saveGallery();
-  let longestPause = 0;
-  const started = performance.now();
-  let last = started;
-  const timer = setInterval(() => {
-    const now = performance.now();
-    longestPause = Math.max(longestPause, now - last);
-    last = now;
-  }, 2);
-  try {
-    await flushGallery();
-  } finally {
-    clearInterval(timer);
-  }
-  const total = performance.now() - started;
-  const text = fs.readFileSync(galleryPath, "utf8");
-  assert.equal(text.includes("\n"), false, "no pretty-printing");
-  const saved = JSON.parse(text);
+  await flushGallery();
+  const db = runtimeDatabase(dataDir);
+  const saved = readGalleryRows(db);
   assert.equal(saved.length, 50_000);
-  assert.deepEqual(saved[0], store.gallery[0]);
-  // The old synchronous write held the server for the whole file; now no single
-  // pause comes near the whole save (on a busy machine both stretch alike).
-  assert.ok(
-    longestPause < Math.max(400, total * 0.5),
-    `the server paused ${Math.round(longestPause)} ms of a ${Math.round(total)} ms save`,
-  );
-
-  // An older pretty-printed file (how earlier versions saved) still loads.
-  fs.writeFileSync(galleryPath, JSON.stringify(saved.slice(0, 3), null, 2));
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(galleryPath, "utf8")).map((item) => item.id),
-    saved.slice(0, 3).map((item) => item.id),
+    saved.find((item) => item.id === store.gallery[0].id),
+    store.gallery[0],
   );
+  const changes = () => db.prepare("SELECT total_changes() AS count").get().count;
+  const before = changes();
+  updateGalleryJob(store.gallery[0].id, { prompt: "changed" });
+  await flushGallery();
+  assert.equal(changes() - before, 1, "only the changed item's row is written");
 });
 
 test("a strict save is not failed by a change made while it is writing", async () => {
@@ -170,7 +153,7 @@ test("a strict save is not failed by a change made while it is writing", async (
   await saving;
   await flushGalleryStrict();
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(galleryPath, "utf8"))
+    readGalleryRows(runtimeDatabase(dataDir))
       .map((item) => item.id)
       .sort(),
     ["first.png", "second.png"],
@@ -192,7 +175,7 @@ test("a save still waiting when the server stops is written before it exits", as
     env: { ...process.env, STUDIO_DATA_DIR: dataDir, STUDIO_GALLERY_SAVE_MS: "60000" },
   });
   assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(dataDir, "gallery.json"), "utf8")).map((item) => item.id),
+    readGalleryRows(runtimeDatabase(dataDir)).map((item) => item.id),
     ["kept"],
   );
 });

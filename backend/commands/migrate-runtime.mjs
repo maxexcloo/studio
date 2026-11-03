@@ -14,6 +14,7 @@ import { uncensoredMarker } from "../uncensored-marker.js";
 import { profilePrompting } from "../profile/prompting-migration.js";
 import { migrateUploads } from "../uploads.js";
 import { versionSources } from "../version-sources.js";
+import { legacyRecords } from "../legacy-records.js";
 const { values } = parseArgs({
   options: {
     apply: { type: "boolean" },
@@ -46,6 +47,7 @@ else {
     versionSources: versionSources(dataDir, { apply: values.apply }),
     profilePrompting: profilePrompting(dataDir, { apply: values.apply }),
     loraLayers: loraLayers(dataDir, { apply: values.apply }),
+    legacyRecords: legacyRecords(dataDir, { apply: values.apply }),
     ...(values["dream-owner"]
       ? {
           dreamOwnership: dreamOwnership(dataDir, {
