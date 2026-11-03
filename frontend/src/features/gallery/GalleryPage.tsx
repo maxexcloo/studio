@@ -39,6 +39,7 @@ import {
   galleryFacetsQuery,
 } from "./GalleryFilters";
 import { GalleryToolbar } from "./GalleryToolbar";
+import { droppedFiles, GalleryUpload, useGalleryUpload } from "./GalleryUpload";
 import { usePhone } from "../../ui/usePhone";
 import { useRemembered } from "../auth/useRemembered";
 import { chipProps, iconChipProps } from "../generation/chip";
@@ -193,6 +194,8 @@ export function GalleryPage() {
     setMenu(null);
     requestAnimationFrame(() => selectionButton.current?.focus());
   }
+  // New uploads show at once under the Uploads filter.
+  const upload = useGalleryUpload(() => setFilters((current) => ({ ...current, uploads: true })));
   const View = view === "runs" ? RunsView : MediaGrid;
   return (
     <Stack
@@ -209,6 +212,17 @@ export function GalleryPage() {
           event.preventDefault();
           selection.select(() => true);
         }
+      }}
+      // Files or folders dropped on the gallery (not on the composer, which takes references) upload.
+      onDragOver={(event) => {
+        if (event.defaultPrevented || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }}
+      onDrop={(event) => {
+        if (event.defaultPrevented || !event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        void droppedFiles(event.dataTransfer).then(upload.upload);
       }}
     >
       <VisuallyHidden component="h1">{kind === "video" ? "Videos" : "Images"}</VisuallyHidden>
@@ -260,18 +274,21 @@ export function GalleryPage() {
             )
           }
           actions={
-            <Tooltip label="Select Items" disabled={!phone}>
-              <Button
-                {...(phone ? iconChipProps : chipProps)}
-                ref={selectionButton}
-                aria-label="Select Items"
-                leftSection={phone ? undefined : <SquareCheck size={15} />}
-                disabled={!items.length}
-                onClick={selection.start}
-              >
-                {phone ? <SquareCheck size={16} /> : "Select"}
-              </Button>
-            </Tooltip>
+            <>
+              <GalleryUpload upload={upload} />
+              <Tooltip label="Select Items" disabled={!phone}>
+                <Button
+                  {...(phone ? iconChipProps : chipProps)}
+                  ref={selectionButton}
+                  aria-label="Select Items"
+                  leftSection={phone ? undefined : <SquareCheck size={15} />}
+                  disabled={!items.length}
+                  onClick={selection.start}
+                >
+                  {phone ? <SquareCheck size={16} /> : "Select"}
+                </Button>
+              </Tooltip>
+            </>
           }
         />
       )}
