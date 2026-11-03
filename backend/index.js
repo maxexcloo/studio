@@ -44,9 +44,12 @@ import { registerMaintenanceRoutes, registerRewriteRoutes } from "./domain/route
 import { loadRuntime, registerRuntimeStatus } from "./runtime/bootstrap.ts";
 import { createLocalText, createServicesObserver } from "./runtime/services.ts";
 import { registerModelDownloadRoutes } from "./model/download-routes.js";
-import { accountMayUseLoras, createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
+import { createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
 import { registerStatusRoutes } from "./status-routes.js";
+import { createAssistantContext } from "./assistant-context.js";
+import { modelFileReferences, profileDefinitions } from "./library/file-users.js";
+import { draftCheckpointProfile } from "./profile/import-draft.js";
 import { createGenerationQueue } from "./generation-queue.js";
 import { createSessionChat } from "./chat-service.js";
 import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
@@ -59,27 +62,14 @@ import { registerLoraRoutes } from "./lora/routes.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 import { registerPresetRoutes } from "./preset-routes.js";
 import { registerLibraryRoutes } from "./library/routes.js";
-import {
-  createEditableProfile,
-  listEditableProfiles,
-  profileIdTaken,
-  readEditableProfile,
-  registerProfileEditorRoutes,
-  repointProfiles,
-  validateProfileText,
-} from "./profile/editor.js";
+import { registerProfileEditorRoutes, repointProfiles } from "./profile/editor.js";
 import { registerProfileRoutes } from "./profile/routes.js";
-import { draftProfileFromImport } from "./profile/drafts.js";
 import { seedSamples } from "./profile/seed.js";
-import { draftedProfile } from "./assistant.js";
-import { catalogDownloadsForFile } from "./catalog-downloads.js";
-import { familyFromName } from "./family-catalog.js";
-import { downscaleReferences, registerAssistantRoutes } from "./assistant-routes.js";
+import { registerAssistantRoutes } from "./assistant-routes.js";
 import { createPromptStage } from "./prompt-stage.js";
 import {
   canonicalProfileId,
   guideStore,
-  livePrompting,
   profileStore,
   withCanonicalProfile,
 } from "./profile/store.js";
@@ -159,11 +149,7 @@ import {
   registerMultiUserAuthRoutes,
 } from "./multi-user-auth.js";
 import { enforceMultiUserRequest } from "./multi-user-gate.js";
-import {
-  ownerIdForRequest,
-  recordBelongsToRequest,
-  recordsForRequest,
-} from "./account-ownership.js";
+import { ownerIdForRequest, recordsForRequest } from "./account-ownership.js";
 import { isCloudProfile, mayUseFeature, mayUseGenerationProfile } from "./account-policy.js";
 import {
   accountAccessForId,
@@ -376,61 +362,14 @@ const presetRoutes = registerPresetRoutes(app, { models: presetModels });
 const unique = (...lists) => [
   ...new Set(lists.flat().filter((name) => typeof name === "string" && name)),
 ];
-/** Each saved profile definition: its name, declared family and text. */
-async function profileDefinitions() {
-  const names = await fs.promises.readdir(userWorkflowsDir).catch(() => []);
-  const definitions = [];
-  for (const name of names) {
-    if (!name.endsWith(".json") || name.startsWith(".")) continue;
-    const text = await fs.promises
-      .readFile(path.join(userWorkflowsDir, name), "utf8")
-      .catch(() => "");
-    let block = {};
-    try {
-      const parsed = JSON.parse(text);
-      block = parsed.studio || {};
-    } catch {
-      /* Unreadable definitions still count as naming the files they mention. */
-    }
-    definitions.push({
-      name: name.replace(/\.json$/, ""),
-      family: String(block.family || ""),
-      text,
-    });
-  }
-  return definitions;
-}
-/** What still uses a model file, so an update removes the old one only when nothing does (Decision 4). */
-async function modelFileReferences({ file }) {
-  if (!file) return [];
-  const quoted = JSON.stringify(file);
-  const users = (await profileDefinitions())
-    .filter((definition) => definition.text.includes(quoted))
-    .map((definition) => `the ${definition.name} profile`);
-  for (const profile of (await presetModels().catch(() => ({ profiles: [] }))).profiles || []) {
-    if (
-      [profile.defaults?.model, profile.model, profile.baseModel].includes(file) &&
-      !users.includes(`the ${profile.id} profile`)
-    )
-      users.push(`the ${profile.displayName || profile.label || profile.id} profile`);
-  }
-  const stacks = [path.join(dataDir, "lora-stacks.json")];
-  try {
-    for (const owner of await fs.promises.readdir(path.join(dataDir, "accounts")))
-      stacks.push(path.join(dataDir, "accounts", owner, "lora-stacks.json"));
-  } catch {
-    /* Single-user. */
-  }
-  let saved = 0;
-  for (const stack of stacks)
-    if ((await fs.promises.readFile(stack, "utf8").catch(() => "")).includes(quoted)) saved += 1;
-  if (saved) users.push(saved === 1 ? "a saved LoRA stack" : `${saved} saved LoRA stacks`);
-  return users;
-}
 const library = registerLibraryRoutes(app, {
   presets: presetRoutes,
   catalogue: loraCatalogue,
-  draftProfile: (record, options) => draftCheckpointProfile(record, options),
+  draftProfile: (record, options) =>
+    draftCheckpointProfile(record, options, {
+      engine: assistantEngine,
+      info: () => profileObjectInfo("image"),
+    }),
   families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
   loraInfo: (names) => loraInfos(names),
   installed: async () => {
@@ -469,7 +408,7 @@ const library = registerLibraryRoutes(app, {
   // The assistant registers below; the Library asks for it only when describing an image.
   assistant: () => assistantEngine,
   repoint: async (from, to) => repointProfiles(from.file, to.file),
-  references: modelFileReferences,
+  references: (model) => modelFileReferences(model, presetModels),
   profileDefinitions,
   schedule: !demoMode,
 });
@@ -502,109 +441,16 @@ registerProfileRoutes(app, {
   }),
 });
 
-/**
- * A checkpoint or diffusion model import's AI-drafted profile and guide (profile/drafts.js): the
- * nearest same-family profile as template, parts through Download Missing, checked against
- * ComfyUI's object_info before it is written. Administrators only until approved.
- */
-async function draftCheckpointProfile(record, options) {
-  return draftProfileFromImport(record, options, {
-    templates: () =>
-      listEditableProfiles()
-        .filter((item) => item.readable)
-        .map((item) => {
-          try {
-            return { ...item, raw: JSON.parse(readEditableProfile(item.id).text) };
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean),
-    info: () => profileObjectInfo("image"),
-    families: (baseModel) => familiesFromMetadata({ base_model: String(baseModel || "") }),
-    familyFromName: (file) => familyFromName(file),
-    taken: profileIdTaken,
-    downloadsFor: catalogDownloadsForFile,
-    engine: assistantEngine,
-    draftedProfile,
-    validate: validateProfileText,
-    create: (id, text, { by }) =>
-      createEditableProfile(id, text, {
-        by,
-        origin: "ai",
-        aiDrafted: true,
-        info: null,
-        note: `Drafted from import ${record.id}`,
-      }),
-    guides: guideStore(),
-  });
-}
-
-// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature.
-const assistantGuides = (() => {
-  try {
-    return livePrompting();
-  } catch (error) {
-    console.warn(`[Studio] The prompt assistant has no guides: ${error.message}`);
-    return () => null;
-  }
-})();
-const assistantProfiles = async (req) => {
-  try {
-    return modelsForAccount(await catalogueModels(), req).profiles || [];
-  } catch {
-    return [];
-  }
-};
-const assistantLoras = async (req) => {
-  if (!accountMayUseLoras(req)) return [];
-  try {
-    const names = optionsFor((await loadComfyContext()).info, "LoraLoader", "lora_name");
-    const infos = await loraInfos(names);
-    return names.map((name) => ({ name, info: infos[name] || { families: [], triggers: [] } }));
-  } catch {
-    return [];
-  }
-};
-const assistantGuide = (profile) => {
-  try {
-    return assistantGuides(profile);
-  } catch {
-    return null;
-  }
-};
+// The prompt assistant (assistant-routes.js): account-scoped, behind the Prompt Assistant feature,
+// reading what an account may use (assistant-context.js).
+const assistant = createAssistantContext({ catalogueModels, loadComfyContext });
 const assistantEngine = registerAssistantRoutes(app, {
   localText,
-  frame: (req, id) => assistantImage(req.studioAccount, id),
-  profiles: assistantProfiles,
-  guide: assistantGuide,
-  loras: assistantLoras,
-  // Learning from stars: the account's six newest starred prompts on the same family, and their LoRAs.
-  starred: async (req, profile) => {
-    const families = new Map((await assistantProfiles(req)).map((item) => [item.id, item.family]));
-    const same = (item, id = canonicalProfileId(item.settings?.profileId)) =>
-      id === profile.id || (profile.family && families.get(id) === profile.family);
-    const items = gallery
-      .filter(
-        (item) =>
-          item.favorite &&
-          item.status === "done" &&
-          item.prompt &&
-          recordBelongsToRequest(item, req) &&
-          same(item),
-      )
-      .slice(0, 6);
-    return {
-      examples: items.map((item) => item.prompt),
-      loras: [
-        ...new Set(
-          items.flatMap((item) =>
-            (item.settings?.loras || []).map((lora) => lora?.name).filter(Boolean),
-          ),
-        ),
-      ],
-    };
-  },
+  frame: (req, id) => assistant.image(req.studioAccount, id),
+  profiles: assistant.profiles,
+  guide: assistant.guide,
+  loras: assistant.loras,
+  starred: assistant.starred,
 });
 
 registerGalleryReadRoutes(app, {
@@ -697,15 +543,6 @@ const generationRoutes = registerGenerationRoutes(app, {
   comfyDownMessage,
 });
 
-/** A reference image as the text model reads it ({ mime, data }, downscaled), or null. */
-async function assistantImage(account, id) {
-  if (!id) return null;
-  const reference = await bytesForReferenceAccount(account, id);
-  const [image] = await downscaleReferences([
-    `data:${reference.mime};base64,${reference.buffer.toString("base64")}`,
-  ]);
-  return image || null;
-}
 // The queue's writing stage (prompt-stage.js): prompts the assistant writes for a generation.
 const promptStage = createPromptStage({
   engine: assistantEngine,
@@ -713,10 +550,10 @@ const promptStage = createPromptStage({
     const account = ownerId ? accountAccessForId(ownerId) : undefined;
     return ownerId && !account?.authenticated ? null : account;
   },
-  profiles: (account) => assistantProfiles({ studioAccount: account }),
-  guide: assistantGuide,
+  profiles: (account) => assistant.profiles({ studioAccount: account }),
+  guide: assistant.guide,
   dream: () => dream,
-  frame: assistantImage,
+  frame: assistant.image,
 });
 // The generation queue (generation-queue.js): local workers, the direct cloud and upscales.
 const { generationQueue, queueResourceFor, validateGenerationInput } = createGenerationQueue({
@@ -860,7 +697,7 @@ const dream = createDream({
   },
   textBusy,
   writer: assistantEngine,
-  guide: assistantGuide,
+  guide: assistant.guide,
   gallery: (ownerId) =>
     gallery.filter((item) => (item.ownerId || "") === ownerId).map(withCanonicalProfile),
   visible: filterVisibleGallery,
@@ -1014,7 +851,7 @@ const sessionChat = createSessionChat({
   admit: admitGeneration,
   catalogueModels,
   mcp,
-  referenceImage: assistantImage,
+  referenceImage: assistant.image,
   runtime,
   store,
   taste,
