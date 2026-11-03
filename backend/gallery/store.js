@@ -340,6 +340,7 @@ function gallerySearchText(item) {
       settings.profileId,
       settings.workflow,
       item.outputName,
+      item.filename,
       ...loras,
     ]
       .filter((value) => typeof value === "string" && value)

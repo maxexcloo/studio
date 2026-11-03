@@ -47,9 +47,24 @@ const escapeHtml = (value) =>
     (character) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character],
   );
+/**
+ * UploadLink's page: the photo picker (with a refusal's `message` above it while the link is
+ * open), or `message` alone once it is closed. Without script, so its CSP allows none.
+ */
+export function uploadPage({ message = "", open = true } = {}) {
+  const form = open
+    ? '<form method="post" enctype="multipart/form-data"><input type="file" name="image" accept="image/png,image/jpeg,image/webp" required><button>Upload</button></form>'
+    : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="referrer" content="no-referrer"><title>Upload Photo</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem;color-scheme:light dark;font-size:1.1rem}form{display:grid;gap:1rem;max-width:30rem}input,button{font:inherit}button{padding:.8rem;border-radius:.5rem}</style></head><body><h1>Upload Photo</h1>${message ? `<p>${escapeHtml(message)}</p>` : open ? "<p>Choose or take the photo for your chat.</p>" : ""}${form}</body></html>`;
+}
 /** A conversation's result numbering; references look like "result 3", "r3", "#3" or "3". */
 const referencePattern = /^\s*(?:result|r|#)?\s*#?\s*(\d{1,7})\s*$/i;
 const maxReferenceScopes = 5000;
+// Chat hosts such as LibreChat cannot hand an attached file to a tool.
+const attachedImageHint =
+  "LibreChat can't pass attached files to tools: call UploadLink, ask the user to upload the image there, then call Search with uploads: true to use it.";
+// An upload link (UploadLink) takes one image within this time.
+const uploadLinkMs = 15 * 60 * 1000;
 // Short result links: ten random base62 characters (about 59 bits), mapped server-side to an owner and output.
 const shortAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 const shortPattern = /^([A-Za-z0-9]{10})(\.jpg)?$/;
@@ -183,6 +198,8 @@ export class McpMedia {
     this.domainRequest = domainRequest;
     this.cloudVideoFailures = cloudVideoFailures;
     this.credentials = new Map();
+    // Open upload links (uploadUrl): nonce → expiry time.
+    this.uploadLinks = new Map();
     this.stopping = new AbortController();
     this.profileRequests = new Map();
     this.enqueuePhase = Promise.resolve();
@@ -857,13 +874,15 @@ export class McpMedia {
    * words, Image Search's "looks like", kind and starred), newest first. Each hit's job joins this
    * scope's refs, so Reuse, Review and Result take it; a job another MCP owner holds is left out.
    */
-  async search(owner, scope, { query, kind, starred, limit }, { signal } = {}) {
+  async search(owner, scope, { query, kind, starred, uploads, limit }, { signal } = {}) {
     const params = new URLSearchParams({ q: query, includeFailed: "0", limit: "200" });
     if (kind) params.set("type", kind);
     if (starred) params.set("favorites", "1");
+    if (uploads) params.set("uploads", "1");
     const { items = [] } = await this.request("GET", `/api/gallery?${params}`, undefined, owner, {
       signal,
     });
+    if (uploads) return this.uploadHits(owner, items, limit, signal);
     const hits = items
       .filter(
         (item) =>
@@ -876,6 +895,30 @@ export class McpMedia {
       .slice(0, limit);
     this.adopt(owner, scope, { jobs: [...new Set(hits.map((item) => item.jobId))] });
     return hits.map((item) => ({ ...item, index: outputIndex(item) }));
+  }
+  /**
+   * The account's uploads among gallery `items`, each with its reference (a video's by its first
+   * frame, as the composer takes it) as `assetId`, which Generate then takes. A reference another
+   * MCP owner uploaded is left out.
+   */
+  async uploadHits(owner, items, limit, signal) {
+    const hits = [];
+    for (const item of items) {
+      if (hits.length >= limit) break;
+      if (!item.uploaded || item.status !== "done" || !item.id) continue;
+      const { asset } = await this.request(
+        "POST",
+        "/api/reference-assets/from-gallery",
+        { galleryItemId: item.id, ...(item.type === "video" ? { frame: 0 } : {}) },
+        owner,
+        { signal },
+      );
+      const holders = this.state.assets[asset?.id];
+      if (!asset?.id || (holders && ![holders].flat().includes(owner))) continue;
+      hits.push({ ...item, assetId: asset.id });
+    }
+    this.adopt(owner, "", { assets: hits.map((item) => item.assetId) });
+    return hits;
   }
   /** Scope of a conversation's result numbers: the owner, narrowed by the client's conversation when it sends one. */
   referenceScope(owner, conversation = "") {
@@ -1034,6 +1077,70 @@ export class McpMedia {
     const sealed = Buffer.concat([cipher.update(JSON.stringify(claims)), cipher.final()]);
     return `${prefix}.${iv.toString("base64url")}.${sealed.toString("base64url")}.${cipher.getAuthTag().toString("base64url")}`;
   }
+  /** The claims of a sealed link split at its dots, or a throw when anything about it is off. */
+  unseal([, iv, sealed, tag, extra]) {
+    // Canonical base64url only: an altered character must never decode to the same bytes.
+    const canonical = (part) => Buffer.from(part, "base64url").toString("base64url") === part;
+    if (extra !== undefined || !iv || !sealed || !tag || ![iv, sealed, tag].every(canonical))
+      throw new Error("Invalid result link.");
+    try {
+      // A full 16-byte tag only: older Node accepts truncated tags, which are easier to forge.
+      const tagBytes = Buffer.from(tag, "base64url");
+      if (tagBytes.length !== 16) throw new Error("short tag");
+      const decipher = crypto.createDecipheriv(
+        "aes-256-gcm",
+        Buffer.from(this.sealingKey()),
+        Buffer.from(iv, "base64url"),
+        { authTagLength: 16 },
+      );
+      decipher.setAuthTag(tagBytes);
+      return JSON.parse(
+        Buffer.concat([
+          decipher.update(Buffer.from(sealed, "base64url")),
+          decipher.final(),
+        ]).toString(),
+      );
+    } catch {
+      throw new Error("Invalid result link.");
+    }
+  }
+  /**
+   * A one-time upload page's link (UploadLink) for the owner: sealed like a result link, it takes
+   * one image within uploadLinkMs. Open links are held in memory only, so a restart ends them.
+   */
+  uploadUrl(owner) {
+    const now = Date.now();
+    for (const [nonce, expires] of this.uploadLinks)
+      if (expires <= now) this.uploadLinks.delete(nonce);
+    const nonce = crypto.randomBytes(16).toString("base64url");
+    const expires = now + uploadLinkMs;
+    this.uploadLinks.set(nonce, expires);
+    const token = this.seal("u2", { audience: this.publicUrl, owner, nonce, expires });
+    return { url: `${this.publicUrl}/mcp/results/upload/${token}`, expires };
+  }
+  /** An open upload link's claims, or a throw once it is used, expired, altered or for another studio. */
+  uploadClaims(token) {
+    const parts = String(token || "").split(".");
+    if (parts[0] !== "u2") throw new Error("Invalid upload link.");
+    const claims = this.unseal(parts);
+    if (
+      claims.audience !== this.publicUrl ||
+      !(claims.expires > Date.now()) ||
+      this.uploadLinks.get(claims.nonce) !== claims.expires
+    )
+      throw new Error("Invalid upload link.");
+    return claims;
+  }
+  /** Saves the page's image as the link owner's upload and closes the link; a failed save leaves it open. */
+  async uploadByLink(claims, file, credential) {
+    if (!this.uploadLinks.delete(claims.nonce)) throw new Error("Invalid upload link.");
+    try {
+      return (await this.store(claims.owner, file.buffer, file.name, { credential })).asset;
+    } catch (error) {
+      if (claims.expires > Date.now()) this.uploadLinks.set(claims.nonce, claims.expires);
+      throw error;
+    }
+  }
   linkKey(audience, owner, jobId, index) {
     return JSON.stringify([audience, owner, jobId, index ?? "page"]);
   }
@@ -1124,33 +1231,8 @@ export class McpMedia {
     }
     const parts = String(token || "").split(".");
     let claims;
-    if (parts[0] === "v2" || parts[0] === "p2") {
-      const [, iv, sealed, tag, extra] = parts;
-      // Canonical base64url only: an altered character must never decode to the same bytes.
-      const canonical = (part) => Buffer.from(part, "base64url").toString("base64url") === part;
-      if (extra !== undefined || !iv || !sealed || !tag || ![iv, sealed, tag].every(canonical))
-        throw new Error("Invalid result link.");
-      try {
-        // A full 16-byte tag only: older Node accepts truncated tags, which are easier to forge.
-        const tagBytes = Buffer.from(tag, "base64url");
-        if (tagBytes.length !== 16) throw new Error("short tag");
-        const decipher = crypto.createDecipheriv(
-          "aes-256-gcm",
-          Buffer.from(this.sealingKey()),
-          Buffer.from(iv, "base64url"),
-          { authTagLength: 16 },
-        );
-        decipher.setAuthTag(tagBytes);
-        claims = JSON.parse(
-          Buffer.concat([
-            decipher.update(Buffer.from(sealed, "base64url")),
-            decipher.final(),
-          ]).toString(),
-        );
-      } catch {
-        throw new Error("Invalid result link.");
-      }
-    } else {
+    if (parts[0] === "v2" || parts[0] === "p2") claims = this.unseal(parts);
+    else {
       // Links issued before sealing: a readable payload with its signature, and any expiry it carried.
       const [payload, signature, extra] = parts;
       const expected = this.digest(payload || "");
@@ -1483,42 +1565,53 @@ export class McpMedia {
     return (width > 0 && height > 0 && frameSize(profile, width, height)) || {};
   }
   async upload(owner, base64, filename = "reference.png") {
-    if (
-      base64.length > 28000000 ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
-    )
-      throw new Error("Supply a base64 PNG, JPEG or WebP image of at most 20 MB.");
-    const content = Buffer.from(base64, "base64");
-    if (!content.length || content.length > 20000000)
-      throw new Error("Reference images must be at most 20 MB.");
-    let metadata;
+    if (base64.length > 28000000) throw new Error("Reference images must be at most 20 MB.");
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64))
+      throw new Error(`That isn't a base64 PNG, JPEG or WebP image. ${attachedImageHint}`);
+    return this.store(owner, Buffer.from(base64, "base64"), filename, {
+      advice: ` For a Studio result, call Reuse with mode reference and its ref. ${attachedImageHint}`,
+    });
+  }
+  /**
+   * Saves an image as the owner's Studio upload through the studio's own upload route, so the
+   * owner's tools take its reference. A HEIC photo becomes a JPEG when sharp can read it.
+   */
+  async store(owner, content, filename, { credential, advice = "" } = {}) {
+    if (content.length > 20000000) throw new Error("Reference images must be at most 20 MB.");
+    let metadata = {};
     try {
-      metadata = await sharp(content, { limitInputPixels: 80000000 }).metadata();
+      if (content.length)
+        metadata = await sharp(content, { limitInputPixels: 80000000 }).metadata();
     } catch {
-      throw new Error("Use a PNG, JPEG or WebP reference image.");
+      /* Not an image. */
     }
+    if (metadata.format === "heif")
+      try {
+        content = await sharp(content, { limitInputPixels: 80000000 })
+          .rotate()
+          .jpeg({ quality: 92 })
+          .toBuffer();
+        metadata = await sharp(content).metadata();
+        filename = `${path.basename(filename).replace(/\.[a-z0-9]+$/i, "")}.jpg`;
+      } catch {
+        throw new Error("Studio can't read this HEIC photo. Choose a PNG, JPEG or WebP image.");
+      }
     if (!["png", "jpeg", "webp"].includes(metadata.format))
-      throw new Error("Use a PNG, JPEG or WebP reference image.");
+      throw new Error(`That isn't a PNG, JPEG or WebP image.${advice}`);
     // A chat model without the image's bytes tends to send a made-up few-pixel image, which a model's encoder rejects.
     if (Math.min(metadata.width, metadata.height) < 32)
-      throw new Error(
-        "This image is only a few pixels, so it is not the real picture. For a Studio result, call Reuse with mode reference and its ref; otherwise upload the user's actual image.",
-      );
+      throw new Error(`This image is only a few pixels, so it is not the real picture.${advice}`);
     const form = new FormData();
     form.append(
       "image",
       new Blob([content], { type: `image/${metadata.format}` }),
       path.basename(filename),
     );
-    const result = await this.request("POST", "/api/reference-assets/upload", form, owner);
+    const result = await this.request("POST", "/api/reference-assets/upload", form, owner, {
+      credential,
+    });
     if (!result.asset?.id) throw new Error("Studio could not accept this reference image.");
-    this.state.assets[result.asset.id] = [
-      ...new Set([
-        ...(this.state.assets[result.asset.id] ? [this.state.assets[result.asset.id]].flat() : []),
-        owner,
-      ]),
-    ];
-    this.save();
+    this.adopt(owner, "", { assets: [result.asset.id] });
     return result;
   }
   /**
