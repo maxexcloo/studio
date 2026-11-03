@@ -149,7 +149,7 @@ test("the migration merges every source by folder/file with provenance, the more
   assert.deepEqual(snapshot(f.dir), before, "the source files stay exactly as they were");
 });
 
-test("the migration is idempotent and definition changes flow, unless Studio changed the entry", (t) => {
+test("the migration is idempotent and a source file that goes keeps its last layer", (t) => {
   const f = fixture(t);
   f.store().migrate();
   const file = path.join(f.dir, "library", "catalogue.json");
@@ -157,20 +157,6 @@ test("the migration is idempotent and definition changes flow, unless Studio cha
   const again = f.store();
   assert.equal(again.migrate(), false, "nothing new on the second start");
   assert.equal(fs.readFileSync(file, "utf8"), first);
-  // A definitions update reaches entries Studio hasn't edited.
-  const definitions = path.join(f.dir, "config", "catalogue.json");
-  fs.writeFileSync(
-    definitions,
-    JSON.stringify({ "loras/defined.safetensors": { title: "Defined" } }),
-  );
-  assert.equal(again.entry("loras/defined.safetensors").title, "Defined");
-  again.edit("loras/defined.safetensors", { title: "Studio Defined" }, { by: "admin-1" });
-  fs.writeFileSync(
-    definitions,
-    JSON.stringify({ "loras/defined.safetensors": { title: "Defined v2", note: "Low" } }),
-  );
-  assert.equal(again.entry("loras/defined.safetensors").title, "Studio Defined");
-  assert.equal(again.entry("loras/defined.safetensors").note, "Low");
   // A source file that goes keeps its last layer.
   fs.rmSync(path.join(f.dir, "model-download-sources.json"));
   assert.equal(f.store().entry("loras/style.safetensors").sha256, hex("a"));

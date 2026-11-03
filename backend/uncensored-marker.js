@@ -34,7 +34,6 @@ function catalogueFiles(dataDir) {
   const imports = path.join(dataDir, "library", "imports");
   return [
     "library/catalogue.json",
-    "config/catalogue.json",
     "model-download-sources.json",
     ...(fs.existsSync(imports)
       ? fs
