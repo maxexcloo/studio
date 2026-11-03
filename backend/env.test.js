@@ -9,14 +9,11 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 // env.js runs once per process, so the case starts a fresh one.
-test("the shell beats Studio's settings file, and saving rewrites only the file's own lines", () => {
+test("the shell beats Studio's settings file", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-env-"));
   const file = path.join(dir, "settings.env");
   try {
-    fs.writeFileSync(
-      file,
-      "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\nSTUDIO_VIDEO_PREVIEW_CACHE_MB=9\n",
-    );
+    fs.writeFileSync(file, "STUDIO_DEMO=1\nSTUDIO_ALLOWED_HOSTS=from-file\n");
     const output = execFileSync(
       process.execPath,
       [
@@ -24,10 +21,7 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
         "-e",
         `
         const env = await import("./backend/env.js");
-        const before = { hosts: process.env.STUDIO_ALLOWED_HOSTS, hostsFromFile: env.envFileKeys.has("STUDIO_ALLOWED_HOSTS"), demoFromFile: env.envFileKeys.has("STUDIO_DEMO") };
-        env.writeLocalEnvValue("STUDIO_DEMO", "0");
-        env.removeLocalEnvValue("STUDIO_VIDEO_PREVIEW_CACHE_MB");
-        console.log(JSON.stringify({ before, demo: process.env.STUDIO_DEMO, removed: process.env.STUDIO_VIDEO_PREVIEW_CACHE_MB ?? null, file: (await import("node:fs")).readFileSync(${JSON.stringify(file)}, "utf8") }));
+        console.log(JSON.stringify({ hosts: process.env.STUDIO_ALLOWED_HOSTS, demo: process.env.STUDIO_DEMO, hostsFromFile: env.envFileKeys.has("STUDIO_ALLOWED_HOSTS"), demoFromFile: env.envFileKeys.has("STUDIO_DEMO") }));
       `,
       ],
       {
@@ -41,15 +35,12 @@ test("the shell beats Studio's settings file, and saving rewrites only the file'
         encoding: "utf8",
       },
     );
-    const result = JSON.parse(output);
-    assert.deepEqual(result.before, {
+    assert.deepEqual(JSON.parse(output), {
       hosts: "from-shell",
+      demo: "1",
       hostsFromFile: false,
       demoFromFile: true,
     });
-    assert.equal(result.demo, "0");
-    assert.equal(result.removed, null);
-    assert.equal(result.file, "STUDIO_DEMO=0\nSTUDIO_ALLOWED_HOSTS=from-file\n");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

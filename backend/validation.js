@@ -5,7 +5,6 @@ import { optionalLoraPolicyIssue } from "./lora/catalogue.js";
 import { missingNodes, nodeRange, optionsFor } from "./comfy/comfy.js";
 import { inferModels } from "./model/models.js";
 import { getCustomWorkflow } from "./custom-workflows.js";
-import { inpaintingEnabled } from "./features.js";
 import { hasReferenceImage, resolveImageMode } from "./workflow-modes.js";
 
 function clampNumber(value, fallback, min, max) {
@@ -100,8 +99,7 @@ function sanitizeLoras(input = {}, info = {}, profile = null, kind = "image", ma
  */
 function sanitizeInpaint(input, profile, referenceAssets) {
   const mask = String(input.inpaint?.mask || "");
-  if (!inpaintingEnabled || !mask || !profile.capabilities.inpaint || !referenceAssets.length)
-    return null;
+  if (!mask || !profile.capabilities.inpaint || !referenceAssets.length) return null;
   if (!mask.startsWith("data:image/png;base64,"))
     throw new Error("The painted mask didn’t come through. Paint it again.");
   const strength = Number(input.inpaint.strength);
