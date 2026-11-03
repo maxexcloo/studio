@@ -4,6 +4,7 @@ import { icons } from "../../ui/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api";
 import { NumberSetting } from "../../ui/NumberSetting";
+import { SettingRow } from "../../ui/SettingRows";
 import { usePhone } from "../../ui/usePhone";
 import { dreamQuery, type Dream, type DreamSettings } from "./queries";
 
@@ -28,51 +29,42 @@ export function useDreamSettings() {
 function SettingsForm({ dream }: { dream: Dream }) {
   const save = useDreamSettings();
   const { settings } = dream;
+  const toggle = (key: "enabled" | "spicy" | "videos", label: string, description: string) => (
+    <SettingRow label={label} description={description}>
+      <Switch
+        aria-label={label}
+        checked={settings[key]}
+        onChange={(event) => save.mutate({ [key]: event.currentTarget.checked })}
+      />
+    </SettingRow>
+  );
+  const number = (
+    key: "buffer" | "dailyImages" | "dailyVideos",
+    label: string,
+    max: number,
+    description?: string,
+  ) => (
+    <SettingRow label={label} description={description}>
+      <NumberSetting
+        label={label}
+        value={settings[key]}
+        min={key === "buffer" ? 1 : 0}
+        max={max}
+        disabled={key === "dailyVideos" && !settings.videos}
+        onSave={(value) => save.mutate({ [key]: value })}
+      />
+    </SettingRow>
+  );
   return (
-    <Stack gap="md">
-      <Switch
-        label="Dream"
-        description="Make new images in idle time from your taste profile."
-        checked={settings.enabled}
-        onChange={(event) => save.mutate({ enabled: event.currentTarget.checked })}
-      />
-      <NumberSetting
-        label="Unseen Buffer"
-        description="Dream waits once this many results are unseen."
-        value={settings.buffer}
-        min={1}
-        max={50}
-        onSave={(buffer) => save.mutate({ buffer })}
-      />
-      <NumberSetting
-        label="Images per Day"
-        value={settings.dailyImages}
-        min={0}
-        max={500}
-        onSave={(dailyImages) => save.mutate({ dailyImages })}
-      />
-      <Switch
-        label="Videos"
-        description="Animate kept or starred images too."
-        checked={settings.videos}
-        onChange={(event) => save.mutate({ videos: event.currentTarget.checked })}
-      />
-      <NumberSetting
-        label="Videos per Day"
-        value={settings.dailyVideos}
-        min={0}
-        max={100}
-        disabled={!settings.videos}
-        onSave={(dailyVideos) => save.mutate({ dailyVideos })}
-      />
-      {dream.spicyAvailable && (
-        <Switch
-          label="Spicy"
-          description="Allow explicit themes."
-          checked={settings.spicy}
-          onChange={(event) => save.mutate({ spicy: event.currentTarget.checked })}
-        />
-      )}
+    <Stack gap="xs">
+      <div>
+        {toggle("enabled", "Dream", "Make new images in idle time from your taste profile.")}
+        {number("buffer", "Unseen Buffer", 50, "Dream waits once this many results are unseen.")}
+        {number("dailyImages", "Images per Day", 500)}
+        {toggle("videos", "Videos", "Animate kept or starred images too.")}
+        {number("dailyVideos", "Videos per Day", 100)}
+        {dream.spicyAvailable && toggle("spicy", "Spicy", "Allow explicit themes.")}
+      </div>
       {save.error && (
         <Alert color="red" title="Couldn’t Save Dream Settings">
           {save.error.message}

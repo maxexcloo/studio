@@ -1,10 +1,12 @@
 import { NumberInput } from "@mantine/core";
 import { useState } from "react";
 
-/** A whole-number setting saved on blur or Enter; an out-of-range entry snaps back. */
+/**
+ * A setting row's whole-number control, saved on blur or Enter; an out-of-range entry snaps back.
+ * The row shows `label`, which names the input.
+ */
 export function NumberSetting({
   label,
-  description,
   value,
   min,
   max,
@@ -12,7 +14,6 @@ export function NumberSetting({
   onSave,
 }: {
   label: string;
-  description?: string;
   value: number;
   min: number;
   max: number;
@@ -27,12 +28,12 @@ export function NumberSetting({
   };
   return (
     <NumberInput
-      label={label}
-      description={description}
+      aria-label={label}
       value={draft}
       min={min}
       max={max}
-      size="sm"
+      size="xs"
+      w={80}
       allowDecimal={false}
       clampBehavior="strict"
       disabled={disabled}
