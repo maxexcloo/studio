@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Badge, Button, Menu, Modal, Select, Stack, Text } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, ListRestart } from "lucide-react";
+import { Check, ExternalLink, ListRestart } from "lucide-react";
 import { icons } from "../../ui/icons";
 import type { UnfinishedJob } from "../../../../shared/queue";
 import { api, post } from "../../api";
-import { copyText } from "../../ui/clipboard";
+import { useCopy } from "../../ui/clipboard";
 import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { DataTable } from "../../ui/DataTable";
 import { useAccount, useIsAdmin } from "../auth/AccountGate";
@@ -52,13 +51,10 @@ function DeleteFailedItems() {
         "/api/gallery/errors/clear",
         owner === "mine" ? undefined : { owner },
       ),
-    onSuccess: ({ cleared }) => {
+    onSuccess: () => {
       for (const queryKey of [["gallery"], ["gallery-filters"], ["queue"]])
         void client.invalidateQueries({ queryKey });
       setConfirming(false);
-      notifications.show({
-        message: cleared === 1 ? "1 failed item deleted" : `${count(cleared)} failed items deleted`,
-      });
     },
   });
   return (
@@ -84,6 +80,11 @@ function DeleteFailedItems() {
       >
         Delete
       </Button>
+      {remove.data && (
+        <Text size="sm" c="dimmed">
+          {remove.data.cleared === 1 ? "1 deleted" : `${count(remove.data.cleared)} deleted`}
+        </Text>
+      )}
       <ConfirmDialog
         opened={confirming}
         title="Delete Failed Items"
@@ -114,11 +115,10 @@ function UnfinishedItems() {
   const act = useMutation({
     mutationFn: ({ action, job }: { action: "retry" | "delete"; job: UnfinishedJob }) =>
       post(`/api/maintenance/unfinished/${action}`, { ownerId: job.ownerId, id: job.id }),
-    onSuccess: (_data, { action }) => {
+    onSuccess: () => {
       for (const queryKey of [unfinishedQuery.queryKey, ["queue"], ["gallery"]])
         void client.invalidateQueries({ queryKey });
       setDeleting(null);
-      notifications.show({ message: action === "retry" ? "Queued again" : "Item deleted" });
     },
   });
   const jobs = unfinished.data?.jobs || [];
@@ -226,6 +226,7 @@ function UnfinishedItems() {
 /** Settings › Maintenance: clean-up and bug-report tools backed by the gallery and diagnostics routes. */
 export function MaintenanceSettings() {
   const admin = useIsAdmin();
+  const { copied, copy } = useCopy();
   // Read ahead so copying stays inside the tap, which Safari requires for the clipboard.
   const diagnostics = useQuery({
     queryKey: ["diagnostics"],
@@ -278,12 +279,12 @@ export function MaintenanceSettings() {
         >
           <Button
             variant="default"
-            leftSection={<icons.copy size={16} />}
+            leftSection={copied ? <Check size={16} /> : <icons.copy size={16} />}
             loading={diagnostics.isPending}
             disabled={!diagnostics.data}
-            onClick={() => diagnostics.data && void copyText(diagnostics.data.text, "Diagnostics")}
+            onClick={() => diagnostics.data && copy(diagnostics.data.text)}
           >
-            Copy
+            {copied ? "Copied" : "Copy"}
           </Button>
         </SettingRow>
         <SettingRow label="Troubleshooting" description="Common errors and how to fix them.">

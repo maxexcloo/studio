@@ -23,7 +23,7 @@ primary component reference and verify APIs against the installed version.
   `MutationCache` default notification. Do not add per-call duplicate surfaces.
 - Recurring UI has one owner: `GenerationEditor` for gallery and timeline
   editing, one item-actions list for every media surface, `ConfirmDialog`,
-  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and `copyText`.
+  `DataTable`, `EmptyState`, `LoadingState`, `StudioLogo`, `TextBox` and copying (`copyText` for menu items, `useCopy` for buttons).
 - `ui/icons.ts` gives each meaning one icon, and actions, modes and recurring
   controls take theirs from it: SlidersHorizontal only for Prompt and composer
   settings, ListFilter for filters, the gear for settings, Layers only for
@@ -354,8 +354,10 @@ primary component reference and verify APIs against the installed version.
   Shared `SearchInput` reads Search, never naming what it searches (its
   accessible name does), and clears only the query, never a selected model/profile.
   Queue access has one owner: the header status action.
-- Use notifications for action outcomes and inline alerts for failed forms or
-  views. Notifications sit bottom right, raised clear of the composer and viewer
+- Use notifications for failures, Undo offers and outcomes with nowhere else to
+  show (a menu item's Copy), and inline alerts for failed forms or views. Routine
+  success shows where it happened, never as a toast: a copy button's check, a
+  saved record in its list, a short line beside the action. Notifications sit bottom right, raised clear of the composer and viewer
   action bars, so they never cover header buttons. Generation is the exception: submitting and completing show in the
   gallery, strip or card, never as toasts. Avoid duplicate error surfaces. Use Title Case for headings, labels
   and actions, and Australian English for explanatory prose. Placeholders are

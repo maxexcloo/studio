@@ -68,14 +68,13 @@ export function PresetPicker({
       id?: string;
       method: "POST" | "PATCH" | "DELETE";
       value?: Partial<Preset>;
-      message?: string;
       deleted?: Preset;
     }) =>
       api<{ preset?: Preset }>(
         id ? `/api/user-presets/${encodeURIComponent(id)}` : "/api/user-presets",
         json(method, value ?? {}),
       ),
-    onSuccess: ({ preset }, { method, message, deleted }) => {
+    onSuccess: ({ preset }, { method, deleted }) => {
       refresh();
       if (method === "POST" && preset)
         onSelectionChange({ presetId: preset.id, presetTitle: preset.title });
@@ -100,7 +99,7 @@ export function PresetPicker({
             </Group>
           ),
         });
-      } else if (message) notifications.show({ message });
+      }
     },
   });
   // The list arrives newest first; saved items sort undated records by their place, oldest first.
@@ -140,7 +139,6 @@ export function PresetPicker({
               id: preset.id,
               method: "PATCH",
               value: { input: current() },
-              message: "Preset updated",
             })
           }
           onDelete={(preset) => change.mutate({ id: preset.id, method: "DELETE", deleted: preset })}
@@ -155,7 +153,6 @@ export function PresetPicker({
               change.mutate({
                 method: "POST",
                 value: { title, input: current() },
-                message: "Preset saved",
               })
             }
           />

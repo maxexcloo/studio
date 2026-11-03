@@ -46,7 +46,7 @@ test("Settings follow the settled section order and run maintenance and worker r
   const confirm = page.getByRole("dialog", { name: "Delete Failed Items", exact: true });
   await expect(confirm).toContainText("Remove member@example.test's failed and cancelled items");
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
-  await expect(page.getByText("2 failed items deleted", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 deleted", { exact: true })).toBeVisible();
   expect(cleared).toEqual([{ owner: "member" }]);
   await section(page, "Settings", "Workers");
   await expect(page.getByRole("region", { name: "Services", exact: true })).toHaveText(
@@ -159,7 +159,6 @@ test("Unfinished Items in Settings › Maintenance retry and delete any account'
   );
   await dialog.getByRole("button", { name: "Actions for A lost lighthouse", exact: true }).click();
   await page.getByRole("menuitem", { name: "Retry", exact: true }).click();
-  await expect(page.getByText("Queued again", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("row", { name: "A lost lighthouse" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Actions for A slow tide", exact: true }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();

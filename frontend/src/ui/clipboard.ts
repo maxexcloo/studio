@@ -1,11 +1,30 @@
+import { useRef, useState } from "react";
 import { notifications } from "@mantine/notifications";
 import { failure } from "../api";
 
-/** Copies text and reports the outcome as "<label> copied" or a failure. */
+/**
+ * Copies text from a menu item, which closes with nothing left to show the result, so it reports
+ * "<label> copied" or a failure. Buttons use `useCopy`, showing the result on themselves.
+ */
 export function copyText(text: string, label: string): Promise<void> {
   return writeText(text).then(() => {
     notifications.show({ message: `${label} copied` });
   }, failure);
+}
+
+/** A copy button's copy: `copied` names what it copied last for a moment; failures still report. */
+export function useCopy() {
+  const [copied, setCopied] = useState<string>();
+  const timer = useRef(0);
+  return {
+    copied,
+    copy: (text: string, name = "text") =>
+      void writeText(text).then(() => {
+        setCopied(name);
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => setCopied(undefined), 1500);
+      }, failure),
+  };
 }
 /**
  * Copies inside the tap itself, as iOS Safari requires: a selected text area and the copy command

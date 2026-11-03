@@ -136,10 +136,9 @@ export function ProfilePicker({
           const parked = profileReadiness(profile, workers)?.workloads;
           if (admin && startParked && parked?.length) {
             const name = profileName(profile);
-            void runtime.start(parked, name, () => {
-              notifications.show({ message: `${name} is ready.` });
-              void client.invalidateQueries({ queryKey: modelsQuery.queryKey });
-            });
+            void runtime.start(parked, name, () =>
+              client.invalidateQueries({ queryKey: modelsQuery.queryKey }),
+            );
           }
         }}
         swatch={runtime.starting && !failure ? "yellow" : readiness?.color}
