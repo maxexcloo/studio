@@ -10,6 +10,7 @@ import {
   Title,
   Tooltip,
 } from "@mantine/core";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import type { MediaItem, Profile, ReferenceAsset } from "../../types";
@@ -172,12 +173,28 @@ export function useSettingsText(item: MediaItem) {
       .join("\n");
 }
 
-/** A prompt on a subtle surface; long prompts scroll within a bounded height. */
-function PromptText({ dimmed, children }: { dimmed?: boolean; children: React.ReactNode }) {
+/**
+ * A prompt or caption on a subtle surface; long text scrolls within a bounded height, or `clamped`
+ * shows its first two lines ending in "…".
+ */
+function PromptText({
+  dimmed,
+  clamped,
+  children,
+}: {
+  dimmed?: boolean;
+  clamped?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div className={classes.promptText}>
       <ScrollArea.Autosize mah="12rem">
-        <Text size="sm" c={dimmed ? "dimmed" : undefined} style={{ whiteSpace: "pre-wrap" }}>
+        <Text
+          size="sm"
+          c={dimmed ? "dimmed" : undefined}
+          lineClamp={clamped ? 2 : undefined}
+          style={{ whiteSpace: "pre-wrap" }}
+        >
           {children}
         </Text>
       </ScrollArea.Autosize>
@@ -201,13 +218,70 @@ function useMediaSize(url: string) {
   });
 }
 
-/** One Details section: its heading over its content. */
-function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+/** One Details section: its heading, with any `action` at its end, over its content. */
+function DetailSection({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <Stack gap={6}>
-      <Title order={6}>{title}</Title>
+      <Group justify="space-between" wrap="nowrap">
+        <Title order={6}>{title}</Title>
+        {action}
+      </Group>
       {children}
     </Stack>
+  );
+}
+
+/** The gallery caption in the prompt's style, expanded until Show Less folds it to two lines. */
+function Caption({ item }: { item: MediaItem }) {
+  const [open, setOpen] = useState(true);
+  const caption = item.caption;
+  if (!caption?.text && !caption?.tags?.length) return null;
+  return (
+    <DetailSection
+      title="Caption"
+      action={
+        <Anchor
+          component="button"
+          type="button"
+          size="xs"
+          c="dimmed"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? "Show Less" : "Show More"}
+        </Anchor>
+      }
+    >
+      {caption.text && <PromptText clamped={!open}>{caption.text}</PromptText>}
+      {open && !!caption.tags?.length && (
+        <Group gap={4} aria-label="Caption Tags">
+          {[...caption.tags]
+            .sort((a, b) => a.localeCompare(b))
+            .map((tag) => (
+              <Badge
+                key={tag}
+                component={Link}
+                to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
+                aria-label={`Search ${tag}`}
+                variant="default"
+                radius="sm"
+                size="sm"
+                fw={400}
+                style={{ cursor: "pointer" }}
+              >
+                {tag}
+              </Badge>
+            ))}
+        </Group>
+      )}
+    </DetailSection>
   );
 }
 
@@ -302,32 +376,7 @@ export function MediaDetails({
         <WritingThinking writing={item.writing} />
         {item.negative && <PromptText dimmed>Negative: {item.negative}</PromptText>}
       </DetailSection>
-      {(item.caption?.text || !!item.caption?.tags?.length) && (
-        <DetailSection title="Caption">
-          {item.caption?.text && <Text size="sm">{item.caption.text}</Text>}
-          {!!item.caption?.tags?.length && (
-            <Group gap={4} aria-label="Caption Tags">
-              {[...item.caption.tags]
-                .sort((a, b) => a.localeCompare(b))
-                .map((tag) => (
-                  <Badge
-                    key={tag}
-                    component={Link}
-                    to={`${item.type === "video" ? "/video" : "/images"}?q=${encodeURIComponent(tag)}`}
-                    aria-label={`Search ${tag}`}
-                    variant="default"
-                    radius="sm"
-                    size="sm"
-                    fw={400}
-                    style={{ cursor: "pointer" }}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-            </Group>
-          )}
-        </DetailSection>
-      )}
+      <Caption item={item} />
       {item.source && (
         <DetailSection title="Source">
           <Anchor href={item.source.url} target="_blank" rel="noreferrer" size="sm">

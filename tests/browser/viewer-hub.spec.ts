@@ -828,6 +828,10 @@ test("Details show the gallery caption and its tags", async ({ page }, testInfo)
   ).toBeVisible();
   const tags = details.getByLabel("Caption Tags", { exact: true });
   await expect(tags.getByRole("link")).toHaveText(["bird", "branch"]);
+  // The caption starts expanded; Show Less folds it and Show More brings it back.
+  await details.getByRole("button", { name: "Show Less", exact: true }).click();
+  await expect(tags).toBeHidden();
+  await details.getByRole("button", { name: "Show More", exact: true }).click();
   // A tag searches the gallery for it and closes the viewer.
   await tags.getByRole("link", { name: "Search branch", exact: true }).click();
   await expect(viewer).toBeHidden();
