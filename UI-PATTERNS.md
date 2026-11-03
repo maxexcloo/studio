@@ -47,7 +47,8 @@ primary component reference and verify APIs against the installed version.
   popover forms) step down one tier to bar height: Button `sm`/`compact-sm`,
   inputs and SegmentedControl `xs`/`sm`, Badge `xs`/`sm`. Emphasis: one filled primary action per view, `default` for
   secondary actions, `subtle` for row and toolbar actions, `light` status
-  Badges and filled count dots. Set a per-call size only to step down a tier, never to restate a default.
+  Badges and filled count dots. Disabled controls keep their normal look at
+  40% opacity. Set a per-call size only to step down a tier, never to restate a default.
 - Use Mantine spacing, typography, colours and breakpoints, including custom
   media CSS. Give Paper padding and borders explicitly where needed; do not
   apply global Paper defaults that leak into dialogs and navigation.
