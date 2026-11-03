@@ -10,6 +10,7 @@ process.env.STUDIO_DATA_DIR = temporary;
 process.env.STUDIO_DEFAULT_IMAGE_PROFILE = "deployment-profile";
 delete process.env.STUDIO_GALLERY_CAPTIONS;
 delete process.env.STUDIO_IMAGE_SEARCH;
+delete process.env.STUDIO_GALLERY_WHILE_BUSY;
 writeRuntimeDocument(temporary, "settings", {
   STUDIO_GALLERY_CAPTIONS: "0",
   STUDIO_DEFAULT_IMAGE_PROFILE: "saved-profile",
@@ -33,6 +34,19 @@ test("values report their source and only deployment values are locked", () => {
     locked: false,
   });
   assert.equal(settings.flagEnabled("STUDIO_IMAGE_SEARCH"), true, "Image Search starts on");
+  assert.equal(
+    settings.flagEnabled("STUDIO_GALLERY_WHILE_BUSY"),
+    false,
+    "Run While Busy starts off",
+  );
+});
+
+test("a switch saves only when it differs from its default", () => {
+  settings.saveFlag("STUDIO_GALLERY_WHILE_BUSY", true);
+  assert.equal(settings.flagEnabled("STUDIO_GALLERY_WHILE_BUSY"), true);
+  settings.saveFlag("STUDIO_GALLERY_WHILE_BUSY", false);
+  assert.equal(settings.flagEnabled("STUDIO_GALLERY_WHILE_BUSY"), false);
+  assert.equal(readRuntimeDocument(temporary, "settings").STUDIO_GALLERY_WHILE_BUSY, undefined);
 });
 
 test("saving writes SQLite, refuses deployment values and clears back to the default", () => {

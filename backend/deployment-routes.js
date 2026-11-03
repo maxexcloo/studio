@@ -9,6 +9,7 @@ import {
   describeFlag,
   isCatalogueFlag,
   saveDeploymentSetting,
+  saveFlag,
   settingSource,
 } from "./deployment-settings.js";
 import { presetsEnabled } from "./features.js";
@@ -76,14 +77,7 @@ export function registerDeploymentRoutes(
     try {
       if (isCatalogueFlag(key)) {
         if (typeof value !== "boolean") throw new Error("Choose on or off.");
-        // On (the default) is no saved value at all, so a later default change still applies.
-        res.json({
-          ok: true,
-          setting: {
-            ...saveDeploymentSetting(key, value ? "" : "0"),
-            key,
-          },
-        });
+        res.json({ ok: true, setting: { ...saveFlag(key, value), key } });
         return;
       }
       if (assistantSettingKeys.includes(key)) {

@@ -39,8 +39,14 @@ export function settingSource(key) {
   return { source: "deployment", locked: true };
 }
 
-// Each switch is on unless set to 0.
-const flag = (key, label, description) => ({ key, label, description, kind: "flag" });
+// A switch is 0 or 1, or unset for its default (on unless `defaultOn` is false).
+const flag = (key, label, description, defaultOn = true) => ({
+  key,
+  label,
+  description,
+  kind: "flag",
+  defaultOn,
+});
 
 /**
  * Catalogue switches: what the generation catalogue offers. LoRAs, Cloud Models
@@ -58,9 +64,21 @@ export const catalogueFlags = [
     "Image Search",
     "Gallery search also finds images that look like the words, read by SigLIP 2 on Studio's CPU while it is idle. Downloads the model (about 690 MB) into the data folder.",
   ),
+  flag(
+    "STUDIO_GALLERY_WHILE_BUSY",
+    "Run While Busy",
+    "Caption, index and title the gallery even while Studio is generating or chatting, instead of waiting until it is idle.",
+    false,
+  ),
 ];
 
-const flagOn = (item) => process.env[item.key] !== "0";
+const flagOn = (item) => (process.env[item.key] ? process.env[item.key] !== "0" : item.defaultOn);
+
+/** Saves a catalogue switch: its default is no saved value, so a later default change still applies. */
+export function saveFlag(key, on) {
+  const item = catalogueFlags.find((entry) => entry.key === key);
+  return saveDeploymentSetting(key, on === item.defaultOn ? "" : on ? "1" : "0");
+}
 
 /** Whether a catalogue switch is on now (Settings saves apply at once). */
 export function flagEnabled(key) {
