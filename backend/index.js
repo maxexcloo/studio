@@ -23,10 +23,8 @@ import {
   registerSuggestionRoutes,
 } from "./domain/suggestions.ts";
 import { createTaste, preferenceSignal, registerTasteRoutes, tasteSignal } from "./domain/taste.ts";
-import { ChatStore } from "./domain/chat-store.ts";
-import { ChatService } from "./domain/chat.ts";
 import { createChatRouter } from "./domain/chat-routes.ts";
-import { publicJob, queuePriority, Store } from "./domain/store.ts";
+import { queuePriority, Store } from "./domain/store.ts";
 import { GenerationQueue } from "./domain/queue.ts";
 import { createCaptioner } from "./domain/captions.ts";
 import { createImageSearch, createImageVectors } from "./domain/image-search.ts";
@@ -57,6 +55,7 @@ import { registerModelDownloadRoutes } from "./model/download-routes.js";
 import { accountMayUseLoras, createModelCatalogue, modelsForAccount } from "./model/catalogue.js";
 import { registerModelRoutes } from "./model/routes.js";
 import { registerStatusRoutes } from "./status-routes.js";
+import { createSessionChat } from "./chat-service.js";
 import { createMcpDomainRequest, resolveSignedMcpResult } from "./mcp/studio-requests.js";
 import { registerUpscaleRoutes } from "./upscale-routes.js";
 import { registerJobRoutes } from "./job-routes.js";
@@ -79,8 +78,7 @@ import {
 import { registerProfileRoutes } from "./profile/routes.js";
 import { draftProfileFromImport } from "./profile/drafts.js";
 import { seedSamples } from "./profile/seed.js";
-import { createAssistant, draftedProfile } from "./assistant.js";
-import { chatModelAllowed, chatSettings, servedChatModels } from "./chat-settings.js";
+import { draftedProfile } from "./assistant.js";
 import { catalogDownloadsForFile } from "./catalog-downloads.js";
 import { familyFromName } from "./family-catalog.js";
 import { downscaleReferences, registerAssistantRoutes } from "./assistant-routes.js";
@@ -166,12 +164,7 @@ import { registerVideoEditRoutes } from "./gallery/video-edits.js";
 import { registerRecreateRoute } from "./gallery/recreate.js";
 
 import { loadLoraLibrary } from "./lora/stacks.js";
-import {
-  bytesForReferenceAccount,
-  galleryStill,
-  referenceAssetForAccount,
-  referenceExistsForAccount,
-} from "./references.js";
+import { bytesForReferenceAccount, galleryStill, referenceAssetForAccount } from "./references.js";
 import { runUpscaleJob } from "./upscale-jobs.js";
 import { compressJson, serveApp } from "./http-assets.js";
 import { isMediaUrl, mediaRoot, mediaSubfolder } from "./media-paths.js";
@@ -1312,173 +1305,17 @@ generationRoutes.setAdmission(async (req, res) => {
   res.status(result.status).json(result.payload);
 });
 
-/** The catalogue profile a Chat draft names, if any. */
-async function chatProfile(input) {
-  const models = await catalogueModels();
-  return models.profiles?.find((item) => item.id === canonicalProfileId(input?.profileId));
-}
-async function selectedChatMediaProfile(input, operation) {
-  const profile = await chatProfile(input);
-  const reject = (message) => {
-    throw Object.assign(new Error(message), { status: 400 });
-  };
-  if (!profile) reject("Choose an available generation model before asking Chat to create media.");
-  const kind = operation === "animate" ? "video" : "image";
-  if ((profile.kind || "image") !== kind)
-    reject(
-      `Choose a ${kind} model for this action; the selected model will not be changed automatically.`,
-    );
-  if (
-    operation !== "image" &&
-    !(
-      profile.capabilities?.startImage ||
-      profile.imageModes?.reference ||
-      profile.mediaInputs?.length
-    )
-  )
-    reject("Choose a model that supports image references for this action.");
-  return profile;
-}
-let chatGateway;
-const sessionChat = new ChatService({
-  store: new ChatStore(store.db),
-  settings: chatSettings,
-  // Chat already requires the prompt assistant; the taste writer check keeps the two in step.
-  taste: (ownerId) => (tasteWriter(ownerId) ? taste.read(ownerId).summary : ""),
-  session: (ownerId, id) => store.session(ownerId, id),
-  // Studio's MCP server for this chat, in process: the tools and rules LibreChat gets.
-  agent: (ownerId, sessionId, owned) =>
-    mcp.agent({
-      owner: ownerId,
-      account: ownerId ? accountAccessForId(ownerId) : undefined,
-      session: sessionId,
-      ...owned,
-    }),
-  results: (ownerId, sessionId) =>
-    store.jobs(ownerId, sessionId).map((job) => ({
-      id: job.id,
-      status: job.status,
-      kind: job.input.kind,
-      profile: job.input.profileId,
-      prompt: job.input.prompt,
-    })),
-  // A text workload's model reads images as its workloads say; Bifrost's cloud models all do.
-  vision: async (modelId) => {
-    const served = (runtime?.controller.workloads || []).filter(
-      (item) =>
-        item.kind === "text" &&
-        item.model &&
-        // A workload model without a provider prefix matches only itself, not every model.
-        (item.model.includes("/")
-          ? modelId.startsWith(item.model.slice(0, item.model.lastIndexOf("/") + 1))
-          : modelId === item.model),
-    );
-    return served.length ? served.every((item) => item.vision === true) : true;
-  },
-  models: async (ownerId) => {
-    const settings = chatSettings();
-    if (!settings) return [];
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated) return [];
-    chatGateway ||= createAssistant(process.env, { resolveSettings: chatSettings });
-    const models = ((await chatGateway?.listModelDetails()) || []).filter((model) =>
-      chatModelAllowed(model.id, settings.patterns),
-    );
-    const workloads = (runtime?.controller.workloads || []).filter(
-      (item) =>
-        item.kind === "text" && item.model && chatModelAllowed(item.model, settings.patterns),
-    );
-    if (!workloads.length) return models;
-    // Only administrators may start a stopped model, as in Settings › Workers.
-    const admin = !multiUserEnabled || account?.role === "administrator";
-    const phases = admin
-      ? undefined
-      : Object.fromEntries(
-          (await runtime.controller.observe()).workloads.map(({ id, phase }) => [id, phase]),
-        );
-    return servedChatModels(models, workloads, phases);
-  },
-  revision: async (ownerId, sessionId, revision) => {
-    const source = store.job(ownerId, revision.sourceJobId);
-    if (!source || source.sessionId !== sessionId)
-      throw Object.assign(new Error("Source generation not found."), { status: 404 });
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
-    const kind = revision.operation === "animate" ? "video" : "image";
-    if (revision.input.kind && revision.input.kind !== kind)
-      throw Object.assign(new Error("The selected operation does not match the media kind."), {
-        status: 400,
-      });
-    const input = { ...revision.input, kind };
-    const profile = await selectedChatMediaProfile(input, revision.operation);
-    const startImage = input.startImageId || input.startImage;
-    if (startImage && !referenceExistsForAccount(account, startImage))
-      throw Object.assign(new Error("The start image does not belong to this account."), {
-        status: 400,
-      });
-    if (!input.referenceAssets?.length && startImage)
-      input.referenceAssets = [
-        { assetId: startImage, slot: profile.mediaInputs?.[0]?.id || "reference" },
-      ];
-    if (revision.operation !== "image" && !input.referenceAssets?.length)
-      throw Object.assign(
-        new Error("Choose a reference image before submitting a refinement or animation."),
-        { status: 400 },
-      );
-    if (input.referenceAssets !== undefined && !Array.isArray(input.referenceAssets))
-      throw Object.assign(new Error("Choose reference images as an array."), { status: 400 });
-    for (const reference of input.referenceAssets || [])
-      if (
-        !reference ||
-        typeof reference.assetId !== "string" ||
-        !referenceExistsForAccount(account, reference.assetId)
-      )
-        throw Object.assign(new Error("Choose reference images belonging to this account."), {
-          status: 400,
-        });
-    const checked = await validateGenerationInput(input, account || undefined);
-    if (checked.status >= 400)
-      throw Object.assign(new Error(checked.payload.error), { status: checked.status });
-    return {
-      sourceJobId: source.id,
-      operation: revision.operation,
-      input,
-      previousInput: source.input,
-    };
-  },
-  reference: async (ownerId, id) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account no longer has access."), { status: 403 });
-    const image = await assistantImage(account, id);
-    if (!image)
-      throw Object.assign(new Error("This reference image cannot be used by Chat."), {
-        status: 400,
-      });
-    return `data:${image.mime};base64,${image.data}`;
-  },
-  // A card revision, already checked by `revision`, runs exactly as submitted.
-  admit: async ({ ownerId, sessionId, turnId, draft }) => {
-    const account = ownerId ? accountAccessForId(ownerId) : undefined;
-    if (ownerId && !account?.authenticated)
-      throw Object.assign(new Error("This account is unavailable."), { status: 403 });
-    const result = await admitGeneration(
-      {
-        ...draft.input,
-        kind: draft.operation === "animate" ? "video" : "image",
-        clientJobId: turnId,
-        allowFallback: draft.input.allowFallback === true,
-      },
-      account || undefined,
-      { sessionId, operation: draft.operation, parentJobId: draft.parentJobId },
-    );
-    if (result.status >= 400)
-      throw Object.assign(new Error(result.payload.error || "Generation could not be started."), {
-        status: result.status,
-      });
-    return { job: publicJob(store.job(ownerId, result.payload.jobId)) };
-  },
+// Studio Chat (chat-service.js).
+const sessionChat = createSessionChat({
+  admit: admitGeneration,
+  catalogueModels,
+  mcp,
+  referenceImage: assistantImage,
+  runtime,
+  store,
+  taste,
+  tasteWriter,
+  validate: validateGenerationInput,
 });
 app.use("/api", createChatRouter(sessionChat, ownerIdForRequest));
 
