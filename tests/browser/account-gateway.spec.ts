@@ -127,31 +127,34 @@ test("Personal MCP credentials can be issued, rotated and revoked without retain
     return route.fulfill({ json: { ok: true, enabled: false, createdAt: "" } });
   });
   await page.goto("/settings#account");
-  await expect(page.getByRole("textbox", { name: "MCP Endpoint", exact: true })).toHaveValue(
-    status.endpoint,
-  );
+  await expect(page.getByText(status.endpoint, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveValue(
-    "browser-fixture-token-1",
-  );
+  const token = page.getByRole("textbox", { name: "New MCP Token", exact: true });
+  await expect(token).toHaveValue("browser-fixture-token-1");
   await expect(page.getByText("Token Active", { exact: true })).toBeVisible();
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
-  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
+  await expect(token).toHaveCount(0);
   await page.getByRole("button", { name: "Rotate Token", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveValue(
-    "browser-fixture-token-2",
-  );
-  await page.getByRole("button", { name: "Revoke Token", exact: true }).click();
+  await expect(token).toHaveValue("browser-fixture-token-2");
+  // Revoking sits in the Danger Zone and confirms first.
+  await page
+    .getByRole("region", { name: "Danger Zone", exact: true })
+    .getByRole("button", { name: "Revoke Token", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Revoke Token", exact: true })
+    .getByRole("button", { name: "Revoke", exact: true })
+    .click();
   await expect(page.getByText("No Token Issued", { exact: true })).toBeVisible();
-  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
+  await expect(token).toHaveCount(0);
   await page.getByRole("button", { name: "Create Token", exact: true }).click();
   await expect.poll(() => issued).toBe(3);
   await section(page, "Settings", "Users");
   await section(page, "Settings", "Account");
   finishLateIssuance();
   await expect(page.getByRole("button", { name: "Rotate Token", exact: true })).toBeEnabled();
-  await expect(page.getByRole("textbox", { name: "MCP Token", exact: true })).toHaveCount(0);
+  await expect(token).toHaveCount(0);
   expect({ issued, revoked }).toEqual({ issued: 3, revoked: 1 });
 });
 
@@ -219,6 +222,10 @@ test("Administrators save and verify per-user cloud and uncensored access throug
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
   await page.getByRole("menuitem", { name: "Disable Account", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Disable Account", exact: true })
+    .getByRole("button", { name: "Disable", exact: true })
+    .click();
   await expect(member.getByText("Disabled", { exact: true })).toBeVisible();
   expect(state.administration.accounts.find((account) => account.id === "member")?.disabled).toBe(
     true,
@@ -230,13 +237,109 @@ test("Users change their email only behind password-protected controls", async (
   await signIn(page, { id: "admin", role: "user" });
   await page.goto("/settings");
   const own = page.getByRole("region", { name: "Your Account", exact: true });
-  await expect(own.getByRole("textbox", { name: "Email", exact: true })).toHaveValue(
+  await expect(own.getByText("admin@example.test", { exact: true })).toBeVisible();
+  await own.getByRole("button", { name: "Change", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Email & Password", exact: true });
+  await expect(dialog.getByRole("textbox", { name: "Email", exact: true })).toHaveValue(
     "admin@example.test",
   );
-  await expect(own.getByRole("textbox", { name: "Current Password", exact: true })).toBeVisible();
   await expect(
-    own.getByRole("button", { name: "Save Email & Password", exact: true }),
+    dialog.getByRole("textbox", { name: "Current Password", exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Save Email & Password", exact: true }),
   ).toBeDisabled();
+});
+
+test("Administrators change roles, reset passwords and delete accounts and empty groups", async ({
+  page,
+}) => {
+  const state = await accountFixture(page);
+  Object.assign(state.administration.accounts[1], { passwordSignIn: true });
+  state.administration.accessProfiles.push({
+    id: "empty",
+    name: "Empty",
+    allModels: false,
+    generationProfiles: [],
+    features: { cloudModels: false, loras: false, uncensoredModels: false },
+  });
+  const patches: unknown[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PATCH" && request.url().includes("/api/accounts/users/"))
+      patches.push(request.postDataJSON());
+  });
+  await page.goto("/settings#users");
+  const member = page.getByRole("row", { name: "member@example.test", exact: true });
+  const menu = (item: string) =>
+    member
+      .getByRole("button", { name: "Actions for member@example.test", exact: true })
+      .click()
+      .then(() => page.getByRole("menuitem", { name: item, exact: true }).click());
+  // Administrators can't change or delete their own account here.
+  await expect(
+    page
+      .getByRole("row", { name: "admin@example.test", exact: true })
+      .getByRole("button", { name: "Actions for admin@example.test", exact: true }),
+  ).toHaveCount(0);
+
+  await menu("Make Administrator");
+  await page
+    .getByRole("dialog", { name: "Make Administrator", exact: true })
+    .getByRole("button", { name: "Make Administrator", exact: true })
+    .click();
+  await expect(member.getByText("Administrator", { exact: true })).toBeVisible();
+
+  await menu("Reset Password");
+  const reset = page.getByRole("dialog", { name: "Reset Password", exact: true });
+  await reset.getByLabel("New Password").fill("a new member password");
+  await reset.getByRole("button", { name: "Reset Password", exact: true }).click();
+  await expect(reset).toBeHidden();
+
+  await menu("Delete Account");
+  const confirm = page.getByRole("dialog", { name: "Delete Account", exact: true });
+  await expect(confirm).toContainText("stay on disk");
+  await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(member).toHaveCount(0);
+  expect(patches).toEqual([{ role: "administrator" }, { password: "a new member password" }]);
+
+  // Only a group nobody belongs to that isn't the default can go.
+  await section(page, "Settings", "Groups");
+  const actions = (name: string) =>
+    page.getByRole("button", { name: `Actions for ${name}`, exact: true }).click();
+  await actions("Users");
+  await expect(page.getByRole("menuitem", { name: "Delete Group", exact: true })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await actions("Empty");
+  await page.getByRole("menuitem", { name: "Delete Group", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete Group", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page.getByRole("row", { name: "Empty", exact: true })).toHaveCount(0);
+  expect(state.administration.accessProfiles.map((group) => group.id)).toEqual(["users"]);
+});
+
+test("A member turns the Cloud and Uncensored Models its group grants off for itself", async ({
+  page,
+}) => {
+  const state = await fixtures(page);
+  await signIn(page, {
+    id: "member",
+    role: "user",
+    features: { cloudModels: true, uncensoredModels: true },
+  });
+  state.preferences.grants = { cloudModels: true, uncensoredModels: false };
+  await page.goto("/settings#preferences");
+  const models = page.getByRole("region", { name: "Models", exact: true });
+  // Only what the group grants can be turned off.
+  await expect(models.getByRole("switch")).toHaveCount(1);
+  const cloud = models.getByRole("switch", { name: "Cloud Models", exact: true });
+  await expect(cloud).toBeChecked();
+  await cloud.click({ force: true });
+  await expect(cloud).not.toBeChecked();
+  await expect.poll(() => state.preferences.preferences.cloudModels).toBe(false);
+  await page.reload();
+  await expect(cloud).not.toBeChecked();
 });
 
 test("Account menu names the account by its email and opens the account workspace", async ({

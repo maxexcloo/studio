@@ -172,6 +172,8 @@ export interface Account {
   accessProfile?: { name: string } | null;
   disabled?: boolean;
   signInLinked?: boolean;
+  /** An administrator may set a new password: the account signs in with one. */
+  passwordSignIn?: boolean;
   provider?: string;
   canChangeEmail?: boolean;
   canChangePassword?: boolean;
