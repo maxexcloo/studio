@@ -17,12 +17,12 @@ Studio never reads ComfyUI's folders: outputs come into [Studio media storage](#
 Studio runs on zero, one or many ComfyUI workers. Each has a stable id, a name,
 an address and what it can do:
 
-| Capability | Runs                                                                                               |
-| ---------- | -------------------------------------------------------------------------------------------------- |
-| `image`    | Image generation, and provider-backed cloud runs (Grok), which go through a worker's provider node |
-| `video`    | Local video generation                                                                             |
-| `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too  |
-| `models`   | Holds the model library and receives model and LoRA downloads                                      |
+| Capability | Runs                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `image`    | Image generation                                                                                  |
+| `video`    | Local video generation                                                                            |
+| `upscale`  | Upscaling finished images and videos; Smart upscale inside a run needs it on the image worker too |
+| `models`   | Holds the model library and receives model and LoRA downloads                                     |
 
 The deployment defines the workers; Studio does not edit them:
 
