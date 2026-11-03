@@ -26,6 +26,7 @@ import {
   Trash2,
   Trophy,
   Wand,
+  WandSparkles,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -54,8 +55,10 @@ export const icons = {
   moreLikeThis: Wand,
   /** Holding and releasing work: the queue and Dream. */
   pause: CirclePause,
-  /** Prompt and the composer's settings. */
+  /** Editing a prompt and the composer's settings. */
   prompt: SlidersHorizontal,
+  /** Recreate: running an item again from its prompt and settings. */
+  recreate: WandSparkles,
   resume: CirclePlay,
   retry: RotateCw,
   settings: Settings,

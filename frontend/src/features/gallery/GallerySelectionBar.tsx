@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionBar, ActionIcon, Menu, Text, Tooltip } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { LoaderCircle, SquareCheck, TriangleAlert, WandSparkles } from "lucide-react";
+import { LoaderCircle, SquareCheck, TriangleAlert } from "lucide-react";
 import { icons } from "../../ui/icons";
 import { failure } from "../../api";
 import { usePhone } from "../../ui/usePhone";
@@ -129,26 +129,17 @@ export function GallerySelectionBar({
   const single = (id: ItemActionId) =>
     selected.length === 1 ? oneItem.current.find((action) => action.id === id) : undefined;
   const actions = itemActionGroups([
-    single("chat"),
-    // Several uploads share Prompt › Recreate, one run queued for each.
-    selected.length > 1 && uploads.length > 0
-      ? itemAction("prompt", {
-          menu: [
-            [
-              {
-                id: "recreate",
-                label: "Recreate",
-                icon: WandSparkles,
-                disabled: recreate.isPending,
-                loading: recreate.isPending,
-                onClick: () => recreate.mutate(uploads),
-              },
-            ],
-          ],
-        })
-      : single("prompt"),
     single("animate"),
     single("edit"),
+    // Several uploads share Recreate, one run queued for each.
+    selected.length > 1 && uploads.length > 0
+      ? itemAction("recreate", {
+          disabled: recreate.isPending,
+          loading: recreate.isPending,
+          onClick: () => recreate.mutate(uploads),
+        })
+      : single("recreate"),
+    single("chat"),
     (failed.length > 0 || busy === "retry") &&
       itemAction("retry", {
         disabled: pending || !failed.length,

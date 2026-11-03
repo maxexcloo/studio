@@ -364,11 +364,11 @@ primary component reference and verify APIs against the installed version.
   the one review pause before a written prompt runs. Continue in Chat (in the
   field on desktop, under More on phones) starts a Chat about the item (attached
   as its reference, its settings as the input, any change typed as the
-  message). Prompt opens the item in the page's composer. Runs started from the
+  message). Recreate › Edit Prompt opens the item in the page's composer. Runs started from the
   viewer queue as usual into a strip of the item's versions, grouped as the grid
   groups them (`gallery/versions.ts`); choosing one makes it current. Under the
-  field come the labelled primaries Edit, Animate ▾ and Prompt ▾, then the other
-  shared actions as icons with tooltips (Upscale, Copy, Download, Star,
+  field come the labelled primaries Animate ▾, Edit, Recreate ▾ and Upscale ▾,
+  then the other shared actions as icons with tooltips (Copy, Download, Star,
   Delete); Animate opens its LLM prompt menu
   (Cinematic Camera, Living Photo, Action, Spicy for accounts with Uncensored
   Models, Custom Animation, Animate in Composer). Details lists
@@ -381,10 +381,10 @@ primary component reference and verify APIs against the installed version.
   upscale's Output adds the Original Size the model drew beside its
   Dimensions. The
   desktop details sidebar is open by default and its toggle is remembered.
-  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Edit, Animate, Prompt and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
+  Phones show the image full-bleed above the same bar: the field's two-line summary (tapping it opens the full-screen editor, whose send arrow runs or asks) over Animate, Edit, Recreate and More, labelled under their icons with ▾ for their options, More listing every other action. The bar stays in reach while the details sheet is open above it; swipe left/right navigates (phones show no arrow buttons),
   down closes and up reveals details and further options. At Fit the picture
   follows the finger and the next one slides in; videos loop and take the same
-  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
+  swipes. A video tile plays its short preview under the mouse. On desktop one key runs a bar action (E Edit, U Upscale, P Edit Prompt, R Run Again, F Star; listed in Settings › Studio). Navigation (swipe,
   arrows, buttons) stops at the first and last item rather than wrapping.
   Running, failed and cancelled work opens too, in the gallery and in Chat, and
   takes the same swipes: the stage shows its status (streaming the prompt while
@@ -393,7 +393,7 @@ primary component reference and verify APIs against the installed version.
 - Images and Videos offer Grid and Runs views (chosen in Filter ▾). Runs shows each run as a stacked
   card that fans out in place; its images open the viewer hub. Grid shows every
   generation by default (the All Versions filter chip, on). Turning it off
-  collapses a result and its versions (runs made from it: Edit, Prompt, Run Again
+  collapses a result and its versions (runs made from it: Edit, Recreate, Run Again
   and the like, which record it as `parentItemId`) into one tile
   showing the original (its first version), with a version count; crossing it
   with the pointer, or a sideways swipe on phones, flips through them. Sharing a
@@ -414,21 +414,24 @@ primary component reference and verify APIs against the installed version.
   Mask editing uses the installed zoom/pan library with Paint, Erase and Hand;
   zoom and panning preserve mask pixels and undo history.
 - Item actions have one definition (`gallery/MediaActions.tsx`) and one order in
-  every bar and menu (viewer, tile ⋯, right-click and phone More): Edit, Animate,
-  Prompt | Upscale | Copy, Download | Star, Delete. Retry or Stop lead for
-  unfinished work, Continue in Chat follows Prompt, Compare joins Upscale's section
-  in menus (the tile and right-click menu and the selection's More, never the
-  viewer's bar) and Delete is last. Bars are icons with tooltips (their accessible
-  names unchanged) at one size and spacing; only the desktop viewer names Edit,
-  Animate ▾ and Prompt ▾ beside their icons, and only those labelled buttons show
+  every bar and menu (viewer, tile ⋯, right-click and phone More): Animate, Edit,
+  Recreate, Upscale | Compare, Continue in Chat | Copy, Download | Star, Delete.
+  Retry or Stop lead for unfinished work, Compare shows only in menus (the tile
+  and right-click menu and the selection's More, never the viewer's bar) and
+  Delete is last. Bars are icons with tooltips (their accessible
+  names unchanged) at one size and spacing; only the desktop viewer names Animate ▾,
+  Edit, Recreate ▾ and Upscale ▾ beside their icons, and only those labelled buttons show
   ▾. There are no split buttons: a control with options opens its menu on click,
   and its first option is its usual action. Menus share one compact style
   (`ActionMenuItems`): one width, row height and icon size, short labels,
   dividers only between real groups and no explanatory notes, only the reason when
   nothing can run. Options are submenus on desktop and expand in place on phones,
-  never as a second floating layer. The options: Prompt (opens the composer) ›
-  Edit, Use as Reference (images), Recreate (an upload with a suggested prompt;
-  the run is its version; several selected uploads queue one run each), Run Again (new seed), Run Again (Same Seed); Edit opens
+  never as a second floating layer, and an action left with one option runs it
+  without a submenu. The options: Recreate (reusing the item's prompt and
+  settings) › Edit Prompt (opens the composer), Use as Reference (images), Run
+  Again (new seed), Run Again (Same Seed), and for an upload only Edit Prompt
+  from its suggested prompt (the run is its version; several selected uploads
+  queue one run each) and Use as Reference; Edit opens
   the image for editing in the composer; a video's Edit › Trim…, Reverse, Back and
   Forth, Slow Motion, Smooth Motion (each saved by ffmpeg as a new version, the
   original kept); Animate › Fast or Quality as a small segmented control at the

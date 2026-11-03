@@ -68,9 +68,9 @@ test("A video uploads as a reference, and Recreate runs an upload's suggested pr
   await page.getByRole("button", { name: "Uploads", exact: true }).click();
   await page.keyboard.press("Escape");
   await page.locator('[data-media-id="clip"]').click();
-  await viewerAction(page, "Prompt");
-  await page.getByRole("menuitem", { name: "Recreate", exact: true }).click();
-  expect(recreated).toEqual([{ galleryItemId: "clip" }]);
+  // An upload video's Recreate has the one option, its suggested prompt, so it runs at once.
+  await viewerAction(page, "Recreate");
+  await expect.poll(() => recreated).toEqual([{ galleryItemId: "clip" }]);
   const prompt = page.getByRole("textbox", { name: "Prompt", exact: true });
   await expect(prompt).toHaveValue("A lighthouse at dusk, waves breaking");
   // This video model starts from a picture: the clip's first frame.
