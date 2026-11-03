@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
  * The viewer's Animate menu: the prompt assistant writes an image-to-video motion prompt from the
- * source image's prompt and a theme, as the queue item's writing stage (prompt-stage.js), through
- * the same engine (assistant.js) as assistant-routes.js. When the running text model reads images it
- * also sees the frame the clip starts from, so the motion stays consistent with what is visible.
- * Spicy needs Uncensored Models.
+ * source image's prompt and a theme, as the queue item's writing stage (prompt-stage.js) or for
+ * Review Prompt First (assistant-routes.js), through the same engine (assistant.js). When the
+ * running text model reads images it also sees the frame the clip starts from, so the motion stays
+ * consistent with what is visible. Spicy needs Uncensored Models.
  *
  *   input.writing = { kind: "animate", theme, instruction?, source, extend? }
  *

@@ -3,7 +3,8 @@ import { ActionIcon, Group, Menu, Tooltip } from "@mantine/core";
 import { Download, Ellipsis, Star } from "lucide-react";
 import type { MediaItem } from "../../types";
 import { DeleteMediaDialog } from "./DeleteMediaDialog";
-import { CustomAnimationDialog, MediaActionMenu } from "./MediaActions";
+import { AnimateDialog, MediaActionMenu } from "./MediaActions";
+import type { AnimateTheme } from "./useMediaAction";
 import { useMediaTransfer } from "./mediaShare";
 import { useMediaFavorite } from "./useMediaFavorite";
 import { mediaTitle } from "./mediaLabels";
@@ -27,7 +28,7 @@ export function MediaTileActions({
 }) {
   const [deleting, setDeleting] = useState(false);
   const [upscaling, setUpscaling] = useState(false);
-  const [animating, setAnimating] = useState(false);
+  const [animating, setAnimating] = useState<AnimateTheme | null>(null);
   const [trimming, setTrimming] = useState(false);
   const favorite = useMediaFavorite(item);
   const transfer = useMediaTransfer(item, opened);
@@ -88,7 +89,7 @@ export function MediaTileActions({
                 sessionId={sessionId}
                 omit={omit}
                 onApplied={() => onOpenedChange(false)}
-                onCustomAnimation={() => setAnimating(true)}
+                onAnimate={setAnimating}
                 onDelete={() => setDeleting(true)}
                 onTrim={() => setTrimming(true)}
                 onUpscale={() => setUpscaling(true)}
@@ -104,11 +105,11 @@ export function MediaTileActions({
         onDeleted={() => {}}
       />
       {animating && (
-        <CustomAnimationDialog
+        <AnimateDialog
           item={item}
           sessionId={sessionId}
-          opened
-          onClose={() => setAnimating(false)}
+          theme={animating}
+          onClose={() => setAnimating(null)}
         />
       )}
       {item.status === "done" && (
