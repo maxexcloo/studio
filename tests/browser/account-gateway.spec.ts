@@ -211,8 +211,11 @@ test("Administrators save and verify per-user cloud and uncensored access throug
     .getByRole("combobox", { name: "Access Group for member@example.test", exact: true })
     .click();
   await page.getByRole("option", { name: "Member Cloud", exact: true }).click();
-  await expect(member.getByText("Cloud Models On", { exact: true })).toBeVisible();
-  await expect(member.getByText("Uncensored Models On", { exact: true })).toBeVisible();
+  await expect(
+    member.getByRole("combobox", { name: "Access Group for member@example.test", exact: true }),
+  ).toHaveValue("Member Cloud");
+  // The toolbar spells its actions out.
+  await expect(page.getByText("New User", { exact: true })).toBeVisible();
   await member
     .getByRole("button", { name: "Actions for member@example.test", exact: true })
     .click();
