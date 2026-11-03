@@ -72,7 +72,7 @@ primary component reference and verify APIs against the installed version.
   summary at the bottom, which administrators tap to open Settings › Workers:
   on desktop a dropdown under the icon, which keeps its queue icon in Chat too
   (the sidebar lists the Chats); on phones a slideout, listing the Chats in Chat.
-  Endpoint selection and full runtime controls live in Settings › Workers, not
+  Full runtime controls live in Settings › Workers, not
   in the header. Readiness comes from actual text/media endpoints, with unknown
   placement shown honestly. The phone overflow orders Library, Settings,
   Theme, a divider, the account name, Account and supported Sign Out. Desktop
