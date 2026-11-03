@@ -1,5 +1,5 @@
 import type { QueueMedia } from "../../shared/queue.ts";
-import type { JobObservation, QueueAdapter } from "./queue.ts";
+import { unreachableCancelReason, type JobObservation, type QueueAdapter } from "./queue.ts";
 import type { OwnedJob } from "./store.ts";
 
 type RecordValue = Record<string, any>;
@@ -107,8 +107,11 @@ export function createGenerationQueueAdapter(options: GenerationAdapterOptions):
       const live = current(job);
       if (live && !live.terminalAt) options.jobs.set(job.id, { ...live, status: "canceling" });
       const promptId = live?.promptId || job.providerJobId;
-      if (promptId)
-        await options.cancelPrompt({ promptId, backend: live?.comfyBackend || job.backend });
+      const stopped = promptId
+        ? await options.cancelPrompt({ promptId, backend: live?.comfyBackend || job.backend })
+        : "";
+      if (stopped === "unreachable")
+        return { status: "cancelled", reason: unreachableCancelReason };
       // An unknown provider outcome stays recorded until recovery confirms cancellation.
     },
     async saveOutputs(job) {

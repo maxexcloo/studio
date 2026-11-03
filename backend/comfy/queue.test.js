@@ -257,3 +257,10 @@ test("a worker that stays busy and silent past the busy limit is still given up"
     (error) => error.lostConnection === true,
   );
 });
+
+test("a worker that refuses the connection has nothing to stop", async () => {
+  const request = async () => {
+    throw refused();
+  };
+  assert.equal(await cancelPrompt("p1", request), "unreachable");
+});
