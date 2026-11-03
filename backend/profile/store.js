@@ -16,10 +16,9 @@
  * Guides live in `<data>/guides/prompting.json`: the prompting.json schema (families, packs,
  * profiles, variants, negatives) plus `meta.<packId>`. Pack versions go under
  * `<data>/history/guides/<packId>/<n>.json`; the profile bindings (`profiles`, `variants`,
- * `negatives`) are versioned together as `_bindings`, an id no pack can have. The deployment's
- * STUDIO_MCP_PROMPTING_PATH is seed input only: it fills a new install and adds packs and bindings Studio doesn't have, and never
- * replaces one Studio holds. Studio is the only writer of live profiles and guides; the profiles
- * repository (`ai/profiles/`) is their seed and backup, fed by Settings › Profiles › Export.
+ * `negatives`) are versioned together as `_bindings`, an id no pack can have. The store is the only
+ * source of guides. Studio is the only writer of live profiles and guides; the profiles
+ * repository (`ai/profiles/`) is their backup, fed by Settings › Profiles › Export.
  *
  * Origins: "seed" (a sample profile or an older seed), "studio" (an administrator in Studio), "ai"
  * (assistant drafts) and "chat" (MCP admin tools). An AI-drafted save sets aiDrafted; an
@@ -366,7 +365,6 @@ export function createProfileStore({
 
 /* ------------------------------------------------------------ Guides */
 
-const sections = ["reviewed_on", "families", "profiles", "variants", "negatives"];
 const bindingSections = ["profiles", "variants", "negatives"];
 const bindingsId = "_bindings";
 const versionedId = (id) => id === bindingsId || validPackId(id);
@@ -381,29 +379,12 @@ function cleanPack(pack) {
   return structuredClone(pack);
 }
 
-/** The guides' seed, STUDIO_MCP_PROMPTING_PATH, or "". */
-export const guideSeedFile = (environment = process.env) =>
-  environment.STUDIO_MCP_PROMPTING_PATH || "";
-
-export function createGuideStore({
-  dataDir = currentDataDir(),
-  seedFile = guideSeedFile(),
-  log = console,
-} = {}) {
+export function createGuideStore({ dataDir = currentDataDir() } = {}) {
   const file = path.join(dataDir, "guides", "prompting.json");
   const historyDir = (packId) => path.join(dataDir, "history", "guides", packId);
   const read = () => {
     try {
       const value = readJsonFile(file);
-      return isObject(value) ? value : null;
-    } catch {
-      return null;
-    }
-  };
-  const readSeed = () => {
-    if (!seedFile) return null;
-    try {
-      const value = JSON.parse(fs.readFileSync(seedFile, "utf8"));
       return isObject(value) ? value : null;
     } catch {
       return null;
@@ -459,73 +440,6 @@ export function createGuideStore({
       seedHash: origin === "seed" ? hash : current.seedHash || "",
       exportedHash: current.exportedHash || "",
     };
-  }
-
-  /**
-   * The boot migration, safe on every start, seed-only: the first time it copies the seed into the
-   * store (each pack version 1, origin seed); later it adds only packs and bindings the store
-   * doesn't have yet. A pack or binding Studio holds is never replaced, whoever last changed it.
-   * The seed file is never written.
-   */
-  function migrate() {
-    const seed = readSeed();
-    const existing = read();
-    if (!seed && !existing) return { packs: 0, versions: 0 };
-    const store = existing
-      ? { ...existing, meta: isObject(existing.meta) ? { ...existing.meta } : {} }
-      : { packs: {}, meta: {} };
-    store.packs = isObject(store.packs) ? { ...store.packs } : {};
-    let added = 0;
-    let bindings = false;
-    // A profile replaced by another (Combine Backends) keeps no binding, so the seed can't restore
-    // the ones migrate-runtime removed (combined-profiles.js).
-    let replaced = {};
-    try {
-      replaced = readJsonFile(path.join(dataDir, "workflows", ".studio-aliases.json")) || {};
-    } catch {
-      /* none */
-    }
-    const current = (name) =>
-      !(name.startsWith("custom:") && Object.hasOwn(replaced, name.slice(7)));
-    if (seed) {
-      for (const key of sections) {
-        if (seed[key] === undefined) continue;
-        if (store[key] === undefined) {
-          store[key] =
-            bindingSections.includes(key) && isObject(seed[key])
-              ? Object.fromEntries(
-                  Object.entries(structuredClone(seed[key])).filter(([name]) => current(name)),
-                )
-              : structuredClone(seed[key]);
-          bindings = true;
-          continue;
-        }
-        if (!isObject(seed[key]) || !isObject(store[key])) continue;
-        const missing = Object.keys(seed[key]).filter(
-          (name) =>
-            !Object.hasOwn(store[key], name) && (!bindingSections.includes(key) || current(name)),
-        );
-        if (!missing.length) continue;
-        store[key] = {
-          ...store[key],
-          ...Object.fromEntries(missing.map((name) => [name, structuredClone(seed[key][name])])),
-        };
-        bindings = true;
-      }
-      for (const [packId, pack] of Object.entries(isObject(seed.packs) ? seed.packs : {})) {
-        if (!validPackId(packId) || !isObject(pack) || store.packs[packId]) continue;
-        store.packs[packId] = structuredClone(pack);
-        addVersion(store, packId, store.packs[packId], { by: "seed", origin: "seed" });
-        added += 1;
-      }
-    }
-    if (added || bindings || !existing) {
-      writeStore(store);
-      log.info?.(
-        `[guides] ${existing ? "Added" : "Copied"} ${added} prompting guide pack${added === 1 ? "" : "s"} ${existing ? "missing from guides/prompting.json" : "into guides/prompting.json"} from the seed; packs Studio holds stay as they are.`,
-      );
-    }
-    return { packs: Object.keys(store.packs).length, versions: added };
   }
 
   /** One pack with its meta and hash, for an edit's base. */
@@ -714,7 +628,7 @@ export function createGuideStore({
    * profile's own binding, else its family's pack for its kind. Null without one.
    */
   function resolve(profile = {}) {
-    const store = read() || readSeed() || {};
+    const store = read() || {};
     const binding = isObject(store.profiles?.[profile.id]) ? store.profiles[profile.id] : null;
     const packId = binding?.pack ?? store.families?.[profile.family]?.[profile.kind];
     if (!packId || !store.packs?.[packId]) return null;
@@ -754,13 +668,11 @@ export function createGuideStore({
     if (changed) writeJsonFile(file, store);
   }
 
-  /** The configuration file the guide loader reads: the store once it exists, else the seed. */
-  const configFile = () =>
-    fs.existsSync(file) ? file : seedFile && fs.existsSync(seedFile) ? seedFile : "";
+  /** The configuration file the guide loader reads: the store once it exists, else none. */
+  const configFile = () => (fs.existsSync(file) ? file : "");
 
   return {
     file,
-    migrate,
     pack,
     save,
     versions,
@@ -780,16 +692,11 @@ export function createGuideStore({
 }
 
 /**
- * The guide resolver (loadMcpPrompting) over the guide store, falling back to the seed file, and
- * reloaded whenever the store changes, so a saved guide applies without a restart. A store that
- * fails to load keeps the last good guides.
+ * The guide resolver (loadMcpPrompting) over the guide store, reloaded whenever the store changes,
+ * so a saved guide applies without a restart. A store that fails to load keeps the last good guides.
  */
-export function livePrompting({
-  dataDir = currentDataDir(),
-  seedFile = guideSeedFile(),
-  log = console,
-} = {}) {
-  const store = createGuideStore({ dataDir, seedFile, log });
+export function livePrompting({ dataDir = currentDataDir(), log = console } = {}) {
+  const store = createGuideStore({ dataDir });
   let loaded = null;
   let signature = null;
   const current = () => {

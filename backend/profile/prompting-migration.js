@@ -46,7 +46,7 @@ export function profilePrompting(dataDir, { apply = false } = {}) {
   const quiet = { info() {}, warn() {} };
   const workflowsDir = path.join(dataDir, "workflows");
   const result = { applied: false, backup: "", profiles: {} };
-  const configFile = createGuideStore({ dataDir, log: quiet }).configFile();
+  const configFile = createGuideStore({ dataDir }).configFile();
   if (!configFile) return result;
   const guideOf = loadMcpPrompting(configFile);
   const changed = [];

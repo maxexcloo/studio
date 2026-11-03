@@ -1619,10 +1619,11 @@ test("invalid uploads and unsupported waits are refused without accessing anothe
   assert.equal(f.requests.length, before);
 });
 
-test("deployment prompting packs retain compact discovery, profile modes and reviewed variants", async (t) => {
+test("guide packs retain compact discovery, profile modes and reviewed variants", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-native-mcp-prompting-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const file = path.join(dir, "prompting.json");
+  const file = path.join(dir, "guides", "prompting.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
     JSON.stringify({
@@ -1645,7 +1646,7 @@ test("deployment prompting packs retain compact discovery, profile modes and rev
       variants: { quick: { rules: ["Keep the request concise"] } },
     }),
   );
-  const f = await fixture(t, { dataDir: dir, environment: { STUDIO_MCP_PROMPTING_PATH: file } });
+  const f = await fixture(t, { dataDir: dir });
   const client = await f.client();
   // Guides stay in the detail; the compact list carries only each profile's id and label.
   assert.deepEqual(data(await call(client, "Models", { kind: "image" })), {
@@ -2118,7 +2119,8 @@ test("Models consumes self-contained profile guidance without a runtime promptin
 test("profile-owned prompting overrides a stale compatibility inventory", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "studio-native-mcp-owned-guide-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const file = path.join(dir, "fallback.json");
+  const file = path.join(dir, "guides", "prompting.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
     JSON.stringify({
@@ -2126,7 +2128,7 @@ test("profile-owned prompting overrides a stale compatibility inventory", async 
       packs: { "stale-pack": { summary: "Stale fallback guidance", rules: ["Old guidance"] } },
     }),
   );
-  const f = await fixture(t, { dataDir: dir, environment: { STUDIO_MCP_PROMPTING_PATH: file } });
+  const f = await fixture(t, { dataDir: dir });
   const owned = {
     id: "profile-guide",
     summary: "Reviewed profile guidance",

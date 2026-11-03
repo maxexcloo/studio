@@ -361,13 +361,12 @@ async function resolveSignedMcpResult(owner, jobId, index) {
     return null;
   }
 }
-// Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue,
-// guide and profile stores take in what the older files hold, which stay where they are
-// (profile/seed.js, library/catalogue.js, profile/store.js). Before MCP reads guides.
+// Once per start and safe to repeat: the samples seed an empty data folder, then the catalogue
+// and profile stores take in what the older files hold, which stay where they are
+// (profile/seed.js, library/catalogue.js, profile/store.js).
 for (const [name, migrate] of [
   ["seed", () => seedSamples({ dataDir, workflowsDir: userWorkflowsDir, store: profileStore() })],
   ["catalogue", () => loraCatalogue().migrate()],
-  ["guides", () => guideStore().migrate()],
   ["profiles", () => profileStore().migrate()],
 ]) {
   try {

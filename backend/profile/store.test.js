@@ -173,11 +173,11 @@ test("saving through the editor records versions, marks AI drafts until an edit 
   assert.throws(() => editor.revertEditableProfile("image-test", 9), /version was not found/);
 });
 
-const seedGuides = (summary = "Seed summary.") => ({
+const startingGuides = () => ({
   reviewed_on: "2026-10-01",
   families: { krea2: { image: "krea2" } },
   packs: {
-    krea2: { name: "Krea 2", summary, rules: ["R"] },
+    krea2: { name: "Krea 2", summary: "Krea summary.", rules: ["R"] },
     other: { name: "Other", summary: "Other summary." },
   },
   profiles: { "custom:fixture": { pack: "other" } },
@@ -185,24 +185,15 @@ const seedGuides = (summary = "Seed summary.") => ({
   negatives: { "custom:fixture": { effect: "none", notes: "No negative." } },
 });
 
-test("guides copy from the seed once, then take only packs and bindings they lack: nothing Studio holds is replaced", (t) => {
-  const dir = scratch(t);
-  const seedFile = path.join(dir, "config", "prompting.json");
-  fs.mkdirSync(path.dirname(seedFile), { recursive: true });
-  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
-  assert.deepEqual(store.migrate(), { packs: 2, versions: 2 });
-  assert.deepEqual(store.read().meta.krea2, {
-    version: 1,
-    origin: "seed",
-    aiDrafted: false,
-    editedAt: store.read().meta.krea2.editedAt,
-    by: "seed",
-    seedHash: hashOf(seedGuides().packs.krea2),
-    exportedHash: "",
-  });
-  assert.deepEqual(store.migrate(), { packs: 2, versions: 0 }, "idempotent");
-  // Studio edits one pack; a stale base is refused.
+/** The guide store of a data folder whose guides/prompting.json holds `guides`. */
+function guidesIn(dir, guides = startingGuides()) {
+  fs.mkdirSync(path.join(dir, "guides"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "guides", "prompting.json"), JSON.stringify(guides));
+  return createGuideStore({ dataDir: dir });
+}
+
+test("guide packs save as versions: a stale edit is refused, an AI draft waits for approval and revert adds a version", (t) => {
+  const store = guidesIn(scratch(t));
   const { hash } = store.pack("other");
   assert.throws(
     () => store.save("other", { summary: "x" }, { baseHash: "stale" }),
@@ -213,31 +204,10 @@ test("guides copy from the seed once, then take only packs and bindings they lac
     { name: "Other", summary: "Studio summary." },
     { by: "admin-1", baseHash: hash },
   );
-  // The seed changes both packs and adds one pack and one binding: only the new ones arrive.
-  const next = seedGuides("Seed summary v2.");
-  next.packs.other = { summary: "Seed other v2." };
-  next.packs.added = { name: "Added", summary: "New in the seed." };
-  next.families.added = { image: "added" };
-  next.families.krea2 = { image: "other" };
-  fs.writeFileSync(seedFile, JSON.stringify(next));
-  const seedText = fs.readFileSync(seedFile, "utf8");
-  assert.deepEqual(store.migrate(), { packs: 3, versions: 1 });
   assert.deepEqual(
-    [
-      store.pack("krea2").pack.summary,
-      store.pack("krea2").meta.version,
-      store.pack("other").pack.summary,
-      store.pack("added").meta.origin,
-    ],
-    ["Seed summary.", 1, "Studio summary.", "seed"],
+    [store.pack("other").meta.version, store.pack("other").meta.origin, store.pack("krea2").meta],
+    [1, "studio", null],
   );
-  assert.deepEqual(
-    [store.read().families.krea2, store.read().families.added],
-    [{ image: "krea2" }, { image: "added" }],
-    "an existing binding stays; a new one is added",
-  );
-  assert.equal(fs.readFileSync(seedFile, "utf8"), seedText, "the seed file is only read");
-  // An AI draft is marked until approved; revert restores an earlier version as a new one.
   store.save(
     "other",
     { summary: "AI summary." },
@@ -248,37 +218,14 @@ test("guides copy from the seed once, then take only packs and bindings they lac
   store.revert("other", 1, { by: "admin-1" });
   assert.deepEqual(
     [store.pack("other").pack.summary, store.versions("other").map((item) => item.version)],
-    ["Other summary.", [4, 3, 2, 1]],
+    ["Studio summary.", [3, 2, 1]],
   );
   assert.throws(() => store.save("broken", "text"), /JSON object/);
 });
 
-test("the seed never restores a binding of a profile that Combine Backends replaced", (t) => {
-  const dir = scratch(t);
-  const seedFile = path.join(dir, "prompting.json");
-  const seed = seedGuides();
-  seed.profiles["custom:fixture-comfyui"] = { pack: "krea2" };
-  seed.negatives["custom:fixture-comfyui"] = { effect: "none" };
-  fs.writeFileSync(seedFile, JSON.stringify(seed));
-  fs.mkdirSync(path.join(dir, "workflows"), { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, "workflows", ".studio-aliases.json"),
-    JSON.stringify({ "fixture-comfyui": { to: "fixture", backend: "comfyui" } }),
-  );
-  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
-  // On the first copy and on every later start, the replaced profile's bindings stay out.
-  store.migrate();
-  store.migrate();
-  assert.deepEqual(Object.keys(store.read().profiles), ["custom:fixture"]);
-  assert.deepEqual(Object.keys(store.read().negatives), ["custom:fixture"]);
-});
-
 test("a guide resolves per profile, binds to a drafted profile and records its export", (t) => {
   const dir = scratch(t);
-  const seedFile = path.join(dir, "prompting.json");
-  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
-  store.migrate();
+  const store = guidesIn(dir);
   assert.deepEqual(store.resolve({ id: "custom:fixture", family: "krea2", kind: "image" }), {
     packId: "other",
     source: "profile",
@@ -302,16 +249,12 @@ test("a guide resolves per profile, binds to a drafted profile and records its e
   store.markExported({ drafted: store.pack("drafted").hash });
   assert.equal(store.pack("drafted").meta.exportedHash, store.pack("drafted").hash);
   // The live loader follows the binding without a restart.
-  const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet });
+  const prompting = livePrompting({ dataDir: dir, log: quiet });
   assert.equal(prompting({ id: "custom:new", family: "krea2", kind: "image" }).summary, "Drafted.");
 });
 
 test("guide bindings are edited, removed, reverted and approved as versions, and a stale edit is refused", (t) => {
-  const dir = scratch(t);
-  const seedFile = path.join(dir, "prompting.json");
-  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
-  store.migrate();
+  const store = guidesIn(scratch(t));
   const first = store.bindings();
   assert.deepEqual(first.bindings.profiles, { "custom:fixture": { pack: "other" } });
   const edited = store.saveBindings(
@@ -356,24 +299,22 @@ test("guide bindings are edited, removed, reverted and approved as versions, and
   assert.deepEqual(Object.keys(store.read().packs).sort(), ["krea2", "other"]);
 });
 
-test("the guide loader reads the store first, falls back to the seed, reloads on change and fills negatives", (t) => {
+test("the guide loader reads the store, reloads on change and fills negatives", (t) => {
   const dir = scratch(t);
-  const seedFile = path.join(dir, "prompting.json");
-  fs.writeFileSync(seedFile, JSON.stringify(seedGuides()));
-  const prompting = livePrompting({ dataDir: dir, seedFile, log: quiet });
+  const prompting = livePrompting({ dataDir: dir, log: quiet });
   const fixture = { id: "custom:fixture", family: "krea2", kind: "image" };
-  assert.equal(prompting(fixture).summary, "Other summary.", "the seed while there is no store");
+  assert.equal(prompting(fixture), null, "no guides before the store exists");
+  const store = guidesIn(dir);
+  assert.equal(prompting(fixture).summary, "Other summary.");
   assert.deepEqual(prompting(fixture).negative, { effect: "none", notes: "No negative." });
-  assert.deepEqual(prompting(fixture), loadMcpPrompting(seedFile)(fixture));
-  const store = createGuideStore({ dataDir: dir, seedFile, log: quiet });
-  store.migrate();
+  assert.deepEqual(prompting(fixture), loadMcpPrompting(store.file)(fixture));
   store.save("other", { summary: "Edited in Studio." }, { by: "admin-1" });
   assert.equal(
     prompting(fixture).summary,
     "Edited in Studio.",
     "a saved guide applies without a restart",
   );
-  assert.equal(prompting({ id: "x", family: "krea2", kind: "image" }).summary, "Seed summary.");
+  assert.equal(prompting({ id: "x", family: "krea2", kind: "image" }).summary, "Krea summary.");
   // A profile's own fields go over its guide's; the rest still follow the guide.
   const own = prompting({ ...fixture, prompting: { negative: { effect: "optional" } } });
   assert.deepEqual([own.summary, own.negative], ["Edited in Studio.", { effect: "optional" }]);
