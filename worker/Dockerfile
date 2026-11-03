@@ -4,9 +4,6 @@ FROM docker.io/yanwk/comfyui-boot:rocm-20261027
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 \
     PIP_USER=false
-COPY --from=radiance /opt/radiance /opt/radiance
-COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
-COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
 RUN python3 -m pip install --no-cache-dir \
     # renovate: datasource=pypi depName=fsspec
     fsspec==2026.9.0 \
@@ -30,6 +27,10 @@ RUN sed -i 's|http://download.opensuse.org/|https://download.opensuse.org/|g' /e
     && zypper clean --all \
     # renovate: datasource=pypi depName=uv
     && python3 -m pip install --no-cache-dir uv==0.13.6
+# Radiance comes last: a Radiance update then changes only these layers, not the whole image.
+COPY --from=radiance /opt/radiance /opt/radiance
+COPY --from=radiance /lib64/ld-linux-x86-64.so.2 /opt/radiance/runtime/ld-linux-x86-64.so.2
+COPY --from=radiance /usr/lib/x86_64-linux-gnu /opt/radiance/runtime/lib
 COPY LICENSE /opt/studio/LICENSE
 WORKDIR /root/ComfyUI
 EXPOSE 8188
