@@ -27,7 +27,7 @@ import { SectionHeader, SectionToolbar } from "../../ui/SectionToolbar";
 import type { Account } from "../../types";
 import { modelsQuery, useGenerationActions } from "../generation/GenerationProvider";
 import { isCloudProfile } from "../generation/payload";
-import { ChatGatewayAccounts, type GatewayAccounts } from "./ChatGatewayAccounts";
+import { ChatGateway, useGatewayChange, type GatewayAccounts } from "./ChatGatewayAccounts";
 const featureLabels = {
   chat: "Chat",
   cloudModels: "Cloud Models",
@@ -367,9 +367,10 @@ export function GroupsAdmin({ heading }: { heading: ReactNode }) {
   );
 }
 
-/** Settings › Users: accounts, their groups and the new-account policy. */
+/** Settings › Users: accounts, their groups, linked chat identities and the new-account policy. */
 export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const { admin, refresh } = useAdministration();
+  const gatewayChange = useGatewayChange();
   const [query, setQuery] = useState("");
   const [popup, setPopup] = useState<"new" | "policy" | null>(null);
   const change = useMutation({
@@ -385,6 +386,8 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
   const data = admin.data;
   const groupOf = (account: Account) =>
     data.accessProfiles.find((group) => group.id === account.accessProfileId);
+  const identitiesOf = (account: Account) =>
+    (data.gateway?.links || []).filter((link) => link.accountId === account.id);
   return (
     <Stack gap="md">
       <SectionHeader heading={heading}>
@@ -439,6 +442,11 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
                       Single Sign-On
                     </Badge>
                   )}
+                  {identitiesOf(account).length > 0 && (
+                    <Badge miw="max-content" color="gray">
+                      Chat Gateway
+                    </Badge>
+                  )}
                 </Group>
               </>
             ),
@@ -472,17 +480,29 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
           },
         ]}
         rowActions={(account) => (
-          <Menu.Item
-            color={account.disabled ? undefined : "red"}
-            disabled={change.isPending}
-            onClick={() =>
-              change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
-            }
-          >
-            {account.disabled ? "Enable Account" : "Disable Account"}
-          </Menu.Item>
+          <>
+            {identitiesOf(account).map(({ identity }) => (
+              <Menu.Item
+                key={identity}
+                disabled={gatewayChange.isPending}
+                onClick={() => gatewayChange.mutate({ kind: "link", identity })}
+              >
+                Unlink {identity}
+              </Menu.Item>
+            ))}
+            <Menu.Item
+              color={account.disabled ? undefined : "red"}
+              disabled={change.isPending}
+              onClick={() =>
+                change.mutate({ id: account.id, patch: { disabled: !account.disabled } })
+              }
+            >
+              {account.disabled ? "Enable Account" : "Disable Account"}
+            </Menu.Item>
+          </>
         )}
       />
+      <ChatGateway gateway={data.gateway} accounts={data.accounts} change={gatewayChange} />
       <Modal
         opened={popup !== null}
         onClose={() => setPopup(null)}
@@ -510,12 +530,4 @@ export function UsersAdmin({ heading }: { heading: ReactNode }) {
       </Modal>
     </Stack>
   );
-}
-
-/** Settings › Chat Gateway: chat identities linked to accounts. */
-export function ChatGatewayAdmin() {
-  const { admin } = useAdministration();
-  if (admin.isPending) return <LoadingState label="Loading Chat Gateway" />;
-  if (admin.error) return <Alert color="red">{admin.error.message}</Alert>;
-  return <ChatGatewayAccounts gateway={admin.data.gateway} accounts={admin.data.accounts} />;
 }
